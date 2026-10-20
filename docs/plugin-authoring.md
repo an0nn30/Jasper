@@ -62,13 +62,17 @@ warning, and when two plugins ship the same id the development copy wins, then t
 then the lowest plugin id. A kit file's `[defaults]` may name its own plugin's themes.
 
 The bundled Enterprise plugin (`plugins/enterprise`, off by default) is a worked presentation provider: its look is the
-kit file, IBM Plex fonts and theme its descriptor names, and its code only publishes
-`dev.jasper.enterprise.api.Workstation` while the Enterprise look is active. A plugin that composes a classic layout
-declares `requires = [{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]`, compiles against that
-package and checks `context.services().find(Workstation.class)` in `start`, wrapped in
-`try { … } catch (NoClassDefFoundError absent) { … }` with the default layout in the catch, as Remote does for `VaultApi`:
-the package is visible only while Enterprise is loaded. An in-repo plugin names `dev.jasper.enterprise.api` only in its
-own `workstation` package, which `verifyPluginArchitecture` checks.
+kit file, IBM Plex fonts and theme its descriptor names, and its code does nothing. A kit's `[defaults]` may also hold
+one table per plugin, `[defaults."<plugin id>"]`, keyed as that plugin's settings file writes its keys: each value
+becomes the setting's default when the plugin declares it, a saved value still wins, and Reset returns to it. A value
+the setting's kind rejects, or a key the plugin does not declare, is logged and ignored. Enterprise's gives the Editor
+IBM Plex Mono.
+
+Any plugin can ask which look is running: `context.appearance().presentation()` (SDK 0.18.2) says whether it is classic,
+its icon set, how tool windows are reached, the title bar and where the menus are, how the toolbar offers Search
+Everywhere, its UI and data faces, body size and default toolbar height. Branch on it once in `start` (Remote, File
+Server and Vault compose their classic layouts when `classic()` is true), and test both with
+`FakePluginHost.setPresentation(FakePresentations.CLASSIC)`. Declare `sdk = ">=0.18.2, <0.19"`.
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
@@ -668,7 +672,9 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
 
 Kinds are `bool`, `integer`, `number`, `text` (optionally with a rule and message), `choice` and `stringList`. A value
 the kind rejects falls back to the default and is reported against the file with its line; keys nothing declares are
-reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `PluginConfig` and `context.config()`.
+reported as unknown. Declaring after `start` returns throws. Under a look whose kit defaults the key, the default is the
+look's (see above); `FakePluginHost.setKitDefault` and `lookDefaultProblems` test it. SDK 0.9 removed `PluginConfig` and
+`context.config()`.
 
 Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
 heading wherever `section` changes (the page's name heads rows before the first one), the description under each control, and an editor chosen by kind or by
@@ -745,7 +751,7 @@ window under that name, and the modules compile with the rest of the project.
 ```sh
 ./gradlew :jasper-plugin-snippets:build          # compile, test and jar one plugin
 ./gradlew :jasper-plugin-snippets:stagePlugin    # plugins/snippets/build/plugin/dev.jasper.snippets/, a --plugin-dir directory
-./gradlew :jasper-plugin-snippets:pluginZip      # plugins/snippets/build/distributions/dev.jasper.snippets-0.1.0.zip
+./gradlew :jasper-plugin-snippets:pluginZip      # plugins/snippets/build/distributions/dev.jasper.snippets-0.3.0.zip
 ./gradlew pluginZips                             # every plugin, built and zipped, collected in plugins/build/zips/
 ```
 

@@ -237,7 +237,8 @@ track, strong secondary text and the secondary button edge), or the
 `appearance().onChanged(...)` (chrome) or `onWorkspaceChanged(...)` (workspace content, including opacity). Never cache
 a color across a change. A role that carries opacity is painted as given; the kit applies treatments such as focus
 rings and hovers on top. Content in the workspace area of a translucent window paints its background with
-`workspaceOpacity(component)`.
+`workspaceOpacity(component)`. Specialized content that needs the look's faces reads them from
+`appearance().presentation()` (`uiFace`, `dataFace`, `bodySize`; SDK 0.18.2).
 
 ## Testing
 

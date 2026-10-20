@@ -117,7 +117,7 @@ public interface PluginContext {
     StatusBar statusBar();
 
     /**
-     * The application's look, change notifications and theme-aware icons.
+     * The application's colours, variant, presentation and their change notifications.
      *
      * @return the appearance service
      */

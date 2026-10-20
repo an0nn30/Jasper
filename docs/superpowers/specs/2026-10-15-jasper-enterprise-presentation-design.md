@@ -20,6 +20,7 @@ Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (sid
 Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 6.4, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 10.8, 11.5, 14.4, 16.1, 17 and 19.1.
 Amended on 2026-10-19 at the user's direction after trying plan 12 (plan 13): 5.2, 10.7, 16.1 and 19.1 (every labelled stripe button starts with its tool window's icon, IntelliJ's classic tool-window icons under Enterprise, over the mocks' text-only labels).
 Amended on 2026-10-19 at the user's direction (plan 14): 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1, 5.2, 5.3, 5.9, 9.1, 10.1, 10.2, 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1. On macOS and Windows the Enterprise look draws IntelliJ Classic's title bar (`title_bar = "classic"`): on macOS a band in the toolbar's colour under its own traffic lights and title, with the menus in the screen menu bar; on Windows a custom title bar holding the menus and the title. Linux keeps the system title bar and the in-window menu row, and the toolbar is 28 px; these override the mocks' native title bar, in-window menu row and 34 px toolbar.
+Amended on 2026-10-19 at the user's direction (plan 15): 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1, 4.6, 4.7, 5.1, 5.8, 5.9, 8.4, 8.7, 9.1, 14.1 to 14.3, 15, 16.1, 17, 18 and 19.1. Plugins read the active presentation through the SDK (`Appearance.presentation()`, SDK 0.18.2), so any classic look drives Remote's, File Server's and Vault's classic compositions, and the Enterprise API is removed; a kit may default other plugins' settings (`[defaults."<plugin id>"]`), and Enterprise's sets the Editor's font to IBM Plex Mono.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -57,13 +58,13 @@ theme only.
 The user's decisions (2026-10-14 and 2026-10-15):
 
 1. **Kit code lives host-side.** jasper-ui and the app implement each look variant once. The Enterprise plugin ships a
-   declarative kit definition, its theme and its fonts as data, and exports `dev.jasper.enterprise.api`. The plugin
-   presentation gate, the JDK-only SDK and the SDK signature rules are unchanged.
+   declarative kit definition, its theme and its fonts as data. The plugin presentation gate, the JDK-only SDK and the
+   SDK signature rules are unchanged.
 2. **Bundled and off by default.** The user turns Enterprise on in Settings › Plugins; a restart applies it.
 3. **Colours come from the active theme**, and every existing theme must keep working under the Enterprise kit,
    enforced by tests.
-4. **Remote adds the toolbar's session combo and Run button only when Enterprise is enabled**, discovering Enterprise
-   through its exported API (a presence-only `Workstation` service and an optional requirement).
+4. **Remote adds the toolbar's session combo and Run button only when Enterprise is enabled**, reading the active
+   presentation through the SDK (`Appearance.presentation()`; since 2026-10-19, plan 15).
 5. The overall shape and principles (section 3) are approved as presented.
 6. The presentation provider (section 4) is approved as presented.
 7. The kit file and the jasper-ui seam (sections 5 and 6) are approved as presented.
@@ -98,7 +99,7 @@ The user's decisions (2026-10-14 and 2026-10-15):
 19. **The second mock set** (Credential Vault, Dark Mode, App Icon, Boot Splash) was added on 2026-10-15 with the
     instruction to make the kit match the mocks and to decide on the user's behalf. Claude's rulings: Enterprise Dark
     takes the Dark Mode mock (7.6); OVERLAY and ATTACHED_SHEET dialogs are drawn in the window as classic dialogs
-    (10.8), replacing native dialogs; Vault consumes `Workstation` for a classic manager (14.8); the splash and the
+    (10.8), replacing native dialogs; Vault composes a classic manager under a classic look (14.8); the splash and the
     icon belong to the look's `[branding]` (10.11) as plan 11, the splash without motion and with real start-up steps;
     the packaged icon, the product name outside the splash and "Remember in Keychain" stay out of scope (section 18).
 
@@ -265,8 +266,8 @@ Established on 2026-10-15 in the worktree at `3c6e9dcc3`. Do not re-derive; test
    `ui.animations.enabled`, `window.native_decorations` and `window.rail_width`. Where a plugin composes differently,
    every action stays reachable (section 14.7).
 6. **Composition belongs to its owner.** Where a mock changes layout (a tree table instead of rows), the owner branches
-   once at its composition root: plugins on whether `Workstation` is published, app pages on the `Composition` value
-   their factory receives. Renderers never branch on a look.
+   once at its composition root: plugins on whether the SDK's presentation is classic, app pages on the `Composition`
+   value their factory receives. Renderers never branch on a look.
 7. **A small closed schema over a catalog the host owns.** The kit file selects a host catalog and tunes 11 public
    tokens. Unknown keys fail, and an invalid file means the default look.
 8. **No motion under Enterprise, and the header stays flush.** The title, menu bar and toolbar rows are separated by
@@ -283,17 +284,16 @@ The Enterprise plugin's `plugin.toml`:
 ```toml
 id = "dev.jasper.enterprise"
 name = "Enterprise"
-version = "0.2.0"
+version = "0.3.0"
 entry = "dev.jasper.enterprise.EnterprisePlugin"
-sdk = ">=0.18.0, <0.19"
-description = "The Enterprise look: native title bars, menus in the window, labelled tool window stripes, a Run window and classic controls, in the Enterprise theme or any other."
+sdk = ">=0.18.2, <0.19"
+description = "The Enterprise look: an IntelliJ Classic title bar on macOS and Windows, labelled tool window stripes, a Run window and classic controls, in the Enterprise theme or any other."
 vendor = "Jasper"
 icon_hue = "blue"
 icon_selected_ink = "foreground"
 icon = "icons/enterprise.svg"
 enabled_by_default = false
 capabilities = ["presentation.provide"]
-exports = ["dev.jasper.enterprise.api"]
 presentation = "presentation/enterprise.kit.toml"
 themes = ["themes/enterprise.json"]
 ```
@@ -418,9 +418,8 @@ compares (`:446-448`). `state` is `pending`, `proven` or `failed`. The store, `A
   `pending` only when that mark is set. Any other exit, including `System.exit` with a nonzero status
   (`ApplicationBootstrap.java:44`), which also runs the hook (`:66`), leaves `pending`.
 - **`failed`** is written when the kit is blamed at start (4.7) or when the provider fails to load or start (its
-  `PluginStatus` is FAILED). In that last case the current session keeps the classic chrome with no `Workstation`:
-  Remote and File Server compose their default layouts, which is a reachable, tested state. `EnterprisePlugin.start`
-  only publishes `Workstation`, and a test pins that it cannot throw.
+  `PluginStatus` is FAILED). In that last case the current session keeps the classic chrome, and plugins read its
+  classic presentation. `EnterprisePlugin.start` does nothing, and a test pins that it cannot throw.
 - At start, a `pending` or `failed` record whose digest and build match makes the resolver SKIP the provider with
   "did not finish starting with this look last time". `PluginRuntime.start` leaves this SKIPPED status out of the
   plugin problems, so the Warning below is the only notice. Jasper posts one Warning notification, "Jasper started
@@ -442,11 +441,11 @@ With the default kit, steps 2 and 4 do not exist and the behaviour is today's. B
 already committed before AWT (the native title and in-window menus, or the default look's under the classic title on
 macOS and Windows), with the default kit; 9.1 gives the value of every projection field. The
 fallback is handed to every consumer before `startPlugins`, and the provider is marked SKIPPED in the `PluginSelection`
-so no `Workstation` is published. `ThemeController.startup` returns which step succeeded, and `JasperApplication`
-records `failed` through `AttemptStore` (the `appearance` package has no `presentation` edge). The fallback session
-keeps the `ConfigService`'s `DefaultSource` and the plugin theme tier as read at start; the next start, with the
-provider skipped, uses `DefaultSource.CORE`. Strategy construction (`WorkspaceChrome.of` and the others) must be
-infallible and is tested; there is no rollback around it.
+so plugins read the fallback's presentation. `ThemeController.startup` returns which step succeeded, and
+`JasperApplication` records `failed` through `AttemptStore` (the `appearance` package has no `presentation` edge). The
+fallback session keeps the `ConfigService`'s `DefaultSource` and the plugin theme tier as read at start; the next start,
+with the provider skipped, uses `DefaultSource.CORE`. Strategy construction (`WorkspaceChrome.of` and the others) must
+be infallible and is tested; there is no rollback around it.
 
 ### 4.8 Bootstrap: `PluginSelection`
 
@@ -586,11 +585,15 @@ splash_art = "splash/art.svg"
 "palette.visible_rows" = 8
 "window.toolbar_height" = 28
 "window.toolbar" = "icons"
+
+[defaults."dev.jasper.editor"]
+font_family = "IBM Plex Mono"
 ```
 
 Top-level keys: `kit` (required, the integer 1), `base` (required, `"default"` or `"classic"`, the host catalog that
 supplies every private role table and a default for every variant point), and the tables `chrome`, `controls`,
-`metrics`, `type`, `colors`, `branding` and `defaults`, each optional. A key left out takes the base's value.
+`metrics`, `type`, `colors`, `branding` and `defaults`, each optional; `defaults` may also hold one table per plugin
+(5.8). A key left out takes the base's value.
 `base = "classic"` leaves `title_bar` at `native`; the Enterprise kit names `classic`.
 `branding` has no base value: a look without it keeps Jasper's icon and shows no splash (10.11). `icons` names a
 directory holding `icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-64.png`, `icon-128.png`, `icon-256.png` and
@@ -759,6 +762,16 @@ Reset stages `Optional.empty()`, which now means the effective default, and Rese
 it. `config.example.toml` and `docs/configuration.md` say for the five keys: "The default depends on the active look."
 A test starts a fresh home under Enterprise and checks that the first window opens with the kit's defaults.
 
+**Plugin settings** (the user, 2026-10-19; plan 15). A kit may default any plugin's declared settings in a table
+`[defaults."<plugin id>"]`, keyed as that plugin's settings file writes its keys (`sftp.max_parallel_files = 4` nests,
+as in the file). The parser checks only the shape: an id with at least one dot outside the reserved `jasper` namespace,
+setting keys, and string, integer, float, boolean or array values. The plugin's runtime reads each value with the
+setting's own kind when the plugin declares it (`DeclaredSettings`), so the precedence is user-saved, then the kit's,
+then the plugin's own default, and Reset to Default returns to the kit's. A value the kind rejects and a key the plugin
+does not declare are logged once and ignored, and the plugin's own default applies; a table for a plugin that is not
+running is ignored. Enterprise's kit sets the Editor's `font_family` to IBM Plex Mono, its data face. The fallback (4.7)
+keeps them, as it keeps the core defaults.
+
 ### 5.9 Validation and limits
 
 Validation is strict and all-or-nothing. The kit file is at most 64 KiB; fonts are `.ttf` or `.otf`, at most 2 MiB
@@ -768,6 +781,8 @@ each and at most 8 files. A kit is rejected for:
 - a token outside its range, or a `[type].base` (the body size in points) that is not an integer from 10 to 16;
 - `menu_bar = "window"` with `title_bar = "unified"`;
 - a `[defaults]` key outside the allowlist, or a value its setting rejects;
+- a `[defaults]` table not named by a plugin id with a dot, a key in it that is not a setting key, or a value in it that
+  is not a string, number, boolean or array;
 - a `[defaults]` theme id that is neither a built-in id nor a theme file the plugin declares;
 - a path that breaks the path rule, a missing file, or a font file that is not `.ttf` or `.otf`;
 - a `window_title` token other than `{context}`, `{session}` and `{directory}`;
@@ -1109,8 +1124,8 @@ No API shape changes; the javadoc and `docs/plugin-ui.md` say:
 ### 8.4 Not added
 
 No mock needs these: `StatusItem` severity, SDK panel badges, WINDOW or HELP standard menus, `Option.enabled` with a
-reason (TFTP's case becomes a read-only field), `Numeric.unit`, an ORDERED entry slot, Status or Tabs nodes, an active-
-presentation query, `SettingSpec.dependsOn`, `SettingsPanel.valid()`, a radio hint.
+reason (TFTP's case becomes a read-only field), `Numeric.unit`, an ORDERED entry slot, Status or Tabs nodes,
+`SettingSpec.dependsOn`, `SettingsPanel.valid()`, a radio hint.
 
 ### 8.5 Version and manifests
 
@@ -1126,6 +1141,20 @@ An additive release (the user, 2026-10-18): `ToolbarItem.View` admits, besides a
 icon-only GHOST Buttons (a blank label with an icon and a tooltip), drawn flat until hovered with their glyph at rail
 size; and two authored built-in icon names, `run` (IntelliJ's classic Run triangle) and `application` (its
 run-configuration icon), host artwork in both looks. Only Remote's manifest moves to `sdk = ">=0.18.1, <0.19"`.
+
+### 8.7 SDK 0.18.2
+
+An additive release (the user, 2026-10-19; plan 15): `Appearance.presentation()` returns
+`dev.jasper.sdk.ui.Presentation`, a record of the look Jasper runs with: `classic` (the classic base), `icons`
+(`NEW_UI`, `CLASSIC`), `toolWindows` (`RAILS`, `STRIPES`), `titleBar` (`UNIFIED`, `NATIVE`, `CLASSIC`, resolved for the
+platform), `menus` (`SCREEN_MENU_BAR`, `TITLE_BAR`, `WINDOW`), `toolbarSearch` (`FIELD`, `ICON`), the look's `uiFace`
+and `dataFace` (a regular face's name, empty for the platform's), its `bodySize` and its default `toolbarHeight`. It is
+IntelliJ's `ExperimentalUI.isNewUI()` and `JBUI.CurrentTheme` for Jasper: chosen at start, the same for every plugin and
+safe from any thread; values a user setting changes are reported as the look's. The host builds it in
+`dev.jasper.app.plugins.HostedPresentation` from the `PluginLook` projection (9.1), the kit and the look's defaults; the
+testkit's `FakePluginHost.setPresentation` and `FakePresentations` mirror it. Remote, File Server, Vault and Sample
+declare `sdk = ">=0.18.2, <0.19"`, and so does Enterprise: its kit's `[defaults."<plugin id>"]` table (5.8) needs a
+0.18.2 host, and an older one would refuse the kit (5.9).
 
 ## 9. The app: projections and consumers
 
@@ -1149,6 +1178,7 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | `TitleFormat` | the template | workspace: `WindowContent.onTitle` |
 | `DockLayoutKey` | empty for the default look, else the provider id | application → `UiState` (a plain string) |
 | `AppPanels` | `notificationsTitle`, `notificationsSlot` | application: `NotificationsFeature` |
+| `PluginLook` | `classic`, `classicIcons`, `stripes`, `titleBar`, `menus`, `search` | plugins: `HostedPresentation` (the SDK's `Presentation`, 8.7) |
 | `DefaultSource` (in `config`) | the kit's defaults | `ConfigService`, `SettingsDraft` |
 
 `Projections.Host` gives the table the platform (macOS, Windows, or Linux for any other system) and whether the unified
@@ -1157,7 +1187,7 @@ values.
 
 `WorkspaceChrome.of`, `ShellChrome.of` and `PaletteViews.of` are the only classes that read the `WorkspaceLook`,
 `ShellLook` and `PaletteLook` variant enums and pick implementations; `DialogMapping` is read only by
-`AuxiliaryWindows`, `Motion` only by the application's animations supplier, and `Composition` only by the listed roots. Other readers read values (sizes, strings, booleans).
+`AuxiliaryWindows`, `Motion` only by the application's animations supplier, `PluginLook`'s enums only by `HostedPresentation`, and `Composition` only by the listed roots. Other readers read values (sizes, strings, booleans).
 
 Each field comes from the kit file as below, and the last column is `Presentation.fallback` (4.7). The default look's
 values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.1 lists the Settings ones).
@@ -1186,6 +1216,7 @@ values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.
 | `TitleFormat` | `window_title` | `"{context}"` |
 | `DockLayoutKey` | the provider id | empty |
 | `AppPanels` | "Event Log" at BOTTOM_LEFT when `tool_windows = "stripes"` | "Notifications" at RIGHT_TOP |
+| `PluginLook` | `classic` when `base = "classic"`; `classicIcons` and `stripes` with `icons = "classic"` and `tool_windows = "stripes"`; `titleBar` the title as resolved for the platform; `menus` the screen menu bar on macOS while the committed flags keep it, else in the window under a native title and in the title bar otherwise; `search` FIELD | the default look's under the committed flags |
 | `DefaultSource` | `[defaults]` | as read at start (4.7) |
 
 ### 9.2 Package edges
@@ -1587,42 +1618,26 @@ stays green otherwise:
 - `presentation/icons/icon-16.png` to `icon-1024.png` (5.1), copied from the 09 App Icon set (9b, Narrow Square
   Prompt), and `presentation/splash/art.svg`, the 10 Boot Splash mock's art;
 - `themes/enterprise.json` (7.6);
-- `dev.jasper.enterprise.EnterprisePlugin`, whose `start()` only calls
-  `context.services().publish(Workstation.class, new Workstation() { })`;
-- `dev.jasper.enterprise.api.Workstation` and its `package-info`.
+- `dev.jasper.enterprise.EnterprisePlugin`, whose `start()` does nothing.
 
 `stagePlugins` (`jasper-app/build.gradle.kts:41-57`) gains `:jasper-plugin-enterprise` into `dev.jasper.enterprise`, so
 the plugin is bundled.
 
 IBM Plex (OFL-1.1) gets a `licenses/notices.toml` component in the app with the OFL text in app resources, and
 `verifyThirdPartyNotices` also requires every font file in a bundled plugin's resources to be listed in a component's
-new `files` key. The plugin has no requirements and imports no plugin API, and a gate check keeps it so: cycle detection
-counts optional edges.
+new `files` key. The plugin has no requirements.
 
-### 14.2 The API
+### 14.2 The presentation query
 
-```java
-/** Published only while the Enterprise presentation is active; a plugin that finds it composes its classic layout. */
-public interface Workstation { }
-```
-
-Presence only: the equivalent of IntelliJ's optional dependency on `com.intellij.classic.ui`. The toolbar control is
-generic SDK (`ToolbarItem.View`), the menus are standard menus, and anchors and compositions belong to their owners.
+Plugins learn the look from the SDK (8.7), not from a plugin's API: `Appearance.presentation().classic()` is the
+equivalent of IntelliJ's `ExperimentalUI.isNewUI()` being false. The toolbar control is generic SDK
+(`ToolbarItem.View`), the menus are standard menus, and anchors and compositions belong to their owners.
 
 ### 14.3 Consuming it
 
-Remote, File Server and Vault:
-
-- add `{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }` to `requires`;
-- add `compileOnly(project(":jasper-plugin-enterprise"))`;
-- add `dev.jasper.enterprise.api` to their `declaredImports` (`gradle/plugin-architecture.gradle.kts:10`);
-- confine the lookup to `dev.jasper.remote.workstation`, `dev.jasper.fileserver.workstation` and
-  `dev.jasper.vault.workstation`, which turn
-  `services().find(Workstation.class)`, wrapped in `catch (NoClassDefFoundError absent)`, into a plugin-local
-  `Layout.CLASSIC` or `Layout.ROWS`;
-- `verifyPluginArchitecture` gains a check that only those packages reference `dev.jasper.enterprise.api`, and
-  AGENTS.md records it;
-- tests use fakes of `Workstation`.
+Remote, File Server and Vault read `Layout.of(context.appearance().presentation())` once in `start`: `Layout.CLASSIC`
+under a classic look, else `Layout.ROWS`. Each `Layout` lives in the plugin's `workstation` package. Tests set the
+testkit's `FakePresentations.CLASSIC`.
 
 ### 14.4 Remote
 
@@ -1729,7 +1744,7 @@ Keychain" (section 18).
 | `--safe-mode` | Every presentation-declaring plugin is DISABLED with "safe mode uses the standard look" |
 | Matching `pending` or `failed` attempt | SKIPPED with "did not finish starting with this look last time"; one Warning notification with Try Again |
 | The kit fails to install while the theme installs under the default kit | The fallback presentation (4.7); the record says `failed`; the next start uses the default look |
-| The provider fails to load or start | FAILED; the record says `failed`; this session keeps the classic chrome without `Workstation` |
+| The provider fails to load or start | FAILED; the record says `failed`; this session keeps the classic chrome and its presentation |
 | The attempt record unreadable | Treated as absent and logged: a fresh try |
 | The attempt record lock busy or unwritable | Logged; the launch proceeds without a record |
 | A plugin theme file invalid | That theme is skipped and reported, as folder themes are |
@@ -1801,8 +1816,7 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
      `ThemeManager`'s split divider.
    - The package DAGs (`verifyUiArchitecture`: `kit` depends on `metrics` and `theme` only, `metrics` on `theme` only,
      and `swing` gains `kit`;
-     `verifyApplicationArchitecture`: the edges of 9.2), `dev.jasper.app.dock` JDK-only, `KitValuesTest` lossless, the
-     Enterprise confinement check (14.3).
+     `verifyApplicationArchitecture`: the edges of 9.2), `dev.jasper.app.dock` JDK-only, `KitValuesTest` lossless.
 8. **Runtime.**
    - `PresentationSelectionTest`: origin then id; whole-plugin skip; invalid kits skipped; safe mode; the effective
      rule in `admit`; the one selection consumed by start; the one-provider transaction for enabling and consenting; the
@@ -1822,6 +1836,8 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    - `DefaultsPrecedenceTest`: a fresh home under Enterprise opens its first window with the kit's defaults; a saved
      value wins; Reset gives the effective default; picking the core default under the kit stages an explicit value; the
      audit of 5.8.
+   - `DeclaredSettingsTest` and the contract: a kit's plugin default replaces the declared default, a saved value wins,
+     a rejected value or an undeclared key is reported and ignored, and Reset returns to the kit's.
    - Strategy-construction tests: every strategy builds for every projection value without throwing.
 9. **Behavioural contracts** (the testkit fake and the host; a disagreement is a host bug).
    - `KitContractTest` and `HostedKitContractTest` run for both kits: a checkbox click emits `Toggled`, a radio
@@ -1832,8 +1848,8 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    - `PluginContractTest` cases: `ToolbarItem.View` (admission refusals, one view per open window, none for the
      rehearsal, closing with the window and the registration, event routing); SESSION and TRANSFER; Notice; Properties;
      tree columns; cell nodes; heading rows; `empty` and `emptyText`; TABS; read-only fields; Separator placement;
-     SWATCH; EXCLUSIVE with 2 to 4 options; palette `hue`, `itemNoun` and `role` validation; `presentation.provide`;
-     the `declareBundled` one-active rule.
+     SWATCH; EXCLUSIVE with 2 to 4 options; palette `hue`, `itemNoun` and `role` validation; `presentation.provide`; the
+     presentation (8.7); the look's plugin defaults; the `declareBundled` one-active rule.
    - `CompositionParityTest` (14.7).
 10. **Guards.** `ColourLiteralScanTest` with the plugin-theme exemption and its loader test; every plan adds its
     `docs/design/theme-engine/migration.csv` rows (`ThemeMigrationCoverageTest`); `RemovedThemeLayerTest`;
@@ -1854,8 +1870,8 @@ Smallest edits:
 
 - `docs/plugin-ui.md`: delete the checkbox rule at line 57; the re-documented contracts and the new vocabulary of 8.2
   and 8.3; the renames.
-- `docs/plugin-authoring.md`: the `presentation`, `themes` and `enabled_by_default` keys, `presentation.provide`, and
-  consuming `Workstation`.
+- `docs/plugin-authoring.md`: the `presentation`, `themes` and `enabled_by_default` keys, `presentation.provide`, the
+  presentation query and the look's plugin defaults.
 - `docs/plugin-authoring.md`, `jasper-sdk/README.md`, `docs/sdk-icons.md` and `docs/examples/external-plugin`: the
   0.18 SDK range (8.5).
 - `docs/sdk-architecture.md`: one active presentation, safe mode dropping presentations, the opt-in.
@@ -1867,27 +1883,26 @@ Smallest edits:
   meaning of `"system"` and of an unset `ui.font.size`.
 - `docs/command-palette.md`: the Run window.
 - `docs/remote.md`, `docs/file-server.md`, `docs/credential-vault.md`: the menus and status text.
-- `AGENTS.md`: the Enterprise plugin, the `presentation` package and the confinement of `dev.jasper.enterprise.api`.
+- `AGENTS.md`: the Enterprise plugin and the `presentation` package.
 - `docs/STATUS.md`: an entry per plan.
 
 ## 18. Out of scope
 
-Live switching between looks, and mixed or per-window looks; plugin renderers or Swing; an SDK active-presentation query
-or traits; the items of 8.4; per-look theme variants (`targetUi`) and a theme reset on switching; derived roles in the
-SDK's `SemanticColor`; public tokens beyond the 11 metrics and two colour slots; an Enterprise settings page or a look
-picker (turning the plugin on is the choice); `JASPER_PRESENTATION_SKIP`; AOT training of the classic strategies before
-a measurement; a `PaletteResults` total; a Problems panel; Detach; rebinding any shortcut; remembering the master
-password in the Keychain (the Unlock Vault mock's "Remember in Keychain"); the splash steps "Unlocking credential
-vault…" and "Indexing hosts…", which no start-up phase performs; the product name anywhere but the splash; a new
-packaged application icon.
+Live switching between looks, and mixed or per-window looks; plugin renderers or Swing; the items of 8.4; per-look theme
+variants (`targetUi`) and a theme reset on switching; derived roles in the SDK's `SemanticColor`; public tokens beyond
+the 11 metrics and two colour slots; an Enterprise settings page or a look picker (turning the plugin on is the choice);
+`JASPER_PRESENTATION_SKIP`; AOT training of the classic strategies before a measurement; a `PaletteResults` total; a
+Problems panel; Detach; rebinding any shortcut; remembering the master password in the Keychain (the Unlock Vault mock's
+"Remember in Keychain"); the splash steps "Unlocking credential vault…" and "Indexing hosts…", which no start-up phase
+performs; the product name anywhere but the splash; a new packaged application icon.
 
 ## 19. Delivery
 
 ### 19.1 Plans
 
-Fourteen plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans`
-and named `docs/superpowers/plans/YYYY-MM-DD-enterprise-N-<slug>.md` (the date each is written). Each adds its
-`migration.csv` rows. Order: 1 to 14 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
+Fifteen plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans` and
+named `docs/superpowers/plans/YYYY-MM-DD-enterprise-N-<slug>.md` (the date each is written). Each adds its
+`migration.csv` rows. Order: 1 to 15 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
 
 Plan 3 is delivered as five plans (the user, 2026-10-15): 3a `sdk-0-18-renames` (8.1, 8.3, 8.5, the 4.2 constant and
 `KitCompatibility`); 3b `sdk-0-18-controls` (Notice, Properties, `ChoiceKind.TABS`, `Field.readOnly`,
@@ -1904,16 +1919,17 @@ its additions in the default look and adds them to the testkit fake and the cont
 | 2 | `derived-roles` | `DerivedColor`, `DerivedPalette`, override keys and their parse table, the guards, the converter keys and goldens, `PaintedContrastTest` with the degenerate palettes, jasper-ui `testFixtures` and the default-kit matrix in `check`. Zero pixel change |
 | 3 | `sdk-0-18` | SDK 0.18.0: the renames and `KitCompatibility`, every addition of 8.2 with its default rendering (the Notice card, toolbar views in today's header, SESSION and TRANSFER), the re-documentation, the `presentation.provide` constant and its javadoc, the testkit and contracts; every manifest bumped; the bundled scopes' nouns, hues and SPLIT roles (14.6); the default-look changes of section 13 with their reference pairs; THD's rebuild coordinated |
 | 4 | `classic-catalog` | `DesignMetrics.CLASSIC`, `TypeScale.CLASSIC`, `MetricTokens`, the 14 face pairs and `KitFaces.of`, the classic FlatLaf overlay, the Enterprise fixture kit, the full kit matrix with the complement and covering array, the isolation and variant-read tests |
-| 5 | `provider` | The descriptor keys, the effective rule and opt-in, `PluginSelection` and the single selection, selection in `resolve`, safe mode, the attempt record, the fallback chain, reach, the plugin theme tier with reservation, exemption and dormant ids, `KitParser` and validation, `DefaultSource` and the audit, font registration and notices, `presentation.provide` in `DescriptorParser.CAPABILITIES` with its key rule, `DesktopFlags` computed (plan 6 applies them), the Enterprise plugin with its kit, fonts, theme (Light and Dark, 7.6), `dev.jasper.enterprise.api.Workstation` and its publication in `EnterprisePlugin.start`, its `stagePlugins` entry and its `dev.jasper.enterprise` `migration.csv` row, conformance and the shipped-kit render, compared with the Workstation and Dark Mode mocks. Until its plan lands, a chrome value maps to the default projection. Turning Enterprise on gives classic controls, metrics and fonts |
+| 5 | `provider` | The descriptor keys, the effective rule and opt-in, `PluginSelection` and the single selection, selection in `resolve`, safe mode, the attempt record, the fallback chain, reach, the plugin theme tier with reservation, exemption and dormant ids, `KitParser` and validation, `DefaultSource` and the audit, font registration and notices, `presentation.provide` in `DescriptorParser.CAPABILITIES` with its key rule, `DesktopFlags` computed (plan 6 applies them), the Enterprise plugin with its kit, fonts, theme (Light and Dark, 7.6), `EnterprisePlugin`, its `stagePlugins` entry and its `dev.jasper.enterprise` `migration.csv` row, conformance and the shipped-kit render, compared with the Workstation and Dark Mode mocks. Until its plan lands, a chrome value maps to the default projection. Turning Enterprise on gives classic controls, metrics and fonts |
 | 6 | `window-chrome` | `DesktopFlags` applied: native titles and in-window menus; `ClassicMenuBar`, `ClassicHeader` with `window.toolbar` and toolbar views, `TitleFormat`, `RuledCells` and the leading "▶ Run…" item (opening the palette's current view), `ClassicTabs`, `DialogMapping` and the classic in-window dialogs (10.8), NSAppearance and captions, `Motion`, Compact under a native title; the JUnit chrome renders of 16.1.4 |
 | 7 | `dock-chrome` | Labelled stripes and their numbers, the bottom strip and pills, frames and header strips, horizontal drop geometry, the dock layout per look, Event Log; the chrome renders extended |
 | 8 | `run-window` | `PaletteView` and `PaletteHome` pairs, typed headings and Run copy, the modeless window and focus hand-back, the saved place per home kind, Browse…, the fixed list height; the chrome renders extended |
 | 9 | `settings` | `SettingsChrome`, the collapsible navigation, Reset in the context menu, hidden rows, the Appearance, Keymap, Notifications, Plugins and Shell compositions, ⋯ menus, the font row copy; the chrome renders extended |
-| 10 | `plugin-compositions` | `Workstation` consumption; Remote's toolbar view, Sessions tree and Properties, Tunnels table, SFTP row, Transfers panel and anchors; File Server's table, Properties and keys table; Vault's classic manager, editors and Unlock form (14.8); the confinement check; `CompositionParityTest` |
+| 10 | `plugin-compositions` | The classic layout; Remote's toolbar view, Sessions tree and Properties, Tunnels table, SFTP row, Transfers panel and anchors; File Server's table, Properties and keys table; Vault's classic manager, editors and Unlock form (14.8); the confinement check; `CompositionParityTest` |
 | 11 | `branding` | `[branding]` and its validation, the `Branding` projection, the Enterprise icons and splash art, the runtime application icon and `Splash` with its start-up steps (10.11); a render of the splash compared with the Boot Splash frames |
 | 12 | `intellij-classic` | The user's 2026-10-18 direction: IntelliJ's classic icons (vendored, attributed) under `[chrome] icons`, the classic header's icon buttons and `window.toolbar` as a look default, SDK 0.18.1's icon-only GHOST toolbar buttons with `run` and `application`, Remote's run-configuration combo and Run, the Enterprise theme as ports of IntelliJ Light and New UI Dark, a pressed tool window activated, the Run window's upper home |
 | 13 | `stripe-icons` | The user's 2026-10-19 direction: every labelled stripe button starts with its tool window's 13 px icon, upright at the reading start, IntelliJ's classic tool-window icons (vendored, attributed) under `[chrome] icons = "classic"`, the label's monochrome glyph for any other name, drag and the ghost keeping it |
 | 14 | `title-bar` | The user's 2026-10-19 direction: IntelliJ Classic's title bar on macOS (the toolbar-coloured band under the system's lights and title, the screen menu bar, full screen and double-click) and Windows (the custom title bar holding the menus and the left-aligned title, dimmed while inactive, over its rule, folding when narrow), Linux unchanged, classic dialogs below the title, the 28 px toolbar |
+| 15 | `look-query` | The user's 2026-10-19 direction, in two plans: 15a `look-query` (SDK 0.18.2's `Appearance.presentation()` and `PluginLook`, the Enterprise API removed, kit defaults for plugin settings, Enterprise 0.3.0 with the Editor in IBM Plex Mono, the consumers' and Sample's versions); 15b `look-polish` (activation by a panel's own toggle action, classic icons in tool-window headers and toolbar views, the toolbar search icon, the identity guard) |
 
 ### 19.2 Amendments
 

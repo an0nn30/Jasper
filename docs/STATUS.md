@@ -1,5 +1,84 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 15a: the look query at the user's direction — 2026-10-19** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, from `main` at `f78bb0385`; [plan](superpowers/plans/2026-10-19-enterprise-15a-look-query.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+Commits `2ad889b0b..23796aaa9`, then this documentation commit; spec 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1,
+4.6, 4.7, 5.1, 5.8, 5.9, 8.4, 8.7, 9.1, 14.1 to 14.3, 15, 16.1, 17, 18 and 19.1 amended, and the plugin SDK design gains
+a banner line. The user asked: "Lets make sure that the changes we made were in the enterprise kit, and are exposed via
+plugin code and all plugins are up to date with these changes so that future plugins can also leverage look-specific
+settings when Enterprise is enabled." After the audit they approved: "Go ahead with plan 15 as proposed: SDK look query
+(and remove the Enterprise API), kit defaults for plugin settings, activation, classic icons everywhere, the search
+icon, versions, docs and the Sample plugin." This plan is the first of two; plan 15b
+(`2026-10-19-enterprise-15b-look-polish.md`) runs next on this branch. SDK 0.18.2 adds `Appearance.presentation()`,
+which returns `dev.jasper.sdk.ui.Presentation`, a JDK-only record of the look Jasper runs with: `classic` (the classic
+base), `icons` (`NEW_UI`, `CLASSIC`), `toolWindows` (`RAILS`, `STRIPES`), `titleBar` (`UNIFIED`, `NATIVE`, `CLASSIC`,
+resolved for the platform), `menus` (`SCREEN_MENU_BAR`, `TITLE_BAR`, `WINDOW`), `toolbarSearch` (`FIELD` for every look
+until 15b), `uiFace` and `dataFace`, `bodySize` and the look's default `toolbarHeight`; it is IntelliJ's
+`ExperimentalUI.isNewUI()` plus `JBUI.CurrentTheme`, fixed for the run, the same for every plugin and safe from any
+thread. The host builds it once in `dev.jasper.app.plugins.HostedPresentation` from the new `PluginLook` projection
+(`classic`, `classicIcons`, `stripes`, `titleBar`, `menus`, `search`; read only by `HostedPresentation`), the installed
+`Kit` and the look's `DefaultSource`, handed over by `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)`; the
+fallback (spec 4.7) reports the default look's chrome with the defaults read at start. The Enterprise API is removed
+outright: `dev.jasper.enterprise.api.Workstation`, its export, the optional requirements, the compile-only dependencies,
+the `workstationPackages` gate rule and the three `FakeEnterprise` copies are gone; Enterprise 0.3.0 has no exports and
+its `start` does nothing. Remote 0.15.0, Vault 0.7.0 and File Server 0.6.0 choose `Layout.CLASSIC` from
+`Layout.of(context.appearance().presentation())` in `start`, so any classic look drives their classic compositions;
+they, Sample 0.4.0 and Enterprise declare `sdk = ">=0.18.2, <0.19"` (Editor, History, Indexer and Snippets are
+unchanged). A kit's `[defaults."<plugin id>"]` table holds raw TOML values keyed as that plugin's settings file writes
+its keys; `DefaultSource` carries them, and `DeclaredSettings` reads each with the declared setting's own kind and uses
+it as the default, so the precedence is user-saved, then the kit's, then the plugin's own, and Reset to Default returns
+to the kit's (staging the plugin's own default under a kit default saves an explicit value). A value the kind rejects
+and a key the plugin never declares are logged at WARNING once (`PluginHost.lookDefaultProblem`) and ignored, and the
+plugin starts. Enterprise's kit sets `[defaults."dev.jasper.editor"] font_family = "IBM Plex Mono"`, its bundled data
+face. The Sample's panel starts in the bottom strip under labelled stripes and on the left otherwise
+(`example:pluginlook` in the authoring guide), and its `demo_step_millis` demonstrates a kit default under test. The
+testkit mirrors it all: `FakePluginHost.setPresentation`, `FakePresentations.STANDARD` and `CLASSIC`, `setKitDefault`
+and `lookDefaultProblems`, with shared contract cases on both hosts. Rulings (plan, "Rulings"): (1) two plans, 15a and
+15b; (2) the type is `dev.jasper.sdk.ui.Presentation`, reached as `Appearance.presentation()`; (3) the method is
+abstract; (4) the design's ten facts; (5) values a user can change are reported as the look's, fixed for the run, with
+no change notification; (6) `menus` is the look's placement in the Normal view with the platform's default decorations;
+(7) the fallback reports the default look's chrome with the defaults read at start; (8) a new projection `PluginLook`,
+read only by `HostedPresentation`; (9) `toolbarSearch` ships now and reads `FIELD` until 15b; (10) `Layout.CLASSIC`
+exactly when `classic()`; (11) the `workstation` packages keep their names; (12) Enterprise keeps an `EnterprisePlugin`
+whose `start` does nothing; (13) Enterprise is 0.3.0 once for plan 15; (14) the consumers and Enterprise declare
+`>=0.18.2`, and the Editor is not bumped; (15) the `[defaults."<plugin id>"]` format, with raw values checked by the
+declared kind; (16) a rejected value or an undeclared key is logged once and the plugin starts; (17) Reset returns to
+the kit's default; (18) Enterprise's kit sets only the Editor's `font_family`; (19) the Sample shows the query and a kit
+default with no new setting; (20) the external Hello example gets only its `jasperSdkVersion` default, `0.18.2`; (21)
+the `FakeKit.BUILT_INS` parity test reads the private field reflectively; (22) `FakePresentations` replaces the
+`FakeEnterprise` copies; (23) migration rows follow added and deleted files; (24) the two stale STATUS lines are
+corrected; (25) the docs are split by the plans' points; (26) `PluginRuntime.presentation` takes the kit, the look and
+the defaults, with no one-argument overload; (27) one spec header line for plan 15. Execution rulings (plan, "Execution
+notes"): E1 the app's default presentation is per platform (`SCREEN_MENU_BAR` on macOS) while
+`FakePresentations.STANDARD` is the Windows and Linux one; E2 one "started" flag in `FakePluginHost`; E3 the SDK
+README's version sentence names 0.18.2; E4 the staged fixtures set the host's presentation before the consumer starts
+and keep today's Vault compositions; E5 `KitParser.name` quotes non-bare segments; E6 Task 4 keeps
+`plugin-architecture.gradle.kts:51`, drops `EnterprisePluginTest`'s unused constants and corrects its migration row; E7
+Task 9 finds its guide anchors by text; E8 migration rows copy their neighbours' owners; E9 `sdkRelease --rerun` for
+stale jars; E10 a changed Enterprise render is recorded, never a lowered floor; E11 the `LayoutTest` javadoc; E12 Task
+6's logger, import and harness details; E13 the guide's `pluginlook` text after the `pluginpanels` notes; E14 every
+interface plan 15b relies on kept as written; E15 only the two STATUS lines of Rulings 24 are corrected. No Enterprise
+Settings render moved in Task 2. One Enterprise render changed, at the user's 2026-10-19 direction: Settings › Editor
+(`enterprise-settings/light/13.png`) shows the Font row's kit default, "IBM Plex Mono", where it showed "JetBrains Mono"
+(pair `enterprise-settings-13` 0.723, now 0.722). `./gradlew check --continue`: **11,567 tests, 0 failures, 0 errors, 25
+skipped**; `check_pairs.py` passes 101 of 101 gated pairs with the same verdicts as the Task 1 baseline (`f78bb0385`),
+and every agreement is the same except that line and `composition-light-vault-manager` (0.730, now 0.729), whose status
+bar prints the vault file's path under a fresh JUnit temporary directory on every run; the headless gallery is
+byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look jasper-app
+renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and settings images,
+`DefaultDockPixelsTest`'s `default-dark` and `default-light`). No test needed a re-run. Left for plan 15b: activation by
+a panel's own toggle action, classic icons in tool-window headers and toolbar views, the toolbar search icon
+(`[chrome] toolbar_search`, which `toolbarSearch` will report) and the identity guard, with their docs. Later: the
+splash's fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's port to SDK 0.18.
+The side-stripes entry below also ends "Not merged, not pushed.", but its commits are not ancestors of `f78bb0385` (the
+series was rebased), so it is left for the user to confirm (E15). GUI checks for the user, in this order: (1) under
+Enterprise, the Editor opens files in IBM Plex Mono, and Settings › Editor shows "IBM Plex Mono" with Reset to Default
+hidden; choosing another font shows Reset, and Reset returns to IBM Plex Mono; (2) with Enterprise off, the Editor keeps
+its own default font; (3) under Enterprise, Remote's Sessions on the right, Transfers in the bottom strip, File Servers'
+table and the Vault manager's classic layout, as before; (4) with Enterprise off, all three show their rows; (5) with
+`demo_ui = true`, the Sample panel starts in the bottom strip under Enterprise and on the left without it; (6) Settings
+› Plugins shows Enterprise 0.3.0, Remote 0.15.0, Vault 0.7.0, File Server 0.6.0 and Sample 0.4.0. Not merged, not
+pushed.
+
 **Enterprise presentation, plan 14: IntelliJ Classic's title bar at the user's direction — 2026-10-19** (`claude/enterprise-title-bar`, worktree `.claude/worktrees/enterprise-14`, from `main` at `3a36993ba`; [plan](superpowers/plans/2026-10-19-enterprise-14-title-bar.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
 Commits `200367316..98dedc443`, then this documentation commit; spec 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1
 to 5.3, 5.9, 9.1, 10.1 to 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1 amended, and the app architecture guide
@@ -96,7 +175,7 @@ its process streams. They add 5 tests; the windows, workspace, platform, present
 (1,158 tests) and `javadoc` pass, the 11 default-look jasper-app renders still equal the baseline, and `check` was
 not rerun after them. Follow-up: the
 default look's macOS menu bar (in the unified bar) still folds against the window's width, a risk older than this plan.
-Not merged, not pushed.
+Merged to local `main` (`f78bb0385`), not pushed.
 
 **Enterprise presentation, plan 13: stripe icons at the user's direction — 2026-10-19** (`claude/enterprise-stripe-icons`, worktree `.claude/worktrees/enterprise-13`, from `main` at `2c065f8cd`; [plan](superpowers/plans/2026-10-19-enterprise-13-stripe-icons.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
 Commits `eca2feca8..2606d5633`, then this documentation commit; spec 5.2, 10.7, 16.1 and 19.1 amended. After trying
@@ -278,7 +357,7 @@ Log and Transfers from their stripe labels after clicking into one (the tint sta
 against the user's screenshot (#DFE2E9); Enterprise Light and Dark as a whole against IntelliJ Light and New UI Dark;
 the Run window opening centred in the upper part in a tall window (about 1200 px or more), ending at the middle in a
 window about 1000 to 1200 px tall and just under the toolbar, crossing the middle, in a shorter one, then dragged away
-and back; the About page's IntelliJ entries. Not merged, not pushed.
+and back; the About page's IntelliJ entries. Merged to local `main` (`f78bb0385`), not pushed.
 
 **Enterprise presentation: side stripes at the user's direction — 2026-10-18** (`claude/enterprise-stripes`, worktree
 `.claude/worktrees/enterprise-stripes`, from `main` at `4ed94fb78`: `095e220b9`, `4b55dbfb7`, then this documentation
