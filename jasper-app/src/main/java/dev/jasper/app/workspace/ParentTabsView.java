@@ -152,6 +152,19 @@ final class ParentTabsView extends JPanel {
         else openParentTab(tab, id, index);
     }
 
+    /**
+     * Moves the parent tab {@code id} to {@code index} among the others in the bar, where a drag along the bar dropped
+     * it (parent tabs spec 5): its workspace takes its new place among the views. The one that shows stays, no tab
+     * moves, and the bar takes the new order at once.
+     */
+    void reorder(ParentTabId id, int index) {
+        if (closed || !views.containsKey(id) || index < 0 || index >= count() || model.indexOf(id) == index) return;
+        model = model.move(id, index);
+        // The views keep the bar's order, ahead of any other child; a z-order move keeps the focus where it is.
+        setComponentZOrder(views.get(id), index);
+        owner.workspaceChanged(active(), false);
+    }
+
     /** Shows the parent tab {@code id} as it was left (spec 7); the focus stays where it is, for the caller to move. */
     void select(ParentTabId id) {
         if (closed || model.active().equals(id) || !views.containsKey(id)) return;

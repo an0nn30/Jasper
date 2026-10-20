@@ -14,7 +14,8 @@ import javax.swing.JPopupMenu;
  * active tab, as terminal apps title a tab by its active pane (spec 4). It shows while the look says so for the window's
  * count of parent tabs: from two under the equal tabs, always under the classic tabs, which show no entry for the main
  * window's empty workspace. A click shows a parent tab, its close button and its menu close one after its tabs' guards,
- * the classic "+" is New Tab; its entries never move, and a press on one starts no drag. EDT only.
+ * the classic "+" is New Tab. A press on an entry may start the tab drag, which carries the whole parent tab (parent
+ * tabs spec 5); the entries never slide, and a drop puts them in their new places at once. EDT only.
  */
 final class ParentTabBar implements StripSource {
     private final WindowContent owner;
@@ -68,10 +69,18 @@ final class ParentTabBar implements StripSource {
     @Override public JPopupMenu menu(Tab tab) { return owner.parentTabMenu(tab); }
     @Override public void select(Tab tab) { owner.parentTabOf(tab).ifPresent(owner::selectParentTab); }
     @Override public void close(Tab tab) { owner.parentTabOf(tab).ifPresent(owner::closeParentTab); }
-    /** A press ends a dock drag whose release was lost; a parent tab does not drag. */
-    @Override public void pressed(Tab tab, MouseEvent event) { owner.dockDrag().cancel(); }
-    @Override public void dragged(MouseEvent event) { }
-    @Override public void released(MouseEvent event) { }
+    /**
+     * A left press on a parent tab's entry: the tab drag may start from it, carrying the whole parent tab (parent tabs
+     * spec 5). A dock drag still running lost its release, so it ends first.
+     */
+    @Override public void pressed(Tab tab, MouseEvent event) {
+        owner.dockDrag().cancel();
+        owner.tabDrag().pressed(this, tab, event);
+    }
+    /** A drag event from the bar, which the tab drag follows. */
+    @Override public void dragged(MouseEvent event) { owner.tabDrag().dragged(event); }
+    /** A release on the bar, which ends the tab drag. */
+    @Override public void released(MouseEvent event) { owner.tabDrag().released(event); }
     /** The classic tabs' "+": New Tab, a parent tab. */
     @Override public void newTab() { owner.invoke(ActionId.NEW_TAB); }
     /** New Tab: the bar's "+" opens a parent tab. */

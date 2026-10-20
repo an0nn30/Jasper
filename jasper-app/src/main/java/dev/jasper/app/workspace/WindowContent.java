@@ -1697,6 +1697,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** How many parent tabs this window has. */
     int parentTabCount() { return parentTabs.count(); }
 
+    /**
+     * A parent tab dragged along this window's bar (parent tabs spec 5): it takes {@code index} among the others, and
+     * the one that shows stays.
+     */
+    void reorderParentTab(ParentTabId id, int index) { if (!closed) parentTabs.reorder(id, index); }
+
     TerminalContent openTab(Path directory) { return openTab(directory, null); }
 
     /** {@code requestOrNull} makes the tab's first pane a provided session instead of a local shell. */

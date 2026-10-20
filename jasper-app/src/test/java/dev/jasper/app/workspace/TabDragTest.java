@@ -16,6 +16,9 @@ import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Orientation;
+import dev.jasper.app.layout.ParentTab;
+import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.persistence.UiState;
@@ -28,6 +31,7 @@ import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Optional;
 import javax.swing.AbstractButton;
 import javax.swing.ImageIcon;
@@ -329,6 +333,151 @@ class TabDragTest {
             assertThat(owner.parentTabCount()).isEqualTo(2);
             assertThat(owner.parentTabOf(a)).as("the tab stays where it was").isNotEqualTo(Optional.of(owner.activeParentTab()));
             assertThat(owner.tabs().subList(0, 3)).as("in its order").containsExactly(a, b, c);
+        });
+    }
+
+    /** {@code title}'s entry's left edge in {@code bar}. */
+    private static int left(WindowTabs bar, String title) {
+        return SwingUtilities.convertPoint(WindowTabsTest.named(bar, "select:" + title), 0, 0, bar).x;
+    }
+
+    /**
+     * Parent tabs spec 5 and workspace plan 7c Rulings 1 to 3: a parent tab dragged along its bar takes its new place on
+     * the release, its entries there at once though motion is on, and keeps its tabs and the one that shows.
+     */
+    @Test void aParentTabDraggedAlongItsBarTakesItsNewPlaceAtOnce() throws Exception {
+        edt(() -> {
+            ParentTabId first = owner.activeParentTab();
+            owner.currentTerminal().rename("first");
+            owner.newParentTab(HOME);
+            owner.currentTerminal().rename("second");
+            ParentTabId middle = owner.activeParentTab();
+            owner.newParentTab(HOME);
+            owner.currentTerminal().rename("third");
+            Tab third = owner.selectedTab();
+            ParentTabId last = owner.activeParentTab();
+            owner.update();
+            owner.setAnimations(AnimationSettings.defaults());
+            relayout(frame);
+            var bar = (WindowTabs) owner.parentTabBar();
+            Tab shown = owner.parentTabs().bar().tabs().getFirst();
+            Point pastThird = onParentTab(owner, third, 0.75);
+            Component source = startParentTab(owner, shown, pastThird);
+            TabDrag drag = owner.tabDrag();
+            assertThat(drag.active()).isTrue();
+            assertThat(drag.dragged()).as("the parent tab's entry").isSameAs(shown);
+            assertThat(drag.draggedParentTab()).isEqualTo(first);
+            assertThat(drag.target()).contains(new TabDrag.Target.Bar(owner, 2));
+            assertThat(drag.label().text()).isEqualTo("first");
+            assertThat(drag.overlay().getParent()).isSameAs(SwingUtilities.getRootPane(owner).getLayeredPane());
+            assertThat(drag.overlay().placeholder()).as("a bar in the parent-tab bar").isNotNull();
+            assertThat(drag.overlay().highlight()).isNull();
+            assertThat(owner.parentTabs().model().parentTabs()).extracting(ParentTab::id).as("nothing moves before the release")
+                .containsExactly(first, middle, last);
+            mouse(source, MouseEvent.MOUSE_RELEASED, pastThird);
+            assertThat(owner.parentTabs().model().parentTabs()).extracting(ParentTab::id).containsExactly(middle, last, first);
+            assertThat(Arrays.stream(owner.parentTabs().getComponents()).filter(WorkspaceView.class::isInstance)
+                .map(view -> ((WorkspaceView) view).id()).toList()).as("the views follow the bar").containsExactly(middle, last, first);
+            assertThat(owner.activeParentTab()).as("the press showed it, and it stays shown").isEqualTo(first);
+            assertThat(left(bar, "second")).isLessThan(left(bar, "third"));
+            assertThat(left(bar, "third")).as("the entries are in their new places at once").isLessThan(left(bar, "first"));
+            assertThat(bar.motionRunning()).as("and never slide").isFalse();
+            assertThat(owner.parentTabs().view(first).orElseThrow().tabs()).as("its tabs stay in it").containsExactly(a, b, c);
+            assertThat(drag.active()).isFalse();
+            assertThat(drag.overlay().getParent()).as("the landing goes").isNull();
+        });
+    }
+
+    /** Review Focus 4 and workspace plan 7c Rulings 2 and 9: its own place, a pane and a pane's strip take no parent tab. */
+    @Test void aParentTabDropsOnlyAlongItsBarAndNotWhereItIs() throws Exception {
+        edt(() -> {
+            ParentTabId first = owner.activeParentTab();
+            owner.newParentTab(HOME);
+            relayout(frame);
+            Tab shown = owner.parentTabs().bar().tabs().getFirst();
+            Component source = startParentTab(owner, shown, onParentTab(owner, shown, 0.25));
+            TabDrag drag = owner.tabDrag();
+            ParentTabs pressed = owner.parentTabs().model();
+            assertThat(drag.draggedParentTab()).isEqualTo(first);
+            assertThat(drag.target()).as("its own place in the bar").isEmpty();
+            assertThat(drag.overlay().getParent()).as("no landing shows").isNull();
+            Point pane = inside(cards(owner, owner.workspace().model().activeGroup()), 0.5, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, pane);
+            assertThat(drag.target()).as("a pane (parent tabs spec 13)").isEmpty();
+            Point strip = onTab(owner, a, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, strip);
+            assertThat(drag.target()).as("a pane's strip").isEmpty();
+            mouse(source, MouseEvent.MOUSE_RELEASED, strip);
+            assertThat(owner.parentTabs().model()).as("nothing changes").isEqualTo(pressed);
+            assertThat(owner.parentTabs().view(first).orElseThrow().tabs()).containsExactly(a, b, c);
+        });
+    }
+
+    /** Review Focus 5 and workspace plan 7c Rulings 1: the tab a parent tab's entry shows closing ends its drag clean. */
+    @Test void aParentTabsDragEndsWhenTheTabItsEntryShowsCloses() throws Exception {
+        edt(() -> {
+            ParentTabId first = owner.activeParentTab();
+            owner.newParentTab(HOME);
+            Tab other = owner.selectedTab();
+            ParentTabId second = owner.activeParentTab();
+            relayout(frame);
+            Tab shown = owner.parentTabs().bar().tabs().getFirst();
+            Point pastOther = onParentTab(owner, other, 0.75);
+            Component source = startParentTab(owner, shown, pastOther);
+            assertThat(owner.tabDrag().target()).isPresent();
+            owner.closeTab(shown);
+            assertThat(owner.tabDrag().active()).isFalse();
+            assertThat(owner.tabDrag().label().showing()).isFalse();
+            assertThat(owner.tabDrag().overlay().getParent()).isNull();
+            assertThat(keys.dispatchers).as("the Esc dispatcher goes").isEmpty();
+            assertThat(motionListeners()).as("the lost-release listener goes").isEqualTo(listeners);
+            mouse(source, MouseEvent.MOUSE_RELEASED, pastOther);
+            assertThat(owner.parentTabs().model().parentTabs()).extracting(ParentTab::id).as("nothing lands")
+                .containsExactly(first, second);
+        });
+    }
+
+    /** Workspace plan 7c Rulings 1: the parent tab's entry showing another of its tabs ends its drag. */
+    @Test void aParentTabsDragEndsWhenItsEntryShowsAnotherTab() throws Exception {
+        edt(() -> {
+            ParentTabId first = owner.activeParentTab();
+            owner.newParentTab(HOME);
+            ParentTabId second = owner.activeParentTab();
+            Tab other = owner.selectedTab();
+            relayout(frame);
+            Point pastOther = onParentTab(owner, other, 0.75);
+            Component source = startParentTab(owner, c, pastOther);
+            assertThat(owner.tabDrag().target()).contains(new TabDrag.Target.Bar(owner, 1));
+            owner.selectTab(a);
+            assertThat(owner.tabDrag().active()).as("its entry shows a, no longer c").isFalse();
+            assertThat(owner.tabDrag().overlay().getParent()).isNull();
+            assertThat(keys.dispatchers).isEmpty();
+            mouse(source, MouseEvent.MOUSE_RELEASED, pastOther);
+            assertThat(owner.parentTabs().model().parentTabs()).extracting(ParentTab::id).containsExactly(first, second);
+        });
+    }
+
+    /** Parent tabs spec 7: Enterprise's bar, the classic tabs, always shows, and its parent tabs drag along it too. */
+    @Test void enterprisesBarDragsItsParentTabsAlongItToo() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            WindowContent classic = null;
+            try {
+                classic = DesktopTestSupport.content(idleLauncher(pending), themes, ClassicTabsTest.classic());
+                ParentTabId first = classic.activeParentTab();
+                classic.newParentTab(HOME);
+                ParentTabId second = classic.activeParentTab();
+                frame(classic, 100, 50, 1208, 760);
+                assertThat(classic.parentTabBar()).isInstanceOf(ClassicTabs.class);
+                var entries = classic.parentTabs().bar().tabs();
+                dropParentTab(classic, entries.get(1), onParentTab(classic, entries.get(0), 0.25));
+                assertThat(classic.parentTabs().model().parentTabs()).extracting(ParentTab::id).containsExactly(second, first);
+            } finally {
+                if (classic != null) classic.tabDrag().cancel();
+                DesktopTestSupport.closeOwnersNow();
+                themes.close();
+                EnterpriseLook.restoreDefault();
+            }
         });
     }
 

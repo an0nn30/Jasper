@@ -98,6 +98,20 @@ final class TabDragTestSupport {
         return SwingUtilities.getDeepestComponentAt(strip, (int) bounds.getCenterX(), (int) bounds.getCenterY());
     }
 
+    /** A point in the bar's entry that shows {@code tab}, {@code across} of its width, on the pretend screen. */
+    static Point onParentTab(WindowContent window, Tab tab, double across) {
+        TabStrip bar = window.parentTabBar();
+        Rectangle entry = bar.tabBounds().get(window.parentTabs().bar().tabs().indexOf(tab));
+        return inside(onScreen(bar.component(), entry), across, 0.5);
+    }
+
+    /** The component a press on the parent-tab bar's entry that shows {@code tab} reaches. */
+    static Component barEntry(WindowContent window, Tab tab) {
+        TabStrip bar = window.parentTabBar();
+        Rectangle bounds = bar.tabBounds().get(window.parentTabs().bar().tabs().indexOf(tab));
+        return SwingUtilities.getDeepestComponentAt(bar.component(), (int) bounds.getCenterX(), (int) bounds.getCenterY());
+    }
+
     /** A left-button event at {@code screen}, sent to {@code source} as Swing sends a drag's events to the pressed component. */
     static void mouse(Component source, int id, Point screen) {
         Point at = new Point(screen);
@@ -113,8 +127,20 @@ final class TabDragTestSupport {
      *
      * @return the pressed component, which takes the drag's later events
      */
-    static Component start(WindowContent window, Tab tab, Point... path) {
-        Component source = entry(window, tab);
+    static Component start(WindowContent window, Tab tab, Point... path) { return startAt(entry(window, tab), path); }
+
+    /** As {@link #start}, from the parent-tab bar's entry that shows {@code tab}: the drag of its whole parent tab. */
+    static Component startParentTab(WindowContent window, Tab tab, Point... path) {
+        return startAt(barEntry(window, tab), path);
+    }
+
+    /** As {@link #startParentTab}, then releases at the last point. */
+    static void dropParentTab(WindowContent window, Tab tab, Point... path) {
+        mouse(startParentTab(window, tab, path), MouseEvent.MOUSE_RELEASED, path[path.length - 1]);
+    }
+
+    /** Presses in the middle of {@code source}, drags 12 px down and on to each point, without releasing. */
+    private static Component startAt(Component source, Point... path) {
         Point press = middle(source);
         mouse(source, MouseEvent.MOUSE_PRESSED, press);
         mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y + 12));
