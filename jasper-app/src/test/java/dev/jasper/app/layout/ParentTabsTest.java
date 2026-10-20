@@ -46,11 +46,19 @@ class ParentTabsTest {
             .as("a group in two parent tabs").withMessageContaining("Group");
     }
 
+    @Test void openRefusesAnEmptyParentTabBesideAnotherAndAnIndexBelowTheBar() {
+        ParentTabs one = ParentTabs.of(parent(A));
+        assertThatIllegalArgumentException().isThrownBy(() -> one.open(new ParentTab(ParentTabId.random(), Layout.empty()), 1))
+            .withMessageContaining("only parent tab may be empty");
+        assertThatIllegalArgumentException().isThrownBy(() -> one.open(parent(B), -1)).withMessageContaining("Index -1");
+    }
+
     @Test void onlyAWindowsOnlyParentTabMayBeEmpty() {
         ParentTab empty = new ParentTab(ParentTabId.random(), Layout.empty());
         assertThatIllegalArgumentException().isThrownBy(() -> ParentTabs.of(empty).open(parent(A), 1))
             .as("New Tab fills the empty workspace instead").withMessageContaining("only parent tab may be empty");
-        assertThatIllegalArgumentException().isThrownBy(() -> new ParentTabs(List.of(parent(A), empty), empty.id()));
+        assertThatIllegalArgumentException().isThrownBy(() -> new ParentTabs(List.of(parent(A), empty), empty.id()))
+            .withMessageContaining("only parent tab may be empty");
         ParentTab first = parent(A);
         ParentTabs one = ParentTabs.of(first);
         assertThat(one.replace(new ParentTab(first.id(), first.layout().remove(A))).isEmpty()).as("its last tab closed").isTrue();
@@ -81,6 +89,13 @@ class ParentTabsTest {
         assertThat(without.remove(a.id()).active()).as("removing a hidden one keeps the shown one").isEqualTo(c.id());
         assertThatIllegalArgumentException().isThrownBy(() -> ParentTabs.of(a).remove(a.id())).withMessageContaining("only parent tab");
         assertThatIllegalArgumentException().isThrownBy(() -> tabs.remove(ParentTabId.random())).withMessageContaining("not in the window");
+    }
+
+    @Test void theOneUsedBeforeItShowsEvenWhenAnotherFollowsItInTheBar() {
+        ParentTab a = parent(A), b = parent(B), c = parent(C);
+        ParentTabs tabs = new ParentTabs(List.of(a, b, c), a.id()).select(c.id()).select(a.id());
+        assertThat(tabs.recent()).containsExactly(a.id(), c.id(), b.id());
+        assertThat(tabs.remove(a.id()).active()).as("c was used before a; b merely follows it in the bar").isEqualTo(c.id());
     }
 
     @Test void parentTabsNeverShownFollowAfterTheShownOneThenBeforeIt() {
