@@ -8,6 +8,7 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import dev.jasper.editor.vim.VimTextArea;
+import dev.jasper.editor.markdown.MarkdownMode;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.EditorPalette;
@@ -27,6 +28,31 @@ import org.fife.ui.rtextarea.RTextScrollPane;
 final class DocumentArea extends JComponent implements AutoCloseable {
     final VimTextArea area = new VimTextArea();
     final RTextScrollPane scroll;
+    private final PreviewPane preview;
+    final JScrollPane previewScroll;
+    private final JSplitPane split;
+    private MarkdownMode mode = MarkdownMode.SOURCE;
+    private double dividerRatio = .5;
+    private boolean restoringDivider;
+    private java.util.function.IntConsumer activateLink = id -> {};
+    private Runnable geometryChanged = () -> {};
+
+    PreviewPane preview() { return preview; }
+    void previewCallbacks(java.util.function.IntConsumer links, Runnable geometry) { activateLink=links;geometryChanged=geometry; }
+    double dividerRatio() { return dividerRatio; }
+    void mode(MarkdownMode value) {
+        if (closed || mode==value) return;
+        mode=value;removeAll();split.setLeftComponent(null);split.setRightComponent(null);
+        if(value==MarkdownMode.SOURCE){preview.cancelInstall();add(scroll,BorderLayout.CENTER);}
+        else if(value==MarkdownMode.PREVIEW)add(previewScroll,BorderLayout.CENTER);
+        else {restoringDivider=true;try{split.setLeftComponent(scroll);split.setRightComponent(previewScroll);add(split,BorderLayout.CENTER);}finally{restoringDivider=false;}}
+        revalidate();repaint();
+    }
+    @Override public void doLayout() {
+        restoringDivider=true;
+        try {super.doLayout();if(mode==MarkdownMode.SPLIT){split.setDividerLocation(dividerRatio);split.doLayout();}}
+        finally{restoringDivider=false;}
+    }
     private final java.awt.event.HierarchyListener hierarchy = event -> {
         if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.PARENT_CHANGED) != 0) refreshAppearance();
     };
@@ -41,6 +67,15 @@ final class DocumentArea extends JComponent implements AutoCloseable {
 
     DocumentArea() {
         setLayout(new BorderLayout());
+        preview=new PreviewPane(id -> activateLink.accept(id), () -> geometryChanged.run());
+        previewScroll=new JScrollPane(preview.editor());previewScroll.setBorder(BorderFactory.createEmptyBorder());
+        previewScroll.setOpaque(false);previewScroll.getViewport().setOpaque(false);
+        split=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);split.setOpaque(false);split.setBorder(BorderFactory.createEmptyBorder());split.setResizeWeight(.5);
+        split.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY,event -> {
+            int extent=split.getWidth()-split.getDividerSize();
+            if(!restoringDivider && mode==MarkdownMode.SPLIT && extent>0)dividerRatio=Math.max(0,Math.min(1,split.getDividerLocation()/(double)extent));
+        });
+        addPropertyChangeListener("font",event -> {if(getFont()!=null)preview.bodyFont(getFont());});
         area.setCodeFoldingEnabled(true);
         area.setMarkOccurrences(true);
         area.setBracketMatchingEnabled(true);
@@ -83,7 +118,8 @@ final class DocumentArea extends JComponent implements AutoCloseable {
 
     private void refreshAppearance() {
         if (!closed && appearance != null && settings != null)
-            apply(settings, theme, appearance.editorPalette(), appearance.syntaxPalette(), appearance.workspaceOpacity(this));
+            { apply(settings, theme, appearance.editorPalette(), appearance.syntaxPalette(), appearance.workspaceOpacity(this));
+                if(typography!=null && getFont()!=null)preview.restyle(typography,appearance.workspacePalette(),appearance.syntaxPalette(),getFont(),appearance.workspaceOpacity(this)); }
     }
 
     void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax, double opacity) {
@@ -98,6 +134,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        preview.close();
         removeHierarchyListener(hierarchy);
         if (changes != null) changes.close();
     }
@@ -114,13 +151,15 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     double opacity() { return opacity; }
 
     @Override protected void paintComponent(Graphics graphics) {
-        if (opacity >= 1) { graphics.setColor(background); graphics.fillRect(0, 0, getWidth(), getHeight()); return; }
+        Rectangle sourceBounds = scroll.getParent()==null ? new Rectangle() : SwingUtilities.convertRectangle(scroll.getParent(),scroll.getBounds(),this);
+        if(mode==MarkdownMode.PREVIEW) return;
+        if (opacity >= 1) { graphics.setColor(background); graphics.fillRect(sourceBounds.x,sourceBounds.y,sourceBounds.width,sourceBounds.height); return; }
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
             g.setComposite(AlphaComposite.Src);
             g.setColor(translucent(background));
-            g.fillRect(0, 0, getWidth(), getHeight());
+            g.fillRect(sourceBounds.x,sourceBounds.y,sourceBounds.width,sourceBounds.height);
             var header = scroll.getRowHeader();
             if (header != null && header.isVisible() && header.getParent() != null) {
                 Rectangle bounds = SwingUtilities.convertRectangle(header.getParent(), header.getBounds(), this);

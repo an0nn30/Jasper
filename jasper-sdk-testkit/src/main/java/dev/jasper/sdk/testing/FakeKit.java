@@ -10,6 +10,11 @@ import java.util.function.Consumer;
 /** Functional, EDT-confined plugin kit; construct freely, then operate on the EDT. */
 public final class FakeKit implements UiKit, AutoCloseable {
     private final String owner;
+    private java.awt.Font contentFont=new java.awt.Font(java.awt.Font.SANS_SERIF,java.awt.Font.PLAIN,13);
+    java.awt.Font contentFont(){return contentFont;}
+    /** Simulates the current host UI body font and its normal property changes on specialized content. */
+    public void contentFont(java.awt.Font font){guard();contentFont=Objects.requireNonNull(font);for(var view:List.copyOf(views))view.contentFont(font);}
+
     Object anchorHost;
     private final Set<FakeKitView> views = new LinkedHashSet<>();
     private final Map<String,IconAsset> icons = new java.util.concurrent.ConcurrentHashMap<>();
