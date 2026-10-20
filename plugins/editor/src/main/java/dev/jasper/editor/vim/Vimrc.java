@@ -107,7 +107,7 @@ public final class Vimrc {
         byte[] bytes = Files.readAllBytes(file);
         String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPLACE)
             .onUnmappableCharacter(CodingErrorAction.REPLACE).decode(ByteBuffer.wrap(bytes)).toString();
-        if (text.startsWith("﻿")) text = text.substring(1);
+        if (text.startsWith("\uFEFF")) text = text.substring(1);
         List<String> lines = new ArrayList<>(List.of(text.split("\r?\n", -1)));
         if (!lines.isEmpty() && lines.getLast().isEmpty()) lines.removeLast();
         return lines;

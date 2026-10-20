@@ -143,6 +143,15 @@ class EditorWindowTest {
         assertThat(recorded).containsExactly(LocalDocument.key(file), LocalDocument.key(file));
     }
 
+    @Test void aTabPublishesItsCommandsButLeavesCloseTabToTheHost() throws Exception {
+        var tab = opened(file("menu.txt", "text"));
+        var published = window.contentCommands(tab);
+        assertThat(published).extracting(dev.jasper.sdk.ui.ContentCommand::id).as("the host's tab menu has its own Close Tab")
+            .doesNotContain("close-tab").contains("save", "find", "find-next", "find-previous", "copy", "paste");
+        assertThat(published).filteredOn(command -> command.id().equals("find-previous")).singleElement()
+            .satisfies(command -> assertThat(command.shortcut()).isEqualTo(KeyNames.findAgain(true)));
+    }
+
     @Test void filesUseHostedTabsAndMovingPreservesDirtyTextAndUndo() throws Exception {
         var tab = opened(file("hosted.txt", "before"));
         assertThat(host.windows()).isEmpty();

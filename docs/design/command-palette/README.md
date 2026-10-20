@@ -83,7 +83,6 @@ OUTPUT="$(pwd)/docs/design/command-palette"
 ./gradlew :jasper-app:commandPalettePreview -Pjasper.uiScale=2x \
   --args="$OUTPUT --expect-ui-scale=2"
 ./gradlew :jasper-app:commandSearchMeasurement --args="$OUTPUT"
-./gradlew :jasper-app:shellHistorySearchMeasurement --args="$OUTPUT"
 ```
 
 These tasks are opt-in and are not dependencies of `check`. The UI task is

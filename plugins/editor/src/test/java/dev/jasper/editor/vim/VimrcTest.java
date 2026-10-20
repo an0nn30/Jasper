@@ -74,6 +74,16 @@ class VimrcTest {
         });
     }
 
+    @Test void aByteOrderMarkBeforeTheFirstLineIsIgnored() throws Exception {
+        Path vimrc = folder.resolve("bom-vimrc");
+        Files.writeString(vimrc, "\uFEFFset ts=4\n");
+        onEdt(() -> {
+            var editor = editor("one\n");
+            assertThat(Vimrc.read(editor, vimrc)).isEqualTo(new Vimrc.Result(true, null, 0));
+            assertThat(editor.options().number("tabstop")).isEqualTo(4);
+        });
+    }
+
     @Test void onlyIdeaVimsConditionsAreTrue() throws Exception {
         Path vimrc = file("vimrc",
             "if has('ide')",

@@ -132,7 +132,8 @@ public final class CoreSettings {
             Map.entry("left", OptionAsMeta.LEFT), Map.entry("right", OptionAsMeta.RIGHT),
             Map.entry("both", OptionAsMeta.BOTH), Map.entry("none", OptionAsMeta.NONE))), OptionAsMeta.LEFT)
         .label("Option key as Meta").keywords("option", "alt", "meta", "keyboard")
-        .description("Option key sending Meta: \"left\", \"right\", \"both\", or \"none\"; updates live.").build();
+        .description("macOS only, live: which Option key sends Meta: \"left\", \"right\", \"both\", or \"none\". On Linux and\n"
+            + "Windows, Alt always sends Meta except together with Ctrl.").build();
     public static final Setting<Float> TERMINAL_DIM_INACTIVE_PANES = Setting.of("terminal.dim_inactive_panes", SettingKind.number(0, 1), .3f)
         .label("Dim inactive panes").keywords("dim", "split", "inactive", "focus")
         .description("Inactive pane dimming, 0.0-1.0; updates live.").build();
@@ -212,41 +213,44 @@ public final class CoreSettings {
         .label("Environment variables").keywords("environment", "env", "variables", "PATH").applies(Applies.NEW_PANES)
         .description("New panes only: add string values to the inherited environment.\n"
             + "Names use letters, digits and underscore, starting with a letter or underscore.\n"
-            + "Values must not contain NUL. Desktop launches remove inherited TERM_PROGRAM,\n"
-            + "TERM_PROGRAM_VERSION, TERM_SESSION_ID, TMUX, TMUX_PANE, and ITERM_* variables,\n"
-            + "then apply this overlay.\n"
-            + "Explicit configured values are intentional overrides. On macOS, LANG defaults to\n"
-            + "en_US.UTF-8 only when absent or blank; LC_* values are preserved. TERM and COLORTERM\n"
-            + "remain reserved and are always forced to xterm-256color and truecolor.\n"
-            + "This table does not change which default login shell is selected.").build();
+            + "Values must not contain NUL. Jasper removes inherited TERM_PROGRAM, TERM_PROGRAM_VERSION,\n"
+            + "TERM_SESSION_ID, TMUX, TMUX_PANE, ITERM_* and JASPER_* variables; this overlay then overrides\n"
+            + "the inherited environment and the variables Jasper and plugins add. Jasper still sets JASPER_PANE\n"
+            + "and JASPER_COMMAND_SOCKET last. On macOS, LANG defaults to en_US.UTF-8 only when absent or blank;\n"
+            + "LC_* values are preserved. TERM and COLORTERM remain reserved and are always forced to\n"
+            + "xterm-256color and truecolor. This table does not change which default login shell is selected.").build();
     public static final Setting<String> UI_FONT_FAMILY = Setting.of("ui.font.family",
             SettingKind.string(CoreSettings::fontName, FONT_NAME), UiFontConfig.defaults().family())
         .label("UI font").keywords("font", "interface", "chrome", "typeface")
         .description("UI font for app chrome and plugin controls; updates live, independently of the terminal font.\n"
-            + "\"system\" uses the platform font on macOS, Linux and Windows.\n"
-            + "A missing named font falls back to that platform font.").build();
+            + "\"system\" uses the look's interface font: the platform's font, or a look's own face such as IBM Plex Sans\n"
+            + "under Enterprise. A missing named font falls back to that font.").build();
     public static final Setting<Float> UI_FONT_SIZE = Setting.of("ui.font.size", SettingKind.number(8, 32), UiFontConfig.defaults().size())
         .example(14f).label("UI font size").keywords("font", "interface", "size", "points")
-        .description("Omit size to retain platform sizing. Use 8-32 points, including fractions, when set.").build();
+        .description("Omit size to keep the look's size: the platform's, or a look's own such as 12 under Enterprise.\n"
+            + "Use 8-32 points, including fractions, when set.").build();
     public static final Setting<AppearanceMode> UI_APPEARANCE = Setting.of("ui.appearance", SettingKind.choice(List.of(
             Map.entry("system", AppearanceMode.SYSTEM), Map.entry("dark", AppearanceMode.DARK), Map.entry("light", AppearanceMode.LIGHT))),
             AppearanceMode.SYSTEM)
         .label("Appearance").keywords("appearance", "theme", "dark", "light", "system", "slate cobalt", "look")
-        .description("The UI appearance: \"system\" (the default) follows the operating system's light or dark setting;\n"
-            + "\"dark\" or \"light\" chooses one. [ui.theme] names the theme each shows. Switches live across windows.").build();
+        .description("The UI appearance: \"system\" (the default) follows the macOS light or dark setting (Linux and Windows\n"
+            + "report none, so it shows Dark there); \"dark\" or \"light\" chooses one. [ui.theme] names the theme each shows.\n"
+            + "Switches live across windows.").build();
     static final String THEME_ID = "Use a theme id such as \"slate-cobalt\"; using the default.";
     public static final Setting<String> UI_THEME_DARK = Setting.of("ui.theme.dark",
             SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
         .label("Dark theme").keywords("theme", "dark", "appearance", "slate cobalt", "imported")
-        .description("The theme the Dark appearance shows: \"slate-cobalt\" (the default), a built-in Catppuccin flavour such as\n"
-            + "\"catppuccin-mocha\", or an imported theme's id, its file name in the themes folder without .json. A theme without a\n"
-            + "Dark variant is reported and Slate Cobalt is used. Switches live.").build();
+        .description("The theme the Dark appearance shows: \"slate-cobalt\" (the default unless the look sets its own), the\n"
+            + "built-in \"ubuntu-yaru\" or a Catppuccin flavour such as \"catppuccin-mocha\", a plugin's theme such as \"enterprise\",\n"
+            + "or an imported theme's id, its file name in the themes folder without .json. A theme without a Dark variant is\n"
+            + "reported and Slate Cobalt is used. Switches live.").build();
     public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
             SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID)
         .label("Light theme").keywords("theme", "light", "appearance", "jasper meadow", "slate cobalt", "imported")
-        .description("The theme the Light appearance shows: \"jasper-meadow\" (the default), the built-in \"catppuccin-latte\", or an\n"
-            + "imported theme's id, its file name in the themes folder without .json. A theme without a Light variant is reported\n"
-            + "and Jasper Meadow Light is used. Switches live.").build();
+        .description("The theme the Light appearance shows: \"jasper-meadow\" (the default unless the look sets its own), the\n"
+            + "built-in \"slate-cobalt\", \"ubuntu-yaru\" or \"catppuccin-latte\", a plugin's theme such as \"enterprise\", or an\n"
+            + "imported theme's id, its file name in the themes folder without .json. A theme without a Light variant is\n"
+            + "reported and Jasper Meadow Light is used. Switches live.").build();
     static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.";
     public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",
             SettingKind.string(text -> TerminalSchemeChoice.parse(text).isPresent(), SCHEME_ID), TerminalSchemeChoice.MATCH.key())
@@ -286,7 +290,7 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "shell"), "The shell new panes start."),
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
             Map.entry(List.of("ui"), "The interface: its appearance, fonts, workspace glass and animations."),
-            Map.entry(List.of("ui", "theme"), "The theme each appearance shows: a built-in theme's id or an imported theme's id."),
+            Map.entry(List.of("ui", "theme"), "The theme each appearance shows: a built-in theme's, a plugin's or an imported theme's id."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
             Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values keep the terminal area opaque."),
             Map.entry(List.of("ui", "animations"), "App-wide animation policy. Changes apply live.")));

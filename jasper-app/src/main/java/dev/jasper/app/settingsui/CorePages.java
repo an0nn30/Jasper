@@ -82,11 +82,11 @@ public final class CorePages {
     }
 
     /**
-     * Schema pages; {@code glass} is whether workspace glass exists here (macOS only), which decides whether its
-     * Settings rows (and their Workspace section) are built.
+     * Schema pages; {@code macOs} decides whether the macOS-only rows are built: workspace glass (and its Workspace
+     * section) and Option key as Meta.
      */
-    static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean glass) {
-        return specs(appearance, system, shells, navigate, glass, NotificationGroupChoices.NONE);
+    static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean macOs) {
+        return specs(appearance, system, shells, navigate, macOs, NotificationGroupChoices.NONE);
     }
 
     /** Settings › Appearance. */
@@ -111,9 +111,9 @@ public final class CorePages {
 
     /** As above, with the notification groups the Notifications page lists. */
     static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
-                                       java.util.function.Consumer<String> navigate, boolean glass, NotificationGroupChoices groups) {
+                                       java.util.function.Consumer<String> navigate, boolean macOs, NotificationGroupChoices groups) {
         return List.of(
-            appearance(appearance, glass),
+            appearance(appearance, macOs),
             SchemaPage.page("window", "Window").parent("appearance-behavior")
                 .section("Toolbar & Status Bar")
                 .row(WINDOW_TOOLBAR, Editors.segments(Map.of("icons_and_labels", "Icons & Labels", "icons", "Icons Only", "hidden", "Hidden")))
@@ -147,7 +147,7 @@ public final class CorePages {
                     "close_on_success", "Close when it succeeds", "close", "Close")))
                 .row(TERMINAL_COPY_ON_SELECT)
                 .row(TERMINAL_OPTION_AS_META, Editors.choice(Map.of("left", "Left Option", "right", "Right Option",
-                    "both", "Both", "none", "Neither")))
+                    "both", "Both", "none", "Neither"))).shownWhen(macOs)
                 .row(TERMINAL_DIM_INACTIVE_PANES, Editors.number(0.05, "")),
             SchemaPage.page("terminal.font", "Font & Colors").parent("terminal").anchor("terminal-colors")
                 .section("Font")
