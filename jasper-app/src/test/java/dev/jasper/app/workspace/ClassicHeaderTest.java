@@ -64,7 +64,8 @@ class ClassicHeaderTest {
     static Window window(ThemeController themes, boolean view, WorkspaceLook.Icons icons) {
         var chrome = classic(icons);
         var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, chrome);
-        owner.setToolbarHeight(34);
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        owner.setToolbarHeight(28);
         var model = new Contributions();
         owner.connectContributions(model);
         if (view) {
@@ -91,7 +92,8 @@ class ClassicHeaderTest {
                 window.width(1440);
                 var header = window.owner().chrome().header();
                 var bar = window.owner().chrome().windowToolbar();
-                assertThat(header.getHeight()).as("34 and the rule").isEqualTo(35);
+                // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+                assertThat(header.getHeight()).as("28 and the rule").isEqualTo(29);
                 var rule = (MatteBorder) header.getBorder();
                 assertThat(rule.getMatteColor()).isEqualTo(themes.current().chrome().semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_WINDOW));
                 assertThat(ThemeZone.theme(header.field())).as("not a title-bar zone").isSameAs(FlatLafInstaller.installedTheme());
@@ -100,7 +102,8 @@ class ClassicHeaderTest {
                 var first = (ClassicToolbarButton) bar.getComponent(0);
                 assertThat(first.getX()).as("toolbar padding 8").isEqualTo(8);
                 assertThat(first.getHeight()).isEqualTo(24);
-                assertThat(first.getY()).isEqualTo(5);
+                // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+                assertThat(first.getY()).isEqualTo(2);
                 var classic = (ClassicHeader) window.owner().chrome().composition();
                 var settings = (ClassicToolbarButton) classic.trailing().getComponent(0);
                 int settingsRight = classic.trailing().getX() + settings.getX() + settings.getWidth();
@@ -108,7 +111,8 @@ class ClassicHeaderTest {
                 var field = header.field();
                 assertThat(field.getSize()).isEqualTo(new Dimension(300, 22));
                 assertThat(field.getX() + field.getWidth()).as("6 before Settings…").isEqualTo(classic.trailing().getX() + settings.getX() - 6);
-                assertThat(field.getY()).as("centred in the 34 px row").isEqualTo(6);
+                // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+                assertThat(field.getY()).as("centred in the 28 px row").isEqualTo(3);
                 // The field reads "Search everywhere": its tip and name say so, not the pane's context.
                 field.setContext("~/projects", "dustin@host:~/projects", null);
                 String shortcut = field.shortcutText();

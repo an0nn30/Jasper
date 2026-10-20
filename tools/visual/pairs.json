@@ -895,16 +895,16 @@
     "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
     "crop": [
       2,
-      110,
+      116,
       2880,
-      70
+      56
     ],
     "render": "jasper-app/build/chrome-renders/enterprise-light-workstation.png",
     "render_crop": [
       0,
       50,
       2880,
-      70
+      56
     ],
     "min_agreement": 0.3,
     "colours": [
@@ -912,29 +912,30 @@
       "#D1D1D1",
       "#C4C4C4",
       "#FFFFFF"
-    ]
+    ],
+    "note": "The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights."
   },
   {
     "name": "chrome-toolbar-dark",
     "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
     "crop": [
       2,
-      110,
+      116,
       2880,
-      70
+      56
     ],
     "render": "jasper-app/build/chrome-renders/enterprise-dark-workstation.png",
     "render_crop": [
       0,
       50,
       2880,
-      70
+      56
     ],
     "min_agreement": 0.3,
     "colours": [
       "#2B2D30"
     ],
-    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port."
+    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights."
   },
   {
     "name": "chrome-tabs-light",

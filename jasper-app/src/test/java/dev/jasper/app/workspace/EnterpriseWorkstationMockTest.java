@@ -25,12 +25,19 @@ class EnterpriseWorkstationMockTest {
     static final int X = EnterpriseMenuRowMockTest.X, Y = EnterpriseMenuRowMockTest.Y;
     /** The Run Dialog mock, the one that shows the status bar's run item. */
     static final String RUN = "06 Run Dialog/Run Dialog - Just opened (recent + most used).png";
+    // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+    /** The toolbar row's height in px. */
+    static final int TOOLBAR = 28;
+    // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+    /** The device pixels by which the mocks' 34 px toolbar row is taller than the 28 px one. */
+    static final int SHORTER = 2 * (34 - 28);
 
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
-    /** The mocks' window: the 34 px toolbar row, "Local: ~" and the selected "Mac: ~", a configuration warning. EDT. */
+    /** The mocks' window: the 28 px toolbar row, "Local: ~" and the selected "Mac: ~", a configuration warning. EDT. */
     static void workstation(WindowContent owner) {
-        owner.setToolbarHeight(34);
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        owner.setToolbarHeight(TOOLBAR);
         owner.currentTab().rename("Local: ~");
         owner.newTab(DesktopTestSupport.HOME);
         owner.currentTab().rename("Mac: ~");
@@ -66,8 +73,12 @@ class EnterpriseWorkstationMockTest {
     void theRowsDownTheWindowAreTheMocks(boolean dark) throws Exception {
         String what = dark ? "dark " : "light ";
         // Column 2000 crosses no control: the menu row and its rule, the toolbar row and its rule, the tab strip and its rule.
-        var expected = MockProfile.solid(MockProfile.column(mock(dark), 2000, Y, Y + 180), 2);
-        var actual = MockProfile.solid(MockProfile.column(window(dark).image(), 2000 - X, 0, 180), 2);
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        var expected = new ArrayList<>(MockProfile.solid(MockProfile.column(mock(dark), 2000, Y, Y + 180), 2));
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34. The render's column stops
+        // SHORTER sooner, so it ends at the same row of the tab strip as the mock's (the Dark strip, rule and terminal are
+        // one colour and run to the column's end).
+        var actual = MockProfile.solid(MockProfile.column(window(dark).image(), 2000 - X, 0, 180 - SHORTER), 2);
         String[] names = {"menu row", "menu rule", "toolbar row", "toolbar rule", "tab strip", "tab rule"};
         Color[] colours = {MockProfile.role(dark, "surface.app"), MockProfile.role(dark, "border.divider"), MockProfile.role(dark, "surface.app"),
             MockProfile.painted(dark, WindowPairs.RULE), MockProfile.role(dark, "surface.tabstrip"), MockProfile.role(dark, "border.window")};
@@ -80,6 +91,8 @@ class EnterpriseWorkstationMockTest {
             names = java.util.Arrays.copyOf(names, 5);
             names[4] = "tab strip and its rule";
         }
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        expected.set(2, new MockProfile.Run(expected.get(2).start(), expected.get(2).length() - SHORTER, expected.get(2).color()));
         for (int i = 0; i < names.length; i++) same(what + names[i], actual.get(i), expected.get(i), 2, colours[i]);
     }
 
@@ -91,7 +104,8 @@ class EnterpriseWorkstationMockTest {
         var render = mounted.image();
         // "+" and "New Session": toolbar padding 8, button padding 8, the glyph 6 before the label (mock ink 38-51, 66-199).
         var expected = MockProfile.inks(mock, new Rectangle(X + 4, 112, 400, 64), 12, 25);
-        var actual = MockProfile.inks(render, new Rectangle(4, 112 - Y, 400, 64), 12, 25);
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        var actual = MockProfile.inks(render, new Rectangle(4, 112 - Y, 400, 64 - SHORTER), 12, 25);
         // The user's 2026-10-18 direction: classic icon then label. The add icon's ink begins 3 px into it and is 10 wide;
         // the label follows the 16 px icon and its 6 px gap where it followed the 7 px "+" and its 6 px gap.
         int[] shift = {2 * 3, 2 * ((16 + 6) - (7 + 6))};
@@ -103,7 +117,8 @@ class EnterpriseWorkstationMockTest {
             // The user's 2026-10-18 direction: classic icon then label. The add icon's 10 px ink, 3 px into the icon centred in
             // the 24 px button, tops out 2 px above the 7 px "+" centred there.
             int rise = i == 0 ? 2 * 2 : 0;
-            assertThat(actual.get(i).top() + Y).as(what + "ink " + i + " top").isCloseTo(expected.get(i).top() - rise, within(3));
+            // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+            assertThat(actual.get(i).top() + Y).as(what + "ink " + i + " top").isCloseTo(expected.get(i).top() - rise - SHORTER / 2, within(3));
         }
         // The search field: x 2116-2715, y 122-165 in the mock.
         var field = mounted.field();
@@ -111,14 +126,16 @@ class EnterpriseWorkstationMockTest {
         // The user's 2026-10-18 direction: classic icon then label (Settings… gains its 16 px icon and 6 px gap).
         MockProfile.fonts(what + "search field left", 2 * field.x + X, 2116 - 2 * (16 + 6), 4);
         assertThat(2 * field.width).as(what + "search field width").isCloseTo(600, within(2));
-        assertThat(2 * field.y + Y).as(what + "search field top").isCloseTo(122, within(2));
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        assertThat(2 * field.y + Y).as(what + "search field top").isCloseTo(122 - SHORTER / 2, within(2));
         assertThat(2 * field.height).as(what + "search field height").isCloseTo(44, within(2));
         // "Settings…" at the trailing edge: ink 2742-2846 in the mock.
         var settings = MockProfile.inks(mock, new Rectangle(2722, 112, 160, 64), 12, 25);
         // The user's 2026-10-18 direction: classic icon then label. The crop widens left by the icon and its gap. Settings…
         // is disabled here (no settings opener), so its grey icon, faded at 0.42, lies about ΔE 19 from the row: the
         // render's crop reads ink from ΔE 12.
-        var rendered = MockProfile.inks(render, new Rectangle(2722 - 44 - X, 112 - Y, 160 + 44, 64), 12, 12);
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        var rendered = MockProfile.inks(render, new Rectangle(2722 - 44 - X, 112 - Y, 160 + 44, 64 - SHORTER), 12, 12);
         assertThat(settings).as("the mock's Settings…").hasSize(1);
         // The user's 2026-10-18 direction: classic icon then label.
         assertThat(rendered).as(what + "Settings…'s icon, then its label").hasSize(2);
@@ -135,15 +152,18 @@ class EnterpriseWorkstationMockTest {
         assertThat(mounted.firstTab().isEmpty()).as(what + "classic tabs").isFalse();
         int left = 2 * mounted.firstTab().x;
         // The underline row: mock y 233 (the indicator 232-235 above the rule at 236); the render's strip is 2 px taller.
-        int underline = 2 * (25 + 35 + 29) - 3;
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        int underline = 2 * (25 + TOOLBAR + 1 + 29) - 3;
         var expected = MockProfile.solid(MockProfile.row(mock, 233, 650, 1100), 4);
         var actual = MockProfile.solid(MockProfile.row(render, underline, left, left + 450), 4);
         same(what + "the first tab and its divider on the strip", actual.get(0), expected.get(0), 6, MockProfile.role(dark, "surface.tabstrip"));
         same(what + "the active tab's tab.indicator underline", actual.get(1), expected.get(1), 6, MockProfile.painted(dark, WindowPairs.TAB_INDICATOR));
         // The active tab on surface.card, inside its 12 px leading padding (mock x 850, mid-strip y 208).
-        assertThat(MockProfile.deltaE(MockProfile.at(render, left + 200, 2 * (25 + 35 + 14)), MockProfile.role(dark, "surface.card")))
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        assertThat(MockProfile.deltaE(MockProfile.at(render, left + 200, 2 * (25 + TOOLBAR + 1 + 14)), MockProfile.role(dark, "surface.card")))
             .as(what + "the active tab's ground").isLessThanOrEqualTo(2.5);
-        MockProfile.write(render.getSubimage(left, 2 * (25 + 35), 700, 58), "enterprise-" + (dark ? "dark" : "light") + "-tabs");
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
+        MockProfile.write(render.getSubimage(left, 2 * (25 + TOOLBAR + 1), 700, 58), "enterprise-" + (dark ? "dark" : "light") + "-tabs");
     }
 
     @ParameterizedTest @ValueSource(booleans = {false, true})
