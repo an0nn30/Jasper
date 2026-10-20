@@ -62,7 +62,8 @@ Under the Enterprise look an EXCLUSIVE choice draws radios, TABS draws folder ta
 a Section with its Card draws a titled box, a Table draws a header band, zebra rows and banded headings, a Tree draws ▶
 and ▼, an Empty state shows one button (its visible PRIMARY action, or else its first visible one), a Chip is boxed in upper case, a ROUTE stack draws edged cells, and an ORDERED
 list's commands move to a side column that acts on the selection, and a panel's stripe label starts with its icon
-([plugin icons](sdk-icons.md)); the descriptors and events are the same.
+([plugin icons](sdk-icons.md)), and the six classic icon names draw IntelliJ's classic art in headers
+and toolbar views; the descriptors and events are the same.
 
 Descriptors say what a control means and the presentation draws it. GHOST is a quiet button, `ButtonPresentation.HELP`
 opens help and `FormKind.PROMPT` is a short, focused question. A `Section` holding a `Card` is a titled group.

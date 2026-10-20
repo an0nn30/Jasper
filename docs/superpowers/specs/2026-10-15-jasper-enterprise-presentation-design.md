@@ -20,7 +20,7 @@ Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (sid
 Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 6.4, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 10.8, 11.5, 14.4, 16.1, 17 and 19.1.
 Amended on 2026-10-19 at the user's direction after trying plan 12 (plan 13): 5.2, 10.7, 16.1 and 19.1 (every labelled stripe button starts with its tool window's icon, IntelliJ's classic tool-window icons under Enterprise, over the mocks' text-only labels).
 Amended on 2026-10-19 at the user's direction (plan 14): 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1, 5.2, 5.3, 5.9, 9.1, 10.1, 10.2, 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1. On macOS and Windows the Enterprise look draws IntelliJ Classic's title bar (`title_bar = "classic"`): on macOS a band in the toolbar's colour under its own traffic lights and title, with the menus in the screen menu bar; on Windows a custom title bar holding the menus and the title. Linux keeps the system title bar and the in-window menu row, and the toolbar is 28 px; these override the mocks' native title bar, in-window menu row and 34 px toolbar.
-Amended on 2026-10-19 at the user's direction (plan 15): 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1, 4.6, 4.7, 5.1, 5.8, 5.9, 8.4, 8.7, 9.1, 14.1 to 14.3, 15, 16.1, 17, 18 and 19.1. Plugins read the active presentation through the SDK (`Appearance.presentation()`, SDK 0.18.2), so any classic look drives Remote's, File Server's and Vault's classic compositions, and the Enterprise API is removed; a kit may default other plugins' settings (`[defaults."<plugin id>"]`), and Enterprise's sets the Editor's font to IBM Plex Mono.
+Amended on 2026-10-19 at the user's direction (plan 15): 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1, 4.6, 4.7, 5.1, 5.2, 5.3, 5.8, 5.9, 8.4, 8.7, 9.1, 10.3, 10.7, 11.6, 14.1 to 14.3, 15, 16.1, 16.2, 17, 18 and 19.1. Plugins read the active presentation through the SDK (`Appearance.presentation()`, SDK 0.18.2), so any classic look drives Remote's, File Server's and Vault's classic compositions, and the Enterprise API is removed; a kit may default other plugins' settings (`[defaults."<plugin id>"]`), and Enterprise's sets the Editor's font to IBM Plex Mono; a panel's own toggle action activates its tool window, IntelliJ's classic icons draw the six classic names in tool-window headers and toolbar views, and Enterprise's toolbar shows IntelliJ Classic's Search Everywhere icon in place of the field (`[chrome] toolbar_search = "icon"`).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -526,6 +526,7 @@ palette = "run_window"
 dialogs = "classic"
 motion = "none"
 icons = "classic"
+toolbar_search = "icon"
 
 [controls]
 toggle = "checkbox"
@@ -602,7 +603,7 @@ key so the file can be reviewed; `PresentationConformanceTest` pins the list.
 
 ### 5.2 Variant points
 
-Twenty-four points: 10 chrome points and 14 control points, all two-valued except `title_bar`, which has three values,
+Twenty-five points: 11 chrome points and 14 control points, all two-valued except `title_bar`, which has three values,
 and the `window_title` template. There is no `toolbar` point: the classic header honours the existing `window.toolbar`
 setting (10.3).
 
@@ -617,7 +618,8 @@ setting (10.3).
 | `palette` | `anchored` | `run_window` | The Run window and the leading "▶ Run…" status item (section 11) |
 | `dialogs` | `as_requested` | `classic` | OVERLAY and ATTACHED_SHEET dialogs are drawn in their window as classic dialogs (10.8) |
 | `motion` | `standard` | `none` | No motion, whatever `ui.animations.enabled` says (10.9) |
-| `icons` | `new_ui` | `classic` | The workspace chrome's icons: IntelliJ's classic icons in the header and status bar (10.3) and on the labelled stripes (10.7) |
+| `icons` | `new_ui` | `classic` | The workspace chrome's icons: IntelliJ's classic icons in the header and status bar (10.3) and on the labelled stripes (10.7), and for the six classic names in tool-window headers and toolbar views (10.3, 10.7) |
+| `toolbar_search` | `field` | `icon` | IntelliJ Classic's Search Everywhere: an icon-only button with the classic magnifier, before Settings…, in place of the "Search everywhere" field (10.3) |
 
 | `[controls]` key | Default | Enterprise | What the Enterprise value does |
 |---|---|---|---|
@@ -643,8 +645,9 @@ Back/Forward pair, notification cards (square, 1 px border, the catalog's popup 
 ### 5.3 Constraints
 
 `menu_bar = "window"` requires `title_bar = "native"` or `"classic"`: the unified row hosts the header and leaves an
-in-window menu row no home. It is the only cross-field constraint. The `palette` point alone decides whether the
-"▶ Run…" status item exists, under either status layout.
+in-window menu row no home. `toolbar_search = "icon"` requires `palette = "run_window"` and `title_bar = "native"` or
+`"classic"`: the anchored card's home is the field, and the unified header holds it. These are the only cross-field
+constraints. The `palette` point alone decides whether the "▶ Run…" status item exists, under either status layout.
 
 ### 5.4 Public tokens
 
@@ -780,6 +783,7 @@ each and at most 8 files. A kit is rejected for:
 - an unknown table or key, a wrong type, an unknown value, or `kit` other than 1;
 - a token outside its range, or a `[type].base` (the body size in points) that is not an integer from 10 to 16;
 - `menu_bar = "window"` with `title_bar = "unified"`;
+- `toolbar_search = "icon"` without `palette = "run_window"` and a native or classic title bar;
 - a `[defaults]` key outside the allowlist, or a value its setting rejects;
 - a `[defaults]` table not named by a plugin id with a dot, a key in it that is not a setting key, or a value in it that
   is not a string, number, boolean or array, or two keys that name the same setting;
@@ -1167,7 +1171,7 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | Projection | Fields | Consumer |
 |---|---|---|
 | `DesktopFlags` | `screenMenuBar`, `nativeTitle` | bootstrap: desktop properties, `TitleBarStyle` |
-| `WorkspaceLook` | menus (STANDARD, CLASSIC), header (UNIFIED, CLASSIC), stripes (RAILS, LABELLED), tabs (EQUAL, CLASSIC), status (SLASH, RULED), `runItem`, `FrameStyle`, icons (NEW_UI, CLASSIC) | workspace: `WorkspaceChrome.of` |
+| `WorkspaceLook` | menus (STANDARD, CLASSIC), header (UNIFIED, CLASSIC), stripes (RAILS, LABELLED), tabs (EQUAL, CLASSIC), status (SLASH, RULED), `runItem`, `FrameStyle`, icons (NEW_UI, CLASSIC), search (FIELD, ICON) | workspace: `WorkspaceChrome.of` |
 | `ShellLook` | `unifiedTitle`, `windowMenus`, `followThemeAppearance`, `classicTitle` | windows: `ShellChrome.of`, `NativeShells`; workspace: `WindowLook` (`classicTitle`) |
 | `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, UPPER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
 | `SettingsChrome` | `integratedTitle`, `collapsibleNav`, `inlineReset`, `hiddenKeys`, `kitFontSize` (from which `fontRowCopy` follows) | settingsui |
@@ -1201,6 +1205,7 @@ values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.
 | `WorkspaceLook.tabs` | CLASSIC when `editor_tabs = "classic"` | EQUAL |
 | `WorkspaceLook.status` | RULED when `status_bar = "cells"` | SLASH |
 | `WorkspaceLook.icons` | CLASSIC when `icons = "classic"` | NEW_UI |
+| `WorkspaceLook.search` | ICON when `toolbar_search = "icon"` | FIELD |
 | `WorkspaceLook.runItem`, `PaletteLook.view`, `PaletteLook.home` | true, RUN_WINDOW and UPPER when `palette = "run_window"` | false, CARD, TITLE_FIELD |
 | `ShellLook.unifiedTitle` | true only when `title_bar = "unified"` and `MacTitleBar.isSupported()` | false |
 | `ShellLook.windowMenus` | true when `menu_bar = "window"`, except under `title_bar = "classic"` on macOS, where auxiliary frames carry the minimal File menu for the screen menu bar | as committed |
@@ -1216,7 +1221,7 @@ values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.
 | `TitleFormat` | `window_title` | `"{context}"` |
 | `DockLayoutKey` | the provider id | empty |
 | `AppPanels` | "Event Log" at BOTTOM_LEFT when `tool_windows = "stripes"` | "Notifications" at RIGHT_TOP |
-| `PluginLook` | `classic` when `base = "classic"`; `classicIcons` and `stripes` with `icons = "classic"` and `tool_windows = "stripes"`; `titleBar` the title as resolved for the platform; `menus` the screen menu bar on macOS while the committed flags keep it, else in the window under a native title and in the title bar otherwise; `search` FIELD | the default look's under the committed flags |
+| `PluginLook` | `classic` when `base = "classic"`; `classicIcons` and `stripes` with `icons = "classic"` and `tool_windows = "stripes"`; `titleBar` the title as resolved for the platform; `menus` the screen menu bar on macOS while the committed flags keep it, else in the window under a native title and in the title bar otherwise; `search` ICON when `toolbar_search = "icon"`, else FIELD | the default look's under the committed flags |
 | `DefaultSource` | `[defaults]` | as read at start (4.7) |
 
 ### 9.2 Package edges
@@ -1285,16 +1290,20 @@ Each built-in menu that has no items of its own shows only while it has entries,
 
 `HeaderComposition` has `UnifiedHeader` (today's centred title field) and `ClassicHeader`: a toolbar row of left-packed
 buttons in separated groups, New Session (NEW_TAB), Split (today's Split dropdown), Maximize (ZOOM_PANE); then
-contributed items and views; then, trailing, the title search field reading "Search everywhere" with the
-COMMAND_PALETTE keycap, and "Settings…". New Window and Find stay in the File and Edit menus. Built-in labels are host
-strings owned by the strategy. `WindowToolbar.doLayout` learns to place any component and to pack leading.
+contributed items and views; then, trailing, the title search field reading "Search everywhere" with the COMMAND_PALETTE
+keycap, and "Settings…". Under `toolbar_search = "icon"` (the user, 2026-10-19; Enterprise) the field is IntelliJ
+Classic's Search Everywhere icon: an icon-only 22 px button with the classic magnifier, tooltip "Search Everywhere" and
+the palette's shortcut, leading the trailing group before Settings… and doing what the field does; it stays icon-only
+under `icons_and_labels`. New Window and Find stay in the File and Edit menus. Built-in labels are host strings owned by
+the strategy. `WindowToolbar.doLayout` learns to place any component and to pack leading.
 
 The classic header honours `window.toolbar`. `icons` (Enterprise's default, 5.8) gives 22 px icon buttons whose tooltips
 are their labels, Split marking its menu with a small ▼ in its corner. `icons_and_labels` gives each button's icon, then
 its label (Split ending in ▾). `hidden` gives no row, so the Session view and Search everywhere go with it, and the Run
 window stays reachable by ⇧⌘P and "▶ Run…". The icons are the look's `[chrome] icons` set (5.2), IntelliJ's classic
-icons under Enterprise. `window.toolbar_height` is the classic toolbar row's height; Enterprise's default is 28,
-IntelliJ's (the user, 2026-10-19, over the mocks' 34).
+icons under Enterprise. Tool-window headers and toolbar views draw the same classic art for those six names; every other
+name, and every panel body, keeps its catalog art. `window.toolbar_height` is the classic toolbar row's height;
+Enterprise's default is 28, IntelliJ's (the user, 2026-10-19, over the mocks' 34).
 
 **`ToolbarItem.View` admission and lifetime:**
 
@@ -1364,10 +1373,14 @@ leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window 
   is also the focused one after any mouse press inside it (its content, blank space, its header strip, a control that
   takes no focus) and when the user opens it from its stripe or its View toggle action; both move the keyboard into it
   (its first control that takes keys, else the frame), as IntelliJ activates a tool window. A press in the terminal
-  column hands the tint back; dragging a divider keeps it, and a plugin's own toggle opens a frame without activating
-  it. A header detail is muted, and a digits-only detail is parenthesised ("Sessions (2)"). Kit `PanelHeaders` receive
-  it as a host flag. Its arc and gutter are the window's kit metrics `WORKSPACE_SURFACE_ARC` and `WORKSPACE_GUTTER` (0
-  in the classic catalog), which replace the static finals at `ToolWindowArea.java:53,55` (6.6).
+  column hands the tint back; dragging a divider keeps it, and a plugin's toggle or `PanelHost.show()` activates the
+  frame only when made while the panel's own declared toggle action runs (`PanelSpec.withToggleActionId`;
+  `PanelRequest.Op.ACTIVATING_TOGGLE`, and `ACTIVATING_SHOW` for the show; the user, 2026-10-19; plan 15), so View ›
+  Tool Windows and the stripe-number shortcuts activate the bundled tool windows, as IntelliJ's ⌘1 does; any other
+  plugin toggle opens a frame without activating it. A header detail is muted, and a digits-only detail is parenthesised
+  ("Sessions (2)"). Kit `PanelHeaders` receive it as a host flag. Its arc and gutter are the window's kit metrics
+  `WORKSPACE_SURFACE_ARC` and `WORKSPACE_GUTTER` (0 in the classic catalog), which replace the static finals at
+  `ToolWindowArea.java:53,55` (6.6).
 - **Layout per look.** The default look keeps today's ui-state keys unchanged. A non-default look saves its dock under
   its provider id, so a first Enterprise start gets Enterprise's default anchors and a return to the default look finds
   the old layout:
@@ -1529,10 +1542,11 @@ bottom = 1.0
 
 ### 11.6 Opening, focus and closing
 
-Openers: ⇧⌘P, the "▶ Run…" status item and the toolbar's Search everywhere field; an open Run window takes focus
-instead of opening again. The window is modeless: it closes only on Escape, ×, Cancel or running a row. It ignores the
-card's other dismissals: a tab switch, the window losing focus, and the opener or the active scope's shortcut pressed
-while it is open, which focuses it (`PaletteController.java:72`, `WindowContent.java:272`, `:1382`); it goes with its
+Openers: ⇧⌘P, the "▶ Run…" status item and the toolbar's Search everywhere field, or its Search Everywhere icon under
+`toolbar_search = "icon"`; an open Run window takes focus instead of opening again. The window is modeless: it closes
+only on Escape, ×, Cancel or running a row. It ignores the card's other dismissals: a tab switch, the window losing
+focus, and the opener or the active scope's shortcut pressed while it is open, which focuses it
+(`PaletteController.java:72`, `WindowContent.java:272`, `:1382`); it goes with its
 window. Clicking a pane hands focus back to it and leaves the window open; the overlay passes presses outside
 the window through. There is no
 reveal or other motion, and the shadow uses the catalog's popup values.
@@ -1789,13 +1803,14 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    `settingsPreview` render under the default, Enterprise and complement kits, both palette views and the fallback
    combination (native title, window menus, default kit), the shipped look on each platform (`enterprise` on Linux,
    `enterprise-mac` with the band, `enterprise-windows` with FlatLaf's title pane), and over a checked-in strength-2
-   array of `ChromeSpec` values across 9 of the ten chrome points (`window_title` as its two shipped templates;
-   `title_bar` over its three values, its `classic` rows rendered as macOS and as Windows; `icons`
-   is held at `classic` in every row and covered by `ChromeArtworkTest`, `ZoneIconsTest`, `StripeIconTest` and
-   `StripeIconsTest`) honouring the `menu_bar`/`title_bar` constraint, asserting painted pairs and structure (a flush
-   header, no gutter, the stripe labels) and writing images under `build/` for inspection. The opt-in `JavaExec` tasks
-   and `tools/visual/pairs.json` stay opt-in tools. Each of plans 5 to 10 adds `tools/visual/pairs.json` crops pairing
-   its Enterprise renders with the preserved mocks; the comparison stays opt-in.
+   array of `ChromeSpec` values across 9 of the eleven chrome points (`window_title` as its two shipped templates;
+   `title_bar` over its three values, its `classic` rows rendered as macOS and as Windows; `icons` is held at `classic`
+   in every row and covered by `ChromeArtworkTest`, `ZoneIconsTest`, `StripeIconTest` and `StripeIconsTest`, and
+   `toolbar_search` at `field` and covered by `ClassicHeaderTest`) honouring the `menu_bar`/`title_bar` constraint,
+   asserting painted pairs and structure (a flush header, no gutter, the stripe labels) and writing images under
+   `build/` for inspection. The opt-in `JavaExec` tasks and `tools/visual/pairs.json` stay opt-in tools. Each of plans 5
+   to 10 adds `tools/visual/pairs.json` crops pairing its Enterprise renders with the preserved mocks; the comparison
+   stays opt-in.
 5. **The shipped kit.** `EnterpriseKitRenderTest` (jasper-app tests) parses the real `enterprise.kit.toml` with the
    production `KitParser`, registers the real Plex fonts from `plugins/enterprise/src/main/resources`, and renders with
    the jasper-ui test fixtures. `EnterpriseFixtureTest` checks that the parsed kit's metrics, type scale, variants and
@@ -1817,6 +1832,8 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    - The package DAGs (`verifyUiArchitecture`: `kit` depends on `metrics` and `theme` only, `metrics` on `theme` only,
      and `swing` gains `kit`;
      `verifyApplicationArchitecture`: the edges of 9.2), `dev.jasper.app.dock` JDK-only, `KitValuesTest` lossless.
+   - `LookIdentityTest`: no production class of the app, jasper-ui or a bundled plugin other than Enterprise
+     names "enterprise" (plan 15).
 8. **Runtime.**
    - `PresentationSelectionTest`: origin then id; whole-plugin skip; invalid kits skipped; safe mode; the effective
      rule in `admit`; the one selection consumed by start; the one-provider transaction for enabling and consenting; the
@@ -1860,10 +1877,11 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
 
 Agents never launch the GUI or train the AOT cache. The user checks, per plan: the macOS classic title band (its traffic
 lights and title against IntelliJ's) and screen menu bar, Windows' classic title bar, and Linux NATIVE with the caption
-colour; the Run window's drag, attach to home, saved place, focus hand-back and modeless behaviour; stripe drag and drop
-including the bottom strip; the classic in-window dialogs; Enterprise Dark against the Dark Mode mock; the splash and
-the Dock or taskbar icon on a cold start; the Credential Vault window; and Enterprise's cold-start time against the
-default look.
+colour; the Run window's drag, attach to home, saved place, focus hand-back and modeless behaviour; Enterprise's Search
+Everywhere icon (its tooltip, the Run window it opens, a narrow window); ⌘⌥1 to ⌘⌥3 activating the bundled tool windows;
+the classic `add` icon in Sessions' and Tunnels' headers; stripe drag and drop including the bottom strip; the classic
+in-window dialogs; Enterprise Dark against the Dark Mode mock; the splash and the Dock or taskbar icon on a cold start;
+the Credential Vault window; and Enterprise's cold-start time against the default look.
 
 ## 17. Documentation
 

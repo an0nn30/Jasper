@@ -14,7 +14,7 @@ import java.util.Optional;
  * @param toolWindows how tool windows are reached
  * @param titleBar the title bar on this platform
  * @param menus where the menus are on this platform
- * @param toolbarSearch how the toolbar offers Search Everywhere
+ * @param toolbarSearch how the toolbar offers Search Everywhere: the field, or IntelliJ Classic's icon button
  * @param uiFace the look's UI face for its regular weight, a name {@code java.awt.Font} accepts, or empty for the
  *     platform face; the user's font setting is not reported
  * @param dataFace the look's data face for its regular weight, a name {@code java.awt.Font} accepts, or empty for the

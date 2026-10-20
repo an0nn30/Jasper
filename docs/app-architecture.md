@@ -239,9 +239,9 @@ Windows and Linux system title bar no appearance hint (JBR has none). `Workspace
 `ShellChrome.of` (windows) read the look's projections and choose the strategies, among them `MenuBarLayout`:
 `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).
 `WindowTitle` fills the look's title template. `WorkspaceChrome.of` also picks the window content: `HeaderComposition`
-(`UnifiedHeader`, or `ClassicHeader`, a toolbar row of left-packed buttons with the search field and Settings…
-trailing), `TabStrip` (`WindowTabs`, or the content-sized `ClassicTabs`), `StatusCells` (`SlashSegments`, or
-`RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's dialog mapping and marks the surfaces
+(`UnifiedHeader`, or `ClassicHeader`, a toolbar row of left-packed buttons with the search field, or under
+`toolbar_search = "icon"` a Search Everywhere button, and Settings… trailing), `TabStrip` (`WindowTabs`, or the
+content-sized `ClassicTabs`), `StatusCells` (`SlashSegments`, or `RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's dialog mapping and marks the surfaces
 it makes; `NativeShells` draws a marked modal overlay or attached sheet whose window is showing in that window as a
 `ClassicDialog`. The title search field shows `WindowHeaderContext` and opens the palette, which `WindowCommandPalette`
 places through its `PaletteHome` (the field's bounds for the card). `WindowTabs` are IntelliJ editor tabs sized to content with a 3 px selection underline,

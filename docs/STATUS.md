@@ -1,5 +1,69 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 15b: look polish at the user's direction — 2026-10-20** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, after plan 15a; [plan](superpowers/plans/2026-10-19-enterprise-15b-look-polish.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+Commits `41847317f..807169d15` (the anchor refresh, then Tasks 1 to 5), then this documentation commit; plan 15's spec
+amendment line gains 5.2, 5.3, 10.3, 10.7, 11.6 and 16.2, and 5.1, 5.9, 9.1 and 16.1 are edited again. The user asked on
+2026-10-19: "in entperise I want to replace that text box command pallete in the toolbar with just search icon like in
+IntelliJ classic", and approved plan 15 ("... activation, classic icons everywhere, the search icon, versions, docs and
+the Sample plugin", quoted in full in plan 15a's entry below). What they became. **Activation:** a `Panels.toggle` or
+`PanelHost.show()` made synchronously inside the handler of the panel's own declared toggle action
+(`PanelSpec.withToggleActionId`) is sent as `PanelRequest.Op.ACTIVATING_TOGGLE` or the new `ACTIVATING_SHOW`, which
+`WindowContributions` maps to toggle or show, then activate; under flush frames (Enterprise) the tool window takes the
+focused tint and the keyboard, and under standard frames nothing activates. A hide, a deferred call, another action's
+call and a panel without a declared toggle stay plain. This answers plan 12's question (the user: yes): View › Tool
+Windows and ⌘⌥1 to ⌘⌥3 activate Sessions, SFTP, Tunnels, Transfers and File Servers, and Transfers' action, which only
+shows, activates on every press without a Remote change. No SDK or testkit value changes; the javadoc of
+`Panels.toggle`, `PanelHost.show` and `PanelSpec` says it (since 0.18.2). **Classic icons:** under `[chrome] icons =
+"classic"` the six classic names (`add`, `split`, `zoom`, `settings`, `window.add`, `search`) draw IntelliJ's classic
+art in the app-drawn `ToolWindowHeader` actions, a borrowed kit header's host actions, the panel's own header controls
+and the buttons of toolbar views, through `KitView.classicChromeIcons(boolean)`, `IconRegistry.classicChromeIcon`,
+`AppIcons.classicChromeIcon` and `ToolWindowArea` taking the window's `ChromeArtwork`; `BuiltInArtwork.CLASSIC_NAMES`
+lets the host ask without decoding the classic SVGs. Every other name, a document bar's buttons and every panel or
+window body keep their catalog art. **`toolbar_search`:** the eleventh chrome point, `[chrome] toolbar_search = "field"
+| "icon"`, is `field` in both bases and `icon` in Enterprise's kit; `icon` needs `palette = "run_window"` and a native
+or classic title bar, else the kit is refused with one message naming the key. `WorkspaceLook.Search` (read only by
+`WorkspaceChrome`) and `PluginLook.Search` carry it, and SDK 0.18.2's `Presentation.toolbarSearch` now reports `ICON`
+under Enterprise; `FakePresentations.CLASSIC` takes `ICON`. **The button:** `ClassicHeader(true)` puts an icon-only
+"Search Everywhere" button with the classic magnifier (a 22 px square, priority 100) first in the trailing group, 8 px
+before Settings…, in place of the field; it runs COMMAND_PALETTE as the field does, its tooltip is "Search Everywhere"
+plus the palette's shortcut in parentheses, it stays icon-only under `icons_and_labels`, goes with the row under
+`hidden` (⇧⌘P still opens the Run window) and stays beside Settings… in a narrow window. **`LookIdentityTest`:** no
+class in the app or jasper-ui jar, and no `dev/jasper/` class of a staged plugin other than Enterprise, holds
+"enterprise" in its constant pool, so a look stays data. No version moves: SDK 0.18.2, Enterprise 0.3.0, no plugin code
+or manifest changes. Rulings (plan, "Rulings"): (1) a toggle or show inside the panel's own declared toggle action
+activates, anything else stays plain; (2) activation needs no SDK or testkit change; (3) the classic set reaches
+tool-window headers and toolbar views, not bodies; (4) classic art for the six names only, through a `KitView` flag and
+`AppIcons.classicChromeIcon`; (5) the key is `toolbar_search`, values `field` and `icon`; (6) `icon` needs the Run
+window and a native or classic title bar; (7) the button is icon-only, named "Search Everywhere" with the shortcut,
+first in the trailing group, and runs COMMAND_PALETTE; (8) the covering array holds `toolbar_search` at `field`; (9) no
+version moves; (10) the identity guard scans constant pools, Enterprise's own classes and bundled libraries excepted;
+(11) `FakePresentations.CLASSIC` moves to `ICON`; (12) plan 15a's baseline is reused; (13) one spec header line for plan
+15. Execution rulings (plan, "Execution notes") X1 to X23, among them: X1 the window-level activation tests sit in
+`WindowPanelsTest`; X2 an activating toggle also needs `PanelEntry.namedToggle()`; X3 "in the panel header" is `panel &&
+!documentBar`; X4 `CLASSIC_NAMES` lives outside `ClassicHolder`; X7 `ClassicHeader` declares both constructors; X8
+`ProjectionsTest`'s Enterprise plugin looks take `Search.ICON`; X9 `EnterpriseMenuRowMockTest.Mounted` captures the
+button's bounds; X12 and X13 spec 5.3, 9.1 and 10.7 are corrected, not just extended. Deviations from the Enterprise
+mocks, as the user's 2026-10-19 direction: the toolbar's field is the icon, so `EnterpriseWorkstationMockTest` drops the
+field's assertions (mock x 2116-2715, y 122-165) for the button's (a 44 mock px square at the field's top, 16 mock px
+before Settings…; the Settings… crop is unchanged), and the pairs `chrome-toolbar-light` (0.581, now 0.427) and
+`chrome-toolbar-dark` (0.577, now 0.423) pass at their unchanged 0.30 floors with a note, the light one no longer
+listing `#FFFFFF`, the field's `surface.input`. Task 2 changed no Enterprise mock probe or pair. `./gradlew check
+--continue`: **11,594 tests, 0 failures, 0 errors, 25 skipped** (plan 15a: 11,569 and 25); `check_pairs.py` passes 101
+of 101 gated pairs with the same verdicts as the baseline (`plan15-baseline`, from `f78bb0385`), and every agreement is
+the same except the two toolbar lines and `enterprise-settings-13` (0.723, 0.722 since plan 15a); the headless gallery
+is byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look
+jasper-app renders. No test needed a re-run. Later: the splash's fixed colours and "Workstation…" step text for other
+branded looks; the external THD plugin's port to SDK 0.18. GUI checks for the user, in this order: (1) under Enterprise
+Light and Dark, the toolbar's magnifier before the wrench, against IntelliJ Classic's: its hover, the tooltip "Search
+Everywhere (⇧⌘P)", a click opens the Run window, ⇧⌘P still does, Icons & Labels keeps it icon-only, and a narrow window
+keeps it beside the wrench; (2) View › Tool Windows › Sessions, SFTP, Tunnels, Transfers and File Servers, and ⌘⌥1 to
+⌘⌥3: each opens its tool window with the focused header tint, and typing goes there; for Sessions, SFTP, Tunnels and
+File Servers a second press hides it and hands the keyboard back to the terminal, while Transfers' action only shows, so
+a second View › Transfers or ⌘⌥3 keeps it open and activates it again; (3) Sessions' and Tunnels' header `+` and any
+header gear in IntelliJ's classic art, next to the toolbar's; (4) Remote's session view's Run button unchanged; (5) the
+default look: the title field, the rails, the headers and the shortcuts as before (a toggle shortcut opens without the
+tint). Not merged, not pushed.
+
 **Enterprise presentation, plan 15a: the look query at the user's direction — 2026-10-19** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, from `main` at `f78bb0385`; [plan](superpowers/plans/2026-10-19-enterprise-15a-look-query.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
 Commits `2ad889b0b..23796aaa9`, then this documentation commit and the final review fixes; spec 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1,
 4.6, 4.7, 5.1, 5.8, 5.9, 8.4, 8.7, 9.1, 14.1 to 14.3, 15, 16.1, 17, 18 and 19.1 amended, and the plugin SDK design gains

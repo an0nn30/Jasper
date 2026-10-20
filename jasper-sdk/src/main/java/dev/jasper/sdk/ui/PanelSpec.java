@@ -5,12 +5,14 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * A panel as the stripes show it: an icon on a tool window stripe and, while it shows, a tool window with a header.
+ * A panel as the stripes show it: an icon on a tool window stripe (under a classic look a labelled button starting
+ * with the icon) and, while it shows, a tool window with a header.
  *
  * @param id namespaced id that starts with the plugin's id and a dot; unless {@code toggleActionId}
  *           names one, the application also registers the action {@code <id>.toggle}, which users
  *           may bind under {@code [keybindings]}
  * @param title non-blank title, used for the stripe tooltip, the tool window's header and the application's toggle action
+ *              and, under a classic look, the stripe button's label
  * @param icon semantic stripe icon name
  * @param defaultAnchor the side used until the user moves the panel
  * @param toggleActionId one of the plugin's own actions, already registered, that toggles this panel:
