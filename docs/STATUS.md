@@ -1,5 +1,18 @@
 # Jasper — Status and Handoff
 
+**Editor: a New Editor Window toolbar button — 2026-10-19** (`claude/workspace-tabs`, one commit on `914bfc272`). The user
+asked on 2026-10-19: "I also want a toolbar button in this mode and Enterprise mode where I can open a new Editor File
+window too." The Editor places `ToolbarItem.action("dev.jasper.editor.new_window")` after its File menu items; the
+action carries the kit's `window.add` glyph (a window with a plus, also the app's NEW_WINDOW glyph), its title is the
+tip, and clicking it runs the action the File menu runs. Both looks' headers already draw a contributed button, so
+the standard look shows the glyph with its label and the Enterprise classic row shows the label-first button (the glyph
+when the toolbar is icons only); the Editor stays at 0.11.0. Files: `EditorPlugin`, `EditorPluginTest` (one new test),
+`EditorToolbarButtonTest` (new: the staged Editor in the real host, both looks), `BundledSamplePluginTest` (the
+bundled toolbar now holds three entries), `docs/editor.md` and the `ThemeMigrationCoverageTest` ledger row.
+`:jasper-plugin-editor:check` and `:jasper-app:check` pass: 4913 Editor tests, 3807 app tests (one new), 0 failures,
+19 skipped. GUI check for the user: the New Editor Window button shows in the standard look and in the Enterprise
+look, and clicking it opens a new editor window with one untitled document. Not merged, not pushed.
+
 **Workspace tabs: a window's only tab shows no strip — 2026-10-19** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, one commit on `4a3bbd01a`, between plans 5 and 6a;
 [spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md), amended). The user asked on 2026-10-19: "in

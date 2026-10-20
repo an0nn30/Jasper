@@ -233,6 +233,25 @@ class EditorPluginTest {
         }
     }
 
+    /** The toolbar shows New Editor Window as a button with the window-plus glyph; it runs the action the File menu runs. */
+    @Test void newEditorWindowIsAToolbarButtonThatOpensTheSameWindowAsTheMenu() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow();
+            assertThat(host.toolbar()).containsExactly("button:dev.jasper.editor.new_window");
+            assertThat(host.actionSpec("dev.jasper.editor.new_window")).hasValueSatisfying(spec -> {
+                assertThat(spec.title()).as("the button's tooltip").isEqualTo("New Editor Window");
+                assertThat(spec.icon()).as("the button's glyph").contains("window.add");
+            });
+            assertThat(host.invoke("dev.jasper.editor.new_window", main, null)).isTrue();
+            var tab = host.contentTabs().getFirst();
+            assertThat(host.contentTabs()).hasSize(1);
+            assertThat(tab.window().isMain()).as("a child window, as from the File menu").isFalse();
+            assertThat(tab.window().tabs()).hasSize(1);
+            assertThat(host.contentPresentation(tab).title()).startsWith("Untitled");
+        }
+    }
+
     @Test void theOpenActionUsesAJasperWindowsChooserAndClosingItsTabLetsAFreshOneOpen() throws Exception {
         try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());

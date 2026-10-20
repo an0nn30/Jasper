@@ -26,6 +26,7 @@ import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.StandardMenu;
+import dev.jasper.sdk.ui.ToolbarItem;
 import java.awt.GraphicsEnvironment;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -107,8 +108,9 @@ public final class EditorPlugin implements Plugin {
             invoked -> window().openFrom(invoked.window(), invoked.pane()));
         context.actions().register(ActionSpec.of(NEW, "New Editor File").withKeywords(List.of("editor", "new", "file", "untitled")),
             invoked -> window().newUntitled(invoked.window()));
-        // Workspace tabs spec 6.5: an untitled document in a child window of its own; no default key.
-        context.actions().register(ActionSpec.of(NEW_WINDOW, "New Editor Window").withKeywords(List.of("editor", "new", "window", "untitled")),
+        // Workspace tabs spec 6.5: an untitled document in a child window of its own; no default key. Its icon is the toolbar button's.
+        context.actions().register(ActionSpec.of(NEW_WINDOW, "New Editor Window").withIcon("window.add")
+                .withKeywords(List.of("editor", "new", "window", "untitled")),
             invoked -> window().newUntitled(invoked.window(), dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW));
         context.actions().register(ActionSpec.of(SHOW, "Show Editor").withKeywords(List.of("editor", "tabs")), invoked -> window().show());
         context.actions().register(ActionSpec.of(RecentFilesScope.ACTION, "Recent Files…").withKeywords(List.of("editor", "recent", "files", "open")),
@@ -134,6 +136,7 @@ public final class EditorPlugin implements Plugin {
         file.add(OPEN);
         file.add(NEW);
         file.add(NEW_WINDOW);
+        context.toolbar().add(ToolbarItem.action(NEW_WINDOW));
     }
 
     @Override public void stop() {
