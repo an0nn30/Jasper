@@ -24,7 +24,24 @@ import javax.swing.*;
 /** Native window boundary; all terminal behavior lives in the actual WindowContent component. */
 public final class TerminalWindow implements AutoCloseable {
     private final WindowCallbacks callbacks;
-    private final JFrame frame = new JFrame("Jasper");
+    private Runnable firstVisiblePaint;
+    private boolean paintNotificationQueued;
+    private final JFrame frame = new JFrame("Jasper") {
+        @Override public void paint(java.awt.Graphics graphics) {
+            super.paint(graphics);
+            if (!isShowing() || firstVisiblePaint == null || paintNotificationQueued) return;
+            Toolkit.getDefaultToolkit().sync();
+            paintNotificationQueued = true;
+            // Let the native paint finish before removing the splash covering this window.
+            SwingUtilities.invokeLater(() -> {
+                paintNotificationQueued = false;
+                if (closed || !isShowing()) return;
+                Runnable ready = firstVisiblePaint;
+                firstVisiblePaint = null;
+                if (ready != null) ready.run();
+            });
+        }
+    };
     private final WindowContent content;
     private final MacTitleBar titleBar;
     private final WindowGlass glass;
@@ -178,6 +195,15 @@ public final class TerminalWindow implements AutoCloseable {
     public void show() { frame.setVisible(true); reportState(); content.focusSelected(); }
 
     /**
+     * Runs once after this visible window has painted its complete workspace. Register before showing it. EDT.
+     * @param ready notified after native painting returns
+     */
+    public void afterFirstVisiblePaint(Runnable ready) {
+        firstVisiblePaint = java.util.Objects.requireNonNull(ready, "ready");
+    }
+
+
+    /**
      * Closes this window without remembering it: neither its bounds nor its dock layout are saved, so a window that
      * failed to compose, or the warm-up rehearsal's (never shown, at the default size), never becomes the last window
      * closed, whose layout the next window restores. EDT.
@@ -193,6 +219,7 @@ public final class TerminalWindow implements AutoCloseable {
         if (closed) return;
         rememberBounds();
         closed = true;
+        firstVisiblePaint = null;
         frame.removeComponentListener(geometry);
         // Save the intact dock first; plugin disposal callbacks must not change the closing window's snapshot.
         if (glass != null) glass.close();

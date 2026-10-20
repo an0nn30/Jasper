@@ -1,5 +1,14 @@
 # Jasper — Status and Handoff
 
+**Local Meadow splash — 2026-10-20** (`codex/meadow-splash-preview`): Standard windowed launches show
+Jasper in a pixel meadow with the Meadow palette, build version and actual startup steps. A daemon animates
+blink/wave frames while startup occupies the EDT; painting is serialized and the first visible workspace paint (or startup failure) cancels
+animation before closing the window. The saved app-wide animation preference is honored. Custom branded looks
+retain their own splash, and background/headless/safe-mode launches stay silent. Sprite resources are packaged
+from the companion's approved source artwork. The browser study remains local and outside the public site bundle.
+Independent review passed after correcting the animation preference; native desktop testing remains with the user.
+
+
 **Jasper pixel sprites — 2026-10-20**: The app uses the approved shaded pixel artwork: 20 frames at 84 × 96, nearest-neighbor sampling, and a 105 × 120 default display. Animation timing and reduced-motion behavior are unchanged. The editable master, atlas, exporter and maintenance documentation match the runtime strip. Full headless `check` passed: 11,621 Java tests, zero failures/errors and 25 existing platform skips; the exporter verified all 20 frames against the runtime strip.
 
 **Windows user install from IntelliJ — 2026-10-20** (`codex/windows-user-install`):

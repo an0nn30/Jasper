@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jasper — Meadow splash preview</title>
+<style>
+:root{color-scheme:light;--paper:#FAF9F5;--panel:#F3F2E9;--ink:#302F28;--muted:#676B5C;--moss:#52643F;--line:#DADCCF}
+*{box-sizing:border-box}body{margin:0;background:#E8EADD;color:var(--ink);font:14px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;transition:background .2s}body.dark{background:#242821;color:#e3e6da}header{max-width:1040px;margin:auto;padding:30px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline}.preview-label{font:11px ui-monospace,monospace;letter-spacing:1px;text-transform:uppercase;opacity:.7}main{padding:60px 24px 32px}.viewport{width:720px;height:440px;margin:auto;position:relative}.splash{width:720px;height:440px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 24px 70px -22px #20291b40,0 2px 6px #20291b0c;position:relative;transform-origin:top left}.brand-area{position:absolute;inset:0 0 85px;display:flex;align-items:center;padding:0 54px;gap:40px}.mascot{width:168px;height:192px;flex:none;background:url('assets/jasper-app-pixel-sprites.png') 0 0 / 3360px 192px no-repeat;image-rendering:pixelated}.wordmark{margin:0 0 17px;font-size:58px;font-weight:650;letter-spacing:-2.5px;line-height:1}.tagline{margin:0;color:var(--muted);font-size:18px;line-height:1.65;letter-spacing:-.3px}.tagline code{display:block;color:var(--moss);font:22px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:-.7px}.version{margin:23px 0 0;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}.footer{position:absolute;bottom:5px;left:0;right:0;height:80px;border-top:1px solid var(--line);background:var(--panel);padding:0 32px;display:flex;justify-content:space-between;align-items:center;gap:20px}.status{font-size:12px;display:flex;align-items:center;gap:9px;margin:0}.status:before{content:"";width:5px;height:5px;border-radius:50%;background:var(--moss);flex:none}.footer small{font-size:10px;color:var(--muted)}.track{position:absolute;bottom:0;left:0;right:0;height:5px;background:#E8ECDF}.fill{height:100%;width:12%;background:var(--moss);transition:width .3s ease}.controls{max-width:720px;margin:32px auto 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}.buttons{display:flex;gap:8px}button{font:inherit;color:inherit;border:1px solid #aab29d;background:transparent;border-radius:6px;padding:9px 14px;cursor:pointer}button:hover{background:#52643f12}button.primary{background:var(--moss);color:white;border-color:var(--moss)}a:focus-visible,button:focus-visible{outline:2px solid var(--moss);outline-offset:4px}.note{max-width:720px;margin:24px auto;font-size:12px;line-height:1.7;opacity:.72}.dark button:hover{background:#ffffff12}.dark button.primary:hover{background:#64794c}@media(max-width:600px){main{padding-top:30px}header{padding:24px}.preview-label{font-size:10px}.controls{justify-content:center}.note{text-align:center}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.meadow{position:absolute;inset:0;width:720px;height:354px;pointer-events:none}.brand-area{padding-bottom:18px}.mascot{position:relative;top:18px}.brand-area>div:last-child{position:relative}.version{color:#526043}.footer{background:#F3F2E9}
+</style>
+</head>
+<body>
+<header><a href="./">← Jasper homepage</a><span class="preview-label">Meadow / splash study</span></header>
+<main>
+<div class="viewport"><section class="splash" aria-label="Jasper splash design">
+<svg class="meadow" viewBox="0 0 720 354" aria-hidden="true" shape-rendering="crispEdges">
+<rect width="720" height="354" fill="#F3F2E9"/>
+<path d="M0 0H720V214H648V204H564V198H470V204H390V218H296V208H212V194H124V202H52V218H0Z" fill="#FAF9F5"/>
+<path d="M0 246H48V230H96V218H164V226H224V244H288V252H354V242H422V226H480V214H544V208H608V220H664V236H720V354H0Z" fill="#E8ECDF"/>
+<path d="M0 284H44V268H100V260H168V270H236V286H306V302H388V292H464V276H532V260H606V254H672V264H720V354H0Z" fill="#D9E1C8"/>
+<path d="M0 326H58V310H126V302H192V310H256V324H338V338H444V328H530V310H616V304H676V316H720V354H0Z" fill="#C4D0AF"/>
+<path d="M68 292H76V288H164V292H184V300H164V304H84V300H68Z" fill="#A7B88D"/>
+<g fill="#91A775"><path d="M28 322v-16h4v8h4v-16h4v24ZM202 322v-18h4v10h4v-6h4v14ZM596 328v-20h4v12h4v-8h4v16ZM660 304v-16h4v8h4v-12h4v20Z"/></g>
+<g fill="#FAF9F5"><path d="M48 292h4v-4h4v4h4v4h-4v4h-4v-4h-4ZM230 304h4v-4h4v4h4v4h-4v4h-4v-4h-4ZM634 282h4v-4h4v4h4v4h-4v4h-4v-4h-4Z"/></g>
+<g fill="#BDA66B"><path d="M52 292h4v4h-4ZM234 304h4v4h-4ZM638 282h4v4h-4Z"/></g>
+</svg>
+<div class="brand-area"><div class="mascot" role="img" aria-label="Jasper the pixel-art turtle"></div><div><h1 class="wordmark">Jasper</h1><p class="tagline">Make yourself at <code>127.0.0.1</code></p><p class="version">VERSION 1.0.0</p></div></div>
+<div class="footer"><p class="status" id="status" role="status">Starting Java runtime…</p><small>Your infrastructure. One workspace.</small></div>
+<div class="track" role="progressbar" aria-label="Sample startup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="12"><div class="fill"></div></div>
+</section></div>
+<div class="controls"><div class="buttons"><button class="primary" id="play">Play startup</button><button id="next">Next step</button></div><button id="background" aria-pressed="false">Dark desktop</button></div>
+<p class="note">Local design preview · 720 × 440 logical pixels. Sample startup messages and timing; the app will report its real startup steps and close when ready. Jasper blinks and waves during loading; reduced-motion preferences keep him still. The preview holds the final frame for review.</p>
+</main>
+<script src="splash-preview.js"></script>
+</body>
+</html>
