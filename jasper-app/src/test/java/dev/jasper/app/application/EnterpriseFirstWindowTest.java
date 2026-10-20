@@ -37,7 +37,8 @@ class EnterpriseFirstWindowTest {
                     null, null, selection);
                 var first = application[0].windowConfiguration();
                 assertThat(first.visibleRows()).isEqualTo(8);
-                assertThat(first.toolbarHeight()).isEqualTo(34);
+                // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.
+                assertThat(first.toolbarHeight()).isEqualTo(28);
                 assertThat(first.lightTheme()).isEqualTo("enterprise");
                 assertThat(first.darkTheme()).isEqualTo("enterprise");
                 assertThat(application[0].themes().current().chrome().name()).as("the window's theme is the kit's pick").startsWith("Enterprise");

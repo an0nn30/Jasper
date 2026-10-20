@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeSelection;
 import dev.jasper.app.config.TerminalSchemeChoice;
+import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.presentation.ChromeSpec;
 import dev.jasper.app.presentation.DesktopFlags;
@@ -46,8 +47,11 @@ class ChromeRenderTest {
      * @param name the image's name
      * @param themes makes the theme controller (and so the kit) the window runs under
      * @param projections the look's projections
+     * @param platform the platform the window is built for
      */
-    record Case(String name, Supplier<ThemeController> themes, Projections projections) { }
+    record Case(String name, Supplier<ThemeController> themes, Projections projections, Projections.Platform platform) {
+        Case(String name, Supplier<ThemeController> themes, Projections projections) { this(name, themes, projections, HOST.platform()); }
+    }
 
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
@@ -79,6 +83,11 @@ class ChromeRenderTest {
         cases.add(new Case("default", () -> slateCobalt(Kit.DEFAULT), Projections.of(ChromeSpec.DEFAULT, false, false, "", HOST)));
         cases.add(new Case("enterprise", () -> EnterpriseLook.controller(false),
             Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", LINUX)));
+        // Plan 14: IntelliJ Classic's frame on macOS (the band) and Windows (FlatLaf's title pane with the menus); no mock shows them.
+        cases.add(new Case("enterprise-mac", () -> EnterpriseLook.controller(false),
+            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.MAC, true)), Projections.Platform.MAC));
+        cases.add(new Case("enterprise-windows", () -> EnterpriseLook.controller(false),
+            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.WINDOWS, false)), Projections.Platform.WINDOWS));
         cases.add(new Case("complement", () -> slateCobalt(KitFixtures.complement()), Projections.of(ChromeSpec.DEFAULT, true, true, "dev.example", HOST)));
         cases.add(new Case("fallback", () -> slateCobalt(Kit.DEFAULT), Projections.fallback(new DesktopFlags(false, true), HOST)));
         var rows = covering();
@@ -100,7 +109,15 @@ class ChromeRenderTest {
         if (bar == null) {
             assertThat(root.getJMenuBar()).as(look.name() + ": the menus are a row of the window").isSameAs(owner.menuBar());
             int contentTop = SwingUtilities.convertPoint(owner, 0, 0, root).y;
-            assertThat(contentTop).as(look.name() + ": the content meets the menu row flush").isEqualTo(root.getJMenuBar().getHeight());
+            // FlatLaf's Windows window border puts the layered pane, where the inset is measured, 1 px into the root.
+            int expected = !window.classicTitle() ? root.getJMenuBar().getHeight()
+                : owner.titleBand() != null ? MacTitleBand.HEIGHT : SwingUtilities.convertPoint(root.getContentPane(), 0, 0, root).y;
+            assertThat(contentTop).as(look.name() + ": the content meets the title chrome flush").isEqualTo(expected);
+            if (window.classicTitle()) {
+                assertThat(contentTop).as(look.name() + ": a classic title takes room").isPositive();
+                assertThat(dev.jasper.app.platform.TitleInset.of(root)).as(look.name() + ": the classic title's inset")
+                    .isEqualTo(contentTop - root.getLayeredPane().getY());
+            }
             var header = owner.chrome().header();
             if (header.getParent() == owner) assertThat(header.getY()).as(look.name() + ": no gutter above the header").isZero();
         }
@@ -162,10 +179,17 @@ class ChromeRenderTest {
                 MacTitleBar bar = null;
                 try {
                     var window = WindowLook.of(look.projections());
-                    var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, window.chrome());
+                    var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, window.chrome(),
+                        look.platform() == Projections.Platform.MAC);
                     owner.connectContributions(WindowChromeMenusTest.model(false));
                     var root = new JRootPane();
+                    if (window.classicTitle() && look.platform() == Projections.Platform.WINDOWS) {
+                        root.setWindowDecorationStyle(JRootPane.FRAME);
+                        root.updateUI();
+                    }
                     bar = WindowContent.mount(root, owner, window, title -> { });
+                    // macOS shows the root's menus in the screen menu bar, not in the window.
+                    if (window.classicTitle() && look.platform() == Projections.Platform.MAC) root.getJMenuBar().setVisible(false);
                     MockProfile.write(MockProfile.print(root, 1200, 700), "chrome-" + look.name());
                     check(look, owner, root, bar);
                 } finally {

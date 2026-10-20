@@ -2,7 +2,7 @@ kit = 1
 base = "classic"
 
 [chrome]
-title_bar = "native"
+title_bar = "classic"
 menu_bar = "window"
 window_title = "Workstation — {session} — {directory}"
 tool_windows = "stripes"
@@ -69,5 +69,5 @@ splash_art = "splash/art.svg"
 "ui.theme.light" = "enterprise"
 "ui.theme.dark" = "enterprise"
 "palette.visible_rows" = 8
-"window.toolbar_height" = 34
+"window.toolbar_height" = 28
 "window.toolbar" = "icons"

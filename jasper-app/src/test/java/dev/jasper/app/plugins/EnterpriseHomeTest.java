@@ -33,7 +33,8 @@ class EnterpriseHomeTest {
         try (var service = new ConfigService(root.resolve("config.toml"), false, on.presentation().defaults())) {
             var snapshot = service.initialState().snapshot();
             assertThat(snapshot.visibleRows()).isEqualTo(8);
-            assertThat(snapshot.toolbarHeight()).isEqualTo(34);
+            // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.
+            assertThat(snapshot.toolbarHeight()).isEqualTo(28);
             assertThat(snapshot.lightTheme()).isEqualTo("enterprise");
             assertThat(snapshot.darkTheme()).isEqualTo("enterprise");
         }
