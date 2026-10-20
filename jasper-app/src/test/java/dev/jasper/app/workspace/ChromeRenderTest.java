@@ -71,7 +71,8 @@ class ChromeRenderTest {
                     ChromeSpec.ToolWindows.valueOf(v[3].toUpperCase()), ChromeSpec.EditorTabs.valueOf(v[4].toUpperCase()),
                     ChromeSpec.StatusBar.valueOf(v[5].toUpperCase()), ChromeSpec.PaletteKind.valueOf(v[6].toUpperCase()),
                     ChromeSpec.DialogKind.valueOf(v[7].toUpperCase()), ChromeSpec.MotionKind.valueOf(v[8].toUpperCase()),
-                    ChromeSpec.Icons.CLASSIC));
+                    // Held at classic and field: ChromeArtworkTest covers the icons, ClassicHeaderTest the search icon (plan 15b Rulings 8).
+                    ChromeSpec.Icons.CLASSIC, ChromeSpec.ToolbarSearch.FIELD));
             }
             return rows;
         } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }

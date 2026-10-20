@@ -61,7 +61,7 @@ public final class KitParser {
     private static final Pattern TOKEN = Pattern.compile("\\{([^{}]*)}");
     private static final Set<String> TITLE_TOKENS = Set.of("context", "session", "directory");
     private static final List<String> CHROME = List.of("title_bar", "menu_bar", "window_title", "tool_windows", "editor_tabs",
-        "status_bar", "palette", "dialogs", "motion", "icons");
+        "status_bar", "palette", "dialogs", "motion", "icons", "toolbar_search");
     private static final List<String> CONTROLS = List.of("toggle", "exclusive", "tabs", "group", "form_label", "empty", "table",
         "tree", "stepper", "ordered_list", "buttons", "tag", "route", "prompt");
 
@@ -316,9 +316,13 @@ public final class KitParser {
         var dialogs = point(table, "chrome", "dialogs", ChromeSpec.DialogKind.class, base.dialogs());
         var motion = point(table, "chrome", "motion", ChromeSpec.MotionKind.class, base.motion());
         var icons = point(table, "chrome", "icons", ChromeSpec.Icons.class, base.icons());
+        var toolbarSearch = point(table, "chrome", "toolbar_search", ChromeSpec.ToolbarSearch.class, base.toolbarSearch());
         if (menuBar == ChromeSpec.MenuBar.WINDOW && titleBar == ChromeSpec.TitleBar.UNIFIED)
             throw new Invalid("[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\" or \"classic\"");
-        return new ChromeSpec(titleBar, menuBar, title, toolWindows, editorTabs, statusBar, palette, dialogs, motion, icons);
+        if (toolbarSearch == ChromeSpec.ToolbarSearch.ICON
+                && (palette != ChromeSpec.PaletteKind.RUN_WINDOW || titleBar == ChromeSpec.TitleBar.UNIFIED))
+            throw new Invalid("[chrome].toolbar_search: \"icon\" needs [chrome].palette = \"run_window\" and [chrome].title_bar = \"native\" or \"classic\"");
+        return new ChromeSpec(titleBar, menuBar, title, toolWindows, editorTabs, statusBar, palette, dialogs, motion, icons, toolbarSearch);
     }
 
     private static String windowTitle(String text) throws Invalid {

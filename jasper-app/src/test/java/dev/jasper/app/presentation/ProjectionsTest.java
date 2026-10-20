@@ -116,7 +116,8 @@ class ProjectionsTest {
         for (var dialogs : ChromeSpec.DialogKind.values()) for (var motion : ChromeSpec.MotionKind.values())
         for (String template : new String[] {"{context}", "Workstation — {session} — {directory}"}) {
             if (menu == ChromeSpec.MenuBar.WINDOW && title == ChromeSpec.TitleBar.UNIFIED) continue;
-            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion, ChromeSpec.Icons.NEW_UI);
+            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion, ChromeSpec.Icons.NEW_UI,
+                ChromeSpec.ToolbarSearch.FIELD);
             for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX})
                 assertThatCode(() -> Projections.of(chrome, true, true, "p", host)).doesNotThrowAnyException();
             if (title != ChromeSpec.TitleBar.CLASSIC)
@@ -166,7 +167,7 @@ class ProjectionsTest {
     @Test void labelledStripesHideThePanelRailWidth() {
         var d = ChromeSpec.DEFAULT;
         var stripes = new ChromeSpec(d.titleBar(), d.menuBar(), d.windowTitle(), ChromeSpec.ToolWindows.STRIPES, d.editorTabs(),
-            d.statusBar(), d.palette(), d.dialogs(), d.motion(), d.icons());
+            d.statusBar(), d.palette(), d.dialogs(), d.motion(), d.icons(), d.toolbarSearch());
         for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX}) {
             assertThat(Projections.of(stripes, false, false, "p", host).settings().hiddenKeys()).contains("window.rail_width");
             assertThat(Projections.of(d, false, false, "", host).settings().hiddenKeys()).doesNotContain("window.rail_width");
@@ -229,6 +230,21 @@ class ProjectionsTest {
             .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.NATIVE, PluginLook.Menus.WINDOW, PluginLook.Search.FIELD));
         var nativeWindowMenus = EnterpriseLook.titled(classic, ChromeSpec.TitleBar.NATIVE);
         assertThat(Projections.of(nativeWindowMenus, true, true, "dev.jasper.enterprise", MAC).plugins().menus()).isEqualTo(PluginLook.Menus.WINDOW);
+    }
+
+    /** Plan 15b: the kit's [chrome] toolbar_search reaches the workspace's classic header and the plugins' look. */
+    @Test void theToolbarSearchReachesTheWorkspaceAndPlugins() {
+        var c = ChromeSpec.CLASSIC;
+        var icon = new ChromeSpec(c.titleBar(), c.menuBar(), c.windowTitle(), c.toolWindows(), c.editorTabs(), c.statusBar(), c.palette(),
+            c.dialogs(), c.motion(), c.icons(), ChromeSpec.ToolbarSearch.ICON);
+        for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX}) {
+            var projections = Projections.of(icon, true, true, "p", host);
+            assertThat(projections.workspace().search()).as("%s", host).isEqualTo(WorkspaceLook.Search.ICON);
+            assertThat(projections.plugins().search()).as("%s", host).isEqualTo(PluginLook.Search.ICON);
+            var standard = Projections.of(ChromeSpec.DEFAULT, false, false, "", host);
+            assertThat(standard.workspace().search()).as("%s", host).isEqualTo(WorkspaceLook.Search.FIELD);
+            assertThat(standard.plugins().search()).as("%s", host).isEqualTo(PluginLook.Search.FIELD);
+        }
     }
 
     /** Plan 15a Rulings 7: the fallback's plugin look is the default look's under the flags committed before AWT. */

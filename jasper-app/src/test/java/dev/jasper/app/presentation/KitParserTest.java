@@ -157,7 +157,7 @@ class KitParserTest {
         assertThat(parsed.chrome()).isEqualTo(new ChromeSpec(ChromeSpec.TitleBar.NATIVE, ChromeSpec.MenuBar.WINDOW,
             "Workstation — {session} — {directory}", ChromeSpec.ToolWindows.STRIPES, ChromeSpec.EditorTabs.CLASSIC,
             ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE,
-            ChromeSpec.Icons.CLASSIC));
+            ChromeSpec.Icons.CLASSIC, ChromeSpec.ToolbarSearch.FIELD));
         assertThat(parsed.kit().controls()).isEqualTo(new ControlVariants(ControlVariants.Toggle.CHECKBOX, ControlVariants.Exclusive.RADIOS,
             ControlVariants.Tabs.FOLDER, ControlVariants.Group.TITLED_BOX, ControlVariants.FormLabel.COLON, ControlVariants.Empty.TEXT,
             ControlVariants.Table.CLASSIC, ControlVariants.Tree.CLASSIC, ControlVariants.Stepper.SPINNER, ControlVariants.OrderedList.SIDE_COLUMN,
@@ -229,6 +229,14 @@ class KitParserTest {
         }
     }
 
+    /** Plan 15b: the toolbar's Search Everywhere is the field in both bases; a kit may name IntelliJ Classic's icon. */
+    @Test void theToolbarSearchPointDefaultsToTheFieldAndTakesTheIcon() throws Exception {
+        assertThat(parse("kit = 1\nbase = \"classic\"\n").chrome().toolbarSearch()).isEqualTo(ChromeSpec.ToolbarSearch.FIELD);
+        assertThat(parse("kit = 1\nbase = \"default\"\n").chrome().toolbarSearch()).isEqualTo(ChromeSpec.ToolbarSearch.FIELD);
+        assertThat(parse("kit = 1\nbase = \"classic\"\n[chrome]\ntoolbar_search = \"icon\"\n").chrome().toolbarSearch())
+            .as("the classic base has the Run window and a native title").isEqualTo(ChromeSpec.ToolbarSearch.ICON);
+    }
+
     @Test void aDefaultsThemeMayBeBuiltInOrDeclaredAndADeclaredThemeThatDidNotLoadIsDropped() throws Exception {
         var builtIn = parse("kit = 1\nbase = \"default\"\n[defaults]\n\"ui.theme.light\" = \"catppuccin-latte\"\n");
         assertThat(builtIn.defaults().value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("catppuccin-latte");
@@ -267,6 +275,11 @@ class KitParserTest {
         cases.put(head + "[type]\nbase = 9\n", "[type].base: 9 is not a body size from 10 to 16");
         cases.put(head + "[type]\nbase = 12.5\n", "[type].base: expected an integer");
         cases.put(head + "[chrome]\nmenu_bar = \"window\"\n", "[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\" or \"classic\"");
+        String iconNeeds = "[chrome].toolbar_search: \"icon\" needs [chrome].palette = \"run_window\" and [chrome].title_bar = \"native\" or \"classic\"";
+        cases.put(head + "[chrome]\ntoolbar_search = \"icon\"\n", iconNeeds);
+        cases.put("kit = 1\nbase = \"classic\"\n[chrome]\ntoolbar_search = \"icon\"\npalette = \"anchored\"\n", iconNeeds);
+        cases.put("kit = 1\nbase = \"classic\"\n[chrome]\ntoolbar_search = \"icon\"\ntitle_bar = \"unified\"\nmenu_bar = \"system\"\n", iconNeeds);
+        cases.put(head + "[chrome]\ntoolbar_search = \"box\"\n", "[chrome].toolbar_search: \"box\" is not one of field, icon");
         cases.put(head + "[defaults]\n\"ui.font.size\" = 12\n", "[defaults].\"ui.font.size\": not a setting a look may default; use "
             + "\"ui.theme.light\", \"ui.theme.dark\", \"palette.visible_rows\", \"window.toolbar_height\" or \"window.toolbar\"");
         cases.put(head + "[defaults]\n\"palette.visible_rows\" = 30\n", "[defaults].\"palette.visible_rows\": Use an integer from 1–20.");

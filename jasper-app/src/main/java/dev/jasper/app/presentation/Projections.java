@@ -95,6 +95,8 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
         // IntelliJ Classic shows its macOS menus only in the screen menu bar; on Windows they stay in the window's title bar.
         boolean shellWindowMenus = windowMenus && !(classicTitle && host.mac());
         boolean stripes = chrome.toolWindows() == ChromeSpec.ToolWindows.STRIPES, runWindow = chrome.palette() == ChromeSpec.PaletteKind.RUN_WINDOW;
+        // ChromeSpec's constraint gives the icon a classic header and the Run window (spec 5.3).
+        boolean iconSearch = chrome.toolbarSearch() == ChromeSpec.ToolbarSearch.ICON;
         var desktop = new DesktopFlags(screenMenuBar, nativeTitle);
         var workspace = new WorkspaceLook(windowMenus ? WorkspaceLook.Menus.CLASSIC : WorkspaceLook.Menus.STANDARD,
             unified ? WorkspaceLook.Header.UNIFIED : WorkspaceLook.Header.CLASSIC,
@@ -103,7 +105,8 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
             chrome.statusBar() == ChromeSpec.StatusBar.CELLS ? WorkspaceLook.Status.RULED : WorkspaceLook.Status.SLASH,
             chrome.palette() == ChromeSpec.PaletteKind.RUN_WINDOW,
             stripes ? WorkspaceLook.FrameStyle.FLUSH : WorkspaceLook.FrameStyle.STANDARD,
-            chrome.icons() == ChromeSpec.Icons.CLASSIC ? WorkspaceLook.Icons.CLASSIC : WorkspaceLook.Icons.NEW_UI);
+            chrome.icons() == ChromeSpec.Icons.CLASSIC ? WorkspaceLook.Icons.CLASSIC : WorkspaceLook.Icons.NEW_UI,
+            iconSearch ? WorkspaceLook.Search.ICON : WorkspaceLook.Search.FIELD);
         var shell = new ShellLook(unified && host.unifiedTitleSupported(), shellWindowMenus, !unified, classicTitle);
         var palette = new PaletteLook(runWindow ? PaletteLook.View.RUN_WINDOW : PaletteLook.View.CARD,
             runWindow ? PaletteLook.Home.UPPER : PaletteLook.Home.TITLE_FIELD);
@@ -115,7 +118,7 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
         var plugins = new PluginLook(classicBase, chrome.icons() == ChromeSpec.Icons.CLASSIC, stripes,
             unified ? PluginLook.TitleBar.UNIFIED : classicTitle ? PluginLook.TitleBar.CLASSIC : PluginLook.TitleBar.NATIVE,
             host.mac() ? (screenMenuBar ? PluginLook.Menus.SCREEN_MENU_BAR : PluginLook.Menus.WINDOW)
-                : (nativeTitle ? PluginLook.Menus.WINDOW : PluginLook.Menus.TITLE_BAR), PluginLook.Search.FIELD);
+                : (nativeTitle ? PluginLook.Menus.WINDOW : PluginLook.Menus.TITLE_BAR), iconSearch ? PluginLook.Search.ICON : PluginLook.Search.FIELD);
         return new Projections(desktop, workspace, shell, palette, settings, classicBase ? Composition.CLASSIC : Composition.ROWS,
             new DialogMapping(chrome.dialogs() == ChromeSpec.DialogKind.CLASSIC ? DialogMapping.Kind.CLASSIC : DialogMapping.Kind.AS_REQUESTED, !unified),
             chrome.motion() == ChromeSpec.MotionKind.NONE ? Motion.NONE : Motion.STANDARD, new TitleFormat(chrome.windowTitle()),

@@ -22,7 +22,7 @@ public final class EnterpriseLook {
     public static final ChromeSpec CHROME = new ChromeSpec(ChromeSpec.TitleBar.CLASSIC, ChromeSpec.MenuBar.WINDOW,
         "Workstation — {session} — {directory}", ChromeSpec.ToolWindows.STRIPES, ChromeSpec.EditorTabs.CLASSIC,
         ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE,
-        ChromeSpec.Icons.CLASSIC);
+        ChromeSpec.Icons.CLASSIC, ChromeSpec.ToolbarSearch.FIELD);
 
     private EnterpriseLook() { }
 
@@ -35,7 +35,7 @@ public final class EnterpriseLook {
      */
     public static ChromeSpec titled(ChromeSpec spec, ChromeSpec.TitleBar title) {
         return new ChromeSpec(title, spec.menuBar(), spec.windowTitle(), spec.toolWindows(), spec.editorTabs(), spec.statusBar(), spec.palette(),
-            spec.dialogs(), spec.motion(), spec.icons());
+            spec.dialogs(), spec.motion(), spec.icons(), spec.toolbarSearch());
     }
 
     /** The shipped Enterprise kit; its IBM Plex files are registered first. */

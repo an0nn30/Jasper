@@ -30,6 +30,18 @@ import javax.swing.JButton;
  */
 final class ClassicHeader implements HeaderComposition {
     private final WindowToolbar trailing = new WindowToolbar(() -> { });
+    /** Whether the toolbar offers Search Everywhere as IntelliJ Classic's icon button rather than the field (plan 15b). */
+    private final boolean iconSearch;
+
+    /** The classic row with the search field. */
+    ClassicHeader() { this(false); }
+
+    /**
+     * The classic row.
+     *
+     * @param iconSearch whether Search Everywhere is an icon button rather than the field
+     */
+    ClassicHeader(boolean iconSearch) { this.iconSearch = iconSearch; }
 
     private static int metric(DesignMetrics.Role role) { return UIScale.scale(FlatLafInstaller.installedKit().metrics().value(role)); }
 

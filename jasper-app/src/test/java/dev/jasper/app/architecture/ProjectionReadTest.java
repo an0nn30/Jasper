@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 class ProjectionReadTest {
     /** A variant pattern over internal names, and the classes that may read it. */
     static final Map<Pattern, Predicate<String>> PROJECTION_READERS = Map.of(
-        Pattern.compile("dev/jasper/app/presentation/WorkspaceLook\\$(?:Menus|Header|Stripes|Tabs|Status|FrameStyle|Icons)(?=[;$.]|$)"),
+        Pattern.compile("dev/jasper/app/presentation/WorkspaceLook\\$(?:Menus|Header|Stripes|Tabs|Status|FrameStyle|Icons|Search)(?=[;$.]|$)"),
             type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/workspace/WorkspaceChrome")
                 || type.startsWith("dev/jasper/app/workspace/WorkspaceChrome$"),
         Pattern.compile("dev/jasper/app/presentation/Motion(?=[;$.]|$)"),
@@ -115,6 +115,10 @@ class ProjectionReadTest {
         byte[] icons = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.WindowIconsProbe"), builder -> builder
             .withField("icons", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Icons"), ClassFile.ACC_PRIVATE));
         assertThat(projectionReaders(List.of(icons))).hasSize(1);
+        // Plan 15b: so does the toolbar's search.
+        byte[] search = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.WindowSearchProbe"), builder -> builder
+            .withField("search", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Search"), ClassFile.ACC_PRIVATE));
+        assertThat(projectionReaders(List.of(search))).hasSize(1);
     }
 
     /** Plan 8b (spec 16.1.8): the palette's strategies, its two views and two homes. */
