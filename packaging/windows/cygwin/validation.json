@@ -1,0 +1,9 @@
+{
+  "seed": "8093925a9b40473df99b261dd8a233a177c7f138f442ca77afde67a5c53a6cf6eaad72ea6e10e5a64b0dd8e22988ef7f9e0809e1a8bba3ead8e8b349c0b5152c",
+  "aarch64": true,
+  "amd64": false,
+  "interactiveApps": {
+    "aarch64": false,
+    "amd64": false
+  }
+}

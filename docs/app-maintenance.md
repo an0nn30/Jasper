@@ -725,3 +725,6 @@ pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifest
 The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
 rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
 content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.
+
+Bundled Windows Cygwin provisioning, seed refresh, ownership/recovery and native
+acceptance are documented in the [Cygwin guide](../packaging/windows/cygwin/README.md).

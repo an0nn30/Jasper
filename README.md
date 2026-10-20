@@ -100,7 +100,12 @@ in `%APPDATA%\JasperApp` with a Start Menu shortcut. It requires no MSVC, WiX, i
 or administrator rights. A Java helper copies files and creates the shortcut through
 Windows APIs, so PowerShell script execution can remain disabled. Windows must permit
 running the generated executable. Both tasks compile the small helper with JBR SDK 25;
-uninstall does not build the application.
+uninstall does not build the application. The task also installs the pinned Cygwin starter
+set in `%LOCALAPPDATA%\Jasper\cygwin`, using bundled Setup and relay binaries. Gradle
+fetches only hash-locked artifacts using Java; installation works offline once staged.
+Select **Cygwin Bash** in the shell settings and use **Manage Cygwin packages…** to add
+tools. Updates and uninstall preserve the Cygwin root, packages and user files. See the
+[Cygwin guide](packaging/windows/cygwin/README.md) for package management and recovery.
 
 Exit Jasper, including its background process, before installing an update or running
 `.\gradlew.bat :jasper-app:uninstallWindowsUser`. Uninstall removes this installation,

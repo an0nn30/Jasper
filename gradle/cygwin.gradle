@@ -132,17 +132,28 @@ tasks.register('verifyCygwinManifest', JavaExec) {
 tasks.named('check') { dependsOn('verifyCygwinManifest') }
 
 def seedLock = rootProject.file('packaging/windows/cygwin/seed.lock.json')
+def retainedSeed = providers.gradleProperty('jasper.cygwinSnapshot').map { file(it) }
+    .orElse(layout.buildDirectory.dir('cygwin/downloads').map { it.asFile })
+def acquireSeed = tasks.register('acquireCygwinSeed', JavaExec) {
+    group = 'distribution'
+    description = 'Obtains only hash-locked seed artifacts using the JDK; no package resolution or external tools.'
+    dependsOn(compileBundle)
+    classpath = files(bundleClasses)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'BundleTool'
+    onlyIf { !providers.gradleProperty('jasper.cygwinSnapshot').isPresent() }
+    doFirst { setArgs(['acquire', seedLock.absolutePath, retainedSeed.get().absolutePath,
+        rootProject.file('packaging/windows/cygwin/seed-support').absolutePath]) }
+}
 ['verify', 'stage'].each { action ->
     tasks.register("${action}CygwinSeed", JavaExec) {
         group = 'distribution'
-        dependsOn(compileBundle)
+        dependsOn(compileBundle, acquireSeed)
         classpath = files(bundleClasses)
         javaLauncher = javaToolchains.launcherFor(java.toolchain)
         mainClass = 'BundleTool'
         doFirst {
-            String snapshot = providers.gradleProperty('jasper.cygwinSnapshot').orNull
-            if (!snapshot) throw new GradleException('Set -Pjasper.cygwinSnapshot to the retained immutable snapshot directory; refresh is a separate maintainer operation')
-            def arguments = [action, seedLock.absolutePath, file(snapshot).absolutePath]
+            def arguments = [action, seedLock.absolutePath, retainedSeed.get().absolutePath]
             if (action == 'stage') arguments.add(layout.buildDirectory.dir('cygwin/seed').get().asFile.absolutePath)
             setArgs(arguments)
         }
@@ -153,7 +164,7 @@ tasks.register('refreshCygwinSeed', Exec) {
     description = 'Creates a new candidate snapshot from signed metadata and reviewed licenses; never modifies the committed lock.'
     doFirst {
         def arguments = [providers.gradleProperty('jasper.python').getOrElse('python3'), rootProject.file('packaging/windows/cygwin/seed_refresh.py').absolutePath]
-        ['mirror', 'snapshot', 'metadata', 'licenses', 'relays', 'installed-bytes'].each { key ->
+        ['mirror', 'snapshot', 'metadata', 'licenses', 'relays', 'setup-source', 'installed-bytes'].each { key ->
             String value = providers.gradleProperty("jasper.cygwinRefresh.${key}").orNull
             if (!value) throw new GradleException("Set -Pjasper.cygwinRefresh.${key} for explicit refresh")
             arguments.addAll(["--${key}", value])
@@ -216,5 +227,31 @@ tasks.register('probeCygwinProduction', JavaExec) {
         systemProperty('jasper.cygwinProbeRelay', new File(binaries, 'backend.exe').absolutePath)
         ['aarch64', 'amd64'].each { arch -> systemProperty("jasper.cygwinProbeFrontend.${arch}", new File(binaries, "frontend-${arch}.exe").absolutePath) }
         args(scratch, runtime)
+    }
+}
+
+// Release verification is stricter than local user installation: native evidence is tied to this seed.
+tasks.register('verifyCygwinDistribution', JavaExec) {
+    group = 'verification'
+    dependsOn('stageCygwinSeed', cygwinTool)
+    classpath = files(bundleClasses)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'BundleTool'
+    doFirst {
+        String arch = System.getProperty('os.arch') in ['aarch64', 'arm64'] ? 'aarch64' : 'amd64'
+        setArgs(['distribution', seedLock.absolutePath, layout.buildDirectory.dir('cygwin/seed').get().asFile.absolutePath,
+            cygwinTool.get().archiveFile.get().asFile.absolutePath,
+            rootProject.file('packaging/windows/cygwin/validation.json').absolutePath, arch])
+    }
+}
+tasks.register('cygwinSourcesZip', Zip) {
+    group = 'distribution'
+    dependsOn('stageCygwinSeed')
+    archiveFileName = providers.provider { "Jasper-${jasperPackageVersion.get()}-cygwin-sources-${System.getProperty('os.arch')}.zip" }
+    destinationDirectory = layout.buildDirectory.dir('packaging/dist')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    from(layout.buildDirectory.dir('cygwin/seed')) {
+        include('seed.lock.json', '**/*-src.tar.*', 'notices/**', 'setup-source/**', 'relay/*.c', 'relay/*.cpp', 'relay/LICENSE.md')
     }
 }

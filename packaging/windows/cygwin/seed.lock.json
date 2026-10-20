@@ -1,0 +1,3389 @@
+{
+  "schema": 1,
+  "architecture": "x86_64",
+  "installedBytes": 831247849,
+  "setup": "setup-x86_64.exe",
+  "metadata": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/setup.xz",
+  "signature": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/setup.xz.sig",
+  "artifacts": [
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/_autorebase/_autorebase-001091-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/_autorebase/_autorebase-001091-1-src.tar.zst",
+      "bytes": 5473,
+      "sha512": "f081ae1c940e768aeb0ba0a38416b7a61c637e3501147ce97258689eed2809cf9201e75b85b1fee021ef8435515b03e065d2587d9df6e86cd27be7e6fbf8d1bb"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/_autorebase/_autorebase-001091-1.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/_autorebase/_autorebase-001091-1.tar.zst",
+      "bytes": 4696,
+      "sha512": "a9416ce992ca57f3a6208f46517520d21dfac61988ac84cbb5b17b76e053a0845c15368ccb8ca9c483d8935f9e3db81568433c0d08d0265ec5e6916ea30f2831"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/base-cygwin/base-cygwin-3.8-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/base-cygwin/base-cygwin-3.8-2-src.tar.xz",
+      "bytes": 2048,
+      "sha512": "3da8285d62e5e4a566cb8ef9e8983e46dd029153014d8006aa4c41495b9760a46b3fe7c03950d5338841a671239eeb75227b8417d08401a62066239c572be91d"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/base-cygwin/base-cygwin-3.8-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/base-cygwin/base-cygwin-3.8-2.tar.xz",
+      "bytes": 1260,
+      "sha512": "e03949b4ae6b692858e1d29fb764afbda990c07a6b70b0eb7219fc12f28dfba3cf7e757a7570c31e315be79f091b012d6a6ddafdb4b0b8961afe9af9f4977fab"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/base-files/base-files-4.3-3-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/base-files/base-files-4.3-3-src.tar.zst",
+      "bytes": 50914,
+      "sha512": "7fe6bd65c3d1a5a15fe4af0db15177c7fd7db0d2ac66389e3ece71e27ee7ef9a6f768baf3f047d25ca53acdb5758eefa3fee8e1543420e9ab7c6dd32122c3f0c"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/base-files/base-files-4.3-3.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/base-files/base-files-4.3-3.tar.zst",
+      "bytes": 46481,
+      "sha512": "dfafbe28fbe89d9b72a2eeb10901712e04de71d9089a85cfd2b8d45ffd739bdd49dadb7b57d098f01b8902456f5b839e9d4a10dbd6a8001573e035fde6797b63"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-noarch.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-noarch.tar.zst",
+      "bytes": 915867,
+      "sha512": "d3a34f94f0b394df540c730e232836551cf9cb1793f35fa4de6d615a5373dd3d8e584feab3a32f1ca72b996d552a68333211588132a86cccaabe2f87091df17b"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-src.tar.zst",
+      "bytes": 575212,
+      "sha512": "679bae01de8782dc3aa873723e3f1ccc0ea0bc64c9e3754527c6f1d16cbc6c7d336dbd3b0d2fb8b45c801d8b7aa10f9738107a8e9ccc9452a23286c62678bea8"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/crypto-policies/crypto-policies-20190218-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/crypto-policies/crypto-policies-20190218-1-src.tar.xz",
+      "bytes": 35588,
+      "sha512": "5c8b2319692abd3c0019f8bd53e31a86d663d42e4c1ac08579c918f410bd26fc84f6af72db34fee4f7b568f17f4bf1a695a03943d757094bbf590671e29cb8dd"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/crypto-policies/crypto-policies-20190218-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/crypto-policies/crypto-policies-20190218-1.tar.xz",
+      "bytes": 14032,
+      "sha512": "44d50ff08528df786eeb26ec1d312445ec92d77ecc9f448a3b741f7647e187f11eabdc0b38f8ab8de803e21d2e610f67eb44de7554f3fa83f6e8172e609b0054"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/perl-Error/perl-Error-0.17030-2-noarch.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/perl-Error/perl-Error-0.17030-2-noarch.tar.zst",
+      "bytes": 32617,
+      "sha512": "fc409871055bf05826f889a5d22f0d342a003cd81321f82d414260139941961d904fde2f8bd34129f6d54ac6f07f8df3d3c876d9d89ab2cc79dcb6fc48191dea"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/perl-Error/perl-Error-0.17030-2-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/perl-Error/perl-Error-0.17030-2-src.tar.zst",
+      "bytes": 34396,
+      "sha512": "1ab98bbbe103fe3e28756d01fd704c47fec1c86036c3269daca06881fb3658f13e21f016b946d30a9e1ae12e02ae1dd0c1743b061ad4ce0f9bb62583c6a379d1"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/publicsuffix-list/publicsuffix-list-dafsa/publicsuffix-list-dafsa-20260724-1-noarch.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/publicsuffix-list/publicsuffix-list-dafsa/publicsuffix-list-dafsa-20260724-1-noarch.tar.xz",
+      "bytes": 52696,
+      "sha512": "283f77ab69512f8530f98ada3045c8b809077b2b8837dc270e3f4d12c5ff497f42bd90d43e5afac19a31bf7c2ee2fc244d89086378ce4f4773605c34acf34f0b"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/tzdata/tzdata-2026e-1-noarch.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/tzdata/tzdata-2026e-1-noarch.tar.xz",
+      "bytes": 185808,
+      "sha512": "3d85ba57adf847f84b257a49d20ab9ee041fab69cb8b0b7a61202fd208cfd69549bc192f192ceace0323c50a2af5b6163cdbfbc188c914465cca89ab4cccf4d1"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/attr/attr-2.5.2-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/attr/attr-2.5.2-2-src.tar.xz",
+      "bytes": 69476,
+      "sha512": "83ea7fe61d77ccf771d2ecceeed37543dfff4b381e2b08c180e91cce396336a2b8e97e404cf9b0062cdff4ff35678d1b8902d611c5c074019f172718179e3a18"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/brotli/brotli-1.2.0-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/brotli/brotli-1.2.0-2-src.tar.xz",
+      "bytes": 645860,
+      "sha512": "a2c0bf5873c99e82d7aea769a01fbdc37b5c2e80df90cbee4dd84a58912fb1c46b2778898b62a530979310bfb820f2cc52a510fd437bf1c2b35db4d399a400ef"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/curl/curl-8.23.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/curl/curl-8.23.0-1-src.tar.xz",
+      "bytes": 9925884,
+      "sha512": "78658bc0412293279a97957a4fb3f6659de53422b0305be9aa399943420095e51535be2f48a5259bdde5b038b487f7030cd8ae38bf043b4273e6f26e71953d6a"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/cygrunsrv/cygrunsrv-1.65-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/cygrunsrv/cygrunsrv-1.65-1-src.tar.xz",
+      "bytes": 51980,
+      "sha512": "65e51c6f213bd4a0d935c708bc38641c2060e2ae5ec4d3d4097ee0d9ed7c0c7b2703ab44823529d308d4fe254c9b0c0c5b381ecb18284da0a0947d28889582fd"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/cygwin/cygwin-3.6.11-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/cygwin/cygwin-3.6.11-1-src.tar.xz",
+      "bytes": 9316544,
+      "sha512": "0c90f92e714d69013cf9281647a75737952f44acca556959645a7a0669606e2c9caa8217abee667c795824ff6fbe711a020b75d8043818c828713570652bec32"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/expat/expat-2.9.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/expat/expat-2.9.0-1-src.tar.xz",
+      "bytes": 688048,
+      "sha512": "5375648d000581d25011db3bd4685a5a64effdde3aac8f63c243c6ade3e1c7e765f5d0c353a57a8058935e90876523b1179b2a9b27e4f0b0778197f427183ebd"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/file/file-5.46-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/file/file-5.46-1-src.tar.xz",
+      "bytes": 1317524,
+      "sha512": "38ea441103e0802ce920b61f75b87e2f440c1b6a0008ef24bfb842e10c7d2e8bc51733a3f4a1ca4c1df8ad1d7473b92a73c2ce92eaff6a9c138dab2054f62418"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/gawk/gawk-5.4.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/gawk/gawk-5.4.0-1-src.tar.xz",
+      "bytes": 4661040,
+      "sha512": "5c23e610288d88531bb906bc6cd16db784d404778bc7ca10a1575f80f346593fd5091cf6f2c5220fe98ba952a11325bd53fa548eef26bb6637f5ac99f99dde4b"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/groff/groff-1.24.2-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/groff/groff-1.24.2-1-src.tar.zst",
+      "bytes": 8976228,
+      "sha512": "d6b0963da8cff079b82196503b6db602e417bf6e8c5981da3ec986231dcf329972adef5041abe1ec2335a47654ed721a1e19ac3bc71ad1005189d07b8e561d21"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/gzip/gzip-1.15-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/gzip/gzip-1.15-1-src.tar.xz",
+      "bytes": 812316,
+      "sha512": "eefa397a72b77a3a68391c8a43c657592fe3405f90c7ef877240146e804ddf90bbfe546860ef1fa671afa3ae24a299d468abe3e3ec8512a6cfcb9f9d373d76cf"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/less/less-710-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/less/less-710-1-src.tar.xz",
+      "bytes": 923436,
+      "sha512": "d9e4748f28689161b904e4acb82f28e562dc1d0b2b78103a3a1e5b824874d337d6ea092aa625b313d66603d8d5b16b63bafee013e303fee38936f943acf9bd4b"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libargp/libargp-20250917-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libargp/libargp-20250917-2-src.tar.xz",
+      "bytes": 5896632,
+      "sha512": "bed6ebfd1770f6e7bebbf8cd812e0da7545c75b1e24dda42c89d790a9d9d6e26c4a57a958da8860b14e2f00020246884c217cd57dcaddea14e14caf89067654c"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libedit/libedit-20251016-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libedit/libedit-20251016-1-src.tar.xz",
+      "bytes": 551648,
+      "sha512": "94828de5e9c90be56c56b198074a9a1cd13a0143b0a9708ca1d765c95b079e86261f326664b5eb955b43e9e0e4a0d9283074779f0e580fd74aabfeafdd2e53d4"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libffi/libffi-3.8.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libffi/libffi-3.8.0-1-src.tar.xz",
+      "bytes": 1583092,
+      "sha512": "7d8b8250fc50b8a48387ee65b7c191c14b5965c5a089c5aeef2dfaa442f0132be6ed089044fd28bf4cbbd62919e53639245671e9c8c7c9225f4c880dcea33180"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libfido2/libfido2-1.17.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libfido2/libfido2-1.17.0-1-src.tar.xz",
+      "bytes": 678280,
+      "sha512": "08843931e3c0d95aa4bee6b4a4f4cea58b5ea491f7551d927bbd29d84d1da40b7ca7ef32cceee497561a6f59b3789d71a233b813cdda8a42f008ee52957b9a85"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libiconv/libiconv-1.19-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libiconv/libiconv-1.19-2-src.tar.xz",
+      "bytes": 5086384,
+      "sha512": "62288f9458b6c5a9eec369900971e9c552747b03df0198fbe1749ca93f76bf3d3079109f115ec0f53b2dc2f72c0c8624e21fa439fc41b9a0be339465fce1c534"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libpsl/libpsl-0.23.3-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libpsl/libpsl-0.23.3-1-src.tar.xz",
+      "bytes": 2130516,
+      "sha512": "54819ac75c011b8af1e69602d42861cf9e6d196a153b2796aa6819016c076d67731e7f08b8e4b2b212b46406ca874af7ac4ac5cba6e5a456c134e07c90f06688"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libtasn1/libtasn1-4.21.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libtasn1/libtasn1-4.21.0-1-src.tar.xz",
+      "bytes": 1739292,
+      "sha512": "0ac7b0a5633f03c214ffcbafd0fe4e441da2dca0c7b9e7188e20ab673cb0ced8152134ace4d2be2130a6cac7265ce5fd3f413ef07cfe6cb0ef53916be2fab2c3"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libunistring/libunistring-1.4.1-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libunistring/libunistring-1.4.1-1-src.tar.xz",
+      "bytes": 4747520,
+      "sha512": "105bacc7118918a80255089dcad8a5605a5e2769c5ce7b5077d036a4a872a007693dd024bb6c3a84eaa47e8b2db825eb39bccd344a9f7cf78ffb3d90ec459111"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libxcrypt/libxcrypt-4.5.2-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libxcrypt/libxcrypt-4.5.2-1-src.tar.xz",
+      "bytes": 572544,
+      "sha512": "febb2198032521ccad5df4c1311c99cb9fc8fe11b7a67ec5199a80614a96969836f9989a48797644cb11cd7b54933ff4deaa7ed1246e171f99fe52111a51accb"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/nghttp2/nghttp2-1.69.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/nghttp2/nghttp2-1.69.0-1-src.tar.xz",
+      "bytes": 1701812,
+      "sha512": "1b9f28492832231531c4bc2da689b8bd0e5efb1b2b9334f0be39bf61dea0173cf56e817c24f9a7d434d8de55912d1adafa8f5056eba5c9953eec0f47d23711cf"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/openssh/openssh-10.6p1-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/openssh/openssh-10.6p1-1-src.tar.xz",
+      "bytes": 1929108,
+      "sha512": "6785350c2dd86d42842d9c6e6cdb9c1fccf5e1014d61bf6f419997724dba94b91081fac35874554e1b949bbd53b5d74567cf2a5a2e7ede196e019f7a885eb18c"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/openssl/openssl-3.5.9-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/openssl/openssl-3.5.9-1-src.tar.zst",
+      "bytes": 53203241,
+      "sha512": "3c12d022311e2b02cd117740c535d512848421a5e6f806a35547bd7e8fb03976f6e92e6cae82fbfc80d90a6e34bcab6320db8808ba55b36fe63dbacea0f05663"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/pcre2/pcre2-10.49-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/pcre2/pcre2-10.49-1-src.tar.zst",
+      "bytes": 2185865,
+      "sha512": "d559a06956119d26a0c275169434f40ffdb9f443504fce7cca8403e96c249cb4821a87ead8cddffec062824e6a5ceb0d2d148e13882afff28c614f09f49876ec"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/publicsuffix-list/publicsuffix-list-20260724-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/publicsuffix-list/publicsuffix-list-20260724-1-src.tar.xz",
+      "bytes": 307496,
+      "sha512": "dfe6986bd714fc9277714d6da85f6d6d7aca35a10f77892ac8cba2b32e1c65de2f15a7fde91916a748d97e3185b47a6eab993b122dbfe318605bc35e2e12c926"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/tzcode/tzcode-2026e-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/tzcode/tzcode-2026e-1-src.tar.xz",
+      "bytes": 332896,
+      "sha512": "6c8d675c148e4b93e699a9cf6de9f45b7b349c42e5bdd3970aa7012aca9a6c1b99c5b9e024be0d45a2887dc3c1c4386183730edc4ed401eda2e2397cbaffd0ee"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/tzdata/tzdata-2026e-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/tzdata/tzdata-2026e-1-src.tar.xz",
+      "bytes": 488592,
+      "sha512": "9fd3b91a7e0a21a20aa3ace3219bdc98538097143172253d2a46bb56263af0369262f4530823e6875ad775eb96ff1a312ed9ef8602f3fe427c61bb54de8a6875"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/which/which-2.25-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/which/which-2.25-1-src.tar.xz",
+      "bytes": 205068,
+      "sha512": "2b000f90207b672f3293f4ca57a45ee0648ce8403ed415830fd714d89058c1e5b64b42df367329a8eb208b94498cbc3f445219ea4a5adbb03ba72f679371235f"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/xxhash/xxhash-0.8.4-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/xxhash/xxhash-0.8.4-1-src.tar.xz",
+      "bytes": 1089768,
+      "sha512": "8d32016dbaef67dcc138e0f369110bf83c7d1477bc0f6b5063988c72b15e9e719868b0a875b790bc06d4875d2b70d13ca6bc9f1d663965e89190d92766b9fe87"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/alternatives/alternatives-1.31-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/alternatives/alternatives-1.31-1-src.tar.xz",
+      "bytes": 197288,
+      "sha512": "90c77840c047960389308ca0e6c4a2256218bf40a7e327765a13b64467aacc5b90de0add211e7f3ee562b8794494a36a17d16f7d1bc0dc7fed49bef2817c198a"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/alternatives/alternatives-1.31-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/alternatives/alternatives-1.31-1.tar.xz",
+      "bytes": 123748,
+      "sha512": "94adf3376e7fcaf937594be718f54a99f2a2b66367eb2bb294b6fd4a933a9515954a9e9f309ed74cc62fbb353adb053d8500bbaf42994e4355f7180664afa62c"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/attr/libattr1/libattr1-2.5.2-2-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/attr/libattr1/libattr1-2.5.2-2-x86_64.tar.xz",
+      "bytes": 6160,
+      "sha512": "345b8f84b9c4df2eeea5e211dbaff5e0382aaee788435e1f4cc69f546e1603bbb45e9baec02a37d935674fcd55fb782d924c3a1540d2f829bde4969c96945ce4"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bash/bash-5.2.21-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bash/bash-5.2.21-1-src.tar.xz",
+      "bytes": 10951680,
+      "sha512": "b5c71e11f625de28282572bcadba337567119bbc97391eb9d16cafd0066089f8f3bf7b68f919245f64463304119f4297f7165141f5101a76a3cb853e4eb0ede1"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bash/bash-5.2.21-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bash/bash-5.2.21-1.tar.xz",
+      "bytes": 1650932,
+      "sha512": "c3a5594f1c248dd27a3b5aa10c31fb1651072eae878479d3d8cab09c28354ce4509a2fe230f176ad200a6484a561bc10c2dc9c74c4e9f03164190dac2e683d65"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/brotli/libbrotlicommon1/libbrotlicommon1-1.2.0-2-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/brotli/libbrotlicommon1/libbrotlicommon1-1.2.0-2-x86_64.tar.xz",
+      "bytes": 55304,
+      "sha512": "8685685196bd235bad51e4b1ea54392ac1b187c2d6c4e3b3e9e12e7dc75e3be207387a31a9c607d552560bbb456d0b005283064ffd718ff66462ab5afa1cad99"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/brotli/libbrotlidec1/libbrotlidec1-1.2.0-2-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/brotli/libbrotlidec1/libbrotlidec1-1.2.0-2-x86_64.tar.xz",
+      "bytes": 20684,
+      "sha512": "a886e2d3aa63d3df1711fa25344b3c64c21cfa67c79075f92a30ff422a88f157781ba63f7c42c05030511ffa4354e68fd1e24d7bff50cb1ed923032b7d9259d8"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz",
+      "bytes": 810856,
+      "sha512": "9eab5b5ca9cf6bcd28d16c4c7dda92ef98466609473faec28f4dfb299459470ec5a5009e3e40b325b1c6ce87a91c48bb450dda6cc7df2c9b61422692c36e0ac1"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bzip2/bzip2-1.0.8-2-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bzip2/bzip2-1.0.8-2-x86_64.tar.xz",
+      "bytes": 36396,
+      "sha512": "86e4b0b21b64d17b9fb60260a787626125102b0cb786de67893cb1d39a109457637bdb93956c992429f1135f64b07def64dd0116682a6190b635ba12f81395d7"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bzip2/libbz2_1/libbz2_1-1.0.8-2-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bzip2/libbz2_1/libbz2_1-1.0.8-2-x86_64.tar.xz",
+      "bytes": 26884,
+      "sha512": "d15d88e8e0fae69f7c4c3025515e748c273d758a0f470312162cec46c4cf0d340d2ef036e3a4f4d03b5edf4508b4927834ffa0f9aa45585a5f3bc3b3163ff675"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/coreutils/coreutils-9.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/coreutils/coreutils-9.0-1-src.tar.xz",
+      "bytes": 5634596,
+      "sha512": "20ea749c3226568d4771bed23a65c93612cfb9c3f3a292e53e1ea2d0c1a155fe123d067a8ffcc4c0c35f113840f0841d9cc0b142423e9a31bde9e65b86762c46"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/coreutils/coreutils-9.0-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/coreutils/coreutils-9.0-1.tar.xz",
+      "bytes": 2767296,
+      "sha512": "530f47640d878f5953580f3556c492a93786191abe573322026b70206a46c7f17d05927784db3e7f2c044d1555f35941880316f7288b887eaec770a9eda4c687"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/csih/csih-0.9.14-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/csih/csih-0.9.14-1-src.tar.xz",
+      "bytes": 66468,
+      "sha512": "48b08e0b41a8e5bcadf36960d274539dab56a20bc2b0361f473533540b4b67812adcee02c31315de8eb319e8257308a79f3b39220a2f60dcbcd6edfb05eca187"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/csih/csih-0.9.14-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/csih/csih-0.9.14-1.tar.xz",
+      "bytes": 308428,
+      "sha512": "9fea1343d7f64b1751cb1bde1f6f6e6f6e22e6e9a235fb677e293d7f65da28a6ac576fd675d674a7cd8400b24fcbb186489a33fb40fb30da5a2edaca5fb8d20a"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/curl/curl-8.23.0-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/curl/curl-8.23.0-1-x86_64.tar.xz",
+      "bytes": 7328840,
+      "sha512": "ec5998b06c9678cf83d47220c793a2cd24bff6bc760531439290ccd3e500d3debbe49971ba858ec26ff803b3ece498496d217e39c526a16088be82e047ffdd3e"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/curl/libcurl4/libcurl4-8.23.0-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/curl/libcurl4/libcurl4-8.23.0-1-x86_64.tar.xz",
+      "bytes": 368880,
+      "sha512": "3de5f54fb286383c3a5f0e4cbc1d1b8b874054ab1292e98c342c1d2b2df6a2f9483094a197081f4b684ef8cb68c3d1ba1aa77f212ca0857d5831d5223150b3cf"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cygrunsrv/cygrunsrv-1.65-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cygrunsrv/cygrunsrv-1.65-1-x86_64.tar.xz",
+      "bytes": 69448,
+      "sha512": "b69e08367f5cd9df55e5de82aff1249838b93f1662649715076c2f28107b478b2fc12142adbba0a2b4ca403af5073dd33fc555d75fccbc358a9e088236d61663"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cygutils/cygutils-1.4.17-4-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cygutils/cygutils-1.4.17-4-src.tar.xz",
+      "bytes": 384876,
+      "sha512": "601d41f3fcdaef978fb7097c060cc4c17217150144c5f973325ecb93a47b7329793469277e26eff0f7570e029227fcc45ec73633f69e6a25ae0703184c1e0b36"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cygutils/cygutils-1.4.17-4-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cygutils/cygutils-1.4.17-4-x86_64.tar.xz",
+      "bytes": 90580,
+      "sha512": "a9c63f8ac86e529fa8809c9637bb80651721003160726e2058c361687e5df6377c4cdbea2d023677b23e1d166bbce37d5a412f7d1135baf075ae2631fdeb77b2"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cygwin/cygwin-3.6.11-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cygwin/cygwin-3.6.11-1-x86_64.tar.xz",
+      "bytes": 1621088,
+      "sha512": "1c33f8396d78eca035106325c5b90ff1165a6b78839f16190ec00f025067306522a23a5ec1b99557974e471649104cd31dad68685d2a544c31fb4494297a744a"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cyrus-sasl/cyrus-sasl-2.1.27-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cyrus-sasl/cyrus-sasl-2.1.27-1-src.tar.xz",
+      "bytes": 3898108,
+      "sha512": "d0d09974d464d746ab7624c46905bdddb5932265394fa08fb46010608144383a588ba8b1d28d08b0ec7be5a619ed42650797bfd066be7c87537b5997b9997fca"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cyrus-sasl/libsasl2_3/libsasl2_3-2.1.27-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cyrus-sasl/libsasl2_3/libsasl2_3-2.1.27-1.tar.xz",
+      "bytes": 138480,
+      "sha512": "7cbb03e1752c7a36d79afb82b9b02f166404fcd9ef11d04650a5174c2092512d640322c613bbed606c973aa89e5283439cf6766f3b1a1b7fdd8ef4db90735ff4"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/dash/dash-0.5.12-5-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/dash/dash-0.5.12-5-src.tar.xz",
+      "bytes": 249124,
+      "sha512": "f37e5b999bec90dc7c591229664d5103f6fd4c19e991968a57032f45aaa3e814ea3da491b20603cd1348d8d1e251b8c11c054fdb36c4b2dee90fe0ce713fae67"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/dash/dash-0.5.12-5.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/dash/dash-0.5.12-5.tar.xz",
+      "bytes": 79612,
+      "sha512": "8891165224ca8531ad7b601309bc1a74f8b68dad24721060fd3db5d12ae504e3c96bbd0217006bbcbe0650d13283f04c1f58412bde54c40f19acb5291dfaced9"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/db/db-5.3.28-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/db/db-5.3.28-2-src.tar.xz",
+      "bytes": 34327392,
+      "sha512": "b4858dbb4ce01a7651a6b37b11951be2702da805e0f64e8a4d7620066e47fbcf739aee81b2c0c7a6fe17278eae04cf86c42d03f289b6f291f6f526ac76037b07"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/db/libdb5.3/libdb5.3-5.3.28-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/db/libdb5.3/libdb5.3-5.3.28-2.tar.xz",
+      "bytes": 883388,
+      "sha512": "539c2781efe864563526826833a2b22750e4715067dfa438d5dc231d07d26258dc94757b0c2304600e806d8ab9de7af762f29c1d34d22f763be85ef48a3597a2"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/diffutils/diffutils-3.12-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/diffutils/diffutils-3.12-1-src.tar.xz",
+      "bytes": 1943288,
+      "sha512": "0cb3dddc478d25e6d4ed041ce0f45858a6857e1efae3ef1cd46c9a95ea7dac66cce90036ae8e142660d4aaae5ec7f87c7350714d8b500038c379eb602e94137e"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/diffutils/diffutils-3.12-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/diffutils/diffutils-3.12-1-x86_64.tar.xz",
+      "bytes": 431400,
+      "sha512": "2a9d8fa0acd5a6108f74afe515f55a2a7cade6fa7f96368e46a6f33cf3b49d270b50dc3cee0320740c8f1729edcbf8dd3824f4b268261fba7aeed0d75a4e943c"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/e2fsprogs/e2fsprogs-1.44.5-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/e2fsprogs/e2fsprogs-1.44.5-1-src.tar.xz",
+      "bytes": 7600184,
+      "sha512": "5976599e58ce1942f56c2e45d4e88415ae905a29a10451294647012d049951d4662e06c93492914c5c3d880097a834b8a5476464a302cf954a43393faf7fa6d4"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/e2fsprogs/libcom_err2/libcom_err2-1.44.5-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/e2fsprogs/libcom_err2/libcom_err2-1.44.5-1.tar.xz",
+      "bytes": 4132,
+      "sha512": "3344fbc09364d789e92a81af5ba1e830dd47cef3392a1ee389a2fd49a9cc56a63afc78bebefb92c025d8222e6e454c114d572f0f395e5e20ede2b2266b0fe709"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/editrights/editrights-1.04-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/editrights/editrights-1.04-1-src.tar.xz",
+      "bytes": 6460,
+      "sha512": "83198f35c862efa5166611c88c239d5afca616be321fba2f7daeb94535ba1d9da9e74df873c66a18660bc1855e2271ed3341ec46c426b991d0487c60d13dc77e"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/editrights/editrights-1.04-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/editrights/editrights-1.04-1.tar.xz",
+      "bytes": 7112,
+      "sha512": "aadc188201441ee1ff5710df0e5550c8ca5cb65421d025c5845921510560a2875c317d1f35b6ea8abbb5077172c0de7fc8f2f55ae95dc8d1e59d26c963c93aa7"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/expat/libexpat1/libexpat1-2.9.0-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/expat/libexpat1/libexpat1-2.9.0-1-x86_64.tar.xz",
+      "bytes": 58184,
+      "sha512": "7b097b2469270bade93b9790d9b98e54af886ce852b6108d1f2f54c12859e15706fc5fb8587038d68be36c4a20616c4a27c8a08bb14ee3cba9b7d4de5ca6767e"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/file/file-5.46-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/file/file-5.46-1-x86_64.tar.xz",
+      "bytes": 840940,
+      "sha512": "e4b52477d353557d36af625a6a55c97a11ae41053ce17602624210df2a6d2683f46250c2b9f6db5a9f9e5fcccb7b0be4b24705a36d196cee677bf47d90dfee99"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/findutils/findutils-4.11.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/findutils/findutils-4.11.0-1-src.tar.xz",
+      "bytes": 2455656,
+      "sha512": "c0b5766b4692140859a3147f8738a335c55333eff722dd1e1816eecead7f98b15bab2bc1dd5813f1c64de8a5a56a22563bcdafc7cd4b40be7a8bef1c31c1265c"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/findutils/findutils-4.11.0-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/findutils/findutils-4.11.0-1-x86_64.tar.xz",
+      "bytes": 768172,
+      "sha512": "cbb1359fd81c55f98da1485f84f11f905a7a3fe9ce1676424e86da4d7f0effa5fc298546bd5c62c9707e8ddf93c31597d6da01e60be0610c50b9b22ef9475814"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gawk/gawk-5.4.0-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gawk/gawk-5.4.0-1-x86_64.tar.xz",
+      "bytes": 1496256,
+      "sha512": "3604c99921d0cff387279aec1d3b332e8afcd2746b052304c0511221efdb6ae6d4a3117b36593e44adc43c67b6f6c4c48bccf6b686e2e1a5cac644c89613d829"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gcc/gcc-14.4.0-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gcc/gcc-14.4.0-1-src.tar.zst",
+      "bytes": 91626118,
+      "sha512": "a4fa4be6b610a7d868271027c17c46c5f64e1b125e0bec1d51d34cc47f53a670c95841ad4fdcb5aa236244e8b09e5dc194c64e788fc5011459ba2eb29a815299"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gcc/libgcc1/libgcc1-14.4.0-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gcc/libgcc1/libgcc1-14.4.0-1-x86_64.tar.zst",
+      "bytes": 59166,
+      "sha512": "5ac8a56e5eee285efcd6dbd05a473e795e181021d7194b8a98dfe2fa201a71f0abe2908e0b4c81490eb5ef472efaeac8e56a61a5f289eee4ad6e90e52a844ff8"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gcc/libstdc++6/libstdc++6-14.4.0-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gcc/libstdc++6/libstdc++6-14.4.0-1-x86_64.tar.zst",
+      "bytes": 651767,
+      "sha512": "3d86409193c952618eee7e2dea32bdeb97f22ee800e13cc46f98b5095d4d0b1b31ac4336dc5819abb2d553ad1c2151619e9f6f337dfe921ba80fda1323f6f4e3"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gdbm/gdbm-1.26-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gdbm/gdbm-1.26-1-src.tar.xz",
+      "bytes": 1228800,
+      "sha512": "ad0b21614bb22c3a6f4640a38f3c99c41f38797cb3987e31b0839ec9ea5047f01f60caab7d89fc66e4221da93aae2ce225cccb5b167fa781f28544d5f79d6f9f"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gdbm/libgdbm6/libgdbm6-1.26-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gdbm/libgdbm6/libgdbm6-1.26-1-x86_64.tar.xz",
+      "bytes": 25436,
+      "sha512": "8ed666a5b978b40f8cfc69d270d47cd674a31eb41bac499f783137eedfde6aa02ba4346de3d5dc3184d9af10ec80f57730c7517a88732616f4c6e0ef637d4bce"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/getent/getent-2.18.90-5-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/getent/getent-2.18.90-5-src.tar.xz",
+      "bytes": 47960,
+      "sha512": "7efaf05e5fcb807a3216cfcc2cfacbf8feea4a7f04f1fb31d316faf40dc2f7eef8bc5aa43c652872e5be98583d708a18040ae9308df20ee3be63a2c619fe4ff6"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/getent/getent-2.18.90-5.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/getent/getent-2.18.90-5.tar.xz",
+      "bytes": 17864,
+      "sha512": "b860f3d01f32da7312a0ce118bdaa53e2418c53f0ac5cfd52b3e4267f353fa21ae27fd2649eb9c6bff48b3d10a0a9f7bcaa2d644f770f0f3916f5d969beedd65"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/gettext-0.22.5-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-0.22.5-1-src.tar.xz",
+      "bytes": 8483620,
+      "sha512": "101bf0971ec63c5a99fc1f78be0047417ce4bbbe6bee88596a27973cad07cbb7a89e466e3e996332ef9d99b3d38b3bede42e53ca544c5e3540f723ccb8621e04"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/gettext-0.22.5-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-0.22.5-1.tar.xz",
+      "bytes": 225460,
+      "sha512": "fccb5b15319047543961c7d606fa1024ccc6031e3b90b1170ca88b429ae87d9bb76ff006c3eb1b425415f156006bc6d401b38b3e19754b3429ec4f571d767bea"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/gettext-0.26-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-0.26-1-src.tar.xz",
+      "bytes": 9549988,
+      "sha512": "cac03748f8d93146e6f2c29745bf3d676d32080f5995d8286c4e618becadc62c0cafdfc057fd8119ceb35dc8043b9a15dc44eaaf5bb0598bb5954959ae47f00e"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/gettext-locale-alias/gettext-locale-alias-0.26-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-locale-alias/gettext-locale-alias-0.26-1-x86_64.tar.xz",
+      "bytes": 1596,
+      "sha512": "289feafbe00598a2451527b64b0187ab62115577ceaa960774b020270e5a8c5bff4038f389a44c7d9eb870f7e2741c7bb2b27be507843cc8c4ae5c33bc74c8f3"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/libintl8/libintl8-0.22.5-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/libintl8/libintl8-0.22.5-1.tar.xz",
+      "bytes": 43256,
+      "sha512": "370a19af888bc7c9ed95cf8ade0d36d5e7cdb634abdebcba260cad61fa9a4cc05b5e748e315c9709f66861e8756b227d6757d529846591189e19ee2b2d00002d"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/git/git-2.51.0-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/git/git-2.51.0-1-src.tar.zst",
+      "bytes": 11755852,
+      "sha512": "8f6e4059924cd83e764d5d6de529ae150403533395cf004b354c26e4053de97dc1dcdff38ff35d21cf2e926244147a0d5f75b64001f5e9d227d5a846906dac03"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/git/git-2.51.0-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/git/git-2.51.0-1-x86_64.tar.zst",
+      "bytes": 9710553,
+      "sha512": "0927767d61bb2ebf24f642bcd39bda4d41ccbc0158f03d453d36fe564391356ec4589fb5e2c0dcf33d57a32e46ed1a27bbe9220ad6c6a1c747b99caaaa6eb5e3"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gmp/gmp-6.3.0-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gmp/gmp-6.3.0-1-src.tar.zst",
+      "bytes": 2095913,
+      "sha512": "fb2d8d5106aef273c028e3b5772a7c1d11dcd8b82f69ce1e19c46f0fd3cfc34d49a2b76614527f0f98882efa369e7825bfb9232e746976b8e0cb35c6e38f2e8c"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gmp/libgmp10/libgmp10-6.3.0-1.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gmp/libgmp10/libgmp10-6.3.0-1.tar.zst",
+      "bytes": 254680,
+      "sha512": "947cd56e1945ddf180622b453f17e6655b4ee3e79fcc91238370a8826b88cd07c31d939f1ed7b87d91344d46fee90af2560105267a9207dcca800cba72459191"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/grep/grep-3.12-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/grep/grep-3.12-1-src.tar.xz",
+      "bytes": 1922824,
+      "sha512": "0890bfdbe2ade72d1f9ddccfa3782af054ddbdd8a831446fb01e5e567491910dc64de10ed73668aabfe97ecd255af500ba1d3ee9ec1e8f94131916f93dcd5920"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/grep/grep-3.12-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/grep/grep-3.12-1-x86_64.tar.xz",
+      "bytes": 418788,
+      "sha512": "2ba28b5d93c352bc3f3f0f232e2052e6651b71cc535841f4ff8cedb23e61e9e4c030d7d5516ed9c797074e1a59cbf3a56732ca678cb0e986e86dcbbf25955976"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/groff/groff-1.24.2-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/groff/groff-1.24.2-1-x86_64.tar.zst",
+      "bytes": 5886279,
+      "sha512": "65654f47e815bd7a01b33eeedaae74d3309f4fd2afc0f968b85ec6cf76a46e99462e2b561f29528033f839440f67abe0995aae50e8a674437754498b8a6c93b3"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gzip/gzip-1.15-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gzip/gzip-1.15-1-x86_64.tar.xz",
+      "bytes": 162104,
+      "sha512": "478d012810ff5f14daf6d7312a8e2641e0a02311327f52da4afc8676223f7a5c930110af26fd34558156d30e3ebe85bce9c78c27d9957a27b1966db2ca8cd9b9"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/hostname/hostname-3.13-1-src.tar.bz2",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/hostname/hostname-3.13-1-src.tar.bz2",
+      "bytes": 17158,
+      "sha512": "5c8ebfcd966d26ad71216b28d019f0f39a2e66203322d593bf35347cfa9a93005fc8f90fbba1325c8cc5fe2a60a4bef11f78888e531a507debcf88f7d02f3415"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/hostname/hostname-3.13-1.tar.bz2",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/hostname/hostname-3.13-1.tar.bz2",
+      "bytes": 14024,
+      "sha512": "75114326fa4575b8341434658a881feb81a6565e7e0adf8fd100dde87022d3818b5fc3df430bd9b3298d818a1d23f6b6c4bc7ff33efb3ded5f0ea0bf118c1aae"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ipc-utils/ipc-utils-1.1-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ipc-utils/ipc-utils-1.1-1-src.tar.xz",
+      "bytes": 10356,
+      "sha512": "8672267a594eb5adc55e4b63ed23bf90844dd11f28f70aa5189786cd34e94916af5bb494483ee4423606f320813abe1be50625c22825710b162fd8b7d3fcd4d1"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ipc-utils/ipc-utils-1.1-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ipc-utils/ipc-utils-1.1-1.tar.xz",
+      "bytes": 11120,
+      "sha512": "374ef40c871d00eb3b4774c383bb85872443a2e8b9abf74b8b9b9b27984598abfb6284716c2d2cd264181e6d012cf7dc8cd04f6bab91f9b083f72e9b51e6226b"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "bytes": 9488172,
+      "sha512": "388e966277d23f15e2687fdebc7a1d9f215780e26d9e69e9370a28e2ba499abf5335d5f6b89d2e44e702c993f49e1b44ee5af6552535d292fdd0f22609da09bd"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/libgssapi_krb5_2/libgssapi_krb5_2-1.15.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/libgssapi_krb5_2/libgssapi_krb5_2-1.15.2-2.tar.xz",
+      "bytes": 102828,
+      "sha512": "0b9922b28f24f260bccb179c52354377173c1f0243420fb655154b4bd6da99af33b17c172dc46344d9fb38756abb0d8d449d5c7fba7f179dda7a3337c330224f"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/libk5crypto3/libk5crypto3-1.15.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/libk5crypto3/libk5crypto3-1.15.2-2.tar.xz",
+      "bytes": 73344,
+      "sha512": "249808d087f1a1ac7a5b117aaf499e173c9e404b224b9d9ff5a5fa1d2ace8b7c1185100bfa33174a82cbc250f376671d48b7d93d11924b5c4b524897841e2967"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/libkrb5_3/libkrb5_3-1.15.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/libkrb5_3/libkrb5_3-1.15.2-2.tar.xz",
+      "bytes": 236076,
+      "sha512": "639bb23f5bafc62fe6d36d44f1786445b949db5547dee66c73ec75c5d1d9d3444b8f326ffae811fb18fed3e85fead713362cf2c2488f880d3f5bc8ea087cee64"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/libkrb5support0/libkrb5support0-1.15.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/libkrb5support0/libkrb5support0-1.15.2-2.tar.xz",
+      "bytes": 14424,
+      "sha512": "93162fc8430153b054c77c1dea7d9df6be8422922a9ee6fd923b46797c466200d78e80cb4e17387dd18ed1631a7828a57169fdc743c7b2a7a270259aa586113d"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/less/less-710-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/less/less-710-1-x86_64.tar.xz",
+      "bytes": 177064,
+      "sha512": "b46f37b63a6ba1db79c4e6100792c892c74040a7f547106d67409da1e183820fcbbd637413c1da1c8a62e7c66e82e577c099b8318dadf7eede26b5d410c70ed2"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libargp/libargp-20250917-2-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libargp/libargp-20250917-2-x86_64.tar.xz",
+      "bytes": 19508,
+      "sha512": "a83ef7c1809cae1b10a50e228643a640ea14e1be324429b9f53be9a4c8cee03ddd0efb46b24e159493dfa36569e73b636bc897943d61cdb90511e5e4cbb54257"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libedit/libedit0/libedit0-20251016-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libedit/libedit0/libedit0-20251016-1-x86_64.tar.xz",
+      "bytes": 77960,
+      "sha512": "4c5afd4f494da552e3073dd9cd0a25b95d29065fb9b68ad3dfc2e2546a40e9f038821dd15bbece3f1d026276df798afc3a90dd09c1c9265df6fb262055781170"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libffi/libffi8/libffi8-3.8.0-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libffi/libffi8/libffi8-3.8.0-1-x86_64.tar.xz",
+      "bytes": 196924,
+      "sha512": "935a0567f740a314d70ecd4adc8c4cf5ad37c6fb43f2d26dee882d4fda71f08efb2646bee10cee6e2000f52e25cce87fa29ce07665ba6d22532e0daa76bc887c"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libfido2/libfido2-1.17.0-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libfido2/libfido2-1.17.0-1-x86_64.tar.xz",
+      "bytes": 102452,
+      "sha512": "d6134d478fda6738038d59834210f9ee6ab33fc7acafc9c00f9e439090ddcb404c271056732556b74a81325006d429cacb6000321ec370a93f2b43fb2cd0d118"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libiconv/libiconv2/libiconv2-1.19-2-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libiconv/libiconv2/libiconv2-1.19-2-x86_64.tar.xz",
+      "bytes": 555664,
+      "sha512": "a1b23e24e0a495e7163923bcf40a4b933403e0826cfc0d9bde785bc92c909b8c4fb94b1e6b2c0242f4328a723855e72ff3baab9f557ef855b7fe7a7d901b0943"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libidn2/libidn2-2.3.8-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libidn2/libidn2-2.3.8-1-src.tar.xz",
+      "bytes": 2157184,
+      "sha512": "e6a23095763f1b75a7ef8029a03d1ea933433e4b7012ea4fa37a6961ecb20a1ad9050d0027620507018607deb3355ca9b06ce4c7e233781bb28f46876ed7795e"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libidn2/libidn2_0/libidn2_0-2.3.8-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libidn2/libidn2_0/libidn2_0-2.3.8-1.tar.xz",
+      "bytes": 117676,
+      "sha512": "0ac5f0b8809e27fdff86ba7cbf344f6527b7337ad0cc00bbb6813ccfff39803e14aba7fbed17871c17d7e8993a80308bb5b95a24d5cb44c191ccc50e99be4974"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libpipeline/libpipeline-1.5.8-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libpipeline/libpipeline-1.5.8-1-src.tar.xz",
+      "bytes": 1070632,
+      "sha512": "75061f5e899512b29a6e1afd5515c1e2945f4f891d098ba1a418663825cd26e770e10a5a733a0b48998206203d00875112ce50bc9273eeac35960318cdc472b0"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libpipeline/libpipeline1/libpipeline1-1.5.8-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libpipeline/libpipeline1/libpipeline1-1.5.8-1-x86_64.tar.xz",
+      "bytes": 24880,
+      "sha512": "1d062ac4909d37fbac3ce66b07ac691df0ae5acbd01f08c5019a5ed897cb2bbef95f9e347c5bc71185ae3317d89383306e46f2c59acae5d28a18fa65f66d4e80"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libpsl/libpsl5/libpsl5-0.23.3-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libpsl/libpsl5/libpsl5-0.23.3-1-x86_64.tar.xz",
+      "bytes": 59816,
+      "sha512": "e0d990b0f423004a426f1b2eb288bd5323bcf2a91a34485f6da6939d1f757b344c1ba3ecd37d5c31f9158f50cb3c6af3b9ea805f5147030c2807e3217023866e"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libssh2/libssh2-1.11.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libssh2/libssh2-1.11.0-1-src.tar.xz",
+      "bytes": 1058764,
+      "sha512": "97a8f128483278a185b8877165822aad2b1f1eab39618e1b59b46997fe94433ca38b827077c4250e34af001c20b38f1684d9ae5acec43bfa4b6c427e12701324"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libssh2/libssh2_1/libssh2_1-1.11.0-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libssh2/libssh2_1/libssh2_1-1.11.0-1.tar.xz",
+      "bytes": 186580,
+      "sha512": "6a4ad8255271c78671e1ceb7fcfe4f43eff900c90942ad0b8446070cd496f7297b1b8bf9a1ad79bd9f419ec2ee2a73761ef1b29956861265657354c75d656463"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libtasn1/libtasn1_6/libtasn1_6-4.21.0-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libtasn1/libtasn1_6/libtasn1_6-4.21.0-1-x86_64.tar.xz",
+      "bytes": 32072,
+      "sha512": "d28713b27d5d41408b29caed785e29380da4d8b4ccdc1c479ae13906e6765bedc6d6b9e6c1c22fd2111d678fcf1663187d3de27d7ad2e104cd48c38086189e36"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libunistring/libunistring5/libunistring5-1.4.1-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libunistring/libunistring5/libunistring5-1.4.1-1-x86_64.tar.xz",
+      "bytes": 498220,
+      "sha512": "cbd454f5068bfb9291d440a3b03b0c58437aa0342a199007d5cce6fa006b6b5ea4d3ba10c136fb0257ffb0d0199db73484275c632506e4ec31c81e1746667b80"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libxcrypt/libcrypt2/libcrypt2-4.5.2-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libxcrypt/libcrypt2/libcrypt2-4.5.2-1-x86_64.tar.xz",
+      "bytes": 106104,
+      "sha512": "7668d29aaebba8ca94e48e810d92108db72b067b2786cea8dcf4a049c29f20f0aeb8653a6e9524869c69e0b1df9d4d0ac499a052a86f0d44178e8a8167002c97"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/login/login-1.13-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/login/login-1.13-1-src.tar.xz",
+      "bytes": 23020,
+      "sha512": "44c8f6cefb1898332a48a00056225a3c032d236004c8696bf0e1c24f300fd2c4dee154e9b39e2313325d1f14f5b27870eb856fd251be13a98e200fed2ac64abd"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/login/login-1.13-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/login/login-1.13-1.tar.xz",
+      "bytes": 17264,
+      "sha512": "66acc3255962a27af8d701a8c02846f3b9180b7b1d65d946f6fb27cd24aeedc8e6a9a2601b419e981c94b356ef376a5c565ea31a4a220e5add9d70ae501a11d1"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/lz4/liblz4_1/liblz4_1-1.9.4-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/lz4/liblz4_1/liblz4_1-1.9.4-1.tar.xz",
+      "bytes": 53296,
+      "sha512": "70e6b0f3af2c5e04089c955b46c13293ab935ee4683e4690da0cebfffba4ba91614004aede99dd804f54e4def93461159f55d151e7fbb647d1ca97ca29e619cc"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/lz4/lz4-1.9.4-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/lz4/lz4-1.9.4-1-src.tar.xz",
+      "bytes": 356588,
+      "sha512": "6778ed42184c5f702ca8a2743a8df7384592b445e75c8ad778ba2b73c4bcc8cdcd2363bf370dd8816479d5f7476dce73929dd215822455f46e3a6fec54d8480a"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/man-db/man-db-2.13.1-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/man-db/man-db-2.13.1-1-src.tar.zst",
+      "bytes": 2113045,
+      "sha512": "bc899f05cb229adc3f0a8d92938fac4fb96cf5e30b29ea3b5c9af85e8c12bc524157fd6b2e40458c961e48356eb775e325b76f3ca2176d95dbad058f387252da"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/man-db/man-db-2.13.1-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/man-db/man-db-2.13.1-1-x86_64.tar.zst",
+      "bytes": 1301518,
+      "sha512": "a1e8a0d6d5a75465e32be83c13e685a73f084fa41abc5500d9437837a2c9de2f897827d3516c1076fa6cdd07a3d1aaaa4751f3b393fcfe64c370ff8f6b8b7f84"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/mintty/mintty-3.8.3-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/mintty/mintty-3.8.3-1-src.tar.xz",
+      "bytes": 2087012,
+      "sha512": "9b5c99b05cf3422d94f00d3988da68a470675b246960ddefc691e04ae1870a24eb2dcc74156cdd88745011cde3298fc07b889720d561285b7474580f75e282b9"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/mintty/mintty-3.8.3-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/mintty/mintty-3.8.3-1-x86_64.tar.xz",
+      "bytes": 1190356,
+      "sha512": "79068708c81a7bf6abba3ad1cd0550a2c3eb6f6eea21adade8b0d2b77339cd2519716f528159da9f0972f93bb624867e394d782c3e3b0b7e841a8db985395b92"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/mpfr/libmpfr6/libmpfr6-4.2.2-1.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/mpfr/libmpfr6/libmpfr6-4.2.2-1.tar.zst",
+      "bytes": 284416,
+      "sha512": "8203dc61bf646041c71f7fece9fe59422ded96ac28dd24826ffb00a9607f274f3226673f9bee441f32b424a7e26c2f178281bd7836db26b0253d37da208d06a8"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/mpfr/mpfr-4.2.2-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/mpfr/mpfr-4.2.2-1-src.tar.zst",
+      "bytes": 1508481,
+      "sha512": "60e5406de4b0416a1c56697327297ded22d4c45d069eb9e0ee3c8add7401cb7ba40748f80d5425935f787280f70cc9efee3a8bfdbed71f6e86ec89bbd6fcd115"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/libncursesw10/libncursesw10-6.5+20240427-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/libncursesw10/libncursesw10-6.5+20240427-1.tar.xz",
+      "bytes": 393928,
+      "sha512": "08102f7a7083cb5663fecc46d819f2ece4123444a8f94c42300f03f7eebd40395f556c44b22ab58bf57321b44d9b8fb8b19358e535c7500d36e52d48b05dcca8"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz",
+      "bytes": 3703872,
+      "sha512": "e16cffd412ae0b998553a162041b71a5fb20b89b36a1d2acc5de633a82430010de58439fddbd16bfba1679697659a43d3672b9a3f53e03353bd4ad22a7a8f09b"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/ncurses-6.5+20240427-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/ncurses-6.5+20240427-1.tar.xz",
+      "bytes": 111396,
+      "sha512": "e15664bdab3f4d82bac6481deaa66476adbe34404937079983b5165930fa18cec3aa0345b93fbb2c390f8304ef20f041cd47d268552b92d01a51adb6abde0fc5"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/terminfo/terminfo-6.5+20240427-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/terminfo/terminfo-6.5+20240427-1.tar.xz",
+      "bytes": 94760,
+      "sha512": "128fb04f188bbf2af3060416193c9879a9cbbf7e5486febf851f35c3d9d00b9d61a0e2bf4be575d2308fd665a224ce5674485dcfd071125c3a8d199a4b88a042"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/nghttp2/libnghttp2_14/libnghttp2_14-1.69.0-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/nghttp2/libnghttp2_14/libnghttp2_14-1.69.0-1-x86_64.tar.xz",
+      "bytes": 86464,
+      "sha512": "614c20bfa3dcdd43bc115e861319d26ba3835e58afa004168b55de31db64860bb81b643bf931cd395d409451e0f1d7b2c8dab682c0699ba4574fb90ecdb2479d"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openldap/libopenldap2/libopenldap2-2.6.15-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openldap/libopenldap2/libopenldap2-2.6.15-1-x86_64.tar.zst",
+      "bytes": 155062,
+      "sha512": "65a85aeb0a56a8f240fc1806f74c9c630f1494e364b52c2648e6f7750d3264916c0c0139374d9395fcefd02e7b05c3888a62f73a8f95b5ca19bd6ec6d8b125ec"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openldap/libopenldap2_4_2/libopenldap2_4_2-2.6.15-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openldap/libopenldap2_4_2/libopenldap2_4_2-2.6.15-1-x86_64.tar.zst",
+      "bytes": 155106,
+      "sha512": "9bb4b6434d8dc79d3d728c917f26cfc70fc7016581254258fbf001d1305c0664cc68b559165103baf1e23cc9aa3eaaff38769f0a54a5c4d6769ab8b4c07e8ce3"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst",
+      "bytes": 6487799,
+      "sha512": "f1b64d78e32bc3d9efb410b297d69dd048f72347adcf8d1fcf047f97dc0f51e1ab3415e6f5a66ae650fefc6cced9da0822a961c4239f6e5bc4e062aed41b1b71"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssh/openssh-10.6p1-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openssh/openssh-10.6p1-1-x86_64.tar.xz",
+      "bytes": 1265716,
+      "sha512": "e18356ded4c4a98c985ff706f819ded8f04f372e4c4cbb11c8a99f5689f3d196f4bc929574ff208413f7fb5ec47b722c90dfd8a874cade5b2d8293af2db222b3"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssl/libssl1.1/libssl1.1-1.1.1w-1.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openssl/libssl1.1/libssl1.1-1.1.1w-1.tar.zst",
+      "bytes": 1255182,
+      "sha512": "d03c5050e1cf5c8420824e5f825916f460ada86df695b0c8dd9eff7f1d94fe7131b35ed2c3d94972aad109610236f50c874a087bbf7bb1485807f59bddafa047"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssl/libssl3/libssl3-3.5.9-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openssl/libssl3/libssl3-3.5.9-1-x86_64.tar.zst",
+      "bytes": 2101048,
+      "sha512": "cc3836812d1133caaab81c17e79efffb47aa5172dce3d4644682ed73a2df2b0754d2e1e8df879479d0be148d4a329b4cd76e15dfaff6e7874fa8aabe298a8288"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssl/openssl-1.1.1w-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openssl/openssl-1.1.1w-1-src.tar.zst",
+      "bytes": 9896162,
+      "sha512": "88037310892947b17e44206cf19ff766f24f082c244f1dedd321991bc1fb3d97948547cf6ac1a6becd4752026166fbbcd624a9c802d4b473e07bd99e6d330123"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssl/openssl-3.5.9-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openssl/openssl-3.5.9-1-x86_64.tar.zst",
+      "bytes": 1412450,
+      "sha512": "c90b46cc126846817673dce971f0b2c5ef7c6d3a4e00b19eb041593a2c6aa66385d98fc153f7ba30791515d914f07970248c80ee3a5c6798901dcd89af3c7ac7"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/libp11-kit0/libp11-kit0-0.26.5-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/libp11-kit0/libp11-kit0-0.26.5-1-x86_64.tar.xz",
+      "bytes": 212700,
+      "sha512": "dd64f129fe71233e26e0845b6711db5cf2eb2e6d2d050f07b6aec0d9dd54d980e87390614744fbf022cf57aa2b3f7edbdc30c548c2f9d480188c22bcde0c2eba"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz",
+      "bytes": 1088428,
+      "sha512": "3121e44601f87184352240bd7029a4f91ec5a732f51b4a88d87d676b34becc8f0606afabd43651ba3742b59aaba48e1a54ee713d43732bba03154ca8c0438a55"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/p11-kit-0.26.5-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/p11-kit-0.26.5-1-x86_64.tar.xz",
+      "bytes": 332724,
+      "sha512": "1f057de789a5553f04649c80e6f78385135b57de7ba078e9dd51f2db60afee37717bb6de9dcf0a330cf72fce1359e08c0186988632b5f858992ebf95739bb840"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/p11-kit-trust/p11-kit-trust-0.26.5-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/p11-kit-trust/p11-kit-trust-0.26.5-1-x86_64.tar.xz",
+      "bytes": 110096,
+      "sha512": "2f98ae11e42f69fa4626638f7cefe2ba2fed808ae618093c1e6c568f8a8be79e6690b40e39e20df02a8d363c371cca8b8320fea7b288e8561cd299f15cc5b796"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/pcre/libpcre1/libpcre1-8.45-1.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/pcre/libpcre1/libpcre1-8.45-1.tar.zst",
+      "bytes": 166711,
+      "sha512": "85c793ed3622a00b811773b94c45376882513e267b9f1d2a3efa0bc42ff86a4e4bebd8362a193d302e66ae9e5c9b93befc1bb1096c0fd397e2cd0f5632c808dd"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/pcre/pcre-8.45-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/pcre/pcre-8.45-1-src.tar.zst",
+      "bytes": 1580850,
+      "sha512": "adc2fbd4bc4b6adc1353c137525e8b56a02419237aa226912ee12e495b36ce06954975cf909cd0c8397d59b09172ba761a253bc68d31969e5b0bc85507ec77d2"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/pcre2/libpcre2_8_0/libpcre2_8_0-10.49-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/pcre2/libpcre2_8_0/libpcre2_8_0-10.49-1-x86_64.tar.zst",
+      "bytes": 244195,
+      "sha512": "4093be5fdc2077d078865c1a553df6bc2fe5c02b4ea106e605c4d92dfd876c68ca894908539e86fdb089d60b376776a941f2645c21b2cad76027a335ac338bb0"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl-TermReadKey/perl-TermReadKey-2.380.0-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl-TermReadKey/perl-TermReadKey-2.380.0-1-src.tar.zst",
+      "bytes": 85845,
+      "sha512": "0b3ae2a3336633fc02c0363a5d959233e4e8cda8eaea42bddf6ba194681f7a60fc13223359afe569fca32f817635ed93eb7f9d7feebd64458fa0c96c8c9c70b2"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl-TermReadKey/perl-TermReadKey-2.380.0-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl-TermReadKey/perl-TermReadKey-2.380.0-1-x86_64.tar.zst",
+      "bytes": 21535,
+      "sha512": "fc43a0808d9ed2e0f72d7cad17adaf43999e9a3bc61a79732918d15f165f3ae524e2fd65c27210cd82186690d069aa3b912fbe1ba8e04c26e75bf877500415b3"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl/perl-5.44.0-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl/perl-5.44.0-1-src.tar.zst",
+      "bytes": 14927805,
+      "sha512": "26be3a3db4ed18e20898825d4503189a0e1fa6b326800f5a9b26c4dfe5d2fa6c976f918d75565610a8e74877ac7c6e0e328808d34fc0c7b1205e7dc579fdaae6"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl/perl_autorebase/perl_autorebase-5.44.0-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl/perl_autorebase/perl_autorebase-5.44.0-1-x86_64.tar.zst",
+      "bytes": 175,
+      "sha512": "55cd94604cfa3e2491df45e5a3715f32b2dee8298a656ca2da8de2eba4096329c595228a8c950760e9641b2c6097309571350c0ffe1c8d13759eb76ec841a4f8"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl/perl_base/perl_base-5.44.0-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl/perl_base/perl_base-5.44.0-1-x86_64.tar.zst",
+      "bytes": 3772189,
+      "sha512": "3039e7a60c950cd682d8372f948ec83f7ebea27e9b425ab7406ed2eff0bebb80f7622423cf82b9ab07e34deb183bdf1b56fe129c8306bd2cfb04e7cd96beb992"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/popt/libpopt-common/libpopt-common-1.19-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/popt/libpopt-common/libpopt-common-1.19-1.tar.xz",
+      "bytes": 18536,
+      "sha512": "4d69e6d7e196cdb4caad558c5d7543f706a4c6d7053476be861be07672506e378084126f22903deab8113557f757d2a07578f4a790ae316a2ea50ba612148a43"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/popt/libpopt0/libpopt0-1.19-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/popt/libpopt0/libpopt0-1.19-1.tar.xz",
+      "bytes": 18748,
+      "sha512": "e820a7bac13cdd3bff07673ac54dcb80f342c6a32917035f218ef255bdb707d654ee6a1684242d7ce8439eebf050ade6566f27f5118896fbf8e0171173b5bfee"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/popt/popt-1.19-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/popt/popt-1.19-1-src.tar.xz",
+      "bytes": 598796,
+      "sha512": "661590612d7c704bfe08d88edc125a459cf8a7407bcb7cfc8cbb700516d536e69fc94b7b301730015483372b744c795ef62ad6fb6305c061e7ab52b66b9c8ea4"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/readline/libreadline7/libreadline7-8.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/readline/libreadline7/libreadline7-8.2-2.tar.xz",
+      "bytes": 113340,
+      "sha512": "1d27576cf49b056f35f90ad933e39c5d946bc271ddcd109daa98f95b97123b428256827889ff45ca8a76409cdb1afd0146e99c9b70150b302538356512acfe38"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/readline/libreadline8/libreadline8-8.3-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/readline/libreadline8/libreadline8-8.3-1-x86_64.tar.xz",
+      "bytes": 120084,
+      "sha512": "64142c5f305b9836c5be9a4271e4163d8b3e739a0451c0d152373eeb3338342f7cf5691e4437b8e6d0a8404c30ea7a21832e342e7a1ca3b5f3e8e3403051b96e"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/readline/readline-8.2-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/readline/readline-8.2-2-src.tar.xz",
+      "bytes": 3046308,
+      "sha512": "ebedad14bf205cb9f5df0f5e4742f737e98e6bad5539996c36840d1c86d603877e0c3e4f9d0c9df9081b4c820c9b8c3224dbe8b45b9e7f5c97bc7973a35b3da4"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/readline/readline-8.3-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/readline/readline-8.3-1-src.tar.xz",
+      "bytes": 3354620,
+      "sha512": "31710b8055e4df64d6fd256f76eb513df10366faf4ee5e7f97dc75b720186ee9883c843c48da796dce5600eba0ca424500e35db0435d5cf34ad9ce631fd352c8"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/rebase/rebase-4.6.6-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/rebase/rebase-4.6.6-1-src.tar.xz",
+      "bytes": 110220,
+      "sha512": "c7a3717798a2c719b8a1835b6886ce7f3e6030e99383614b8296754400a358e69aa05bf147e62f12d4a5d0b9729b0b08e062771a820e65678f6f12627bf2b026"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/rebase/rebase-4.6.6-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/rebase/rebase-4.6.6-1.tar.xz",
+      "bytes": 248832,
+      "sha512": "9f3751c4687b09f3c286cf5c4522a0d976fce2d79ab471ab37560b15f14af84f7d13162b6102c02d0d60784448ff0586e76e9291675af4fa0c9320a3713633da"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/rsync/rsync-3.3.0-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/rsync/rsync-3.3.0-1-src.tar.xz",
+      "bytes": 1230316,
+      "sha512": "70831c10251596dd209ec4832779ed3d73a2e88643b325ecb1a3292a1c680b9be2a2734a7c6d1ee715be3e9bcb7008e70855b9b1bee5a0fc916f520c14e3de2c"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/rsync/rsync-3.3.0-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/rsync/rsync-3.3.0-1.tar.xz",
+      "bytes": 1043220,
+      "sha512": "80d41800f7b2ddab272bcdbef4ad7708804d1bd64009d39643a22b67f13fed968bf2a73e1237dca72f828a7bae116773b138daa37370c9bae4059e6168a66712"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/run/run-1.3.4-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/run/run-1.3.4-2-src.tar.xz",
+      "bytes": 48576,
+      "sha512": "777ce505dce98dbfa6ebeebe4aba4c615f3c70277cd8605580c1198e732322f1a3b9d165e113cd2709632107434f37e66c03c345e28d1508ce874bc720a416d8"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/run/run-1.3.4-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/run/run-1.3.4-2.tar.xz",
+      "bytes": 34492,
+      "sha512": "7e3156bbddc5f934fde3530879aa5186c9fdccb757ba848fc958e79e96534b336975f2882e413d5c18174628033a422157d25c48f8b5e90f0f1555ff2fa6343f"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/sed/sed-4.10-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/sed/sed-4.10-1-src.tar.xz",
+      "bytes": 1737036,
+      "sha512": "0b327f8771e53f940b082c93667e480217264f9fa84cf7965e589b1b2dc531b279ee385f57377ec48481169e7f10bcd5ecae9fa44d5ea3c085014fd1d90a5dbd"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/sed/sed-4.10-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/sed/sed-4.10-1-x86_64.tar.xz",
+      "bytes": 359252,
+      "sha512": "da5475344a1693f90fb560773ccca48eaf13af0e6bbcada9dcea658862bf7f46043b2d7365de0e2e235fb9a874fe784ad83bc29eb2fdbf3207cd8ad5e127b8b9"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/sqlite3/libsqlite3_0/libsqlite3_0-3.49.1-1.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/sqlite3/libsqlite3_0/libsqlite3_0-3.49.1-1.tar.xz",
+      "bytes": 686212,
+      "sha512": "cd81686fe5778a94ab91e4aebdd2a229cb963318ce7b393e0a0299e29ed7648c24135733c1978cbebbb926813d7f994b9e38318ede12c72fe79ad404dbfdeaf2"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/sqlite3/sqlite3-3.49.1-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/sqlite3/sqlite3-3.49.1-1-src.tar.xz",
+      "bytes": 3508192,
+      "sha512": "6ab08f70e1d0415c161f0a435ceae191367f8c9c2ccd61d11daad251acb269f63d5bc1f6899dc3ce49028c65b55bf233c1fec89a137092e2dc7beaf3bdebdcaf"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/tar/tar-1.35-2-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/tar/tar-1.35-2-src.tar.zst",
+      "bytes": 2320558,
+      "sha512": "be2d7221ef5e2507a8281365d0265b29d42a2079337c693f2d7ef5dcb4f80c47a5319f0be126fc7075c14097b237e98eb309e0428f127981b5b14fbc2f4b8909"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/tar/tar-1.35-2.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/tar/tar-1.35-2.tar.zst",
+      "bytes": 997616,
+      "sha512": "007c7df12bc27ca14862a925680e2b2ff616a5149262b153889e6f580f3db492f98da49b5f34a8c4234194ee25021b67e9a84c987c96c5d6baa7ee0b3ea02425"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/texinfo/info/info-7.3-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/texinfo/info/info-7.3-1-x86_64.tar.zst",
+      "bytes": 607040,
+      "sha512": "3af0e7c2edc34a068d88974c6c1b0f529663f4bbce145b5a33f3b7e90671fd908fb4a544e033b98a6906d3244c64a18732104c5f1d323c0ccac8a5134e13f411"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/texinfo/texinfo-7.3-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/texinfo/texinfo-7.3-1-src.tar.zst",
+      "bytes": 6942953,
+      "sha512": "4c8914ff6b497fd34da19e12075c3b517655674fc344faf5310969e954112b993ae724308bae60859372f826e597aca28338ea2b9b3691587be374eb4bdb255a"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/tzcode/tzcode-2026e-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/tzcode/tzcode-2026e-1-x86_64.tar.xz",
+      "bytes": 187756,
+      "sha512": "0c939b23a245bb0ca90f9ae14ef4bce6c73d9213d86ec09651c7463fb18bff9c3a04d35d84886bddedf7f76a01b87f112c737df7055eb12370429c93afb10c72"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/uchardet/libuchardet0/libuchardet0-0.0.8-1.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/uchardet/libuchardet0/libuchardet0-0.0.8-1.tar.zst",
+      "bytes": 72637,
+      "sha512": "1fad5711590a82a8386c2492286dd9c0ad7cbe086aab249d07ad27277757327a6a67264e9718aef7d30307515462fe67d64f23582f08f0ced85a19cc8e0afe23"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/uchardet/uchardet-0.0.8-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/uchardet/uchardet-0.0.8-1-src.tar.zst",
+      "bytes": 223975,
+      "sha512": "bc76d415a9151c410cf2d2aa48207f0bd5cfa1ed8022ee4252902e260ec87ec5b3c6e9267d6859041195f588253e6628703f5caed617cc2e72fb8c04cce8f347"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/unzip/unzip-6.0-18-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/unzip/unzip-6.0-18-src.tar.xz",
+      "bytes": 1405456,
+      "sha512": "d484bacb22e6f55011c7b29dda670e3335eeb8e3c259748110b4e72ba80c7be3042fe4256bed45279d7d1334b1a14bd6bb2d7fdeabf8c36cab08b406915388e0"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/unzip/unzip-6.0-18.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/unzip/unzip-6.0-18.tar.xz",
+      "bytes": 193176,
+      "sha512": "f81179c52bcb78d71ed22c94f220543e2926e246f42083c746334d7ad33a7abef3e9041f182417fb2a8bfef5fa9f20f6329cd03f726a961ec571d02b7373d784"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/libblkid1/libblkid1-2.40.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/libblkid1/libblkid1-2.40.2-2.tar.xz",
+      "bytes": 120936,
+      "sha512": "d931c47cce5a7caf18799a16ed526e0f0d0f82c0f6d0af952420d50d88f1e0f0ea9d6c07be72f9d0baa06a3299b2db8c3bd3c43d13d94400edc816e7c00da148"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/libfdisk1/libfdisk1-2.40.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/libfdisk1/libfdisk1-2.40.2-2.tar.xz",
+      "bytes": 160264,
+      "sha512": "0c8e6854eb72bb8cc51fc33565ee0d36a747e520e98e074a1d2400672a45651807b53be0f5a1c97efa0ce34975063f86953c9465312dcfdaba8104edb1298d62"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/liblastlog2/liblastlog2-2.40.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/liblastlog2/liblastlog2-2.40.2-2.tar.xz",
+      "bytes": 4908,
+      "sha512": "89350921fe76c9065662dd9d72dd464d2f404f1690e806210cbb828ae8325ea5f3f9909d8eb04c8342b80417a4e1e22c3569241515762ad081ecd58d56927c02"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/libsmartcols1/libsmartcols1-2.40.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/libsmartcols1/libsmartcols1-2.40.2-2.tar.xz",
+      "bytes": 96124,
+      "sha512": "71ded6f02d264343d068b90450d96f4fdeb4087f278b990709aaa814c16123f4ae947714e5f10020260c30a6d78865c2d35d9ffe57a51b038815db52c3274317"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/libuuid1/libuuid1-2.40.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/libuuid1/libuuid1-2.40.2-2.tar.xz",
+      "bytes": 12532,
+      "sha512": "3ba0c5d5a401c88796077e9f45164532408882f2f5d9f0ab99b2fdf6eb915917250124cde3653a7c53b648866e091aa3baf3304d0b243337f0d4e254a7631f55"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "bytes": 8862568,
+      "sha512": "55f519b022990db0d31cf4e36dee9c84226a71931ce5db213a5fd083974f645b0c0c4434da5cd8c468df9c9855134a9dbadf94b8d23f7104b450e7a211a25701"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/util-linux-2.40.2-2.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2.tar.xz",
+      "bytes": 2053568,
+      "sha512": "4f3473472e32bff586401ec31f1423237c9cb112ae1140cdd8b2797040c5c182632f49f5354eaaa409d2dacba7767d5baa8b8926d7638e2725ad80065b46c10b"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/vim/vim-9.1.1825-1-src.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/vim/vim-9.1.1825-1-src.tar.xz",
+      "bytes": 19098280,
+      "sha512": "94ec019e3667caf84d8380669cef45abd0ed92990c2fac221affaddfee6e26baf7f1ac8ee09916e4daec7aa9c190db832a66c58549e55c0cd8c793663ed393d4"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/vim/vim-minimal/vim-minimal-9.1.1825-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/vim/vim-minimal/vim-minimal-9.1.1825-1-x86_64.tar.xz",
+      "bytes": 794064,
+      "sha512": "6a252210e2ef08a7038d6e5bc8e5312e0c25d8328ab0aefd7f292eb79b7a32dd699f15f3f293cfbb83687e87cb3f68a335e969b117f55e6ff99b34ebdfbc8119"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/which/which-2.25-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/which/which-2.25-1-x86_64.tar.xz",
+      "bytes": 31388,
+      "sha512": "d6452f6c237603be1cd9d3acab16b4aeb10c66c3d06602a60c05a893eec7e049e1d5a6bcd299181f088d34628362a8e28c08dee9db11c3cc2ca61f30ee1b550f"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/xxhash/libxxhash0/libxxhash0-0.8.4-1-x86_64.tar.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/xxhash/libxxhash0/libxxhash0-0.8.4-1-x86_64.tar.xz",
+      "bytes": 12964,
+      "sha512": "47d4bc1695f8ba7b152e8e499d6b6982611f48c887e87213ca7153bd668a94749580a8b848b00b5a90b57307eee24ff00136beede7ffaf2803134b54d42f5671"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/xz/liblzma5/liblzma5-5.8.4-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/xz/liblzma5/liblzma5-5.8.4-1-x86_64.tar.zst",
+      "bytes": 88387,
+      "sha512": "3fa68c933b64215fe70be45c026d046fd330a28467a589329ffe1a571b7434246063c866369314015d9966767476f315c91097c9bb1d25a71e4ce36c0ef98a9d"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/xz/xz-5.8.4-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/xz/xz-5.8.4-1-src.tar.zst",
+      "bytes": 1568804,
+      "sha512": "869d8da3ce0d38a2e6295132623ddd85da2b2486316e640c2385fa7817d80c7affd23d3786f008a82eb1649e88885f9be52a2093419cd3ff607651713277a90e"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/xz/xz-5.8.4-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/xz/xz-5.8.4-1-x86_64.tar.zst",
+      "bytes": 783595,
+      "sha512": "bb1d89a074e1b048b18713f496a74f5c73ffb2a1484f8cdf036a6fc3192546d1f114ff5f592a4bf01cd57abd3b02706f8d16b2e1b54cd46af1ca3707431340df"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zlib/zlib-1.3.2-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zlib/zlib-1.3.2-1-src.tar.zst",
+      "bytes": 1321796,
+      "sha512": "10aa89718be99490ba9e76c19cf8e7e5cbb2a84c7510ea928c87c60279cb5ef0beb58def1049f427139e2b2024e4434ca32bdfbf7cd9a73ea7672684b2b3bcb9"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zlib/zlib0/zlib0-1.3.2-1-x86_64.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zlib/zlib0/zlib0-1.3.2-1-x86_64.tar.zst",
+      "bytes": 46254,
+      "sha512": "d79ba6098cadf6bf2f32f35d9cd54729293c64b3c9daabb9d080f52861a19db71544d5710fdbd61ff45e7c2ae4eecb3f2e3b8a1e3bc05695b8cfe01c7639c53a"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zstd/libzstd1/libzstd1-1.5.7-1.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zstd/libzstd1/libzstd1-1.5.7-1.tar.zst",
+      "bytes": 253786,
+      "sha512": "f89cdaa004487ec8c4796b8f56887c81f6f497873c1495b9cb585ffe6c8d6e6b8ad4b52617d5238075f965f1fe001da287d9a00d121590274b2d87672b415a0f"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zstd/zstd-1.5.7-1-src.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zstd/zstd-1.5.7-1-src.tar.zst",
+      "bytes": 1868357,
+      "sha512": "70e7e40283b8f7783b5545b249e4afc815fe1ac625786ad9e6e6ef50a733d0cf8b810ccea280786dd30f7b82af837f7fc09efe0f3cd0ca146d9c231648f3cc64"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zstd/zstd-1.5.7-1.tar.zst",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zstd/zstd-1.5.7-1.tar.zst",
+      "bytes": 394600,
+      "sha512": "5de9a2fdee75345a35592444d467a1b70504f09f3b2ee5aaf8af8a9d9fda1a4e77d37c5c4c4fee9b96995ef78f9708e6c02adea7a70d9f80f1238e507b2bc0fc"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/setup.xz",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/setup.xz",
+      "bytes": 3639576,
+      "sha512": "1c901b9ac7e13b17c3b0773c148bc52f98753ddbfaf7017f55a6f5c35a4f74b8b8dbda8d1e6fe6d93ceb8c700f51af8f416eec4d7f943f685c5acf8b2bacc3c4"
+    },
+    {
+      "path": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/setup.xz.sig",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/setup.xz.sig",
+      "bytes": 566,
+      "sha512": "d0b40a6e5ac39c16aebd28a7589b1244ed7bb1baf27eb5fafd4e6b22204dfd89a19b987e3c57e5cd2805896e1ec8d00d39f8df3d624bf2545aa727dc88f7a679"
+    },
+    {
+      "path": "notices/_autorebase.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/_autorebase/_autorebase-001091-1-src.tar.zst",
+      "bytes": 15153,
+      "sha512": "9fc12f23e76121720d70fb5268829d12fcff7d358109274fe972c9ee25b78d37d50e39d38cc031c234eac5064627e806677ba0d8e941386d39a709684f0250f1"
+    },
+    {
+      "path": "notices/alternatives.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/alternatives/alternatives-1.31-1-src.tar.xz",
+      "bytes": 19619,
+      "sha512": "a218d4ee1ddb31d20f936be6a56f50756ef2a39f725ccfd70b7f6fbbfc66b9b1b2c62db8e7ae8b61615dd6ae2c994b30fdb786817c5b05f6fe22027cf39a0774"
+    },
+    {
+      "path": "notices/base-cygwin.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/base-cygwin/base-cygwin-3.8-2-src.tar.xz",
+      "bytes": 4035,
+      "sha512": "eebdffb25ac976ea1380444fef65dfdebaffa09d46d7288daa873e9a4633613f8b2b4dc522e2e907e29e76fb5b7cedb3c3ac5f120b4bdc7f92c2f0d9933d31b4"
+    },
+    {
+      "path": "notices/base-files.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/base-files/base-files-4.3-3-src.tar.zst",
+      "bytes": 266555,
+      "sha512": "a706cfb62611ce07336ea1694e8571bb538171b2a83673657e99f95c1a983f07c0996d9023cc6d12f3a8b2e38209589146957232011eb94146c18d3173d07b01"
+    },
+    {
+      "path": "notices/bash.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bash/bash-5.2.21-1-src.tar.xz",
+      "bytes": 110985,
+      "sha512": "a3d1a534eae8242d2417c3719632dacbdc9ea5972267d51b75cbfe27fb3a877695ce60630824f6f086027207e7dcd1a58cb284c16ea10902bebb78568f3cad12"
+    },
+    {
+      "path": "notices/bzip2.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz",
+      "bytes": 3607,
+      "sha512": "20b4860d2d2c36f3beae3500b4fafc0ab852c24b33c9c23ea15b82fdfafd7c156cb97d4264d43fbf37cd80b486633d8e54eb1be3ba7598403e8fde4ae2f61df2"
+    },
+    {
+      "path": "notices/ca-certificates.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-src.tar.zst",
+      "bytes": 48506,
+      "sha512": "5a9c3105ecee28ff6caad5e0c426afc0a93bd2b7444707e7b148a49e7c9bb2a227a11001f9459b564ad6b970fb16f44c4d404d7fb72c6757c37c3579eb971fb3"
+    },
+    {
+      "path": "notices/coreutils.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/coreutils/coreutils-9.0-1-src.tar.xz",
+      "bytes": 43462,
+      "sha512": "25feb6c94d19a94ada798e4e8adc43f221d728527566731ef76752384c078b7167111d5469fb2f2af9d86102d96c19ad0634c7d1c071703d7e8717bf30d80c77"
+    },
+    {
+      "path": "notices/crypto-policies.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/crypto-policies/crypto-policies-20190218-1-src.tar.xz",
+      "bytes": 27810,
+      "sha512": "498967f63717821409c2468cca7cd467e76fcb0127b58627d0d397ca3e40cb6b8d4ac19e1de7e4a4685fb0e13995117b05d6fb6bf686c386336c888030a4e76b"
+    },
+    {
+      "path": "notices/csih.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/csih/csih-0.9.14-1-src.tar.xz",
+      "bytes": 30217,
+      "sha512": "74d7656cdab44af9b8c6d6e95bf14183d55ddbc613ee80a129f3f5ab51c85a60a1e113ca039b810b49233c3daaf93383cbee8ca437e0b27b0d72be6ff3fe46c0"
+    },
+    {
+      "path": "notices/curl.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/curl/curl-8.23.0-1-src.tar.xz",
+      "bytes": 18863,
+      "sha512": "37fb8e06b626b68d734c861ea2f05dc0381f804b70e8ed7f61603ae081c5bb79eda23eb0a160b893995bdd462593c0bf8acd42912eacfcd53091c7d838806416"
+    },
+    {
+      "path": "notices/cygrunsrv.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/cygrunsrv/cygrunsrv-1.65-1-src.tar.xz",
+      "bytes": 36235,
+      "sha512": "76eb8ebe4007041d0c1af5cb4455429438d841cb016fa6dc7ff31be28c542667a2cd7b14cc0f6c2e042ea4c9eabc9fe4d5af3876d38f79f338f5af2d61a90521"
+    },
+    {
+      "path": "notices/cygutils.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cygutils/cygutils-1.4.17-4-src.tar.xz",
+      "bytes": 92947,
+      "sha512": "8c6cbfe05723e14c6c621f8af27080fd03eecf85a438025fb2d7a1c5b484d6e92f5f0f36fc8e7ddb7ea5c071bec637d8db8b80f20f1e0412a853edc44601ed0e"
+    },
+    {
+      "path": "notices/cygwin.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/cygwin/cygwin-3.6.11-1-src.tar.xz",
+      "bytes": 238675,
+      "sha512": "146b8b18f3372c91f024b01786e1b0cf6e0417e923d7e3bc6c8cf439b9f6077f3ec106d0179fbccba562611c3f56299ae66dcf5632a64922f9c7fe7be699107f"
+    },
+    {
+      "path": "notices/dash.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/dash/dash-0.5.12-5-src.tar.xz",
+      "bytes": 6500,
+      "sha512": "754c54f528b8cd19fc0e9bce4bd1cd705b8a27417e599e1ac74208c3a26827ff444baaa2e27869b16cc24fa56fe87114e8d6fd252ca34303323a38a1c421cd74"
+    },
+    {
+      "path": "notices/diffutils.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/diffutils/diffutils-3.12-1-src.tar.xz",
+      "bytes": 39775,
+      "sha512": "41eec6b2c96df1933d72478a67ecd389f58d2cedb449e273cbb5b5b1b0a1addf642dd6fca8a8a3c819234ae9dc6733e8f3eb90652bead947e11c2ac9f414d62c"
+    },
+    {
+      "path": "notices/editrights.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/editrights/editrights-1.04-1-src.tar.xz",
+      "bytes": 2388,
+      "sha512": "0467f0c20d9c3a349d7a7046eb42e61c1e7d62a6543610c817781743df971a202c10ddfcf7835ed238ea519bd272d5cc18fc6c92dc33fd28af66b39210158e53"
+    },
+    {
+      "path": "notices/file.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/file/file-5.46-1-src.tar.xz",
+      "bytes": 5291,
+      "sha512": "0eda5b3808f187797bc6c854d0083bb4bfca9c9a7c3ac80ab66867117afe4a0d712753339fac1844bda2c178e8dc525037d7a736d3e7a35400dc5248fe92a633"
+    },
+    {
+      "path": "notices/findutils.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/findutils/findutils-4.11.0-1-src.tar.xz",
+      "bytes": 39738,
+      "sha512": "41598c0d0b9af7e790b133570ea889f6975792fe22f1425721bde6e308853322a456900e775eeb3b41d47e4ae4024fa857b737004a2740e0183c3545af29b16a"
+    },
+    {
+      "path": "notices/gawk.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/gawk/gawk-5.4.0-1-src.tar.xz",
+      "bytes": 97049,
+      "sha512": "d65eae97d9aa50710937d3eb705f327765306f7855d11099c4a7d86bcf52cb1baca48bab4a969e09bf8425132ff9f7c4021112b3c9d382d1fc989600f368e3e9"
+    },
+    {
+      "path": "notices/getent.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/getent/getent-2.18.90-5-src.tar.xz",
+      "bytes": 28233,
+      "sha512": "0cd8d896caa1f8977120d271d5b9bfbc99be63066624ce8c2b380c243aef54c4aaee9d984ff8be82e6765f272ffe1fe890b5ae08dfb6bd5c1f7efdd3bdda27e5"
+    },
+    {
+      "path": "notices/gettext-locale-alias.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-0.26-1-src.tar.xz",
+      "bytes": 201136,
+      "sha512": "cd28160536c6db1c9bc965ccfe9e46c24416a1d2451e7a7aadb93c34aa740bfb3896191565c245fe016659ff7ad2d72c65eca2426cf98d76101195e519727114"
+    },
+    {
+      "path": "notices/gettext.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-0.22.5-1-src.tar.xz",
+      "bytes": 166394,
+      "sha512": "3c2b7d52c3ac20f23dc6343c7e6ad295a26baee8b0f3289edacc5ca164a6a68ce5eda10cf2c2a1d5550545b254104968dfe95f821758b0c015ecfe80d645a1c9"
+    },
+    {
+      "path": "notices/git.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/git/git-2.51.0-1-src.tar.zst",
+      "bytes": 50021,
+      "sha512": "665c98298c8534cca4779bc36abf17e728b479f3d620b1dc9429169b0e899581138db8a819425c890beec298cbb10cbbbee6b7bc3250c2ccb75d69f322145b08"
+    },
+    {
+      "path": "notices/grep.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/grep/grep-3.12-1-src.tar.xz",
+      "bytes": 39413,
+      "sha512": "a1af10210a537be76fa52d3a67f30d7714e8052f5933cfe527252a7a33d8b3dc19b565215a4484d5507f918581c368b2265e5598415e8be3ca63966676df18fc"
+    },
+    {
+      "path": "notices/groff.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/groff/groff-1.24.2-1-src.tar.zst",
+      "bytes": 90852,
+      "sha512": "a54b485a7c0149dff6f3329dc60f42a74658835dcb9aae8738f737b613b705b4736d01771c8317671976eae29d796dfcf34ee65e164ac56ab7141edcdf77c3ad"
+    },
+    {
+      "path": "notices/gzip.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/gzip/gzip-1.15-1-src.tar.xz",
+      "bytes": 37888,
+      "sha512": "8a26a5e0b3db0b14d46b828a9e356b97c0617445a7cd3a936ceec1b04d96aa8b5b75dc5e97788f711b02b1c7ee0a92a12c5d5bbd487eebe16cc6a69c2090c184"
+    },
+    {
+      "path": "notices/hostname.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/hostname/hostname-3.13-1-src.tar.bz2",
+      "bytes": 3093,
+      "sha512": "51a4682e5d47561f99432bc0a574b84583067fcd7ead5b334271891cb3a60da8146ea7d4fb39442d8b7669e2524434de54f03b722352ac3715ce22f2ee634b14"
+    },
+    {
+      "path": "notices/info.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/texinfo/texinfo-7.3-1-src.tar.zst",
+      "bytes": 153868,
+      "sha512": "135408b8a2cd7013230c2ff30e68160ed4257837d76c1beb6f98777df6d2d474ed8e3876c40bb10af323fa7147b5277cd4baf71716306ca1dee4c240b80cf373"
+    },
+    {
+      "path": "notices/ipc-utils.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ipc-utils/ipc-utils-1.1-1-src.tar.xz",
+      "bytes": 37852,
+      "sha512": "c400af6c66b9032bb45b050c2ec2dd20b02ab789b7f16c2eb24e302a616c3f6ab5c04a488798c67f24622c89580ef79ddda9671194244cf5dd0e613dde6810c0"
+    },
+    {
+      "path": "notices/less.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/less/less-710-1-src.tar.xz",
+      "bytes": 37540,
+      "sha512": "5faa84d3bb4a05bb174ec5d08953e03a1e6f61204f23536f45a0d672740952e60e93508a348023a042bb584c11cb5b8446cc0e9d49a7d866b7edd94652bcd896"
+    },
+    {
+      "path": "notices/libargp.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libargp/libargp-20250917-2-src.tar.xz",
+      "bytes": 37924,
+      "sha512": "52b57a727041126f36ce5c0fb4be0f233a06b0bb2b72f1957de2f02a152aee2d3dbc7fff8dccab331776d411494f42a7ae0a8c89f08e0e2090a0e30c11f36ae7"
+    },
+    {
+      "path": "notices/libattr1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/attr/attr-2.5.2-2-src.tar.xz",
+      "bytes": 47280,
+      "sha512": "21d6c3cd192882136a52c8b90c044cebd91e9d58be699f8328e9115e28b2c977ba01be8b57dcc2672d7e825224d2b1b9754336760122e431013b4352a75b3e2c"
+    },
+    {
+      "path": "notices/libblkid1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "bytes": 133890,
+      "sha512": "ec81bbe1a18f060ef59adbed9c2771cba54be6c16c66491fd7284a8562763a44bcb5d1fe5ac532168a3ba90fae17d0549b0639893e2ca5081499c60eee4e6bb0"
+    },
+    {
+      "path": "notices/libbrotlicommon1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/brotli/brotli-1.2.0-2-src.tar.xz",
+      "bytes": 3992,
+      "sha512": "4c5a1da27056930f695b88d80df35da79c066eb8e998de6a1059bfba053ee0387e383a75ccb97332641783c9cbc218abb111176bf5b034c523f81037a8088ad9"
+    },
+    {
+      "path": "notices/libbrotlidec1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/brotli/brotli-1.2.0-2-src.tar.xz",
+      "bytes": 3992,
+      "sha512": "4c5a1da27056930f695b88d80df35da79c066eb8e998de6a1059bfba053ee0387e383a75ccb97332641783c9cbc218abb111176bf5b034c523f81037a8088ad9"
+    },
+    {
+      "path": "notices/libbz2_1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz",
+      "bytes": 3607,
+      "sha512": "20b4860d2d2c36f3beae3500b4fafc0ab852c24b33c9c23ea15b82fdfafd7c156cb97d4264d43fbf37cd80b486633d8e54eb1be3ba7598403e8fde4ae2f61df2"
+    },
+    {
+      "path": "notices/libcom_err2.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/e2fsprogs/e2fsprogs-1.44.5-1-src.tar.xz",
+      "bytes": 72155,
+      "sha512": "4d7c7061c24111fc872d0af29e8dc4619eca2081a340216a7551fdbdbd7d5edff1b5a86b47cb573b8766de30aa31e17ce2ca9d24ca8f3712e0cf1224d91a6074"
+    },
+    {
+      "path": "notices/libcrypt2.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libxcrypt/libxcrypt-4.5.2-1-src.tar.xz",
+      "bytes": 27786,
+      "sha512": "d9570e4e55831097af0096ed05f0ca13cf26fe9eecbc6c33a0cb32bfadc8d1d22f5d7aba1bfdcb7714c6f4cc65ca2259347cf8d9b7d5ace0d356aea5b6e6dd0f"
+    },
+    {
+      "path": "notices/libcurl4.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/curl/curl-8.23.0-1-src.tar.xz",
+      "bytes": 18863,
+      "sha512": "37fb8e06b626b68d734c861ea2f05dc0381f804b70e8ed7f61603ae081c5bb79eda23eb0a160b893995bdd462593c0bf8acd42912eacfcd53091c7d838806416"
+    },
+    {
+      "path": "notices/libdb5.3.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/db/db-5.3.28-2-src.tar.xz",
+      "bytes": 19330,
+      "sha512": "5507322b19d1e3df9ae6c80e01f9e226a6b9ae41b4d33cadf1704bcf691d3668224562c69893acb14be45555614a15c93d6ec4410ef7a438756dab6016139df0"
+    },
+    {
+      "path": "notices/libedit0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libedit/libedit-20251016-1-src.tar.xz",
+      "bytes": 3295,
+      "sha512": "2c5d29ca184d7182141ce0fca9637c1a05b62fe577b6574273e62e6bc42648fd483fa32061a0e303113ef0143e95f789c740228bef173c0d791df3e75c2b80e7"
+    },
+    {
+      "path": "notices/libexpat1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/expat/expat-2.9.0-1-src.tar.xz",
+      "bytes": 3031,
+      "sha512": "6a7d114931d719c2b1d987d4fc31daec53db0b29b1cdf7b1d01cb00a0e2b4977e03788e1c674ad872074d48a6fd99e9d0899a50f9675341f84a8ee98db6f9888"
+    },
+    {
+      "path": "notices/libfdisk1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "bytes": 133890,
+      "sha512": "ec81bbe1a18f060ef59adbed9c2771cba54be6c16c66491fd7284a8562763a44bcb5d1fe5ac532168a3ba90fae17d0549b0639893e2ca5081499c60eee4e6bb0"
+    },
+    {
+      "path": "notices/libffi8.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libffi/libffi-3.8.0-1-src.tar.xz",
+      "bytes": 20874,
+      "sha512": "19b518e8805e3f1e4f7d8b97ba9f2d87411e6aaa74c7593b14b37dbe2a3aaff28dcc395e5e01443cb6dce055d1926fa51e67edc202b6679ae84a842ea1f67776"
+    },
+    {
+      "path": "notices/libfido2.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libfido2/libfido2-1.17.0-1-src.tar.xz",
+      "bytes": 2551,
+      "sha512": "434ab1f204f98008c79e039b6f9d066e947baa8f1e751960e328c73ec6a9432d46339183971289c5f07072a9bc0d9d87ae928c017d4b14b7227cc3e157157aa6"
+    },
+    {
+      "path": "notices/libgcc1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gcc/gcc-14.4.0-1-src.tar.zst",
+      "bytes": 311747,
+      "sha512": "8f548941c69d1a9d8c622fb45e420e556a4621bd9ec9e5cc4eb458fcc7cc13a76e3b134d8898e0a4f92c790e23b01bed671fe400317539a62a51bd11c3f9c885"
+    },
+    {
+      "path": "notices/libgdbm6.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gdbm/gdbm-1.26-1-src.tar.xz",
+      "bytes": 36585,
+      "sha512": "878155d59f3c8ae4285307aa292a94e4ecae671ae481925c5471fe0580dee14ac1f2ee50b596b72ac5a02c52a8bb80859c96e97829d68087b1a0d6f9ca41c631"
+    },
+    {
+      "path": "notices/libgmp10.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gmp/gmp-6.3.0-1-src.tar.zst",
+      "bytes": 44958,
+      "sha512": "ace01cba31bf9cfe92c4950fe7633dec5a37548dee5bdb937571085bd223685d3a356b4d0703d8d2587cec74d304d59ddb915ca7fe2ee2ddb836aee5512b0b97"
+    },
+    {
+      "path": "notices/libgssapi_krb5_2.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "bytes": 140434,
+      "sha512": "9a97b40913cea52e2a096c8f4079956bfe881a83c09799e994ea20641b06af295837e3966f28f63db0623c5a235502e76faa27c31440604f04a82ce336012eae"
+    },
+    {
+      "path": "notices/libiconv2.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libiconv/libiconv-1.19-2-src.tar.xz",
+      "bytes": 90527,
+      "sha512": "01786acb93e7e4a93686262cfa290ed8407c2ef01df250a658a918701ea98b6b83be1d6a3d009af99644f0d439deb914a601a69d9565a4b3ee67e8580ef2668c"
+    },
+    {
+      "path": "notices/libidn2_0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libidn2/libidn2-2.3.8-1-src.tar.xz",
+      "bytes": 58416,
+      "sha512": "1927360435a3678dc482529a83d5a3a37486168af6e9a275fdade2fe12eea487bc6192465651b23bea9f8150b909d9fb0dee1f31c17a2b82b1df9fd70fee74a1"
+    },
+    {
+      "path": "notices/libintl8.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-0.22.5-1-src.tar.xz",
+      "bytes": 166394,
+      "sha512": "3c2b7d52c3ac20f23dc6343c7e6ad295a26baee8b0f3289edacc5ca164a6a68ce5eda10cf2c2a1d5550545b254104968dfe95f821758b0c015ecfe80d645a1c9"
+    },
+    {
+      "path": "notices/libk5crypto3.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "bytes": 140434,
+      "sha512": "9a97b40913cea52e2a096c8f4079956bfe881a83c09799e994ea20641b06af295837e3966f28f63db0623c5a235502e76faa27c31440604f04a82ce336012eae"
+    },
+    {
+      "path": "notices/libkrb5_3.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "bytes": 140434,
+      "sha512": "9a97b40913cea52e2a096c8f4079956bfe881a83c09799e994ea20641b06af295837e3966f28f63db0623c5a235502e76faa27c31440604f04a82ce336012eae"
+    },
+    {
+      "path": "notices/libkrb5support0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "bytes": 140434,
+      "sha512": "9a97b40913cea52e2a096c8f4079956bfe881a83c09799e994ea20641b06af295837e3966f28f63db0623c5a235502e76faa27c31440604f04a82ce336012eae"
+    },
+    {
+      "path": "notices/liblastlog2.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "bytes": 133890,
+      "sha512": "ec81bbe1a18f060ef59adbed9c2771cba54be6c16c66491fd7284a8562763a44bcb5d1fe5ac532168a3ba90fae17d0549b0639893e2ca5081499c60eee4e6bb0"
+    },
+    {
+      "path": "notices/liblz4_1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/lz4/lz4-1.9.4-1-src.tar.xz",
+      "bytes": 59686,
+      "sha512": "891e9cea74ddfca3201eed55e513959b30d4c5b48f5f6877b119ce339b8d36ff83636e36cef96e00c3a06827529f6e2f1b96a52a7706050b6a8112c9ec3735c2"
+    },
+    {
+      "path": "notices/liblzma5.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/xz/xz-5.8.4-1-src.tar.zst",
+      "bytes": 89872,
+      "sha512": "c3e27b408448a485b20cf6c3a3d458c3742e6c439aae09d0190f41fe0e89e2bf7367dff80dd651bc0c02672119d7e2329a7072d44622adf8c73b58620c53dc41"
+    },
+    {
+      "path": "notices/libmpfr6.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/mpfr/mpfr-4.2.2-1-src.tar.zst",
+      "bytes": 45169,
+      "sha512": "248384e9f67a813b493b973b0765a186fd90a72a1d58f1374e65986e2be4512ebf8266c32d226227a1f744f6c1a302e7402c309f2be6bd367353d62371143d6d"
+    },
+    {
+      "path": "notices/libncursesw10.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz",
+      "bytes": 49557,
+      "sha512": "2bf800a282bc691c0f83ec9d538cdecd9f6d423b741fcb80b01b8a6709ecbbb4ec62c99a50faaa661614d349261da0ae0394deb3aa2259d99ae18941a4f30273"
+    },
+    {
+      "path": "notices/libnghttp2_14.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/nghttp2/nghttp2-1.69.0-1-src.tar.xz",
+      "bytes": 13214,
+      "sha512": "52317dfdfdaad918a4b434b5b18fd40cc51a771a757dd17e327525424e9256cae456df18c936fa32675768cfdbb0c8e61d67754ca0d2e25fcf50cdaca2444c32"
+    },
+    {
+      "path": "notices/libopenldap2.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst",
+      "bytes": 22707,
+      "sha512": "10b3e55914c857fcd417fc83c94da3c1e9ee3640c550a2cecd430a9faddcde263534a570b6954c2d1f0decc0bc46f8014b4c1dd78935454057ba8e4962f56b38"
+    },
+    {
+      "path": "notices/libopenldap2_4_2.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst",
+      "bytes": 22707,
+      "sha512": "10b3e55914c857fcd417fc83c94da3c1e9ee3640c550a2cecd430a9faddcde263534a570b6954c2d1f0decc0bc46f8014b4c1dd78935454057ba8e4962f56b38"
+    },
+    {
+      "path": "notices/libp11-kit0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz",
+      "bytes": 10150,
+      "sha512": "7f52b6d2bb536134220e68b233a886b699a520821b3e66305bbfa0a078005f72277f371673f55e6f252185f83fa77bdb9d55f724153953efcb5e34ae9ba166ab"
+    },
+    {
+      "path": "notices/libpcre1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/pcre/pcre-8.45-1-src.tar.zst",
+      "bytes": 7388,
+      "sha512": "6ffed2a43ef72a25ac592ae958b7de1a35eb2f777db2070337320ce72a3e04e67bf6b07067a85b810538a4c8ef11c2b895b5e9322ad856af2bd49ec3773d7b89"
+    },
+    {
+      "path": "notices/libpcre2_8_0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/pcre2/pcre2-10.49-1-src.tar.zst",
+      "bytes": 9644,
+      "sha512": "2551234b47146dc84b0b71b5c232a4d04cdef679cb0cf53bfde5188e9a7437b1a7c130e78122ab9afd6eb19d071f1132efeacf6e7579eef755f658eea4c90c25"
+    },
+    {
+      "path": "notices/libpipeline1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libpipeline/libpipeline-1.5.8-1-src.tar.xz",
+      "bytes": 36382,
+      "sha512": "e46422884413f4e28a15ee4e5008a4d624f8e02527a888899ffa13ffa7b4c7b0b3e81a0bc71322bda9bf660b4aacdc29fd5264a5f9b8d1884740934df5488141"
+    },
+    {
+      "path": "notices/libpopt-common.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/popt/popt-1.19-1-src.tar.xz",
+      "bytes": 2318,
+      "sha512": "a3b54733c4973e353b309f98123c694a735107a0e8d311e212c55fb1b5f3227a03946be1985e40ac1510592519f79bba028d1f59c4e7680db248dbb3033fc21e"
+    },
+    {
+      "path": "notices/libpopt0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/popt/popt-1.19-1-src.tar.xz",
+      "bytes": 2318,
+      "sha512": "a3b54733c4973e353b309f98123c694a735107a0e8d311e212c55fb1b5f3227a03946be1985e40ac1510592519f79bba028d1f59c4e7680db248dbb3033fc21e"
+    },
+    {
+      "path": "notices/libpsl5.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libpsl/libpsl-0.23.3-1-src.tar.xz",
+      "bytes": 13158,
+      "sha512": "7289fb1a6c30df27fabe077fca9c9a871404bbf7bab5d3fa41068e4e38c93412205e1b3c6b5a8db5b33eac8e6781e30a07c0cb78f2df295709b81d6281500003"
+    },
+    {
+      "path": "notices/libreadline7.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/readline/readline-8.2-2-src.tar.xz",
+      "bytes": 39050,
+      "sha512": "cb9ff1079226ebe7c88c9aa774605dd1da1e64e09291fcc7426ea46afd72e6f15cf8f81a5d6b7d9ca123dee3038ce75f3ea603c1adccd52664e898c67591c59f"
+    },
+    {
+      "path": "notices/libreadline8.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/readline/readline-8.3-1-src.tar.xz",
+      "bytes": 38771,
+      "sha512": "bb2607e917788550d559738b1d4d27373c1ce280a4f595e1d7a178d88af43c2f6e3e07f5ce95ef635df814d5766c5026ed6e68d6159ed042919754d7ad1e26db"
+    },
+    {
+      "path": "notices/libsasl2_3.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cyrus-sasl/cyrus-sasl-2.1.27-1-src.tar.xz",
+      "bytes": 9970,
+      "sha512": "a5cd55b0deb21f60228942f06b59cd918a99dfc77bf0066fa098139b46e1c6e312bd389ca656d5c86fef2262be5c41f39bef6ac4d5e328c206c73ca52f3aab24"
+    },
+    {
+      "path": "notices/libsmartcols1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "bytes": 133890,
+      "sha512": "ec81bbe1a18f060ef59adbed9c2771cba54be6c16c66491fd7284a8562763a44bcb5d1fe5ac532168a3ba90fae17d0549b0639893e2ca5081499c60eee4e6bb0"
+    },
+    {
+      "path": "notices/libsqlite3_0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/sqlite3/sqlite3-3.49.1-1-src.tar.xz",
+      "bytes": 7271,
+      "sha512": "1607522d37d0b079f8e03889919d548b3f35b63d44f5ddfb8a2c3420e684c08704bcdc8123417e7a91c2b0982ce348cf056aa86aeb5955d8c07f24ea284355a0"
+    },
+    {
+      "path": "notices/libssh2_1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libssh2/libssh2-1.11.0-1-src.tar.xz",
+      "bytes": 8131,
+      "sha512": "eec93723279e3c0ba260cf040ffc3bbe048919f35c1c59742134e2a6ecd9c940de472d591f2b6845b6000f8ca5a6c0b60e0cbd20b9eba0dc59a3a985c9ed9c3a"
+    },
+    {
+      "path": "notices/libssl1.1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openssl/openssl-1.1.1w-1-src.tar.zst",
+      "bytes": 30266,
+      "sha512": "baa3f55c7fa672dec46510b2f61eddee89cda7107318fc1353db38f7e3b9a7e01b508d88aa44788dc2403420ad062143bc1b7a154c787499e477f8a0265fcdfa"
+    },
+    {
+      "path": "notices/libssl3.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/openssl/openssl-3.5.9-1-src.tar.zst",
+      "bytes": 34319,
+      "sha512": "31ca3609241f2e15f50da0f6fa6feb3b2281d8166c22af052bc456c31a0a63d275fea6d2b852e0867ed2fb11fbaf577f30392408ebe45d3a05508d19faf4e723"
+    },
+    {
+      "path": "notices/libstdc++6.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gcc/gcc-14.4.0-1-src.tar.zst",
+      "bytes": 311747,
+      "sha512": "8f548941c69d1a9d8c622fb45e420e556a4621bd9ec9e5cc4eb458fcc7cc13a76e3b134d8898e0a4f92c790e23b01bed671fe400317539a62a51bd11c3f9c885"
+    },
+    {
+      "path": "notices/libtasn1_6.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libtasn1/libtasn1-4.21.0-1-src.tar.xz",
+      "bytes": 62783,
+      "sha512": "d4956f6d51102cc15d9f877126c4c8f441e55d755cf6b05438de5dceb02dc7281d2cba1c72f8a048d90ff7dc641d85480b59c8c2981f677c2b27cc4d9841cfb2"
+    },
+    {
+      "path": "notices/libuchardet0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/uchardet/uchardet-0.0.8-1-src.tar.zst",
+      "bytes": 71660,
+      "sha512": "c97b344f8affbc28533348b8eaab552e42a0a58911fa3dbc9127dd9426a1da5e0def6125b955f1645b412081bf74a5c91f74ae0223c144f581ffc8094e2da3e4"
+    },
+    {
+      "path": "notices/libunistring5.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libunistring/libunistring-1.4.1-1-src.tar.xz",
+      "bytes": 44489,
+      "sha512": "5e1292462cf2607969f4efc6aeb63b0c7a4cfb9e56a0d5ace16f51c517b473bbd28a7ca470c570c3c286c612d6a8e0441d3830f94e3cadc4d435aa78b91a7005"
+    },
+    {
+      "path": "notices/libuuid1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "bytes": 133890,
+      "sha512": "ec81bbe1a18f060ef59adbed9c2771cba54be6c16c66491fd7284a8562763a44bcb5d1fe5ac532168a3ba90fae17d0549b0639893e2ca5081499c60eee4e6bb0"
+    },
+    {
+      "path": "notices/libxxhash0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/xxhash/xxhash-0.8.4-1-src.tar.xz",
+      "bytes": 57932,
+      "sha512": "ebcf9a47c3e774d3a7ea5d9c172cefe48b35a970dbaa3793fe51092121f39455891a1c2d6294fac01b607b5d3e5dbc7fd7770fc6fa1ed0bd2a8bdc58b5015ae3"
+    },
+    {
+      "path": "notices/libzstd1.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zstd/zstd-1.5.7-1-src.tar.zst",
+      "bytes": 22584,
+      "sha512": "0d67c80fd6bd38c3f47f5d661647c3cf02d93c258146da43a3cb410e2120c2c9226f26bac4dbab039f51c3f1e6e220105e51bc607b14d508267535db9642e5b1"
+    },
+    {
+      "path": "notices/login.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/login/login-1.13-1-src.tar.xz",
+      "bytes": 68160,
+      "sha512": "873dec069c18ef31d3b7ad6f92989c0c637b94a20ad8724d4147a82ae019a982f761fbbbc390a01b1f4f345791902caaa1298eb1f6d2a5ed7e0f34d3fcb5ef62"
+    },
+    {
+      "path": "notices/man-db.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/man-db/man-db-2.13.1-1-src.tar.zst",
+      "bytes": 83549,
+      "sha512": "8ab2a92606456e72bef79cc541e205f36d2fa67afae24e98d84e8bbc5f791c66a5972da64fa7d2475052d809452a1f5904c63b94c52a931819c0d5c635fe2b64"
+    },
+    {
+      "path": "notices/mintty.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/mintty/mintty-3.8.3-1-src.tar.xz",
+      "bytes": 46870,
+      "sha512": "91b3c7c206fddcf9e560372f321a512a5fa5120080bb8fdf87311998c83db321e9f93c22826f3c59201aece99d3ab6ed8004108351b75d7c86eccff712784fdc"
+    },
+    {
+      "path": "notices/ncurses.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz",
+      "bytes": 49557,
+      "sha512": "2bf800a282bc691c0f83ec9d538cdecd9f6d423b741fcb80b01b8a6709ecbbb4ec62c99a50faaa661614d349261da0ae0394deb3aa2259d99ae18941a4f30273"
+    },
+    {
+      "path": "notices/openssh.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/openssh/openssh-10.6p1-1-src.tar.xz",
+      "bytes": 22988,
+      "sha512": "c3282095102544b6f77481c68ff0fc3b33bfcac305ce11e9f9d82d58801dc0b36dbca2e50407d71529f9c11f9dc0c34ba2ed4055e346bbdf1ea300d4cd80b03a"
+    },
+    {
+      "path": "notices/openssl.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/openssl/openssl-3.5.9-1-src.tar.zst",
+      "bytes": 34319,
+      "sha512": "31ca3609241f2e15f50da0f6fa6feb3b2281d8166c22af052bc456c31a0a63d275fea6d2b852e0867ed2fb11fbaf577f30392408ebe45d3a05508d19faf4e723"
+    },
+    {
+      "path": "notices/p11-kit-trust.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz",
+      "bytes": 10150,
+      "sha512": "7f52b6d2bb536134220e68b233a886b699a520821b3e66305bbfa0a078005f72277f371673f55e6f252185f83fa77bdb9d55f724153953efcb5e34ae9ba166ab"
+    },
+    {
+      "path": "notices/p11-kit.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz",
+      "bytes": 10150,
+      "sha512": "7f52b6d2bb536134220e68b233a886b699a520821b3e66305bbfa0a078005f72277f371673f55e6f252185f83fa77bdb9d55f724153953efcb5e34ae9ba166ab"
+    },
+    {
+      "path": "notices/perl-Error.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/perl-Error/perl-Error-0.17030-2-src.tar.zst",
+      "bytes": 21816,
+      "sha512": "c93c2e4ba79f1cbf506f707bfe3fe44d0b2609446a71a4dc9dae2ef4df19a1f30ef1b926833f89c34c5740524fa266948ef450ca862698451f07bc316b3e2613"
+    },
+    {
+      "path": "notices/perl-TermReadKey.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl-TermReadKey/perl-TermReadKey-2.380.0-1-src.tar.zst",
+      "bytes": 295521,
+      "sha512": "b6835668d8de757877b52260307bc3b2fe8a978c13187930a65d82f74b2ee89a08a21e4c130db29bdc2077a238c98cb13f59edbc5dd31e95ee7c8444ff1ba0e4"
+    },
+    {
+      "path": "notices/perl_autorebase.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl/perl-5.44.0-1-src.tar.zst",
+      "bytes": 43604,
+      "sha512": "2bc8ba71a6f2dd576ee19999b493de7a5d5347148e398a176c60392eef4ca05c74ed515d3006bc559d0b4e2cb1072dde701677fb84b9465d5fab5ce82296548a"
+    },
+    {
+      "path": "notices/perl_base.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl/perl-5.44.0-1-src.tar.zst",
+      "bytes": 43604,
+      "sha512": "2bc8ba71a6f2dd576ee19999b493de7a5d5347148e398a176c60392eef4ca05c74ed515d3006bc559d0b4e2cb1072dde701677fb84b9465d5fab5ce82296548a"
+    },
+    {
+      "path": "notices/publicsuffix-list-dafsa.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/publicsuffix-list/publicsuffix-list-20260724-1-src.tar.xz",
+      "bytes": 19157,
+      "sha512": "b559eaf3e6a44410e042ad8624d27d8b24f4d0bce9941a28936dad509822855414037d4c8a5348cf0dbec58885f9b4f7222eebb69a0e1cdf0e2cf41f44b29c8a"
+    },
+    {
+      "path": "notices/rebase.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/rebase/rebase-4.6.6-1-src.tar.xz",
+      "bytes": 18813,
+      "sha512": "036b41d7f8dc8b632f607a8d1a1931a9c871a4f728f37973b3c650f91085e305f3cd4ba2141e1fdca4007866c501fc3e6823436d54e765b2d1a088bb4b6cdaf3"
+    },
+    {
+      "path": "notices/rsync.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/rsync/rsync-3.3.0-1-src.tar.xz",
+      "bytes": 37129,
+      "sha512": "30b246f773683970cc40d15eaee7f3cdb8139357f8964230c1d112008cc3860c892ac20e84e3ddba65ad902fb080d63fd3209c87253f1bf4864aa4786eae43d8"
+    },
+    {
+      "path": "notices/run.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/run/run-1.3.4-2-src.tar.xz",
+      "bytes": 18513,
+      "sha512": "2e009bda519d21a0a39c9010776acfa9913db7783cfcedb063f5709ef11ccae67426dd3dc790f7604665941a283fc9b951434fee57c2d918eee7b79461d0f6b3"
+    },
+    {
+      "path": "notices/sed.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/sed/sed-4.10-1-src.tar.xz",
+      "bytes": 39383,
+      "sha512": "83639c523751cb235634a9e412aae0e537a11d6ab726652cee5ce0c6857a5e69695dbf8ba86ccf4061aad28ca8801b3ccd2b0dec86bd65e06d71604eb3be67ed"
+    },
+    {
+      "path": "notices/tar.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/tar/tar-1.35-2-src.tar.zst",
+      "bytes": 36725,
+      "sha512": "adf49f0cbe34cff32f254873cf649cb5361cae0968d90a56e2c1a4d7a2e387190f975fe76b924cb1eb52a5ff4b532052bc7fafed14d2844f4addb7458e79ac83"
+    },
+    {
+      "path": "notices/terminfo.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz",
+      "bytes": 49557,
+      "sha512": "2bf800a282bc691c0f83ec9d538cdecd9f6d423b741fcb80b01b8a6709ecbbb4ec62c99a50faaa661614d349261da0ae0394deb3aa2259d99ae18941a4f30273"
+    },
+    {
+      "path": "notices/tzcode.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/tzcode/tzcode-2026e-1-src.tar.xz",
+      "bytes": 4124,
+      "sha512": "06f8a5fea990ef66fb01367c23bc064c0e2f17e4daa6ed3102e6e66abb258a686b73911117df08f3a279029d9b5c4676eecd7189f836c6005cdb8a9baab817c3"
+    },
+    {
+      "path": "notices/tzdata.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/tzdata/tzdata-2026e-1-src.tar.xz",
+      "bytes": 7003,
+      "sha512": "d19bba15f8652581abed7658431b2381c1be74f32c080ab2bfd3ab413f300256c1bd1306191bd9703e1b560d673e5694cd15bd9bbbae614e0276b214d258ac4a"
+    },
+    {
+      "path": "notices/unzip.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/unzip/unzip-6.0-18-src.tar.xz",
+      "bytes": 17871,
+      "sha512": "a16464008c06f43c14b05322326c1cc730186ce342cba9c8f8da2cf49187d6c359fc52119cabed729590242dc8dff12fcab9d2de707f5a03e8de301c6374dec6"
+    },
+    {
+      "path": "notices/util-linux.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "bytes": 133890,
+      "sha512": "ec81bbe1a18f060ef59adbed9c2771cba54be6c16c66491fd7284a8562763a44bcb5d1fe5ac532168a3ba90fae17d0549b0639893e2ca5081499c60eee4e6bb0"
+    },
+    {
+      "path": "notices/vim-minimal.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/vim/vim-9.1.1825-1-src.tar.xz",
+      "bytes": 72206,
+      "sha512": "04130574cd508ba7d9dd245e0674c3bd94a036a014f98cba3646de150b2eb3ba258e64728c7bf8ebf7bf02d9006739b972ac52cd57a09ec6052f5107b61fb179"
+    },
+    {
+      "path": "notices/which.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/which/which-2.25-1-src.tar.xz",
+      "bytes": 36009,
+      "sha512": "5e45df5789c5f8528efcdc7c17da59a48db5fe3f931815010df805dff9d15a003572d0c30263fe136495505d7b84be4fac37d1e7cb32c60de85afa2c0c1570d0"
+    },
+    {
+      "path": "notices/xz.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/xz/xz-5.8.4-1-src.tar.zst",
+      "bytes": 89872,
+      "sha512": "c3e27b408448a485b20cf6c3a3d458c3742e6c439aae09d0190f41fe0e89e2bf7367dff80dd651bc0c02672119d7e2329a7072d44622adf8c73b58620c53dc41"
+    },
+    {
+      "path": "notices/zlib0.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zlib/zlib-1.3.2-1-src.tar.zst",
+      "bytes": 7878,
+      "sha512": "634d34360f6cf806e0bfb79889f3c79ab4149588a0edce40309e69e35f1128b3399804de7e90c69d58eeb137ff697bce381d9addff32abc33894e49ff198ecba"
+    },
+    {
+      "path": "notices/zstd.txt",
+      "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zstd/zstd-1.5.7-1-src.tar.zst",
+      "bytes": 22584,
+      "sha512": "0d67c80fd6bd38c3f47f5d661647c3cf02d93c258146da43a3cb410e2120c2c9226f26bac4dbab039f51c3f1e6e220105e51bc607b14d508267535db9642e5b1"
+    },
+    {
+      "path": "pubring.asc",
+      "origin": "https://cygwin.com/key/pubring.asc",
+      "bytes": 3122,
+      "sha512": "3666810719f036011944cd6e95f6e73a64be9fffca06c674f2623172e044d5a5eb53fa28d4922429a8c84bd0b8e9fc2d7c4ee0e300d11b9cf934b3c68c76811d"
+    },
+    {
+      "path": "relay/ConPtyRelay.cpp",
+      "origin": "https://github.com/an0nn30/Jasper",
+      "bytes": 9113,
+      "sha512": "c404233b7565a9fd8138eaf5338d66d0354788c9108b213b8279a462fb1b7fc99885bac32e110c3af79a68d9b599f9172bb569d18e08da262ae4a419e8b6b236"
+    },
+    {
+      "path": "relay/CygwinPtyRelay.c",
+      "origin": "https://github.com/an0nn30/Jasper",
+      "bytes": 5138,
+      "sha512": "55c99255b229e7879cb8fa897bdbb658762986de78fdc22549f59075dd50513ee7982f1d2bbc458a8c6b790228a7bf74613255e3579f1a4cb8e4dc9921dfca59"
+    },
+    {
+      "path": "relay/LICENSE.md",
+      "origin": "https://github.com/an0nn30/Jasper",
+      "bytes": 4653,
+      "sha512": "e01a97db49c81bc7f530425156de5c2168f70b89b3185e04c586feadd3ee21c40e9378285fba4eaa62b4ffe64d8e911c9b2e9cd2c4ab869296e4902626f667db"
+    },
+    {
+      "path": "relay/backend.exe",
+      "origin": "https://github.com/an0nn30/Jasper",
+      "bytes": 74691,
+      "sha512": "4b78323dd1c73d8cc5a89cf60a9089455b66d16055d5fcc0a3391680163279203d5999e167d7f694200c8170745e0ae4e40406ecfdb7c87b6a243cd308e889a3"
+    },
+    {
+      "path": "relay/frontend-aarch64.exe",
+      "origin": "https://github.com/an0nn30/Jasper",
+      "bytes": 176128,
+      "sha512": "4f03abed3a66da36b70a024c5139dfb833f451d3a31dce4f6223538ff68c3800f131eb8ee763444113d137bb37ddfd611b5d33137c5665b1260eb32ef6ae5473"
+    },
+    {
+      "path": "relay/frontend-amd64.exe",
+      "origin": "https://github.com/an0nn30/Jasper",
+      "bytes": 189440,
+      "sha512": "59b1c43186ee0e01f1b90f82307237000da495daeec31ba6fff47e3ae568e194313fb9f84e97ab066a1f94c2e1303b09d1b83b77c2e6341c2eb0b65381e452b9"
+    },
+    {
+      "path": "setup-source/COPYING",
+      "origin": "https://cygwin.com/git/cygwin-apps/setup.git",
+      "bytes": 17990,
+      "sha512": "8f7f8af6f02ed42e52413890a1bc6ef7eea892cc1c8ace11e87316ddc3a64d779515daf1a1cf8e8d32fb58de2a27f5164b98ac02a906b0352b97412588617859"
+    },
+    {
+      "path": "setup-source/provenance.json",
+      "origin": "https://cygwin.com/git/cygwin-apps/setup.git",
+      "bytes": 327,
+      "sha512": "32f4128dd832b9c33c8b3b2033bcaa997282c63ac59e0891b4a3d6434f5be164e662e716ee1774ff6bc15e7915b1300706d62202edf327461271ebf3bc7326aa"
+    },
+    {
+      "path": "setup-source/setup-2.937.tar.gz",
+      "origin": "https://cygwin.com/git/cygwin-apps/setup.git",
+      "bytes": 672204,
+      "sha512": "42bdf3a4828973b24a49e59215eab8fcaa7484514c0a2ff773e6c615d670c5dedc9374cb4139fae941788cd23834ddbd172d4cba222a6328349b267ddeeacb59"
+    },
+    {
+      "path": "setup-x86_64.exe",
+      "origin": "https://cygwin.com/setup/setup-2.937.x86_64.exe",
+      "bytes": 1574328,
+      "sha512": "6acea47c59781c9e7f544a18d53935d59df6e44d5d52ac95ee165671b8e388820455eebf30ccc7d254b00c3d0eb694269a0f8dc84b17944c1f355dac9c5aafcc"
+    },
+    {
+      "path": "setup-x86_64.exe.sig",
+      "origin": "https://cygwin.com/setup/setup-2.937.x86_64.exe.sig",
+      "bytes": 566,
+      "sha512": "9da6a064938ebb17809f989c8efa709f89803e8f1be1c04ce292647ca9a9d60e86faad33774d8914c4e69f7902c9974adb5d9bde1172656c33e969b746a41ad3"
+    }
+  ],
+  "packages": [
+    {
+      "name": "_autorebase",
+      "version": "001091-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/_autorebase/_autorebase-001091-1.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/_autorebase/_autorebase-001091-1-src.tar.zst",
+      "license": "notices/_autorebase.txt",
+      "dependencies": [
+        "dash"
+      ]
+    },
+    {
+      "name": "alternatives",
+      "version": "1.31-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/alternatives/alternatives-1.31-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/alternatives/alternatives-1.31-1-src.tar.xz",
+      "license": "notices/alternatives.txt",
+      "dependencies": [
+        "cygwin",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "base-cygwin",
+      "version": "3.8-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/base-cygwin/base-cygwin-3.8-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/base-cygwin/base-cygwin-3.8-2-src.tar.xz",
+      "license": "notices/base-cygwin.txt",
+      "dependencies": [
+        "bash"
+      ]
+    },
+    {
+      "name": "base-files",
+      "version": "4.3-3",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/base-files/base-files-4.3-3.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/base-files/base-files-4.3-3-src.tar.zst",
+      "license": "notices/base-files.txt",
+      "dependencies": [
+        "bash",
+        "coreutils",
+        "findutils",
+        "sed"
+      ]
+    },
+    {
+      "name": "bash",
+      "version": "5.2.21-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bash/bash-5.2.21-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bash/bash-5.2.21-1-src.tar.xz",
+      "license": "notices/bash.txt",
+      "dependencies": [
+        "cygwin",
+        "libiconv2",
+        "libintl8",
+        "libreadline7"
+      ]
+    },
+    {
+      "name": "bzip2",
+      "version": "1.0.8-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bzip2/bzip2-1.0.8-2-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz",
+      "license": "notices/bzip2.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libbz2_1"
+      ]
+    },
+    {
+      "name": "ca-certificates",
+      "version": "2026.2.90_v9.0.317-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-noarch.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-src.tar.zst",
+      "license": "notices/ca-certificates.txt",
+      "dependencies": [
+        "bash",
+        "p11-kit",
+        "p11-kit-trust"
+      ]
+    },
+    {
+      "name": "coreutils",
+      "version": "9.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/coreutils/coreutils-9.0-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/coreutils/coreutils-9.0-1-src.tar.xz",
+      "license": "notices/coreutils.txt",
+      "dependencies": [
+        "cygwin",
+        "libattr1",
+        "libgcc1",
+        "libgmp10",
+        "libiconv2",
+        "libintl8",
+        "tzcode"
+      ]
+    },
+    {
+      "name": "crypto-policies",
+      "version": "20190218-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/crypto-policies/crypto-policies-20190218-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/crypto-policies/crypto-policies-20190218-1-src.tar.xz",
+      "license": "notices/crypto-policies.txt",
+      "dependencies": [
+        "bash"
+      ]
+    },
+    {
+      "name": "csih",
+      "version": "0.9.14-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/csih/csih-0.9.14-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/csih/csih-0.9.14-1-src.tar.xz",
+      "license": "notices/csih.txt",
+      "dependencies": [
+        "bash",
+        "coreutils",
+        "cygwin",
+        "diffutils",
+        "editrights",
+        "gawk",
+        "grep",
+        "sed"
+      ]
+    },
+    {
+      "name": "curl",
+      "version": "8.23.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/curl/curl-8.23.0-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/curl/curl-8.23.0-1-src.tar.xz",
+      "license": "notices/curl.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libcurl4",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "cygrunsrv",
+      "version": "1.65-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cygrunsrv/cygrunsrv-1.65-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/cygrunsrv/cygrunsrv-1.65-1-src.tar.xz",
+      "license": "notices/cygrunsrv.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "cygutils",
+      "version": "1.4.17-4",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cygutils/cygutils-1.4.17-4-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cygutils/cygutils-1.4.17-4-src.tar.xz",
+      "license": "notices/cygutils.txt",
+      "dependencies": [
+        "cygwin",
+        "libpopt0"
+      ]
+    },
+    {
+      "name": "cygwin",
+      "version": "3.6.11-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cygwin/cygwin-3.6.11-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/cygwin/cygwin-3.6.11-1-src.tar.xz",
+      "license": "notices/cygwin.txt",
+      "dependencies": [
+        "bash",
+        "libgcc1",
+        "libintl8",
+        "libzstd1",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "dash",
+      "version": "0.5.12-5",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/dash/dash-0.5.12-5.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/dash/dash-0.5.12-5-src.tar.xz",
+      "license": "notices/dash.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "diffutils",
+      "version": "3.12-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/diffutils/diffutils-3.12-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/diffutils/diffutils-3.12-1-src.tar.xz",
+      "license": "notices/diffutils.txt",
+      "dependencies": [
+        "cygwin",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "editrights",
+      "version": "1.04-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/editrights/editrights-1.04-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/editrights/editrights-1.04-1-src.tar.xz",
+      "license": "notices/editrights.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "file",
+      "version": "5.46-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/file/file-5.46-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/file/file-5.46-1-src.tar.xz",
+      "license": "notices/file.txt",
+      "dependencies": [
+        "cygwin",
+        "libbz2_1",
+        "liblzma5",
+        "libzstd1",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "findutils",
+      "version": "4.11.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/findutils/findutils-4.11.0-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/findutils/findutils-4.11.0-1-src.tar.xz",
+      "license": "notices/findutils.txt",
+      "dependencies": [
+        "bash",
+        "coreutils",
+        "cygwin",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "gawk",
+      "version": "5.4.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gawk/gawk-5.4.0-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/gawk/gawk-5.4.0-1-src.tar.xz",
+      "license": "notices/gawk.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libgmp10",
+        "libintl8",
+        "libmpfr6",
+        "libreadline8"
+      ]
+    },
+    {
+      "name": "getent",
+      "version": "2.18.90-5",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/getent/getent-2.18.90-5.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/getent/getent-2.18.90-5-src.tar.xz",
+      "license": "notices/getent.txt",
+      "dependencies": [
+        "cygwin",
+        "libargp"
+      ]
+    },
+    {
+      "name": "gettext",
+      "version": "0.22.5-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/gettext-0.22.5-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/gettext-0.22.5-1-src.tar.xz",
+      "license": "notices/gettext.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libiconv2",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "gettext-locale-alias",
+      "version": "0.26-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/gettext-locale-alias/gettext-locale-alias-0.26-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/gettext-0.26-1-src.tar.xz",
+      "license": "notices/gettext-locale-alias.txt",
+      "dependencies": []
+    },
+    {
+      "name": "git",
+      "version": "2.51.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/git/git-2.51.0-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/git/git-2.51.0-1-src.tar.zst",
+      "license": "notices/git.txt",
+      "dependencies": [
+        "bash",
+        "cygutils",
+        "cygwin",
+        "gettext",
+        "less",
+        "libcurl4",
+        "libexpat1",
+        "libiconv2",
+        "libintl8",
+        "libpcre2_8_0",
+        "libssl3",
+        "openssh",
+        "perl-Error",
+        "perl-TermReadKey",
+        "perl_base",
+        "rsync",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "grep",
+      "version": "3.12-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/grep/grep-3.12-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/grep/grep-3.12-1-src.tar.xz",
+      "license": "notices/grep.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libintl8",
+        "libpcre2_8_0"
+      ]
+    },
+    {
+      "name": "groff",
+      "version": "1.24.2-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/groff/groff-1.24.2-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/groff/groff-1.24.2-1-src.tar.zst",
+      "license": "notices/groff.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libgcc1",
+        "libiconv2",
+        "libstdc++6",
+        "libuchardet0"
+      ]
+    },
+    {
+      "name": "gzip",
+      "version": "1.15-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gzip/gzip-1.15-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/gzip/gzip-1.15-1-src.tar.xz",
+      "license": "notices/gzip.txt",
+      "dependencies": [
+        "bash",
+        "cygwin"
+      ]
+    },
+    {
+      "name": "hostname",
+      "version": "3.13-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/hostname/hostname-3.13-1.tar.bz2",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/hostname/hostname-3.13-1-src.tar.bz2",
+      "license": "notices/hostname.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "info",
+      "version": "7.3-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/texinfo/info/info-7.3-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/texinfo/texinfo-7.3-1-src.tar.zst",
+      "license": "notices/info.txt",
+      "dependencies": [
+        "cygwin",
+        "dash",
+        "libiconv2",
+        "libintl8",
+        "libncursesw10"
+      ]
+    },
+    {
+      "name": "ipc-utils",
+      "version": "1.1-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ipc-utils/ipc-utils-1.1-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ipc-utils/ipc-utils-1.1-1-src.tar.xz",
+      "license": "notices/ipc-utils.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "less",
+      "version": "710-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/less/less-710-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/less/less-710-1-src.tar.xz",
+      "license": "notices/less.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libncursesw10",
+        "libpcre1"
+      ]
+    },
+    {
+      "name": "libargp",
+      "version": "20250917-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libargp/libargp-20250917-2-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libargp/libargp-20250917-2-src.tar.xz",
+      "license": "notices/libargp.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libattr1",
+      "version": "2.5.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/attr/libattr1/libattr1-2.5.2-2-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/attr/attr-2.5.2-2-src.tar.xz",
+      "license": "notices/libattr1.txt",
+      "dependencies": [
+        "cygwin",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "libblkid1",
+      "version": "2.40.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/libblkid1/libblkid1-2.40.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "license": "notices/libblkid1.txt",
+      "dependencies": [
+        "cygwin",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "libbrotlicommon1",
+      "version": "1.2.0-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/brotli/libbrotlicommon1/libbrotlicommon1-1.2.0-2-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/brotli/brotli-1.2.0-2-src.tar.xz",
+      "license": "notices/libbrotlicommon1.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libbrotlidec1",
+      "version": "1.2.0-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/brotli/libbrotlidec1/libbrotlidec1-1.2.0-2-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/brotli/brotli-1.2.0-2-src.tar.xz",
+      "license": "notices/libbrotlidec1.txt",
+      "dependencies": [
+        "cygwin",
+        "libbrotlicommon1"
+      ]
+    },
+    {
+      "name": "libbz2_1",
+      "version": "1.0.8-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bzip2/libbz2_1/libbz2_1-1.0.8-2-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz",
+      "license": "notices/libbz2_1.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libcom_err2",
+      "version": "1.44.5-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/e2fsprogs/libcom_err2/libcom_err2-1.44.5-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/e2fsprogs/e2fsprogs-1.44.5-1-src.tar.xz",
+      "license": "notices/libcom_err2.txt",
+      "dependencies": [
+        "cygwin",
+        "libgcc1"
+      ]
+    },
+    {
+      "name": "libcrypt2",
+      "version": "4.5.2-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libxcrypt/libcrypt2/libcrypt2-4.5.2-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libxcrypt/libxcrypt-4.5.2-1-src.tar.xz",
+      "license": "notices/libcrypt2.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libcurl4",
+      "version": "8.23.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/curl/libcurl4/libcurl4-8.23.0-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/curl/curl-8.23.0-1-src.tar.xz",
+      "license": "notices/libcurl4.txt",
+      "dependencies": [
+        "ca-certificates",
+        "cygwin",
+        "libbrotlidec1",
+        "libgcc1",
+        "libgssapi_krb5_2",
+        "libidn2_0",
+        "libnghttp2_14",
+        "libopenldap2",
+        "libpsl5",
+        "libssh2_1",
+        "libssl3",
+        "libzstd1",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "libdb5.3",
+      "version": "5.3.28-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/db/libdb5.3/libdb5.3-5.3.28-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/db/db-5.3.28-2-src.tar.xz",
+      "license": "notices/libdb5.3.txt",
+      "dependencies": [
+        "cygwin",
+        "libgcc1",
+        "libstdc++6"
+      ]
+    },
+    {
+      "name": "libedit0",
+      "version": "20251016-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libedit/libedit0/libedit0-20251016-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libedit/libedit-20251016-1-src.tar.xz",
+      "license": "notices/libedit0.txt",
+      "dependencies": [
+        "cygwin",
+        "libncursesw10"
+      ]
+    },
+    {
+      "name": "libexpat1",
+      "version": "2.9.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/expat/libexpat1/libexpat1-2.9.0-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/expat/expat-2.9.0-1-src.tar.xz",
+      "license": "notices/libexpat1.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libfdisk1",
+      "version": "2.40.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/libfdisk1/libfdisk1-2.40.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "license": "notices/libfdisk1.txt",
+      "dependencies": [
+        "cygwin",
+        "libblkid1",
+        "libintl8",
+        "libuuid1"
+      ]
+    },
+    {
+      "name": "libffi8",
+      "version": "3.8.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libffi/libffi8/libffi8-3.8.0-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libffi/libffi-3.8.0-1-src.tar.xz",
+      "license": "notices/libffi8.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libfido2",
+      "version": "1.17.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libfido2/libfido2-1.17.0-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libfido2/libfido2-1.17.0-1-src.tar.xz",
+      "license": "notices/libfido2.txt",
+      "dependencies": [
+        "cygwin",
+        "libgcc1",
+        "libssl3",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "libgcc1",
+      "version": "14.4.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gcc/libgcc1/libgcc1-14.4.0-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gcc/gcc-14.4.0-1-src.tar.zst",
+      "license": "notices/libgcc1.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libgdbm6",
+      "version": "1.26-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gdbm/libgdbm6/libgdbm6-1.26-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gdbm/gdbm-1.26-1-src.tar.xz",
+      "license": "notices/libgdbm6.txt",
+      "dependencies": [
+        "cygwin",
+        "libgcc1",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "libgmp10",
+      "version": "6.3.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gmp/libgmp10/libgmp10-6.3.0-1.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gmp/gmp-6.3.0-1-src.tar.zst",
+      "license": "notices/libgmp10.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libgssapi_krb5_2",
+      "version": "1.15.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/libgssapi_krb5_2/libgssapi_krb5_2-1.15.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "license": "notices/libgssapi_krb5_2.txt",
+      "dependencies": [
+        "cygwin",
+        "libcom_err2",
+        "libintl8",
+        "libk5crypto3",
+        "libkrb5_3",
+        "libkrb5support0"
+      ]
+    },
+    {
+      "name": "libiconv2",
+      "version": "1.19-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libiconv/libiconv2/libiconv2-1.19-2-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libiconv/libiconv-1.19-2-src.tar.xz",
+      "license": "notices/libiconv2.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libidn2_0",
+      "version": "2.3.8-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libidn2/libidn2_0/libidn2_0-2.3.8-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libidn2/libidn2-2.3.8-1-src.tar.xz",
+      "license": "notices/libidn2_0.txt",
+      "dependencies": [
+        "cygwin",
+        "libiconv2",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "libintl8",
+      "version": "0.22.5-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/libintl8/libintl8-0.22.5-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gettext/gettext-0.22.5-1-src.tar.xz",
+      "license": "notices/libintl8.txt",
+      "dependencies": [
+        "cygwin",
+        "libiconv2"
+      ]
+    },
+    {
+      "name": "libk5crypto3",
+      "version": "1.15.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/libk5crypto3/libk5crypto3-1.15.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "license": "notices/libk5crypto3.txt",
+      "dependencies": [
+        "cygwin",
+        "libintl8",
+        "libkrb5support0"
+      ]
+    },
+    {
+      "name": "libkrb5_3",
+      "version": "1.15.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/libkrb5_3/libkrb5_3-1.15.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "license": "notices/libkrb5_3.txt",
+      "dependencies": [
+        "cygwin",
+        "libcom_err2",
+        "libintl8",
+        "libk5crypto3",
+        "libkrb5support0"
+      ]
+    },
+    {
+      "name": "libkrb5support0",
+      "version": "1.15.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/libkrb5support0/libkrb5support0-1.15.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz",
+      "license": "notices/libkrb5support0.txt",
+      "dependencies": [
+        "cygwin",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "liblastlog2",
+      "version": "2.40.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/liblastlog2/liblastlog2-2.40.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "license": "notices/liblastlog2.txt",
+      "dependencies": [
+        "cygwin",
+        "libsqlite3_0"
+      ]
+    },
+    {
+      "name": "liblz4_1",
+      "version": "1.9.4-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/lz4/liblz4_1/liblz4_1-1.9.4-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/lz4/lz4-1.9.4-1-src.tar.xz",
+      "license": "notices/liblz4_1.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "liblzma5",
+      "version": "5.8.4-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/xz/liblzma5/liblzma5-5.8.4-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/xz/xz-5.8.4-1-src.tar.zst",
+      "license": "notices/liblzma5.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libmpfr6",
+      "version": "4.2.2-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/mpfr/libmpfr6/libmpfr6-4.2.2-1.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/mpfr/mpfr-4.2.2-1-src.tar.zst",
+      "license": "notices/libmpfr6.txt",
+      "dependencies": [
+        "cygwin",
+        "libgcc1",
+        "libgmp10"
+      ]
+    },
+    {
+      "name": "libncursesw10",
+      "version": "6.5+20240427-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/libncursesw10/libncursesw10-6.5+20240427-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz",
+      "license": "notices/libncursesw10.txt",
+      "dependencies": [
+        "cygwin",
+        "terminfo"
+      ]
+    },
+    {
+      "name": "libnghttp2_14",
+      "version": "1.69.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/nghttp2/libnghttp2_14/libnghttp2_14-1.69.0-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/nghttp2/nghttp2-1.69.0-1-src.tar.xz",
+      "license": "notices/libnghttp2_14.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libopenldap2",
+      "version": "2.6.15-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openldap/libopenldap2/libopenldap2-2.6.15-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst",
+      "license": "notices/libopenldap2.txt",
+      "dependencies": [
+        "cygwin",
+        "libsasl2_3",
+        "libssl3"
+      ]
+    },
+    {
+      "name": "libopenldap2_4_2",
+      "version": "2.6.15-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openldap/libopenldap2_4_2/libopenldap2_4_2-2.6.15-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst",
+      "license": "notices/libopenldap2_4_2.txt",
+      "dependencies": [
+        "cygwin",
+        "libopenldap2",
+        "libsasl2_3",
+        "libssl3"
+      ]
+    },
+    {
+      "name": "libp11-kit0",
+      "version": "0.26.5-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/libp11-kit0/libp11-kit0-0.26.5-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz",
+      "license": "notices/libp11-kit0.txt",
+      "dependencies": [
+        "cygwin",
+        "libffi8",
+        "libgcc1",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "libpcre1",
+      "version": "8.45-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/pcre/libpcre1/libpcre1-8.45-1.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/pcre/pcre-8.45-1-src.tar.zst",
+      "license": "notices/libpcre1.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libpcre2_8_0",
+      "version": "10.49-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/pcre2/libpcre2_8_0/libpcre2_8_0-10.49-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/pcre2/pcre2-10.49-1-src.tar.zst",
+      "license": "notices/libpcre2_8_0.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libpipeline1",
+      "version": "1.5.8-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libpipeline/libpipeline1/libpipeline1-1.5.8-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libpipeline/libpipeline-1.5.8-1-src.tar.xz",
+      "license": "notices/libpipeline1.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libpopt-common",
+      "version": "1.19-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/popt/libpopt-common/libpopt-common-1.19-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/popt/popt-1.19-1-src.tar.xz",
+      "license": "notices/libpopt-common.txt",
+      "dependencies": []
+    },
+    {
+      "name": "libpopt0",
+      "version": "1.19-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/popt/libpopt0/libpopt0-1.19-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/popt/popt-1.19-1-src.tar.xz",
+      "license": "notices/libpopt0.txt",
+      "dependencies": [
+        "cygwin",
+        "libiconv2",
+        "libintl8",
+        "libpopt-common"
+      ]
+    },
+    {
+      "name": "libpsl5",
+      "version": "0.23.3-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libpsl/libpsl5/libpsl5-0.23.3-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libpsl/libpsl-0.23.3-1-src.tar.xz",
+      "license": "notices/libpsl5.txt",
+      "dependencies": [
+        "cygwin",
+        "libiconv2",
+        "libidn2_0",
+        "libunistring5",
+        "publicsuffix-list-dafsa"
+      ]
+    },
+    {
+      "name": "libreadline7",
+      "version": "8.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/readline/libreadline7/libreadline7-8.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/readline/readline-8.2-2-src.tar.xz",
+      "license": "notices/libreadline7.txt",
+      "dependencies": [
+        "cygwin",
+        "libncursesw10"
+      ]
+    },
+    {
+      "name": "libreadline8",
+      "version": "8.3-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/readline/libreadline8/libreadline8-8.3-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/readline/readline-8.3-1-src.tar.xz",
+      "license": "notices/libreadline8.txt",
+      "dependencies": [
+        "cygwin",
+        "libncursesw10"
+      ]
+    },
+    {
+      "name": "libsasl2_3",
+      "version": "2.1.27-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cyrus-sasl/libsasl2_3/libsasl2_3-2.1.27-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/cyrus-sasl/cyrus-sasl-2.1.27-1-src.tar.xz",
+      "license": "notices/libsasl2_3.txt",
+      "dependencies": [
+        "cygwin",
+        "libcrypt2",
+        "libdb5.3",
+        "libgssapi_krb5_2",
+        "libkrb5_3",
+        "libopenldap2_4_2",
+        "libssl1.1"
+      ]
+    },
+    {
+      "name": "libsmartcols1",
+      "version": "2.40.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/libsmartcols1/libsmartcols1-2.40.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "license": "notices/libsmartcols1.txt",
+      "dependencies": [
+        "cygwin",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "libsqlite3_0",
+      "version": "3.49.1-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/sqlite3/libsqlite3_0/libsqlite3_0-3.49.1-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/sqlite3/sqlite3-3.49.1-1-src.tar.xz",
+      "license": "notices/libsqlite3_0.txt",
+      "dependencies": []
+    },
+    {
+      "name": "libssh2_1",
+      "version": "1.11.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libssh2/libssh2_1/libssh2_1-1.11.0-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libssh2/libssh2-1.11.0-1-src.tar.xz",
+      "license": "notices/libssh2_1.txt",
+      "dependencies": [
+        "cygwin",
+        "libssl1.1",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "libssl1.1",
+      "version": "1.1.1w-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssl/libssl1.1/libssl1.1-1.1.1w-1.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssl/openssl-1.1.1w-1-src.tar.zst",
+      "license": "notices/libssl1.1.txt",
+      "dependencies": [
+        "ca-certificates",
+        "crypto-policies",
+        "cygwin",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "libssl3",
+      "version": "3.5.9-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssl/libssl3/libssl3-3.5.9-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/openssl/openssl-3.5.9-1-src.tar.zst",
+      "license": "notices/libssl3.txt",
+      "dependencies": [
+        "ca-certificates",
+        "crypto-policies",
+        "cygwin",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "libstdc++6",
+      "version": "14.4.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gcc/libstdc++6/libstdc++6-14.4.0-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/gcc/gcc-14.4.0-1-src.tar.zst",
+      "license": "notices/libstdc++6.txt",
+      "dependencies": [
+        "cygwin",
+        "libgcc1",
+        "libiconv2",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "libtasn1_6",
+      "version": "4.21.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libtasn1/libtasn1_6/libtasn1_6-4.21.0-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libtasn1/libtasn1-4.21.0-1-src.tar.xz",
+      "license": "notices/libtasn1_6.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libuchardet0",
+      "version": "0.0.8-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/uchardet/libuchardet0/libuchardet0-0.0.8-1.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/uchardet/uchardet-0.0.8-1-src.tar.zst",
+      "license": "notices/libuchardet0.txt",
+      "dependencies": [
+        "cygwin",
+        "libgcc1",
+        "libstdc++6"
+      ]
+    },
+    {
+      "name": "libunistring5",
+      "version": "1.4.1-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/libunistring/libunistring5/libunistring5-1.4.1-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/libunistring/libunistring-1.4.1-1-src.tar.xz",
+      "license": "notices/libunistring5.txt",
+      "dependencies": [
+        "cygwin",
+        "libiconv2"
+      ]
+    },
+    {
+      "name": "libuuid1",
+      "version": "2.40.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/libuuid1/libuuid1-2.40.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "license": "notices/libuuid1.txt",
+      "dependencies": [
+        "cygwin",
+        "libgcc1",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "libxxhash0",
+      "version": "0.8.4-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/xxhash/libxxhash0/libxxhash0-0.8.4-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/xxhash/xxhash-0.8.4-1-src.tar.xz",
+      "license": "notices/libxxhash0.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "libzstd1",
+      "version": "1.5.7-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zstd/libzstd1/libzstd1-1.5.7-1.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zstd/zstd-1.5.7-1-src.tar.zst",
+      "license": "notices/libzstd1.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "login",
+      "version": "1.13-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/login/login-1.13-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/login/login-1.13-1-src.tar.xz",
+      "license": "notices/login.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "man-db",
+      "version": "2.13.1-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/man-db/man-db-2.13.1-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/man-db/man-db-2.13.1-1-src.tar.zst",
+      "license": "notices/man-db.txt",
+      "dependencies": [
+        "cygwin",
+        "groff",
+        "gzip",
+        "less",
+        "libgdbm6",
+        "libiconv2",
+        "libintl8",
+        "libpipeline1",
+        "util-linux",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "mintty",
+      "version": "3.8.3-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/mintty/mintty-3.8.3-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/mintty/mintty-3.8.3-1-src.tar.xz",
+      "license": "notices/mintty.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "dash"
+      ]
+    },
+    {
+      "name": "ncurses",
+      "version": "6.5+20240427-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/ncurses-6.5+20240427-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz",
+      "license": "notices/ncurses.txt",
+      "dependencies": [
+        "cygwin",
+        "libncursesw10"
+      ]
+    },
+    {
+      "name": "openssh",
+      "version": "10.6p1-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssh/openssh-10.6p1-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/openssh/openssh-10.6p1-1-src.tar.xz",
+      "license": "notices/openssh.txt",
+      "dependencies": [
+        "bash",
+        "csih",
+        "cygrunsrv",
+        "cygwin",
+        "diffutils",
+        "libcrypt2",
+        "libedit0",
+        "libfido2",
+        "libgcc1",
+        "libgssapi_krb5_2",
+        "libkrb5_3",
+        "libssl3",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "openssl",
+      "version": "3.5.9-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/openssl/openssl-3.5.9-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/openssl/openssl-3.5.9-1-src.tar.zst",
+      "license": "notices/openssl.txt",
+      "dependencies": [
+        "cygwin",
+        "libssl3"
+      ]
+    },
+    {
+      "name": "p11-kit",
+      "version": "0.26.5-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/p11-kit-0.26.5-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz",
+      "license": "notices/p11-kit.txt",
+      "dependencies": [
+        "cygwin",
+        "libintl8",
+        "libp11-kit0",
+        "libtasn1_6"
+      ]
+    },
+    {
+      "name": "p11-kit-trust",
+      "version": "0.26.5-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/p11-kit-trust/p11-kit-trust-0.26.5-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz",
+      "license": "notices/p11-kit-trust.txt",
+      "dependencies": [
+        "cygwin",
+        "libgcc1",
+        "libintl8",
+        "libp11-kit0",
+        "libtasn1_6"
+      ]
+    },
+    {
+      "name": "perl-Error",
+      "version": "0.17030-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/perl-Error/perl-Error-0.17030-2-noarch.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/perl-Error/perl-Error-0.17030-2-src.tar.zst",
+      "license": "notices/perl-Error.txt",
+      "dependencies": [
+        "perl_base"
+      ]
+    },
+    {
+      "name": "perl-TermReadKey",
+      "version": "2.380.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl-TermReadKey/perl-TermReadKey-2.380.0-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl-TermReadKey/perl-TermReadKey-2.380.0-1-src.tar.zst",
+      "license": "notices/perl-TermReadKey.txt",
+      "dependencies": [
+        "cygwin",
+        "perl_base"
+      ]
+    },
+    {
+      "name": "perl_autorebase",
+      "version": "5.44.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl/perl_autorebase/perl_autorebase-5.44.0-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl/perl-5.44.0-1-src.tar.zst",
+      "license": "notices/perl_autorebase.txt",
+      "dependencies": [
+        "perl_base"
+      ]
+    },
+    {
+      "name": "perl_base",
+      "version": "5.44.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl/perl_base/perl_base-5.44.0-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/perl/perl-5.44.0-1-src.tar.zst",
+      "license": "notices/perl_base.txt",
+      "dependencies": [
+        "cygwin",
+        "libcrypt2",
+        "libgcc1",
+        "perl_autorebase"
+      ]
+    },
+    {
+      "name": "publicsuffix-list-dafsa",
+      "version": "20260724-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/publicsuffix-list/publicsuffix-list-dafsa/publicsuffix-list-dafsa-20260724-1-noarch.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/publicsuffix-list/publicsuffix-list-20260724-1-src.tar.xz",
+      "license": "notices/publicsuffix-list-dafsa.txt",
+      "dependencies": []
+    },
+    {
+      "name": "rebase",
+      "version": "4.6.6-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/rebase/rebase-4.6.6-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/rebase/rebase-4.6.6-1-src.tar.xz",
+      "license": "notices/rebase.txt",
+      "dependencies": [
+        "cygwin",
+        "dash"
+      ]
+    },
+    {
+      "name": "rsync",
+      "version": "3.3.0-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/rsync/rsync-3.3.0-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/rsync/rsync-3.3.0-1-src.tar.xz",
+      "license": "notices/rsync.txt",
+      "dependencies": [
+        "bash",
+        "libiconv2",
+        "liblz4_1",
+        "libssl1.1",
+        "libxxhash0",
+        "libzstd1"
+      ]
+    },
+    {
+      "name": "run",
+      "version": "1.3.4-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/run/run-1.3.4-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/run/run-1.3.4-2-src.tar.xz",
+      "license": "notices/run.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "sed",
+      "version": "4.10-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/sed/sed-4.10-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/sed/sed-4.10-1-src.tar.xz",
+      "license": "notices/sed.txt",
+      "dependencies": [
+        "cygwin",
+        "libattr1",
+        "libintl8"
+      ]
+    },
+    {
+      "name": "tar",
+      "version": "1.35-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/tar/tar-1.35-2.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/tar/tar-1.35-2-src.tar.zst",
+      "license": "notices/tar.txt",
+      "dependencies": [
+        "bash",
+        "bzip2",
+        "cygwin",
+        "gzip",
+        "libiconv2",
+        "libintl8",
+        "xz",
+        "zstd"
+      ]
+    },
+    {
+      "name": "terminfo",
+      "version": "6.5+20240427-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/terminfo/terminfo-6.5+20240427-1.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz",
+      "license": "notices/terminfo.txt",
+      "dependencies": []
+    },
+    {
+      "name": "tzcode",
+      "version": "2026e-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/tzcode/tzcode-2026e-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/tzcode/tzcode-2026e-1-src.tar.xz",
+      "license": "notices/tzcode.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libintl8",
+        "tzdata"
+      ]
+    },
+    {
+      "name": "tzdata",
+      "version": "2026e-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/noarch/release/tzdata/tzdata-2026e-1-noarch.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/tzdata/tzdata-2026e-1-src.tar.xz",
+      "license": "notices/tzdata.txt",
+      "dependencies": []
+    },
+    {
+      "name": "unzip",
+      "version": "6.0-18",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/unzip/unzip-6.0-18.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/unzip/unzip-6.0-18-src.tar.xz",
+      "license": "notices/unzip.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libbz2_1",
+        "libiconv2"
+      ]
+    },
+    {
+      "name": "util-linux",
+      "version": "2.40.2-2",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/util-linux-2.40.2-2.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz",
+      "license": "notices/util-linux.txt",
+      "dependencies": [
+        "cygwin",
+        "libblkid1",
+        "libfdisk1",
+        "libintl8",
+        "liblastlog2",
+        "libncursesw10",
+        "libreadline7",
+        "libsmartcols1",
+        "libuuid1",
+        "zlib0"
+      ]
+    },
+    {
+      "name": "vim-minimal",
+      "version": "9.1.1825-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/vim/vim-minimal/vim-minimal-9.1.1825-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/vim/vim-9.1.1825-1-src.tar.xz",
+      "license": "notices/vim-minimal.txt",
+      "dependencies": [
+        "cygwin",
+        "libiconv2",
+        "libncursesw10"
+      ]
+    },
+    {
+      "name": "which",
+      "version": "2.25-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/which/which-2.25-1-x86_64.tar.xz",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/src/release/which/which-2.25-1-src.tar.xz",
+      "license": "notices/which.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "xz",
+      "version": "5.8.4-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/xz/xz-5.8.4-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/xz/xz-5.8.4-1-src.tar.zst",
+      "license": "notices/xz.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libintl8",
+        "liblzma5"
+      ]
+    },
+    {
+      "name": "zlib0",
+      "version": "1.3.2-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zlib/zlib0/zlib0-1.3.2-1-x86_64.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zlib/zlib-1.3.2-1-src.tar.zst",
+      "license": "notices/zlib0.txt",
+      "dependencies": [
+        "cygwin"
+      ]
+    },
+    {
+      "name": "zstd",
+      "version": "1.5.7-1",
+      "binary": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zstd/zstd-1.5.7-1.tar.zst",
+      "source": "cache/https%3a%2f%2fmirrors.kernel.org%2fsourceware%2fcygwin%2f/x86_64/release/zstd/zstd-1.5.7-1-src.tar.zst",
+      "license": "notices/zstd.txt",
+      "dependencies": [
+        "bash",
+        "cygwin",
+        "libgcc1",
+        "liblz4_1",
+        "liblzma5",
+        "libstdc++6",
+        "zlib0"
+      ]
+    }
+  ],
+  "relays": {
+    "aarch64": "relay/frontend-aarch64.exe",
+    "amd64": "relay/frontend-amd64.exe",
+    "backend": "relay/backend.exe"
+  },
+  "setupSource": "setup-source/setup-2.937.tar.gz",
+  "setupLicense": "setup-source/COPYING"
+}

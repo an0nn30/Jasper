@@ -36,6 +36,7 @@ a GUI or native benchmark without the user's request. Building the distribution 
 - [Buddy embedding](../jasper-buddy/README.md): the five supported facade/value types.
 - [SDK architecture](../docs/sdk-architecture.md) and [plugin authoring](../docs/plugin-authoring.md):
   how `plugins/` loads, consents to and hosts plugins, and how to write, test and package one.
+- [Bundled Cygwin](../packaging/windows/cygwin/README.md): Windows provisioning, persistent roots, package management and the PTY relay.
 - [Current handoff](../docs/STATUS.md) and [verification](../docs/app-refactor-verification.md):
   actual checkpoints, decisions, independent review and pending native acceptance.
 

@@ -808,7 +808,10 @@ if (normalizedHost().os == 'windows') {
             File temporary = new File(packagingRoot.get().asFile, 'installer-work')
             delete(artifact, temporary)
             temporary.mkdirs()
+            File shortImage = Files.createTempDirectory('jpi').toFile()
             try {
+                executeNative([new File(context.sdkHome, 'bin/java.exe').absolutePath, '-cp', layout.buildDirectory.dir('cygwin/classes').get().asFile.absolutePath,
+                    'CygwinInstallerTemplate', 'stage-image', new File(imageDirectory.get().asFile, 'Jasper').absolutePath, shortImage.absolutePath], 'Stage WiX app image')
                 File output = new File(temporary, 'output')
                 File work = new File(temporary, 'jpackage')
                 File resources = new File(temporary, 'resources')
@@ -817,7 +820,7 @@ if (normalizedHost().os == 'windows') {
                 executeNative([context.jpackage.absolutePath, jpackageLauncherOption(), '--type', 'exe', '--name', 'Jasper',
                     '--app-version', context.version, '--vendor', 'Jasper', '--description', packageDescription,
                     '--icon', nativeIcon.get().absolutePath,
-                    '--app-image', new File(imageDirectory.get().asFile, 'Jasper').absolutePath,
+                    '--app-image', shortImage.absolutePath,
                     '--dest', output.absolutePath, '--temp', work.absolutePath, '--resource-dir', resources.absolutePath,
                     '--win-per-user-install', '--install-dir', 'Jasper', '--win-dir-chooser',
                     '--win-menu', '--win-menu-group', 'Jasper', '--win-shortcut', '--win-shortcut-prompt',
@@ -836,6 +839,7 @@ if (normalizedHost().os == 'windows') {
                 logger.lifecycle(verification.stdout.trim())
                 Files.move(generated.toPath(), artifact.toPath())
             } finally {
+                delete(shortImage)
                 // Keep failed build inputs for diagnosis; never publish an unverified setup.
                 if (artifact.isFile()) delete(temporary)
             }

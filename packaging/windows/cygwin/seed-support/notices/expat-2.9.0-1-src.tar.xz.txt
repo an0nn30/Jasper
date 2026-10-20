@@ -1,0 +1,84 @@
+Package source: src/release/expat/expat-2.9.0-1-src.tar.xz
+License identifier: MIT
+
+--- expat-2.9.0-1.src/expat.cygport ---
+NAME="expat"
+VERSION=2.9.0
+
+LICENSE="MIT"
+RELEASE=1
+CATEGORY="Libs"
+HOMEPAGE="https://libexpat.github.io/"
+SUMMARY="Expat XML parser library"
+
+DESCRIPTION="This is Expat, a C library for parsing XML, originally
+written by James Clark, and now maintained by a loose group of
+developers. Expat is a stream-oriented XML parser.  This means that
+you register handlers with the parser before starting the parse.
+These handlers are called when the parser discovers the associated
+structures in the document being parsed.  A start tag is an example
+of the kind of structures for which you may register handlers."
+
+# P_V is PV with '.'s replaced by '_'s.
+P_V=$( echo ${PV} | sed -e 's/\./_/g' )
+# github release file
+SRC_URI="https://github.com/libexpat/libexpat/releases/download/R_${P_V}/${P}.tar.bz2"
+
+BUILD_REQUIRES="gettext-devel docbook2X"
+
+# Only give the library package an ABI tag.  The -devel package should
+# not have one because we want it to upgrade even if the setup.exe user
+# elects to install a version of the library with a prior ABI.
+ABI=1
+PKG_NAMES="expat libexpat${ABI} libexpat-devel"
+
+expat_CONTENTS='usr/bin/*.exe usr/share/'
+expat_SUMMARY="$SUMMARY (binary)"
+
+declare libexpat${ABI}_CONTENTS="usr/bin/cygexpat-${ABI}.dll"
+declare libexpat${ABI}_SUMMARY="$SUMMARY (runtime)"
+
+libexpat_devel_CONTENTS='usr/include/ usr/lib/'
+libexpat_devel_SUMMARY="$SUMMARY (devel)"
+
+CYGCONF_ARGS="--enable-static"
+
+DIFF_EXCLUDES="expat_config.h expat_config.h.in aclocal.m4 configure"
+
+HTMLDOCS="doc/*.png doc/*.html doc/*.css"
+
+WANT_AUTOCONF=2.5
+
+src_compile() {
+	cd ${S}
+	./buildconf.sh
+	# cygautoreconf
+	cd ${B}
+	cygconf
+	cygmake
+}
+
+Source archive: src/release/expat/expat-2.9.0-1-src.tar.xz
+
+--- expat-2.9.0-1.src/expat-2.9.0.tar.bz2!/expat-2.9.0/COPYING ---
+Copyright (c) 1998-2000 Thai Open Source Software Center Ltd and Clark Cooper
+Copyright (c) 2001-2025 Expat maintainers
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

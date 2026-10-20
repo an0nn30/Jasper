@@ -54,7 +54,12 @@ public final class CygwinProvisioner {
                     CygwinLayout.write(layout.base().resolve("state.json"), Map.of("phase", "INITIALIZING", "seed", identity));
                     seed = retained;
                 }
-                CygwinProcesses.assertIdle(layout);
+                // An empty root cannot have loaded executables. MSI's protected processes
+                // cannot be inspected from its impersonated custom action; partial retries
+                // still need the full check before Setup changes any existing files.
+                try (var contents = Files.list(layout.root())) {
+                    if (contents.findAny().isPresent()) CygwinProcesses.assertIdle(layout);
+                }
                 String selection = String.join(",", manifest.packages().stream().map(p -> p.name() + "=" + p.version()).toList());
                 var command = List.of(seed.resolve(manifest.setup()).toString(), "--quiet-mode=hidden", "--no-admin", "--local-install",
                     "--no-version-check", "--no-shortcuts", "--no-replaceonreboot", "--no-write-registry", "--local-package-dir",

@@ -14,7 +14,20 @@ public final class CygwinInstallerTemplate {
             + escaped + "\" Execute=\"deferred\" Impersonate=\"yes\" Return=\"check\"/>\n<InstallExecuteSequence>\n"
             + "<Custom Action=\"JasperProvisionCygwin\" After=\"InstallFiles\">NOT REMOVE</Custom>");
     }
+    static void stageImage(Path source, Path destination) throws Exception {
+        try (var paths = Files.walk(source)) {
+            for (Path path : paths.toList()) {
+                if (Files.isSymbolicLink(path)) throw new java.io.IOException("Linked app-image file: " + path);
+                Path target = destination.resolve(source.relativize(path));
+                if (target.toAbsolutePath().toString().length() >= 260)
+                    throw new java.io.IOException("WiX 3 requires a shorter TEMP directory for: " + target);
+                if (Files.isDirectory(path)) Files.createDirectories(target);
+                else Files.copy(path, target);
+            }
+        }
+    }
     public static void main(String[] args) throws Exception {
+        if (args.length == 3 && args[0].equals("stage-image")) { stageImage(Path.of(args[1]), Path.of(args[2])); return; }
         if (args.length != 2) throw new IllegalArgumentException("CygwinInstallerTemplate jdk.jpackage.jmod resource-directory");
         try (var archive = new ZipFile(args[0])) {
             var entry = archive.getEntry("classes/jdk/jpackage/internal/resources/main.wxs");

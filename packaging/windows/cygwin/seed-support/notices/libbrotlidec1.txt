@@ -1,0 +1,121 @@
+Package source: src/release/brotli/brotli-1.2.0-2-src.tar.xz
+License identifier: MIT
+
+--- brotli-1.2.0-2.src/brotli.cygport ---
+CYGCMAKE_GENERATOR="Ninja"
+PYTHON_WHEEL_VERSIONS="3.8:3.9:3.12"
+inherit cmake python-wheel
+
+NAME="brotli"
+VERSION=1.2.0
+RELEASE=2
+CATEGORY="Libs"
+SUMMARY="Brotli compression format library"
+DESCRIPTION="Brotli is a generic-purpose lossless compression algorithm that
+compresses data using a combination of a modern variant of the LZ77 algorithm,
+Huffman coding and 2nd order context modeling, with a compression ratio
+comparable to the best currently available general-purpose compression methods.
+It is similar in speed with deflate but offers more dense compression."
+HOMEPAGE="https://github.com/google/brotli"
+
+LICENSE="MIT"
+# cf. https://www.cygwin.com/packaging-hint-files.html#pvr-src.hint
+#     https://spdx.org/licenses/MIT.html
+
+SRC_URI="${HOMEPAGE}/archive/v${VERSION}/brotli-v${VERSION}.tar.gz"
+
+BUILD_REQUIRES="\
+  cmake\
+  ninja\
+\
+  python38-devel python38-pip python38-wheel\
+  python39-devel python39-pip python39-wheel\
+  python312-devel python312-pip python312-wheel\
+"
+
+PKG_NAMES="brotli libbrotlicommon1 libbrotlidec1 libbrotlienc1 libbrotli-devel
+	   python38-brotli python39-brotli python312-brotli"
+brotli_CATEGORY="Archive"
+brotli_CONTENTS="
+	usr/bin/brotli.exe
+	usr/share/doc/${NAME}
+	usr/share/man/
+"
+libbrotlicommon1_CONTENTS="
+	usr/bin/cygbrotlicommon-1.dll
+"
+libbrotlidec1_CONTENTS="
+	usr/bin/cygbrotlidec-1.dll
+"
+libbrotlienc1_CONTENTS="
+	usr/bin/cygbrotlienc-1.dll
+"
+libbrotli_devel_CONTENTS="
+	usr/include/brotli/
+	usr/lib/libbrotlicommon.dll.a
+	usr/lib/libbrotlidec.dll.a
+	usr/lib/libbrotlienc.dll.a
+	usr/lib/pkgconfig/libbrotlicommon.pc
+	usr/lib/pkgconfig/libbrotlidec.pc
+	usr/lib/pkgconfig/libbrotlienc.pc
+"
+python38_brotli_CATEGORY="Python"
+python38_brotli_CONTENTS="
+	usr/lib/python3.8/site-packages/Brotli-${VERSION}.dist-info/
+	usr/lib/python3.8/site-packages/_brotli.*.dll
+	usr/lib/python3.8/site-packages/brotli.py
+	usr/lib/python3.8/site-packages/__pycache__/brotli.*.pyc
+"
+python39_brotli_CATEGORY="Python"
+python39_brotli_CONTENTS="
+	usr/lib/python3.9/site-packages/brotli-${VERSION}.dist-info/
+	usr/lib/python3.9/site-packages/_brotli.*.dll
+	usr/lib/python3.9/site-packages/brotli.py
+	usr/lib/python3.9/site-packages/__pycache__/brotli.*.pyc
+"
+python312_brotli_CATEGORY="Python"
+python312_brotli_CONTENTS="
+	usr/lib/python3.12/site-packages/brotli-${VERSION}.dist-info/
+	usr/lib/python3.12/site-packages/_brotli.*.dll
+	usr/lib/python3.12/site-packages/brotli.py
+	usr/lib/python3.12/site-packages/__pycache__/brotli.*.pyc
+"
+
+src_compile() {
+	lndirs
+	cd ${B}
+	cygcmake
+	cygninja
+	python_wheel_compile
+}
+
+src_install() {
+	cd ${B}
+	ninja_install
+	python_wheel_install
+
+	rm -f ${D}/usr/lib/lib*-static.a
+}
+
+Source archive: src/release/brotli/brotli-1.2.0-2-src.tar.xz
+
+--- brotli-1.2.0-2.src/brotli-v1.2.0.tar.gz!/brotli-1.2.0/LICENSE ---
+Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

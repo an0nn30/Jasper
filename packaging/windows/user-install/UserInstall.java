@@ -142,11 +142,13 @@ public final class UserInstall {
     }
     static void deleteTree(Path path) throws IOException {
         if (!exists(path)) return;
-        if (!linked(path) && Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+        boolean link = linked(path);
+        if (!link && Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
             try (var children = Files.newDirectoryStream(path)) {
                 for (Path child : children) deleteTree(child);
             }
         }
+        if (windows() && !link) Files.setAttribute(path, "dos:readonly", false, LinkOption.NOFOLLOW_LINKS);
         Files.delete(path);
     }
 }

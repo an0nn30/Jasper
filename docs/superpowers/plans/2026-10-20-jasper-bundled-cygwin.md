@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-10-20-jasper-bundled-cygwin-design.md).
 
-**Status:** Production integration implemented on `codex/cygwin-probes`, 2026-10-20; the full plan remains incomplete. User-approved deviation: ship pinned prebuilt POSIX PTY relay frontend/backend artifacts instead of direct Cygwin console input; the user-install graph excludes native compilation. Production launch, persistent lifecycle, management UI and both provisioning hooks are implemented and independently reviewed, with all six findings fixed. Native ARM64 and x64-emulated production probes and lifecycle checks pass. Task 2 still requires the approved seed lock and completed source/license inventory; real seeded installer/user-install and package-manager acceptance remain pending. Native x64 Windows and interactive-app validation remain explicit release checks. Earlier probe deviations: decoded events replace unsupported raw-output capture; guest runs use built jars and matching dependencies, separate JVMs and twenty immediate resize/write cycles. [Evidence and rulings](2026-10-20-jasper-cygwin-probe-results.md).
+**Status:** Implementation complete on `codex/cygwin-probes`, 2026-10-20. User-approved deviation: pinned prebuilt POSIX PTY relay artifacts replace direct Cygwin console input; ordinary Gradle installation requires no PowerShell, package manager or native compiler. The locked seed/source inventory, distribution gates, production lifecycle/discovery/management, MSI and Gradle install paths are complete. Real disconnected ARM64 MSI and Gradle lifecycle acceptance passes, including added packages and exact preservation of 8,275 root entries. Native x64 Windows and interactive-app acceptance remain explicit release gates at the user's direction; their matrix steps stay unchecked. Earlier full-check failures are three baseline editor tests. [Final evidence](2026-10-20-jasper-cygwin-verification.md); [probe history and rulings](2026-10-20-jasper-cygwin-probe-results.md).
 
 ## Global Constraints
 
@@ -111,7 +111,7 @@ assert result.upgradePreservedSentinel();
   authority for option and result interpretation. Measure actual disk usage.
   Run unit assertions that a missing event times out instead of passing.
 
-- [ ] **Step 6: Finalize this plan from evidence and commit the probe task.**
+- [x] **Step 6: Finalize this plan from evidence and commit the probe task.**
   Pin the installer resource filename, WiX fragment, return-code mapping and
   accepted Bash invocation in Tasks 3–5. If the hook cannot satisfy the design,
   present a design amendment before implementing a bootstrapper. ARM64 failure
@@ -139,27 +139,27 @@ assert result.upgradePreservedSentinel();
 - Refresh requires an explicit upstream mirror and snapshot destination;
   it never runs as a dependency of build, check or installation.
 
-- [ ] **Step 1: Write `BundleManifestTest`.** Fixtures reject absolute/traversing
+- [x] **Step 1: Write `BundleManifestTest`.** Fixtures reject absolute/traversing
   archive names, duplicate paths, unknown schema, wrong architecture, incorrect
   size/digest, missing dependencies, missing source/license and changed metadata.
   One complete fixture passes; changing one byte causes verification to fail.
-- [ ] **Step 2: Run `./gradlew :jasper-app:verifyCygwinSeed` against fixtures;
+- [x] **Step 2: Run `./gradlew :jasper-app:verifyCygwinSeed` against fixtures;
   expect RED before verifier implementation.** Separate fixture verification
   from real payload acquisition so headless `check` needs no network.
-- [ ] **Step 3: Implement manifest verification and the explicit refresh task.**
+- [x] **Step 3: Implement manifest verification and the explicit refresh task.**
   Resolve Base and the exact requested packages from signed metadata, compute the
   closure, download binaries and corresponding sources, preserve repository
   layout and signatures, and produce a candidate lock. Verify the Setup
   signature using the documented trusted key. Require maintainer review before
   replacing the committed manifest. Ordinary staging verifies the committed
   lock and only fetches its exact artifacts.
-- [ ] **Step 4: Validate real offline Setup in Task 1's scratch environment.**
+- [x] **Step 4: Validate real offline Setup in Task 1's scratch environment.**
   Verify signatures remain enabled and every installed package matches the seed
   inventory. Record compressed and installed sizes; include the latter in the
   space check. Verify a missing artifact fails without falling back to a mirror.
   Retain an immutable distributable snapshot; if publication is needed, prepare
   the artifact and obtain the required publication authorization.
-- [ ] **Step 5: Run fixture verification and real staging; commit**
+- [x] **Step 5: Run fixture verification and real staging; commit**
   `build: lock and stage the Cygwin starter distribution`.
 
 ### Task 3: Implement persistent provisioning and process coordination
@@ -185,7 +185,7 @@ assert result.upgradePreservedSentinel();
   `status`; fixture-only explicit root injection is kept out of normal app UI.
 - `verifyCygwinLifecycle` compiles and tests the standalone helper on all hosts.
 
-- [ ] **Step 1: Write lifecycle regressions.** Assert:
+- [x] **Step 1: Write lifecycle regressions.** Assert:
 
 ```java
 assertEquals(before, snapshot(root)); // reuse of READY root, including removed packages
@@ -198,8 +198,8 @@ assertEquals(oldManagerDigest, managerDigestAfterFailedReplacement);
   Define fixture snapshot as path/type/content digest without following links.
   Add disk-full injection, malformed records, root junction, legitimate internal
   links, changed user identity, and a retry using the original seed identity.
-- [ ] **Step 2: Run `./gradlew :jasper-app:verifyCygwinLifecycle`; expect RED.**
-- [ ] **Step 3: Implement state and provisioning.** Use atomic metadata writes;
+- [x] **Step 2: Run `./gradlew :jasper-app:verifyCygwinLifecycle`; expect RED.**
+- [x] **Step 3: Implement state and provisioning.** Use atomic metadata writes;
   validate control-directory ancestry without recursively rejecting Cygwin
   links. Initialize only at the final path. Ensure disk-space requirements
   include archive cache, installed files and temporary extraction space.
@@ -207,7 +207,7 @@ assertEquals(oldManagerDigest, managerDigestAfterFailedReplacement);
   Verify the package database and noninteractive tool probes before ready.
   Keep initializing state on failure; retain enough seed metadata to retry
   deterministically after an app version change.
-- [ ] **Step 4: Implement launch/management arbitration.** Under a short
+- [x] **Step 4: Implement launch/management arbitration.** Under a short
   cross-process mutex, reserve management or register a launch before starting
   Bash. Management refuses pending launches and live processes. Use PID plus
   process start identity for leases, reclaiming only demonstrably dead owners.
@@ -215,12 +215,12 @@ assertEquals(oldManagerDigest, managerDigestAfterFailedReplacement);
   paths. Detect root-owned executables and processes loading its Cygwin DLL
   through Windows APIs, not substring matching names. Unknown process inspection
   must produce a diagnostic before management, not a false all-clear.
-- [ ] **Step 5: Add child-JVM race tests and run GREEN.** Simultaneous launch and
+- [x] **Step 5: Add child-JVM race tests and run GREEN.** Simultaneous launch and
   management admits one side; a killed owner leaves recoverable state; PID reuse
   does not hold a stale lease. READY-root reuse does not require stopping running
   shells. The standalone helper and app compile from the same shared sources
   and pass `verifyApplicationArchitecture`.
-- [ ] **Step 6: Commit** `feat: provision persistent Cygwin environments`.
+- [x] **Step 6: Commit** `feat: provision persistent Cygwin environments`.
 
 ### Task 4: Wire both Windows installation paths and portable provisioning
 
@@ -239,17 +239,17 @@ assertEquals(oldManagerDigest, managerDigestAfterFailedReplacement);
 - Portable entry point `provision-cygwin.cmd` invokes the same helper using its
   adjacent packaged runtime and quoted paths.
 
-- [ ] **Step 1: Extend user-install tests.** Inject a concrete provisioning
+- [x] **Step 1: Extend user-install tests.** Inject a concrete provisioning
   callback via `Consumer<Path>` overload; make it fail and assert old app and
   shortcut restoration. Assert ready Cygwin state is unchanged on success,
   rollback and uninstall. Add a fresh-install failure and retained partial root.
-- [ ] **Step 2: Run `./gradlew :jasper-app:verifyWindowsUserInstall`; expect RED.**
-- [ ] **Step 3: Stage identical payloads in standard and user app images.**
+- [x] **Step 2: Run `./gradlew :jasper-app:verifyWindowsUserInstall`; expect RED.**
+- [x] **Step 3: Stage identical payloads in standard and user app images.**
   Invoke provisioning before install success and preserve current app rollback.
   Apply the proven MSI override, restricted to install/repair with files present,
   and exclude uninstall. Keep persistent files out of MSI components.
   Package verification checks helper, cache, notices and provisioning entry point.
-- [ ] **Step 4: Extend graph and MSI checks.** Keep uninstall depending only on
+- [x] **Step 4: Extend graph and MSI checks.** Keep uninstall depending only on
   helper compilation. Verify user install adds no forbidden tasks; shared helper
   compilation must not pull the application compile graph into uninstall.
   MSI checks assert user execution identity, synchronous failure propagation,
@@ -260,7 +260,7 @@ assertEquals(oldManagerDigest, managerDigestAfterFailedReplacement);
   On an isolated Windows test account, install offline by each route, upgrade
   in both orders, repair, uninstall/reinstall, and induce Setup failure.
   Expected: correct exit outcomes and byte-identical pre-existing root.
-- [ ] **Step 6: Commit** `feat: install Cygwin through both Windows distribution paths`.
+- [x] **Step 6: Commit** `feat: install Cygwin through both Windows distribution paths`.
 
 ### Task 5: Expose Cygwin Bash and adapt shell integration
 
@@ -282,7 +282,7 @@ assertEquals(oldManagerDigest, managerDigestAfterFailedReplacement);
   Define its immutable result record in that file. It runs only on the launch
   worker, after catalog confirmation and before terminal process creation.
 
-- [ ] **Step 1: Write profile and launch regressions.** Assert exact id/name/order,
+- [x] **Step 1: Write profile and launch regressions.** Assert exact id/name/order,
   PowerShell default, Linux/macOS absence, discovery refresh after package change,
   stale refresh rejection, and a saved Cygwin selection on slow first discovery.
   Add:
@@ -296,12 +296,12 @@ assertEquals(requestedDirectory, observedShellDirectory); // profile cd cannot o
 
   Include missing Bash, timeout, quoting/metacharacters, custom mounts, HOME
   mapping and foreign UNC rejection. Custom Windows Bash retains old behavior.
-- [ ] **Step 2: Run the four targeted test classes; expect RED for new cases.**
-- [ ] **Step 3: Implement discovery and confirmation.** No executable guessed from
+- [x] **Step 2: Run the four targeted test classes; expect RED for new cases.**
+- [x] **Step 3: Implement discovery and confirmation.** No executable guessed from
   PATH. When Cygwin is selected before first detection, confirm on the worker
   rather than preserving a premature fallback captured on the EDT. Retain the
   catalog generation/close guards and bounded wait.
-- [ ] **Step 4: Implement launch adaptation from Task 1's validated invocation.**
+- [x] **Step 4: Implement launch adaptation from Task 1's validated invocation.**
   Prepare Cygwin-specific environment and invoke its absolute `cygpath` off EDT,
   with a 5-second timeout and 64 KiB output bound. Arguments remain distinct.
   Honor AUTO/MANUAL/OFF integration behavior. Apply explicit requested cwd after
@@ -309,10 +309,10 @@ assertEquals(requestedDirectory, observedShellDirectory); // profile cd cannot o
   Shell-side OSC 7 conversion preserves the prior command exit status and URI
   escaping; Java reuses host/UNC validation without launching conversions on
   the reader thread. Acquire/release Task 3's launch reservation on all paths.
-- [ ] **Step 5: Run GREEN and repeat the native ConPTY probe** using production
+- [x] **Step 5: Run GREEN and repeat the native ConPTY probe** using production
   launch preparation, verifying script paths, home, mounts, native command
   execution, prompt navigation and `TERM`/`COLORTERM`.
-- [ ] **Step 6: Commit** `feat: add the Cygwin Bash shell profile`.
+- [x] **Step 6: Commit** `feat: add the Cygwin Bash shell profile`.
 
 ### Task 6: Add supervised package management and its UI action
 
@@ -335,12 +335,12 @@ assertEquals(requestedDirectory, observedShellDirectory); // profile cd cannot o
 - Add `MANAGE_CYGWIN_PACKAGES` to ActionId. Supply UI availability and invocation
   through callbacks; `ShellChoices` retains a delegating three-argument constructor.
 
-- [ ] **Step 1: Write tests** for Windows-only visibility, exact label/id, no
+- [x] **Step 1: Write tests** for Windows-only visibility, exact label/id, no
   shortcut, both entry points invoking one controller, absent/damaged root
   diagnosis, active sessions, duplicate invocation, cancellation, failed download,
   restart requirement, missing Bash after Setup, and disposed UI callbacks.
-- [ ] **Step 2: Run new targeted tests; expect RED.**
-- [ ] **Step 3: Implement supervisor and persistent result protocol.** Use a
+- [x] **Step 2: Run new targeted tests; expect RED.**
+- [x] **Step 3: Implement supervisor and persistent result protocol.** Use a
   unique operation id and atomic result file, with Task 1's observed exit mapping.
   Distinguish cancellation from failure only where Setup provides evidence;
   report an ambiguous outcome honestly and check readiness afterward.
@@ -349,16 +349,16 @@ assertEquals(requestedDirectory, observedShellDirectory); // profile cd cannot o
   independently of replaceable app files: copy the required helper/runtime into
   an operation directory outside both app and Cygwin root before starting, verify
   contents, then clean up after exit on a subsequent safe operation.
-- [ ] **Step 4: Wire action and settings affordance.** Keep non-Windows UI clean;
+- [x] **Step 4: Wire action and settings affordance.** Keep non-Windows UI clean;
   generic ActionId enumeration must not inadvertently expose the action there.
   Refresh catalog on completion, including when the initiating window closed.
   Other shell profiles remain launchable while management is active.
-- [ ] **Step 5: Run child-process lifecycle tests.** Kill the parent app fixture
+- [x] **Step 5: Run child-process lifecycle tests.** Kill the parent app fixture
   while a stand-in manager remains active; a second helper and a Bash launch must
   still be refused. Updating/removing the old app fixture must not break the
   supervisor. Replace the verified manager only while idle, with atomic fallback.
   Real Setup UI acceptance is user-run.
-- [ ] **Step 6: Commit** `feat: manage Cygwin packages from Jasper`.
+- [x] **Step 6: Commit** `feat: manage Cygwin packages from Jasper`.
 
 ### Task 7: Integrate release verification and user documentation
 
@@ -374,15 +374,15 @@ assertEquals(requestedDirectory, observedShellDirectory); // profile cd cannot o
 - Windows native probe tasks remain explicit; ordinary `check` runs only
   headless portable lifecycle/manifest/launch tests.
 
-- [ ] **Step 1: Write distribution checks** that fail for missing source archives,
+- [x] **Step 1: Write distribution checks** that fail for missing source archives,
   changed package bytes, missing manager/helper, and unvalidated target architecture.
-- [ ] **Step 2: Run verification against an intentionally incomplete fixture;
+- [x] **Step 2: Run verification against an intentionally incomplete fixture;
   expect RED.**
-- [ ] **Step 3: Wire source and binary artifact publication together.** Retain the
+- [x] **Step 3: Wire source and binary artifact publication together.** Retain the
   existing Windows x64/ARM64 matrix. Require native evidence for each target;
   a skipped probe cannot green-light release. Keep retained snapshot acquisition
   separate from explicit refresh; ordinary CI does not resolve latest packages.
-- [ ] **Step 4: Document** selecting Cygwin, managing packages, Setup's Keep
+- [x] **Step 4: Document** selecting Cygwin, managing packages, Setup's Keep
   selection, closing Cygwin processes, internet requirements for extra tools,
   persistent paths, upgrade preservation, portable provisioning, uninstall
   preservation and manual removal. Add maintainer instructions for snapshot
@@ -400,7 +400,7 @@ assertEquals(requestedDirectory, observedShellDirectory); // profile cd cannot o
 
 **Interfaces:** completed feature and the evidence from Tasks 1–7.
 
-- [ ] **Step 1: Run `./gradlew check`** using JBR 25; read XML totals rather than
+- [x] **Step 1: Run `./gradlew check`** using JBR 25; read XML totals rather than
   guessing counts. Run `git diff --check` and the repository Java source-hygiene
   scan. Re-run only checks justified by failures or subsequent changes.
 - [ ] **Step 2: Complete Windows end-to-end lifecycle verification.** On isolated
@@ -410,15 +410,15 @@ assertEquals(requestedDirectory, observedShellDirectory); // profile cd cannot o
   snapshot contents before opening a shell (shell startup may legitimately
   update history). Test interrupted setup, corrupt cache, disk-full injection,
   simultaneous launch/management and app shutdown during management.
-- [ ] **Step 3: Hand the interactive checklist to the user.** Cygwin selection in
+- [x] **Step 3: Hand the interactive checklist to the user.** Cygwin selection in
   tabs/splits/settings, Manage action in Settings/palette, Setup package changes,
   Ctrl+C/resize/Unicode, native programs, prompt navigation and cwd inheritance.
   Distinguish pending acceptance from failed or completed checks.
-- [ ] **Step 4: Request one independent whole-branch review** under the approved
+- [x] **Step 4: Request one independent whole-branch review** under the approved
   native workflow. Review ownership, rollback, process races, installer sequencing,
   source distribution and both Windows architectures. Fix findings and rerun the
   affected verification before marking complete.
-- [ ] **Step 5: Commit final evidence** as `docs: record Cygwin integration verification`.
+- [x] **Step 5: Commit final evidence** as `docs: record Cygwin integration verification`.
   List remaining native/user acceptance explicitly. Do not merge or push as part
   of this planning authorization.
 

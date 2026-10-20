@@ -1,0 +1,73 @@
+Package source: src/release/libfido2/libfido2-1.17.0-1-src.tar.xz
+License identifier: BSD-2-Clause
+
+--- libfido2-1.17.0-1.src/libfido2.cygport ---
+NAME="libfido2"
+LICENSE="BSD-2-Clause"
+VERSION="1.17.0"
+RELEASE="1"
+HOMEPAGE="https://developers.yubico.com/libfido2/"
+
+GIT_URI="https://github.com/Yubico/libfido2"
+GIT_TAG="${VERSION}"
+inherit git
+
+PKG_NAMES="libfido2 libfido2-devel"
+SUMMARY="Library implementing FIDO2 over USB"
+DESCRIPTION="libfido2 provides library functionality and command-line tools to
+communicate with a FIDO device over USB, and to verify attestation and
+assertion signatures.
+
+libfido2 supports the FIDO U2F (CTAP 1) and FIDO 2.0 (CTAP 2) protocols."
+
+libfido2_CATEGORY="Libs"
+libfido2_CONTENTS="usr/bin/"
+
+libfido2_devel_CATEGORY="Devel"
+libfido2_devel_REQUIRES="libcbor-devel"
+libfido2_devel_CONTENTS="usr/include/ usr/lib/ usr/share"
+
+CYGCMAKE_ARGS="-DUSE_WINHELLO=ON"
+inherit cmake
+
+CFLAGS="-D_GNU_SOURCE=1"
+
+BUILD_REQUIRES=" \
+  cmake \
+  gcc-g++ \
+  libssl-devel \
+  libcbor-devel \
+  zlib-devel \
+"
+
+SCALLYWAG="notest"
+
+Source archive: src/release/libfido2/libfido2-1.17.0-1-src.tar.xz
+
+--- libfido2-1.17.0-1.src/libfido2-1.17.0.tar.bz2!/libfido2/LICENSE ---
+Copyright (c) 2018-2026 Yubico AB. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   1. Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+   2. Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in
+      the documentation and/or other materials provided with the
+      distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+SPDX-License-Identifier: BSD-2-Clause

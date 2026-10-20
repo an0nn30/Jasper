@@ -2,7 +2,26 @@
 
 The production integration uses a persistent per-user root and prebuilt POSIX PTY
 relay. `check` runs portable lifecycle and launch checks; native probes are explicit
-tasks and fail on non-Windows hosts. The final distribution seed remains in preparation.
+tasks and fail on non-Windows hosts. The checked-in seed locks every binary, source
+archive, notice and relay artifact.
+
+## Using the bundled environment
+
+Both the Windows installer and `installWindowsUser` provision the starter set offline
+in `%LOCALAPPDATA%\Jasper\cygwin\root`. Choose **Cygwin Bash** in terminal shell
+settings. **Manage Cygwin packages…** is available there and in the command palette;
+close Cygwin sessions and other processes using this root before starting it.
+Setup opens with the existing installation selected. Leave packages at **Keep** to
+retain their versions; select additional tools or updates as desired. Downloading
+additional packages requires internet access. The supervisor continues if Jasper exits.
+
+App updates, repair, rollback, reinstall and uninstall preserve the entire Cygwin
+root, including added packages, home files, `/etc` and repositories. An interrupted
+initial install can be retried with its retained seed. Logs are under
+`%LOCALAPPDATA%\Jasper\cygwin\logs`; a damaged ready root is repaired through Setup.
+Portable ZIP users run `provision-cygwin.cmd` once from the extracted app directory.
+To remove the environment deliberately, close all processes using it and remove
+`%LOCALAPPDATA%\Jasper\cygwin` separately; the app uninstaller preserves it.
 
 ## Portable verification
 
@@ -148,9 +167,39 @@ leases and exclusion of a renamed external process loading the owned Cygwin DLL.
 Its small fixture manifest tests launch validation; distribution acceptance uses the real seed.
 
 `verifyCygwinManifest`, `verifyCygwinLifecycle`, and `verifyCygwinProvisioning` run
-portable manifest, ownership, concurrency and preservation checks. `stageCygwinSeed`
-requires `-Pjasper.cygwinSnapshot=<retained snapshot>` and the checked-in seed lock;
-missing or mismatched artifacts fail the build. `cygwinToolJar` packages the shared
+portable manifest, ownership, concurrency and preservation checks. `stageCygwinSeed` uses the checked-in seed lock. Its JDK-only acquisition task downloads
+only missing, pinned HTTPS artifacts into `build/cygwin/downloads`; local signed metadata,
+notices, Setup sources and relay binaries come from `seed-support`. No Python, GnuPG,
+PowerShell, native compiler or separately installed Cygwin is needed for ordinary builds
+or `installWindowsUser`. `-Pjasper.cygwinSnapshot=<retained snapshot>` selects a fully
+offline source instead. Missing or mismatched artifacts fail the build. `cygwinToolJar` packages the shared
 helper used by MSI, `installWindowsUser`, and `provision-cygwin.cmd`. Neither installer
 compiles the relay. The Windows settings button and palette action start a copied
 supervisor runtime so app replacement does not interrupt package management.
+
+The 2026-10-20 seed contains 114 packages and 91 corresponding package source archives,
+plus Setup 2.937 sources, notices and relay sources. `seed-licenses.json` records upstream
+license declarations and notice provenance; `LicenseRef-Upstream-*` entries retain the
+actual upstream terms instead of inferring an SPDX expression. `_autorebase` supplies no
+explicit declaration in this release, so its notice preserves the complete scripts and README.
+The lock records 510,489,120 artifact bytes and 831,247,849 measured installed bytes.
+Retain the staged seed alongside release artifacts so removed upstream versions remain available.
+Refresh additionally requires `jasper.cygwinRefresh.setup-source` with the tagged Setup
+archive, COPYING and hash-bearing provenance.json.
+
+`InstallerAcceptanceTest` is an opt-in headless Windows harness compiled by
+`compileCygwinBundle`. It accepts an app image, a new scratch directory, the JBR SDK
+and a cache containing the signed extra `hello` package. It requires an absent system
+Cygwin root, uses the production MSI template, and verifies initial provisioning,
+headless package management, repair, upgrade and uninstall preservation. WiX is needed
+only to build the test MSIs; `installWindowsUser` uses the JBR app-image path.
+`UserInstallAcceptanceTest` brackets actual Gradle install/update/uninstall/reinstall
+runs with a complete root snapshot, including an added package, configuration,
+symlink and repository. Both harnesses require an isolated test account.
+Provisioning outcomes are retained in `logs/provision-result.json` under the owned
+environment, including failures reported by an MSI custom action.
+
+Windows release builds run `verifyCygwinDistribution` and produce a separate
+`cygwinSourcesZip` alongside the application assets. `validation.json` binds native
+and interactive acceptance to the seed digest for each architecture; missing evidence
+blocks publication. Local installation and packaging remain available for validation.

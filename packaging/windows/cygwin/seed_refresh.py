@@ -104,6 +104,7 @@ def main():
     parser.add_argument('--metadata', required=True, type=pathlib.Path, help='Retained setup.xz, setup.xz.sig and pubring.asc')
     parser.add_argument('--licenses', required=True, type=pathlib.Path, help='Reviewed per-package license inventory')
     parser.add_argument('--relays', required=True, type=pathlib.Path, help='Verified prebuilt relay directory and provenance.json')
+    parser.add_argument('--setup-source', required=True, type=pathlib.Path, help='Retained Setup source archive, COPYING and provenance.json')
     parser.add_argument('--installed-bytes', required=True, type=int, help='Measured size of this exact snapshot')
     args = parser.parse_args()
     if not args.snapshot.is_absolute() or args.installed_bytes <= 0: parser.error('Absolute snapshot and positive measured size required')
@@ -158,7 +159,15 @@ def main():
         source = args.relays/entry.get('source', entry['file'])
         if hashlib.sha512(source.read_bytes()).hexdigest() != entry['sha512']: raise ValueError('Relay source provenance mismatch')
         retain('relay/'+entry['file'], entry['origin'], source)
+    setup_provenance = json.loads((args.setup_source/'provenance.json').read_text())
+    setup_archive = args.setup_source/setup_provenance['source']
+    safe_path(setup_provenance['source'])
+    if hashlib.sha512(setup_archive.read_bytes()).hexdigest() != setup_provenance['sha512']:
+        raise ValueError('Setup source provenance mismatch')
+    for name in (setup_archive.name, 'COPYING', 'provenance.json'):
+        retain('setup-source/'+name, setup_provenance['repository'], args.setup_source/name)
     manifest = {'schema': 1, 'architecture': 'x86_64', 'installedBytes': args.installed_bytes, 'setup': 'setup-x86_64.exe',
+        'setupSource': 'setup-source/'+setup_archive.name, 'setupLicense': 'setup-source/COPYING',
         'metadata': cache+'x86_64/setup.xz', 'signature': cache+'x86_64/setup.xz.sig',
         'artifacts': sorted(artifacts.values(), key=lambda a:a['path']), 'packages': locked_packages, 'relays': relays}
     (args.snapshot/'seed.lock.json').write_text(json.dumps(manifest, indent=2)+'\n')

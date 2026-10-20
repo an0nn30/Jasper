@@ -1,0 +1,1283 @@
+Package source: noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-src.tar.zst
+License identifier: MIT AND GPL-2.0-or-later
+
+--- ca-certificates-2026.2.90_v9.0.317-1.src/ca-certificates.cygport ---
+# -*- mode: sh; sh-shell: bash -*-
+NAME="ca-certificates"
+VERSION="2026.2.90_v9.0.317"
+RELEASE="1"
+CATEGORY="Net"
+SUMMARY="CA root certificates"
+DESCRIPTION="Mozilla's CA root certificates for use with OpenSSL, NSS, GnuTLS,
+and other software that handles certificate verification."
+HOMEPAGE="https://wiki.mozilla.org/CA"
+LICENSE="MIT AND GPL-2.0-or-later"
+SRC_URI="
+  fedora/certdata.txt
+  fedora/nssckbi.h
+  fedora/update-ca-trust
+  fedora/trust-fixes
+  fedora/certdata2pem.py
+  fedora/ca-legacy.conf
+  fedora/ca-legacy
+  fedora/ca-legacy.8.txt
+  fedora/update-ca-trust.8.txt
+  fedora/README.usr
+  fedora/README.etc
+  fedora/README.extr
+  fedora/README.edk2
+  fedora/README.java
+  fedora/README.openssl
+  fedora/README.pem
+  fedora/README.src
+"
+PATCH_URI="
+  ${P}-bash_needed.patch
+"
+SRC_DIR=.
+
+ARCH=noarch
+
+BUILD_REQUIRES="asciidoc docbook2X openssl python3 libxslt"
+
+REQUIRES="p11-kit p11-kit-trust"
+CONTENTS="
+  etc/defaults/etc/pki/ca-trust/ca-legacy.conf
+  etc/pki/ca-trust/
+  etc/pki/tls/cert.pem
+  etc/pki/tls/certs/ca-bundle*.crt
+  etc/postinstall/${PN}.sh
+  etc/preremove/${PN}.sh
+  etc/ssl/certs
+  usr/bin/ca-legacy
+  usr/bin/update-ca-trust
+  usr/libexec/p11-kit/
+  usr/lib/security/cacerts
+  usr/share/man/man8/*
+  usr/share/pki/ca-trust-legacy
+  usr/share/pki/ca-trust-source
+"
+OBSOLETES="ca-certificates-letsencrypt"
+
+# actually get the Fedora sources
+# the output from git must not be seen by cygport…
+# {
+#     git submodule init
+#     git submodule update
+# } > /dev/null
+
+src_compile() {
+    mkdir -p ${B}/certs/legacy-{default,disable}
+    cd ${B}/certs
+    cp ${S}/certdata.txt .
+    python3 ${S}/certdata2pem.py
+
+    cd ${B}
+    (
+	cat <<-_EOF
+		# This is a bundle of X.509 certificates of public Certificate
+		# Authorities.	It was generated from the Mozilla root CA list.
+		# These certificates and trust/distrust attributes use the file format accepted
+		# by the p11-kit-trust module.
+		#
+		# Source: mozilla/security/nss/lib/ckfw/builtins/certdata.txt
+		# Source: mozilla/security/nss/lib/ckfw/builtins/nssckbi.h
+		#
+		# Generated from:
+	_EOF
+	grep -w NSS_BUILTINS_LIBRARY_VERSION ${S}/nssckbi.h | awk '{print "# " $2 " " $3}';
+	echo '#';
+    ) > ca-bundle.trust.p11-kit
+
+    > ca-bundle.legacy.default.crt
+    > ca-bundle.legacy.disable.crt
+
+    for f in certs/legacy-default/*.crt
+    do
+	[ -f $f ] || continue
+	echo "processing $f"
+	tbits=`sed -n '/^# openssl-trust/{s/^.*=//;p;}' $f`
+	alias=`sed -n '/^# alias=/{s/^.*=//;p;q;}' $f | sed "s/'//g" | sed 's/"//g'`
+	targs=""
+	if [ -n "$tbits" ]
+	then
+	    for t in $tbits
+	    do
+		targs="$targs -addtrust $t"
+	    done
+	fi
+	if [ -n "$targs" ]
+	then
+	    echo "legacy default flags $targs for $f" >> info.trust
+	    openssl x509 -text -in "$f" -trustout $targs -setalias "$alias" >> ca-bundle.legacy.default.crt
+	fi
+    done
+
+    for f in certs/legacy-disable/*.crt
+    do
+	[ -f $f ] || continue
+	echo "processing $f"
+	tbits=`sed -n '/^# openssl-trust/{s/^.*=//;p;}' $f`
+	alias=`sed -n '/^# alias=/{s/^.*=//;p;q;}' $f | sed "s/'//g" | sed 's/"//g'`
+	targs=""
+	if [ -n "$tbits" ]
+	then
+	    for t in $tbits
+	    do
+		targs="${targs} -addtrust $t"
+	    done
+	fi
+	if [ -n "$targs" ]
+	then
+	    echo "legacy disable flags $targs for $f" >> info.trust
+	    openssl x509 -text -in "$f" -trustout $targs -setalias "$alias" >> ca-bundle.legacy.disable.crt
+	fi
+    done
+
+    P11FILES=`find certs -name *.tmp-p11-kit | wc -l`
+    if [ $P11FILES -ne 0 ]
+    then
+	for p in certs/*.tmp-p11-kit
+	do
+	    cat "$p" >> ca-bundle.trust.p11-kit
+	done
+    fi
+    cat ${S}/trust-fixes >> ca-bundle.trust.p11-kit
+
+    for man in update-ca-trust.8 ca-legacy.8
+    do
+	asciidoc -v -d manpage -b docbook -o ${B}/$man.xml ${S}/$man.txt
+	xsltproc --nonet -o ${B}/$man /usr/share/docbook2X/xslt/man/manpage.xsl ${B}/$man.xml
+    done
+}
+
+src_install() {
+    dobin ${S}/update-ca-trust ${S}/ca-legacy
+    doman ${B}/update-ca-trust.8 ${B}/ca-legacy.8
+    sed -i -e 's/sln/ln -sf/' ${D}/usr/bin/ca-legacy
+
+    # for p11-kit
+    dodir /usr/libexec/p11-kit
+    dosym ../../bin/update-ca-trust /usr/libexec/p11-kit/trust-extract-compat
+
+    insinto /usr/share/pki/ca-trust-source
+    doins ${B}/ca-bundle.trust.p11-kit
+    newins ${S}/README.usr README
+    dodir /usr/share/pki/ca-trust-source/{anchors,blacklist}
+    keepdir /usr/share/pki/ca-trust-source/{anchors,blacklist}
+
+    insinto /usr/share/pki/ca-trust-legacy
+    doins ${B}/ca-bundle.legacy.default.crt
+    doins ${B}/ca-bundle.legacy.disable.crt
+
+    insinto /etc/pki/ca-trust
+    doins ${S}/ca-legacy.conf
+    make_etc_defaults /etc/pki/ca-trust/ca-legacy.conf
+
+    cat >> ${D}/etc/postinstall/${PN}.sh <<-_EOF
+		/usr/bin/ca-legacy install
+		/usr/bin/update-ca-trust
+	_EOF
+
+    # touch all files overwritten by update-ca-trust for easy cleanup
+    insinto /etc/pki/ca-trust/extracted
+    newins ${S}/README.extr README
+
+    insinto /etc/pki/ca-trust/extracted/openssl
+    newins ${S}/README.openssl README
+    touch ${D}/etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt
+
+    insinto /etc/pki/ca-trust/extracted/pem
+    newins ${S}/README.pem README
+    touch ${D}/etc/pki/ca-trust/extracted/pem/{tls,email,objsign}-ca-bundle.pem
+
+    insinto /etc/pki/ca-trust/extracted/java
+    newins ${S}/README.java README
+    touch ${D}/etc/pki/ca-trust/extracted/java/cacerts
+
+    insinto /etc/pki/ca-trust/extracted/edk2
+    newins ${S}/README.edk2 README
+    touch ${D}/etc/pki/ca-trust/extracted/edk2/cacerts.bin
+
+    insinto /etc/pki/ca-trust/source
+    newins ${S}/README.src README
+    dodir /etc/pki/ca-trust/source/{anchors,blacklist}
+    keepdir /etc/pki/ca-trust/source/{anchors,blacklist}
+
+    dodir /etc/pki/tls/certs /etc/ssl
+    # for OpenSSL
+    dosym /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/tls/cert.pem
+    # for backwards compatibility
+    dosym /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/tls/certs/ca-bundle.crt
+    dosym /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt /etc/pki/tls/certs/ca-bundle.trust.crt
+    # for other hardcoded ca-certificates consumers
+    dosym /etc/pki/tls/certs /etc/ssl/certs
+
+    # for GNU Classpath Java
+    dodir /usr/lib/security
+    dosym /etc/pki/ca-trust/extracted/java/cacerts /usr/lib/security/cacerts
+}
+
+Source archive: noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-src.tar.zst
+
+--- ca-certificates-2026.2.90_v9.0.317-1.src/ca-certificates.cygport ---
+# -*- mode: sh; sh-shell: bash -*-
+NAME="ca-certificates"
+VERSION="2026.2.90_v9.0.317"
+RELEASE="1"
+CATEGORY="Net"
+SUMMARY="CA root certificates"
+DESCRIPTION="Mozilla's CA root certificates for use with OpenSSL, NSS, GnuTLS,
+and other software that handles certificate verification."
+HOMEPAGE="https://wiki.mozilla.org/CA"
+LICENSE="MIT AND GPL-2.0-or-later"
+SRC_URI="
+  fedora/certdata.txt
+  fedora/nssckbi.h
+  fedora/update-ca-trust
+  fedora/trust-fixes
+  fedora/certdata2pem.py
+  fedora/ca-legacy.conf
+  fedora/ca-legacy
+  fedora/ca-legacy.8.txt
+  fedora/update-ca-trust.8.txt
+  fedora/README.usr
+  fedora/README.etc
+  fedora/README.extr
+  fedora/README.edk2
+  fedora/README.java
+  fedora/README.openssl
+  fedora/README.pem
+  fedora/README.src
+"
+PATCH_URI="
+  ${P}-bash_needed.patch
+"
+SRC_DIR=.
+
+ARCH=noarch
+
+BUILD_REQUIRES="asciidoc docbook2X openssl python3 libxslt"
+
+REQUIRES="p11-kit p11-kit-trust"
+CONTENTS="
+  etc/defaults/etc/pki/ca-trust/ca-legacy.conf
+  etc/pki/ca-trust/
+  etc/pki/tls/cert.pem
+  etc/pki/tls/certs/ca-bundle*.crt
+  etc/postinstall/${PN}.sh
+  etc/preremove/${PN}.sh
+  etc/ssl/certs
+  usr/bin/ca-legacy
+  usr/bin/update-ca-trust
+  usr/libexec/p11-kit/
+  usr/lib/security/cacerts
+  usr/share/man/man8/*
+  usr/share/pki/ca-trust-legacy
+  usr/share/pki/ca-trust-source
+"
+OBSOLETES="ca-certificates-letsencrypt"
+
+# actually get the Fedora sources
+# the output from git must not be seen by cygport…
+# {
+#     git submodule init
+#     git submodule update
+# } > /dev/null
+
+src_compile() {
+    mkdir -p ${B}/certs/legacy-{default,disable}
+    cd ${B}/certs
+    cp ${S}/certdata.txt .
+    python3 ${S}/certdata2pem.py
+
+    cd ${B}
+    (
+	cat <<-_EOF
+		# This is a bundle of X.509 certificates of public Certificate
+		# Authorities.	It was generated from the Mozilla root CA list.
+		# These certificates and trust/distrust attributes use the file format accepted
+		# by the p11-kit-trust module.
+		#
+		# Source: mozilla/security/nss/lib/ckfw/builtins/certdata.txt
+		# Source: mozilla/security/nss/lib/ckfw/builtins/nssckbi.h
+		#
+		# Generated from:
+	_EOF
+	grep -w NSS_BUILTINS_LIBRARY_VERSION ${S}/nssckbi.h | awk '{print "# " $2 " " $3}';
+	echo '#';
+    ) > ca-bundle.trust.p11-kit
+
+    > ca-bundle.legacy.default.crt
+    > ca-bundle.legacy.disable.crt
+
+    for f in certs/legacy-default/*.crt
+    do
+	[ -f $f ] || continue
+	echo "processing $f"
+	tbits=`sed -n '/^# openssl-trust/{s/^.*=//;p;}' $f`
+	alias=`sed -n '/^# alias=/{s/^.*=//;p;q;}' $f | sed "s/'//g" | sed 's/"//g'`
+	targs=""
+	if [ -n "$tbits" ]
+	then
+	    for t in $tbits
+	    do
+		targs="$targs -addtrust $t"
+	    done
+	fi
+	if [ -n "$targs" ]
+	then
+	    echo "legacy default flags $targs for $f" >> info.trust
+	    openssl x509 -text -in "$f" -trustout $targs -setalias "$alias" >> ca-bundle.legacy.default.crt
+	fi
+    done
+
+    for f in certs/legacy-disable/*.crt
+    do
+	[ -f $f ] || continue
+	echo "processing $f"
+	tbits=`sed -n '/^# openssl-trust/{s/^.*=//;p;}' $f`
+	alias=`sed -n '/^# alias=/{s/^.*=//;p;q;}' $f | sed "s/'//g" | sed 's/"//g'`
+	targs=""
+	if [ -n "$tbits" ]
+	then
+	    for t in $tbits
+	    do
+		targs="${targs} -addtrust $t"
+	    done
+	fi
+	if [ -n "$targs" ]
+	then
+	    echo "legacy disable flags $targs for $f" >> info.trust
+	    openssl x509 -text -in "$f" -trustout $targs -setalias "$alias" >> ca-bundle.legacy.disable.crt
+	fi
+    done
+
+    P11FILES=`find certs -name *.tmp-p11-kit | wc -l`
+    if [ $P11FILES -ne 0 ]
+    then
+	for p in certs/*.tmp-p11-kit
+	do
+	    cat "$p" >> ca-bundle.trust.p11-kit
+	done
+    fi
+    cat ${S}/trust-fixes >> ca-bundle.trust.p11-kit
+
+    for man in update-ca-trust.8 ca-legacy.8
+    do
+	asciidoc -v -d manpage -b docbook -o ${B}/$man.xml ${S}/$man.txt
+	xsltproc --nonet -o ${B}/$man /usr/share/docbook2X/xslt/man/manpage.xsl ${B}/$man.xml
+    done
+}
+
+src_install() {
+    dobin ${S}/update-ca-trust ${S}/ca-legacy
+    doman ${B}/update-ca-trust.8 ${B}/ca-legacy.8
+    sed -i -e 's/sln/ln -sf/' ${D}/usr/bin/ca-legacy
+
+    # for p11-kit
+    dodir /usr/libexec/p11-kit
+    dosym ../../bin/update-ca-trust /usr/libexec/p11-kit/trust-extract-compat
+
+    insinto /usr/share/pki/ca-trust-source
+    doins ${B}/ca-bundle.trust.p11-kit
+    newins ${S}/README.usr README
+    dodir /usr/share/pki/ca-trust-source/{anchors,blacklist}
+    keepdir /usr/share/pki/ca-trust-source/{anchors,blacklist}
+
+    insinto /usr/share/pki/ca-trust-legacy
+    doins ${B}/ca-bundle.legacy.default.crt
+    doins ${B}/ca-bundle.legacy.disable.crt
+
+    insinto /etc/pki/ca-trust
+    doins ${S}/ca-legacy.conf
+    make_etc_defaults /etc/pki/ca-trust/ca-legacy.conf
+
+    cat >> ${D}/etc/postinstall/${PN}.sh <<-_EOF
+		/usr/bin/ca-legacy install
+		/usr/bin/update-ca-trust
+	_EOF
+
+    # touch all files overwritten by update-ca-trust for easy cleanup
+    insinto /etc/pki/ca-trust/extracted
+    newins ${S}/README.extr README
+
+    insinto /etc/pki/ca-trust/extracted/openssl
+    newins ${S}/README.openssl README
+    touch ${D}/etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt
+
+    insinto /etc/pki/ca-trust/extracted/pem
+    newins ${S}/README.pem README
+    touch ${D}/etc/pki/ca-trust/extracted/pem/{tls,email,objsign}-ca-bundle.pem
+
+    insinto /etc/pki/ca-trust/extracted/java
+    newins ${S}/README.java README
+    touch ${D}/etc/pki/ca-trust/extracted/java/cacerts
+
+    insinto /etc/pki/ca-trust/extracted/edk2
+    newins ${S}/README.edk2 README
+    touch ${D}/etc/pki/ca-trust/extracted/edk2/cacerts.bin
+
+    insinto /etc/pki/ca-trust/source
+    newins ${S}/README.src README
+    dodir /etc/pki/ca-trust/source/{anchors,blacklist}
+    keepdir /etc/pki/ca-trust/source/{anchors,blacklist}
+
+    dodir /etc/pki/tls/certs /etc/ssl
+    # for OpenSSL
+    dosym /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/tls/cert.pem
+    # for backwards compatibility
+    dosym /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/tls/certs/ca-bundle.crt
+    dosym /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt /etc/pki/tls/certs/ca-bundle.trust.crt
+    # for other hardcoded ca-certificates consumers
+    dosym /etc/pki/tls/certs /etc/ssl/certs
+
+    # for GNU Classpath Java
+    dodir /usr/lib/security
+    dosym /etc/pki/ca-trust/extracted/java/cacerts /usr/lib/security/cacerts
+}
+
+
+--- ca-certificates-2026.2.90_v9.0.317-1.src/ca-legacy.8.txt ---
+////
+Copyright (C) 2013 Red Hat, Inc.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+////
+
+
+ca-legacy(8)
+============
+:doctype: manpage
+:man source: ca-legacy
+
+
+NAME
+----
+ca-legacy - Manage the system configuration for legacy CA certificates
+
+
+SYNOPSIS
+--------
+*ca-legacy* ['COMMAND']
+
+
+DESCRIPTION
+-----------
+ca-legacy(8) is used to include or exclude a set of legacy Certificate Authority (CA)
+certificates in the system's list of trusted CA certificates.
+
+The list of CA certificates and trust flags included in the ca-certificates package
+are based on the decisions made by Mozilla.org according to the Mozilla CA policy.
+
+Occasionally, removal or distrust decisions made by Mozilla.org might be incompatible with the requirements
+or limitations of some applications that also use the CA certificates list in the Linux environment.
+
+The ca-certificates package might keep some CA certificates included and trusted by default,
+as long as it is seen necessary by the maintainers, despite the fact that they have
+been removed by Mozilla. These certificates are called legacy CA certificates.
+
+The general requirements to keep legacy CA certificates included and trusted might change over time,
+for example if functional limitations of software packages have been resolved.
+Future versions of the ca-certificates package might reduce the set of legacy CA certificates
+that are included and trusted by default.
+
+The ca-legacy(8) command can be used to override the default behaviour.
+
+The mechanisms to individually trust or distrust CA certificates as described in update-ca-trust(8) still apply.
+
+
+COMMANDS
+--------
+*check*::
+    The current configuration will be shown.
+
+*default*::
+    Configure the system to use the default configuration, as recommended
+    by the package maintainers.
+
+*disable*::
+    Configure the system to explicitly disable legacy CA certificates.
+    Using this configuration, the system will use the set of
+    included and trusted CA certificates as released by Mozilla.
+
+*install*::
+    The configuration file will be read and the system configuration
+    will be set accordingly. This command is executed automatically during
+    upgrades of the ca-certificates package.
+
+
+FILES
+-----
+/etc/pki/ca-trust/ca-legacy.conf::
+	A configuration file that will be used and modified by the ca-legacy command.
+    The contents of the configuration file will be read on package upgrades.
+
+AUTHOR
+------
+Written by Kai Engert.
+
+
+--- ca-certificates-2026.2.90_v9.0.317-1.src/certdata2pem.py ---
+#!/usr/bin/python
+# vim:set et sw=4:
+#
+# certdata2pem.py - splits certdata.txt into multiple files
+#
+# Copyright (C) 2009 Philipp Kern <pkern@debian.org>
+# Copyright (C) 2013 Kai Engert <kaie@redhat.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301,
+# USA.
+
+import base64
+import os.path
+import re
+import sys
+import textwrap
+import urllib.request, urllib.parse, urllib.error
+import subprocess
+
+objects = []
+
+def printable_serial(obj):
+  return ".".join([str(x) for x in obj['CKA_SERIAL_NUMBER']])
+
+# Dirty file parser.
+in_data, in_multiline, in_obj = False, False, False
+field, ftype, value, binval, obj = None, None, None, bytearray(), dict()
+for line in open('certdata.txt', 'r'):
+    # Ignore the file header.
+    if not in_data:
+        if line.startswith('BEGINDATA'):
+            in_data = True
+        continue
+    # Ignore comment lines.
+    if line.startswith('#'):
+        continue
+    # Empty lines are significant if we are inside an object.
+    if in_obj and len(line.strip()) == 0:
+        objects.append(obj)
+        obj = dict()
+        in_obj = False
+        continue
+    if len(line.strip()) == 0:
+        continue
+    if in_multiline:
+        if not line.startswith('END'):
+            if ftype == 'MULTILINE_OCTAL':
+                line = line.strip()
+                for i in re.finditer(r'\\([0-3][0-7][0-7])', line):
+                    integ = int(i.group(1), 8)
+                    binval.extend((integ).to_bytes(1, sys.byteorder))
+                obj[field] = binval
+            else:
+                value += line
+                obj[field] = value
+            continue
+        in_multiline = False
+        continue
+    if line.startswith('CKA_CLASS'):
+        in_obj = True
+    line_parts = line.strip().split(' ', 2)
+    if len(line_parts) > 2:
+        field, ftype = line_parts[0:2]
+        value = ' '.join(line_parts[2:])
+    elif len(line_parts) == 2:
+        field, ftype = line_parts
+        value = None
+    else:
+        raise NotImplementedError('line_parts < 2 not supported.\n' + line)
+    if ftype == 'MULTILINE_OCTAL':
+        in_multiline = True
+        value = ""
+        binval = bytearray()
+        continue
+    obj[field] = value
+if len(list(obj.items())) > 0:
+    objects.append(obj)
+
+# Build up trust database.
+trustmap = dict()
+for obj in objects:
+    if obj['CKA_CLASS'] != 'CKO_NSS_TRUST':
+        continue
+    key = obj['CKA_LABEL'] + printable_serial(obj)
+    trustmap[key] = obj
+    print(" added trust", key)
+
+# Build up cert database.
+certmap = dict()
+for obj in objects:
+    if obj['CKA_CLASS'] != 'CKO_CERTIFICATE':
+        continue
+    key = obj['CKA_LABEL'] + printable_serial(obj)
+    certmap[key] = obj
+    print(" added cert", key)
+
+def obj_to_filename(obj):
+    label = obj['CKA_LABEL'][1:-1]
+    label = label.replace('/', '_')\
+        .replace(' ', '_')\
+        .replace('(', '=')\
+        .replace(')', '=')\
+        .replace(',', '_')
+    labelbytes = bytearray()
+    i = 0
+    imax = len(label)
+    while i < imax:
+        if i < imax-3 and label[i] == '\\' and label[i+1] == 'x':
+            labelbytes.extend(bytes.fromhex(label[i+2:i+4]))
+            i += 4
+            continue
+        labelbytes.extend(str.encode(label[i]))
+        i = i+1
+        continue
+    label = labelbytes.decode('utf-8')
+    serial = printable_serial(obj)
+    return label + ":" + serial
+
+def write_cert_ext_to_file(f, oid, value, public_key):
+    f.write("[p11-kit-object-v1]\n")
+    f.write("label: ");
+    f.write(tobj['CKA_LABEL'])
+    f.write("\n")
+    f.write("class: x-certificate-extension\n");
+    f.write("object-id: " + oid + "\n")
+    f.write("value: \"" + value + "\"\n")
+    f.write("modifiable: false\n");
+    f.write(public_key)
+
+trust_types = {
+  "CKA_TRUST_DIGITAL_SIGNATURE": "digital-signature",
+  "CKA_TRUST_NON_REPUDIATION": "non-repudiation",
+  "CKA_TRUST_KEY_ENCIPHERMENT": "key-encipherment",
+  "CKA_TRUST_DATA_ENCIPHERMENT": "data-encipherment",
+  "CKA_TRUST_KEY_AGREEMENT": "key-agreement",
+  "CKA_TRUST_KEY_CERT_SIGN": "cert-sign",
+  "CKA_TRUST_CRL_SIGN": "crl-sign",
+  "CKA_TRUST_SERVER_AUTH": "server-auth",
+  "CKA_TRUST_CLIENT_AUTH": "client-auth",
+  "CKA_TRUST_CODE_SIGNING": "code-signing",
+  "CKA_TRUST_EMAIL_PROTECTION": "email-protection",
+  "CKA_TRUST_IPSEC_END_SYSTEM": "ipsec-end-system",
+  "CKA_TRUST_IPSEC_TUNNEL": "ipsec-tunnel",
+  "CKA_TRUST_IPSEC_USER": "ipsec-user",
+  "CKA_TRUST_TIME_STAMPING": "time-stamping",
+  "CKA_TRUST_STEP_UP_APPROVED": "step-up-approved",
+}
+
+legacy_trust_types = {
+  "LEGACY_CKA_TRUST_SERVER_AUTH": "server-auth",
+  "LEGACY_CKA_TRUST_CODE_SIGNING": "code-signing",
+  "LEGACY_CKA_TRUST_EMAIL_PROTECTION": "email-protection",
+}
+
+legacy_to_real_trust_types = {
+  "LEGACY_CKA_TRUST_SERVER_AUTH": "CKA_TRUST_SERVER_AUTH",
+  "LEGACY_CKA_TRUST_CODE_SIGNING": "CKA_TRUST_CODE_SIGNING",
+  "LEGACY_CKA_TRUST_EMAIL_PROTECTION": "CKA_TRUST_EMAIL_PROTECTION",
+}
+
+openssl_trust = {
+  "CKA_TRUST_SERVER_AUTH": "serverAuth",
+  "CKA_TRUST_CLIENT_AUTH": "clientAuth",
+  "CKA_TRUST_CODE_SIGNING": "codeSigning",
+  "CKA_TRUST_EMAIL_PROTECTION": "emailProtection",
+}
+
+cert_distrust_types = {
+  "CKA_NSS_SERVER_DISTRUST_AFTER": "nss-server-distrust-after",
+  "CKA_NSS_EMAIL_DISTRUST_AFTER": "nss-email-distrust-after",
+}
+
+for tobj in objects:
+    if tobj['CKA_CLASS'] == 'CKO_NSS_TRUST':
+        key = tobj['CKA_LABEL'] + printable_serial(tobj)
+        print("producing trust for " + key)
+        trustbits = []
+        distrustbits = []
+        openssl_trustflags = []
+        openssl_distrustflags = []
+        legacy_trustbits = []
+        legacy_openssl_trustflags = []
+        for t in list(trust_types.keys()):
+            if t in tobj and tobj[t] == 'CKT_NSS_TRUSTED_DELEGATOR':
+                trustbits.append(t)
+                if t in openssl_trust:
+                    openssl_trustflags.append(openssl_trust[t])
+            if t in tobj and tobj[t] == 'CKT_NSS_NOT_TRUSTED':
+                distrustbits.append(t)
+                if t in openssl_trust:
+                    openssl_distrustflags.append(openssl_trust[t])
+
+        for t in list(legacy_trust_types.keys()):
+            if t in tobj and tobj[t] == 'CKT_NSS_TRUSTED_DELEGATOR':
+                real_t = legacy_to_real_trust_types[t]
+                legacy_trustbits.append(real_t)
+                if real_t in openssl_trust:
+                    legacy_openssl_trustflags.append(openssl_trust[real_t])
+            if t in tobj and tobj[t] == 'CKT_NSS_NOT_TRUSTED':
+                raise NotImplementedError('legacy distrust not supported.\n' + line)
+
+        fname = obj_to_filename(tobj)
+        try:
+            obj = certmap[key]
+        except:
+            obj = None
+
+        # optional debug code, that dumps the parsed input to files
+        #fulldump = "dump-" + fname
+        #dumpf = open(fulldump, 'w')
+        #dumpf.write(str(obj));
+        #dumpf.write(str(tobj));
+        #dumpf.close();
+
+        is_legacy = 0
+        if 'LEGACY_CKA_TRUST_SERVER_AUTH' in tobj or 'LEGACY_CKA_TRUST_EMAIL_PROTECTION' in tobj or 'LEGACY_CKA_TRUST_CODE_SIGNING' in tobj:
+            is_legacy = 1
+            if obj == None:
+                raise NotImplementedError('found legacy trust without certificate.\n' + line)
+
+            legacy_fname = "legacy-default/" + fname + ".crt"
+            f = open(legacy_fname, 'w')
+            f.write("# alias=%s\n"%tobj['CKA_LABEL'])
+            f.write("# trust=" + " ".join(legacy_trustbits) + "\n")
+            if legacy_openssl_trustflags:
+                f.write("# openssl-trust=" + " ".join(legacy_openssl_trustflags) + "\n")
+            f.write("-----BEGIN CERTIFICATE-----\n")
+            temp_encoded_b64 = base64.b64encode(obj['CKA_VALUE'])
+            temp_wrapped = textwrap.wrap(temp_encoded_b64.decode(), 64)
+            f.write("\n".join(temp_wrapped))
+            f.write("\n-----END CERTIFICATE-----\n")
+            f.close()
+
+            if 'CKA_TRUST_SERVER_AUTH' in tobj or 'CKA_TRUST_EMAIL_PROTECTION' in tobj or 'CKA_TRUST_CODE_SIGNING' in tobj:
+                legacy_fname = "legacy-disable/" + fname + ".crt"
+                f = open(legacy_fname, 'w')
+                f.write("# alias=%s\n"%tobj['CKA_LABEL'])
+                f.write("# trust=" + " ".join(trustbits) + "\n")
+                if openssl_trustflags:
+                    f.write("# openssl-trust=" + " ".join(openssl_trustflags) + "\n")
+                f.write("-----BEGIN CERTIFICATE-----\n")
+                f.write("\n".join(textwrap.wrap(base64.b64encode(obj['CKA_VALUE']), 64)))
+                f.write("\n-----END CERTIFICATE-----\n")
+                f.close()
+
+            # don't produce p11-kit output for legacy certificates
+            continue
+
+        pk = ''
+        cert_comment = ''
+        if obj != None:
+            # must extract the public key from the cert, let's use openssl
+            cert_fname = "cert-" + fname
+            fc = open(cert_fname, 'w')
+            fc.write("-----BEGIN CERTIFICATE-----\n")
+            temp_encoded_b64 = base64.b64encode(obj['CKA_VALUE'])
+            temp_wrapped = textwrap.wrap(temp_encoded_b64.decode(), 64)
+            fc.write("\n".join(temp_wrapped))
+            fc.write("\n-----END CERTIFICATE-----\n")
+            fc.close();
+            pk_fname = "pubkey-" + fname
+            fpkout = open(pk_fname, "w")
+            dump_pk_command = ["openssl", "x509", "-in", cert_fname, "-noout", "-pubkey"]
+            subprocess.call(dump_pk_command, stdout=fpkout)
+            fpkout.close()
+            with open (pk_fname, "r") as myfile:
+                pk=myfile.read()
+            # obtain certificate information suitable as a comment
+            comment_fname = "comment-" + fname
+            fcout = open(comment_fname, "w")
+            comment_command = ["openssl", "x509", "-in", cert_fname, "-noout", "-text"]
+            subprocess.call(comment_command, stdout=fcout)
+            fcout.close()
+            sed_command = ["sed", "--in-place", "s/^/#/", comment_fname]
+            subprocess.call(sed_command)
+            with open (comment_fname, "r", errors = 'replace') as myfile:
+                cert_comment=myfile.read()
+
+        fname += ".tmp-p11-kit"
+        f = open(fname, 'w')
+
+        if obj != None:
+            is_distrusted = False
+            has_server_trust = False
+            has_email_trust = False
+            has_code_trust = False
+
+            if 'CKA_TRUST_SERVER_AUTH' in tobj:
+                if tobj['CKA_TRUST_SERVER_AUTH'] == 'CKT_NSS_NOT_TRUSTED':
+                    is_distrusted = True
+                elif tobj['CKA_TRUST_SERVER_AUTH'] == 'CKT_NSS_TRUSTED_DELEGATOR':
+                    has_server_trust = True
+
+            if 'CKA_TRUST_EMAIL_PROTECTION' in tobj:
+                if tobj['CKA_TRUST_EMAIL_PROTECTION'] == 'CKT_NSS_NOT_TRUSTED':
+                    is_distrusted = True
+                elif tobj['CKA_TRUST_EMAIL_PROTECTION'] == 'CKT_NSS_TRUSTED_DELEGATOR':
+                    has_email_trust = True
+
+            if 'CKA_TRUST_CODE_SIGNING' in tobj:
+                if tobj['CKA_TRUST_CODE_SIGNING'] == 'CKT_NSS_NOT_TRUSTED':
+                    is_distrusted = True
+                elif tobj['CKA_TRUST_CODE_SIGNING'] == 'CKT_NSS_TRUSTED_DELEGATOR':
+                    has_code_trust = True
+
+            if is_distrusted:
+                trust_ext_oid = "1.3.6.1.4.1.3319.6.10.1"
+                trust_ext_value = "0.%06%0a%2b%06%01%04%01%99w%06%0a%01%04 0%1e%06%08%2b%06%01%05%05%07%03%04%06%08%2b%06%01%05%05%07%03%01%06%08%2b%06%01%05%05%07%03%03"
+                write_cert_ext_to_file(f, trust_ext_oid, trust_ext_value, pk)
+
+            trust_ext_oid = "2.5.29.37"
+            if has_server_trust:
+                if has_email_trust:
+                    if has_code_trust:
+                        # server + email + code
+                        trust_ext_value = "0%2a%06%03U%1d%25%01%01%ff%04 0%1e%06%08%2b%06%01%05%05%07%03%04%06%08%2b%06%01%05%05%07%03%01%06%08%2b%06%01%05%05%07%03%03"
+                    else:
+                        # server + email
+                        trust_ext_value = "0 %06%03U%1d%25%01%01%ff%04%160%14%06%08%2b%06%01%05%05%07%03%04%06%08%2b%06%01%05%05%07%03%01"
+                else:
+                    if has_code_trust:
+                        # server + code
+                        trust_ext_value = "0 %06%03U%1d%25%01%01%ff%04%160%14%06%08%2b%06%01%05%05%07%03%01%06%08%2b%06%01%05%05%07%03%03"
+                    else:
+                        # server
+                        trust_ext_value = "0%16%06%03U%1d%25%01%01%ff%04%0c0%0a%06%08%2b%06%01%05%05%07%03%01"
+            else:
+                if has_email_trust:
+                    if has_code_trust:
+                        # email + code
+                        trust_ext_value = "0 %06%03U%1d%25%01%01%ff%04%160%14%06%08%2b%06%01%05%05%07%03%04%06%08%2b%06%01%05%05%07%03%03"
+                    else:
+                        # email
+                        trust_ext_value = "0%16%06%03U%1d%25%01%01%ff%04%0c0%0a%06%08%2b%06%01%05%05%07%03%04"
+                else:
+                    if has_code_trust:
+                        # code
+                        trust_ext_value = "0%16%06%03U%1d%25%01%01%ff%04%0c0%0a%06%08%2b%06%01%05%05%07%03%03"
+                    else:
+                        # none
+                        trust_ext_value = "0%18%06%03U%1d%25%01%01%ff%04%0e0%0c%06%0a%2b%06%01%04%01%99w%06%0a%10"
+
+            # no 2.5.29.37 for neutral certificates
+            if (is_distrusted or has_server_trust or has_email_trust or has_code_trust):
+                write_cert_ext_to_file(f, trust_ext_oid, trust_ext_value, pk)
+
+            pk = ''
+            f.write("\n")
+
+            f.write("[p11-kit-object-v1]\n")
+            f.write("label: ");
+            f.write(tobj['CKA_LABEL'])
+            f.write("\n")
+            if is_distrusted:
+                f.write("x-distrusted: true\n")
+            elif has_server_trust or has_email_trust or has_code_trust:
+                f.write("trusted: true\n")
+            else:
+                f.write("trusted: false\n")
+
+            # requires p11-kit >= 0.23.4
+            f.write("nss-mozilla-ca-policy: true\n")
+            f.write("modifiable: false\n");
+
+            # requires p11-kit >= 0.23.19
+            for t in list(cert_distrust_types.keys()):
+                if t in obj:
+                    value = obj[t]
+                    if value == 'CK_FALSE':
+                        value = bytearray(1)
+                    f.write(cert_distrust_types[t] + ": \"")
+                    f.write(urllib.parse.quote(value));
+                    f.write("\"\n")
+
+            f.write("-----BEGIN CERTIFICATE-----\n")
+            temp_encoded_b64 = base64.b64encode(obj['CKA_VALUE'])
+            temp_wrapped = textwrap.wrap(temp_encoded_b64.decode(), 64)
+            f.write("\n".join(temp_wrapped))
+            f.write("\n-----END CERTIFICATE-----\n")
+            f.write(cert_comment)
+            f.write("\n")
+
+        else:
+            f.write("[p11-kit-object-v1]\n")
+            f.write("label: ");
+            f.write(tobj['CKA_LABEL']);
+            f.write("\n")
+            f.write("class: certificate\n")
+            f.write("certificate-type: x-509\n")
+            f.write("modifiable: false\n");
+            f.write("issuer: \"");
+            f.write(urllib.parse.quote(tobj['CKA_ISSUER']));
+            f.write("\"\n")
+            f.write("serial-number: \"");
+            f.write(urllib.parse.quote(tobj['CKA_SERIAL_NUMBER']));
+            f.write("\"\n")
+            if (tobj['CKA_TRUST_SERVER_AUTH'] == 'CKT_NSS_NOT_TRUSTED') or (tobj['CKA_TRUST_EMAIL_PROTECTION'] == 'CKT_NSS_NOT_TRUSTED') or (tobj['CKA_TRUST_CODE_SIGNING'] == 'CKT_NSS_NOT_TRUSTED'):
+              f.write("x-distrusted: true\n")
+            f.write("\n\n")
+        f.close()
+        print(" -> written as '%s', trust = %s, openssl-trust = %s, distrust = %s, openssl-distrust = %s" % (fname, trustbits, openssl_trustflags, distrustbits, openssl_distrustflags))
+
+
+--- ca-certificates-2026.2.90_v9.0.317-1.src/nssckbi.h ---
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#ifndef NSSCKBI_H
+#define NSSCKBI_H
+
+/*
+ * NSS BUILTINS Version numbers.
+ *
+ * These are the version numbers for the builtins module packaged with
+ * this release on NSS. To determine the version numbers of the builtin
+ * module you are using, use the appropriate PKCS #11 calls.
+ *
+ * These version numbers detail changes to the PKCS #11 interface. They map
+ * to the PKCS #11 spec versions.
+ */
+#define NSS_BUILTINS_CRYPTOKI_VERSION_MAJOR 2
+#define NSS_BUILTINS_CRYPTOKI_VERSION_MINOR 20
+
+/* These version numbers detail the changes
+ * to the list of trusted certificates.
+ *
+ * The NSS_BUILTINS_LIBRARY_VERSION_MINOR macro needs to be bumped
+ * whenever we change the list of trusted certificates.
+ *
+ * Please use the following rules when increasing the version number:
+ *
+ * - starting with version 2.14, NSS_BUILTINS_LIBRARY_VERSION_MINOR
+ *   must always be an EVEN number (e.g. 16, 18, 20 etc.)
+ *
+ * - whenever possible, if older branches require a modification to the
+ *   list, these changes should be made on the main line of development (trunk),
+ *   and the older branches should update to the most recent list.
+ *
+ * - ODD minor version numbers are reserved to indicate a snapshot that has
+ *   deviated from the main line of development, e.g. if it was necessary
+ *   to modify the list on a stable branch.
+ *   Once the version has been changed to an odd number (e.g. 2.13) on a branch,
+ *   it should remain unchanged on that branch, even if further changes are
+ *   made on that branch.
+ *
+ * NSS_BUILTINS_LIBRARY_VERSION_MINOR is a CK_BYTE.  It's not clear
+ * whether we may use its full range (0-255) or only 0-99 because
+ * of the comment in the CK_VERSION type definition.
+ * It's recommend to switch back to 0 after having reached version 98/99.
+ */
+#define NSS_BUILTINS_LIBRARY_VERSION_MAJOR 2
+#define NSS_BUILTINS_LIBRARY_VERSION_MINOR 90
+#define NSS_BUILTINS_LIBRARY_VERSION "2.90"
+
+/* These version numbers detail the semantic changes to the ckfw engine. */
+#define NSS_BUILTINS_HARDWARE_VERSION_MAJOR 1
+#define NSS_BUILTINS_HARDWARE_VERSION_MINOR 0
+
+/* These version numbers detail the semantic changes to ckbi itself
+ * (new PKCS #11 objects), etc. */
+#define NSS_BUILTINS_FIRMWARE_VERSION_MAJOR 1
+#define NSS_BUILTINS_FIRMWARE_VERSION_MINOR 0
+
+#endif /* NSSCKBI_H */
+
+
+--- ca-certificates-2026.2.90_v9.0.317-1.src/update-ca-trust.8.txt ---
+////
+Copyright (C) 2013 Red Hat, Inc.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+////
+
+
+update-ca-trust(8)
+==================
+:doctype: manpage
+:man source: update-ca-trust
+
+
+NAME
+----
+update-ca-trust - manage consolidated and dynamic configuration of CA 
+certificates and associated trust
+
+
+SYNOPSIS
+--------
+*update-ca-trust* [extract] [-o 'DIR'|--output='DIR']
+
+
+DESCRIPTION
+-----------
+update-ca-trust(8) is used to manage a consolidated and dynamic configuration 
+feature of Certificate Authority (CA) certificates and associated trust.
+
+The feature is available for new applications that read the
+consolidated configuration files found in the /etc/pki/ca-trust/extracted directory
+or that load the PKCS#11 module p11-kit-trust.so
+
+Parts of the new feature are also provided in a way to make it useful
+for legacy applications.
+
+Many legacy applications expect CA certificates and trust configuration
+in a fixed location, contained in files with particular path and name,
+or by referring to a classic PKCS#11 trust module provided by the 
+NSS cryptographic library.
+
+The dynamic configuration feature provides functionally compatible replacements 
+for classic configuration files and for the classic NSS trust module named libnssckbi.
+
+In order to enable legacy applications, that read the classic files or 
+access the classic module, to make use of the new consolidated and dynamic configuration 
+feature, the classic filenames have been changed to symbolic links.
+The symbolic links refer to dynamically created and consolidated 
+output stored below the /etc/pki/ca-trust/extracted directory hierarchy.
+
+The output is produced using the 'update-ca-trust' command (without parameters),
+or using the 'update-ca-trust extract' command.
+In order to produce the output, a flexible set of source configuration
+is read, as described in section <<sourceconf,SOURCE CONFIGURATION>>.
+
+In addition, the classic PKCS#11 module 
+is replaced with a new PKCS#11 module (p11-kit-trust.so) that dynamically 
+reads the same source configuration.
+
+
+[[sourceconf]]
+SOURCE CONFIGURATION
+--------------------
+The dynamic configuration feature uses several source directories that
+will be scanned for any number of source files. *It is important to select 
+the correct subdirectory for adding files, as the subdirectory defines how 
+contained certificates will be trusted or distrusted, and which file formats are read.*
+
+Files in *subdirectories below the directory hierarchy /usr/share/pki/ca-trust-source/* contain CA certificates and 
+trust settings in the PEM file format. The trust settings found here will be
+interpreted with a *low priority*.
+
+Files in *subdirectories below the directory hierarchy /etc/pki/ca-trust/source/* contain CA certificates and 
+trust settings in the PEM file format. The trust settings found here will be
+interpreted with a *high priority*.
+
+.You may use the following rules of thumb to decide, whether your configuration files should be added to the /etc or rather to the /usr directory hierarchy:
+* If you are manually adding a configuration file to a system, you probably 
+want it to override any other default configuration, and you most likely should
+add it to the respective subdirectory in the /etc hierarchy.
+* If you are creating a package that provides additional root CA certificates,
+that is intended for distribution to several computer systems, but you still
+want to allow the administrator to override your list, then your package should 
+add your files to the respective subdirectory in the /usr hierarchy.
+* If you are creating a package that is supposed to override the default system
+trust settings, that is intended for distribution to several computer systems, then your package should install the files to the respective
+subdirectory in the /etc hierarchy.
+
+.*QUICK HELP 1*: To add a certificate in the simple PEM or DER file formats to the list of CAs trusted on the system:
+* add it as a new file to directory /etc/pki/ca-trust/source/anchors/
+* run 'update-ca-trust extract'
+
+.*QUICK HELP 2*: If your certificate is in the extended BEGIN TRUSTED file format (which may contain distrust/blocklist trust flags, or trust flags for usages other than TLS) then:
+* add it as a new file to directory /etc/pki/ca-trust/source/
+* run 'update-ca-trust extract'
+
+.In order to offer simplicity and flexibility, the way certificate files are treated depends on the subdirectory they are installed to.
+* simple trust anchors subdirectory: /usr/share/pki/ca-trust-source/anchors/ or /etc/pki/ca-trust/source/anchors/
+* simple blocklist (distrust) subdirectory: /usr/share/pki/ca-trust-source/blocklist/ or /etc/pki/ca-trust/source/blocklist/
+* extended format directory: /usr/share/pki/ca-trust-source/ or /etc/pki/ca-trust/source/
+
+.In the main directories /usr/share/pki/ca-trust-source/ or /etc/pki/ca-trust/source/ you may install one or multiple files in the following file formats:
+* certificate files that include trust flags,
+  in the BEGIN/END TRUSTED CERTIFICATE file format
+  (any file name), which have been created using the openssl x509 tool
+  and the -addreject -addtrust options.
+  Bundle files with multiple certificates are supported.
+* files in the p11-kit file format using the .p11-kit file name
+  extension, which can (e.g.) be used to distrust certificates
+  based on serial number and issuer name, without having the
+  full certificate available.
+  (This is currently an undocumented format, to be extended later.
+   For examples of the supported formats, see the files
+   shipped with the ca-certificates package.)
+* certificate files without trust flags in either the DER file format or in
+  the PEM (BEGIN/END CERTIFICATE) file format (any file name). Such files 
+  will be distrusted.
+  (If you want a CA certificate in these file formats to be trusted, you 
+   should remove it from this directory and move it to the 
+   ./anchors subdirectory instead.)
+
+In the anchors subdirectories /usr/share/pki/ca-trust-source/anchors/ or /etc/pki/ca-trust/source/anchors/
+you may install one or multiple certificates in either the DER file
+format or in the PEM (BEGIN/END CERTIFICATE) file format.
+Each certificate will be treated as *trusted* for all purposes.
+
+In the blocklist subdirectories /usr/share/pki/ca-trust-source/blocklist/ or /etc/pki/ca-trust/source/blocklist/
+you may install one or multiple certificates in either the DER file
+format or in the PEM (BEGIN/END CERTIFICATE) file format.
+Each certificate will be treated as *distrusted* for all purposes.
+
+Please refer to the x509(1) manual page for the documentation of the 
+BEGIN/END CERTIFICATE and BEGIN/END TRUSTED CERTIFICATE file formats.
+
+Applications that rely on a static file for a list of trusted CAs
+may load one of the files found in the /etc/pki/ca-trust/extracted
+directory. After modifying any file in the
+/usr/share/pki/ca-trust-source/ or /etc/pki/ca-trust/source/
+directories or in any of their subdirectories, or after adding a file, 
+it is necessary to run the 'update-ca-trust extract' command,
+in order to update the consolidated files in /etc/pki/ca-trust/extracted/ .
+
+Applications that load the classic PKCS#11 module using filename libnssckbi.so 
+(which has been converted into a symbolic link pointing to the new module)
+and any application capable of 
+loading PKCS#11 modules and loading p11-kit-trust.so, will benefit from
+the dynamically merged set of certificates and trust information stored in the
+/usr/share/pki/ca-trust-source/ and /etc/pki/ca-trust/source/ directories.
+
+
+[[extractconf]]
+EXTRACTED CONFIGURATION
+-----------------------
+The directory /etc/pki/ca-trust/extracted/ contains generated CA certificate 
+bundle files which are created and updated, based on the <<sourceconf,SOURCE CONFIGURATION>> 
+by running the 'update-ca-trust extract' command.
+
+If your application isn't able to load the PKCS#11 module p11-kit-trust.so,
+then you can use these files in your application to load a list of global
+root CA certificates.
+
+Please never manually edit the files stored in this directory,
+because your changes will be lost and the files automatically overwritten,
+each time the 'update-ca-trust extract' command gets executed.
+
+In order to install new trusted or distrusted certificates,
+please rather install them in the respective subdirectory below the
+/usr/share/pki/ca-trust-source/ or /etc/pki/ca-trust/source/
+directories, as described in the <<sourceconf,SOURCE CONFIGURATION>> section.
+
+The directory /etc/pki/ca-trust/extracted/java/ contains 
+a CA certificate bundle in the java keystore file format.
+Distrust information cannot be represented in this file format,
+and distrusted certificates are missing from these files.
+File cacerts contains CA certificates trusted for TLS server authentication.
+
+The directory /etc/pki/ca-trust/extracted/openssl/ contains 
+CA certificate bundle files in the extended BEGIN/END TRUSTED CERTIFICATE file format, 
+as described in the x509(1) manual page.
+File ca-bundle.trust.crt contains the full set of all trusted
+or distrusted certificates, including the associated trust flags.
+
+The directory /etc/pki/ca-trust/extracted/pem/ contains 
+CA certificate bundle files in the simple BEGIN/END CERTIFICATE file format, 
+as described in the x509(1) manual page.
+Distrust information cannot be represented in this file format,
+and distrusted certificates are missing from these files.
+File tls-ca-bundle.pem contains CA certificates 
+trusted for TLS server authentication.
+File email-ca-bundle.pem contains CA certificates 
+trusted for E-Mail protection.
+File objsign-ca-bundle.pem contains CA certificates 
+trusted for code signing.
+
+The directory /etc/pki/ca-trust/extracted/edk2/ contains a CA
+certificate bundle ("cacerts.bin") in the "sequence of
+EFI_SIGNATURE_LISTs" format, defined in the UEFI-2.7 specification,
+sections "31.4.1 Signature Database" and
+"EFI_CERT_X509_GUID". Distrust information cannot be represented in
+this file format, and distrusted certificates are missing from these
+files. File "cacerts.bin" contains CA certificates trusted for TLS
+server authentication.
+
+
+COMMANDS
+--------
+(absent/empty command)
+~~~~~~~~~~~~~~~~~~~~~~
+Same as the *extract* command described below. (However, the command may print
+fewer warnings, as this command is being run during rpm package installation,
+where non-fatal status output is undesired.)
+
+extract
+~~~~~~~
+Instruct update-ca-trust to scan the <<sourceconf,SOURCE CONFIGURATION>> and
+produce updated versions of the consolidated configuration files stored below
+the /etc/pki/ca-trust/extracted directory hierarchy.
+
+EXTRACT OPTIONS
+^^^^^^^^^^^^^^^
+*-o DIR*, *--output=DIR*::
+	Write the extracted trust store into the given directory instead of
+	updating /etc/pki/ca-trust/extracted. (Note: This option will not
+	populate the ../pki/tls/certs with the directory-hash symbolic links.)
+
+FILES
+-----
+/etc/pki/java/cacerts::
+	Classic filename, file contains a list of CA certificates trusted for TLS server authentication usage, in the Java keystore file format, without distrust information.
+	This file is a symbolic link that refers to the consolidated output created by the update-ca-trust command.
+
+/usr/share/pki/ca-trust-source::
+	Contains multiple, low priority source configuration files as explained in section <<sourceconf,SOURCE CONFIGURATION>>. Please pay attention to the specific meanings of the respective subdirectories.
+
+/etc/pki/ca-trust/source::
+	Contains multiple, high priority source configuration files as explained in section <<sourceconf,SOURCE CONFIGURATION>>. Please pay attention to the specific meanings of the respective subdirectories.
+
+/etc/pki/ca-trust/extracted::
+	Contains consolidated and automatically generated configuration files for consumption by applications, 
+	which are created using the 'update-ca-trust extract' command. Don't edit files in this directory, because they will be overwritten.
+	See section <<extractconf,EXTRACTED CONFIGURATION>> for additional details.
+
+/etc/pki/tls/certs::
+	Contains symbolic links to the directory-hash format certificates generated by update-ca-trust command, they are inteded as a internal format for OpenSSL and not to be used directly by the other crypto libraries or applications.
+
+LEGACY FILES
+------------
+The following file paths were used in legacy versions of the utility
+and have since been replaced. Scripts and configurations referencing
+these old paths should be updated.
+
+/etc/pki/cert.pem::
+    This file has been replaced by /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem.
+
+/etc/pki/tls/certs/ca-certificates.crt::
+    This file has been replaced by /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem.
+
+/etc/pki/tls/certs/ca-bundle.crt::
+    This file has been replaced by /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem.
+
+/etc/pki/tls/certs/ca-bundle.trust.crt::
+    This has been replaced by the directory-hash format certificates stored in /etc/pki/ca-trust/extracted/pem/directory-hash/ directory.
+
+AUTHOR
+------
+Written by Kai Engert and Stef Walter.

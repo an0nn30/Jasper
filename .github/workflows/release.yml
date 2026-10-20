@@ -103,7 +103,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          .\gradlew.bat :jasper-app:packageDist :jasper-app:packageInstaller "-PjasperVersion=$env:JASPER_VERSION" -x :jasper-app:testLauncherCore -x :jasper-app:testLauncherWatch -x :jasper-app:testWatcher --stacktrace
+          .\gradlew.bat :jasper-app:verifyCygwinDistribution :jasper-app:cygwinSourcesZip :jasper-app:packageDist :jasper-app:packageInstaller "-PjasperVersion=$env:JASPER_VERSION" -x :jasper-app:testLauncherCore -x :jasper-app:testLauncherWatch -x :jasper-app:testWatcher --stacktrace
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       # macOS packageDist trains the AOT cache on this hosted runner.
       - name: Build Linux packages or macOS DMG
@@ -163,6 +163,8 @@ jobs:
           expected = {f'Jasper-{version}-macos-aarch64.dmg'}
           for arch in ('x64', 'aarch64'):
               expected.update((f'Jasper-{version}-windows-{arch}.zip', f'Jasper-{version}-windows-{arch}-setup.exe'))
+              java_arch = 'amd64' if arch == 'x64' else 'aarch64'
+              expected.add(f'Jasper-{version}-cygwin-sources-{java_arch}.zip')
           for arch in ('amd64', 'arm64'):
               expected.add(f'Jasper-{version}-linux-{arch}.deb')
           for arch in ('x86_64', 'aarch64'):

@@ -4,7 +4,8 @@ Status: approved by the user on 2026-10-20. The [implementation plan](../plans/2
 is approved for execution. The user authorized production POSIX PTY relay integration on
 2026-10-20 after the relay resolved repeated-resize input loss. Production launch probes
 pass on native ARM64 and x64 emulation. Native x64 Windows and interactive-app acceptance
-remain outstanding release checks; seed/source inventory and installer acceptance are in progress.
+remain outstanding release checks. Seed/source inventory and disconnected ARM64 MSI/Gradle
+installer acceptance are complete; see the [verification record](../plans/2026-10-20-jasper-cygwin-verification.md).
 
 ## 1. Outcome and scope
 

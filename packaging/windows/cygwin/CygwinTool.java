@@ -18,6 +18,10 @@ public final class CygwinTool {
                 if (!options.containsKey("--seed")) throw new IllegalArgumentException("Missing --seed");
                 var result = new CygwinProvisioner().ensure(layout, Path.of(options.get("--seed")));
                 System.out.println(result.diagnostic());
+                try {
+                    layout.requireOwned();
+                    CygwinLayout.write(layout.logs().resolve("provision-result.json"), Map.of("outcome", result.outcome().name(), "diagnostic", result.diagnostic()));
+                } catch (Exception loggingFailure) { System.err.println("Could not persist provisioning result: " + loggingFailure); }
                 if (!result.success()) System.exit(result.outcome() == CygwinProvisioner.Outcome.RESTART_REQUIRED ? 2 : 1);
             }
             case "manage" -> {

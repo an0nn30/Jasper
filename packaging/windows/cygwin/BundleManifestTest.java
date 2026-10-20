@@ -36,6 +36,34 @@ public final class BundleManifestTest {
             BundleTool.main(new String[]{"stage", lock.toString(), root.toString(), staged.toString()});
             if (Files.exists(staged.resolve("obsolete-package.tar.xz"))) throw new AssertionError("Unlisted staged artifact retained");
             checks++;
+            Path evidence = root.resolve("validation.json"), helper = root.resolve("helper.jar");
+            Files.writeString(evidence, "{\"seed\":\"" + BundleManifest.digest(lock) + "\",\"aarch64\":false}");
+            try (var jar = new java.util.jar.JarOutputStream(Files.newOutputStream(helper))) {
+                jar.putNextEntry(new java.util.jar.JarEntry("CygwinTool.class")); jar.write(1); jar.closeEntry();
+            }
+            try { BundleTool.releaseEvidence(lock, helper, evidence, "aarch64"); throw new AssertionError("Unvalidated architecture accepted"); }
+            catch (java.io.IOException expected) { checks++; }
+            Files.writeString(evidence, Files.readString(evidence).replace("false", "true"));
+            try { BundleTool.releaseEvidence(lock, helper, evidence, "aarch64"); throw new AssertionError("Missing interactive acceptance allowed"); }
+            catch (java.io.IOException expected) { checks++; }
+            Files.writeString(evidence, Files.readString(evidence).replace("}", ",\"interactiveApps\":{\"aarch64\":true}}"));
+            BundleTool.releaseEvidence(lock, helper, evidence, "aarch64"); checks++;
+            Files.writeString(evidence, Files.readString(evidence).replace(BundleManifest.digest(lock), "wrong-seed"));
+            try { BundleTool.releaseEvidence(lock, helper, evidence, "aarch64"); throw new AssertionError("Stale release evidence accepted"); }
+            catch (java.io.IOException expected) { checks++; }
+            Path fetched = root.resolve("fetched");
+            BundleTool.acquire(BundleManifest.read(lock), root, fetched, (origin, destination) -> { throw new AssertionError("Local artifact downloaded"); });
+            BundleManifest.read(lock).verify(fetched); checks++;
+            Files.writeString(fetched.resolve("archive"), "corrupt cache");
+            try { BundleTool.acquire(BundleManifest.read(lock), root, fetched, (origin, destination) -> { throw new AssertionError("Corruption silently downloaded"); }); throw new AssertionError("Corrupt cache accepted"); }
+            catch (java.io.IOException expected) { checks++; }
+            Files.delete(fetched.resolve("archive"));
+            Path noLocal = Files.createDirectory(root.resolve("no-local"));
+            BundleTool.acquire(BundleManifest.read(lock), noLocal, fetched, (origin, destination) -> Files.writeString(destination, "verified bytes"));
+            BundleManifest.read(lock).verify(fetched); checks++;
+            Files.delete(fetched.resolve("archive"));
+            try { BundleTool.acquire(BundleManifest.read(lock), noLocal, fetched, (origin, destination) -> Files.writeString(destination, "wrong download")); throw new AssertionError("Wrong download accepted"); }
+            catch (java.io.IOException expected) { if (Files.exists(fetched.resolve("archive"))) throw new AssertionError("Unverified bytes published"); checks++; }
             Files.writeString(lock, fixture); Files.writeString(root.resolve("archive"), "verified byteX");
             try { BundleManifest.read(lock).verify(root); throw new AssertionError("Changed bytes accepted"); }
             catch (java.io.IOException expected) { checks++; }
