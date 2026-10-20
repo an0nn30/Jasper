@@ -1,8 +1,8 @@
 id = "dev.jasper.fileserver"
 name = "File Server"
-version = "0.5.0"
+version = "0.6.0"
 entry = "dev.jasper.fileserver.FileServerPlugin"
-sdk = ">=0.18.0, <0.19"
+sdk = ">=0.18.2, <0.19"
 description = "Share a local folder with other computers over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP: named servers in a File Servers panel, read-only and local-only by default, with an activity log, Vault logins and Serve Current Folder."
 vendor = "Jasper"
 icon_hue = "blue"
@@ -10,4 +10,4 @@ icon_selected_ink = "foreground"
 icon = "icons/fileserver.svg"
 homepage = "https://github.com/an0nn30/Jasper"
 capabilities = ["network.listen", "terminal.observe", "palette.contribute", "clipboard.read"]
-requires = [{ id = "dev.jasper.vault", version = ">=0.2", optional = true }, { id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]
+requires = [{ id = "dev.jasper.vault", version = ">=0.2", optional = true }]

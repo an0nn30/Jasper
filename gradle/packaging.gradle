@@ -343,6 +343,85 @@ def packageApp = tasks.register('packageApp') {
     }
 }
 
+// A separate staging tree deliberately excludes the locally compiled launcher, CLI and platform bridges.
+def userInput = packagingRoot.map { it.dir('windows-user/input') }
+def userImage = packagingRoot.map { it.dir('windows-user/image') }
+def stageWindowsUser = tasks.register('stageWindowsUser', Sync) {
+    from(jarTask.flatMap { it.archiveFile })
+    from(configurations.runtimeClasspath)
+    from(tasks.named('stagePlugins')) { into('plugins') }
+    from(rootProject.file('config.example.toml'))
+    into(userInput)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+def packageWindowsUser = tasks.register('packageWindowsUser') {
+    group = 'distribution'
+    description = 'Builds a Windows app image with the standard JBR launcher; no native compiler or installer.'
+    dependsOn(stageWindowsUser)
+    // Always rebuild: this image is a local installation input, not a release artifact.
+    doLast {
+        if (normalizedHost().os != 'windows') throw new GradleException('Windows user installation requires Windows.')
+        def context = nativeContext()
+        File destination = userImage.get().asFile
+        delete(destination)
+        destination.mkdirs()
+        List<String> args = [context.jpackage.absolutePath, '--type', 'app-image',
+            '--name', 'Jasper', '--app-version', context.version, '--vendor', 'Jasper',
+            '--input', userInput.get().asFile.absolutePath, '--dest', destination.absolutePath,
+            '--main-jar', jarTask.get().archiveFile.get().asFile.name, '--main-class', app.mainClass.get(),
+            '--icon', nativeIcon.get().absolutePath,
+            '--add-modules', runtimeRootModules('windows').join(','), '--jlink-options', jlinkOptions]
+        app.applicationDefaultJvmArgs.each { args.addAll(['--java-options', it.toString()]) }
+        bundledNativeJvmOptions('windows').each { args.addAll(['--java-options', it]) }
+        executeNative(args, 'jpackage Windows user app-image')
+        File image = new File(destination, 'Jasper')
+        removePluginClasspath(new File(image, 'app/Jasper.cfg'))
+        installBundledNatives(new File(image, 'app'), context.host)
+    }
+}
+def userInstallerLibraries = configurations.create('windowsUserInstallerLibraries')
+dependencies.add(userInstallerLibraries.name, 'net.java.dev.jna:jna-platform:5.14.0')
+def userInstallerClasses = layout.buildDirectory.dir('windows-user-installer/classes')
+def compileUserInstaller = tasks.register('compileWindowsUserInstaller', JavaCompile) {
+    source(rootProject.fileTree('packaging/windows/user-install') { include('*.java') })
+    classpath = userInstallerLibraries
+    destinationDirectory = userInstallerClasses
+    javaCompiler = toolchains.compilerFor(java.toolchain)
+}
+def testUserInstaller = tasks.register('verifyWindowsUserInstall', JavaExec) {
+    group = 'verification'
+    description = 'Tests the Java user installer; also exercises Windows shell APIs on Windows.'
+    dependsOn(compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstallTest'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+}
+tasks.named('check') { dependsOn(testUserInstaller) }
+tasks.register('installWindowsUser', JavaExec) {
+    group = 'distribution'
+    description = 'Installs Jasper in APPDATA with a Start Menu shortcut, without MSVC or administrator rights.'
+    dependsOn(packageWindowsUser, compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstall'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+    args('install', new File(userImage.get().asFile, 'Jasper').absolutePath)
+}
+tasks.register('uninstallWindowsUser', JavaExec) {
+    group = 'distribution'
+    description = 'Removes the Windows user installation and its shortcut, preserving Jasper user data.'
+    dependsOn(compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstall'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+    args('uninstall')
+    doFirst {
+        if (normalizedHost().os != 'windows') throw new GradleException('Windows user uninstallation requires Windows.')
+    }
+}
+
 def verifyPackage = tasks.register('verifyPackage') {
     group = 'verification'
     description = 'Verifies the generated native image and bundled runtime without launching Jasper.'

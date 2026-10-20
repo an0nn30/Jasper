@@ -71,7 +71,8 @@ It cannot change:
    changed theme that is on show is applied again at once.
 6. **Fix problems.** A file that does not load is skipped: the status bar's configuration cell reads
    **Config warnings**, and clicking it lists the problem as `<file>: warning: <message>` (with `:<line>:1` after the
-   file for a JSON syntax error). A pick of the skipped theme falls back to Slate Cobalt with a warning on the setting.
+   file for a JSON syntax error). A pick of the skipped theme falls back to Slate Cobalt in Dark or Jasper Meadow
+   Light in Light, with a warning on the setting.
    [Validation and error messages](#validation-and-error-messages) explains every message.
 
 ## The file format
@@ -129,8 +130,9 @@ No other top-level key is allowed.
   without a trailing dash. "Gruvbox Dark" is `gruvbox-dark`; "Frappé Night" is `frappe-night`. A name that leaves
   nothing cannot be imported.
 - **Reserved ids.** The built-in ids `slate-cobalt`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`,
-  `catppuccin-mocha` and `ubuntu-yaru`, and every theme id a discovered plugin declares, enabled or not (the bundled
-  Enterprise plugin declares `enterprise`). A themes-folder file with a reserved id is ignored, and Import refuses one.
+  `catppuccin-mocha`, `ubuntu-yaru` and `jasper-meadow`, and every theme id a discovered plugin declares, enabled or
+  not (the bundled Enterprise plugin declares `enterprise`). A themes-folder file with a reserved id is ignored, and
+  Import refuses one.
 - **Names.** Names need not be unique. When two installed themes have the same name, ignoring case, Settings shows
   each as `Name (id)`; two schemes with the same name show as `Name (theme/key)`.
 - **Scheme keys.** Lowercase letters and digits in words joined by dashes, at most 32 characters: `dark`, `light`,
@@ -183,8 +185,8 @@ are ignored. The seven surfaces take no style, and a trailing comma is an error.
 
 Each UI variant lists all 60 roles of the eight tables below, and may add the 2 [title bar roles](#title-bar-roles)
 and the 9 overridable [derived roles](#derived-roles). Eight more roles always follow another role and must not be
-listed ([Roles you do not list](#roles-you-do-not-list)). The Slate Cobalt columns are the default theme's values, as a
-guide to how the roles relate.
+listed ([Roles you do not list](#roles-you-do-not-list)). The Slate Cobalt columns are the values of Slate Cobalt, the
+default Dark theme, as a guide to how the roles relate.
 
 Plugins see the same roles through the SDK ([`SemanticColor`](sdk-reference.html#dev.jasper.sdk.ui.SemanticColor),
 read with [`Appearance.color`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.color(SemanticColor))), so a theme
@@ -298,7 +300,9 @@ on `surface.panel`, `surface.sidebar` and `surface.card`.
 ### Title bar roles
 
 Two optional roles give the window's header row (the title, the command field and the toolbar buttons) colours of
-its own, such as a dark title bar on a light theme. Slate Cobalt leaves both out; Ubuntu Yaru sets both.
+its own, such as a dark title bar on a light theme. Slate Cobalt leaves both out; Ubuntu Yaru sets both. Under the
+Enterprise look the terminal window's header row and, on macOS and Windows, IntelliJ Classic's title bar above it
+take `surface.app` instead.
 
 | Role | Paints | Left out, it is |
 |---|---|---|
@@ -780,8 +784,9 @@ themes = ["themes/harbour.json"]
 - **Reserved ids.** Every theme id a discovered plugin declares is reserved, whether the plugin is on or not: no
   themes-folder file or import can take it.
 - **While the plugin does not load** (off, waiting for review, or skipped in safe mode, which loads no installed
-  plugin and no look), a setting that names one of its themes shows Slate Cobalt and one that names one of its schemes
-  uses `match`, without a warning, and the setting keeps its value for when the plugin is back.
+  plugin and no look), a setting that names one of its themes shows Slate Cobalt in Dark or Jasper Meadow Light in
+  Light, and one that names one of its schemes uses `match`, without a warning, and the setting keeps its value for
+  when the plugin is back.
 - **Two plugins, one id.** A `--plugin-dir` plugin wins over a bundled one, which wins over an installed one; then the
   lowest plugin id. The others' files are ignored with a message.
 - A look's kit file may make one of its own plugin's themes the default for either appearance (Enterprise makes

@@ -37,7 +37,8 @@ public final class SettingSpec<T> {
      * @param key the dotted key in the settings file, such as {@code sftp.max_parallel_files}; each part is letters,
      *            digits, {@code _} and {@code -}, and each dot but the last names a table
      * @param kind how values are checked
-     * @param defaultValue the value when the file does not set one; the kind must allow it
+     * @param defaultValue the value when the file does not set one, unless the active look's kit file gives the key a
+     *            default the kind accepts; the kind must allow it
      * @param <T> the value type
      * @return the declaration
      */
@@ -130,7 +131,8 @@ public final class SettingSpec<T> {
     public SettingKind<T> kind() { return kind; }
 
     /**
-     * The value when the file does not set one.
+     * The declared default: the value when the file does not set one, unless the active look's kit file gives the key a
+     * default the kind accepts.
      *
      * @return the default
      */

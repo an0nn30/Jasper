@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.18.1, task by task.
+describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.18.2, task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.
@@ -116,7 +116,7 @@ notifications, naming the folder and the problem, for example `Unknown key: colo
 folder, a plugin's folder must be named after its id ("directory *x* holds plugin *y*; rename it to the plugin id").
 
 A plugin whose `sdk` range excludes this Jasper's SDK is skipped and reported as "*name* was not started": "needs SDK
-*range*; this is SDK 0.18.1".
+*range*; this is SDK 0.18.2".
 
 ### requires
 
@@ -160,7 +160,7 @@ at the next start. Its `start`:
     context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("dev.jasper.sample:flask", "M 6 2 H 10 M 6.67 6 H 9.33 M 6.67 2 V 6 L 4 13.33 Q 3.8 14 4.33 14 H 11.67 Q 12.2 14 12 13.33 L 9.33 6 V 2"));
     context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
     context.events().subscribe(AppEvents.THEME_CHANGED,
-        event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
+        event -> context.log().log(System.Logger.Level.INFO, "The theme is now " + event.variant()));
     var settings = new SampleSettings(context.settings());
     context.settings().page(new SampleSettingsPanel(context.kit(), settings));
     long stepMillis = settings.stepMillis.get();
@@ -207,7 +207,7 @@ has its own, so every registration is attributed to it.
 | `panels()` | [Tool windows](#tool-windows). |
 | `windows()` | [Windows, dialogs, overlays and popovers](#windows-dialogs-overlays-and-popovers), [content tabs](#content-tabs) and file pickers. |
 | `kit()` | The factory for every view a plugin shows ([Building plugin UI](plugin-ui.md)). |
-| `appearance()` | Theme colours for [custom content](plugin-ui.md#custom-content). |
+| `appearance()` | Theme colours for [custom content](plugin-ui.md#custom-content), and [the look Jasper runs with](#adapting-to-the-look). |
 | `terminals()` | [Terminal windows, tabs and panes](#terminals), [provided sessions](#providing-a-session) and [shell variables](#shell-variables-and-program-tabs). |
 | `palette()` | [Command palette scopes](#palette-scopes). |
 | `fileSources()` | [Places in Jasper's file chooser](#file-sources). |
@@ -373,7 +373,7 @@ Help, with the Pane and Tab items and the tool window toggles in Window.
 
 ### The rail
 
-`rail().add(actionId)` puts a button for one of the plugin's actions on the left stripe, after the tool window icons.
+`rail().add(actionId)` puts a button for one of the plugin's actions on the left stripe, after the tool window buttons.
 Its tooltip is the action's title; give the action an icon, or the button shows a generic one. The Enterprise look's
 labelled stripes show the title.
 
@@ -391,8 +391,8 @@ A tool window is a view of the plugin's docked in every terminal window, as in I
 instance per window, on the UI thread, the first time the tool window is shown there; the factory returns a view made
 with the plugin's kit, and one that throws shows "This panel could not be loaded." Jasper adds:
 
-- a stripe icon, and a header with the title, an **Options** menu (**Move to** one of six places, **Hide**) and a
-  **Hide** button;
+- a stripe button, the spec's icon (under the Enterprise look a label that starts with the icon and reads the title),
+  and a header with the title, an **Options** menu (**Move to** one of six places, **Hide**) and a **Hide** button;
 - the action `<panel id>.toggle`, "Toggle *title*", with no default shortcut, listed in View › Tool Windows (the Window
   menu under the Enterprise look) and the palette. To give the toggle a shortcut, register an action of your own that
   calls `context.panels().toggle(id, invoked.window())`, register it before the tool window, and name it with
@@ -404,21 +404,23 @@ Do not add a View menu item that toggles the tool window, and do not repeat its 
 The left and right sides each have an upper and a lower half; the bottom area, the window's full width under the
 sides, has a left and a right half. [`Anchor`](sdk-reference.html#dev.jasper.sdk.ui.Anchor) picks the side and
 `PanelSpec.withSplit()` its second half: Remote's SFTP starts under Sessions. One tool window shows per place. The user
-can drag a tool window by its stripe icon or header to another place, or use Move to; Jasper remembers its place, its
+can drag a tool window by its stripe button or header to another place, or use Move to; Jasper remembers its place, its
 order on the stripe and the side's size, per look ([workspace](workspace.md)).
 
-Under the Enterprise look a press anywhere in a tool window, or opening it from its stripe or with `<panel id>.toggle`,
-makes it the active tool window: its header strip shows the focus, and the keyboard moves to its first enabled control
-that takes keys, a button only when there is no other, else to the tool window itself. A toggle action of your own
-that calls `context.panels().toggle` opens the tool window without activating it, so the keyboard does not move
-into it.
+Under the Enterprise look a press anywhere in a tool window, opening it from its stripe, or its toggle action
+(`<panel id>.toggle`, or the action named with `withToggleActionId` when its handler calls `context.panels().toggle` or
+`PanelHost.show()` for it) makes it the active tool window: its header strip shows the focus, and the keyboard moves to
+its first enabled control that takes keys, a button only when there is no other, else to the tool window itself. A
+toggle action run while its tool window shows but is not the active one activates it instead of hiding it. A toggle or
+show made anywhere else, or later than the handler's own run, opens the tool window without activating it, so the
+keyboard does not move into it.
 
 <!-- example:pluginpanels -->
 ```java
 private static void installPanelAndWindow(PluginContext context, long stepMillis) {
     // One instance per window, built the first time the panel is shown there. Its body is the kit's empty state:
     // a tile, a title, one sentence and one secondary action, centered in the panel.
-    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
+    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host ->
         context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
             new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
             Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
@@ -473,6 +475,8 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
   do not add a second action row inside the tool window.
 - `context.panels().toggle(id, window)` opens or hides one of the plugin's tool windows in a terminal window, creating
   the instance the first time.
+- `panelAnchor(context)` picks the Sample's starting side from the look Jasper runs with
+  ([adapting to the look](#adapting-to-the-look)).
 
 ## Windows, dialogs, overlays and popovers
 
@@ -485,8 +489,8 @@ dialogs, overlays and popovers when the plugin stops.
 [`PluginWindow`](sdk-reference.html#dev.jasper.sdk.ui.PluginWindow), shown by `show()`. Jasper owns its icon, title
 bar, menu bar (File › New Window and Close Window, and Quit on Linux and Windows), theme tracking and bounds,
 remembered under its id; `WindowSpec.SizeBasis.CONTENT` makes the size the body's instead of the frame's. Under the
-Enterprise look the window has no menu row; Cmd+W (Ctrl+W on Linux and Windows) still runs Close Window. A singleton
-id returns the window already open. Jasper keeps running while a plugin window is open, even with no terminal window.
+Enterprise look the File menu stays in the screen menu bar on macOS; on Linux and Windows the window has no menu row,
+and Ctrl+W still runs Close Window. A singleton id returns the window already open. Jasper keeps running while a plugin window is open, even with no terminal window.
 
 - `setContent(view)` mounts a kit view, closing the one it replaces. `setTitleActions(Optional.of(view))` puts an
   INLINE `Stack` of `Button`s and `MenuButton`s at the trailing end of the title bar, or in a toolbar under the system
@@ -1030,9 +1034,16 @@ terminal pane, with the path's line and the clicked window. The Editor takes thi
   installed one, then the lowest id. An invalid kit file skips the plugin with a notice naming the problem, given once
   for each version of the look's files. A look whose last start did not finish is skipped until its files or Jasper's
   build change or the user chooses **Try Again**, and `--safe-mode` uses the default look.
-- **Enterprise** (`plugins/enterprise`, off by default) is the worked example: its look is the kit file, IBM Plex fonts
-  and theme its manifest names, and its code only publishes `dev.jasper.enterprise.api.Workstation` while its look is
-  active ([the Enterprise look](enterprise.md)).
+- **Enterprise** (`plugins/enterprise`, off by default) is the worked example: its look is the kit file and theme its
+  manifest names, with the IBM Plex fonts the kit file names, and its code does nothing ([the Enterprise
+  look](enterprise.md)).
+- **Defaults for other plugins' settings.** A kit file's `[defaults."<plugin id>"]` table, keyed as that plugin's
+  settings file writes its keys, gives the plugin's settings the look's defaults: when the plugin declares a key, a
+  value its kind accepts becomes that setting's default, a saved value still wins, and Reset returns to the look's
+  value. A value the kind rejects, or a key the plugin does not declare, is logged as a warning and ignored, and the
+  plugin starts. Enterprise's table gives the Editor's `font_family` IBM Plex Mono. A Jasper older than SDK 0.18.2
+  accepts such a plugin by its `sdk` range and then refuses its kit file, so a look whose kit file holds one declares
+  `sdk = ">=0.18.2, <0.19"`.
 - **Themes.** `themes` lists Jasper theme files in the plugin's jars ([creating themes](creating-themes.md)); a file's
   name is its theme's id (`themes/look.json` is `look`). Jasper reads them once at start. While the plugin loads, its
   themes are listed in Settings › Appearance after the built-in ones, captioned "From the *name* plugin", and cannot be
@@ -1040,6 +1051,39 @@ terminal pane, with the path's line and the clicked window. The Editor takes thi
   keeps the name. A built-in id is ignored with a warning ("*Theme* is built in; the *Plugin* plugin's file is
   ignored."), and when two plugins ship one id the development copy wins, then the bundled one, then the installed one,
   then the lowest plugin id. A kit file's `[defaults]` may name its own plugin's themes.
+
+### Adapting to the look
+
+`context.appearance().presentation()` returns the
+[`Presentation`](sdk-reference.html#dev.jasper.sdk.ui.Presentation) Jasper runs with. It is chosen at start, is the same
+for every plugin until Jasper restarts and is safe from any thread, so a plugin reads it once in `start` and composes
+from it. Remote, Credential Vault and File Server compose their classic layouts when `classic()` is true, and the Sample
+starts its tool window in the bottom strip under labelled stripes:
+
+<!-- example:pluginlook -->
+```java
+/** IntelliJ's classic layout keeps a tool window like this one in the bottom strip: under labelled stripes it starts there. */
+private static Anchor panelAnchor(PluginContext context) {
+    var look = context.appearance().presentation();
+    return look.toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;
+}
+```
+
+| Method | The default look | Enterprise |
+| --- | --- | --- |
+| `classic()`: whether the look starts from the classic catalog | `false` | `true` |
+| `icons()`: the icon set | `NEW_UI` | `CLASSIC` |
+| `toolWindows()`: how tool windows are reached | `RAILS`, icon rails | `STRIPES`, labelled stripes |
+| `titleBar()`: the title bar on this platform | `UNIFIED`, one band with the toolbar | `CLASSIC`, IntelliJ Classic's, on macOS and Windows; `NATIVE` on Linux |
+| `menus()`: where the menus are on this platform | `SCREEN_MENU_BAR` on macOS, `TITLE_BAR` on Linux and Windows | `SCREEN_MENU_BAR` on macOS, `TITLE_BAR` on Windows, `WINDOW` (a menu row) on Linux |
+| `toolbarSearch()`: how the toolbar offers Search Everywhere | `FIELD` | `ICON` |
+| `uiFace()`, `dataFace()`: the look's faces, empty for the platform's | empty | IBM Plex Sans, IBM Plex Mono |
+| `bodySize()`, `toolbarHeight()`: the body text size in points and the default toolbar height in pixels | 13, 30 | 12, 28 |
+
+The faces, sizes, title bar and menus are the look's own: the user's font, toolbar height, window decoration and view
+mode settings are not reported. Test both looks by calling `FakePluginHost.setPresentation(FakePresentations.CLASSIC)`
+before the plugin starts ([testing](#testing)). `presentation()` needs SDK 0.18.2, so a plugin that reads it declares
+`sdk = ">=0.18.2, <0.19"`.
 
 ## Declared settings
 
@@ -1063,15 +1107,19 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
   `label` (required), `description`, `keywords`, `section`, `applies` (`LIVE`, the default, or `RESTART`, which labels
   the row "Takes effect after restart"; change listeners run either way), `editor(EditorHint)` and `unit` (at most 16
   characters, shown after a number).
+- **The default** is the spec's, unless the active look's kit file gives the key one
+  ([defaults for other plugins' settings](#looks-and-themes)) that the kind accepts: then the look's value is the
+  default, which an unset key reads and Reset returns to. `FakePluginHost.setKitDefault` and `lookDefaultProblems` test
+  it.
 
-| [`SettingKind`](sdk-reference.html#dev.jasper.sdk.settings.SettingKind) | Value | A rejected value reports |
+| [`SettingKind`](sdk-reference.html#dev.jasper.sdk.settings.SettingKind) | Value | Jasper reports a rejected value in the file as |
 | --- | --- | --- |
 | `bool()` | `Boolean` | |
-| `integer(min, max)` | `Integer` | Use a whole number from *min*–*max*. |
-| `number(min, max)` | `Double` | Use a number from *min*–*max*. |
-| `text()`, `text(rule, message)` | `String` | the message (a rule that throws rejects the value) |
-| `choice(List<Choice<T>>)` | `T`; `Choice.of(token, displayName, value)` writes the token and shows the name | Use one of: *tokens*. |
-| `stringList()`, `stringList(elementRule)` | `List<String>` | Not an allowed list element: "*x*". |
+| `integer(min, max)` | `Integer` | Use an integer from *min*–*max*; using the default. |
+| `number(min, max)` | `Double` | Use a finite number from *min*–*max*; using the default. |
+| `text()`, `text(rule, message)` | `String` | the message ("Not an allowed value." for `text()`; a rule that throws rejects the value) |
+| `choice(List<Choice<T>>)` | `T`; `Choice.of(token, displayName, value)` writes the token and shows the name | Use *tokens*; using the default. (tokens sorted, separated by commas) |
+| `stringList()`, `stringList(elementRule)` | `List<String>` | Invalid string array element; using the default list. |
 
 - **Reading.** A value its kind rejects is replaced by the default and reported against the file, with its line; a key
   nothing declares is reported as "Unknown setting or table; ignored." A value of the wrong TOML type, or a syntax
@@ -1106,7 +1154,7 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
 ## Services and other plugins' APIs
 
 Plugins extend each other through services: an interface in an exported package, published by its provider and looked
-up by the plugins that require it. Credential Vault, the Editor, Remote, Snippets and Enterprise export APIs;
+up by the plugins that require it. Credential Vault, the Editor, Remote and Snippets export APIs;
 [plugin APIs](plugin-apis.md) lists them.
 
 **Providing a service.**
@@ -1148,15 +1196,14 @@ catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
 - Jasper does not check an optional requirement's version, so a provider older than your range may be present: guard
   calls to methods newer than your minimum with `catch (NoSuchMethodError older)`, as Remote does for older Editors.
 - In the repository, `verifyPluginArchitecture` lets a plugin reference only the JDK, the SDK, its own packages, the
-  libraries it bundles and the packages listed for it in `declaredImports` (`gradle/plugin-architecture.gradle.kts`);
-  `dev.jasper.enterprise.api` only from the plugin's own `workstation` package.
+  libraries it bundles and the packages listed for it in `declaredImports` (`gradle/plugin-architecture.gradle.kts`).
 
 ## Rules that matter
 
 | Runs on, or may be called from | What |
 | --- | --- |
 | The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, windows, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
-| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `log()`; `Subscription.close()`. |
+| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
 
 - **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
   returns promptly.
@@ -1195,7 +1242,8 @@ try (var host = new FakePluginHost()) {
 
 | To test | Use |
 | --- | --- |
-| Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView`, `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel` |
+| Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView`, `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
+| The look | `setPresentation(presentation)` before any plugin starts, with `FakePresentations.STANDARD` (what the fake reports until told otherwise) or `CLASSIC`; `presentation()` |
 | Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `status()`, `progress()`, `rail()` |
 | Tool windows and windows | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel`, `panelView`, `panelHeader`, `closePanel`; `windows()`, `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `closeCommand`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
 | Terminals | `addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `focusTerminalPane`, `closeTerminalPane`, `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
@@ -1211,7 +1259,8 @@ Where the fake differs from Jasper:
 - It does not check that a service API is in an exported package, and an absent optional provider's API is still on
   the test classpath, so the `NoClassDefFoundError` path cannot be tested there.
 - It keeps settings in memory and writes no file; a value of the wrong type keeps only that setting's last good value,
-  where Jasper rejects the whole file; `set` completes at once; `number` values stay `double`.
+  where Jasper rejects the whole file; `set` completes at once; `number` values stay `double`. A look default the plugin
+  cannot use is listed by `lookDefaultProblems`, where Jasper logs it as a warning, with a reason worded its own way.
 - Palette calls get `maxResults` 5 and `macOs` true, and `executeInScope` skips `available`.
 - `FileSource.connect` always gets a window.
 

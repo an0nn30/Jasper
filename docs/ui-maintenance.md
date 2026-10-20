@@ -118,6 +118,7 @@ These tables freeze values; a change to what they freeze edits the table in the 
 | `ColourLiteralScanTest` (jasper-app) | No colour literal in `jasper-ui/src/main`, `jasper-app/src/main` or any `plugins/*/src/main`: Java string literals holding `#RRGGBB` or `#RRGGBBAA`, `Color(`, `ColorUIResource(` or `Color.decode(` given a hex value, and `#RRGGBB[AA]` in `.json`, `.toml`, `.properties`, `.xml`, `.css`, `.html` and `.tsv` resources. Exempt: the built-in theme files, the theme files in-repo `plugin.toml`s list (which must load with the production loader) and the boot splash's `SplashColors.java` |
 | `KitValuesTest` (jasper-app) | Every node, field and event projects between the SDK and the module without loss |
 | `PresentationConformanceTest` (jasper-app) | The Enterprise descriptor, kit file (every key listed, parsed without a problem), fonts, theme and branding |
+| `LookIdentityTest` (jasper-app) | No class in the app or jasper-ui jar, and no `dev/jasper/` class of a staged plugin other than Enterprise, holds "enterprise" in any case in its constant pool: a look is data the host reads, and plugins ask for the look through the SDK |
 | `KitKeyBindingAuditTest` | A kit key binding with a blank action never hides the look and feel's binding for the same key |
 | `UiDocumentationTest` | `jasper-ui/README.md`, `docs/ui-architecture.md`, `docs/ui-maintenance.md` and `docs/design/theme-engine/calibration.md` exist; their relative Markdown links outside code fences resolve; each `<!-- example:name -->` block (a lower-case name) followed by a Java fence equals the `// example:name:start` to `:end` region of `UiExamplesTest.java` (`palette` and `view`) |
 
@@ -189,9 +190,12 @@ scroll bars, never a Metal fallback.
 - A bundled SVG meaning takes a light SVG and its `_dark` sibling under `src/main/resources/dev/jasper/ui/icons/`, a
   row for each (resource path, upstream path, SHA-256) in `assets-selected.tsv` (the catalog), `assets-chrome.tsv`
   (the chrome set) or `assets-classic.tsv` (IntelliJ's classic icons, under `classic/`; a file without a `_dark`
-  sibling serves both variants), the file count in `BuiltInArtwork`'s manifest check (14, 20 and 14) and the meaning
-  in its map. The files are byte-identical upstream artwork under the Apache-2.0 `LICENSE.txt` beside them, with the
-  upstream `NOTICE.txt` and the `ATTRIBUTION.txt` the Licenses window shows; `tools/icons/fetch-classic-icons.py`
+  sibling serves both variants), the file count in `BuiltInArtwork`'s manifest check (14, 20 and 26) and the meaning
+  in its map. A classic tool-window icon for the labelled stripes goes under `classic/toolwindows/` and into
+  `BuiltInArtwork`'s stripe table, keyed by the icon name it draws for. The files are byte-identical upstream artwork
+  under the Apache-2.0 `LICENSE.txt` beside them, with the upstream `NOTICE.txt` and the `ATTRIBUTION.txt` the
+  Licenses window shows; each classic file keeps its JetBrains copyright comment, except the two `toolWindowServer`
+  files, which upstream ships without one (`BuiltInArtworkTest` checks both). `tools/icons/fetch-classic-icons.py`
   reproduces the classic files.
 - The host accepts a plugin icon name that `IconRegistry.names()` holds, and that includes every built-in name. A new
   name (a path glyph or a catalog meaning) is therefore also added to the testkit's `FakeKit.BUILT_INS`, to the

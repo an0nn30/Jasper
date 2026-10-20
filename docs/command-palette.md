@@ -105,7 +105,8 @@ chosen scope, or reads "Type the name of a session, command, file or snippet, an
 no chip. The **Open:** field holds the chip and the query, with no placeholder, and ends in
 a ▼ menu, "Choose what to open", which lists All and every scope with its shortcut.
 
-- The palette shortcut, **▶ Run…** at the start of the status bar and the toolbar's "Search everywhere" field open it.
+- The palette shortcut, **▶ Run…** at the start of the status bar and the toolbar's **Search Everywhere** button (its
+  magnifier, before **Settings…**) open it.
   While it is open they give it the keyboard back and refresh its list; a click anywhere on it also gives it the
   keyboard.
 - It stays open while you work. Clicks outside it reach the window, a click in a pane gives that pane the keyboard,

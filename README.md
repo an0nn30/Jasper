@@ -25,9 +25,10 @@ grow with what you need: the bundled plugins use the same API as any plugin you 
   notifications while Jasper is in the background. See [notifications](docs/notifications.md).
 - **Settings**: a searchable Settings dialog over `config.toml`, a Keymap page where every action can be rebound, and
   most changes applied without a restart. See [configuration](docs/configuration.md).
-- **Themes and looks**: the Slate Cobalt theme (Dark and Light) by default; Catppuccin Latte, Frappé, Macchiato and
-  Mocha and Ubuntu Yaru built in; import further Jasper theme files. A *look* sets the chrome and controls: the default
-  look, or a plugin's look such as Enterprise. See [themes](docs/themes.md) and [looks](docs/looks.md).
+- **Themes and looks**: Slate Cobalt in the Dark appearance and Jasper Meadow Light in the Light appearance by default;
+  Slate Cobalt's Light variant, Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru built in; import further
+  Jasper theme files. A *look* sets the chrome and controls: the default look, or a plugin's look such as Enterprise. See
+  [themes](docs/themes.md) and [looks](docs/looks.md).
 - **The `jasper` command**: open a window, start Jasper with options, or run plugin commands such as
   `jasper editor FILE:LINE` from any shell. See [the command line](docs/command-line.md).
 - **Background residency**: by default on macOS and Windows, Jasper keeps running when its last window closes, so the
@@ -48,7 +49,7 @@ Everything below ships with Jasper as a bundled plugin, listed in Settings › P
 | Project Index | `dev.jasper.indexer` | Offers to index the project a terminal enters, locally or on a saved host, and finds its files from the command palette | Yes |
 | Shell History | `dev.jasper.history` | Searches every shell's history from the command palette, to paste or run a command or save it as a snippet | Yes |
 | Snippets | `dev.jasper.snippets` | Saved commands with fill-in placeholders, from the command palette | Yes |
-| Enterprise | `dev.jasper.enterprise` | The Enterprise look: native title bars, menus in the window, labelled tool-window stripes, the Run window, classic controls, IBM Plex fonts and the Enterprise theme | No |
+| Enterprise | `dev.jasper.enterprise` | The Enterprise look: IntelliJ Classic's title bar on macOS and Windows, labelled tool-window stripes led by their icons, the Run window, classic controls and icons, IBM Plex fonts and the Enterprise theme | No |
 | Sample | `dev.jasper.sample` | Exercises the plugin runtime for plugin authors; does nothing until one of its `demo_*` settings is set | Yes |
 
 See [plugins](docs/plugins.md) for managing plugins and a guide to each one.
@@ -59,7 +60,9 @@ Every plugin in the table is built on the Jasper SDK (`dev.jasper.sdk`, Java, JD
 third-party plugin compiles against. A plugin is a folder of jars, one of which carries a `plugin.toml`; Jasper loads
 each plugin in its own class loader when it starts. Through the SDK and its `plugin.toml` a plugin adds actions, menus,
 toolbar items, status bar items, tool windows, command palette scopes, settings pages, notifications, workspace tabs,
-terminal sessions, `jasper` subcommands, places in the file chooser, themes and even a whole look.
+terminal sessions, `jasper` subcommands, places in the file chooser, themes and even a whole look, which can be data
+alone, as Enterprise's is. Plugins read the look Jasper runs with through the SDK, and a look can give other plugins'
+settings their defaults.
 
 - **Capabilities and consent.** A plugin declares in `plugin.toml` what it does that you cannot see on screen, such as
   typing into terminals, reading the clipboard or accepting network connections. Jasper shows those capabilities
@@ -145,7 +148,8 @@ The [documentation index](docs/README.md) lists every guide. The main ones:
   does not, set `JAVA_HOME` to the SDK and put its `bin` directory on `PATH`, or set
   `org.gradle.java.installations.paths` in your Gradle properties.
 - **Python 3.11 or later** on the `PATH` as `python3` or `python` for the theme converter's tests (or name an
-  interpreter with `-Pjasper.python=<path>`). The `python3` in Xcode's command line tools (3.9) is too old.
+  interpreter with `-Pjasper.python=<path>`). The `python3` in Xcode's command line tools (3.9) is too old. Under
+  Python 3.14 `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails; use 3.11 to 3.13.
 - A **C/C++ compiler**, because `check` builds and tests Jasper's own launcher and the native `jasper` command: the Xcode
   command line tools on macOS, `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the
   "Desktop development with C++" workload on Windows.
@@ -184,6 +188,22 @@ the image layouts and the acceptance checklists.
 
 `./gradlew pluginZips` zips every in-repo plugin into `plugins/build/zips/`, and `./gradlew sdkRelease` writes the
 SDK and test-kit jars to `build/sdk-release/`.
+
+### Windows user installation
+
+`.\gradlew.bat :jasper-app:installWindowsUser` (in IntelliJ's Gradle panel, `jasper-app` › `distribution` ›
+`installWindowsUser`) installs Jasper for the current user without a C/C++ compiler, WiX, an installer or administrator
+rights. It builds the application and the bundled plugins into a jpackage app image with the standard JBR launcher,
+installs it in `%APPDATA%\JasperApp` and adds a Start Menu shortcut, from which you then start Jasper. A small Java
+helper, compiled with the JBR SDK, copies the files and creates the shortcut through Windows APIs, so PowerShell script
+execution can stay disabled; Windows must allow the generated `Jasper.exe` to run. Run the task on its own, not with
+the native packaging tasks.
+
+Exit Jasper, including its background process, before installing an update or running
+`.\gradlew.bat :jasper-app:uninstallWindowsUser`, which does not build the application; it removes the installation,
+its shortcut and its matching login entry, keeping your settings and data in `%APPDATA%\jasper`. Jasper's background
+setting controls residency and login start-up as usual. This installation has no custom `jasper.vmoptions`, no native
+start-up recovery and no native `jasper` command.
 
 ## Repository layout
 

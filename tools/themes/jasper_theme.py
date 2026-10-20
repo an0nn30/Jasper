@@ -73,7 +73,7 @@ EDITOR_REFERENCES = {
     "attribute": "terminal.ansi.yellow", "regex": "terminal.ansi.cyan", "error": "terminal.ansi.red",
 }
 # Import refuses a theme file with a built-in theme's id
-BUILT_IN = ("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru")
+BUILT_IN = ("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "jasper-meadow")
 KEY = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 HEX = re.compile(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?")
 EDITOR_VALUE = re.compile(r"(#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9.]*)( @ \d{1,3}%)?(, italic)?(, bold)?")

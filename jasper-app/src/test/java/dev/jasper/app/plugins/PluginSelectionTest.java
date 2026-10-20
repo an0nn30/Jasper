@@ -84,7 +84,9 @@ class PluginSelectionTest {
         assertThat(runtime.get().statusLines()).as("the deleted plugin is still the selection's").singleElement()
             .satisfies(line -> assertThat(line).contains("dev.example.look", "[DEV]"));
         var pending = new AtomicReference<List<java.util.concurrent.CompletableFuture<?>>>();
+        var pluginWorkers = PluginShutdownTestSupport.capture(runtime.get());
         SwingUtilities.invokeAndWait(() -> pending.set(runtime.get().stop()));
         java.util.concurrent.CompletableFuture.allOf(pending.get().toArray(java.util.concurrent.CompletableFuture[]::new)).get();
+        pluginWorkers.await();
     }
 }

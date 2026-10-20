@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Dimension;
@@ -129,5 +130,45 @@ class CollapsingMenuBarTest {
         bar.setSize(440, 30); bar.doLayout();
         assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.ALL);
         assertThat(header.field().getX() + header.field().getWidth() / 2).as("still centred").isEqualTo(220);
+    }
+
+    /** Plan 14 (Rulings 13): the Windows classic title follows the menus; they fold before it shrinks past its minimum. */
+    /** Plan 14: AppKit lays out the screen menu bar, so a bar it shows never folds against the window's width. */
+    @Test void aBarTheScreenMenuBarShowsNeverFolds() {
+        var bar = bar();
+        bar.screenMenuBar(true);
+        // AquaMenuBarUI asks for no height; the root still gives the bar the window's width.
+        bar.setSize(100, 0); bar.doLayout();
+        assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.NONE);
+        assertThat(shown(bar)).containsExactly(true, true, true, true, true);
+        assertThat(bar.overflowMenu().isVisible()).isFalse();
+        assertThat(bar.hamburgerMenu().isVisible()).isFalse();
+    }
+
+    @Test void aClassicTitleFollowsTheMenusAndTheMenusFoldBeforeItShrinksPastItsMinimum() {
+        var bar = bar();
+        bar.setBorder(BorderFactory.createEmptyBorder());
+        var title = new ClassicWindowTitle();
+        title.setPreferredSize(new Dimension(300, 20));
+        bar.setTitle(title);
+        int gap = UIScale.scale(ClassicWindowTitle.GAP), minimum = UIScale.scale(ClassicWindowTitle.MINIMUM);
+        // FlatLaf sizes its left panel from this and squeezes the window buttons first when its title area drops below 60, so the
+        // bar asks only for its folded minimum; FlatLaf's glue widening gives it its real width, and layoutContainer folds.
+        assertThat(bar.getPreferredSize().width).as("the ☰ menu, the gap and the title's minimum").isEqualTo(30 + gap + minimum);
+        assertThat(bar.getComponent(bar.getComponentCount() - 1)).as("the glue FlatLaf stretches the bar by").isInstanceOf(Box.Filler.class);
+        bar.setSize(800, 28); bar.doLayout();
+        assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.NONE);
+        assertThat(title.getBounds()).as("at its text height, centred in the bar").isEqualTo(new Rectangle(220 + gap, 4, 800 - 220 - gap, 20));
+        bar.setSize(220 + gap + minimum, 28); bar.doLayout();
+        assertThat(bar.fold()).as("the title at its minimum keeps every menu").isEqualTo(CollapsingMenuBar.Fold.NONE);
+        assertThat(title.getWidth()).isEqualTo(minimum);
+        bar.setSize(220 + gap + minimum - 1, 28); bar.doLayout();
+        assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.MORE);
+        assertThat(shown(bar)).containsExactly(true, true, true, true, false);
+        assertThat(title.getX()).isEqualTo(180 + 30 + gap);
+        assertThat(bar.getPreferredSize().width).as("folding does not change what the bar asks for").isEqualTo(30 + gap + minimum);
+        bar.setSize(40, 28); bar.doLayout();
+        assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.ALL);
+        assertThat(title.getWidth()).as("never negative").isZero();
     }
 }

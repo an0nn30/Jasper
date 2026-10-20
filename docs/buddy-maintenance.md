@@ -110,10 +110,11 @@ for shared text/materials; column, drawer and bubble panels own their input and 
 state. Placement helpers (`BuddyPlacement`, `BuddyColumnPlacement`, `BuddyBubblePlacement`)
 own screen geometry; `BuddyDragFrames` coalesces pointer updates. `BuddyWindow` owns
 native acquisition and child disposal. Preserve nonfocusable surfaces, nearest-neighbour
-sprite scaling, screen clamps, drag-end position reporting and hidden state retention.
-Add cleanup when acquiring a new timer, window or global listener. Check both
-initialization failure and final disposal; no new native acquisition belongs in a facade
-constructor or a model mutation.
+sprite sampling and the sprite's logical size (a 42 × 48 frame at scale 2.5), screen
+clamps, drag-end position reporting and hidden state retention. Add cleanup when
+acquiring a new timer, window or global listener. Check both initialization failure and
+final disposal; no new native acquisition belongs in a facade constructor or a model
+mutation.
 
 Drive package-local panel handlers and injected clocks in headless tests. Geometry/window
 predicate tests do not instantiate a native `JWindow`; desktop layering, actual focus,
@@ -144,7 +145,8 @@ optional first argument overrides the directory (`--args='/absolute/output/path'
 [motion preview](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyMotionPreview.java)
 moves the sprite up and back down a 600 × 700 screen so the column flips, and writes
 420 frames (7 seconds at 60 Hz) per theme under `jasper-buddy/build/reports/buddy-motion/`;
-it takes no output-directory argument and prints the directory. Relative paths use the
+it takes no output-directory argument and prints the directory; both previews paint the sprite at scale 2
+(84 × 96), smaller than the app's 105 × 120. Relative paths use the
 Gradle subproject working directory.
 
 The [performance measurement](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyPerformanceMeasurement.java)
@@ -157,5 +159,5 @@ Finish a change with `./gradlew check`. It runs every module's tests, compiled
 documentation examples, Javadoc and the bytecode architecture checks. `BuddyApiTest`
 verifies the actual jar sprite and JDK-only loading. It reads the jar from the
 `jasper.buddyJar` property that `:jasper-buddy:test` sets after building the jar, so run it
-through Gradle. No build task runs the sprite generator or LibreSprite: Buddy builds and
-tests from the committed artwork, so Pillow is needed only to [regenerate or verify it](../packaging/buddy/README.md#editing-and-exporting).
+through Gradle. No build task runs the sprite tools or LibreSprite: Buddy builds and
+tests from the committed artwork, so Pillow (and Swift, for the atlas packer) is needed only to [export, repack or verify it](../packaging/buddy/README.md#editing-and-exporting).

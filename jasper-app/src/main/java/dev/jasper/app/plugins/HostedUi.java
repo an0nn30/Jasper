@@ -75,6 +75,9 @@ final class HostedUi {
 
     private HostedKit kit;
     void kit(HostedKit value) { kit = java.util.Objects.requireNonNull(value); kit.anchorHost=windows; }
+    /** Where this plugin's appearance reads the presentation, on each call and from any thread. */
+    private volatile Supplier<dev.jasper.sdk.ui.Presentation> presentation = HostedPresentation::standard;
+    void presentation(Supplier<dev.jasper.sdk.ui.Presentation> source) { presentation = java.util.Objects.requireNonNull(source, "source"); }
     private final String pluginId;
     private final Contributions model;
     private final Containment containment;
@@ -88,6 +91,11 @@ final class HostedUi {
     private final GlassSource glass;
     private final Set<String> ownActions = new HashSet<>();
     private final List<Runnable> closers = new ArrayList<>();
+    /**
+     * The id of this plugin's action whose handler is running on the UI thread, or null: a toggle or show its panel's
+     * own toggle action makes as it runs activates the panel (plan 15b Rulings 1).
+     */
+    private String running;
 
     HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
              BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
@@ -199,8 +207,12 @@ final class HostedUi {
                 spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
             ActionEntry entry = model.addAction(spec.id(), spec.title(), spec.icon().map(HostedUi.this::icon).orElse(null), spec.keywords(),
                 spec.defaultBinding(), spec.otherDefaultBinding(), keyContext(spec.context()),
-                invocation -> containment.run(pluginId, "action " + spec.id(), () ->
-                    handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle)))));
+                invocation -> containment.run(pluginId, "action " + spec.id(), () -> {
+                    String previous = running;
+                    running = spec.id();
+                    try { handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle))); }
+                    finally { running = previous; }
+                }));
             ownActions.add(spec.id());
             Subscription removal = tracked(() -> { ownActions.remove(spec.id()); entry.close(); });
             return new PluginAction() {
@@ -400,6 +412,7 @@ final class HostedUi {
                 var closed=new AtomicBoolean();Consumer<Variant> guarded=v -> {if(!closed.get())handler.accept(v);};themeHandlers.add(guarded);
                 var removal=tracked(() -> {closed.set(true);themeHandlers.remove(guarded);});return () -> {closed.set(true);removal.close();};
             }
+            @Override public dev.jasper.sdk.ui.Presentation presentation() { return presentation.get(); }
         };
     }
 
@@ -418,7 +431,7 @@ final class HostedUi {
                 Slot.of(dev.jasper.app.dock.Side.valueOf(spec.defaultAnchor().name()), spec.split()),
                 spec.toggleActionId(), site -> {
                 JComponent[] built = {null};
-                containment.run(pluginId, "panel " + spec.id(), () -> { var host=host(site);var view=kit.requireOwned(factory.create(host));view.mount(host);host.onClosed(view::close);built[0]=view.component(); });
+                containment.run(pluginId, "panel " + spec.id(), () -> { var host=host(site, spec);var view=kit.requireOwned(factory.create(host));view.mount(host);host.onClosed(view::close);built[0]=view.component(); });
                 return built[0];
             });
             return tracked(entry::close);
@@ -426,14 +439,17 @@ final class HostedUi {
           @Override public void toggle(String panelId, WindowHandle window) {
             guard("toggle");
             requireNamespace(panelId, "A panel");
-            if (model.panels().stream().noneMatch(panel -> panel.id().equals(panelId)))
-                throw new IllegalArgumentException("Panel not registered: " + panelId);
-            model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, Contributions.PanelRequest.Op.TOGGLE));
+            var entry = model.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Panel not registered: " + panelId));
+            // The panel's own declared toggle action, as its handler runs, is the user's gesture: IntelliJ's Cmd+1.
+            var op = entry.namedToggle() && entry.toggleActionId().equals(running)
+                ? Contributions.PanelRequest.Op.ACTIVATING_TOGGLE : Contributions.PanelRequest.Op.TOGGLE;
+            model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, op));
           }
         };
     }
 
-    private PanelHost host(PanelSite site) {
+    private PanelHost host(PanelSite site, dev.jasper.sdk.ui.PanelSpec spec) {
         return new PanelHost() {
             private boolean closed;
             { site.onClosed(() -> closed=true); }
@@ -445,7 +461,13 @@ final class HostedUi {
                     header.actions().stream().map(action -> new dev.jasper.app.contributions.PanelHeaderState.Action(
                         action.label(), icon(action.icon()), () -> containment.run(pluginId, "panel header action", action.invoke()))).toList()));
             }
-            @Override public void show() { requireUi("show"); site.show(); }
+            @Override public void show() {
+                requireUi("show");
+                // Inside the panel's own toggle action the show activates, as that action's toggle does.
+                if (!closed && spec.toggleActionId().filter(id -> id.equals(running)).isPresent())
+                    model.requestPanel(new Contributions.PanelRequest(site.windowId(), spec.id(), Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+                else site.show();
+            }
             @Override public void hide() { requireUi("hide"); site.hide(); }
             @Override public boolean visible() { return site.visible(); }
             @Override public Subscription onVisibility(Consumer<Boolean> handler) {

@@ -3,7 +3,9 @@
 Packaged Jasper starts from jpackage's native application launcher, which Jasper builds itself from the JetBrains
 Runtime's sources with two additions: it merges the user's `jasper.vmoptions` over the bundled JVM options and decides
 whether the JVM uses the start-up cache, and it starts `jasper-watch`, which starts Jasper once more, without the cache
-or without the user's options, when the JVM dies before it exists. The user-facing rules are in
+or without the user's options, when the JVM dies before it exists. Only the Windows
+[user installation](../../docs/packaging.md#user-installation-without-a-compiler) keeps jpackage's standard launcher,
+because it builds without a compiler. The user-facing rules are in
 [custom VM options](../../docs/configuration.md#custom-vm-options) and
 [start-up recovery](../../docs/diagnostics.md#start-up-recovery); the designs are the specs
 `docs/superpowers/specs/2026-10-13-jasper-custom-vm-options-design.md` and

@@ -44,8 +44,11 @@ values. Run the tools with `python3 -I`; they need Pillow and NumPy. None of the
 
 Run a named test with `./gradlew :jasper-app:test --tests '*<Name>'`. The pairs with a `min_agreement`, which
 `check_pairs.py` runs, are the `classic-*`, `run-window-*`, `chrome-*`, `enterprise-light-*`, `enterprise-dark-*`,
-`dock-*`, `composition-*` and `enterprise-settings-*` pairs. `ChromeRenderTest` also writes `chrome-*.png` files under
-`jasper-app/build/chrome-renders/` for inspection; no pair uses them.
+`dock-*` (except `dock-*-iconed`), `composition-*` and `enterprise-settings-*` pairs. Stripe labels lead with their
+tool window's icon, which the text-only mocks lack, so the nine stripe and bottom-strip pairs read the renders with each
+label's icon slice cut out (`*-text-render.png`); the ungated `dock-*-iconed` pairs set the iconed `*-render.png` beside
+the mock for `compare_all.py`. `ChromeRenderTest` also writes `chrome-*.png` files under `jasper-app/build/chrome-renders/` for
+inspection; no pair uses them.
 
 A high edge agreement is not acceptance: inspect the region crops, and record native font rasterization and platform
 title-bar differences separately.

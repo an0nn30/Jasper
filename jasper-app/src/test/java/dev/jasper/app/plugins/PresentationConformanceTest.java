@@ -28,7 +28,7 @@ class PresentationConformanceTest {
     /** Every key of spec 5.1's kit file. */
     static final Set<String> KEYS = Set.of("kit", "base",
         "chrome/title_bar", "chrome/menu_bar", "chrome/window_title", "chrome/tool_windows", "chrome/editor_tabs", "chrome/status_bar",
-        "chrome/palette", "chrome/dialogs", "chrome/motion", "chrome/icons",
+        "chrome/palette", "chrome/dialogs", "chrome/motion", "chrome/icons", "chrome/toolbar_search",
         "controls/toggle", "controls/exclusive", "controls/tabs", "controls/group", "controls/form_label", "controls/empty",
         "controls/table", "controls/tree", "controls/stepper", "controls/ordered_list", "controls/buttons", "controls/tag",
         "controls/route", "controls/prompt",
@@ -39,7 +39,7 @@ class PresentationConformanceTest {
         "type/data/family", "type/data/regular", "type/data/medium",
         "colors/dialog_surface", "colors/navigation_surface",
         "defaults/ui.theme.light", "defaults/ui.theme.dark", "defaults/palette.visible_rows", "defaults/window.toolbar_height",
-        "defaults/window.toolbar",
+        "defaults/window.toolbar", "defaults/dev.jasper.editor/font_family",
         "branding/product", "branding/icons", "branding/splash_art");
     /** The official IBM Plex 1.1.0 files (verified fact 11), by their name in the plugin. */
     static final Map<String, String> SUMS = Map.of(
@@ -53,10 +53,11 @@ class PresentationConformanceTest {
         var descriptor = DescriptorParser.parse(Files.readString(EnterpriseResources.RESOURCES.resolve("plugin.toml")));
         assertThat(descriptor.id()).isEqualTo("dev.jasper.enterprise");
         assertThat(descriptor.name()).isEqualTo("Enterprise");
-        assertThat(descriptor.version()).isEqualTo(Version.parse("0.2.0"));
+        assertThat(descriptor.version()).isEqualTo(Version.parse("0.3.0"));
         assertThat(descriptor.entry()).isEqualTo("dev.jasper.enterprise.EnterprisePlugin");
         assertThat(descriptor.capabilities()).containsExactly(DescriptorParser.PRESENTATION_PROVIDE);
-        assertThat(descriptor.exports()).containsExactly("dev.jasper.enterprise.api");
+        assertThat(descriptor.exports()).as("no API (plan 15a)").isEmpty();
+        assertThat(descriptor.sdk()).as("the kit's plugin defaults need SDK 0.18.2 (Rulings 14)").isEqualTo(VersionRange.parse(">=0.18.2, <0.19"));
         assertThat(descriptor.requires()).as("no requirements (spec 14.1)").isEmpty();
         assertThat(descriptor.presentation()).isEqualTo("presentation/enterprise.kit.toml");
         assertThat(descriptor.themes()).containsExactly("themes/enterprise.json");
@@ -81,8 +82,11 @@ class PresentationConformanceTest {
         assertThat(parsed.defaults().value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("enterprise");
         assertThat(parsed.defaults().value(CoreSettings.UI_THEME_DARK)).isEqualTo("enterprise");
         assertThat(parsed.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(8);
-        assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR_HEIGHT)).isEqualTo(34);
+        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.
+        assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR_HEIGHT)).isEqualTo(28);
         assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR)).isEqualTo(dev.jasper.app.config.ToolbarMode.ICONS);
+        assertThat(parsed.defaults().plugin("dev.jasper.editor")).as("the Editor in the data face (plan 15a)")
+            .containsExactly(java.util.Map.entry("font_family", "IBM Plex Mono"));
     }
 
     @Test void theFontsAreIbmsDecodeAndEveryWeightResolvesToItsFamily() throws Exception {

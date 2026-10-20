@@ -29,7 +29,7 @@ package cycles.
 
 `verifyPluginArchitecture` checks every in-repo plugin: it may reference only the JDK, the SDK (not the testkit), its
 own packages, the libraries it bundles and the exported packages listed for it in `declaredImports`
-(`gradle/plugin-architecture.gradle.kts`), and `dev.jasper.enterprise.api` only from its own `workstation` package.
+(`gradle/plugin-architecture.gradle.kts`).
 `gradle/architecture/PluginPresentationCheck.java`, which it runs, refuses presentation code in plugin classes:
 constructing ordinary Swing controls, painting, and setting colours, fonts, borders, sizes, layout, alignment or icons
 on visible components. The Editor's `DocumentArea`, `VimTextArea` and `EditorTheme` are the named exceptions for its
@@ -199,8 +199,12 @@ the menu and the palette. The application-registered toggle requests an activati
 (`PanelRequest.Op.ACTIVATING_TOGGLE`), and a stripe press toggles the same way: under flush frames
 (`tool_windows = "stripes"`) a panel it shows becomes the active tool window, as a press anywhere inside its frame makes
 it, and `ToolWindowArea` moves the keyboard to the frame's first enabled control bound to keys, a button only when
-there is no other, else to the frame itself. A plugin's own toggle action, through `Panels.toggle`, shows the panel
-without activating it. A `PanelHeader` set
+there is no other, else to the frame itself. Under flush frames an activating toggle of a showing panel that is not the
+active tool window activates it, and only the active one hides, as IntelliJ's ActivateToolWindowAction. `HostedUi`
+records which of the plugin's actions has its handler running: a `Panels.toggle` or `PanelHost.show()` made inside the
+handler of the panel's own declared toggle action (`PanelSpec.toggleActionId`) is sent as `ACTIVATING_TOGGLE` or
+`ACTIVATING_SHOW`, so it activates as the application's toggle does; any other call, a deferred one included, stays a
+plain toggle or show. A `PanelHeader` set
 through `PanelHost.setHeader` becomes application-owned
 `PanelHeaderState`; `PanelSite` guards its callbacks' lifetime, `ToolWindowArea` keeps the metadata while the panel is
 hidden and updates a live header without rebuilding the content, and closing the site clears it. A panel whose content
@@ -216,11 +220,12 @@ Plugin windows follow the `TerminalWindow`/`WindowContent` split. `AuxiliarySurf
 closing guards and lifetime and is tested headlessly; `NativeShells` is the only code that constructs a frame or
 dialog, and adds the icon, the macOS title bar (`MacTitleBar`), a menu bar with File › New Window, Close Window (Cmd+W,
 Ctrl+W on Linux and Windows) and, outside macOS, Quit, theme tracking and remembered bounds for plugin windows. Under
-the Enterprise look a plugin frame has no menu row and binds the Close Window shortcut directly. Dialogs are owned
+the Enterprise look a plugin frame on Linux and Windows has no menu row and binds the Close Window shortcut directly; on
+macOS it keeps the File menu, which the screen menu bar shows (`ShellChrome.frameMenuRow`). Dialogs are owned
 through `WindowOwner` (a terminal window, one of the plugin's windows, a content tab or a `UiAnchor`), keep their modal
 ownership and close with their owner, so no SDK type exposes a frame. Under the Enterprise look, `ATTACHED_SHEET` and
-`OVERLAY` dialogs are drawn inside their window as classic dialogs (`DialogMapping`). The process stays alive while a
-plugin window is open.
+`OVERLAY` dialogs are drawn inside their window as classic dialogs (`DialogMapping`), below IntelliJ Classic's title
+where the look draws one (`TitleInset`). The process stays alive while a plugin window is open.
 
 - **Overlays.** `Windows.overlay` returns a `PluginDialog` without a native dialog. `AuxiliaryWindows` allows one
   progress overlay per terminal window across plugins; `WindowOverlay` mounts it in the root layered pane, contains
@@ -285,6 +290,14 @@ everything else needs the UI thread. `onWorkspaceChanged` also fires when the wo
 changes: `GlassSource`, built by `JasperApplication` from its windows, answers `workspaceOpacity(component)` (the
 window's opacity inside the centre deck that holds terminal and content tabs, 1.0 for chrome, stripes and tool
 windows), and `WindowContent.setGlassListener` reports opacity changes and content mounting in a translucent window.
+
+`Appearance.presentation()` returns one immutable `Presentation` per run, read from any thread.
+`PluginRuntime.presentation(Kit, PluginLook, DefaultSource)` hands the host the installed kit, the presentation's
+`PluginLook` projection and the look's defaults before plugins start, and `HostedPresentation` builds the value from
+them: the projection's classic base, icon set, stripes, title bar, menus and toolbar search for this platform, the
+kit's regular UI and data faces (empty for the platform's) and body size, and the defaults' `window.toolbar_height`.
+A runtime given no presentation reports the default look's. The testkit's `FakePluginHost.setPresentation` mirrors
+it, and a shared contract case holds both hosts to one value for every plugin, on any thread and across theme changes.
 
 ## Terminal API
 
@@ -430,6 +443,12 @@ settings schema (`SettingTranslation`; `number` values are stored as `float`), r
 syntax error rejects the whole file, and every setting keeps its last good value. `set` saves through the same
 comment-preserving, atomic write as `config.toml`; listeners run on the UI thread when a value changes.
 
+The active look's `[defaults."<plugin id>"]` table reaches the plugin's `DeclaredSettings` through `DefaultSource`.
+`SettingTranslation` reads each raw value with the declared setting's own kind and, when the kind accepts it, makes it
+the setting's default, so a saved value wins, then the look's, then the plugin's own, and Reset returns to the look's.
+A rejected value, and once `start` returns a key the plugin never declared, is logged at WARNING
+(`PluginHost.lookDefaultProblem`) and ignored. `FakePluginHost.setKitDefault` and `lookDefaultProblems` mirror it.
+
 `PluginRuntime.settingsPages` returns, for each running plugin with settings, a generated page (`PluginSettingsPage`,
 a `SchemaPage` over the plugin's own draft) or the plugin's own (`PluginPanelPage`, every call contained), and a
 `PluginStubPage` with Open in Editor for a plugin the user meant to run that is not running (awaiting consent,
@@ -459,8 +478,9 @@ installed, then lowest id, and skips the others ("the *name* look is active"). T
 failed when its kit cannot be installed or its plugin fails to load or start; a look whose last attempt with the same
 files and build is pending or failed is skipped, and a notice offers Try Again. The elected kit is installed before
 any window and is fixed for the process; `Presentation` hands each consumer its part of `Projections` (the window
-shell and workspace, the palette, Settings, dialogs, motion, the window title, the dock layout key and the
-application's own panels). See [looks](looks.md) for the kit file and [the Enterprise look](enterprise.md).
+shell and workspace, the palette, Settings, dialogs, motion, the window title, the dock layout key, the
+application's own panels and `PluginLook`, what plugins learn of the look). See [looks](looks.md) for the kit file and
+[the Enterprise look](enterprise.md).
 
 ## Plugins manager, install and restart
 

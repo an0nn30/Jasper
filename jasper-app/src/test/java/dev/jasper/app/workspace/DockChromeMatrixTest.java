@@ -8,13 +8,18 @@ import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.platform.PresentationIcon;
+import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
+import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.testsupport.KitFixtures;
+import dev.jasper.ui.theme.SemanticColor;
+import java.awt.Color;
 import java.nio.file.Files;
 import java.util.ArrayDeque;
 import java.util.List;
@@ -71,6 +76,28 @@ class DockChromeMatrixTest {
                         else assertThat(owner.leftStripe().buttons()).as(where + " the foot group on the rail").hasSize(2);
                     } finally { owner.close(); themes.close(); }
                 }
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /**
+     * Plan 13 Rulings 10 on the path users see: a window whose look has labelled stripes and New UI artwork hands that
+     * artwork to its stripes, so its left label leads with the New UI folder, not the classic tool-window file.
+     */
+    @Test void labelledStripesUnderNewUiArtworkDrawTheNewUiIcon() throws Exception {
+        try {
+            ThemeController themes = ThemeController.startup(false, ThemeSelection.slateCobalt(TerminalSchemeChoice.MATCH), KitFixtures.enterprise(),
+                failure -> { throw new AssertionError(failure); });
+            var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes,
+                WorkspaceChrome.of(DockChromeTest.CLASSIC_DOCK, new dev.jasper.app.presentation.TitleFormat("{context}")));
+            try {
+                var model = new Contributions();
+                owner.connectContributions(model, UiState.inMemory());
+                model.addPanel("test.left", "Left", new PresentationIcon("folder", null), Slot.LEFT_TOP, site -> new JLabel("left"));
+                var label = (StripeLabels.Label) owner.leftStripe().buttons().getFirst();
+                assertThat(label.icon).isNotNull();
+                assertThat(StripeIconsTest.reference(label.icon, label, Color.WHITE, 2)).isEqualTo(StripeIconsTest.reference(
+                    new IconRegistry().chromeIcon("folder", 13).icon(ThemeZone.theme(label), SemanticColor.TEXT_SECONDARY), label, Color.WHITE, 2));
+            } finally { owner.close(); themes.close(); }
         } finally { EnterpriseLook.restoreDefault(); }
     }
 }

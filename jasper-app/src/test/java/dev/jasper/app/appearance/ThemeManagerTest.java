@@ -45,7 +45,7 @@ class ThemeManagerTest {
             UIManager.setLookAndFeel(lightLaf);
             assertColours(Map.of("Jasper.semantic.surface.app", hex(light.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)),
                 "Jasper.semantic.accent", hex(light.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT))));
-            assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(13f);
+            assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(UIManager.getFont("defaultFont").getSize2D());
         } finally { UIManager.setLookAndFeel(original); }
     }
 
@@ -101,7 +101,7 @@ class ThemeManagerTest {
             assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT))
                 .as("native search reads its canonical role directly").isEqualTo(roles.color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT));
             assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2 * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_RADIUS));
-            assertThat(UIManager.getFont("Label.font").getSize2D()).as("canonical module typography replaces the legacy app override").isEqualTo(13f);
+            assertThat(UIManager.getFont("Label.font").getSize2D()).as("native controls retain the platform default font").isEqualTo(UIManager.getFont("defaultFont").getSize2D());
         } finally { UIManager.setLookAndFeel(original); }
     }
 

@@ -1,19 +1,17 @@
 # Bundled plugin APIs
 
-Five bundled plugins export a package of Java types that other plugins compile against and call: Credential Vault
+Four bundled plugins export a package of Java types that other plugins compile against and call: Credential Vault
 hands credentials to Remote and File Server, the Editor opens the files Remote and Project Index find, Remote lists
-projects on saved hosts for Project Index, Snippets saves commands for Shell History, and Enterprise tells plugins
-that its look is active. A plugin of yours uses these APIs, and exports its own, through the same mechanism. Every
-type below is in the [SDK reference](sdk-reference.html); [writing a plugin](plugin-authoring.md) covers the rest of
-the SDK.
+projects on saved hosts for Project Index, and Snippets saves commands for Shell History. A plugin of yours uses these
+APIs, and exports its own, through the same mechanism. Every type below is in the [SDK reference](sdk-reference.html);
+[writing a plugin](plugin-authoring.md) covers the rest of the SDK.
 
 | Package | Provider | Version | Service | Published with | Bundled consumers |
 | --- | --- | --- | --- | --- | --- |
-| [`dev.jasper.vault.api`](sdk-reference.html#package-dev.jasper.vault.api) | Credential Vault, `dev.jasper.vault` | 0.6.0 | [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi) | `publishPerConsumer`: each consumer gets its own instance | Remote, File Server |
+| [`dev.jasper.vault.api`](sdk-reference.html#package-dev.jasper.vault.api) | Credential Vault, `dev.jasper.vault` | 0.7.0 | [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi) | `publishPerConsumer`: each consumer gets its own instance | Remote, File Server |
 | [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.10.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
-| [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.14.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
+| [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.15.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
 | [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api) | Snippets, `dev.jasper.snippets` | 0.3.0 | [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) | `publish` | Shell History |
-| [`dev.jasper.enterprise.api`](sdk-reference.html#package-dev.jasper.enterprise.api) | Enterprise, `dev.jasper.enterprise` | 0.2.0 | [`Workstation`](sdk-reference.html#dev.jasper.enterprise.api.Workstation) | `publish`, while the Enterprise look is active | Credential Vault, Remote, File Server |
 
 Every bundled consumer declares its provider as an optional requirement and runs without it, except Shell History,
 which fails to start when Snippets is not loaded ([Snippets API](#snippets-api)).
@@ -62,8 +60,7 @@ and its **Exports** ([Details](plugins.md#details)).
 
 In this repository, `verifyPluginArchitecture` lets a plugin reference only the JDK, the SDK (not the testkit), its
 own packages, the libraries it bundles and the exported packages listed for it in `declaredImports`
-(`gradle/plugin-architecture.gradle.kts`), and lets Credential Vault, Remote and File Server name
-`dev.jasper.enterprise.api` only in their own `workstation` package.
+(`gradle/plugin-architecture.gradle.kts`).
 
 ## Using an exported API
 
@@ -160,8 +157,7 @@ returned from a `reopener` resolver). Testing a failure with `instanceof NotConn
   `vault.ifPresent(api -> …)` throws when the Vault is absent, because creating the lambda loads `VaultApi`.
 - Put code covered by the two exceptions in a class the plugin creates only once the service was found, as Remote
   does with `RemoteEditing`, which builds Remote's `EditorDocument`s and passes them to the Editor.
-- Project Index keeps every reference to Remote's API in one class, `RemoteBridge`, whose `find` catches the error;
-  Credential Vault, Remote and File Server keep their Enterprise lookup in a `Layout` enum the same way.
+- Project Index keeps every reference to Remote's API in one class, `RemoteBridge`, whose `find` catches the error.
 - Say what is missing where the feature would be. Without the Editor, Remote reports "Could not open a remote file" /
   "Install the Editor plugin to open *path*.", and Project Index disables its file rows with "Install the Editor plugin
   to open files".
@@ -204,7 +200,7 @@ classpath, so the `NoClassDefFoundError` path cannot be exercised there
 ## Credential Vault API
 
 Package [`dev.jasper.vault.api`](sdk-reference.html#package-dev.jasper.vault.api), from Credential Vault
-(`dev.jasper.vault`, 0.6.0). The user's side is in [Credential Vault](credential-vault.md#other-plugins-and-grants).
+(`dev.jasper.vault`, 0.7.0). The user's side is in [Credential Vault](credential-vault.md#other-plugins-and-grants).
 
 The Vault publishes [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi) with `publishPerConsumer`, so each
 consumer's instance carries that plugin's identity and every grant names it. Call every method on the UI thread; each
@@ -411,7 +407,7 @@ reopener = editor.get().reopener("dev.example.tool:", key -> Optional.of(
 ## Remote API
 
 Package [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api), from Remote (`dev.jasper.remote`,
-0.14.0). The user's side is in [Remote](remote.md).
+0.15.0). The user's side is in [Remote](remote.md).
 
 Remote publishes one [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) for every consumer
 with `publish`. Call every method on the UI thread. A stage completes on a worker thread once its remote work has
@@ -427,7 +423,7 @@ and SDK types. A method without a window never connects and never asks the user 
 | [`hostName(hostId)`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects.hostName(UUID)) | The saved host's name. | Empty when the host is no longer saved |
 | [`fileSourceId()`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects.fileSourceId()) | The id of Remote's file source, for the sources of a [`FileChoice`](sdk-reference.html#dev.jasper.sdk.files.FileChoice). | `"dev.jasper.remote.hosts"` |
 | [`folder(location)`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects.folder(FileLocation.Sourced)) | The host and folder of a [`FileLocation.Sourced`](sdk-reference.html#dev.jasper.sdk.files.FileLocation.Sourced) the file chooser returned from Remote's source. | Empty for another source, a root that is not a saved host, or a path that is not absolute (an unresolved home folder) |
-| [`exists(hostId, folders, names)`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects.exists(UUID,List,Set)) | Which of `names` exist in which absolute `folders`, in one `sh -s` command over the open connection. Names containing `*` are globs. The login's home folder and its ancestors report nothing. | A map of folder to the names found there. Fails with [`NotConnectedException`](sdk-reference.html#dev.jasper.remote.api.NotConnectedException) without an open connection, and with an `IOException` when the command fails ("Could not look for project markers on *host*") or runs over 10 seconds |
+| [`exists(hostId, folders, names)`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects.exists(UUID,List,Set)) | Which of `names` exist in which absolute `folders`, in one `sh -s` command over the open connection. Names containing `*` are globs. The filesystem root, the login's home folder and its ancestors report nothing. | A map of folder to the names found there. Fails with [`NotConnectedException`](sdk-reference.html#dev.jasper.remote.api.NotConnectedException) without an open connection, and with an `IOException` when the command fails ("Could not look for project markers on *host*") or runs over 10 seconds |
 | [`list(hostId, root, options, signIn)`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects.list(UUID,String,ListOptions,Optional)) | A project's files under the absolute `root`: Git's view of the work tree (tracked and untracked files, without ignored ones; not when the work tree's top is the login's home folder), else `find`, else an SFTP walk. With `signIn`, it connects in that window when needed. | A [`RemoteListing`](sdk-reference.html#dev.jasper.remote.api.RemoteListing). Fails with `NotConnectedException` when `signIn` is empty and no connection is open, `NoSuchFileException` when the root cannot be entered, an `IOException` when the timeout passes, and `CancellationException` when `options.cancelled()` returns true |
 | [`open(hostId, path, window)`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects.open(UUID,String,WindowHandle)) | Opens the remote file in the Editor, connecting and asking to sign in when needed; reports failures itself. | Nothing; does nothing for a host that is no longer saved. Without the Editor, posts "Could not open a remote file" / "Install the Editor plugin to open *path*." |
 | [`openTerminal(hostId, folder, window)`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects.openTerminal(UUID,String,WindowHandle)) | Opens an SSH tab on the host in `window`, whose shell starts in `folder`; may connect and ask to sign in. | Nothing; does nothing for a host that is no longer saved |
@@ -511,33 +507,6 @@ private void save(WindowHandle window, String name, String command) {
             Optional.of(SnippetService.rowId(saved.get().name())));
         else context.notifications().group().warning("Snippet not saved", message.orElseThrow());
     });
-}
-```
-
-## Enterprise API
-
-Package [`dev.jasper.enterprise.api`](sdk-reference.html#package-dev.jasper.enterprise.api), from Enterprise
-(`dev.jasper.enterprise`, 0.2.0). The user's side is in [the Enterprise look](enterprise.md).
-
-[`Workstation`](sdk-reference.html#dev.jasper.enterprise.api.Workstation) is an empty interface: its presence is the
-message. Enterprise is off by default and starts only as the active look, and its `start` does nothing but publish
-`Workstation`. A plugin that finds it composes its classic layout for that run, and its default layout otherwise. The
-look changes only at a restart, so read it once in `start`.
-
-**Bundled consumers.** Credential Vault, Remote and File Server each declare
-`{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }` and read a `Layout` once in `start`
-([classic layouts](enterprise.md#classic-layouts-in-remote-file-server-and-credential-vault)).
-
-**Recipe.**
-
-```java
-enum Layout {
-    DEFAULT, CLASSIC;
-
-    static Layout of(Services services) {
-        try { return services.find(Workstation.class).isPresent() ? CLASSIC : DEFAULT; }
-        catch (NoClassDefFoundError absent) { return DEFAULT; }
-    }
 }
 ```
 

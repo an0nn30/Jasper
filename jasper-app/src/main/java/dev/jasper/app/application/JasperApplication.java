@@ -985,8 +985,8 @@ public final class JasperApplication {
         }) : dev.jasper.app.plugins.GlassSource.NONE);
         plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
         plugins.animations(themes::animationsEnabled);
-        // The kit the controller installed: the presentation's, or the default one when the kit was blamed (spec 4.7).
-        plugins.presentation(themes.kit());
+        // The kit the controller installed and the look plugins read: the presentation's, or the fallback when the kit was blamed (spec 4.7).
+        plugins.presentation(themes.kit(), presentation.projections().plugins(), presentation.defaults());
         plugins.shortcuts(this::shortcutLabel);
         plugins.clipboard(clipboard);
         plugins.commandClient(CommandInstall.client(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),

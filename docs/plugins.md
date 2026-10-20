@@ -42,19 +42,19 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 
 | Plugin | Id | Version | On by default | Guide |
 |---|---|---|---|---|
-| Remote | `dev.jasper.remote` | 0.14.0 | Yes | [Remote](remote.md) |
-| Credential Vault | `dev.jasper.vault` | 0.6.0 | Yes | [Credential Vault](credential-vault.md) |
+| Remote | `dev.jasper.remote` | 0.15.0 | Yes | [Remote](remote.md) |
+| Credential Vault | `dev.jasper.vault` | 0.7.0 | Yes | [Credential Vault](credential-vault.md) |
 | Editor | `dev.jasper.editor` | 0.10.0 | Yes | [Editor](editor.md) |
-| File Server | `dev.jasper.fileserver` | 0.5.0 | Yes | [File Server](file-server.md) |
+| File Server | `dev.jasper.fileserver` | 0.6.0 | Yes | [File Server](file-server.md) |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | Yes | [Project Index](project-index.md) |
 | Shell History | `dev.jasper.history` | 0.3.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
 | Snippets | `dev.jasper.snippets` | 0.3.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
-| Enterprise | `dev.jasper.enterprise` | 0.2.0 | No | [The Enterprise look](enterprise.md) |
-| Sample | `dev.jasper.sample` | 0.3.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
+| Enterprise | `dev.jasper.enterprise` | 0.3.0 | No | [The Enterprise look](enterprise.md) |
+| Sample | `dev.jasper.sample` | 0.4.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
-Every bundled plugin declares `sdk = ">=0.18.0, <0.19"` except Remote, which declares `sdk = ">=0.18.1, <0.19"`. A
-plugin uses another plugin it lists under "Uses, when present" only while that plugin is running; without it, the
-features that need it are missing.
+Remote, Credential Vault, File Server, Enterprise and Sample declare `sdk = ">=0.18.2, <0.19"`; Editor, Project Index,
+Shell History and Snippets declare `sdk = ">=0.18.0, <0.19"`. A plugin uses another plugin it lists under "Uses, when
+present" only while that plugin is running; without it, the features that need it are missing.
 
 ### Remote
 
@@ -65,8 +65,7 @@ Windows, the `ssh >` and `tunnels >` palette scopes, and saved hosts as places i
 
 - **Start with** Session › Connect to SSH Host... (Cmd+Shift+H / Ctrl+Shift+H).
 - **Capabilities** `terminal.open`, `session.provide`, `terminal.observe`, `palette.contribute`, `files.source`.
-- **Uses, when present** Credential Vault (`>=0.2`) for host logins and keys, Editor (`>=0.2`) to edit remote files,
-  Enterprise (`>=0.1`) for its classic layout.
+- **Uses, when present** Credential Vault (`>=0.2`) for host logins and keys, Editor (`>=0.2`) to edit remote files.
 - **Exports** `dev.jasper.remote.api`, which Project Index uses to index projects on saved hosts.
 
 ### Credential Vault
@@ -78,7 +77,6 @@ dialog, once or always; File › Vault Plugin Grants... shows the grants. Secure
 
 - **Start with** File › Open Vault... (Cmd+Shift+\\ / Ctrl+Alt+Shift+\\).
 - **Capabilities** `palette.contribute`.
-- **Uses, when present** Enterprise (`>=0.1`) for its classic layout.
 - **Exports** `dev.jasper.vault.api`.
 
 ### Editor
@@ -99,7 +97,7 @@ window, read-only and reachable from this computer only until you change that, w
 
 - **Start with** Transfer › Share Folder….
 - **Capabilities** `network.listen`, `terminal.observe`, `palette.contribute`, `clipboard.read`.
-- **Uses, when present** Credential Vault (`>=0.2`) for Vault logins, Enterprise (`>=0.1`) for its classic layout.
+- **Uses, when present** Credential Vault (`>=0.2`) for Vault logins.
 
 ### Project Index
 
@@ -133,14 +131,16 @@ fields, or edit the file that holds them, `plugins/dev.jasper.snippets/data/snip
 
 ### Enterprise
 
-The Enterprise look: native title bars, menus in the window, labelled tool window stripes, the Run window in place of
-the command palette card, classic controls and IntelliJ's classic toolbar icons, with the IBM Plex fonts, the Enterprise
+The Enterprise look: IntelliJ Classic's title bar on macOS and Windows, with the menus in the macOS menu bar or the
+Windows title bar (on Linux the system title bar and a menu row in the window), labelled tool window stripes, a 28-pixel
+toolbar with a Search Everywhere button, the Run window in place of the command palette card, classic controls and
+IntelliJ's classic icons, with the IBM Plex fonts (IBM Plex Mono is also the Editor's default font), the Enterprise
 theme (Light and Dark, ports of IntelliJ Light and New UI Dark) and a branded splash screen. It is off by default;
-turn it on in Settings › Plugins and restart. Its code only publishes a service that tells Credential Vault, Remote
-and File Server to use their classic layouts. See [looks](#looks-and-plugin-themes).
+turn it on in Settings › Plugins and restart. The look is data, a kit file with its fonts and theme, and the plugin's
+code does nothing; Credential Vault, Remote and File Server use their classic layouts under it. See
+[looks](#looks-and-plugin-themes).
 
 - **Capabilities** `presentation.provide`.
-- **Exports** `dev.jasper.enterprise.api`.
 
 ### Sample
 
@@ -270,7 +270,7 @@ badge when there is one, **Enabled** for a running plugin, and otherwise the sta
 | Active | Running |
 | Disabled | Off: "off by default", "disabled by the user", "marked for removal", "safe mode" or "safe mode uses the standard look" |
 | Needs review | Waiting for your review: "not reviewed yet" or "new capabilities: …" |
-| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.18.1", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
+| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.18.2", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
 | Failed | Its classes could not be loaded, or its start failed |
 | Not loaded yet | Not present when this launch began, such as a plugin installed since |
 
@@ -289,11 +289,11 @@ checks it before it asks you anything:
 - Jar names use only letters, digits, spaces and `.`, `_`, `+`, `-`; no name may appear twice.
 - At most 4096 entries, 256 jars and 512 MiB once unpacked.
 - Exactly one jar holds a valid `plugin.toml` at its root, and the plugin's SDK range includes this Jasper's SDK,
-  0.18.1.
+  0.18.2.
 
 A zip that fails is refused on the message line with the reason, for example "The zip holds no jar files", "The zip
 must hold the plugin's jars at its root or in one folder", "Not a Jasper plugin: no plugin.toml in any jar" or "Tool
-1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.18.1", and nothing is installed.
+1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.18.2", and nothing is installed.
 
 A zip that passes opens the **Install *name*** sheet: the plugin's name and version, "From *vendor*", what it
 [asks to do](#capabilities) and the warning that a plugin is not sandboxed. **Install** stages the plugin in

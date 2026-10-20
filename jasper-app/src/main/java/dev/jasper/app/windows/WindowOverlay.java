@@ -1,5 +1,6 @@
 package dev.jasper.app.windows;
 
+import dev.jasper.app.platform.TitleInset;
 import dev.jasper.app.platform.WindowInput;
 import dev.jasper.ui.swing.ClassicDialog;
 import dev.jasper.ui.swing.KitContext;
@@ -52,6 +53,7 @@ final class WindowOverlay implements AutoCloseable {
     private final ComponentAdapter resize = new ComponentAdapter() {
         @Override public void componentResized(ComponentEvent event) { layout(); }
     };
+    private final PropertyChangeListener insetChanged = event -> layout();
     private boolean shown, closed;
     private final PropertyChangeListener focusChanged = this::focusChanged;
     private Component priorFocus;
@@ -115,6 +117,7 @@ final class WindowOverlay implements AutoCloseable {
             stack.add(this);
             root.putClientProperty(WindowInput.OVERLAY, this);
             root.getLayeredPane().addComponentListener(resize);
+            root.addPropertyChangeListener(TitleInset.CHANGED, insetChanged);
             focusManager.addKeyEventDispatcher(keys);
             focusManager.addPropertyChangeListener("focusOwner", focusChanged);
             layout();
@@ -126,7 +129,10 @@ final class WindowOverlay implements AutoCloseable {
     void layout() {
         if (!shown) return;
         var component = layer.component();
-        component.setBounds(0, 0, root.getLayeredPane().getWidth(), root.getLayeredPane().getHeight());
+        // Below the window's classic title chrome (plan 14), else over the whole layered pane.
+        int width = root.getLayeredPane().getWidth(), height = root.getLayeredPane().getHeight();
+        int top = Math.min(TitleInset.of(root), height);
+        component.setBounds(0, top, width, height - top);
         component.doLayout(); component.revalidate(); component.repaint();
     }
 
@@ -172,6 +178,7 @@ final class WindowOverlay implements AutoCloseable {
         focusManager.removeKeyEventDispatcher(keys);
         focusManager.removePropertyChangeListener("focusOwner", focusChanged);
         root.getLayeredPane().removeComponentListener(resize);
+        root.removePropertyChangeListener(TitleInset.CHANGED, insetChanged);
         var stack = stack();
         stack.remove(this);
         WindowOverlay below = stack.isEmpty() ? null : stack.getLast();

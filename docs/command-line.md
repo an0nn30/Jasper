@@ -109,7 +109,10 @@ Choose Settings › Appearance & Behavior › System Settings › Command line, 
 the command stands, with **Install** and **Uninstall**. The command palette has the same actions as
 **Install 'jasper' Command in PATH** and **Uninstall 'jasper' Command from PATH**, with no default shortcut. Only a
 packaged Jasper, started from its launcher, can install the command: anywhere else the row reads
-"Needs an installed Jasper" and both palette actions are disabled.
+"Needs an installed Jasper" and both palette actions are disabled. The
+[Windows user installation](../README.md#windows-user-installation) built from source has no `jasper` command: its row
+reads "Not installed", but **Install** only adds a `bin` folder that does not exist to your `Path`, and while the
+Jasper Editor is the default editor its shells' `EDITOR` names that missing command.
 
 | OS | Install | Hint after installing |
 |---|---|---|

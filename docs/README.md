@@ -48,8 +48,8 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 - [Writing a plugin](plugin-authoring.md): the manifest, capabilities, lifecycle, contributions, settings, packaging
   and testing.
 - [Plugin UI](plugin-ui.md): building panels, forms and windows with the theme engine.
-- [Plugin APIs](plugin-apis.md): the APIs that the Vault, Editor, Remote, Snippets and Enterprise plugins export to
-  other plugins.
+- [Plugin APIs](plugin-apis.md): the APIs that the Vault, Editor, Remote and Snippets plugins export to other
+  plugins.
 - [SDK architecture](sdk-architecture.md): how Jasper discovers, loads, threads and stops plugins.
 - [Plugin icons](sdk-icons.md): the semantic icon names and registering a plugin's own monochrome icons.
 - [jasper-sdk](../jasper-sdk/README.md): the SDK's packages and release jars.
@@ -60,8 +60,9 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 ## Building Jasper and contributing
 
 [AGENTS.md](../AGENTS.md) covers the toolchain, the architecture rules and what coding agents may run unattended.
-The root [README](../README.md#building-from-source) lists the build requirements. Use the Gradle wrapper with a
-JetBrains Runtime SDK 25:
+The root [README](../README.md#building-from-source) lists the build requirements and, under
+[Windows user installation](../README.md#windows-user-installation), says how to install a build for the current
+Windows user without a C/C++ compiler. Use the Gradle wrapper with a JetBrains Runtime SDK 25:
 
 ```sh
 ./gradlew check :jasper-app:installDist
@@ -79,8 +80,8 @@ user's authorization.
 | `jasper-ui` | [Engine and kit](../jasper-ui/README.md) | [Packages, API and ownership](ui-architecture.md) | [Gallery, extensions and distribution](ui-maintenance.md) |
 | `jasper-buddy` | [Embedding](../jasper-buddy/README.md) | [Facade, model and presentation](buddy-architecture.md) | [Notices, options, animation and assets](buddy-maintenance.md) |
 
-- [Packaging](packaging.md): native images, the DMG, the Windows ZIP and setup wizard, the Linux packages, the
-  release workflow and the acceptance checklists.
+- [Packaging](packaging.md): native images, the DMG, the Windows ZIP, setup wizard and user installation, the Linux
+  packages, the release workflow and the acceptance checklists.
 - [Benchmarks](benchmarks.md): throughput, memory and start-up measurements and how to compare them.
 - [Launcher](../packaging/launcher/README.md): Jasper's build of the jpackage launcher and its launch watcher.
 - [The `jasper` command](../packaging/cli/README.md): the native client and its protocol.

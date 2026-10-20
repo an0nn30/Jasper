@@ -9,6 +9,7 @@ import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.ChromePainter;
@@ -30,24 +31,28 @@ import org.junit.jupiter.api.extension.ExtendWith;
 /** Spec 10.7: a labelled side stripe's labels, order, numbers, reading direction, drag view and actions. */
 @ExtendWith(EdtTestExtension.class)
 class LabelledStripeTest {
-    static ToolStripe.Button window(String id, String title, Slot slot, int number) {
-        return new ToolStripe.Button(id, title, null, slot, true, Optional.empty(), number == 0 ? OptionalInt.empty() : OptionalInt.of(number));
+    static ToolStripe.Button window(String id, String title, Slot slot, int number) { return window(id, title, slot, number, null); }
+
+    /** An open window's button with {@code icon}, its toggle ending in {@code number} unless that is 0. */
+    static ToolStripe.Button window(String id, String title, Slot slot, int number, javax.swing.Icon icon) {
+        return new ToolStripe.Button(id, title, icon, slot, true, Optional.empty(), number == 0 ? OptionalInt.empty() : OptionalInt.of(number));
     }
 
     private static LabelledStripe stripe(Side side) {
         EnterpriseLook.install(false);
-        return new LabelledStripe(side, EnterpriseLook.kit());
+        return new LabelledStripe(side, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
     }
 
     private static int metric(DesignMetrics.Role role) { return com.formdev.flatlaf.util.UIScale.scale(EnterpriseLook.kit().metrics().value(role)); }
 
     /**
      * A labelled side stripe's whole thickness: the label's line across it (the face's fractional ascent and descent,
-     * rounded), its two rail edges and its rule.
+     * rounded) or the 13 px stripe icon, whichever is larger, its two rail edges and its rule.
      */
     private static int fitted(Kit kit) {
-        var line = new StripeLabels(kit).font().getLineMetrics("Mg", new java.awt.font.FontRenderContext(null, true, true));
-        return Math.round(line.getAscent() + line.getDescent()) + 2 * metric(DesignMetrics.Role.RAIL_EDGE) + metric(DesignMetrics.Role.DOCK_RULE);
+        var line = new StripeLabels(kit, ChromeArtwork.CLASSIC).font().getLineMetrics("Mg", new java.awt.font.FontRenderContext(null, true, true));
+        return Math.max(Math.round(line.getAscent() + line.getDescent()), metric(DesignMetrics.Role.STRIPE_ICON))
+            + 2 * metric(DesignMetrics.Role.RAIL_EDGE) + metric(DesignMetrics.Role.DOCK_RULE);
     }
 
     @Test void itShowsItsSidesWindowsByGroupWithTheirNumbers() throws Exception {
@@ -108,7 +113,7 @@ class LabelledStripeTest {
             for (var theme : palettes) for (String state : List.of("closed", "hovered", "open")) {
                 boolean open = state.equals("open");
                 dev.jasper.ui.swing.FlatLafInstaller.install(theme, EnterpriseLook.kit());
-                var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit());
+                var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
                 stripe.render(List.of(new ToolStripe.Button("sftp", "SFTP", null, Slot.LEFT_TOP, open, Optional.empty(), OptionalInt.empty())), List.of());
                 var label = stripe.buttons().getFirst();
                 label.getModel().setRollover(state.equals("hovered"));
@@ -185,12 +190,12 @@ class LabelledStripeTest {
             EnterpriseLook.install(false);
             Kit kit = EnterpriseLook.kit();
             var big = new Kit(kit.id(), kit.metrics(), kit.type().withBody(24), kit.faces(), kit.controls(), kit.colors(), kit.uiKeys());
-            var stripe = new LabelledStripe(Side.LEFT, big);
+            var stripe = new LabelledStripe(Side.LEFT, big, ChromeArtwork.CLASSIC);
             var badge = Optional.of(new PanelBadge(12, PanelBadge.Tone.ERROR, "12 errors"));
             stripe.render(List.of(new ToolStripe.Button("a", "A rather long tool window title", null, Slot.LEFT_TOP, true, badge, OptionalInt.of(1)),
                 window("b", "Second", Slot.LEFT_TOP, 0), window("c", "Third", Slot.LEFT_BOTTOM, 0)), List.of());
             int thickness = stripe.getPreferredSize().width;
-            assertThat(thickness).as("thicker than at the kit's own size").isGreaterThan(new LabelledStripe(Side.LEFT, kit).getPreferredSize().width)
+            assertThat(thickness).as("thicker than at the kit's own size").isGreaterThan(new LabelledStripe(Side.LEFT, kit, ChromeArtwork.CLASSIC).getPreferredSize().width)
                 .isEqualTo(fitted(big));
             MockCrops.render(stripe, thickness, 1200, 1);
             var bounds = stripe.buttons().stream().map(AbstractButton::getBounds).toList();
@@ -245,10 +250,11 @@ class LabelledStripeTest {
             var action = new AbstractAction("About Sample") { @Override public void actionPerformed(ActionEvent event) { } };
             stripe.render(List.of(window("t", "A long top group title", Slot.LEFT_TOP, 0), window("s", "Second", Slot.LEFT_BOTTOM, 0)),
                 List.of(action));
-            var labels = new StripeLabels(EnterpriseLook.kit());
+            var labels = new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
             int rail = metric(DesignMetrics.Role.RAIL_GAP), between = metric(DesignMetrics.Role.STRIPE_LABEL_GAP);
-            int top = labels.length("A long top group title", Optional.empty()), second = labels.length("Second", Optional.empty());
-            int actions = metric(DesignMetrics.Role.RAIL_SECTION_GAP) + labels.length("About Sample", Optional.empty()) + between;
+            int top = labels.length("A long top group title", Optional.empty(), null), second = labels.length("Second", Optional.empty(), null);
+            int actions = metric(DesignMetrics.Role.RAIL_SECTION_GAP)
+                + labels.length("About Sample", Optional.empty(), labels.icon(ToolStripe.actionIcon(action))) + between;
             int slack = 6, height = 2 * rail + top + between + second + slack;
             assertThat(actions).as("the actions need more than the slack").isGreaterThan(slack);
             MockCrops.render(stripe, stripe.getPreferredSize().width, height, 1);
@@ -257,7 +263,7 @@ class LabelledStripeTest {
             assertThat(s.y + s.height).as("the second group at the bottom end").isEqualTo(height - rail);
             assertThat(s.y).as("after the top group").isGreaterThanOrEqualTo(t.y + t.height + between);
             assertThat(about.y).as("the actions follow the second group").isGreaterThanOrEqualTo(s.y + s.height);
-            stripe.beginDrag("t", "A long top group title");
+            stripe.beginDrag("t", "A long top group title", null);
             var groups = stripe.dropGroups();
             assertThat(groups.get(1).bounds().height).as("the second group can take a drop").isPositive();
             assertThat(groups.get(1).bounds().contains(s.x + s.width / 2, s.y + s.height / 2)).isTrue();
@@ -280,7 +286,7 @@ class LabelledStripeTest {
                 MockCrops.render(stripe, stripe.getPreferredSize().width, height, 1);
                 Rectangle under = stripe.buttons().get(1).getBounds(), servers = stripe.buttons().get(2).getBounds();
                 // A drag of a top window: the second group keeps its label at the bottom end.
-                stripe.beginDrag("u", "Under");
+                stripe.beginDrag("u", "Under", null);
                 var groups = stripe.dropGroups();
                 assertThat(groups).extracting(DockDropResolver.Group::slot).containsExactly(top, second);
                 Rectangle topBounds = groups.get(0).bounds(), secondBounds = groups.get(1).bounds();
@@ -312,7 +318,7 @@ class LabelledStripeTest {
                 stripe.endDrag();
 
                 // Dragging the second group's only label: its length stays at the bottom end as the group's drop space.
-                stripe.beginDrag("f", "2: File Servers");
+                stripe.beginDrag("f", "2: File Servers", null);
                 groups = stripe.dropGroups();
                 assertThat(groups.get(1).buttons()).as(side + ": lifted out").isEmpty();
                 assertThat(groups.get(1).bounds().contains(x, servers.y + servers.height / 2)).as(side + ": its place drops back").isTrue();
@@ -325,7 +331,7 @@ class LabelledStripeTest {
                 // An empty second group shows one label's drop space at the bottom end.
                 stripe.render(List.of(window("t", "Top", top, 0), window("u", "Under", top, 0)), List.of());
                 MockCrops.render(stripe, stripe.getPreferredSize().width, height, 1);
-                stripe.beginDrag("u", "Under");
+                stripe.beginDrag("u", "Under", null);
                 groups = stripe.dropGroups();
                 assertThat(groups.get(1).buttons()).isEmpty();
                 stripe.showGap(second, 0);
@@ -342,7 +348,7 @@ class LabelledStripeTest {
             var stripe = stripe(Side.LEFT);
             stripe.render(List.of(window("sftp", "SFTP", Slot.LEFT_TOP, 1), window("servers", "File Servers", Slot.LEFT_TOP, 2)), List.of());
             MockCrops.render(stripe, stripe.getPreferredSize().width, 400, 1);
-            stripe.beginDrag("servers", "2: File Servers");
+            stripe.beginDrag("servers", "2: File Servers", null);
             var groups = stripe.dropGroups();
             assertThat(groups).extracting(DockDropResolver.Group::slot).containsExactly(Slot.LEFT_TOP, Slot.LEFT_BOTTOM);
             assertThat(groups.get(0).buttons()).as("the lifted label is out").hasSize(1);

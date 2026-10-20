@@ -66,7 +66,7 @@ The menu bubble keeps its fixed dark material.
 
 | Surface/owner | Responsibility and lifecycle |
 | --- | --- |
-| `BuddyWindow` | The 84 × 96 sprite window. Pointer entry greets; a single click opens the drawer; a double click runs `activateHost`; the popup trigger (right-click, or Ctrl+click on macOS) opens the menu bubble; a press closes it. A drag starts after 3 pixels and reports `positionChanged` on release. Its one-shot timer follows the animator's next deadline. |
+| `BuddyWindow` | The 105 × 120 sprite window. Pointer entry greets; a single click opens the drawer; a double click runs `activateHost`; the popup trigger (right-click, or Ctrl+click on macOS) opens the menu bubble; a press closes it. A drag starts after 3 pixels and reports `positionChanged` on release. Its one-shot timer follows the animator's next deadline. |
 | `BuddyColumnWindow` / `BuddyColumnPanel` | At most three capsules (`BuddyDeckLayout.MAX_IN_COLUMN`), newest nearest the sprite; with more notices the newest shows the total count. A capsule click runs its activation; a click beside them opens the drawer. Arrival and hover motion, running shimmer and live detail. Hidden when the deck is empty. |
 | `BuddyDeckWindow` / `BuddyDeckPanel` | Every retained notice with wheel scrolling, activation, per-notice × dismissal and a **Clear all** row when there is more than one. No auto-hide timeout; pointer exit, activation, emptying and host hide close it, and it reopens scrolled to the top. Its height is capped by the usable screen height. |
 | `BuddyBubble` / `BuddyBubblePanel` | Menu bubble with one entry, **Hide Jasper**, which runs `toggleRequested`; hides on pointer exit, activation or its five-second timeout. |
@@ -124,10 +124,11 @@ exception display empty text, and text is truncated by whole code points with an
 ellipsis. A `RUNNING` notice's detail carries a sweeping highlight; `NEEDS_INPUT` and
 `DEGRADED` show a dot, and `DOWN` a cross in the `UIManager` colour
 `Jasper.semantic.status.danger` (fallback `#C45A53`). Hovering a capsule reveals an open
-affordance without moving its text. The sprite uses nearest-neighbour integer scaling at
-2×. Its 20-frame, 840 × 48 PNG lives beside `BuddySprite` in the produced jar; a sheet of
-any other size fails to load. See [sprite maintenance](../packaging/buddy/README.md) for
-the generated master and frame order.
+affordance without moving its text. The sprite is shaded pixel art: `BuddySprite` draws
+each 84 × 96 source cell with nearest-neighbour sampling into its 42 × 48 logical frame at
+the window's scale of 2.5, so 105 × 120. Its 20-frame, 1680 × 96 PNG lives beside `BuddySprite` in
+the produced jar; a sheet of any other size fails to load. See
+[sprite maintenance](../packaging/buddy/README.md) for the editable master and frame order.
 
 ## Application boundary and verification
 

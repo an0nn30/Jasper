@@ -193,18 +193,24 @@ class SettingsPagesMockTest {
 
     /** {@code render}'s probes of {@code key} (a page id) against {@code mock}; the failures, the face's printed when not PLEX. */
     static List<String> probes(String key, BufferedImage render, BufferedImage mock) {
+        return probes(key, render, mock, Map.of());
+    }
+
+    static List<String> probes(String key, BufferedImage render, BufferedImage mock, Map<String, java.awt.Point> positions) {
         var failures = new ArrayList<String>();
         for (var probe : PROBES.getOrDefault(key, List.of())) {
             int x = 2 * probe.x(), y = 2 * probe.y();
+            var actual = positions.getOrDefault(probe.name(), new java.awt.Point(probe.x(), probe.y()));
+            int actualX = 2 * actual.x, actualY = 2 * actual.y;
             String name = key + "/" + probe.name();
             double limit = TIGHT.contains(name) ? TIGHT_PROBE : SettingsChromeMockTest.PROBE, distance = Double.MAX_VALUE;
             // A HALF probe's target may lie up to its pixels higher in the render (logical pixels, two 2x rows each).
             int expected = SettingsChromeMockTest.expected(probe, mock, x, y);
             for (int up = 0; up <= 2 * HALF.getOrDefault(name, 0) && distance > limit; up += 2)
-                distance = Math.min(distance, SettingsMockMatch.deltaE(render.getRGB(x, y - up), expected));
+                distance = Math.min(distance, SettingsMockMatch.deltaE(render.getRGB(actualX, actualY - up), expected));
             if (distance <= limit) continue;
             String failure = String.format("%s at (%d, %d): render #%06X, expected %s #%06X, ΔE %.1f", name, probe.x(), probe.y(),
-                render.getRGB(x, y) & 0xFFFFFF, probe.colour() == null ? "the mock's" : probe.colour(), expected & 0xFFFFFF, distance);
+                render.getRGB(actualX, actualY) & 0xFFFFFF, probe.colour() == null ? "the mock's" : probe.colour(), expected & 0xFFFFFF, distance);
             if (RESIDUAL.containsKey(name)) System.out.println("Residual (plan 9b Task 7: " + RESIDUAL.get(name) + "): " + failure);
             else if (FACE.contains(name) && !SettingsChromeMockTest.PLEX) System.out.println(SettingsChromeMockTest.UNCHECKED + failure);
             else failures.add(failure);
@@ -282,6 +288,37 @@ class SettingsPagesMockTest {
         return failures;
     }
 
+    @Test void pageFactoryKeepsWorkspaceControlsSpecificToTheHost() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var system = new CorePages.SystemActions(() -> java.nio.file.Path.of("config.toml"),
+                () -> { }, () -> { }, () -> { }, () -> { }, () -> false, java.util.Optional.empty());
+            var supplied = CorePages.Pages.of(context -> new GroupPage("keymap", "Keymap", java.util.Optional.empty(),
+                false, List::of, context), context -> new GroupPage("plugins", "Plugins", java.util.Optional.empty(),
+                false, List::of, context));
+            var draft = new SettingsDraft(dev.jasper.app.config.ConfigLoader.parse(java.nio.file.Path.of("config.toml"), "", true).values());
+            var context = PageKit.context(draft, ignored -> { }, () -> { });
+            for (boolean glass : new boolean[] {false, true}) {
+                assertWorkspace(CorePages.pages(AppearanceFixtures.CHOICES, system, ShellChoices.NONE,
+                    NotificationGroupChoices.NONE, supplied, glass).apply(context), glass);
+            }
+            assertWorkspace(CorePages.pages(AppearanceFixtures.CHOICES, system, ShellChoices.NONE,
+                NotificationGroupChoices.NONE, supplied).apply(context), com.formdev.flatlaf.util.SystemInfo.isMacOS);
+            assertThat(draft.value(dev.jasper.app.config.CoreSettings.SYSTEM_RUN_IN_BACKGROUND))
+                .isEqualTo(com.formdev.flatlaf.util.SystemInfo.isMacOS || com.formdev.flatlaf.util.SystemInfo.isWindows);
+        });
+    }
+
+    private static void assertWorkspace(List<SettingsPage> pages, boolean glass) {
+        try {
+            var appearance = (SchemaPage) pages.stream().filter(page -> page.id().equals("appearance")).findFirst().orElseThrow();
+            appearance.component();
+            var names = appearance.rows().stream().map(row -> row.setting().name()).toList();
+            assertThat(names.contains("ui.workspace.opacity")).isEqualTo(glass);
+            assertThat(names.contains("ui.workspace.blur")).isEqualTo(glass);
+            assertThat(names).contains("ui.font.family", "ui.font.size");
+        } finally { pages.forEach(SettingsPage::dispose); }
+    }
+
     @Test void appearanceAndWindowMatchTheirMocks() throws Exception {
         try (var settings = EnterpriseSettings.open(false)) {
             assertThat(compare(settings, List.of("appearance", "window"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
@@ -311,20 +348,46 @@ class SettingsPagesMockTest {
         var recording = new SettingsChromeMockTest.Page("Settings 07b - Keymap - Recording shortcut.png", "keymap", 713, 7);
         try (var settings = EnterpriseSettings.open(false)) {
             var render = new BufferedImage[1];
+            var positions = new LinkedHashMap<String, java.awt.Point>();
             SwingUtilities.invokeAndWait(() -> {
                 var keymap = keymap(settings);
                 dev.jasper.app.shortcuthelp.ShortcutPreviewSupport.expand(keymap, "Clipboard");
                 dev.jasper.app.shortcuthelp.ShortcutPreviewSupport.edit(keymap, "Copy");
                 render[0] = settings.render("keymap", 1040, recording.height());
+                var value = KitTestSupport.require(settings.content(), "editor.value", javax.swing.JComponent.class);
+                java.awt.Component detail = value.getParent();
+                while (!(detail instanceof dev.jasper.ui.swing.KitView)) detail = detail.getParent();
+                var bounds = SwingUtilities.convertRectangle(detail.getParent(), detail.getBounds(), settings.content());
+                var field = SwingUtilities.convertRectangle(value.getParent(), value.getBounds(), settings.content());
+                var metrics = dev.jasper.app.testsupport.EnterpriseLook.kit().metrics();
+                int top = bounds.y - metrics.value(dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_TOP);
+                int bottom = bounds.y + bounds.height + metrics.value(dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_BOTTOM) - 1;
+                // The native fallback font can grow the rows and editor. Probe the same band surfaces at
+                // their laid-out positions, retaining the mock's exact colours and the overall share floor.
+                positions.put("band top edge", new java.awt.Point(600, top));
+                positions.put("band bottom edge", new java.awt.Point(600, bottom));
+                positions.put("band fill", new java.awt.Point(300, bottom - 3));
+                positions.put("recorder ring", new java.awt.Point(600, field.y));
             });
             ImageIO.write(render[0], "png", Files.createDirectories(EnterpriseSettings.OUT.resolve("pages")).resolve("07b.png").toFile());
             var mock = SettingsChromeMockTest.content(recording);
-            var failures = new ArrayList<>(probes("keymap-recording", render[0], mock));
+            var failures = new ArrayList<>(probes("keymap-recording", render[0], mock, positions));
             var shares = new StringBuilder();
             failures.addAll(share("keymap-recording", "07b", recording, render[0], mock, shares));
             Files.writeString(EnterpriseSettings.OUT.resolve("pages-keymap-recording.txt"), shares);
+            if (!failures.isEmpty()) SwingUtilities.invokeAndWait(() -> recordingGeometry(settings.content(), settings.content()));
             assertThat(failures).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
         }
+    }
+
+    private static void recordingGeometry(java.awt.Component component, javax.swing.JComponent root) {
+        String name = component.getName();
+        if (name != null && (name.contains("editor") || name.contains("Copy") || name.contains("Clipboard"))) {
+            var bounds = SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), root);
+            System.out.println("Recording geometry: " + name + " " + bounds + " font=" + component.getFont());
+        }
+        if (component instanceof java.awt.Container container)
+            for (var child : container.getComponents()) recordingGeometry(child, root);
     }
 
     @Test void pluginsMatchesItsMock() throws Exception {

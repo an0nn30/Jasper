@@ -5,8 +5,8 @@ import dev.jasper.sdk.Variant;
 import java.util.function.Consumer;
 
 /**
- * Host-owned appearance values. Declarative views follow these automatically; specialized content
- * subscribes to refresh its domain palettes.
+ * Host-owned appearance values and the look Jasper runs with. Declarative views follow these automatically; specialized
+ * content subscribes to refresh its domain palettes.
  */
 public interface Appearance {
     /**
@@ -78,5 +78,11 @@ public interface Appearance {
      * @return the registration
      */
     Subscription onChanged(Consumer<Variant> handler);
+
+    /** The look Jasper runs with, chosen at start: the same value for every plugin until Jasper restarts. Safe from any thread.
+     * @return the presentation
+     * @since 0.18.2
+     */
+    Presentation presentation();
 
 }

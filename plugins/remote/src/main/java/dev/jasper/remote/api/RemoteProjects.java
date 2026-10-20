@@ -61,7 +61,7 @@ public interface RemoteProjects {
 
     /**
      * Which names exist in which folders, in one remote command over an open connection. Names with {@code *} are
-     * globs. The login's home folder and its ancestors report nothing.
+     * globs. The filesystem root, the login's home folder and its ancestors report nothing.
      *
      * @param hostId a saved host
      * @param folders absolute folders

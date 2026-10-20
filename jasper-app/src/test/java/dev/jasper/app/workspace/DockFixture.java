@@ -6,7 +6,9 @@ import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.PresentationIcon;
 import dev.jasper.app.testsupport.MockCrops;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.model.ControlState;
@@ -82,10 +84,10 @@ final class DockFixture implements AutoCloseable {
         this.panels = panels(connected);
         this.binding = new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); });
         var context = KitContext.of(kit, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
-        stripes = new StripeSet.LabelledStripes(kit);
+        stripes = new StripeSet.LabelledStripes(kit, ChromeArtwork.CLASSIC);
         var terminal = new JPanel();
         terminal.setBackground(theme.semantic().color(SemanticColor.SURFACE_TERMINAL));
-        area = new ToolWindowArea(terminal, state, kit, true);
+        area = new ToolWindowArea(terminal, state, kit, true, ChromeArtwork.CLASSIC);
         body.add(stripes.left(), BorderLayout.WEST);
         body.add(area, BorderLayout.CENTER);
         body.add(stripes.right(), BorderLayout.EAST);
@@ -114,13 +116,24 @@ final class DockFixture implements AutoCloseable {
         area.sync();
         var buttons = new ArrayList<ToolStripe.Button>();
         for (Panel panel : panels)
-            buttons.add(new ToolStripe.Button(panel.id(), panel.title(), null, panel.slot(), true, Optional.empty(),
-                panel.number() == 0 ? OptionalInt.empty() : OptionalInt.of(panel.number())));
-        buttons.add(new ToolStripe.Button("log", "Event Log", null, Slot.BOTTOM_LEFT, false));
-        buttons.add(new ToolStripe.Button("transfers", "Transfers", null, Slot.BOTTOM_LEFT, false));
+            buttons.add(new ToolStripe.Button(panel.id(), panel.title(), new PresentationIcon(icon(panel.id()), null), panel.slot(), true,
+                Optional.empty(), panel.number() == 0 ? OptionalInt.empty() : OptionalInt.of(panel.number())));
+        buttons.add(new ToolStripe.Button("log", "Event Log", AppIcons.semantic("bell"), Slot.BOTTOM_LEFT, false));
+        buttons.add(new ToolStripe.Button("transfers", "Transfers", new PresentationIcon("download", null), Slot.BOTTOM_LEFT, false));
         buttons.add(new ToolStripe.Button("problems", "Problems", null, Slot.BOTTOM_LEFT, false,
             Optional.of(new PanelBadge(1, PanelBadge.Tone.ERROR, "1 problem")), OptionalInt.empty()));
         for (DockStripe stripe : stripes.all()) stripe.render(buttons, List.of());
+    }
+
+    /** The icon name the shipped plugin declares for the panel {@code id} (the stripes lead each label with it). */
+    private static String icon(String id) {
+        return switch (id) {
+            case "sftp" -> "folder";
+            case "servers" -> "server";
+            case "sessions" -> "network";
+            case "tunnels" -> "tunnel";
+            default -> throw new IllegalArgumentException(id);
+        };
     }
 
     /**
@@ -160,6 +173,23 @@ final class DockFixture implements AutoCloseable {
         Panel panel = panels.stream().filter(each -> each.id().equals(id)).findFirst().orElseThrow();
         JComponent header = kitHeaders ? views.get(id).panelHeader(id) : area.headerOf(panel.slot());
         return SwingUtilities.convertRectangle(header.getParent(), header.getBounds(), body);
+    }
+
+    /** The independently specified native count; also hold the label's literal content and role. */
+    String nativeCount(String id) {
+        if (kitHeaders) return null;
+        Panel panel = panels.stream().filter(each -> each.id().equals(id)).findFirst().orElseThrow();
+        if (panel.count() == 0) return null;
+        String expected = "(" + panel.count() + ")";
+        var title = area.headerOf(panel.slot()).titleLabel();
+        var labels = java.util.Arrays.stream(title.getParent().getComponents())
+            .filter(component -> component instanceof javax.swing.JLabel && component != title)
+            .map(component -> (javax.swing.JLabel) component).toList();
+        org.assertj.core.api.Assertions.assertThat(labels).hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(labels.getFirst().getText()).isEqualTo(expected);
+        org.assertj.core.api.Assertions.assertThat(labels.getFirst().getFont())
+            .isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.COUNT));
+        return expected;
     }
 
     @Override public void close() {

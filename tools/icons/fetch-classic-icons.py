@@ -4,9 +4,9 @@
     python3 -I tools/icons/fetch-classic-icons.py
 
 Reads jasper-ui's assets-classic.tsv (resource, upstream path, SHA-256), downloads every file with curl into memory,
-checks each SHA-256 and only then writes them, byte for byte, so each keeps its JetBrains copyright comment. Builds and
-runtime never run this; it reproduces the vendoring. Apache-2.0: the shipped licence is icons/LICENSE.txt, never the
-repository's root LICENSE.txt.
+checks each SHA-256 and only then writes them, byte for byte, so each stays the upstream file (with its JetBrains
+copyright comment where upstream has one). Builds and runtime never run this; it reproduces the vendoring. Apache-2.0:
+the shipped licence is icons/LICENSE.txt, never the repository's root LICENSE.txt.
 """
 import hashlib
 import pathlib

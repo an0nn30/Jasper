@@ -242,11 +242,11 @@ public final class CoreSettings {
             + "\"catppuccin-mocha\", or an imported theme's id, its file name in the themes folder without .json. A theme without a\n"
             + "Dark variant is reported and Slate Cobalt is used. Switches live.").build();
     public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
-            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
-        .label("Light theme").keywords("theme", "light", "appearance", "slate cobalt", "imported")
-        .description("The theme the Light appearance shows: \"slate-cobalt\" (the default), the built-in \"catppuccin-latte\", or an\n"
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID)
+        .label("Light theme").keywords("theme", "light", "appearance", "jasper meadow", "slate cobalt", "imported")
+        .description("The theme the Light appearance shows: \"jasper-meadow\" (the default), the built-in \"catppuccin-latte\", or an\n"
             + "imported theme's id, its file name in the themes folder without .json. A theme without a Light variant is reported\n"
-            + "and Slate Cobalt is used. Switches live.").build();
+            + "and Jasper Meadow Light is used. Switches live.").build();
     static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.";
     public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",
             SettingKind.string(text -> TerminalSchemeChoice.parse(text).isPresent(), SCHEME_ID), TerminalSchemeChoice.MATCH.key())

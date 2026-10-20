@@ -57,8 +57,10 @@ class RemoteShortcutConfigTest {
 
     @AfterEach void stop() throws Exception {
         if (runtime != null) {
+            var workers = PluginShutdownTestSupport.capture(runtime);
             var stopped = onEdtValue(runtime::stop);
             CompletableFuture.allOf(stopped.toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            workers.await();
         }
     }
 

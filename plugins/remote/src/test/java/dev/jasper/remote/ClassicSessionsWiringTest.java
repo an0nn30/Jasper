@@ -9,9 +9,9 @@ import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.testsupport.Kits;
 import dev.jasper.remote.trust.KnownHosts;
 import dev.jasper.remote.ui.HostsPanel;
-import dev.jasper.remote.workstation.FakeEnterprise;
 import dev.jasper.sdk.testing.FakeKitView;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.testing.FakePresentations;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
 import java.nio.file.Path;
@@ -28,7 +28,7 @@ import org.junit.jupiter.api.io.TempDir;
  * show one row (the window's choice, else its active SSH pane's host, else the first), whichever of them changed it.
  */
 class ClassicSessionsWiringTest {
-    static final Set<String> OPTIONAL = Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise");
+    static final Set<String> OPTIONAL = Set.of("dev.jasper.vault", "dev.jasper.editor");
     final RemoteHost mac = RemoteHost.create("Mac", "192.168.1.119", 22, "dustin", Auth.AGENT, "Local Network", Optional.empty());
     final RemoteHost minecraft = RemoteHost.create("minecraft-local", "192.168.1.124", 22, "dustin", Auth.AGENT, "Local Network", Optional.empty());
 
@@ -52,7 +52,7 @@ class ClassicSessionsWiringTest {
 
     @Test void theTreeTheComboAndThePropertiesShareTheWindowsRow(@TempDir Path dir) throws Exception {
         try (var host = new FakePluginHost()) {
-            FakeEnterprise.start(host);
+            host.setPresentation(FakePresentations.CLASSIC);
             var plugin = plugin(dir.resolve("ssh"));
             host.start(RemotePluginTest.INFO, Set.of(), OPTIONAL, plugin);
             settle(host);
@@ -107,9 +107,9 @@ class ClassicSessionsWiringTest {
 
     @Test void theComboAndTheTreeFollowTheActiveSshPaneWhileNothingIsChosen(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            host.setPresentation(FakePresentations.CLASSIC);
             var vault = new FakeVault();
             host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
-            FakeEnterprise.start(host);
             var plugin = plugin(dir.resolve("ssh"));
             var context = host.start(RemotePluginTest.INFO, Set.of(), OPTIONAL, plugin);
             UUID credential = vault.password("deploy login", "deploy", "s3cret");

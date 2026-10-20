@@ -63,7 +63,7 @@ class SidePanelRenderTest {
             ThemeTestSupport.install(false);
             var panel = new HostsLike();
             var area = new ToolWindowArea(new JPanel(), new DockState());
-            DockTestSupport.show(area, Slot.LEFT_TOP, panel.root, 280);
+            DockTestSupport.show(area, Slot.LEFT_TOP, panel.root, Math.max(280, panel.header.getPreferredSize().width + 32));
             assertThemeColours(area, panel, false);
 
             ThemeTestSupport.install(true);

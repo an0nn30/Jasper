@@ -20,7 +20,7 @@ platform's interface font at a 13-point body ([the workspace](workspace.md) desc
 A plugin provides a look by naming a kit file with `presentation` in its `plugin.toml` and declaring the capability
 [`presentation.provide`](sdk-reference.html#dev.jasper.sdk.Capabilities.PRESENTATION_PROVIDE). Jasper reads the kit
 file and the files it names from the plugin's jars; the plugin needs no code for it. A look plugin can also ship
-themes and make them the look's defaults. Jasper's notices call the default look "the standard look".
+themes and make them the look's defaults, and give other plugins' settings defaults of its own. Jasper's notices call the default look "the standard look".
 
 ## Choosing a look
 
@@ -100,7 +100,7 @@ id = "dev.example.harbour"
 name = "Harbour"
 version = "1.0.0"
 entry = "dev.example.harbour.HarbourPlugin"
-sdk = ">=0.18.0, <0.19"
+sdk = ">=0.18.2, <0.19"
 capabilities = ["presentation.provide"]
 presentation = "presentation/harbour.kit.toml"
 themes = ["themes/harbour.json"]
@@ -108,9 +108,12 @@ themes = ["themes/harbour.json"]
 
 `presentation` is a jar path: `/`-separated segments of lowercase letters, digits, `_`, `.` and `-`, none of them `.`
 or `..`, without a leading or trailing `/`. The kit file's paths resolve against its own folder, so its fonts, icons
-and splash art live in or under that folder. The entry class's `start` may do nothing; a look plugin that other plugins
-should notice publishes a service there, as [Enterprise does](#adapting-a-plugin-to-a-look). Enterprise also sets
-`enabled_by_default = false`, which keeps a bundled plugin off until the user turns it on.
+and splash art live in or under that folder. The entry class's `start` may do nothing, as Enterprise's does: other
+plugins learn the look through the SDK ([adapting a plugin to a look](#adapting-a-plugin-to-a-look)). Enterprise also
+sets `enabled_by_default = false`, which keeps a bundled plugin off until the user turns it on.
+
+`sdk = ">=0.18.2, <0.19"` admits the Jasper versions that read every key on this page. A Jasper that accepts the
+plugin by a wider range but does not know a key or value the kit file uses refuses the whole kit file.
 
 To try a look while you write it, start Jasper with `--plugin-dir` pointing at the plugin
 ([running a plugin in Jasper](plugin-authoring.md#running-a-plugin-in-jasper)): that copy wins the election and needs
@@ -139,7 +142,8 @@ row_height = 22
 - `kit` and `base` are required. Every table is optional, and every key left out keeps the base's value; within
   `[type.ui]`, `[type.data]` and `[branding]` every key is required.
 - Top-level keys are `kit`, `base`, `chrome`, `controls`, `metrics`, `type`, `colors`, `defaults` and `branding`. Any
-  other key or table, at the top or in a table, is refused.
+  other key or table, at the top or in a table, is refused; a `[defaults."<plugin id>"]` table holds that plugin's own
+  setting keys ([defaults for plugins' settings](#defaults-for-plugins-settings)).
 - No colour literals anywhere, comments included: `#` followed by exactly 3, 6 or 8 hex digits, `0x` followed by 6, and
   `rgb(` or `rgba(` are refused ("… looks like a colour; colours come from the theme"). Write a comment with a space
   after `#`, so that a word such as `#bed` is not read as a colour.
@@ -176,16 +180,33 @@ The base gives every key its starting value (the columns below) and also decides
 
 | Key | Values | `default` base | `classic` base | What it changes |
 |---|---|---|---|---|
-| `title_bar` | `unified`, `native` | `unified` | `native` | `unified`: on macOS the title row holds the toolbar; on Linux and Windows Jasper draws the title bar, or the system draws it with `window.native_decorations`. `native`: the system title bar on every platform, the toolbar in a classic row beneath it (22-pixel icon buttons named by their tooltips under `window.toolbar = "icons"`, each button's icon and then its label under `"icons_and_labels"`), and on macOS a title bar that follows the theme's darkness; Settings draws no title row of its own and hides `window.native_decorations` (always hidden on macOS). |
-| `menu_bar` | `system`, `window` | `system` | `window` | `system`: the standard menus, in the screen menu bar on macOS. `window`: a menu row in each workspace window on every platform (the macOS screen menu bar is off; plugin windows, such as the Credential Vault manager, have none): File, Edit, View, then Session and Transfer, the plugins' menus and Tools, each when filled, then Window and Help. Window holds the Pane and Tab items and the tool window toggles, which leave View. Needs `title_bar = "native"`. |
+| `title_bar` | `unified`, `native`, `classic` | `unified` | `native` | `unified`: on macOS the title row holds the toolbar; on Linux and Windows Jasper draws the title bar, or the system draws it with `window.native_decorations`. `native`: the system title bar on every platform, on macOS following the theme's darkness; Settings hides `window.native_decorations`. `classic`: IntelliJ Classic's title bar on macOS and Windows, and `native`'s on Linux ([the classic title bar](#the-classic-title-bar)). Under `native` and `classic` the toolbar is a classic row beneath the title (22-pixel icon buttons named by their tooltips under `window.toolbar = "icons"`, each button's icon and then its label under `"icons_and_labels"`), and Settings draws no title row of its own. |
+| `menu_bar` | `system`, `window` | `system` | `window` | `system`: the standard menus, in the screen menu bar on macOS. `window`: the classic menus of each workspace window: File, Edit, View, then Session and Transfer, the plugins' menus and Tools, each when filled, then Window and Help. Window holds the Pane and Tab items and the tool window toggles, which leave View. Under `native` they are a row in the window on every platform, the macOS screen menu bar is off and plugin windows, such as the Credential Vault manager, have none; under `classic` they are where [the classic title bar](#the-classic-title-bar) puts them. Needs `title_bar = "native"` or `"classic"`. |
 | `window_title` | 1 to 120 characters | `"{context}"` | `"{context}"` | The window's title, from the [tokens](#window-title-tokens) below. |
-| `tool_windows` | `rails`, `stripes` | `rails` | `stripes` | `rails`: icon stripes as wide as `window.rail_width`. `stripes`: labelled stripes on the sides and a strip along the bottom, tool windows framed flush under header strips, a tool window becoming the active one, with the keyboard, when you click in it or open it from its stripe; Settings hides `window.rail_width`, and the Notifications panel is called **Event Log** and starts in Bottom Left instead of Right Top ([tool windows](workspace.md#tool-windows-and-the-dock)). |
+| `tool_windows` | `rails`, `stripes` | `rails` | `stripes` | `rails`: icon stripes as wide as `window.rail_width`. `stripes`: labelled stripes on the sides and a strip along the bottom, each label starting with its tool window's icon, tool windows framed flush under header strips, and a tool window becoming the active one, with the keyboard, when you click in it, open it from its stripe or use its toggle (a menu item or its shortcut); Settings hides `window.rail_width`, and the Notifications panel is called **Event Log** and starts in Bottom Left instead of Right Top ([tool windows](workspace.md#tool-windows-and-the-dock)). |
 | `editor_tabs` | `equal`, `classic` | `equal` | `classic` | Equal-width tabs, shown once a window has two tabs, or classic tabs, always shown and as wide as their labels, each with a × (a terminal tab also with a status dot), and a + after the last. |
 | `status_bar` | `segments`, `cells` | `segments` | `cells` | Slash-separated segments, or ruled cells. |
 | `palette` | `anchored`, `run_window` | `anchored` | `run_window` | The command palette card under the title field, or the Run window, which opens centred across the upper part of the workspace until it has a saved place, with **▶ Run…** leading the status bar ([the Run window](command-palette.md#the-run-window)). |
 | `dialogs` | `as_requested`, `classic` | `as_requested` | `classic` | Dialogs as each one asks ([`DialogSpec.Presentation`](sdk-reference.html#dev.jasper.sdk.ui.DialogSpec.Presentation)), or overlay and attached-sheet dialogs drawn inside their window as classic dialogs. |
 | `motion` | `standard`, `none` | `standard` | `none` | Motion as `ui.animations.enabled` says, or none; `none` hides that setting. |
-| `icons` | `new_ui`, `classic` | `new_ui` | `classic` | The icons in each window's header and status bar: the New UI artwork, or IntelliJ's classic icons for add, split, zoom, settings, new window and search (the New UI artwork for the rest). |
+| `icons` | `new_ui`, `classic` | `new_ui` | `classic` | The workspace chrome's icons: the New UI artwork, or IntelliJ's classic icons. `classic` draws them for add, split, zoom, settings, new window and search in each window's header and status bar, in tool window headers and in plugins' toolbar views (the New UI artwork for the rest, and a panel's or window's body keeps its own), and on a labelled stripe draws IntelliJ's classic tool-window icons for `network`, `folder`, `tunnel`, `download`, `server` and `bell` and any other icon as a monochrome glyph in the label's colour (an identity name such as `more.vertical` keeps its authored art). Under `new_ui` a stripe label draws what the icon rails draw. |
+| `toolbar_search` | `field`, `icon` | `field` | `field` | Under a `native` or `classic` title bar: the toolbar's "Search everywhere" field with the palette's shortcut, or IntelliJ Classic's **Search Everywhere** button, an icon-only magnifier before **Settings…** whose tooltip names the palette's shortcut, icon-only in every `window.toolbar` mode. Either opens the palette. `icon` needs `palette = "run_window"` and `title_bar = "native"` or `"classic"`. |
+
+#### The classic title bar
+
+`title_bar = "classic"` gives each workspace window IntelliJ Classic's frame:
+
+| Platform | Title bar | Menus (`menu_bar = "window"`) |
+|---|---|---|
+| macOS | A 28-point band in the toolbar's colour, seamless with the toolbar row below it, where macOS draws the traffic lights and the window's title, light or dark with the theme. A double-click in it zooms, minimises or does nothing, as System Settings › Desktop & Dock says; full screen removes it. | The screen menu bar, with **About Jasper** and **Settings…** in the application menu. Other windows, such as Settings, About and plugin windows, keep the system title bar and show a short File menu in the screen menu bar. |
+| Windows | Jasper's 28-pixel title bar in the toolbar's colour, holding the menus and then the window's title, left-aligned and dimmed while the window is inactive, over a 1-pixel rule. As the window narrows, a long title shortens to 60 pixels, then the menus fold into "…" and then ☰. With `window.native_decorations = true` the system title bar instead, after a restart. | In the title bar, or a row in the window under the system title bar. Other windows and dialogs have Jasper's title bar without menus. |
+| Linux | The system title bar, as `native`. | A row in the window; plugin windows have none. |
+
+Classic in-window dialogs and overlays start below the title bar. Compact ([view modes](workspace.md#view-modes)) keeps
+the system title bar on macOS and Windows, without the band; the macOS menus stay in the screen menu bar and the
+Windows ones become a row in the window. Settings hides `window.native_decorations` on macOS and Linux. When the look
+cannot be installed while Jasper starts, a macOS or Windows window gets exactly the default look's title bar and
+menus.
 
 #### Window title tokens
 
@@ -289,13 +310,14 @@ Two theme roles a look chooses between; the colours themselves are the theme's
 
 ### defaults
 
-Defaults for five core settings. Keys are quoted because they hold dots. A value the user saved in `config.toml` or
-Settings wins; otherwise the look's default applies, and without one the core default
-([look-dependent defaults](configuration.md#look-dependent-defaults)).
+Defaults for five core settings and, in tables of their own, for plugins' settings. A core key is quoted because it
+holds dots: written without quotes, `window.toolbar = "icons"` makes a table named `window`, which is refused. A value
+the user saved in `config.toml` or Settings wins; otherwise the look's default applies, and without one the core
+default ([look-dependent defaults](configuration.md#look-dependent-defaults)).
 
 | Key | Value | Core default |
 |---|---|---|
-| `"ui.theme.light"` | a theme id with a Light variant | `slate-cobalt` |
+| `"ui.theme.light"` | a theme id with a Light variant | `jasper-meadow` |
 | `"ui.theme.dark"` | a theme id with a Dark variant | `slate-cobalt` |
 | `"palette.visible_rows"` | integer, 1–20 | `5` |
 | `"window.toolbar_height"` | integer, 28–64 | `30` |
@@ -306,6 +328,32 @@ Settings wins; otherwise the look's default applies, and without one the core de
   have the variant. An installed theme cannot be a look default.
 - When the plugin's theme file named here does not load, the key is left out and the "missing some of its files"
   notice says `[defaults]."<key>": its theme did not load, so the setting keeps its core default`.
+
+#### Defaults for plugins' settings
+
+A `[defaults."<plugin id>"]` table gives defaults to the settings a plugin declares
+([declared settings](plugin-authoring.md#declared-settings)), keyed as that plugin's settings file writes its keys, so a
+dotted key nests as it does there:
+
+```toml
+[defaults."dev.jasper.editor"]
+font_family = "IBM Plex Mono"
+
+[defaults."dev.jasper.remote"]
+sftp.max_parallel_files = 4
+```
+
+- The kit file checks only the shape. The table is named by a plugin id that holds a dot: a lowercase letter, then
+  up to 127 lowercase letters, digits, `_`, `.` and `-`, outside the reserved `jasper.` namespace. Each key is a
+  setting key (dot-separated parts of letters, digits, `_` and `-`), set once, and each value is a string, a number, a
+  boolean or an array.
+- Jasper reads each value with the kind of the setting the plugin declares under that key and makes it the setting's
+  default. A value the user saved in the plugin's settings file wins; Settings shows the look's value as the default,
+  **Reset to Default** returns to it, and choosing the plugin's own default there saves it as the user's value.
+- A value the setting's kind rejects, and a key the plugin does not declare, are left out: the plugin's own default
+  applies, the plugin starts, and Jasper's log says "*plugin id*: the look's default for *key* is not used: *reason*"
+  or "*plugin id*: the look gives a default for *key*, which the plugin does not declare". A table for a plugin that is
+  not running is ignored.
 
 ### branding
 
@@ -340,8 +388,9 @@ Each message names the key it is about. A sample:
 | `[theme]: unknown table`, `[metrics].height: unknown key` | A table or key the format does not have |
 | `kit: missing; a kit file begins with kit = 1`, `kit: 2 is not a format this Jasper reads; expected 1` | `kit` |
 | `base: "modern" is not one of default, classic` | `base` |
-| `[chrome].title_bar: "custom" is not one of unified, native` | A value outside a point's two |
-| `[chrome].menu_bar: "window" needs [chrome].title_bar = "native"` | Window menus under the unified title bar |
+| `[chrome].title_bar: "custom" is not one of unified, native, classic` | A value outside a point's values |
+| `[chrome].menu_bar: "window" needs [chrome].title_bar = "native" or "classic"` | Window menus under the unified title bar |
+| `[chrome].toolbar_search: "icon" needs [chrome].palette = "run_window" and [chrome].title_bar = "native" or "classic"` | The search button without the Run window, or under the unified title bar |
 | `[chrome].window_title: unknown token {host}; use {context}, {session} and {directory}` | The title template |
 | `[metrics].row_height: 40 is outside 18-28` | A token out of range |
 | `[type].base: 18 is not a body size from 10 to 16` | The body size |
@@ -349,6 +398,9 @@ Each message names the key it is about. A sample:
 | `[colors].dialog_surface: "surface.card" is not one of surface.dialog, surface.app` | A colour slot |
 | `[defaults]."ui.font.size": not a setting a look may default; use "ui.theme.light", "ui.theme.dark", "palette.visible_rows", "window.toolbar_height" or "window.toolbar"` | A setting a look cannot default |
 | `[defaults]."ui.theme.light": "ocean" is neither a built-in theme nor one of this plugin's themes`, `… has no Light variant` | A theme default |
+| `[defaults]."window": a plugin's table is named by its id, such as "dev.jasper.editor"; quote a dotted setting key, such as "window.toolbar"` | A table whose name has no dot, such as an unquoted core key |
+| `[defaults]."jasper.core": not a plugin id` | A table name that is not a plugin id, or is in the `jasper.` namespace |
+| `[defaults."dev.jasper.editor"]."font family": not a setting key`, `[defaults."dev.jasper.editor"].font_family: expected a string, number, boolean or array`, `… sets font.size a second time` | A plugin's table |
 | `[branding].icons: icons/icon-32.png is 64 × 64 pixels, not 32 × 32` | A branding icon |
 | `[branding].splash_art: splash/art.svg is not an SVG Jasper can draw: Active SVG denied` | The splash art |
 | `[branding].product: "#1e1e2e" looks like a colour; colours come from the theme`, `kit file: line 3: "#fff" looks like a colour; colours come from the theme` | A colour literal in a value or a comment |
@@ -363,25 +415,24 @@ are listed in Settings › Appearance while the plugin loads, are part of the lo
 
 ## Worked example: Enterprise
 
-The bundled Enterprise plugin (`plugins/enterprise`) is data apart from one service. Its manifest's look keys (beside
-`id`, `name`, `version`, `entry` and `sdk`, as in the Harbour example above):
+The bundled Enterprise plugin (`plugins/enterprise`) is data: its entry class's `start` does nothing. Its manifest's
+look keys (beside `id`, `name`, `version`, `entry` and `sdk`, as in the Harbour example above):
 
 ```toml
 capabilities = ["presentation.provide"]
-exports = ["dev.jasper.enterprise.api"]
 presentation = "presentation/enterprise.kit.toml"
 themes = ["themes/enterprise.json"]
 enabled_by_default = false
 ```
 
-Its kit file, `presentation/enterprise.kit.toml`, names every key, so it is also a complete template:
+Its kit file, `presentation/enterprise.kit.toml`, names every core key, so it is also a complete template:
 
 ```toml
 kit = 1
 base = "classic"
 
 [chrome]
-title_bar = "native"
+title_bar = "classic"
 menu_bar = "window"
 window_title = "Workstation — {session} — {directory}"
 tool_windows = "stripes"
@@ -391,6 +442,7 @@ palette = "run_window"
 dialogs = "classic"
 motion = "none"
 icons = "classic"
+toolbar_search = "icon"
 
 [controls]
 toggle = "checkbox"
@@ -448,16 +500,21 @@ splash_art = "splash/art.svg"
 "ui.theme.light" = "enterprise"
 "ui.theme.dark" = "enterprise"
 "palette.visible_rows" = 8
-"window.toolbar_height" = 34
+"window.toolbar_height" = 28
 "window.toolbar" = "icons"
+
+[defaults."dev.jasper.editor"]
+font_family = "IBM Plex Mono"
 ```
 
 - `base = "classic"`, and `[chrome]`, `[controls]`, `[metrics]`, `[colors]` and `[type] base` restate the classic
-  base's values, except `window_title`.
+  base's values, except `title_bar` (`classic` for the base's `native`), `window_title` and `toolbar_search` (`icon`
+  for the base's `field`).
 - The fonts sit in `presentation/fonts/`, the icons in `presentation/icons/` and the art in
   `presentation/splash/art.svg`, all inside the kit file's folder.
 - `[defaults]` makes the plugin's own `enterprise` theme the default for both appearances, shows 8 Run window rows,
-  makes the toolbar 34 pixels high and shows its buttons as icons only.
+  makes the toolbar 28 pixels high, IntelliJ's, and shows its buttons as icons only; its Editor table draws the
+  Editor's documents in IBM Plex Mono, the look's data face.
 
 [The Enterprise look](enterprise.md) describes the result.
 
@@ -467,15 +524,18 @@ Plugin views built from SDK `Nodes` follow the active look with no work: the sam
 checkboxes, cards or titled boxes, as the kit file says, and dialogs, menus and tool windows go where the look puts them
 ([compositions](plugin-ui.md#compositions)).
 
-For more than that, a plugin can lay itself out differently under a particular look. A look plugin's code starts only
-when its look is the one running, so a service it publishes in `start` marks the look as active. Enterprise publishes
-[`dev.jasper.enterprise.api.Workstation`](sdk-reference.html#dev.jasper.enterprise.api.Workstation), an empty interface
-in its exported package [`dev.jasper.enterprise.api`](sdk-reference.html#package-dev.jasper.enterprise.api), and
-Remote, File Server and Credential Vault compose classic layouts when they find it
-([classic layouts](enterprise.md#classic-layouts-in-remote-file-server-and-credential-vault)). To do the same,
-require Enterprise optionally, compile against `dev.jasper.enterprise.api` without shipping it and look the service up
-once in `start`, as [the Enterprise API](plugin-apis.md#enterprise-api) shows.
+For more than that, a plugin asks which look is running:
+[`context.appearance().presentation()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.presentation()) returns a
+[`Presentation`](sdk-reference.html#dev.jasper.sdk.ui.Presentation). It says whether the look is classic (its kit's
+`base`), its icon set, whether tool windows are reached by rails or labelled stripes, the title bar and where the menus
+are on this platform, whether the toolbar offers Search Everywhere as a field or an icon, the look's interface and
+data faces, its body size and its default toolbar height. These are the look's own facts: the user's font, toolbar,
+window decoration and view mode settings are not reported. The look changes only at a restart, so the answer is the
+same for every plugin for the whole session and can be read once in `start`, from any thread.
 
-The answer holds for the whole session, because the look changes only at a restart.
-[Services and other plugins' APIs](plugin-authoring.md#services-and-other-plugins-apis) covers requirements and
-services in general.
+Remote, File Server and Credential Vault compose their classic layouts when `classic()` is true
+([classic layouts](enterprise.md#classic-layouts-in-remote-file-server-and-credential-vault)), so they follow any
+classic look, not only Enterprise. [Adapting to the look](plugin-authoring.md#adapting-to-the-look) has the example
+and every value under both bundled looks, and the testkit's `FakePluginHost.setPresentation` (with
+`FakePresentations.STANDARD` or `CLASSIC`) tests both; `setKitDefault` and `lookDefaultProblems` test a look's
+[defaults for your settings](#defaults-for-plugins-settings).

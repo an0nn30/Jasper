@@ -158,4 +158,81 @@ class ToolWindowHeaderTest {
         assertThat(dev.jasper.app.platform.ThemeZone.color(root, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL))
             .as("the module theme tells panel from sidebar").isNotEqualTo(dev.jasper.app.platform.ThemeZone.color(root, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
     }
+
+    /** A six-argument header strip over the Enterprise kit with one action, laid out at a fixed size. */
+    private static ToolWindowHeader enterprise(dev.jasper.ui.icons.ChromeArtwork artwork, javax.swing.Icon icon) {
+        var header = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { }, dev.jasper.app.testsupport.EnterpriseLook.kit(), true, artwork);
+        header.presentation(new dev.jasper.app.contributions.PanelHeaderState("", false, List.of(
+            new dev.jasper.app.contributions.PanelHeaderState.Action("Action", icon, () -> { }))));
+        header.setSize(260, 28);
+        LayoutTestSupport.layoutTree(header);
+        return header;
+    }
+
+    private static javax.swing.JButton action(ToolWindowHeader header) {
+        return descendants(header).stream().filter(c -> c instanceof javax.swing.JButton button
+            && "Action".equals(button.getAccessibleContext().getAccessibleName())).map(c -> (javax.swing.JButton) c).findFirst().orElseThrow();
+    }
+
+    private static int[] pixels(java.awt.image.BufferedImage image) {
+        return image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+    }
+
+    private static java.awt.image.BufferedImage painted(javax.swing.JComponent component) {
+        var image = new java.awt.image.BufferedImage(component.getWidth(), component.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { component.paint(g); } finally { g.dispose(); }
+        return image;
+    }
+
+    /** Runs {@code body} under the Enterprise look, restoring the default look after. */
+    private static void underEnterprise(Runnable body) {
+        var themes = dev.jasper.app.testsupport.EnterpriseLook.controller(false);
+        try { body.run(); } finally { themes.close(); dev.jasper.app.testsupport.EnterpriseLook.restoreDefault(); }
+    }
+
+    /** Plan 15b: under the classic chrome icons a header's contributed add action draws IntelliJ's classic add icon. */
+    @Test void underClassicIconsAContributedAddActionDrawsIntelliJsClassicArt() {
+        underEnterprise(() -> {
+            var button = action(enterprise(dev.jasper.ui.icons.ChromeArtwork.CLASSIC, dev.jasper.app.platform.AppIcons.named("ADD")));
+            var icon = button.getIcon();
+            int size = icon.getIconWidth();
+            var expected = new dev.jasper.ui.icons.IconRegistry().classicChromeIcon("add", size).orElseThrow()
+                .icon(dev.jasper.app.platform.ThemeZone.theme(button), dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY);
+            var want = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var g = want.createGraphics();
+            try { com.formdev.flatlaf.ui.FlatUIUtils.setRenderingHints(g); expected.paintIcon(button, g, 0, 0); } finally { g.dispose(); }
+            assertThat(Arrays.stream(pixels(want)).filter(argb -> argb >>> 24 != 0).count()).as("the classic add icon has ink").isPositive();
+            var image = painted(button);
+            int x = (button.getWidth() - size) / 2, y = (button.getHeight() - size) / 2;
+            assertThat(pixels(image.getSubimage(x, y, size, size))).as("the action paints the classic add icon").isEqualTo(pixels(want));
+        });
+    }
+
+    /** Plan 15b: a name outside the classic set, and a plugin's path, keep their header glyph under the classic icons. */
+    @Test void otherNamesKeepTheirGlyphUnderClassicIcons() {
+        underEnterprise(() -> {
+            for (javax.swing.Icon icon : List.of(dev.jasper.app.platform.AppIcons.semantic("folder"),
+                    new dev.jasper.app.platform.PresentationIcon("owner:glyph", "M 2 2 L 14 14"))) {
+                var classic = painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.CLASSIC, icon));
+                var newUi = painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.NEW_UI, icon));
+                assertThat(pixels(classic)).as(icon.toString()).isEqualTo(pixels(newUi));
+            }
+            assertThat(pixels(painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.CLASSIC, dev.jasper.app.platform.AppIcons.named("ADD")))))
+                .as("the add action does change").isNotEqualTo(pixels(painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.NEW_UI, dev.jasper.app.platform.AppIcons.named("ADD")))));
+        });
+    }
+
+    /** Plan 15b: the five-argument header is the New UI one. */
+    @Test void underNewUiNothingChanges() {
+        underEnterprise(() -> {
+            var icon = dev.jasper.app.platform.AppIcons.named("ADD");
+            var five = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { }, dev.jasper.app.testsupport.EnterpriseLook.kit(), true);
+            five.presentation(new dev.jasper.app.contributions.PanelHeaderState("", false, List.of(
+                new dev.jasper.app.contributions.PanelHeaderState.Action("Action", icon, () -> { }))));
+            five.setSize(260, 28);
+            LayoutTestSupport.layoutTree(five);
+            assertThat(pixels(painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.NEW_UI, icon)))).isEqualTo(pixels(painted(five)));
+        });
+    }
 }

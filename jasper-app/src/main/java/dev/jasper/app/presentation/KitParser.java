@@ -36,7 +36,7 @@ import org.tomlj.TomlTable;
 /**
  * Reads a kit file (spec 5): TOML 1.0, strict and all or nothing, in the style of the plugin descriptor parser. A kit
  * names its format ({@code kit = 1}) and a host catalog ({@code base}), then optionally the chrome points, the control
- * points, the eleven public tokens, its type base and face files, two colour slots, five setting defaults and its branding. Every
+ * points, the eleven public tokens, its type base and face files, two colour slots, five setting defaults, defaults for other plugins' settings and its branding. Every
  * failure is one {@link Invalid} naming the key. Pure: files arrive through {@link Files}.
  */
 public final class KitParser {
@@ -50,12 +50,18 @@ public final class KitParser {
     public static final int MAX_ART_BYTES = 256 * 1024;
     private static final Set<String> TOP = Set.of("kit", "base", "chrome", "controls", "metrics", "type", "colors", "defaults", "branding");
     private static final Pattern SEGMENT = Pattern.compile("[a-z0-9_.-]+");
+    /** A TOML bare key: any other key segment is quoted in a message. */
+    private static final Pattern BARE = Pattern.compile("[A-Za-z0-9_-]+");
+    /** A plugin's id, as the SDK's {@code PluginInfo} has it; a {@code [defaults]} table also needs a dot. */
+    private static final Pattern PLUGIN_ID = Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
+    /** A plugin's setting key, dotted, as the SDK's {@code SettingSpec} has it. */
+    private static final Pattern SETTING_KEY = Pattern.compile("[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*");
     private static final Pattern COLOUR = Pattern.compile(
         "#(?:[0-9A-Fa-f]{8}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})(?![0-9A-Za-z])|\\b0[xX][0-9A-Fa-f]{6}\\b|\\brgba?\\(");
     private static final Pattern TOKEN = Pattern.compile("\\{([^{}]*)}");
     private static final Set<String> TITLE_TOKENS = Set.of("context", "session", "directory");
     private static final List<String> CHROME = List.of("title_bar", "menu_bar", "window_title", "tool_windows", "editor_tabs",
-        "status_bar", "palette", "dialogs", "motion", "icons");
+        "status_bar", "palette", "dialogs", "motion", "icons", "toolbar_search");
     private static final List<String> CONTROLS = List.of("toggle", "exclusive", "tabs", "group", "form_label", "empty", "table",
         "tree", "stepper", "ordered_list", "buttons", "tag", "route", "prompt");
 
@@ -150,7 +156,7 @@ public final class KitParser {
     }
 
     private record TypeAndFaces(TypeScale scale, Faces faces) { }
-    private record Defaults(Map<Setting<?>, Object> values, List<String> dropped) { }
+    private record Defaults(Map<Setting<?>, Object> values, List<String> dropped, Map<String, Map<String, Object>> plugins) { }
 
     private KitParser() { }
 
@@ -204,7 +210,7 @@ public final class KitParser {
         Defaults defaults = defaults(table(toml, "defaults"), context);
         Branding branding = branding(table(toml, "branding"), context);
         Kit kit = new Kit(context.id(), metrics, type.scale(), faces(type.faces(), start.faces()), controls, colors, start.uiKeys());
-        return new Parsed(kit, chrome, classic, new DefaultSource(defaults.values()), defaults.dropped(), type.faces(), branding);
+        return new Parsed(kit, chrome, classic, new DefaultSource(defaults.values(), defaults.plugins()), defaults.dropped(), type.faces(), branding);
     }
 
     /** A jar path inside the kit's folder: {@code /}-separated segments of {@code [a-z0-9_.-]}, none {@code .} or {@code ..}. */
@@ -223,11 +229,17 @@ public final class KitParser {
         } catch (CharacterCodingException malformed) { throw new Invalid("kit file: not UTF-8 text"); }
     }
 
-    /** {@code [a.b].c}, {@code [defaults]."ui.theme.dark"} or a top-level {@code kit}. */
+    /**
+     * {@code [a.b].c}, {@code [defaults]."ui.theme.dark"}, {@code [defaults."dev.x.tool"]."bad key"} or a top-level
+     * {@code kit}: a segment that is not a bare key is quoted.
+     */
     private static String name(List<String> path) {
-        String last = path.getLast().contains(".") ? "\"" + path.getLast() + "\"" : path.getLast();
-        return path.size() == 1 ? last : "[" + String.join(".", path.subList(0, path.size() - 1)) + "]." + last;
+        String last = segment(path.getLast());
+        if (path.size() == 1) return last;
+        return "[" + path.subList(0, path.size() - 1).stream().map(KitParser::segment).collect(Collectors.joining(".")) + "]." + last;
     }
+
+    private static String segment(String key) { return BARE.matcher(key).matches() ? key : "\"" + key + "\""; }
 
     /** One value on the walk: its parent and its key, so the path is built only for a message. */
     private record Walked(Object value, Walked parent, String key) {
@@ -304,9 +316,13 @@ public final class KitParser {
         var dialogs = point(table, "chrome", "dialogs", ChromeSpec.DialogKind.class, base.dialogs());
         var motion = point(table, "chrome", "motion", ChromeSpec.MotionKind.class, base.motion());
         var icons = point(table, "chrome", "icons", ChromeSpec.Icons.class, base.icons());
-        if (menuBar == ChromeSpec.MenuBar.WINDOW && titleBar != ChromeSpec.TitleBar.NATIVE)
-            throw new Invalid("[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\"");
-        return new ChromeSpec(titleBar, menuBar, title, toolWindows, editorTabs, statusBar, palette, dialogs, motion, icons);
+        var toolbarSearch = point(table, "chrome", "toolbar_search", ChromeSpec.ToolbarSearch.class, base.toolbarSearch());
+        if (menuBar == ChromeSpec.MenuBar.WINDOW && titleBar == ChromeSpec.TitleBar.UNIFIED)
+            throw new Invalid("[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\" or \"classic\"");
+        if (toolbarSearch == ChromeSpec.ToolbarSearch.ICON
+                && (palette != ChromeSpec.PaletteKind.RUN_WINDOW || titleBar == ChromeSpec.TitleBar.UNIFIED))
+            throw new Invalid("[chrome].toolbar_search: \"icon\" needs [chrome].palette = \"run_window\" and [chrome].title_bar = \"native\" or \"classic\"");
+        return new ChromeSpec(titleBar, menuBar, title, toolWindows, editorTabs, statusBar, palette, dialogs, motion, icons, toolbarSearch);
     }
 
     private static String windowTitle(String text) throws Invalid {
@@ -482,11 +498,20 @@ public final class KitParser {
     }
 
     private static Defaults defaults(TomlTable table, Context context) throws Invalid {
-        if (table == null) return new Defaults(Map.of(), List.of());
+        if (table == null) return new Defaults(Map.of(), List.of(), Map.of());
         var values = new LinkedHashMap<Setting<?>, Object>();
         var dropped = new ArrayList<String>();
+        var plugins = new LinkedHashMap<String, Map<String, Object>>();
         for (String key : table.keySet()) {
             String where = "[defaults].\"" + key + "\"";
+            if (table.get(List.of(key)) instanceof TomlTable plugin) {
+                // Plan 15a Rulings 15: a dotted core key written without quotes is a table, so an id needs a dot.
+                if (!key.contains(".")) throw new Invalid(where + ": a plugin's table is named by its id, such as \"dev.jasper.editor\"; "
+                    + "quote a dotted setting key, such as \"window.toolbar\"");
+                if (!PLUGIN_ID.matcher(key).matches() || key.startsWith("jasper.")) throw new Invalid(where + ": not a plugin id");
+                plugins.put(key, pluginDefaults(new Walked(plugin, new Walked(table, null, "defaults"), key)));
+                continue;
+            }
             Setting<?> setting = DEFAULTS.get(key);
             if (setting == null) throw new Invalid(where + ": not a setting a look may default; use "
                 + DEFAULTS.keySet().stream().map(name -> "\"" + name + "\"").collect(Collectors.joining(", ")).replaceFirst(", ([^,]*)$", " or $1"));
@@ -507,7 +532,36 @@ public final class KitParser {
             }
             values.put(setting, reading.value());
         }
-        return new Defaults(values, dropped);
+        return new Defaults(values, dropped, plugins);
+    }
+
+    /**
+     * One plugin's table: every value by its dotted setting key, as tomlj gives it, with an explicit stack (Rulings 13).
+     * Only the shape is checked here; the plugin's runtime reads each value with its declared setting's kind.
+     */
+    private static Map<String, Object> pluginDefaults(Walked root) throws Invalid {
+        var values = new LinkedHashMap<String, Object>();
+        var pending = new java.util.ArrayDeque<Walked>();
+        pending.push(root);
+        while (!pending.isEmpty()) {
+            Walked item = pending.pop();
+            // The dotted key is a setting key exactly when each segment is one, so only a leaf builds its path.
+            if (item != root && !SETTING_KEY.matcher(item.key()).matches()) throw new Invalid(name(item.path()) + ": not a setting key");
+            if (!(item.value() instanceof TomlTable)) {
+                List<String> path = item.path();
+                String key = String.join(".", path.subList(2, path.size()));
+                Object value = item.value();
+                if (!(value instanceof String || value instanceof Long || value instanceof Double || value instanceof Boolean
+                        || value instanceof TomlArray)) throw new Invalid(name(path) + ": expected a string, number, boolean or array");
+                if (values.putIfAbsent(key, value) != null) throw new Invalid(name(path) + ": sets " + key + " a second time");
+                continue;
+            }
+            TomlTable table = (TomlTable) item.value();
+            List<String> keys = new ArrayList<>(table.keySet());
+            // Pushed last to first, so the file's first problem is the one reported.
+            for (int i = keys.size() - 1; i >= 0; i--) pending.push(new Walked(table.get(List.of(keys.get(i))), item, keys.get(i)));
+        }
+        return values;
     }
 
     private static <T> Reading<T> read(Setting<T> setting, Object raw) { return setting.kind().read(raw, setting.defaultValue()); }

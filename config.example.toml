@@ -1,7 +1,8 @@
 # Jasper example configuration
 # Copy this file to your platform's config.toml, then edit only the values you want to change.
-# All active values below are Jasper's built-in defaults. A look can set its own defaults for toolbar_height,
-# visible_rows and the [ui.theme] ids; a copied line overrides the look's, so delete the lines you do not change.
+# All active values below are Jasper's built-in defaults. A look can set its own defaults for toolbar,
+# toolbar_height, visible_rows and the [ui.theme] ids; a copied line overrides the look's, so delete the lines you do
+# not change.
 version = 2
 
 [window]
@@ -14,7 +15,7 @@ rail_width = 28
 toolbar = "icons_and_labels"
 # Live across open windows, including the unified macOS title bar.
 # Range: 28-64 logical pixels; out-of-range values use the nearest limit.
-# The default depends on the active look (34 under Enterprise); this line overrides it.
+# The default depends on the active look (28 under Enterprise); this line overrides it.
 toolbar_height = 30
 # Live across open windows.
 status_bar = true
@@ -139,13 +140,14 @@ blink = true
 appearance = "system"
 
 [ui.theme]
-# The themes the Dark and Light appearances show, live: a built-in theme ("slate-cobalt", "ubuntu-yaru",
-# "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or "catppuccin-mocha" for Dark),
-# a plugin's theme such as "enterprise", or an imported theme's id (its file name in the themes folder without
-# .json). A theme without that variant is reported and Slate Cobalt is used.
+# The themes the Dark and Light appearances show, live: a built-in theme ("slate-cobalt" or "ubuntu-yaru" for either,
+# "jasper-meadow" or "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or "catppuccin-mocha" for Dark),
+# a plugin's theme such as "enterprise", or an imported theme's id (its file name in the themes folder without .json).
+# A theme without that variant is reported and the appearance's default is used: Slate Cobalt for Dark, Jasper Meadow
+# Light for Light.
 # The default depends on the active look ("enterprise" under Enterprise); these lines override it.
 dark = "slate-cobalt"
-light = "slate-cobalt"
+light = "jasper-meadow"
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of [terminal.font].

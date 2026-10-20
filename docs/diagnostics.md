@@ -102,7 +102,8 @@ request`. `<trigger>` is `cold`, `menu`, `reopen` or `handoff`. A window opened 
 
 ### When Java does not start
 
-The installed app starts through Jasper's own launcher, which also starts `jasper-watch` beside it. When Java exits
+The installed app, except a Windows [user installation](packaging.md#user-installation-without-a-compiler), starts
+through Jasper's own launcher, which also starts `jasper-watch` beside it. When Java exits
 before its virtual machine has started, the watcher starts Jasper again, leaving out one thing at a time:
 
 1. the start-up cache, when it was in use;

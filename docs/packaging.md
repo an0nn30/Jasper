@@ -2,7 +2,7 @@
 
 Jasper ships as a native application image that bundles a trimmed JetBrains Runtime, so users need no Java: a
 `Jasper.app` and DMG on macOS, a portable ZIP and a per-user setup wizard on Windows, and `.deb` and `.rpm` packages on
-Linux. Every image carries the application, all nine bundled plugins, Jasper's own launcher with its start-up recovery
+Linux. Every package carries the application, all nine bundled plugins, Jasper's own launcher with its start-up recovery
 helper `jasper-watch`, and the native [`jasper` command](command-line.md). jpackage builds only for the machine it runs
 on, so each package is built on the operating system and architecture it is for (aarch64 or x64). Installing and
 using a package on the desktop is checked by hand with the [native acceptance checklist](#native-acceptance-checklist).
@@ -16,7 +16,8 @@ using a package on the desktop is checked by hand with the [native acceptance ch
 - A **C/C++ compiler**, because `packageApp` builds Jasper's launcher ([packaging/launcher](../packaging/launcher/README.md)),
   `jasper-watch` and the `jasper` command ([packaging/cli](../packaging/cli/README.md)): the Xcode command line tools on
   macOS (`xcode-select --install`), `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the
-  "Desktop development with C++" workload on Windows (found through `vswhere`).
+  "Desktop development with C++" workload on Windows (found through `vswhere`). The Windows
+  [user installation](#user-installation-without-a-compiler) needs none.
 - **macOS**: Xcode 26 or later for the [macOS 26 window controls](#macos-26-window-controls); an older SDK builds an app
   with the earlier controls and `verifyPackage` warns.
 - **Linux**: `dpkg-deb` and `fakeroot` for the `.deb`; `rpmbuild` (the `rpm` package on Debian and Ubuntu), `readelf`
@@ -39,6 +40,9 @@ All tasks belong to `:jasper-app`. Only those marked in the last column start Ja
 | `packageDist` | macOS | Trains the cache, verifies the image and builds the DMG | yes, through `trainAotCache` |
 | `packageDist` | Windows | Verifies the image and builds the portable ZIP | no |
 | `packageInstaller` | Windows | Verifies the image and builds the setup wizard | no |
+| `packageWindowsUser` | Windows | Builds the [user installation's](#user-installation-without-a-compiler) image in `jasper-app/build/packaging/windows-user/image/`, with jpackage's standard launcher | no |
+| `installWindowsUser` | Windows | Builds that image and installs it in `%APPDATA%\JasperApp` with a Start menu shortcut | no |
+| `uninstallWindowsUser` | Windows | Removes that installation | no |
 | `packageDeb`, `packageRpm` | Linux | Verifies the image and builds one package | no |
 | `packageDist` | Linux | Both `packageDeb` and `packageRpm` | no |
 | `installDist`, `distZip`, `distTar` | all | A portable distribution without jpackage or a bundled runtime | no |
@@ -332,6 +336,41 @@ Installer platform (jpackage's template declares x64 for an ARM64 payload too; `
 own architecture), the folder and shortcut dialogs, at least two shortcuts, and the upgrade rows and removal action.
 The task never installs or opens Jasper.
 
+### User installation without a compiler
+
+`installWindowsUser` installs Jasper for the current user from the source tree with only a JBR SDK 25: no C/C++
+compiler, WiX, installer or administrator rights. In IntelliJ it is **jasper-app › distribution › installWindowsUser**
+in the Gradle tool window; from a shell:
+
+```powershell
+.\gradlew.bat :jasper-app:installWindowsUser
+.\gradlew.bat :jasper-app:uninstallWindowsUser
+```
+
+`stageWindowsUser` stages the application jar, its runtime libraries, the bundled plugins and `config.example.toml` in
+`jasper-app/build/packaging/windows-user/input/`, and `packageWindowsUser` builds an app image from them in
+`windows-user/image/Jasper` on every run. It has the trimmed runtime, JVM options, native libraries and plugin-free
+class path of `packageApp`'s image, but jpackage's standard launcher in place of Jasper's and neither `jasper-watch` nor
+the `jasper` command, so this installation ignores `jasper.vmoptions` and has no
+[start-up recovery](diagnostics.md#start-up-recovery).
+
+A Java helper in `packaging/windows/user-install/` (compiled against JNA by `compileWindowsUserInstaller`) then installs
+the image as `%APPDATA%\JasperApp` and creates the Start menu shortcut `Jasper.lnk`, through Windows APIs rather than
+PowerShell, so script execution can stay disabled; Windows must still allow the image's `Jasper.exe` to run. It copies
+the image beside that folder and swaps it in, restoring the previous installation and shortcut if a step fails. It
+refuses while that installation's `Jasper.exe` runs (exit Jasper, including its background process, first), and
+refuses a folder without its `.jasper-user-install` marker, a symbolic link or junction anywhere in the tree, and a
+shortcut that starts another installation. `uninstallWindowsUser` compiles only the helper; it removes the folder, the
+shortcut, and the `Jasper` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` when that value starts this
+installation, and leaves Jasper home (`%APPDATA%\jasper`). Start Jasper from the Start menu;
+`system.run_in_background` decides residency and the login start as in any other installation.
+
+Run `installWindowsUser` in a build of its own: one that also runs `packageApp`, `packageDist`, `buildLauncher`,
+`buildWatcher`, `buildCommandClient`, `trainAotCache` or a `compileMac…` task fails with "Run installWindowsUser
+separately from native build and packaging tasks." `verifyWindowsUserInstall`, part of `check` on every host, tests the
+helper's install, update, rollback, ownership, link and data-preservation rules against a fake desktop, and on Windows
+also real shortcuts, registry values and a junction.
+
 ## Linux packages
 
 `packageDist` on Linux runs `packageDeb` and `packageRpm`, which build the `.deb` and `.rpm` from the verified image.
@@ -397,7 +436,7 @@ skipping the launcher's native suites (`testLauncherCore`, `testLauncherWatch`, 
 workflow does not run `check`. The publish job refuses to continue if the tag moved during the build, requires exactly
 the nine packages and the five SDK jars (`jasper-sdk-<v>.jar`, `jasper-sdk-<v>-sources.jar`,
 `jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and `jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is
-`JasperSdk.VERSION`, now 0.18.1), and writes `SHA256SUMS`. It creates a draft prerelease titled
+`JasperSdk.VERSION`, now 0.18.2), and writes `SHA256SUMS`. It creates a draft prerelease titled
 `Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds exactly those files, and
 publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which a rerun finishes; a
 published release for the tag is never overwritten.
@@ -417,11 +456,16 @@ names that Debian 12 has and newer releases still provide, and uploads them as t
 that every shared library resolves, and that the menu entry exists, then removes the package and checks that the
 program and the menu entry are gone. It never opens a window.
 
-**ci** ([`ci.yml`](../.github/workflows/ci.yml)) runs `./gradlew check --continue` on `macos-latest`, `ubuntu-24.04`
-and `windows-latest` with JBR 25 and Python 3.12, for pushes to `main` and pull requests, unless every changed file is
-Markdown or lies under `docs/` outside `docs/examples/`. On Linux it also builds the
-[example external plugin](examples/external-plugin) against the SDK jars that `check` wrote to `build/sdk-release/`. A
-newer push to a pull request cancels its running check.
+**ci** ([`ci.yml`](../.github/workflows/ci.yml)) runs `./gradlew check --parallel --continue` on `macos-latest`,
+`ubuntu-24.04` and `windows-latest` with JBR 25 and Python 3.12, for pushes to `main` and pull requests, unless every
+changed file is Markdown or lies under `docs/` outside `docs/examples/`. Independent projects build in parallel with
+two Gradle workers on macOS and Linux and one on Windows, whose subprocess and clean-up tests miss their deadlines
+beside concurrent test JVMs; each project's tests still run one at a time, and a job times out after 30 minutes. On
+Linux it first installs the DejaVu and Noto CJK fonts (`fonts-dejavu-core`, `fonts-noto-cjk`), and afterwards builds
+the [example external plugin](examples/external-plugin) against the SDK jars that `check` wrote to `build/sdk-release/`.
+A failed job uploads its test results and reports, with the renders under `jasper-app/build/enterprise-settings/` and
+`jasper-app/build/chrome-renders/`, as the artifact `test-diagnostics-<runner>`, kept for seven days. A newer push to a
+pull request cancels its running check.
 
 ## Native acceptance checklist
 
@@ -484,6 +528,10 @@ cannot mask a packaging problem.
   and plugins are kept.
 - [ ] Uninstall through Installed apps: the program files and shortcuts are removed, and Jasper home remains.
 - [ ] Extract the whole ZIP to a path containing spaces and launch `Jasper.exe` from Explorer.
+- [ ] On a machine without MSVC or WiX and with PowerShell script execution disabled,
+  `.\gradlew.bat :jasper-app:installWindowsUser` installs Jasper, which starts from its Start menu shortcut; after
+  quitting it, `uninstallWindowsUser` removes `%APPDATA%\JasperApp`, the shortcut and the Run value, and Jasper home
+  remains.
 - [ ] `app\native\` holds FlatLaf's DLL, `jnidispatch.dll` and pty4j's `win\x86-64` (x64) or `win\aarch64` (ARM64)
   files, and launching Jasper creates no `flatlaf-windows-*` file, `jna*.tmp` file or `pty4j` folder under `%TEMP%`.
 - [ ] The icon in Explorer, the taskbar, Alt+Tab and the title bar is Jasper's at 100%, 150% and 200% display scale.

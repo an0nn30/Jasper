@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,24 +18,56 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class ScriptsTest {
     @TempDir Path dir;
 
+    private static boolean windows() { return System.getProperty("os.name").startsWith("Windows"); }
+
+    private static String shell() {
+        if (!windows()) return "sh";
+        Path bash = Path.of(System.getenv("ProgramFiles"), "Git", "usr", "bin", "bash.exe");
+        assertThat(bash).as("Git for Windows supplies the POSIX test shell").isRegularFile();
+        return bash.toString();
+    }
+
+    private static String shellPath(Path path) {
+        String text = path.toAbsolutePath().toString().replace('\\', '/');
+        return windows() ? "/" + Character.toLowerCase(text.charAt(0)) + text.substring(2) : text;
+    }
+
     record Run(int status, List<String> fields) { }
 
     Run run(byte[] script, Path home, String marker) throws Exception {
-        assumeTrue(!System.getProperty("os.name").startsWith("Windows"));
-        var builder = new ProcessBuilder("sh", "-s").redirectError(ProcessBuilder.Redirect.DISCARD);
-        if (home == null) builder.environment().remove("HOME"); else builder.environment().put("HOME", home.toString());
+        // Keep capture outside the home/work-tree fixtures and avoid a blocking reader in the shared common pool.
+        Path input = Files.createTempFile(dir, "script-", ".sh");
+        Files.write(input, script);
+        Path stdout = Files.createTempFile(dir, "script-", ".stdout");
+        Path stderr = Files.createTempFile(dir, "script-", ".stderr");
+        // Give Bash a finite script without depending on native Windows pipe EOF delivery.
+        // Keep -s, as the SSH invocation does, but provide EOF through a regular file rather than a Java pipe.
+        var builder = new ProcessBuilder(shell(), "-x", "-s").redirectInput(input.toFile())
+            .redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
+        if (home == null) builder.environment().remove("HOME"); else builder.environment().put("HOME", shellPath(home));
+        if (windows()) {
+            String unixTools = Path.of(shell()).getParent().toString();
+            // Windows may supply Path instead of PATH; duplicate spellings can discard the override.
+            var environment = builder.environment();
+            String path = environment.entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase("PATH"))
+                .map(Map.Entry::getValue).findFirst().orElse("");
+            environment.keySet().removeIf(key -> key.equalsIgnoreCase("PATH"));
+            environment.put("PATH", unixTools + java.io.File.pathSeparator + path);
+        }
         Process process = builder.start();
-        try (var stdin = process.getOutputStream()) { stdin.write(script); }
-        var reading = CompletableFuture.supplyAsync(() -> {
-            try { return process.getInputStream().readAllBytes(); }
-            catch (IOException closed) { return new byte[0]; }
-        });
         byte[] output;
+        long started = System.nanoTime();
         try {
-            output = reading.get(10, TimeUnit.SECONDS);
-            assertThat(process.waitFor(10, TimeUnit.SECONDS)).as("script finished").isTrue();
+            boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+            assertThat(finished).as("script finished after %d ms (alive=%s); stderr: %s",
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), process.isAlive(), Files.readString(stderr)).isTrue();
+            output = Files.readAllBytes(stdout);
         } finally {
-            process.destroyForcibly();
+            if (process.isAlive()) {
+                process.destroyForcibly();
+                assertThat(process.waitFor(10, TimeUnit.SECONDS)).as("script process released its capture files").isTrue();
+            }
         }
         var fields = new ArrayList<String>();
         byte[] start = (marker + "\0").getBytes(StandardCharsets.UTF_8);
@@ -61,6 +92,13 @@ class ScriptsTest {
         return -1;
     }
 
+    @Test void aScriptWithoutExecOrExitFinishesAtEndOfInput() throws Exception {
+        byte[] script = ("printf '" + Scripts.LIST + "\\000finished\\000'\n").getBytes(StandardCharsets.UTF_8);
+        var run = run(script, dir, Scripts.LIST);
+        assertThat(run.status()).isZero();
+        assertThat(run.fields()).containsExactly("finished");
+    }
+
     @Test void existsReportsLiteralAndGlobMarkersBelowHomeOnly() throws Exception {
         Path home = Files.createDirectories(dir.resolve("home")).toRealPath();
         Files.createDirectories(home.resolve(".git"));
@@ -69,17 +107,24 @@ class ScriptsTest {
         Files.writeString(app.resolve("Shop.sln"), "");
         Path lib = Files.createDirectories(app.resolve("lib"));
         Files.writeString(lib.resolve("Cargo.toml"), "");
-        List<String> folders = List.of(lib.toString(), app.toString(), home.resolve("src").toString(), home.toString(), home + "/",
-            home.getParent().toString(), home.getParent() + "/", "/");
+        List<String> folders = List.of(shellPath(lib), shellPath(app), shellPath(home.resolve("src")), shellPath(home), shellPath(home) + "/",
+            shellPath(home.getParent()), shellPath(home.getParent()) + "/", "/");
         var run = run(Scripts.exists(folders, Set.of(".git", "Cargo.toml", "*.sln", "usr", "us*")), home, Scripts.EXISTS);
         assertThat(run.status()).isZero();
         Map<String, Set<String>> found = Scripts.pairs(run.fields());
-        assertThat(found).containsOnlyKeys(lib.toString(), app.toString());
-        assertThat(found).as("home, its ancestors and / report nothing").doesNotContainKeys("/", home.toString(), home + "/", home.getParent().toString());
-        assertThat(found.get(lib.toString())).containsExactly("Cargo.toml");
-        assertThat(found.get(app.toString())).containsExactlyInAnyOrder(".git", "Shop.sln");
+        assertThat(found).containsOnlyKeys(shellPath(lib), shellPath(app));
+        assertThat(found).as("home, its ancestors and / report nothing").doesNotContainKeys("/", shellPath(home), shellPath(home) + "/", shellPath(home.getParent()));
+        assertThat(found.get(shellPath(lib))).containsExactly("Cargo.toml");
+        assertThat(found.get(shellPath(app))).containsExactlyInAnyOrder(".git", "Shop.sln");
         assertThat(dir.resolve("pwned")).as("names are data, never code").doesNotExist();
         assertThat(home.resolve("src/pwned")).doesNotExist();
+    }
+
+    @Test void existsNeverProbesTheRootEvenWhenHomeIsNotAbsolute() throws Exception {
+        String script = "HOME=relative\n" + new String(Scripts.exists(List.of("/"), Set.of("usr")), StandardCharsets.UTF_8);
+        var run = run(script.getBytes(StandardCharsets.UTF_8), null, Scripts.EXISTS);
+        assertThat(run.status()).isZero();
+        assertThat(run.fields()).as("the filesystem root is never a project candidate").isEmpty();
     }
 
     @Test void findListsFilesSkippingExcludedFoldersAndAMissingRootExitsThree() throws Exception {
@@ -88,11 +133,12 @@ class ScriptsTest {
         Files.writeString(root.resolve("node_modules/x/index.js"), "");
         Files.createDirectories(root.resolve("src"));
         Files.writeString(root.resolve("src/main.rs"), "");
-        Files.writeString(root.resolve("odd\nname"), "");
-        var run = run(Scripts.find(root.toString(), List.of("node_modules")), dir, Scripts.LIST);
+        String oddName = windows() ? "odd 'name" : "odd\nname";
+        Files.writeString(root.resolve(oddName), "");
+        var run = run(Scripts.find(shellPath(root), List.of("node_modules")), dir, Scripts.LIST);
         assertThat(run.status()).isZero();
-        assertThat(run.fields()).containsExactlyInAnyOrder("./src/main.rs", "./odd\nname");
-        assertThat(run(Scripts.find(dir.resolve("gone").toString(), List.of()), dir, Scripts.LIST).status()).isEqualTo(3);
+        assertThat(run.fields()).containsExactlyInAnyOrder("./src/main.rs", "./" + oddName);
+        assertThat(run(Scripts.find(shellPath(dir.resolve("gone")), List.of()), dir, Scripts.LIST).status()).isEqualTo(3);
     }
 
     @Test void gitListsAWorkTreeAndDeclinesOneWhoseTopIsHome() throws Exception {
@@ -103,15 +149,23 @@ class ScriptsTest {
         Files.writeString(root.resolve(".gitignore"), "ignored\n");
         Files.writeString(root.resolve("ignored"), "");
         Files.writeString(root.resolve("kept.txt"), "");
-        var run = run(Scripts.git(root.toString()), home, Scripts.LIST);
+        var run = run(Scripts.git(shellPath(root)), home, Scripts.LIST);
         assertThat(run.status()).isZero();
         assertThat(run.fields()).containsExactlyInAnyOrder(".gitignore", "kept.txt");
-        assertThat(run(Scripts.git(root.toString()), null, Scripts.LIST).fields()).as("no HOME is no home folder").contains("kept.txt");
+        assertThat(run(Scripts.git(shellPath(root)), null, Scripts.LIST).fields()).as("no HOME is no home folder").contains("kept.txt");
         git(home, "init", "-q");
         Path plain = Files.createDirectories(home.resolve("plain"));
-        assertThat(run(Scripts.git(plain.toString()), home, Scripts.LIST).status()).as("home's own work tree").isEqualTo(4);
+        assertThat(run(Scripts.git(shellPath(plain)), home, Scripts.LIST).status()).as("home's own work tree").isEqualTo(4);
         Path outside = Files.createDirectories(dir.resolve("outside"));
-        assertThat(run(Scripts.git(outside.toString()), home, Scripts.LIST).status()).as("not a work tree").isEqualTo(4);
+        assertThat(run(Scripts.git(shellPath(outside)), home, Scripts.LIST).status()).as("not a work tree").isEqualTo(4);
+    }
+
+    @Test void gitComparesTheCanonicalWorkTreeToHome() throws Exception {
+        Path home = Files.createDirectories(dir.resolve("home")).toRealPath();
+        Path nested = Files.createDirectories(home.resolve("nested"));
+        String git = "git() { if [ \"$3\" = rev-parse ]; then printf '%s/./\\n' \"$HOME\"; else return 99; fi; }\n";
+        byte[] script = (git + new String(Scripts.git(shellPath(nested)), StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
+        assertThat(run(script, home, Scripts.LIST).status()).isEqualTo(4);
     }
 
     static boolean gitAvailable() {

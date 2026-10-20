@@ -10,12 +10,13 @@ file and how to make one.
 
 | Theme | Id | Variants | Terminal schemes |
 |---|---|---|---|
-| Slate Cobalt (the default) | `slate-cobalt` | Dark, Light | Slate Cobalt Dark (`slate-cobalt/dark`), Slate Cobalt Light (`slate-cobalt/light`), High Contrast (`slate-cobalt/high-contrast`) |
+| Slate Cobalt (the default Dark theme) | `slate-cobalt` | Dark, Light | Slate Cobalt Dark (`slate-cobalt/dark`), Slate Cobalt Light (`slate-cobalt/light`), High Contrast (`slate-cobalt/high-contrast`) |
 | Catppuccin Latte | `catppuccin-latte` | Light | Catppuccin Latte (`catppuccin-latte/light`) |
 | Catppuccin Frappé | `catppuccin-frappe` | Dark | Catppuccin Frappé (`catppuccin-frappe/dark`) |
 | Catppuccin Macchiato | `catppuccin-macchiato` | Dark | Catppuccin Macchiato (`catppuccin-macchiato/dark`) |
 | Catppuccin Mocha | `catppuccin-mocha` | Dark | Catppuccin Mocha (`catppuccin-mocha/dark`) |
 | Ubuntu Yaru | `ubuntu-yaru` | Dark, Light | Ubuntu Yaru Dark (`ubuntu-yaru/dark`), Ubuntu Yaru Light (`ubuntu-yaru/light`) |
+| Jasper Meadow Light (the default Light theme) | `jasper-meadow` | Light | Jasper Meadow Light (`jasper-meadow/light`) |
 
 - **Slate Cobalt**'s colours are defined in [the Slate Cobalt colour reference](design/theme-engine/slate-cobalt.md).
   High Contrast is a terminal scheme only, white on black, and can be used with any theme.
@@ -23,6 +24,7 @@ file and how to make one.
   3.6.1.
 - **Ubuntu Yaru** is adapted from Ubuntu 26.04's Yaru, with a title bar of its own in each variant;
   [its colour reference](design/theme-engine/ubuntu-yaru.md) records the source and the mapping.
+- **Jasper Meadow Light** pairs warm cream and olive surfaces with moss-green accents on buttons, selections and focus.
 
 Each theme with a UI variant brings its own Editor colours for that variant.
 
@@ -31,8 +33,8 @@ Each theme with a UI variant brings its own Editor colours for that variant.
 A plugin can ship themes. They are listed after the built-in themes, by name, captioned "From the *plugin name*
 plugin", and Settings can neither remove nor replace them. They are read when Jasper starts, so turning the plugin on
 or off takes effect after a restart. While the plugin does not load, a setting that names one of its themes shows
-Slate Cobalt (and one that names one of its schemes uses Same as UI theme) without a warning, and keeps the name, so
-turning the plugin on again restores it.
+Slate Cobalt in Dark or Jasper Meadow Light in Light (and one that names one of its schemes uses Same as UI theme)
+without a warning, and keeps the name, so turning the plugin on again restores it.
 
 The bundled Enterprise plugin, off by default, ships **Enterprise** (`enterprise`), in Light and Dark (ports of
 IntelliJ's IntelliJ Light and New UI Dark) with Editor colours for each, and the schemes Enterprise Light
@@ -46,8 +48,8 @@ default theme of both appearances ([the Enterprise theme](enterprise.md#the-ente
 appearance = "system" # or "dark", "light"
 
 [ui.theme]
-dark = "slate-cobalt"  # the theme the Dark appearance shows
-light = "slate-cobalt" # the theme the Light appearance shows
+dark = "slate-cobalt"   # the theme the Dark appearance shows
+light = "jasper-meadow" # the theme the Light appearance shows
 
 [terminal]
 scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
@@ -57,7 +59,7 @@ scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
 |---|---|---|
 | `ui.appearance` | `"system"` | `"system"` follows the operating system's light or dark setting, live; only macOS reports it, so on Linux and Windows `"system"` shows Dark. `"dark"` and `"light"` choose one. A change of the system's setting never writes `config.toml`. |
 | `ui.theme.dark` | `"slate-cobalt"`, or the active look's default (`"enterprise"` under the Enterprise look) | The id of a theme with a Dark variant: built in, from a plugin, or installed |
-| `ui.theme.light` | `"slate-cobalt"`, or the active look's default (`"enterprise"` under the Enterprise look) | The id of a theme with a Light variant |
+| `ui.theme.light` | `"jasper-meadow"`, or the active look's default (`"enterprise"` under the Enterprise look) | The id of a theme with a Light variant |
 | `terminal.scheme` | `"match"` | `"match"` uses the shown theme's own scheme, so it follows the appearance; a scheme id, `<theme id>/<scheme key>`, chooses one in either appearance |
 
 All four apply live in every window.
@@ -108,9 +110,9 @@ hand.
 - A file named after a built-in theme, such as `slate-cobalt.json`, or after a theme a plugin ships, such as
   `enterprise.json` (even while that plugin is off), is ignored with a warning, and so is a file whose name is not an
   id or that cannot be used ([When something is wrong](#when-something-is-wrong)).
-- Dropdowns list the built-in themes first (Slate Cobalt, the Catppuccin flavours, Ubuntu Yaru), then the plugins'
-  themes by name, then the installed themes by name. Two themes with the same name show their ids, as *name* (*id*);
-  two schemes with the same name show theirs.
+- Dropdowns list the built-in themes first (Slate Cobalt, the Catppuccin flavours, Ubuntu Yaru, Jasper Meadow
+  Light), then the plugins' themes by name, then the installed themes by name. Two themes with the same name show
+  their ids, as *name* (*id*); two schemes with the same name show theirs.
 
 ## Importing and removing themes
 
@@ -132,9 +134,9 @@ is shown in a sheet.
 - **Remove *theme*** removes the theme the dropdown shows; for the Terminal scheme gear, the theme the scheme belongs
   to. It is unavailable for a built-in theme, a plugin's theme and Same as UI theme. It asks first and says what will
   change: the file is deleted, and every setting that names the theme or one of its schemes, saved or staged, returns
-  to its default (the look's default under a look that sets one; Same as UI theme for the scheme). Saved settings are
-  written at once, and other staged changes stay staged. If the file cannot be deleted, nothing changes and the sheet
-  says why.
+  to its default (Slate Cobalt for Dark and Jasper Meadow Light for Light, or the look's default under a look that
+  sets one; Same as UI theme for the scheme). Saved settings are written at once, and other staged changes stay
+  staged. If the file cannot be deleted, nothing changes and the sheet says why.
 
 ## When something is wrong
 
@@ -145,9 +147,9 @@ Problems with themes are listed with the configuration's warnings: the status ba
 |---|---|---|
 | `ui.theme.dark` or `ui.theme.light` is not an id | `Use a theme id such as "slate-cobalt"; using the default.` | The default (the look's, under a look that sets one) |
 | `terminal.scheme` is not `"match"` or a scheme id | `Use "match" or a scheme id such as "slate-cobalt/high-contrast"; using the default.` | Same as UI theme |
-| A theme pick names a theme that is not installed | `"<id>" is not an installed theme. Use one of …; using the default.` | Slate Cobalt, until the theme is installed again |
-| A theme pick names a theme without that variant | `"<id>" has no Dark variant. Use one of …; using the default.` (or Light) | Slate Cobalt |
+| A theme pick names a theme that is not installed | `"<id>" is not an installed theme. Use one of …; using the default.` | Slate Cobalt for Dark, Jasper Meadow Light for Light, until the theme is installed again |
+| A theme pick names a theme without that variant | `"<id>" has no Dark variant. Use one of …; using the default.` (or Light) | Slate Cobalt for Dark, Jasper Meadow Light for Light |
 | `terminal.scheme` names a scheme that is not installed | `"<id>" is not an installed scheme. Use "match" or one of …; using the default.` | Same as UI theme |
-| A pick names a theme or scheme of a plugin that does not load | None | Slate Cobalt, or Same as UI theme; the setting keeps its value |
+| A pick names a theme or scheme of a plugin that does not load | None | Slate Cobalt for Dark, Jasper Meadow Light for Light, or Same as UI theme; the setting keeps its value |
 | A theme file cannot be used | The file's path, the line for a JSON syntax error, and the problem, such as `/Users/you/.config/jasper/themes/dracula.json: warning: ui.dark: Missing colour "accent"` ([every message](creating-themes.md#validation-and-error-messages)) | The file is skipped |
 | A theme cannot be applied | `Could not apply <name> Dark: <cause>; keeping the current appearance.` on `ui.appearance`, and "Could not apply the theme" | The current appearance; at start-up, Slate Cobalt Dark. Reload Config tries again. |

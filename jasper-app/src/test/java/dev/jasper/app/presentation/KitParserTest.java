@@ -157,7 +157,7 @@ class KitParserTest {
         assertThat(parsed.chrome()).isEqualTo(new ChromeSpec(ChromeSpec.TitleBar.NATIVE, ChromeSpec.MenuBar.WINDOW,
             "Workstation — {session} — {directory}", ChromeSpec.ToolWindows.STRIPES, ChromeSpec.EditorTabs.CLASSIC,
             ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE,
-            ChromeSpec.Icons.CLASSIC));
+            ChromeSpec.Icons.CLASSIC, ChromeSpec.ToolbarSearch.FIELD));
         assertThat(parsed.kit().controls()).isEqualTo(new ControlVariants(ControlVariants.Toggle.CHECKBOX, ControlVariants.Exclusive.RADIOS,
             ControlVariants.Tabs.FOLDER, ControlVariants.Group.TITLED_BOX, ControlVariants.FormLabel.COLON, ControlVariants.Empty.TEXT,
             ControlVariants.Table.CLASSIC, ControlVariants.Tree.CLASSIC, ControlVariants.Stepper.SPINNER, ControlVariants.OrderedList.SIDE_COLUMN,
@@ -205,6 +205,7 @@ class KitParserTest {
 
     @Test void everyChromeAndControlPointTakesBothItsValues() throws Exception {
         assertThat(parse("kit = 1\nbase = \"default\"\n[chrome]\ntitle_bar = \"native\"\n").chrome().titleBar()).isEqualTo(ChromeSpec.TitleBar.NATIVE);
+        assertThat(parse("kit = 1\nbase = \"classic\"\n[chrome]\ntitle_bar = \"classic\"\n").chrome()).as("window menus under a classic title").isEqualTo(dev.jasper.app.testsupport.EnterpriseLook.titled(ChromeSpec.CLASSIC, ChromeSpec.TitleBar.CLASSIC));
         assertThat(parse("kit = 1\nbase = \"classic\"\n[chrome]\ntitle_bar = \"unified\"\nmenu_bar = \"system\"\n").chrome().menuBar())
             .isEqualTo(ChromeSpec.MenuBar.SYSTEM);
         String[][] controls = {{"toggle", "switch", "checkbox"}, {"exclusive", "segments", "radios"}, {"tabs", "segments", "folder"},
@@ -226,6 +227,14 @@ class KitParserTest {
                 assertThat(components.get(index).apply(kit.controls()).key()).as(point[0]).isEqualTo(point[value]);
             }
         }
+    }
+
+    /** Plan 15b: the toolbar's Search Everywhere is the field in both bases; a kit may name IntelliJ Classic's icon. */
+    @Test void theToolbarSearchPointDefaultsToTheFieldAndTakesTheIcon() throws Exception {
+        assertThat(parse("kit = 1\nbase = \"classic\"\n").chrome().toolbarSearch()).isEqualTo(ChromeSpec.ToolbarSearch.FIELD);
+        assertThat(parse("kit = 1\nbase = \"default\"\n").chrome().toolbarSearch()).isEqualTo(ChromeSpec.ToolbarSearch.FIELD);
+        assertThat(parse("kit = 1\nbase = \"classic\"\n[chrome]\ntoolbar_search = \"icon\"\n").chrome().toolbarSearch())
+            .as("the classic base has the Run window and a native title").isEqualTo(ChromeSpec.ToolbarSearch.ICON);
     }
 
     @Test void aDefaultsThemeMayBeBuiltInOrDeclaredAndADeclaredThemeThatDidNotLoadIsDropped() throws Exception {
@@ -254,7 +263,7 @@ class KitParserTest {
         cases.put(head + "[chrome]\ntitle = \"x\"\n", "[chrome].title: unknown key");
         cases.put(head + "chrome = 1\n", "chrome: expected a table");
         cases.put(head + "[metrics]\nrow_height = \"22\"\n", "[metrics].row_height: expected an integer");
-        cases.put(head + "[chrome]\ntitle_bar = \"glass\"\n", "[chrome].title_bar: \"glass\" is not one of unified, native");
+        cases.put(head + "[chrome]\ntitle_bar = \"glass\"\n", "[chrome].title_bar: \"glass\" is not one of unified, native, classic");
         cases.put(head + "[controls]\ntoggle = 1\n", "[controls].toggle: expected a string");
         cases.put("kit = 2\nbase = \"default\"\n", "kit: 2 is not a format this Jasper reads; expected 1");
         cases.put("base = \"default\"\n", "kit: missing; a kit file begins with kit = 1");
@@ -265,7 +274,12 @@ class KitParserTest {
         cases.put(head + "[metrics]\ncontrol_height = 19\n", "[metrics].control_height: 19 is outside 20-28");
         cases.put(head + "[type]\nbase = 9\n", "[type].base: 9 is not a body size from 10 to 16");
         cases.put(head + "[type]\nbase = 12.5\n", "[type].base: expected an integer");
-        cases.put(head + "[chrome]\nmenu_bar = \"window\"\n", "[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\"");
+        cases.put(head + "[chrome]\nmenu_bar = \"window\"\n", "[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\" or \"classic\"");
+        String iconNeeds = "[chrome].toolbar_search: \"icon\" needs [chrome].palette = \"run_window\" and [chrome].title_bar = \"native\" or \"classic\"";
+        cases.put(head + "[chrome]\ntoolbar_search = \"icon\"\n", iconNeeds);
+        cases.put("kit = 1\nbase = \"classic\"\n[chrome]\ntoolbar_search = \"icon\"\npalette = \"anchored\"\n", iconNeeds);
+        cases.put("kit = 1\nbase = \"classic\"\n[chrome]\ntoolbar_search = \"icon\"\ntitle_bar = \"unified\"\nmenu_bar = \"system\"\n", iconNeeds);
+        cases.put(head + "[chrome]\ntoolbar_search = \"box\"\n", "[chrome].toolbar_search: \"box\" is not one of field, icon");
         cases.put(head + "[defaults]\n\"ui.font.size\" = 12\n", "[defaults].\"ui.font.size\": not a setting a look may default; use "
             + "\"ui.theme.light\", \"ui.theme.dark\", \"palette.visible_rows\", \"window.toolbar_height\" or \"window.toolbar\"");
         cases.put(head + "[defaults]\n\"palette.visible_rows\" = 30\n", "[defaults].\"palette.visible_rows\": Use an integer from 1–20.");
@@ -287,12 +301,35 @@ class KitParserTest {
         cases.put(head + "[colors]\ndialog_surface = \"surface.card\"\n", "[colors].dialog_surface: \"surface.card\" is not one of surface.dialog, surface.app");
         cases.put(head + "[chrome]\nwindow_title = \"#1E1F22\"\n", "[chrome].window_title: \"#1E1F22\" looks like a colour; colours come from the theme");
         cases.put(head + "# the accent is #2F65CA\n", "kit file: line 3: \"#2F65CA\" looks like a colour; colours come from the theme");
+        cases.put(head + "[defaults.ui]\ntheme = 1\n", "[defaults].\"ui\": a plugin's table is named by its id, such as \"dev.jasper.editor\"; "
+            + "quote a dotted setting key, such as \"window.toolbar\"");
+        cases.put(head + "[defaults.\"jasper.core\"]\nx = 1\n", "[defaults].\"jasper.core\": not a plugin id");
+        cases.put(head + "[defaults.\"dev.x.tool\"]\n\"bad key\" = 1\n", "[defaults.\"dev.x.tool\"].\"bad key\": not a setting key");
+        cases.put(head + "[defaults.\"dev.x.tool\"]\nwhen = 1979-05-27\n", "[defaults.\"dev.x.tool\"].when: expected a string, number, boolean or array");
+        cases.put(head + "[defaults.\"dev.x.tool\"]\nhue = \"#FF0000\"\n",
+            "[defaults.\"dev.x.tool\"].hue: \"#FF0000\" looks like a colour; colours come from the theme");
+        cases.put(head + "[defaults.\"dev.x.tool\"]\n\"a.b\" = 1\na.b = 2\n", "[defaults.\"dev.x.tool\".a].b: sets a.b a second time");
         cases.put(head + "[chrome\n", null);
         for (var item : cases.entrySet()) {
             String message = problem(item.getKey());
             if (item.getValue() == null) assertThat(message).as(item.getKey()).startsWith("kit file: not valid TOML");
             else assertThat(message).as(item.getKey()).isEqualTo(item.getValue());
         }
+    }
+
+    /** Plan 15a: a [defaults] table keyed by a plugin's id holds that plugin's setting defaults, raw, by dotted key. */
+    @Test void aPluginsTableGivesItsSettingsDefaultsAsRawValues() throws Exception {
+        var parsed = parse("kit = 1\nbase = \"default\"\n[defaults]\n\"palette.visible_rows\" = 8\n[defaults.\"dev.x.tool\"]\nfont_family = \"Mono\"\n"
+            + "size = 12\nratio = 1.5\nwrap = true\nsftp.parallel = 3\nnames = [\"a\", \"b\"]\n");
+        var table = parsed.defaults().plugin("dev.x.tool");
+        assertThat(table).containsOnlyKeys("font_family", "size", "ratio", "wrap", "sftp.parallel", "names");
+        assertThat(table.get("font_family")).isEqualTo("Mono");
+        assertThat(table.get("size")).isEqualTo(12L);
+        assertThat(table.get("ratio")).isEqualTo(1.5);
+        assertThat(table.get("wrap")).isEqualTo(true);
+        assertThat(table.get("sftp.parallel")).as("a nested key is the dotted setting key").isEqualTo(3L);
+        assertThat(table.get("names")).isInstanceOf(org.tomlj.TomlArray.class);
+        assertThat(parsed.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(8);
     }
 
     @Test void filesOverTheirLimitsAreRefused() throws Exception {
@@ -310,6 +347,8 @@ class KitParserTest {
         String head = "kit = 1\nbase = \"default\"\n";
         assertThat(problem(head + "[" + "a.".repeat(20_000) + "b]\n")).isEqualTo("[a]: unknown table");
         assertThat(problem(head + "[chrome." + "a.".repeat(20_000) + "b]\n")).isEqualTo("[chrome].a: unknown key");
+        assertThat(problem(head + "[defaults.\"dev.x.tool\"." + "a.".repeat(20_000) + "b]\nwhen = 1979-05-27\n"))
+            .startsWith("[defaults.\"dev.x.tool\".a.a.").endsWith(".a.b].when: expected a string, number, boolean or array");
         assertThat(problem(head + "a = " + "[".repeat(30_000))).startsWith("kit file: not valid TOML");
     }
 

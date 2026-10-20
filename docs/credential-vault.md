@@ -106,9 +106,10 @@ Below are three columns:
 The footer shows the device-secret store, the auto-lock time ("Auto-lock 15 min" or "Auto-lock off") and the path of
 `vault.jv`. **Done** or Escape closes the window. Each change is saved as you make it, so closing undoes nothing.
 
-### Under the Enterprise look
+### Under a classic look
 
-With the [Enterprise look](enterprise.md) the manager is laid out classically:
+Under a classic look, one whose [kit file starts from the classic base](looks.md#kit-and-base) as the
+[Enterprise look](enterprise.md)'s does, the manager is laid out classically:
 
 - A toolbar row: **New** (the add menu), **Edit…**, **Delete**, **Copy Username** (a login), **Copy Password** (a login
   with a password), **Lock Vault** with a fixed shortcut caption, Cmd+Shift+L on macOS and Ctrl+Shift+L on Linux and
@@ -139,7 +140,7 @@ was. Type an absolute path: `~` is not expanded, and a relative path is taken fr
 erase the secrets typed into them when they close.
 
 **Add Login** asks for **Name** and **Username**, then **Authentication**: **Password**, or **Private Key** with the key
-file's path, an optional **Passphrase** and **Also use password** to add a password as well. Under the Enterprise look
+file's path, an optional **Passphrase** and **Also use password** to add a password as well. Under a classic look
 the choice is labelled **Method**.
 
 **Add SSH Key** records an existing key pair as a path key: **Name**, **Private Key** and **Public Key** paths and an
@@ -198,7 +199,7 @@ reports it.
 Copying a password, username or secure note is a secret copy: Jasper clears the clipboard 30 seconds later (retrying
 for a few seconds while another program holds it), and tries once more when the plugin stops and when Jasper quits,
 each time only if the clipboard still holds that text. A later copy, yours or a plugin's, is left alone. Public keys,
-and under the Enterprise look the other Details fields (paths, algorithm, fingerprint, comment, storage), are ordinary
+and under a classic look the other Details fields (paths, algorithm, fingerprint, comment, storage), are ordinary
 copies that stay on the clipboard. The vault only copies: it never types a secret into a terminal.
 
 Each copy shows a card naming what was copied and from which entry, such as "Copied the password for prod-db", never

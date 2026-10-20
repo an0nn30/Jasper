@@ -17,7 +17,7 @@ No File Server command has a default shortcut; assign one in
 
 | Command | ID | Where |
 |---|---|---|
-| Toggle File Servers | `dev.jasper.fileserver.show-panel` | palette, View › Tool Windows, the tool window's rail button, the status bar item |
+| Toggle File Servers | `dev.jasper.fileserver.show-panel` | palette, View › Tool Windows (the Window menu under the Enterprise look), the tool window's rail button, the status bar item |
 | Share Folder… | `dev.jasper.fileserver.share-folder` | Transfer menu, palette; opens New File Server |
 | New File Server… | `dev.jasper.fileserver.new` | Transfer menu, palette, the tool window's **+** |
 | Start or Stop a File Server… | `dev.jasper.fileserver.servers` | palette; opens the palette's [File Servers scope](#the-command-palette) |
@@ -115,15 +115,20 @@ a server reachable from all networks picks up a network you joined.
 The status bar shows "⇅ 1 server" or "⇅ *n* servers" while servers run; its tooltip lists each running server with its
 first address, and clicking it toggles the tool window.
 
-### Under the Enterprise look
+### Under a classic look
 
-Under the [Enterprise look](enterprise.md) the tool window starts in the left side's bottom slot, beneath SFTP. It is a
+Under a classic look, one whose [kit file starts from the classic base](looks.md#kit-and-base) as the
+[Enterprise look](enterprise.md)'s does, the tool window starts in the left side's bottom slot, beneath SFTP. It is a
 table of **Folder** (name and protocol), **Address** and **Status** (a status dot and the state); Enter or a double
 click starts or stops the selected server. A chosen server's details are **Properties — *name***: Folder, Protocol,
 Port, Access, Reachable from, User, TLS certificate, SSH host key, its addresses and Warning. The row menu reads **Copy
 URI** for Copy Address, adds **Copy *address*** for each further address, and has **Show Activity** / **Hide Activity**
 in place of Show Details, which shows the activity log under the properties. New File Server lists the authorized keys
 as a Type / Fingerprint / Comment table.
+
+Under labelled tool window stripes, as in Enterprise, **Toggle File Servers** makes the tool window the active one when
+it shows it, which takes the keyboard, and activates a shown tool window that is not the active one instead of hiding
+it.
 
 ## Adding and editing a server
 

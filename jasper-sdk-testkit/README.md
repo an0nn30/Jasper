@@ -50,8 +50,9 @@ The thread that calls the host plays the UI thread. Nothing happens behind the t
   and returns how many ran.
 - Kit views need the real Swing event dispatch thread: `FakeKit` and `FakeKitView` throw `IllegalStateException`
   ("Kit requires EDT") elsewhere, so a test of a plugin that builds views runs it inside
-  `SwingUtilities.invokeAndWait`. `Appearance` calls accept the thread that made the host or the event dispatch
-  thread.
+  `SwingUtilities.invokeAndWait`. `Appearance`'s colour, palette and opacity calls and its `onChanged` and
+  `onWorkspaceChanged` subscriptions accept the thread that made the host or the event dispatch thread; its variants
+  and presentation answer any thread.
 
 ## FakePluginHost
 
@@ -132,6 +133,8 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `setSetting(id, key, raw)` | Sets a raw value (`String`, `Long`, `Double`, `Boolean` or `List<String>`) as a user editing the file would: before the plugin starts it is part of the file it starts with, afterwards the settings reload and listeners run |
 | `savedSettings(id)`, `settingsReports(id)`, `declared(id)` | The raw values, including what the plugin saved; what the last read reported, as `key: message`; the declared keys |
 | `settingsPanel(id)`, `settingsPanelView(id)`, `highlightSettingsPanel(id, query)`, `pendingSettings(id)`, `settingsPanelChanges(id)`, `applySettingsPanel(id)`, `closeSettingsPanel(id)` | Builds and drives a plugin's own Settings page as Settings would |
+| `setKitDefault(id, key, raw)`, `lookDefaultProblems(id)` | Gives a plugin's setting the look's default, as a kit file's `[defaults."<plugin id>"]` table does, before any plugin starts: when the plugin declares the key, a raw value its kind accepts replaces the declared default, and a saved value still wins. The look defaults the plugin could not use, as `<id>: the look's default for <key> is not used: <reason>` and `<id>: the look gives a default for <key>, which the plugin does not declare` |
+| `setPresentation(presentation)`, `presentation()` | Sets what every plugin's `Appearance.presentation()` returns, before any plugin starts (`IllegalStateException` once one has, even if it stopped since); the presentation set, `FakePresentations.STANDARD` until then |
 | `setVariant(variant)`, `setSemanticColors(map)`, `setWorkspace(variant, palette, editor, syntax)`, `setWorkspaceOpacity(opacity)` | Change the chrome variant (which also publishes `AppEvents.THEME_CHANGED`), the chrome colours, the workspace appearance and the workspace opacity; on the next `flush()`, a variant, chrome-colour or workspace change reaches `onChanged` handlers, and a workspace or opacity change reaches `onWorkspaceChanged` handlers (a variant change does too while the workspace follows the chrome) |
 | `notifications()` | The `FakeNotifications` that records what plugins posted |
 
@@ -144,6 +147,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | [`FakeKitView`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakeKitView) | `spec()` is the current tree. `emit(event)` delivers user input (an edit of a read-only field is dropped); `type(fieldId, text)` types as a person would, and a read-only, hidden, disabled or busy field takes nothing; `setSecret(id, chars)` fills a secret field; `focused()`, `revealed()`, `fieldSelection(id)` and `setComposing(id, composing)` show and script focus, scrolling, selection and input-method composition. |
 | [`FakeNotifications`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakeNotifications) | `lines()` lists posts as `group\|SEVERITY\|title\|content`, with `\|` and the cause's simple class name when there is one; `posts()` gives each post's spec and whether it expired; `groups()` lists `id\|name\|MODE`; `runAction(title, label)` and `click(title)` act as the user would. `new FakeNotifications().group(id)` records for a component that takes a `NotificationGroup`; its actions then run on the caller and what they throw reaches the test. |
 | [`FakeClipboard`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakeClipboard) | `copies()` lists `copy\|<plugin id>\|<text>` and `secret\|<plugin id>\|<text>`; `text()` and `setText(value)` read and set it as the user would; `failWrites(true)` makes writes fail as when another program holds it; `expireSecrets()` runs the 30-second clear now |
+| [`FakePresentations`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakePresentations) | Values for `setPresentation`: `STANDARD`, the default look as on Linux and Windows, and `CLASSIC`, the Enterprise look as on Linux (classic icons, labelled stripes, the native title bar, a menu row in the window, the Search Everywhere icon, IBM Plex Sans and Mono, 12-point body text, a 28-pixel toolbar) |
 | [`FakeCommandCall`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakeCommandCall) | `exit()` completes with the exit code; `out()` and `err()` hold the output; `cancel()` acts as if the caller went away, and `cancelled()` says whether it did |
 
 ## Differences from Jasper
@@ -156,7 +160,8 @@ Jasper's is `<home>/plugins/<id>/data`.
 - Settings live in memory: `settings().file()` names `<root>/<id>/<id>.toml`, but nothing is written there. A value of
   the wrong TOML type keeps that one setting's last good value, where Jasper rejects the whole file and keeps every
   setting's last good value. `Setting.set` completes at once. `SettingKind.number` values stay `double`; Jasper keeps
-  them as `float`, so 0.1 reads back as 0.10000000149011612.
+  them as `float`, so 0.1 reads back as 0.10000000149011612. A look default the plugin cannot use is listed by
+  `lookDefaultProblems`, where Jasper logs it as a warning, and the reason may be worded differently.
 - Services: the fake does not check that a service interface is in one of the provider's exported packages. Class
   visibility is not modelled: an absent optional provider's API classes are on the test classpath, so the
   `NoClassDefFoundError` Jasper raises for them cannot happen.
@@ -174,6 +179,9 @@ Jasper's is `<home>/plugins/<id>/data`.
   belongs to a plugin window or a content tab.
 - `Platform.openInEditor` asks the provided editor on the caller's thread.
 - Panels have no `<panel id>.toggle` action and no View › Tool Windows entry.
+- The fake has no active tool window: `Panels.toggle` and `PanelHost.show()` from a panel's own toggle action only
+  toggle or show it, also under `FakePresentations.CLASSIC`, where Jasper activates a showing panel that is not the
+  active tool window instead of hiding it.
 - `requestQuit()` counts a quit guard whose decision is still pending as a refusal, because the fake does not pump
   events.
 - A declared subcommand with no handler fails with a message naming the plugin's id; Jasper names the plugin.

@@ -17,9 +17,9 @@ take precedence for the editor role and for a subcommand name two loading plugin
 <li><b>Notifications and activity</b><span>Notification groups the user tunes in Settings, long-running activities and connection states shown on Desk Buddy.</span></li>
 <li><b>Settings</b><span>Typed, validated settings in the plugin's own TOML file, read live, with a generated page in Settings › Tools or a page of the plugin's own.</span></li>
 <li><b>Files and the editor</b><span>Places in Jasper's file chooser, such as saved hosts, and the role of the editor Jasper opens files with.</span></li>
-<li><b>Services for other plugins</b><span>Interfaces in an exported package that other plugins look up, as the Vault, Editor, Remote, Snippets and Enterprise plugins do.</span></li>
+<li><b>Services for other plugins</b><span>Interfaces in an exported package that other plugins look up, as the Vault, Editor, Remote and Snippets plugins do.</span></li>
 <li><b>The command line</b><span>{@code jasper <name>} subcommands that run in the running Jasper and report an exit code.</span></li>
-<li><b>Looks and themes</b><span>A look (the presentation of the chrome and controls) and themes, declared as data in the manifest.</span></li>
+<li><b>Looks and themes</b><span>A look (the presentation of the chrome and controls) and themes, declared as data in the manifest; any plugin can read which look Jasper runs with and compose for it.</span></li>
 </ul>
 
 <h3>How a plugin runs</h3>
@@ -42,19 +42,19 @@ preferred size ({@code java.awt.Dimension}), a component's workspace opacity ({@
 
 <h3>The bundled plugins</h3>
 <p>Each bundled plugin is an ordinary plugin on this SDK: it declares capabilities, requires other plugins and exports
-packages exactly as yours would, and each can be turned off in Settings › Plugins. All of them declare
-{@code sdk = ">=0.18.0, <0.19"} except Remote, which declares {@code sdk = ">=0.18.1, <0.19"}.</p>
+packages exactly as yours would, and each can be turned off in Settings › Plugins. Remote, Credential Vault, File
+Server, Enterprise and Sample declare {@code sdk = ">=0.18.2, <0.19"}; the others declare {@code sdk = ">=0.18.0, <0.19"}.</p>
 <table>
 <thead><tr><th>Plugin</th><th>Id</th><th>Capabilities</th><th>Exports</th><th>Requires (optional)</th></tr></thead>
 <tbody>
-<tr><td>Remote: SSH, SFTP and tunnels</td><td>{@code dev.jasper.remote}</td><td>{@code terminal.open}, {@code session.provide}, {@code terminal.observe}, {@code palette.contribute}, {@code files.source}</td><td>{@code dev.jasper.remote.api}</td><td>Vault, Editor, Enterprise</td></tr>
-<tr><td>Credential Vault</td><td>{@code dev.jasper.vault}</td><td>{@code palette.contribute}</td><td>{@code dev.jasper.vault.api}</td><td>Enterprise</td></tr>
+<tr><td>Remote: SSH, SFTP and tunnels</td><td>{@code dev.jasper.remote}</td><td>{@code terminal.open}, {@code session.provide}, {@code terminal.observe}, {@code palette.contribute}, {@code files.source}</td><td>{@code dev.jasper.remote.api}</td><td>Vault, Editor</td></tr>
+<tr><td>Credential Vault</td><td>{@code dev.jasper.vault}</td><td>{@code palette.contribute}</td><td>{@code dev.jasper.vault.api}</td><td></td></tr>
 <tr><td>Editor</td><td>{@code dev.jasper.editor}</td><td>{@code palette.contribute}, {@code terminal.environment}, {@code editor.provide}, {@code terminal.open}</td><td>{@code dev.jasper.editor.api}</td><td></td></tr>
-<tr><td>File Server</td><td>{@code dev.jasper.fileserver}</td><td>{@code network.listen}, {@code terminal.observe}, {@code palette.contribute}, {@code clipboard.read}</td><td></td><td>Vault, Enterprise</td></tr>
+<tr><td>File Server</td><td>{@code dev.jasper.fileserver}</td><td>{@code network.listen}, {@code terminal.observe}, {@code palette.contribute}, {@code clipboard.read}</td><td></td><td>Vault</td></tr>
 <tr><td>Project Index</td><td>{@code dev.jasper.indexer}</td><td>{@code terminal.observe}, {@code terminal.open}, {@code palette.contribute}</td><td></td><td>Editor, Remote</td></tr>
 <tr><td>Shell History</td><td>{@code dev.jasper.history}</td><td>{@code palette.contribute}, {@code terminal.observe}, {@code terminal.inject}</td><td></td><td>Snippets</td></tr>
 <tr><td>Snippets</td><td>{@code dev.jasper.snippets}</td><td>{@code palette.contribute}, {@code terminal.inject}</td><td>{@code dev.jasper.snippets.api}</td><td></td></tr>
-<tr><td>Enterprise look (off by default)</td><td>{@code dev.jasper.enterprise}</td><td>{@code presentation.provide}</td><td>{@code dev.jasper.enterprise.api}</td><td></td></tr>
+<tr><td>Enterprise look (off by default)</td><td>{@code dev.jasper.enterprise}</td><td>{@code presentation.provide}</td><td></td><td></td></tr>
 <tr><td>Sample</td><td>{@code dev.jasper.sample}</td><td>{@code terminal.observe}, {@code terminal.inject}, {@code terminal.open}, {@code session.provide}, {@code palette.contribute}</td><td></td><td></td></tr>
 </tbody>
 </table>

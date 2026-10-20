@@ -4,16 +4,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.formdev.flatlaf.FlatSystemProperties;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.DefaultSource;
+import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.TitleBarStyle;
 import dev.jasper.app.plugins.PluginSelection;
+import dev.jasper.app.presentation.Branding;
+import dev.jasper.app.presentation.ChromeSpec;
 import dev.jasper.app.presentation.DesktopFlags;
+import dev.jasper.app.presentation.KitParser;
 import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
+import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LookFixtures;
+import dev.jasper.ui.kit.Kit;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,10 +62,36 @@ class DesktopFlagsTest {
         assertThat(System.getProperty(FlatSystemProperties.USE_WINDOW_DECORATIONS)).as("the system title bar").isEqualTo("false");
         assertThat(ApplicationBootstrap.applyDesktop(presentation, ConfigSnapshot.defaults(), false)).isEqualTo(TitleBarStyle.NATIVE);
 
-        var standard = Presentation.standard(new Projections.Host(true, true));
+        var standard = Presentation.standard(new Projections.Host(Projections.Platform.MAC, true));
         assertThat(ApplicationBootstrap.applyDesktop(standard, ConfigSnapshot.defaults(), true)).isEqualTo(TitleBarStyle.MAC_UNIFIED);
         assertThat(System.getProperty(MENU)).isEqualTo("true");
         assertThat(ApplicationBootstrap.applyDesktop(standard, ConfigSnapshot.defaults(), false)).isEqualTo(TitleBarStyle.CUSTOM);
+    }
+
+    static Presentation classic(Projections.Host host) {
+        var chrome = EnterpriseLook.titled(ChromeSpec.CLASSIC, ChromeSpec.TitleBar.CLASSIC);
+        return new Presentation(Optional.of(new Presentation.Provider("dev.example.look", "Look", "0.1.0", "d1")), Kit.DEFAULT, chrome, true,
+            KitParser.Faces.NONE, DefaultSource.CORE, Projections.of(chrome, true, false, "dev.example.look", host), List.of(), Branding.NONE);
+    }
+
+    /** Plan 14 (Rulings 5, 17 and 18): macOS and Windows keep the default look's desktop; Linux keeps the system title. */
+    @Test void aClassicTitleCommitsTheDefaultLooksFlagsOnMacOsAndWindowsAndTheSystemTitleOnLinux() {
+        var mac = classic(new Projections.Host(Projections.Platform.MAC, true));
+        assertThat(mac.committedDesktop()).isEqualTo(DesktopFlags.STANDARD);
+        System.setProperty(MENU, "false");
+        assertThat(ApplicationBootstrap.applyDesktop(mac, ConfigSnapshot.defaults(), true)).isEqualTo(TitleBarStyle.MAC_UNIFIED);
+        assertThat(System.getProperty(MENU)).as("the screen menu bar").isEqualTo("true");
+        var windows = classic(new Projections.Host(Projections.Platform.WINDOWS, false));
+        assertThat(windows.committedDesktop()).as("the default look's flags, so the fallback is the default look").isEqualTo(DesktopFlags.STANDARD);
+        assertThat(ApplicationBootstrap.applyDesktop(windows, ConfigSnapshot.defaults(), false)).isEqualTo(TitleBarStyle.CUSTOM);
+        assertThat(System.getProperty(FlatSystemProperties.USE_WINDOW_DECORATIONS)).as("FlatLaf's title pane").isEqualTo("true");
+        assertThat(ApplicationBootstrap.applyDesktop(windows, ConfigSnapshot.defaults().toBuilder().nativeDecorations(true).build(), false))
+            .as("window.native_decorations").isEqualTo(TitleBarStyle.NATIVE);
+        assertThat(ApplicationBootstrap.applyDesktop(windows, ConfigSnapshot.defaults().toBuilder().viewMode(ViewMode.COMPACT).build(), false))
+            .as("Compact").isEqualTo(TitleBarStyle.NATIVE);
+        var linux = classic(new Projections.Host(Projections.Platform.LINUX, false));
+        assertThat(linux.committedDesktop()).isEqualTo(new DesktopFlags(false, true));
+        assertThat(ApplicationBootstrap.applyDesktop(linux, ConfigSnapshot.defaults(), false)).isEqualTo(TitleBarStyle.NATIVE);
     }
 
     @Test void aNativeTitledLookTurnsTheScreenMenuBarOffBeforeAwt() {

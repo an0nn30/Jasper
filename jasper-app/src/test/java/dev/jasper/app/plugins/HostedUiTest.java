@@ -404,6 +404,65 @@ class HostedUiTest {
         assertThat(model.railActions()).isEmpty();
     }
 
+    /** Plan 15b (Rulings 1): the panel's own toggle action activates it, as IntelliJ's ⌘1; anything else toggles. */
+    @Test void aPanelsOwnToggleActionActivatesAndAnythingElseToggles() {
+        var window = UUID.randomUUID();
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        dev.jasper.sdk.terminal.WindowHandle[] handle = {null};
+        ui.actions().register(ActionSpec.of("dev.x.tool.hosts.show", "Hosts"), context -> { handle[0] = context.window(); ui.panels().toggle("dev.x.tool.hosts", context.window()); });
+        ui.actions().register(ActionSpec.of("dev.x.tool.other", "Other"), context -> ui.panels().toggle("dev.x.tool.hosts", context.window()));
+        ui.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", "file", Anchor.RIGHT).withToggleActionId("dev.x.tool.hosts.show"), host -> view());
+        model.action("dev.x.tool.hosts.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        model.action("dev.x.tool.other").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        ui.panels().toggle("dev.x.tool.hosts", handle[0]);
+        assertThat(requests).extracting(Contributions.PanelRequest::op).containsExactly(
+            Contributions.PanelRequest.Op.ACTIVATING_TOGGLE, Contributions.PanelRequest.Op.TOGGLE, Contributions.PanelRequest.Op.TOGGLE);
+        assertThat(requests).extracting(Contributions.PanelRequest::windowId).containsOnly(window);
+    }
+
+    /** Inside the panel's own toggle action only that panel's toggle activates, into whichever window it names. */
+    @Test void insideAPanelsToggleActionAnotherPanelsToggleStaysPlainAndAnotherWindowIsKept() {
+        var window = UUID.randomUUID();
+        var other = UUID.randomUUID();
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        ui.actions().register(ActionSpec.of("dev.x.tool.hosts.show", "Hosts"), context -> {
+            ui.panels().toggle("dev.x.tool.files", context.window());
+            ui.panels().toggle("dev.x.tool.hosts", terminals.windowHandle(other));
+        });
+        ui.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", "file", Anchor.RIGHT).withToggleActionId("dev.x.tool.hosts.show"), host -> view());
+        ui.panels().register(new PanelSpec("dev.x.tool.files", "Files", "file", Anchor.LEFT), host -> view());
+        model.action("dev.x.tool.hosts.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        assertThat(requests).containsExactly(
+            new Contributions.PanelRequest(window, "dev.x.tool.files", Contributions.PanelRequest.Op.TOGGLE),
+            new Contributions.PanelRequest(other, "dev.x.tool.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
+    }
+
+    /** Plan 15b (Rulings 1): a show inside the panel's own toggle action activates it; any other show goes to the site. */
+    @Test void aShowInsideThePanelsOwnToggleActionActivates() {
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        dev.jasper.sdk.ui.PanelHost[] hosts = {null};
+        ui.actions().register(ActionSpec.of("dev.x.tool.queue.show", "Queue"), context -> hosts[0].show());
+        ui.actions().register(ActionSpec.of("dev.x.tool.queue.other", "Other"), context -> hosts[0].show());
+        ui.panels().register(new PanelSpec("dev.x.tool.queue", "Queue", "file", Anchor.BOTTOM).withToggleActionId("dev.x.tool.queue.show"),
+            host -> { hosts[0] = host; return view(); });
+        UUID window = UUID.randomUUID();
+        int[] shows = {0};
+        var site = new dev.jasper.app.contributions.PanelSite(window, () -> shows[0]++, () -> { }, () -> false);
+        assertThat(model.panels().getFirst().factory().apply(site)).isNotNull();
+
+        model.action("dev.x.tool.queue.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, "dev.x.tool.queue", Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+        assertThat(shows[0]).as("the activating show goes through the window").isZero();
+
+        model.action("dev.x.tool.queue.other").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        hosts[0].show();
+        assertThat(requests).as("another action's show and one outside any action").hasSize(1);
+        assertThat(shows[0]).isEqualTo(2);
+    }
+
     @Test void panelHeadersAreWindowOwnedContainFailuresAndBecomeInertWhenDiscarded() {
         var hosts = new ArrayList<dev.jasper.sdk.ui.PanelHost>();
         var calls = new ArrayList<String>();

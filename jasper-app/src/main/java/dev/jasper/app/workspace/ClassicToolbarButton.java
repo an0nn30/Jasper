@@ -28,6 +28,8 @@ import javax.swing.JButton;
 final class ClassicToolbarButton extends JButton {
     private final boolean caret;
     private final Icon icon;
+    /** The tooltip's source while set, read each time the tooltip shows. */
+    private java.util.function.Supplier<String> tooltip;
 
     ClassicToolbarButton(Action action, String label, boolean caret, Icon icon) {
         super(action);
@@ -43,6 +45,15 @@ final class ClassicToolbarButton extends JButton {
     }
 
     private static int metric(DesignMetrics.Role role) { return UIScale.scale(FlatLafInstaller.installedKit().metrics().value(role)); }
+
+    /**
+     * Reads the tooltip from {@code source} each time it shows, so it follows a shortcut that changes.
+     *
+     * @param source the tooltip's text
+     */
+    void tooltip(java.util.function.Supplier<String> source) { tooltip = source; }
+
+    @Override public String getToolTipText() { return tooltip != null ? tooltip.get() : super.getToolTipText(); }
 
     /** Whether the button ends in a ▼ (a dropdown). */
     boolean caret() { return caret; }

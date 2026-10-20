@@ -308,6 +308,8 @@ final class PanelHeaders {
                     menu.main.panel = true;
                     menu.arrow.panel = true;
                 }
+                // The reconcile refreshed the control before it was marked here; the classic art reads the mark.
+                if (view.classicChromeIcons()) control.refresh();
             }
             Stacks.mount(descriptor, controls.stream().map(c -> c.component).toList());
         }

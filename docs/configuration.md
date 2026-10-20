@@ -200,7 +200,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `terminal.env` | table | `{}` | Environment variables for new shells ([Shell](#shell-environment-and-history)) | New panes | Shell › Environment variables |
 | `ui.appearance` | string | `"system"` | `"system"`, `"dark"`, `"light"` ([Theme](#theme)) | Live | Appearance › Dark, Light, Match System |
 | `ui.theme.dark` | string | `"slate-cobalt"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Dark theme |
-| `ui.theme.light` | string | `"slate-cobalt"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Light theme |
+| `ui.theme.light` | string | `"jasper-meadow"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Light theme |
 | `ui.font.family` | string | `"system"` | `"system"` or a font family name ([Interface font](#interface-font)) | Live | Appearance › Font |
 | `ui.font.size` | number | Not set: the look's size | 8–32 points | Live | Appearance › Use platform font size, Font size |
 | `ui.workspace.opacity` | number | Not set: opaque | 10–100 percent: the opacity of terminal and editor backgrounds; macOS only | Live | Appearance › Enable opacity, Opacity (macOS) |
@@ -216,10 +216,13 @@ size (Increase, Decrease and Reset Font Size) and **Show Jasper**/**Hide Jasper*
 ### Look-dependent defaults
 
 The active look can give five settings defaults of its own (the [`defaults` table](looks.md#defaults) of its kit
-file): `ui.theme.dark`, `ui.theme.light`, `palette.visible_rows`, `window.toolbar_height` and `window.toolbar`. A value you set wins; a
-value that is invalid falls back to the look's default. The Enterprise look ([Enterprise](enterprise.md#defaults)) uses
-the `enterprise` theme for both appearances, 8 palette rows and a 34-pixel toolbar of icons only (`"icons"`). A look can also hide Settings rows
-it makes meaningless: `window.native_decorations`, `ui.animations.enabled` and `window.rail_width`, as the table says.
+file): `ui.theme.dark`, `ui.theme.light`, `palette.visible_rows`, `window.toolbar_height` and `window.toolbar`. A
+value you set wins; a value that is invalid falls back to the look's default. The kit file can also default plugins'
+settings, in one `[defaults."<plugin id>"]` table per plugin: a value saved in the plugin's settings file wins, and
+Reset returns to the look's. The Enterprise look ([Enterprise](enterprise.md#defaults)) uses the `enterprise` theme for
+both appearances, 8 palette rows and a 28-pixel toolbar of icons only (`"icons"`), and sets the Editor's font to IBM
+Plex Mono. A look can also hide Settings rows it makes meaningless: `window.native_decorations`,
+`ui.animations.enabled` and `window.rail_width`, as the table says.
 
 ### Theme
 
@@ -228,11 +231,13 @@ it makes meaningless: `window.native_decorations`, `ui.animations.enabled` and `
 `"system"` shows the Dark theme. A change of the system's appearance never writes `config.toml`.
 
 `ui.theme.dark` and `ui.theme.light` name a theme by id: a built-in one (`slate-cobalt`, `ubuntu-yaru`,
-`catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha`), one a plugin provides (such as
-`enterprise`), or one you imported into `themes/` (its file name without `.json`). An id is lowercase letters and
-digits in words joined by `-`, at most 64 characters. A theme without the variant asked for is reported and Slate
-Cobalt is used. A theme that fails to apply keeps the current appearance, is reported on `ui.appearance`, and is tried
-again by Reload Config.
+`jasper-meadow`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha`), one a plugin
+provides (such as `enterprise`), or one you imported into `themes/` (its file name without `.json`). Unless the look
+sets its own, the Dark appearance shows Slate Cobalt (`slate-cobalt`) and the Light appearance Jasper Meadow Light
+(`jasper-meadow`). An id is lowercase letters and digits in words joined by `-`, at most 64 characters. A theme
+without the variant asked for is reported and the appearance's default is used: Slate Cobalt for Dark, Jasper Meadow
+Light for Light. A theme that fails to apply keeps the current appearance, is reported on `ui.appearance`, and is
+tried again by Reload Config.
 
 The Appearance page shows the three appearances as tiles. Its Dark theme, Light theme and Terminal scheme menus list the
 installed themes and schemes; each has a gear (a ⋯ button under Enterprise) with **Import Theme…** and **Remove
@@ -280,11 +285,14 @@ and limited to the display's usable area. Once a window has closed, Jasper saves
 [`ui-state.toml`](#ui-statetoml)) and new windows open there instead; the grid sizes a window only while nothing is
 saved there. A window keeps its size when they change; new tabs and splits in it take the space the layout gives them.
 
-`window.native_decorations` and `window.view_mode` are read when Jasper starts. Jasper puts its header, the title
-search field and the toolbar, in the window's title bar: on macOS beside the window buttons, on Linux and Windows in a
-title bar Jasper draws, with the menus. Windows get the operating system's own title bar instead when Compact is on,
-when the look has the system title bar (as Enterprise does), or, on Linux and Windows, when `window.native_decorations`
-is `true`.
+`window.native_decorations` and `window.view_mode` are read when Jasper starts. Under the default look, Jasper puts its
+header, the title search field and the toolbar, in the window's title bar: on macOS beside the window buttons, on
+Linux and Windows in a title bar Jasper draws, with the menus. A look with IntelliJ Classic's title bar, such as
+Enterprise on macOS and Windows, keeps the toolbar in a row of its own under a title bar in the toolbar's colour: on
+macOS a band holding the window buttons and the window's title, with the menus in the menu bar; on Windows a bar
+holding the menus and then the title. Windows get the operating system's own title bar instead when Compact is on,
+when the look has the system title bar (as Enterprise does on Linux), or, on Linux and Windows, when
+`window.native_decorations` is `true`.
 
 ### Finished-command notifications
 
@@ -353,8 +361,9 @@ it is saved; residency itself is decided when Jasper starts, so turning it on or
 
 ### Custom VM options
 
-The installed app reads Java options from `jasper.vmoptions` in Jasper's home, as IntelliJ reads its `.vmoptions`
-file; `JASPER_VM_OPTIONS=<file>` reads that file instead when it exists. Each line is one option, added after the
+The installed app, except a Windows [user installation](packaging.md#user-installation-without-a-compiler), reads Java
+options from `jasper.vmoptions` in Jasper's home, as IntelliJ reads its `.vmoptions` file; `JASPER_VM_OPTIONS=<file>`
+reads that file instead when it exists. Each line is one option, added after the
 bundled options (`-Xmx2048m` and `-XX:+IgnoreUnrecognizedVMOptions`), so `-Xmx4g` raises the heap limit. Blank lines
 and lines starting with `#` are skipped; a line that does not start with `-`, or that is one of the `java` launcher's
 own options (such as `-version` or `-cp`), is ignored. Changes apply at the next launch. `./gradlew :jasper-app:run`
@@ -537,8 +546,9 @@ found: from the plugin's own example (a commented `settings.toml` it ships), els
 overwrites an existing settings file.
 
 Jasper checks each file once a second and on Reload Config. A file that fails to parse keeps its last good values; a
-value the plugin's declared settings do not allow is reported with its line and the default is used; a key the plugin
-does not declare is reported as unknown; otherwise the rules are those of `config.toml`. These problems appear in the
+value the plugin's declared settings do not allow is reported with its line and the default is used (the look's, when
+the active look sets one: [look-dependent defaults](#look-dependent-defaults)); a key the plugin does not declare is
+reported as unknown; otherwise the rules are those of `config.toml`. These problems appear in the
 [configuration status](#reload-and-diagnostics) with the file's path. Settings › Tools has a page for each running
 plugin with settings; Apply writes the plugin's file and keeps its comments.
 

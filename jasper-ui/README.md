@@ -22,8 +22,9 @@ confined to the Event Dispatch Thread and closed by their owner.
 
 ## Themes and looks
 
-A theme supplies colours and nothing else. `JasperTheme` reads a Jasper theme file; six are built in: Slate Cobalt
-(the default), Catppuccin Latte, Catppuccin Frappé, Catppuccin Macchiato, Catppuccin Mocha and Ubuntu Yaru. The app
+A theme supplies colours and nothing else. `JasperTheme` reads a Jasper theme file; seven are built in: Slate Cobalt
+(the Dark default), Catppuccin Latte, Catppuccin Frappé, Catppuccin Macchiato, Catppuccin Mocha, Ubuntu Yaru and Jasper
+Meadow Light (the Light default). The app
 reads installed and plugin theme files with the same loader. [Themes](../docs/themes.md) describes the format.
 
 A kit is the look: the geometry, type scale, faces, control variants, colour slots and FlatLaf key set that controls

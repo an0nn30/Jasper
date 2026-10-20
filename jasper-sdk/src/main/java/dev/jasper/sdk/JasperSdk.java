@@ -6,7 +6,7 @@ package dev.jasper.sdk;
  */
 public final class JasperSdk {
     /** Semantic version of this SDK. */
-    public static final String VERSION = "0.18.1";
+    public static final String VERSION = "0.18.2";
 
     private JasperSdk() { }
 }

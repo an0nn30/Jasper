@@ -11,7 +11,7 @@ boot splash's `SplashColors` ([maintenance](ui-maintenance.md#rules-the-tests-en
 
 | Package | Allowed outgoing UI packages | Ownership |
 | --- | --- | --- |
-| `theme` | none | Jasper theme files (the built-in Slate Cobalt, Catppuccin and Ubuntu Yaru themes and installed themes), semantic palettes and derived roles, terminal and editor schemes, syntax styles, glass, FlatLaf colour keys and paint-time contrast guards; EDT appearance binding |
+| `theme` | none | Jasper theme files (the built-in Slate Cobalt, Catppuccin, Ubuntu Yaru and Jasper Meadow Light themes and installed themes), semantic palettes and derived roles, terminal and editor schemes, syntax styles, glass, FlatLaf colour keys and paint-time contrast guards; EDT appearance binding |
 | `model` | none | Immutable descriptors and events; no secret values |
 | `metrics` | `theme` | Logical geometry catalogs (`DesignMetrics`, `DEFAULT` and `CLASSIC`) and the 11 public `MetricTokens` a kit file tunes, type scales and faces, central typography and the motion policy |
 | `kit` | `metrics`, `theme` | The look: `Kit` names a metric catalog, type scale, faces, control variants (`ControlVariants`), colour slots (`ColorSlots`) and FlatLaf key set; `Kit.DEFAULT` is the default look and `Kit.CLASSIC` the classic base |
@@ -33,8 +33,9 @@ checks that no plugin runtime or staged plugin jar carries `dev/jasper/ui/`.
 ## Themes
 
 A theme supplies colours only. `JasperTheme` reads a Jasper theme file with the JDK-only `ThemeJson` reader.
-`JasperTheme.builtIns()` holds the six built-ins in their order (Slate Cobalt, Catppuccin Latte, Catppuccin Frappé,
-Catppuccin Macchiato, Catppuccin Mocha, Ubuntu Yaru), `builtIn(id)` finds one and `bundled()` is Slate Cobalt
+`JasperTheme.builtIns()` holds the seven built-ins in their order (Slate Cobalt, Catppuccin Latte, Catppuccin Frappé,
+Catppuccin Macchiato, Catppuccin Mocha, Ubuntu Yaru, Jasper Meadow Light), `builtIn(id)` finds one,
+`LIGHT_DEFAULT_ID` is Jasper Meadow Light's id (`jasper-meadow`, the Light default) and `bundled()` is Slate Cobalt
 (`slate-cobalt.json`, kept identical to the machine-readable block of
 [`slate-cobalt.md`](design/theme-engine/slate-cobalt.md) by `SlateCobaltFileTest`). `parse(json, id)` reads any other
 file; the app reads installed and plugin theme files through it. [Themes](themes.md) describes the file format.
@@ -135,7 +136,7 @@ and `surface.card`.
 
 ## Metrics and density
 
-`DesignMetrics` holds one logical integer per `DesignMetrics.Role`: 705 roles covering heights, paddings, gaps,
+`DesignMetrics` holds one logical integer per `DesignMetrics.Role`: 707 roles covering heights, paddings, gaps,
 radii, widths, icon sizes, shadow and tint percentages and motion durations. `DesignMetrics.DEFAULT` is each role's
 declared value and is Jasper's compact geometry (frozen by `compact-roles.tsv`). `DesignMetrics.CLASSIC` is the default
 catalog with the classic look's delta, measured on the Enterprise references (frozen by `classic-roles.tsv`). Density
@@ -226,7 +227,9 @@ platform face.
   Swing developer defaults: `defaultFont` (family and size), `Label.font` (size) and `Jasper.uiFontFamilyOverride`
   (false keeps the faces and takes only the size). The app sets them from `ui.font.family` and `ui.font.size`.
 - `font(role, text)` switches the whole text to the platform face when a kit's own face lacks a glyph for it (IBM
-  Plex has no macOS modifier symbols and no CJK).
+  Plex has no macOS modifier symbols and no CJK), and to the logical `SansSerif` (`Monospaced` for a data role) when
+  the platform family lacks it too (Liberation Sans on Linux, for example), so Java's installed fallback fonts fill it
+  in glyph by glyph.
 - Under a kit whose regular UI face is registered, `FlatLafInstaller` gives FlatLaf's component fonts that face at the
   kit's body size; menu accelerators keep the platform face.
 
@@ -369,6 +372,7 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 | `dialogBand(true)` | The form footer is a band on `surface.footer` under a `border.window` rule, footnote leading, actions trailing |
 | `dialogCard(true)` | A classic dialog's card paints the form's fill and frame |
 | `runWindow(true)` | The view is part of the Run window (see [Run window and chrome](#run-window-and-chrome)) |
+| `classicChromeIcons(true)` | A toolbar strip's or a panel header's buttons and menu buttons named one of the six classic chrome names draw IntelliJ's classic art ([icons](#icons)) |
 | `setHintPresentation(stackId, true)` | The compact hint face for one stack (the palette footer) |
 | `setFieldTrailing(fieldId, button)` | An owned action inside a TEXT or SEARCH field |
 | `setTreeRowPresentation`, `setButtonValuePresentation`, `setButtonKeycaps`, `attachTreeDetail` | Keymap rows: locked rows and keycaps, the shortcut recorder face, keycap values and a detail below a tree leaf (`TreeDetailHandle`) |
@@ -604,11 +608,17 @@ SHA-256 in a manifest:
 - **The chrome set** (`assets-chrome.tsv`, 20 files): `add`, `window.add`, `split`, `zoom`, `chevron.down`, `folder`,
   `server`, `bell`, `lock`, `terminal`. Only `chromeIcon(name, size[, artwork])`, the native workspace chrome's
   context (title bar, toolbar, tool window stripes and status bar), draws them; descriptor, panel, tile and plugin
-  contexts keep the path glyphs for these names.
-- **The classic set** (`assets-classic.tsv`, 14 files, IntelliJ's classic icons): a chrome receiver marked
+  contexts keep the path glyphs for these names, except for a toolbar strip's and a panel header's classic names
+  (below).
+- **The classic set** (`assets-classic.tsv`, 26 files, IntelliJ's classic icons): a chrome receiver marked
   `ChromeArtwork.CLASSIC` (a look's `[chrome] icons = "classic"`) draws them for add, split, zoom, settings, new window
-  and search, and the chrome set's New UI originals for the rest. The `run` and `application` names are authored host
-  artwork from this set (`BuiltInArtwork`) wherever a control draws them.
+  and search, and the chrome set's New UI originals for the rest. The host-only `KitView.classicChromeIcons(true)` gives
+  a toolbar strip's and a panel header's buttons and menu buttons named one of `IconRegistry.classicChromeNames()` the
+  same art (`IconRegistry.classicChromeIcon`); a document bar and every body keep theirs. The `run` and `application`
+  names are authored host artwork from this set (`BuiltInArtwork`) wherever a control draws them. Its `toolwindows/`
+  rows are a table of their own, reached only through `IconRegistry.stripeIcon`, which gives a labelled stripe
+  IntelliJ's classic 13 px tool-window icons for `network`, `folder`, `tunnel`, `download`, `server` and `bell`, so the
+  classic chrome set is unchanged.
 
 Receiving contexts:
 
@@ -621,6 +631,7 @@ Receiving contexts:
 | `tile(...)` | A category tile at the kit's tile opacity; selected tiles on the accent |
 | `identityHeader(...)` | An identity header tile outlined in `border.identity` |
 | `themedIcon(name, size)`, `chromeIcon(name, size)`, `chromeIcon(name, size, ChromeArtwork)` | A `PreparedIcon` for native Swing, resolved against the live theme; the chrome forms draw the chrome or classic set |
+| `classicChromeIcon(name, size)`, `stripeIcon(name, size)` | An optional `PreparedIcon` of authored light and dark art: one of the six classic chrome names' classic art, or a labelled stripe's classic tool-window icon; empty for any other name |
 
 `size(metrics, IconSize)` maps the model's sizes to roles: CAPTION `ICON_CAPTION` (12), CONTROL `ICON_CONTROL` (14),
 RAIL `ICON_RAIL` (16), EMPTY `ICON_EMPTY` (20), PROMPT `ICON_PROMPT` (24; 16 in the classic catalog) and SWATCH

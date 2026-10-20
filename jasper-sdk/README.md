@@ -43,7 +43,7 @@ third-party plugin. The SDK depends only on the JDK.
 | Declarative views | `UiKit`, `ViewSpec`, `Nodes`, `UiView`, `UiEvent`, `ControlState`, `ListItem`, `TableRow`, `TreeItem`, `Column`, `Option`, `MenuItem`, `Crumb`, `CustomContent`, `IconAsset`, `UiAnchor` |
 | Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelHeader` |
 | Windows, dialogs and content tabs | `Windows`, `WindowSpec`, `WindowSurface`, `PluginWindow`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `ContentPresentation`, `ContentCommand`, `ContentStatus` |
-| Colours for custom content | `Appearance`, `SemanticColor`, `WorkspacePalette`, `EditorPalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle` |
+| Colours for custom content and the look | `Appearance`, `SemanticColor`, `WorkspacePalette`, `EditorPalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Presentation` |
 | Desktop integration | `Platform`, `FileEditor` |
 
 A plugin implements `Plugin`, `PaletteScope`, `FileSource`, `FileBrowser` and `SettingsPanel`, the functional
@@ -53,7 +53,7 @@ Jasper and the testkit implement the other service interfaces; `FileLocation`, `
 
 ## Versioning
 
-[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.18.1`. A plugin's
+[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.18.2`. A plugin's
 `plugin.toml` names the SDK versions it runs on as comma-separated comparators (`>=`, `>`, `<=`, `<`, `=`), all of
 which must hold. 0.x carries no compatibility promise, so a plugin admits the one minor version it was built against,
 as the bundled plugins do:
@@ -62,9 +62,9 @@ as the bundled plugins do:
 sdk = ">=0.18.0, <0.19"
 ```
 
-A plugin that uses something only a later 0.18 version has starts its range there: Remote uses icon-only GHOST buttons
-in its toolbar view and the `run` and `application` icons, which need SDK 0.18.1, and declares
-`sdk = ">=0.18.1, <0.19"`.
+A plugin that uses something only a later 0.18 version has starts its range there. Remote, Credential Vault, File
+Server and the Sample read `Appearance.presentation()`, which needs SDK 0.18.2, and Enterprise's kit file gives the
+Editor's settings a default, which an older Jasper refuses; all five declare `sdk = ">=0.18.2, <0.19"`.
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›
 Plugins shows it as Skipped with the reason "needs SDK *range*; this is SDK *version*". Install from Zip… refuses such a

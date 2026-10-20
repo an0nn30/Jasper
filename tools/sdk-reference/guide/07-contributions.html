@@ -12,8 +12,8 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <tr><td>Menu entries</td><td>{@link Menus#standard(StandardMenu)}, {@link Menus#create(String,String)}, {@link Menus#terminalContext()}</td><td></td><td>A section at the end of a built-in menu, a top-level menu of its own, the pane right-click menu</td></tr>
 <tr><td>Toolbar items</td><td>{@link Toolbar#add(ToolbarItem)}</td><td></td><td>In every window's toolbar, after Jasper's Split and Zoom buttons and before Find and Settings</td></tr>
 <tr><td>Status items and progress</td><td>{@link StatusBar#add(StatusItemSpec)}, {@link StatusBar#addProgress(StatusItemSpec)}</td><td></td><td>Either end of every window's status bar</td></tr>
-<tr><td>Rail buttons</td><td>{@link Rail#add(String)}</td><td></td><td>The left tool window stripe, after the tool window icons</td></tr>
-<tr><td>Tool windows</td><td>{@link Panels#register(PanelSpec,PanelFactory)}, {@link Panels#toggle(String,WindowHandle)}</td><td></td><td>A stripe icon and a tool window in one of six dock slots; View › Tool Windows</td></tr>
+<tr><td>Rail buttons</td><td>{@link Rail#add(String)}</td><td></td><td>The left tool window stripe, after the tool window buttons</td></tr>
+<tr><td>Tool windows</td><td>{@link Panels#register(PanelSpec,PanelFactory)}, {@link Panels#toggle(String,WindowHandle)}</td><td></td><td>A stripe button and a tool window in one of six dock slots; View › Tool Windows</td></tr>
 <tr><td>Windows and dialogs</td><td>{@link Windows#create(WindowSpec)}, {@link Windows#dialog(DialogSpec)}, {@link Windows#overlay(OverlaySpec)}, {@link Windows#popover(UiAnchor)}</td><td></td><td>Plugin windows with Jasper's frame, dialogs and sheets, in-window overlays, popovers below a control</td></tr>
 <tr><td>Content tabs</td><td>{@link Windows#openTab(ContentSpec,WindowOwner,UiView)}</td><td></td><td>A document tab in the workspace, beside terminal tabs</td></tr>
 <tr><td>File choosers</td><td>{@link Windows#choose(FileChoice)}, {@link Windows#chooseFiles(WindowOwner,String,Optional)}, {@link Windows#chooseDirectory(WindowOwner,String,Optional)}, {@link Windows#chooseSaveFile(WindowOwner,String,Optional)}</td><td></td><td>Jasper's file chooser, over the plugin's window, content tab or a terminal window</td></tr>
@@ -102,7 +102,8 @@ adds a progress control that {@link StatusProgress#update(StatusProgressState)} 
 two actions.</p>
 
 <h3>Tool windows and the rail</h3>
-<p>A registered panel gets a stripe icon in every window. Its {@link PanelFactory} builds one view per window, on the UI
+<p>A registered panel gets a stripe button in every window: its icon, or under the Enterprise look's labelled stripes a
+label that starts with the icon and reads its title. Its {@link PanelFactory} builds one view per window, on the UI
 thread, the first time the panel shows there; share the plugin's model between those instances. The
 {@link PanelSpec}'s anchor and {@link PanelSpec#withSplit()} pick the default slot (Left Top, Left Bottom, Bottom Left,
 Right Top, Right Bottom or Bottom Right); the user can move it with the header's Options menu, and Jasper remembers where.
@@ -110,8 +111,11 @@ Unless the spec names a toggle action of the plugin's own ({@link PanelSpec#with
 registers {@code <panel id>.toggle}, titled "Toggle <i>title</i>", with no default shortcut, and View › Tool Windows lists
 it. {@link PanelHost} is one instance's place in one window: {@link PanelHost#show()}, {@link PanelHost#hide()},
 {@link PanelHost#setHeader(PanelHeader)} for a detail, a status dot and icon actions in the header. A factory that throws
-shows "This panel could not be loaded." in that window. {@link Rail#add(String)} adds a plain button for an action,
-for example one that opens a plugin window.</p>
+shows "This panel could not be loaded." in that window. Under the Enterprise look, whose tool windows are flush, the
+toggle action makes the tool window it shows the active one, which takes the keyboard, and activates a showing tool
+window that is not the active one instead of hiding it; a plugin's own toggle action does this when its handler calls
+{@link Panels#toggle(String,WindowHandle)} or {@link PanelHost#show()} for its panel, and any other call only shows or
+hides. {@link Rail#add(String)} adds a plain button for an action, for example one that opens a plugin window.</p>
 
 <h3>Windows, dialogs, overlays and popovers</h3>
 <p>Jasper builds the frame, title bar, icon, menu bar and theme of every surface; the plugin fills it with a

@@ -78,6 +78,15 @@ root of the plugin's jar, or a one-line header, "# Settings for <i>name</i> <i>v
 this file live." Jasper never overwrites an existing file. Ship a {@code settings.toml} of commented examples so users who
 open the file see every setting.</p>
 
+<h3>The look's defaults</h3>
+<p>The active look's kit file may hold a table for the plugin, {@code [defaults."<plugin id>"]}, keyed as the plugin's
+settings file writes its keys. When the plugin declares a key and the value suits its kind, that value is the
+setting's default while the look is active: a key the file leaves out reads it, and Reset returns to it, while a saved
+value still wins. A value the kind rejects, and a key the plugin does not declare, are logged as warnings and ignored,
+and the plugin starts as usual. The Enterprise look gives the Editor's {@code font_family} IBM Plex Mono this way. In a
+test, {@link dev.jasper.sdk.testing.FakePluginHost#setKitDefault(String,String,Object)} gives a look default and
+{@link dev.jasper.sdk.testing.FakePluginHost#lookDefaultProblems(String)} lists the ones the plugin could not use.</p>
+
 <h3>Saving</h3>
 <p>{@link Setting#set(Object)} writes a new value to the file, keeping its comments, and returns a
 {@code CompletableFuture} that completes on the UI thread once the setting's handle shows the value. It fails with

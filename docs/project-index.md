@@ -103,10 +103,11 @@ marks (OSC 133), which Jasper's script sends as well. Without either, **Files** 
 and **Reindex Current Project** still works, because both use the folder Remote follows.
 
 When a pane reports a folder, Jasper looks for markers on the host with one command and offers the project with its host
-name. Your home folder on the host and the folders above it are never projects. Indexing uses Git on the host when the
-project is a work tree, then `find`, then an SFTP walk, and gives up after two minutes. Opening a file opens it from the
-host in the Editor ([Editing remote files](remote.md#editing-remote-files)); **Shift+Enter** opens a new SSH tab on the host
-in the file's folder.
+name. Your home folder on the host, the folders above it and the host's file-system root are never offered as
+projects. Indexing uses Git on the host when the project is a work tree, then `find`, then an SFTP walk, and gives up
+after two minutes. Opening a file opens it from the host in the Editor
+([Editing remote files](remote.md#editing-remote-files)); **Shift+Enter** opens a new SSH tab on the host in the file's
+folder.
 
 Remote projects refresh only while their host is connected; otherwise their saved index is still searched and shows as
 Stale in Settings. Indexing you ask for may connect and ask you to sign in; background refreshes never do. Ignoring a

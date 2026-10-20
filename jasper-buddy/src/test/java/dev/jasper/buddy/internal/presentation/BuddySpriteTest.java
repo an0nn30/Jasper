@@ -12,12 +12,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BuddySpriteTest {
+    @Test void pixelArtworkKeepsTheCompanionsLogicalSize() throws Exception {
+        try (var in = BuddySprite.class.getResourceAsStream(BuddySprite.RESOURCE)) {
+            var sheet = javax.imageio.ImageIO.read(in);
+            assertThat(sheet.getWidth()).isEqualTo(84 * BuddyFrame.values().length);
+            assertThat(sheet.getHeight()).isEqualTo(96);
+        }
+        assertThat(BuddySprite.size(2)).isEqualTo(new Dimension(84, 96));
+    }
+
     @Test void committedSheetHasEveryFrameOpaqueInsideATransparentMargin() {
         BuddySprite sprite = BuddySprite.load();
         for (BuddyFrame frame : BuddyFrame.values()) {
             BufferedImage image = sprite.frame(frame);
-            assertThat(image.getWidth()).isEqualTo(BuddySprite.FRAME_WIDTH);
-            assertThat(image.getHeight()).isEqualTo(BuddySprite.FRAME_HEIGHT);
+            assertThat(image.getWidth()).isEqualTo(BuddySprite.ART_WIDTH);
+            assertThat(image.getHeight()).isEqualTo(BuddySprite.ART_HEIGHT);
             boolean opaque = false;
             for (int y = 0; y < image.getHeight() && !opaque; y++)
                 for (int x = 0; x < image.getWidth() && !opaque; x++) opaque = (image.getRGB(x, y) >>> 24) == 255;
@@ -41,42 +50,67 @@ class BuddySpriteTest {
         int star = new Color(0xff, 0xf3, 0xb0).getRGB();
         for (BuddyFrame frame : List.of(BuddyFrame.SPARKLE_A, BuddyFrame.SPARKLE_B, BuddyFrame.SPARKLE_C)) {
             BufferedImage image = sprite.frame(frame);
-            assertThat(image.getRGB(21, 30) >>> 24).as("%s must not cover the body's centre", frame).isZero();
+            assertThat(image.getRGB(42, 60) >>> 24).as("%s must not cover the body's centre", frame).isZero();
             assertThat(pixels(image)).as("%s must use the star colour", frame).contains(star);
         }
         assertThat(pixels(sprite.frame(BuddyFrame.SPARKLE_A))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.SPARKLE_B)));
         assertThat(pixels(sprite.frame(BuddyFrame.SPARKLE_B))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.SPARKLE_C)));
     }
 
-    @Test void framesAreDistinctAndTheOutlineColorIsPresent() {
+    @Test void framesAreDistinctAndPixelArtHasShading() {
         BuddySprite sprite = BuddySprite.load();
         assertThat(pixels(sprite.frame(BuddyFrame.IDLE))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.BLINK)));
         assertThat(pixels(sprite.frame(BuddyFrame.WAVE_A))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.WAVE_B)));
-        assertThat(pixels(sprite.frame(BuddyFrame.IDLE))).contains(new Color(0x33, 0x2f, 0x27).getRGB());
+        assertThat(java.util.Arrays.stream(pixels(sprite.frame(BuddyFrame.IDLE)))
+            .filter(argb -> (argb >>> 24) >= 240).distinct().count()).isGreaterThan(64);
     }
 
-    @Test void paintingScalesEveryArtPixelIntoASolidBlock() {
-        BufferedImage sheet = new BufferedImage(BuddySprite.FRAME_WIDTH * BuddyFrame.values().length,
-            BuddySprite.FRAME_HEIGHT, BufferedImage.TYPE_INT_ARGB);
-        int red = new Color(200, 30, 30).getRGB();
-        sheet.setRGB(BuddySprite.FRAME_WIDTH * BuddyFrame.WINK.column() + 10, 20, red);
+    @Test void paintingKeepsLogicalBoundsAndDoesNotLeakAnAdjacentFrame() {
+        BufferedImage sheet = new BufferedImage(84 * BuddyFrame.values().length, 96, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D art = sheet.createGraphics();
+        art.setColor(Color.RED);
+        art.fillRect(84 * BuddyFrame.WINK.column(), 0, 84, 96);
+        art.setColor(Color.BLUE);
+        art.fillRect(84 * BuddyFrame.WAVE_A.column(), 0, 84, 96);
+        art.dispose();
         BuddySprite sprite = new BuddySprite(sheet);
-
-        BufferedImage target = new BufferedImage(84, 96, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage target = new BufferedImage(100, 112, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = target.createGraphics();
-        sprite.paint(g, BuddyFrame.WINK, 2, 0, 0);
+        sprite.paint(g, BuddyFrame.WINK, 2, 8, 8);
         g.dispose();
+        for (int y = 0; y < 112; y++) for (int x = 0; x < 100; x++) {
+            boolean inside = x >= 8 && x < 92 && y >= 8 && y < 104;
+            assertThat(target.getRGB(x, y)).as("(%d,%d)", x, y).isEqualTo(inside ? Color.RED.getRGB() : 0);
+        }
+    }
 
-        for (int y = 0; y < 96; y++) for (int x = 0; x < 84; x++) {
-            boolean inside = x >= 20 && x < 22 && y >= 40 && y < 42;
-            assertThat(target.getRGB(x, y)).as("(%d,%d)", x, y).isEqualTo(inside ? red : 0);
+    @Test void packedPixelArtHasNoTranslucentFringe() {
+        BuddySprite sprite = BuddySprite.load();
+        for (BuddyFrame frame : BuddyFrame.values())
+            for (int argb : pixels(sprite.frame(frame))) assertThat(argb >>> 24).isIn(0, 255);
+    }
+
+    @Test void pixelScalingDoesNotInventBlendedColors() {
+        int width = BuddySprite.ART_WIDTH, height = BuddySprite.ART_HEIGHT;
+        BufferedImage sheet = new BufferedImage(width * BuddyFrame.values().length, height, BufferedImage.TYPE_INT_ARGB);
+        sheet.setRGB(10, 20, Color.RED.getRGB());
+        BuddySprite sprite = new BuddySprite(sheet);
+        var size = BuddySprite.size(8);
+        BufferedImage target = new BufferedImage(size.width, size.height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = target.createGraphics();
+        sprite.paint(g, BuddyFrame.IDLE, 8, 0, 0);
+        g.dispose();
+        int factor = size.width / width;
+        for (int y = 0; y < size.height; y++) for (int x = 0; x < size.width; x++) {
+            boolean red = x / factor == 10 && y / factor == 20;
+            assertThat(target.getRGB(x, y)).as("pixel at (%d,%d)", x, y).isEqualTo(red ? Color.RED.getRGB() : 0);
         }
     }
 
     @Test void wrongSheetDimensionsAreRejected() {
         assertThatThrownBy(() -> new BuddySprite(new BufferedImage(42, 48, BufferedImage.TYPE_INT_ARGB)))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(String.valueOf(BuddySprite.FRAME_WIDTH * BuddyFrame.values().length));
+            .hasMessageContaining(String.valueOf(BuddySprite.ART_WIDTH * BuddyFrame.values().length));
     }
 
     @Test void sleepFramesDifferFromEachOtherAndFromIdle() {

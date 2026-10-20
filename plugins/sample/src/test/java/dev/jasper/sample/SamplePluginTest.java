@@ -3,6 +3,7 @@ package dev.jasper.sample;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.testing.FakePresentations;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import dev.jasper.sdk.Capabilities;
@@ -199,6 +200,27 @@ class SamplePluginTest {
             assertThat(host.windows()).as("a singleton").containsExactly("dev.jasper.sample.about-window|About Sample|true");
             assertThat(host.failures()).isEmpty();
         } });
+    }
+
+    @Test void underLabelledStripesTheSamplePanelStartsInTheBottomStrip() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.setPresentation(FakePresentations.CLASSIC);
+            host.setSetting("dev.jasper.sample", "demo_ui", true);
+            start(host, INFO, Set.of(), Set.of(), new SamplePlugin());
+            assertThat(host.panels()).containsExactly("dev.jasper.sample.panel|Sample|BOTTOM");
+        } });
+    }
+
+    @Test void aLooksKitDefaultSetsTheStepDelayAndASavedValueStillWins() {
+        try (var host = new FakePluginHost()) {
+            host.setKitDefault("dev.jasper.sample", "demo_step_millis", 150L);
+            var settings = new java.util.concurrent.atomic.AtomicReference<SampleSettings>();
+            start(host, INFO, Set.of(), Set.of(), context -> settings.set(new SampleSettings(context.settings())));
+            assertThat(settings.get().stepMillis.get()).isEqualTo(150);
+            host.setSetting("dev.jasper.sample", "demo_step_millis", 40L);
+            assertThat(settings.get().stepMillis.get()).isEqualTo(40);
+            assertThat(host.lookDefaultProblems("dev.jasper.sample")).isEmpty();
+        }
     }
 
     private static final PluginInfo OBSERVING = new PluginInfo("dev.jasper.sample", "Sample", "0.1.0",

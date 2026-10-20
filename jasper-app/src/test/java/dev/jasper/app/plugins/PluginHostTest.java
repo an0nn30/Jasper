@@ -91,6 +91,46 @@ class PluginHostTest {
         assertThat(host.failures("test.worker")).isEqualTo(1);
     }
 
+    @Test void fixtureCleanupWaitsForWorkerFinallyAfterTheShutdownGrace() throws Exception {
+        PluginHost host = AppContractTest.host(data, Duration.ofMillis(20));
+        var running = new CountDownLatch(1);
+        var interrupted = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var resourceClosed = new CountDownLatch(1);
+        onEdt(() -> host.start(hosted("test.cleanup", Set.of(), context ->
+            context.background().execute(() -> {
+                running.countDown();
+                try { new CountDownLatch(1).await(); }
+                catch (InterruptedException stopping) {
+                    interrupted.countDown();
+                    try { release.await(); }
+                    catch (InterruptedException failure) { throw new AssertionError(failure); }
+                } finally { resourceClosed.countDown(); }
+            }))));
+        try {
+            assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+            var workers = PluginShutdownTestSupport.capture(host);
+            var pending = new AtomicReference<List<CompletableFuture<?>>>();
+            onEdt(() -> pending.set(host.stop()));
+            CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            assertThat(interrupted.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(resourceClosed.getCount()).isEqualTo(1);
+            var awaiting = new CountDownLatch(1);
+            var cleaned = new CompletableFuture<Void>();
+            Thread.ofVirtual().start(() -> {
+                awaiting.countDown();
+                try { workers.await(); cleaned.complete(null); }
+                catch (Throwable failure) { cleaned.completeExceptionally(failure); }
+            });
+            assertThat(awaiting.await(5, TimeUnit.SECONDS)).isTrue();
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> cleaned.get(100, TimeUnit.MILLISECONDS))
+                .isInstanceOf(java.util.concurrent.TimeoutException.class);
+            release.countDown();
+            cleaned.get(5, TimeUnit.SECONDS);
+            assertThat(resourceClosed.getCount()).isZero();
+        } finally { release.countDown(); }
+    }
+
     @Test void stopRunsInReverseOrderAndSettingsChangesReachOnlyChangedPlugins() throws Exception {
         Files.createDirectories(data.resolve("test.first"));
         Files.writeString(data.resolve("test.first/test.first.toml"), "k = \"v\"\n");

@@ -5,10 +5,10 @@ splits on them, browses their files over SFTP with a persistent transfer queue, 
 local, remote and SOCKS tunnels, imports hosts from `~/.ssh/config` with their keys stored in Credential Vault, and
 lists Windows' WSL distributions beside your hosts. Turn it off or on in Settings › Plugins (see [Plugins](plugins.md)).
 
-Remote works with three other bundled plugins when they are on: [Credential Vault](credential-vault.md) holds the
-passwords and keys hosts sign in with (the SSH agent works without it), the [Editor](editor.md) edits remote files, and
-the [Enterprise look](enterprise.md) gives Remote's tool windows their classic layout
-([Under the Enterprise look](#under-the-enterprise-look)).
+Remote works with two other bundled plugins when they are on: [Credential Vault](credential-vault.md) holds the
+passwords and keys hosts sign in with (the SSH agent works without it), and the [Editor](editor.md) edits remote files.
+Under a classic look, such as [Enterprise](enterprise.md), Remote's tool windows take their classic layout
+([below](#under-a-classic-look)).
 
 ## Commands and shortcuts
 
@@ -42,7 +42,8 @@ Sessions menu, so the palette's Commands scope finds them and Keymap can bind th
 The **Session** menu holds Connect to SSH Host..., Toggle SSH hosts, Split with Same Host, New Host..., Import from
 ~/.ssh/config..., Toggle Tunnels, Start or Stop a Tunnel..., New Tunnel..., Forward a Port... and Stop All Tunnels. The
 **Transfer** menu holds Open SFTP here and Transfers. A terminal's right-click menu offers Forward a Port... and Open
-SFTP here. View › Tool Windows lists Toggle SSH hosts, Toggle SFTP and Toggle Tunnels.
+SFTP here. View › Tool Windows (the Window menu under the Enterprise look) lists Toggle SSH hosts, Toggle SFTP and
+Toggle Tunnels.
 
 ## Opening sessions
 
@@ -242,7 +243,8 @@ A host key Jasper does not know opens **Verify host key** *host*: "The authentic
 established.", the key type and its SHA256 fingerprint, and "Compare it with the server's before trusting."
 
 - **Trust and connect** saves the key in Remote's own `known_hosts` (`plugins/dev.jasper.remote/data/known_hosts`, the
-  OpenSSH format, `[host]:port` for a port other than 22) and connects.
+  OpenSSH format, `[host]:port` for a port other than 22) and connects. When the file cannot be written, the
+  connection stops ("Could not save the host key: …").
 - **Connect once** connects without saving it.
 - **Cancel**, Escape or closing the dialog stops the connection ("Host key not trusted"). No button answers Enter. An
   answer that does not come within `auth_timeout_seconds` counts as Cancel.
@@ -272,7 +274,7 @@ not parse, every connection is refused ("known_hosts line 3 is not a known_hosts
 | Import this key into Vault before connecting | A **Keys** entry is not a key stored in the vault |
 | No username for *host* | No username, and the Vault entry has none |
 | Vault username changed; reopen this host before connecting | The Vault login's username changed while connecting |
-| Host key not trusted, Host key rejected: … | See [Host keys](#host-keys) |
+| Host key not trusted, Host key rejected: …, Could not save the host key: … | See [Host keys](#host-keys) |
 
 ## SSH sessions
 
@@ -392,8 +394,8 @@ deletes links themselves and never what they lead to, and can be cancelled; what
 ### Transfers
 
 Uploads, downloads and host-to-host copies go into one queue that every window shows: at the foot of the SFTP panel
-under the default look (three rows at a time), or in the Transfers tool window under the Enterprise look. **Transfers**
-(Cmd+Option+3, Alt+3, or Transfer › Transfers) shows them.
+(three rows at a time), or in the Transfers tool window under a classic look. **Transfers** (Cmd+Option+3, Alt+3, or
+Transfer › Transfers) shows them.
 
 Before queueing, Remote checks whether the selected names already exist at the destination and asks once: **Replace**
 (files are replaced, folders merged), **Skip existing** (existing files are kept, folders merged) or **Cancel**.
@@ -609,10 +611,11 @@ Under `plugins/dev.jasper.remote/` in the Jasper home:
 Remote reads `~/.ssh/config` and the files it includes only when you import, and `~/.ssh/known_hosts` while
 `read_user_known_hosts` is on; it writes neither.
 
-## Under the Enterprise look
+## Under a classic look
 
-While the [Enterprise look](enterprise.md) is on, Remote's tool windows take their classic layout. Remote chooses its
-layout when it starts, so it follows a change of look at the next start of Jasper.
+Under a classic look, one whose [kit file starts from the classic base](looks.md#kit-and-base) as the
+[Enterprise look](enterprise.md)'s does, Remote's tool windows take their classic layout. Remote chooses its layout
+when it starts, so it follows a change of look at the next start of Jasper.
 
 - **Toolbar**: the session combo, drawn as IntelliJ's run-configuration combo: the application icon and the chosen
   row's name (a long one cut with an ellipsis), over a list of your hosts ("prod-web (web1.example.com)"), then the WSL
@@ -629,8 +632,13 @@ layout when it starts, so it follows a change of look at the next start of Jaspe
   or stops a row, the right-click menu holds the rest, and the line below reads "pg-prod — active. Click to toggle."
 - **SFTP** starts on the left: Back, Forward, Refresh, **Hidden files** and **Upload** over the breadcrumbs, and a
   Name, Size and Modified ("Sep 28") table. While nothing is connected, a **Choose Session…** dropdown lists your hosts.
-- **Transfers** is a bottom tool window ("No Transfers" when the queue is empty), listed in the Window menu;
-  **Transfers** (Cmd+Option+3, Alt+3) shows it.
+- **Transfers** is a bottom tool window ("No Transfers" when the queue is empty), listed with the other toggles in the
+  Window menu; **Transfers** (Cmd+Option+3, Alt+3) shows it.
+
+Under labelled tool window stripes, as in Enterprise, **Toggle SSH hosts**, **Toggle SFTP**, **Toggle Tunnels** and
+**Transfers** make the tool window they show the active one, which takes the keyboard. A toggle of a shown tool window
+that is not the active one activates it instead of hiding it; **Transfers** only shows, so it activates its tool window
+each time.
 
 ## For plugin authors: dev.jasper.remote.api
 
@@ -658,7 +666,7 @@ without a window, fail with `NotConnectedException` ("*host* is not connected") 
 | `hostName(UUID hostId)` | The host's name; empty once it is no longer saved |
 | `fileSourceId()` | Remote's file source id, `dev.jasper.remote.hosts`, for [`FileChoice`](sdk-reference.html#dev.jasper.sdk.files.FileChoice) sources |
 | `folder(FileLocation.Sourced)` | The host and folder of a [location](sdk-reference.html#dev.jasper.sdk.files.FileLocation.Sourced) the file chooser returned from Remote's source |
-| `exists(hostId, folders, names)` | Which names (`*` globs) exist in which absolute folders, in one command on the host (needs a POSIX `sh`, 10 s at most); the login's home folder and its ancestors report nothing |
+| `exists(hostId, folders, names)` | Which names (`*` globs) exist in which absolute folders, in one command on the host (needs a POSIX `sh`, 10 s at most); the file-system root, the login's home folder and its ancestors report nothing |
 | `list(hostId, root, ListOptions, Optional<WindowHandle>)` | A project's files, within its [`ListOptions`](sdk-reference.html#dev.jasper.remote.api.ListOptions) (folder names to exclude, at most `maxFiles` files, one timeout for all strategies, a cancellation check polled from a worker thread): Git's tracked and untracked files without ignored ones (unless the work tree is the home folder), else `find`, else an SFTP walk, as a `RemoteListing` with its strategy and whether it was cut short; with a window it may connect and ask the user to sign in |
 | `open(hostId, path, window)` | Opens a remote file in the Editor; may ask the user to sign in, and reports failures itself |
 | `openTerminal(hostId, folder, window)` | Opens an SSH tab whose shell starts in the folder |

@@ -387,7 +387,7 @@ bad value is reported and its default used ([Plugin settings](plugins.md#plugin-
 
 | Key | Default | Values | On the page | Applies to |
 |---|---|---|---|---|
-| `font_family` | The first installed of JetBrains Mono, Menlo, Consolas and DejaVu Sans Mono, else `Monospaced` | An installed font family; the page lists monospaced ones | Font | Every tab, at once |
+| `font_family` | The first installed of JetBrains Mono, Menlo, Consolas and DejaVu Sans Mono, else `Monospaced`; IBM Plex Mono under the Enterprise look | An installed font family; the page lists monospaced ones | Font | Every tab, at once |
 | `font_size` | `13` | 8–48 points | Font size | Every tab, at once |
 | `tab_size` | `4` | 1–16 columns | Tab size | Every tab, at once; Vim's 'tabstop' and 'shiftwidth' |
 | `soft_wrap` | `false` | | Soft wrap | Tabs opened afterwards; **Toggle Soft Wrap** changes one tab |

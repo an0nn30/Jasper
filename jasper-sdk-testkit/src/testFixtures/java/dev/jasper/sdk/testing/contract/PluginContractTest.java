@@ -28,6 +28,7 @@ import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.PluginWindow;
+import dev.jasper.sdk.ui.Presentation;
 import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
@@ -94,6 +95,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CopyOnWriteArrayList;
+import dev.jasper.sdk.settings.Choice;
 import dev.jasper.sdk.settings.SettingSpec;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.Setting;
@@ -817,6 +819,22 @@ public abstract class PluginContractTest {
         h.stopAll();
         assertThat(h.actions()).isEmpty();
         assertThat(h.menu("TAB")).isEmpty();
+    }
+
+    /** SDK 0.18.2: the presentation is the host's, the same for every plugin and on any thread, and a theme change keeps it. */
+    @Test void presentationIsTheHostsForEveryPluginOnAnyThreadAndThroughThemeChanges() throws Exception {
+        var classic = new Presentation(true, Presentation.Icons.CLASSIC, Presentation.ToolWindows.STRIPES, Presentation.TitleBar.NATIVE,
+            Presentation.Menus.WINDOW, Presentation.ToolbarSearch.FIELD, Optional.of("IBM Plex Sans"), Optional.of("IBM Plex Mono"), 12, 28);
+        h.setPresentation(classic);
+        var first = new AtomicReference<PluginContext>(); var second = new AtomicReference<PluginContext>();
+        h.start(new PluginInfo("test.lookone", "One", "1.0.0", Set.of()), Set.of(), Set.of(), first::set);
+        h.start(new PluginInfo("test.looktwo", "Two", "1.0.0", Set.of()), Set.of(), Set.of(), second::set);
+        assertThat(first.get().appearance().presentation()).isEqualTo(classic);
+        assertThat(second.get().appearance().presentation()).isEqualTo(classic);
+        var offThread = CompletableFuture.supplyAsync(() -> first.get().appearance().presentation()).get(5, TimeUnit.SECONDS);
+        assertThat(offThread).isEqualTo(classic);
+        h.setVariant(Variant.LIGHT); h.flush();
+        assertThat(first.get().appearance().presentation()).isEqualTo(classic);
     }
 
     @Test void aPanelMayNameOneOfThePluginsOwnActionsAsItsToggle() {
@@ -2134,6 +2152,43 @@ public abstract class PluginContractTest {
         assertThat(size.get().get()).isEqualTo(13);
         assertThat(tab.get().get()).isEqualTo(6);
         assertThat(h.settingsReports("test.settings")).singleElement().asString().startsWith("font_size: ");
+    }
+
+    /** Plan 15a (spec 5.8): saved, then the look's, then the plugin's own default. */
+    @Test void aKitDefaultReplacesTheDeclaredDefaultAndASavedValueWins() {
+        h.setKitDefault("test.kitdefault", "size", 15L);
+        var size = new AtomicReference<Setting<Integer>>();
+        h.start(new PluginInfo("test.kitdefault", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context ->
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size"))));
+        assertThat(size.get().get()).isEqualTo(15);
+        h.setSetting("test.kitdefault", "size", 13L);
+        assertThat(size.get().get()).as("a saved value equal to the plugin's own default still wins").isEqualTo(13);
+        assertThat(h.lookDefaultProblems("test.kitdefault")).isEmpty();
+    }
+
+    @Test void aKitDefaultTheKindRejectsLeavesThePluginsDefaultAndIsReported() {
+        h.setKitDefault("test.kitbad", "size", 99L);
+        h.setKitDefault("test.kitbad", "mode", "sideways");
+        var size = new AtomicReference<Setting<Integer>>(); var mode = new AtomicReference<Setting<String>>();
+        h.start(new PluginInfo("test.kitbad", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context -> {
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+            mode.set(context.settings().declare(SettingSpec.of("mode", SettingKind.choice(List.of(Choice.of("up", "Up", "up"), Choice.of("down", "Down", "down"))), "up").label("Mode")));
+        });
+        assertThat(h.active("test.kitbad")).isTrue();
+        assertThat(size.get().get()).isEqualTo(13);
+        assertThat(mode.get().get()).isEqualTo("up");
+        assertThat(h.lookDefaultProblems("test.kitbad")).hasSize(2).allSatisfy(line -> assertThat(line).startsWith("test.kitbad: the look's default for "))
+            .anySatisfy(line -> assertThat(line).startsWith("test.kitbad: the look's default for size is not used: "));
+    }
+
+    @Test void aKitDefaultForAnUndeclaredKeyIsReportedAndAnotherPluginsTableIsIgnored() {
+        h.setKitDefault("test.kitextra", "missing", true);
+        h.setKitDefault("test.notrunning", "size", 9L);
+        h.start(new PluginInfo("test.kitextra", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context ->
+            context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+        assertThat(h.lookDefaultProblems("test.kitextra"))
+            .containsExactly("test.kitextra: the look gives a default for missing, which the plugin does not declare");
+        assertThat(h.lookDefaultProblems("test.notrunning")).isEmpty();
     }
 
     @Test void settingsAreDeclaredOnlyWhileStartingWithUniqueLabelledKeys() {

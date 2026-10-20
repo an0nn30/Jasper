@@ -57,7 +57,8 @@ desktop menu. The package is named `jasper`. The packages are unsigned.
 Jasper opens one window with one tab running your shell: your login shell on macOS and Linux, PowerShell on Windows
 (Settings › Terminal › Shell chooses another). The first window is sized for 100 columns by 35 rows of the terminal
 font, bundled Cousine Nerd Font Mono at 12 points; after that, new windows take the size and place of the last one you
-closed. Jasper follows the system's dark or light appearance with its default theme, Slate Cobalt.
+closed. On macOS Jasper follows the system's dark or light appearance; on Linux and Windows it shows Dark until you
+choose Light. The default themes are Slate Cobalt in Dark and Jasper Meadow Light in Light.
 
 Under the default look the window has:
 
@@ -138,7 +139,8 @@ Cmd+Enter (Ctrl+Enter on Linux and Windows) and Shift+Enter; the palette's hint 
 
 Type `>` first to search only commands, or a scope's name and `>` (for example `ssh >`) to search one scope. Several
 scopes also have their own shortcut, such as **Search Shell History** (Cmd+R, Ctrl+Shift+R). Under the Enterprise look
-the palette is the Run window, opened from **▶ Run…** in the status bar. See [the command palette](command-palette.md).
+the palette is the Run window, which its shortcut, **▶ Run…** in the status bar and the toolbar's **Search
+Everywhere** button open. See [the command palette](command-palette.md).
 
 ### Settings
 
@@ -165,8 +167,8 @@ Notifications on the right; Remote's file transfers show at the foot of the SFTP
 or hide one; View › Tool Windows lists them too, and some have shortcuts, such as **Toggle SSH hosts** (Cmd+Option+1,
 Alt+1) and **Toggle SFTP** (Cmd+Option+2, Alt+2). Drag a rail button or a tool window's header to another edge, or
 right-click the button and choose **Move to**. Each side, and the bottom, has two slots, and each slot shows one tool
-window at a time; Jasper remembers the layout. Under the Enterprise look the rails are labelled stripes, and the tool
-windows are in the Window menu. See [the workspace](workspace.md).
+window at a time; Jasper remembers the layout. Under the Enterprise look the rails are labelled stripes, each label
+starting with its tool window's icon, and the tool windows are in the Window menu. See [the workspace](workspace.md).
 
 ### Connect to a host
 

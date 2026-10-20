@@ -1,21 +1,24 @@
 # Jasper desk buddy sprite
 
-Pixel-art Jasper for the floating desk buddy: 42 × 48 art pixels per frame, drawn at
-2 logical px per art pixel by Buddy (84 × 96 window, 4 device px per art pixel at 2× display scale).
+The app uses shaded pixel-art Jasper: olive green, a cream belly, a brown shell and round glasses.
+The homepage keeps its existing dimensional illustration.
+Each frame holds 84 × 96 source pixels and paints into a 42 × 48 logical frame; Buddy's scale of 2.5
+displays the companion at 105 × 120. Nearest-neighbour sampling keeps the pixel edges hard.
 
-- [jasper-buddy.ase](jasper-buddy.ase) — editable master for [LibreSprite](https://libresprite.github.io). One RGBA layer, 20 frames of 42 × 48.
-- [jasper-buddy.png](../../jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png) — runtime strip, 840 × 48, 20 frames left to right with no inter-frame padding.
-- [generate.py](generate.py) — programmatic artwork and exporter (Python 3 + Pillow).
-  Prefer editing its drawing functions and regenerating both artifacts together. Running
-  it without `--verify-only` overwrites the master and runtime strip, discarding hand edits.
-- [jasper-character-reference.svg](jasper-character-reference.svg) — the silver character
-  artwork the sprite's colours follow.
+- [jasper-buddy.ase](jasper-buddy.ase) — editable master for [LibreSprite](https://libresprite.github.io). One RGBA layer, 20 frames of 84 × 96.
+- [jasper-buddy.png](../../jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png) — runtime strip, 1680 × 96, 20 frames left to right in `BuddyFrame` order with no inter-frame padding.
+- [source-atlas.png](../../docs/design/jasper-pixel/source-atlas.png) — the generated poses of the approved pixel character
+  ([how it was made](../../docs/design/jasper-pixel/README.md)).
+- [pack-atlas.swift](pack-atlas.swift) — packs that atlas into the runtime strip on macOS: slicing, one shared scale,
+  an opaque pixel grid and a common foot baseline, keeping the existing spawn sparkles.
+- [generate.py](generate.py) — pixel-exact exporter and verifier for the master and the strip (Python 3 + Pillow).
+- `jasper-character-reference.svg` is the earlier silver character artwork; nothing uses it.
 
 The runtime resource belongs to `jasper-buddy`, beside
 [BuddySprite](../../jasper-buddy/src/main/java/dev/jasper/buddy/internal/presentation/BuddySprite.java),
-which slices it into one 42 × 48 cell per `BuddyFrame` constant and refuses a sheet of
+which slices it into one 84 × 96 cell per `BuddyFrame` constant and refuses a sheet of
 any other size; `BuddyCompanion.show()` then returns false. Gradle builds load the
-committed artwork and run no generator.
+committed PNG and run none of these tools.
 
 ## Frames
 
@@ -25,18 +28,18 @@ Column order is fixed by [BuddyFrame](../../jasper-buddy/src/main/java/dev/jaspe
 |---|---|---|
 | 0 | `IDLE` | Standing, eyes open |
 | 1 | `BLINK` | Both eyes shut |
-| 2 | `WINK` | Left eye shut |
+| 2 | `WINK` | One eye shut |
 | 3 | `WAVE_A` | Right arm raised |
-| 4 | `WAVE_B` | Right arm swung lower and further out, head leans right |
-| 5 | `HOP` | Lifted one pixel, legs tucked, both arms out |
-| 6 | `LEAN_LEFT` | Head leans left, right leg kicks, right arm up |
-| 7 | `LEAN_RIGHT` | Head leans right, left arm up |
-| 8 | `SIT` | Sitting: body a pixel lower, head slumped, feet out in front of the shell |
+| 4 | `WAVE_B` | Right arm raised higher |
+| 5 | `HOP` | Lifted, legs tucked, both arms out |
+| 6 | `LEAN_LEFT` | Head leans left |
+| 7 | `LEAN_RIGHT` | Head leans right |
+| 8 | `SIT` | Sitting, feet in front of the shell |
 | 9 | `SIT_BLINK` | Sitting with both eyes shut |
-| 10 | `TUCK` | Retracted: no limbs, the head sunk into the top of the shell |
-| 11 | `SLEEP_A` | Empty shell, two Zs low |
-| 12 | `SLEEP_B` | Empty shell, the Zs risen and drifted right |
-| 13 | `SLEEP_C` | Empty shell, the big Z at the top and a new small Z below |
+| 10 | `TUCK` | Head tucking into the shell |
+| 11 | `SLEEP_A` | Sleeping shell, one Z |
+| 12 | `SLEEP_B` | Sleeping shell, two Zs |
+| 13 | `SLEEP_C` | Sleeping shell, three Zs |
 | 14 | `SPARKLE_A` | Spawn overlay: stars only, no body (painted on top of another frame) |
 | 15 | `SPARKLE_B` | Spawn overlay, stars in different places |
 | 16 | `SPARKLE_C` | Spawn overlay, stars in different places again |
@@ -47,67 +50,63 @@ Column order is fixed by [BuddyFrame](../../jasper-buddy/src/main/java/dev/jaspe
 Frames 17–19 are the working animation (A, B, A, B, rest at 250 ms per frame), requested
 by the host through `setWorking(true)`. Jasper requests it while a terminal command runs
 past `notifications.long_command_seconds`, or runs out of sight, unless that setting is 0;
-Buddy has no notification threshold. Frames 0–13 are poses. Frames 14–16 are overlays:
+Buddy has no notification threshold. Frames 0–13 and 17–19 are poses. Frames 14–16 are overlays:
 transparent except for the stars, cycled on top of the body while he fades in at spawn, so they never replace a pose. [BuddyAnimator](../../jasper-buddy/src/main/java/dev/jasper/buddy/internal/animation/BuddyAnimator.java)
 sequences the frames; [Buddy architecture](../../docs/buddy-architecture.md#animation-drawing-and-placement)
 lists the timings.
 
-## Palette
-
-Character colours follow [the silver character artwork](jasper-character-reference.svg);
-laptop colours are explicit constants in `generate.py`.
-
-| Role | Hex |
-|---|---|
-| Outline, pupils, glasses | `#332f27` |
-| Laptop screen | `#1e222a` |
-| Laptop prompt text | `#7fd9a8` |
-| Laptop key deck | `#5a626e` |
-| Skin | `#a7ae70` |
-| Skin highlight | `#c9ce93` |
-| Shell rim | `#d8c49c` |
-| Rim shade | `#b8a278` |
-| Belly | `#eee0bd` |
-| Belly lines | `#ab9670` |
-| Lenses | `#f7efd7` |
-| Eye glint | `#ffffff` |
-| Spawn star | `#fff3b0` |
-| Spawn star highlight | `#ffffff` |
-
 ## Editing and exporting
 
-For the generated-art workflow, edit `generate.py` and run from the repository root:
+Edit the master in LibreSprite, keeping the frame order, the 84 × 96 frame size and the transparent left, right and
+bottom margins. The exporter reads a master with one visible normal layer and full-canvas compressed cels at (0, 0)
+with full opacity, and validates every frame before it writes. Export and verify from the repository root:
 
 ```sh
 python3 packaging/buddy/generate.py
 python3 packaging/buddy/generate.py --verify-only
-./gradlew :jasper-buddy:test --tests '*BuddySpriteTest' --tests '*BuddyApiTest'
+./gradlew :jasper-buddy:test
 ```
 
-The first command overwrites both committed artifacts and verifies that each master
-frame matches its PNG cell. `--verify-only` reads the existing artifacts without writing:
-it checks the frame count and compares the `.ase` pixels with the PNG cells. It still
-needs Pillow, and it does not compare those pixels with newly generated drawing output,
-so passing it alone does not establish that hand-edited artwork matches the generator.
-Both modes print `ok: 20 frames -> …` on success; otherwise an assertion names what
-failed: a malformed `.ase` (header, frame magic or chunk sizes), the frame count, or the
-first frame whose `.ase` and PNG cells differ. `BuddySpriteTest` checks exact
-dimensions/frame count, transparent left, right and bottom margins, sparkle overlays that
-use the star colour and leave the body's centre uncovered, nearest-neighbour scaling and
-distinguishing artwork; `BuddyApiTest` decodes the resource from the jar. Keep the Java enum order, generator
-`FRAMES` order, master and runtime PNG synchronized.
+The first command writes the runtime strip from the master, then checks that each master frame matches its PNG cell;
+it never writes the master. `--verify-only` makes the same comparison without writing anything. Both print
+`ok: 20 pixel frames; master and runtime match` on success; otherwise an assertion names what failed: a malformed
+`.ase` (header, frame magic or chunk sizes), a master in another layout (more than one layer, or trimmed, offset or
+linked cels), the frame count, the strip's dimensions, or the first frame, by its `FRAMES` name, whose `.ase` and PNG
+cells differ. Keep the Java enum order, the `FRAMES` order, the master and the runtime PNG synchronized.
 
-To edit the master by hand in LibreSprite instead, export it to the runtime path (macOS
-install path shown):
+When LibreSprite saves trimmed, linked or layered cels, flatten the master and export it as a horizontal strip to the
+runtime path instead (macOS install path shown):
 
 ```sh
 /Applications/libresprite.app/Contents/MacOS/libresprite --batch packaging/buddy/jasper-buddy.ase \
     --sheet jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png
+python3 packaging/buddy/generate.py --import-strip
 ```
 
-No automated check runs this export. Keep 20 frames of 42 × 48, no inter-frame padding,
-and transparent left/right/bottom margins. Confirm the PNG was rewritten (a batch export
-has been seen to write nothing and not exit), then run `--verify-only` and the tests
-above. Do not run the generator's writing mode after hand edits unless those edits have
-been ported back to its drawing functions. See [Buddy maintenance](../../docs/buddy-maintenance.md)
-for headless image previews and the manual native-acceptance boundary.
+Confirm the PNG was rewritten first (a batch export has been seen to write nothing and not exit). `--import-strip`
+rewrites the master from the strip in the exporter's layout, then verifies the pair as `--verify-only` does; no
+automated check runs the LibreSprite export.
+
+`BuddySpriteTest` checks the exact dimensions and frame count, transparent left, right and bottom margins, pixels that
+are either opaque or transparent, shaded artwork, sparkle overlays that use the star colour and leave the body's
+centre uncovered, distinguishing poses, and nearest-neighbour painting that keeps the logical bounds, blends no
+colours and shows nothing of a neighbouring frame; `BuddyApiTest` decodes the resource from the jar.
+
+To repack the source atlas on macOS, which writes the runtime strip, and update the master:
+
+```sh
+swift packaging/buddy/pack-atlas.swift \
+  docs/design/jasper-pixel/source-atlas.png \
+  docs/design/jasper-dimensional/original-sparkle-source.png \
+  jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png
+python3 packaging/buddy/generate.py --import-strip
+python3 packaging/buddy/generate.py --verify-only
+```
+
+The packer accepts only the 1429 × 1100 atlas, whose measured row and column boundaries it names; inspect a
+replacement atlas and adjust those boundaries before packing it. It crops each pose to its opaque pixels, scales all
+17 poses by one shared factor with nearest-neighbour sampling, centres each in its cell on a common baseline with the
+hop raised above it, draws the three spawn sparkles of the earlier 42 × 48 strip
+(`original-sparkle-source.png`) at twice their size, and makes every pixel fully opaque or fully transparent. Runtime
+geometry does not change. See [Buddy maintenance](../../docs/buddy-maintenance.md) for headless image previews and the
+manual native-acceptance boundary.

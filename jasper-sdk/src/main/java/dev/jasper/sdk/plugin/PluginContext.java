@@ -123,8 +123,9 @@ public interface PluginContext {
     StatusBar statusBar();
 
     /**
-     * Theme colours for custom content: semantic colours, the chrome and workspace variants, the workspace, editor and
-     * syntax palettes, the workspace opacity, and change notifications.
+     * Theme colours for custom content and the look Jasper runs with: semantic colours, the chrome and workspace
+     * variants, the workspace, editor and syntax palettes, the workspace opacity, change notifications and the
+     * presentation.
      *
      * @return the appearance service
      */

@@ -25,6 +25,7 @@ import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.app.palette.ScopeRegistry;
 import dev.jasper.app.palette.CommandsScope;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.config.ToolbarMode;
@@ -142,6 +143,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private boolean firstTerminalSeen;
     /** Whether this window's macOS appearance follows the theme (a native-titled look, spec 10.1); its dialogs follow too. */
     private boolean followsThemeAppearance;
+    /** IntelliJ Classic's macOS title band over the toolbar under a classic title (Enterprise plan 14), or null. */
+    private MacTitleBand titleBand;
+    /** The frame's formatted title, which the Windows classic title shows too. */
+    private String frameTitle = "Jasper";
+    /** The Windows classic title bar's title under a classic title (Enterprise plan 14), or null until decorated. */
+    private ClassicWindowTitle classicWindowTitle;
     Consumer<JComponent> showConfigDiagnostics = control -> {
         if (!followsThemeAppearance) JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
         else showOptionDialog(new JOptionPane(control, JOptionPane.PLAIN_MESSAGE), "Configuration");
@@ -270,10 +277,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // The rounded host paints behind this layout-only container, including partial tab repaints.
         terminalColumn.setOpaque(false);
         terminalColumn.add(windowTabs.component(), BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
-        stripes = look().dock().stripes(themes.kit());
+        stripes = look().dock().stripes(themes.kit(), look().chromeArtwork());
         leftStripe = stripes.left();
         rightStripe = stripes.right();
-        area = new ToolWindowArea(terminalColumn, dock, themes.kit(), look().dock().flushFrames());
+        area = new ToolWindowArea(terminalColumn, dock, themes.kit(), look().dock().flushFrames(), look().chromeArtwork());
         area.setStatusVisible(chrome.status().isVisible());
         area.setHeaderVisible(true);
         for (DockStripe stripe : stripes.all()) stripe.setVisible(false);
@@ -318,20 +325,44 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Mounts {@code content} in a terminal frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
-     * unified macOS bar hosting the header, or the system's title bar with the header as a row in the window. Either way
-     * the menu bar is the root's (the unified bar's {@code setMenuBar} puts it there too); on macOS the screen menu bar
-     * shows it while the look keeps that on, and otherwise it is a row in the window. TerminalWindow and the chrome
-     * renders share this path. Returns the unified bar, or null.
+     * unified macOS bar hosting the header, the system's title bar with the header as a row in the window, or, under a
+     * classic title, IntelliJ Classic's band in the toolbar's colour above that row on macOS and FlatLaf's title pane with
+     * the menus and the title on Windows. Either way the menu bar is the root's (the unified bar's {@code setMenuBar} puts
+     * it there too); on macOS the screen menu bar shows it while the look keeps that on, and otherwise it is a row in the
+     * window or of the Windows title bar. TerminalWindow and the chrome renders share this path. Returns the unified bar,
+     * or null.
      */
     static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
         MacTitleBar bar = installTitleBar(root, content, look.unifiedTitle(), look.followThemeAppearance(), nativeTitle);
-        if (bar == null) installCustomTitleBar(root, content);
+        // IntelliJ Classic's frame (plan 14): the band on macOS, FlatLaf's title pane with the menus and the title on Windows.
+        if (bar == null && look.classicTitle() && content.macOs) installMacTitleBand(root, content);
+        else if (bar == null && look.classicTitle()) installClassicTitleBar(root, content);
+        else if (bar == null) installCustomTitleBar(root, content);
         // Under a native-titled look the header is a row of window chrome, whichever composition draws it (spec 10.1,
         // and spec 9.1's fallback row); the default look keeps today's title-bar zone.
         if (bar == null && look.followThemeAppearance()) content.chrome().chromeRow();
         if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
         return bar;
     }
+
+    /**
+     * The macOS classic title (plan 14 Rulings 7 and 8): IntelliJ Classic's band above the toolbar row, filled with the
+     * header's {@code surface.app} so the band and the toolbar read as one, never the title-bar zone's colour. The window
+     * takes the vibrant appearance of the theme's darkness in place of {@link #installTitleBar}'s Aqua follower; the
+     * window's dialogs still follow through {@code followsThemeAppearance}. Compact keeps the system title bar without
+     * the band.
+     */
+    static void installMacTitleBand(JRootPane root, WindowContent content) {
+        // Under a classic title macOS always shows the menus in the screen menu bar (Rulings 5 and 18), Compact included.
+        content.chrome.menuBar().screenMenuBar(true);
+        if (content.viewMode == ViewMode.COMPACT) return;
+        content.titleBand = MacTitleBand.install(root, () -> ThemeZone.color(content.chrome().header(), SemanticColor.SURFACE_APP));
+        content.onThemeChanged = theme -> content.titleBand.setDark(theme.chrome().dark());
+        content.onThemeChanged.accept(content.theme());
+    }
+
+    /** The macOS classic title band, or null without it. */
+    MacTitleBand titleBand() { return titleBand; }
 
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
@@ -365,9 +396,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 pane == null ? "" : pane.commandLabel());
             if (document != null) context = new WindowHeaderContext(document.title() + (document.host().isEmpty() ? "" : " — " + document.host()), document.location(), document.host().isEmpty() ? "FILE" : "SERVER");
             // The frame title follows the look's template (spec 10.4); the title field keeps the context.
-            nativeTitle.accept(WindowTitle.format(content.look().title(), context.label(),
+            String formatted = WindowTitle.format(content.look().title(), context.label(),
                 document != null ? document.title() : WindowTitle.session(snapshot),
-                document != null ? document.location() : WindowTitle.directory(snapshot, home)));
+                document != null ? document.location() : WindowTitle.directory(snapshot, home));
+            nativeTitle.accept(formatted);
+            content.frameTitle = formatted;
+            if (content.classicWindowTitle != null) content.classicWindowTitle.setText(formatted);
             content.chrome.search().setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
         };
         if (bar != null) {
@@ -395,16 +429,31 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * is created (on {@code pack} or first show), so a new frame's root pane still reads {@code NONE} here.
      */
     static boolean installCustomTitleBar(JRootPane root, WindowContent content) {
+        return whenDecorated(root, content, WindowContent::decorateTitleBar);
+    }
+
+    /**
+     * The Windows classic title (plan 14 Rulings 13 to 15): FlatLaf's title pane, 28 px in the toolbar's colour, embeds the
+     * menus and then the frame's title, left-aligned after them; the header stays a row of the window under it. Returns
+     * as {@link #installCustomTitleBar} does, and with native decorations FlatLaf never decorates, so the menus stay a
+     * row of the window.
+     */
+    static boolean installClassicTitleBar(JRootPane root, WindowContent content) {
+        return whenDecorated(root, content, WindowContent::decorateClassicTitleBar);
+    }
+
+    /** Runs {@code decorate} now if {@code root} has look-and-feel decorations, else once when they arrive; never in Compact. */
+    private static boolean whenDecorated(JRootPane root, WindowContent content, BiConsumer<JRootPane, WindowContent> decorate) {
         if (content.viewMode == ViewMode.COMPACT) return false;
         if (root.getWindowDecorationStyle() != JRootPane.NONE) {
-            decorateTitleBar(root, content);
+            decorate.accept(root, content);
             return true;
         }
         root.addPropertyChangeListener("windowDecorationStyle", new java.beans.PropertyChangeListener() {
             @Override public void propertyChange(java.beans.PropertyChangeEvent event) {
                 if (root.getWindowDecorationStyle() == JRootPane.NONE) return;
                 root.removePropertyChangeListener("windowDecorationStyle", this);
-                decorateTitleBar(root, content);
+                decorate.accept(root, content);
             }
         });
         return false;
@@ -426,6 +475,29 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         content.onThemeChanged = theme -> colors.run();
         content.revalidate();
     }
+
+    private static void decorateClassicTitleBar(JRootPane root, WindowContent content) {
+        var title = new ClassicWindowTitle();
+        title.setText(content.frameTitle);
+        title.setActive(content.active);
+        content.classicWindowTitle = title;
+        content.chrome.menuBar().setTitle(title);
+        root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_SHOW_TITLE, false);
+        root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, ClassicWindowTitle.BAR_HEIGHT);
+        Runnable colors = () -> {
+            // The toolbar's colour, not a title-bar zone, so any theme's bar matches its toolbar (Rulings 13).
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, ThemeZone.color(content.chrome().header(), SemanticColor.SURFACE_APP));
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
+            title.refresh();
+        };
+        colors.run();
+        content.onThemeChanged = theme -> colors.run();
+        dev.jasper.app.platform.TitleInset.publish(root, () -> root.getContentPane() == null ? 0 : root.getContentPane().getY());
+        content.revalidate();
+    }
+
+    /** The Windows classic title bar's title, or null until FlatLaf decorates the window under a classic title. */
+    ClassicWindowTitle classicWindowTitle() { return classicWindowTitle; }
 
     void installRootBindings(JRootPane root) {
         removeRootBindings();
@@ -1492,6 +1564,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (!value && commandPalette != null) commandPalette.windowDeactivated();
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
         if (!value) dockDrag.cancel();
+        if (classicWindowTitle != null) classicWindowTitle.setActive(value);
         active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
@@ -1538,6 +1611,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (terminals != null) { terminals.close(); terminals = null; }
         workspaceActions.disable();
         refreshTabs();
+        if (titleBand != null) { titleBand.close(); titleBand = null; }
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};

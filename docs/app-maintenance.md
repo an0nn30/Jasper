@@ -137,7 +137,9 @@ file (`<home>/plugins/<id>/<id>.toml`), not a core setting. A core setting needs
 
 The loader, the generated template, Settings rows, Settings search and saving need no per-field code. A look may give
 a default only to the settings in `DefaultSource.ALLOWED` (both theme picks, `palette.visible_rows`,
-`window.toolbar_height` and `window.toolbar`). Settings' ? button opens `docs/configuration.md#<anchor>` on GitHub
+`window.toolbar_height` and `window.toolbar`); its `[defaults."<plugin id>"]` tables reach a plugin's declared
+settings through `DefaultSource.plugin(id)`, which `DeclaredSettings` reads with each setting's own kind (a rejected
+value or an undeclared key goes to `PluginHost.lookDefaultProblem`, which logs it). Settings' ? button opens `docs/configuration.md#<anchor>` on GitHub
 (`SettingsDialog.HELP_URL`), with the anchor from the page (`SchemaPage.anchor`, `SettingsPage.helpAnchor`). No test
 checks those anchors: keep the headings that make `supported-settings`, `theme`, `finished-command-notifications`,
 `palette`, `desk-buddy`, `terminal-colors`, `shell-environment-and-history`, `background-residency`, `plugins` and
@@ -522,9 +524,7 @@ To add a bundled plugin:
    `jasper-app/build.gradle.kts`, into a folder named after its id.
 3. When it uses another plugin's exported API, declare `requires` in its `plugin.toml`, depend on that module with
    `compileOnly`, and list the exported packages for it in `declaredImports` (`gradle/plugin-architecture.gradle.kts`);
-   `verifyPluginArchitecture` refuses anything else. A plugin that uses the Enterprise API names
-   `dev.jasper.enterprise.api` only in its own `dev.jasper.<plugin>.workstation` package, listed in
-   `workstationPackages` in the same file.
+   `verifyPluginArchitecture` refuses anything else.
 4. Record every library it bundles in `notices.toml` (see [Adding or bumping a dependency](#adding-or-bumping-a-dependency)).
 5. When it exports an API package, run `./gradlew sdkReference`: the SDK reference includes every package a bundled
    plugin exports, and `verifySdkReference` fails `check` until it is regenerated.
@@ -604,7 +604,8 @@ notice, as `jbr-api.NOTICE.txt` does. The Licenses window reads the same file.
 ## Themes
 
 `JasperTheme.builtIns()` lists the built-in theme files ([architecture](app-architecture.md#themes),
-[themes](themes.md)), Slate Cobalt first. The Catppuccin files are the theme converter's output for the plugin jar
+[themes](themes.md)), Slate Cobalt, the Dark default, first; Jasper Meadow Light (`jasper-meadow.json`,
+`JasperTheme.LIGHT_DEFAULT_ID`) is the Light default. The Catppuccin files are the theme converter's output for the plugin jar
 vendored in `tools/themes/catppuccin/`, with the hand-picked roles in its `roles.json` (its `SOURCE.md` says how to
 regenerate them); a converter test fails when they differ. The Enterprise plugin's `enterprise.json` is likewise the
 converter's port (`convert_port`) of IntelliJ's own IntelliJ Light and New UI Dark files in `tools/themes/intellij/`
@@ -696,6 +697,19 @@ side. Blank header and toolbar areas drag the window; buttons and the field neve
 live (28–64 logical pixels, default 30), including when its toolbar is hidden, and `MacTitleBar` updates the JBR
 custom title height with the same geometry.
 
+Under a classic title (`title_bar = "classic"`) `WindowContent.mount` installs IntelliJ Classic's frame instead: on
+macOS `WindowContent.installMacTitleBand` gives the root `MacTitleBand` (a fixed 28 pt band filled with the header's
+`surface.app`, never a title-bar zone) and marks its menu bar as the screen menu bar's
+(`CollapsingMenuBar.screenMenuBar(true)`), so it never folds (the bootstrap's `DesktopFlags` keep the screen menu bar
+on); on Windows `installClassicTitleBar` puts `ClassicWindowTitle` into `CollapsingMenuBar` once FlatLaf decorates the
+frame, in a 28 px title pane. Neither title is installed in Compact, and with `window.native_decorations = true` FlatLaf
+never decorates, so the menus stay a row of the window.
+Each publishes the title's height through `TitleInset`, which classic in-window dialogs read; `NativeShells`
+publishes the same for a Windows auxiliary frame or dialog under the classic title. `MacTitleDoubleClick` reads
+`AppleActionOnDoubleClick` once off the EDT. The band's traffic lights and title belong to AppKit: a window started
+through JBR's `bin/java` (`:jasper-app:run`) shows macOS's legacy controls with a centred title, and only the packaged
+app shows IntelliJ's, so judge them there (`ClassicMacTitleTest`, `ClassicWindowsTitleTest`, `MacTitleBandTest`).
+
 Run `./gradlew :jasper-app:titleBarPreview :jasper-app:mockUiPreview` for fixture-based headless renders (the second
 rewrites the committed `docs/design/mock-ui-{dark,light}.png`); the title-bar previews include local, remote and narrow
 layouts, without fabricated native controls. For user-run GUI
@@ -713,7 +727,10 @@ never overflows, when the row is too narrow. Theme changes must keep the selecte
 colours differ from the chrome's. The classic header's buttons are `ClassicToolbarButton`s: with labels hidden
 (`window.toolbar = "icons"`) a button is `CHROME_ICON_BUTTON` square, named by its tooltip (its label unless the
 caller sets one, as Split does), and a dropdown draws a `CHROME_ICON_CARET` ▼ in its corner; with labels it draws its
-icon, then its label (`ClassicHeaderTest`).
+icon, then its label (`ClassicHeaderTest`). Under `toolbar_search = "icon"`, `ClassicHeader(true)` hides the search
+field and leads the trailing group with an icon-only "Search Everywhere" button (`searchButton()`) that runs
+`COMMAND_PALETTE`, keeps no label in any toolbar mode and reads the palette's shortcut into its tooltip. Under
+`[chrome] icons = "classic"` `WindowChrome` marks each toolbar view `KitView.classicChromeIcons(true)`.
 
 ### Tool window area, stripes and the dock
 
@@ -775,13 +792,22 @@ icon rails it renders nothing. An action's enable or title change is not a rende
 state itself) and repaints them. Only adding or removing an action or a rail placement, or a dock or panel change,
 renders the stripes again.
 
+A labelled stripe's or the bottom strip's label leads with its window's or rail action's icon: `StripeLabels` lays out
+a `STRIPE_ICON` (13 px) box `STRIPE_LABEL_PADDING` from the label's start and a `STRIPE_ICON_GAP` (4 px) before the
+text, the same in every state, and `DockChrome.stripes` hands the stripes the look's `ChromeArtwork`, from which
+`AppIcons.stripeIcon` picks the art (`StripeIconTest`, `StripeIconsTest`). A dragged label keeps its icon and length,
+and the ghost is `StripeSet.ghost(icon)`.
+
 Under the default look the workspace boundaries are continuous chrome instead of painted rules: rail, toolbar, title
 bar and status bar have no edge strokes, and dock dividers paint nothing, so no UI update can give them a border or
 grip; terminal-internal splits keep their visible indicators. Under flush frames (a stripes look) each divider is a
 painted 1 px rule, and the classic header and status bar draw their own rules. There `ToolWindowArea` activates a frame
 on any mouse press inside it, through an AWT event listener added in `addNotify` and removed in `removeNotify`, and
-`WindowContributions.toggleAndActivate` does so for a stripe click and an `ACTIVATING_TOGGLE` request, without first
-handing focus back to the terminal when the window replaces another in its slot. `focusTarget` picks where the keyboard
+`WindowContributions.toggleAndActivate` does so for a stripe click, `activatingToggle` for an `ACTIVATING_TOGGLE`
+request (a shown frame that is not the active one is only activated) and `showAndActivate` for an `ACTIVATING_SHOW`,
+without first handing focus back to the terminal when the window replaces another in its slot. `HostedUi` sends the
+two activating requests only for a `Panels.toggle` or `PanelHost.show()` made while the panel's own declared toggle
+action runs; the host's generated toggles and the Notifications panel's send `ACTIVATING_TOGGLE` themselves. `focusTarget` picks where the keyboard
 goes; a frame's host is focusable only while it holds the keyboard itself, so it is never a Tab stop
 (`PressedFrameTest`, `WindowPanelsTest`). `ToolWindowSurface` paints only the app-owned root, with `surface.panel`; it
 does not observe or restyle plugin descendants. Shared kit views consume their routed palette and own their control and

@@ -449,10 +449,11 @@ A tab is named after its focused pane, first match winning:
 4. the foreground program, checked every half second on macOS and Linux (a login shell shows without its leading `-`);
 5. the shell's name, such as `zsh`, `PowerShell` or a distribution's name, or a plugin session's own title.
 
-The search field in the window's header shows `user@~/path` for the focused pane, or `host:path` for a remote one,
-followed by ` : ` and the name from steps 3 to 5 (`Shell` for a plugin session with no running command, whose title is
-already shown as the host); a program-set title replaces all of it. Inside tmux, titles that programs set reach Jasper
-only when tmux forwards them, for example with `set -g set-titles on` and `set -g set-titles-string '#{pane_title}'`.
+Under the default look, the search field in the window's header shows `user@~/path` for the focused pane, or
+`host:path` for a remote one, followed by ` : ` and the name from steps 3 to 5 (`Shell` for a plugin session with no
+running command, whose title is already shown as the host); a program-set title replaces all of it. Inside tmux,
+titles that programs set reach Jasper only when tmux forwards them, for example with `set -g set-titles on` and
+`set -g set-titles-string '#{pane_title}'`.
 
 ## When the shell exits
 

@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 class ProjectionReadTest {
     /** A variant pattern over internal names, and the classes that may read it. */
     static final Map<Pattern, Predicate<String>> PROJECTION_READERS = Map.of(
-        Pattern.compile("dev/jasper/app/presentation/WorkspaceLook\\$(?:Menus|Header|Stripes|Tabs|Status|FrameStyle|Icons)(?=[;$.]|$)"),
+        Pattern.compile("dev/jasper/app/presentation/WorkspaceLook\\$(?:Menus|Header|Stripes|Tabs|Status|FrameStyle|Icons|Search)(?=[;$.]|$)"),
             type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/workspace/WorkspaceChrome")
                 || type.startsWith("dev/jasper/app/workspace/WorkspaceChrome$"),
         Pattern.compile("dev/jasper/app/presentation/Motion(?=[;$.]|$)"),
@@ -34,7 +34,10 @@ class ProjectionReadTest {
         Pattern.compile("^dev/jasper/app/presentation/Composition$"), ProjectionReadTest::compositionRoot,
         // Plan 8b (spec 3.3 and 16.1.7): the palette's view is read only by PaletteViews, its home only by WorkspaceChrome.
         Pattern.compile("dev/jasper/app/presentation/PaletteLook\\$View(?=[;$.]|$)"), type -> owns(type, "dev/jasper/app/palette/PaletteViews"),
-        Pattern.compile("dev/jasper/app/presentation/PaletteLook\\$Home(?=[;$.]|$)"), type -> owns(type, "dev/jasper/app/workspace/WorkspaceChrome"));
+        Pattern.compile("dev/jasper/app/presentation/PaletteLook\\$Home(?=[;$.]|$)"), type -> owns(type, "dev/jasper/app/workspace/WorkspaceChrome"),
+        // Plan 15a (spec 9.1): what plugins learn of the look is read only by the plugin runtime's adapter.
+        Pattern.compile("dev/jasper/app/presentation/PluginLook\\$(?:TitleBar|Menus|Search)(?=[;$.]|$)"),
+            type -> owns(type, "dev/jasper/app/plugins/HostedPresentation"));
 
     /** Whether {@code type} (an internal name) is the presentation package's, {@code owner} or a class nested in it. */
     static boolean owns(String type, String owner) {
@@ -90,6 +93,11 @@ class ProjectionReadTest {
                 .filter(scanned -> scanned.strings().stream().anyMatch(s -> s.contains("dev/jasper/app/presentation/PaletteLook$Home")))
                 .map(Scanned::name))
             .as("the palette home's scan is live").anyMatch(name -> name.startsWith("dev/jasper/app/workspace/WorkspaceChrome"));
+        // Plan 15a: the plugin look's scan is live.
+        assertThat(files.stream().map(Scanned::of)
+                .filter(scanned -> scanned.strings().stream().anyMatch(s -> s.contains("dev/jasper/app/presentation/PluginLook$Menus")))
+                .map(Scanned::name))
+            .as("the plugin look's scan is live").contains("dev/jasper/app/plugins/HostedPresentation");
         assertThat(projectionReaders(files)).isEmpty();
     }
 
@@ -100,12 +108,17 @@ class ProjectionReadTest {
             .withField("dialogs", ClassDesc.of("dev.jasper.app.presentation.DialogMapping$Kind"), ClassFile.ACC_PRIVATE)
             .withField("view", ClassDesc.of("dev.jasper.app.presentation.PaletteLook$View"), ClassFile.ACC_PRIVATE)
             .withField("home", ClassDesc.of("dev.jasper.app.presentation.PaletteLook$Home"), ClassFile.ACC_PRIVATE)
-            .withField("icons", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Icons"), ClassFile.ACC_PRIVATE));
-        assertThat(projectionReaders(List.of(probe))).hasSize(5);
+            .withField("icons", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Icons"), ClassFile.ACC_PRIVATE)
+            .withField("plugins", ClassDesc.of("dev.jasper.app.presentation.PluginLook$Menus"), ClassFile.ACC_PRIVATE));
+        assertThat(projectionReaders(List.of(probe))).hasSize(6);
         // Plan 12: the icon set shares the WorkspaceLook pattern, so a class naming only it is reported on its own.
         byte[] icons = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.WindowIconsProbe"), builder -> builder
             .withField("icons", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Icons"), ClassFile.ACC_PRIVATE));
         assertThat(projectionReaders(List.of(icons))).hasSize(1);
+        // Plan 15b: so does the toolbar's search.
+        byte[] search = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.WindowSearchProbe"), builder -> builder
+            .withField("search", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Search"), ClassFile.ACC_PRIVATE));
+        assertThat(projectionReaders(List.of(search))).hasSize(1);
     }
 
     /** Plan 8b (spec 16.1.8): the palette's strategies, its two views and two homes. */

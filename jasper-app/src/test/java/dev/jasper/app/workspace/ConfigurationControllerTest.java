@@ -92,7 +92,7 @@ class ConfigurationControllerTest {
             assertThat(first.tabHeight()).isEqualTo(44);
             assertThat(((JButton) first.toolbar().getComponent(0)).getText()).isNull();
             assertThat(first.status().isVisible()).isFalse();
-            assertThat(first.theme().chrome()).isSameAs(JasperTheme.bundled().generated(false));
+            assertThat(first.theme().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
             assertThat(retained.view().fontSize()).isEqualTo(19);
             retained.findBar().open(); retained.findBar().queryField().setText("alpha");
             first.newTab(HOME); // pending and hides the retained terminal
@@ -136,7 +136,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(45); assertThat(first.toolbar().isVisible()).isTrue();
             assertThat(first.currentPane().view().fontSize()).isEqualTo(20);
-            assertThat(first.theme().chrome()).as("the saved appearance applies").isSameAs(JasperTheme.bundled().generated(false));
+            assertThat(first.theme().chrome()).as("the saved appearance applies").isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
         });
     }
 
@@ -263,9 +263,9 @@ class ConfigurationControllerTest {
             assertThat(owners.getFirst().status().getText()).contains("Config warnings");
             assertThat(controller.shown().diagnostics()).anySatisfy(diagnostic -> {
                 assertThat(diagnostic.key()).isEqualTo("ui.appearance");
-                assertThat(diagnostic.message()).contains("Could not apply Slate Cobalt Light").contains("keeping the current appearance");
+                assertThat(diagnostic.message()).contains("Could not apply Jasper Meadow Light Light").contains("keeping the current appearance");
             });
-            assertThat(errors).singleElement().asString().contains("Slate Cobalt Light");
+            assertThat(errors).singleElement().asString().contains("Jasper Meadow Light Light");
         });
     }
 
@@ -290,7 +290,7 @@ class ConfigurationControllerTest {
             var published=new ArrayList<ResolvedTheme>();
             var listening=themes.subscribe((value,changed) -> published.add(value));published.clear();
             assertThatCode(() -> controller.accept(next)).doesNotThrowAnyException();
-            assertThat(themes.current().chrome()).isSameAs(JasperTheme.bundled().generated(false));
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
             assertThat(published).containsExactly(themes.current());
             assertThat(controller.shown().snapshot()).isEqualTo(next.snapshot());
             assertThat(controller.shown().diagnostics()).noneMatch(diagnostic -> diagnostic.message().contains("Could not apply"));
@@ -548,7 +548,7 @@ class ConfigurationControllerTest {
         };
         var broken = new java.util.concurrent.atomic.AtomicBoolean(false);
         var attempts = new ArrayList<GeneratedTheme>();
-        var dark = JasperTheme.bundled().generated(true); var light = JasperTheme.bundled().generated(false);
+        var dark = JasperTheme.bundled().generated(true); var light = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false);
         var errors = new ArrayList<String>();
         service = new ConfigService(file, false, configWorker, SwingUtilities::invokeLater);
         edt(() -> {
@@ -575,7 +575,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(themes.current().chrome()).isSameAs(light);
             assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
-            assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateCobalt(false, JasperTheme.bundled().matching(false)));
+            assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(false)));
             assertThat(attempts).containsExactly(dark, light, light);
             assertThat(errors).hasSize(1);
             owners.getFirst().selectVariant(true);
@@ -589,6 +589,11 @@ class ConfigurationControllerTest {
             assertThat(themes.current().chrome()).isSameAs(light);
             assertThat(attempts).containsExactly(dark, light, light, dev.jasper.app.appearance.ThemeTestSupport.generated(true), light);
         });
+    }
+
+    private static dev.jasper.app.appearance.ResolvedTheme meadowResolved(dev.jasper.ui.theme.TerminalScheme scheme) {
+        var light = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false);
+        return new dev.jasper.app.appearance.ResolvedTheme(light, light, dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(scheme));
     }
 
     private static Palette slateCobaltDarkPalette() {
@@ -669,10 +674,10 @@ class ConfigurationControllerTest {
 
     @Test void savedTerminalSchemeAppliesLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
         start("[ui]\nappearance='light'\n[terminal]\nscheme='slate-cobalt/dark'\n");
-        edt(() -> assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateCobalt(false, JasperTheme.bundled().matching(true))));
+        edt(() -> assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.bundled().matching(true))));
         reload("[ui]\nappearance='light'\n[terminal]\nscheme='match'\n");
         edt(() -> {
-            assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateCobalt(false, JasperTheme.bundled().matching(false)));
+            assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(false)));
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.") || d.key().startsWith("terminal."));
         });
     }

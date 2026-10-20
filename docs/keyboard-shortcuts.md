@@ -111,6 +111,8 @@ These actions have no default shortcut; give them one in Settings › Keymap (in
 | Notifications: Show Errors | `"notifications.errors"` | notifications |
 
 A plugin's tool window that has no toggle action of its own gets **Toggle** *title*, with the ID `<panel id>.toggle`.
+Under the [Enterprise look](enterprise.md#windows-and-menus) a tool window's toggle shortcut makes it the active tool
+window; pressed while the window shows but is not the active one, it activates the window instead of hiding it.
 
 The palette's view commands (**Toolbar: Icons and Labels**, **Show Rail**, **Themes…**, **Terminal Scheme: …** and the
 like) and their View › Show/Hide menu items (Toolbar, Status Bar, Rail) are not in the keymap and take no shortcut.

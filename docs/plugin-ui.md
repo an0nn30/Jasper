@@ -105,7 +105,9 @@ Tree draws ▶ and ▼, a PROMPT form puts its title in the dialog's header stri
 state shows its text and one button (its visible PRIMARY action, or else its first visible one) without a tile, a Chip
 is boxed in upper case, a ROUTE stack draws edged cells, an ORDERED list's commands move to a side column that acts
 on the selection, and in a toolbar view a DROPDOWN with a `PickerFace` draws as IntelliJ's run-configuration combo (its
-icon, the name cut with an ellipsis at 240 pixels, an arrow box).
+icon, the name cut with an ellipsis at 240 pixels, an arrow box). A tool window's stripe label starts with its icon,
+and six icon names draw IntelliJ's classic art in the toolbar, toolbar views and tool-window headers
+([plugin icons](sdk-icons.md#the-enterprise-looks-classic-art)).
 
 ### A grouped dialog
 
@@ -511,6 +513,10 @@ Only custom content reads colours, from [`Appearance`](sdk-reference.html#dev.ja
   thread (1 elsewhere, so tool windows and side panels stay opaque), fills its own background once with that alpha
   (`AlphaComposite.Src`, unantialiased rectangles) and keeps the components above it non-opaque. Keep selection,
   carets and bars solid. The Editor's `DocumentArea` is the reference.
+- Content that needs the look's faces reads `appearance().presentation()` (any thread): `uiFace()` and `dataFace()`
+  name the look's UI and data faces, empty for the platform's, and `bodySize()` is its body text size in points. They
+  are the look's own; the user's font settings are not reported
+  ([adapting to the look](plugin-authoring.md#adapting-to-the-look)).
 
 ## Testing
 

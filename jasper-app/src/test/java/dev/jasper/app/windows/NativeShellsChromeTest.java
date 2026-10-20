@@ -17,6 +17,50 @@ class NativeShellsChromeTest {
         for (var kind : AuxiliarySurface.Kind.values()) verifyChrome(kind);
     }
 
+    /**
+     * Plan 14 final review: under a classic title on Windows an auxiliary window has FlatLaf's title pane (Rulings 16), so a
+     * classic sheet drawn in it hangs below that pane, not over its caption and window buttons; the default look publishes nothing.
+     */
+    @Test void aWindowsClassicTitleStartsAnAuxiliaryWindowsSheetsBelowItsTitlePane() {
+        var controller = ThemeTestSupport.controller(false);
+        try {
+            var windowsClassic = new ShellChrome(false, true, true, true, false);
+            var manager = new AuxiliarySurface("test", "Credential Vault", AuxiliarySurface.Kind.WINDOW, false,
+                new Dimension(900, 555), null, null, ignored -> { throw new AssertionError(); });
+            var root = new JRootPane();
+            int[] announced = {0};
+            root.addPropertyChangeListener(dev.jasper.app.platform.TitleInset.CHANGED, event -> announced[0]++);
+            try (var chrome = NativeShells.installChrome(root, manager, windowsClassic)) {
+                assertThat(dev.jasper.app.platform.TitleInset.of(root)).as("no title pane before FlatLaf decorates").isZero();
+                int before = announced[0];
+                // FlatLaf decorates a Windows frame when its peer is created, after the chrome is installed.
+                root.setWindowDecorationStyle(JRootPane.FRAME);
+                root.setSize(900, 620); layout(root);
+                var loop = java.awt.Toolkit.getDefaultToolkit().getSystemEventQueue().createSecondaryLoop();
+                javax.swing.SwingUtilities.invokeLater(loop::exit); loop.enter();
+                assertThat(announced[0]).as("the inset is announced once decorations arrive").isGreaterThan(before);
+                int top = root.getContentPane().getY();
+                assertThat(top).as("FlatLaf's title pane").isPositive();
+                assertThat(dev.jasper.app.platform.TitleInset.of(root)).isEqualTo(top);
+                var body = new JPanel(); body.setPreferredSize(new Dimension(440, 300));
+                var sheet = new dev.jasper.ui.swing.ClassicDialog(dev.jasper.app.testsupport.KitTestSupport.context(), body, "Add Login",
+                    dev.jasper.ui.model.Nodes.Hue.BLUE, dev.jasper.ui.swing.ClassicDialog.Placement.SHEET);
+                var addLogin = WindowOverlay.classic(root, sheet);
+                try {
+                    addLogin.show();
+                    assertThat(sheet.getY()).as("joined under the title pane").isEqualTo(top);
+                } finally { addLogin.close(); }
+            }
+            var standard = new JRootPane();
+            standard.setWindowDecorationStyle(JRootPane.FRAME); standard.updateUI();
+            try (var chrome = NativeShells.installChrome(standard, manager, new ShellChrome(false, false, false, false, false))) {
+                standard.setSize(900, 620); layout(standard);
+                assertThat(standard.getContentPane().getY()).isPositive();
+                assertThat(dev.jasper.app.platform.TitleInset.of(standard)).as("the default look publishes no inset").isZero();
+            }
+        } finally { controller.close(); }
+    }
+
     /** A dialog sized to its content (every plugin dialog, a confirmation) is fixed-size; only a dialog that remembers its bounds resizes. */
     @Test void onlyADialogThatRemembersItsBoundsCanBeResized() {
         java.util.function.BiFunction<String, Boolean, AuxiliarySurface> dialog = (id, sheet) -> {
@@ -140,7 +184,9 @@ class NativeShellsChromeTest {
                 assertThat(bar.getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(30));
                 assertThat(bar.controlsHeight()).as("controls centred 21 down").isEqualTo(2 * com.formdev.flatlaf.util.UIScale.scale(21));
                 var title = (JLabel) bar.getComponent(0);
-                assertThat(title.getY() + title.getHeight() / 2).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(21));
+                int desiredCenter = com.formdev.flatlaf.util.UIScale.scale(21);
+                assertThat(title.getY() + title.getHeight() / 2).as("title stays inside its band when the native font is tall")
+                    .isEqualTo(Math.min(desiredCenter, bar.getHeight() - (title.getHeight() + 1) / 2));
                 assertThat(row(bar, bar.getHeight() - line)).as("no rule; the band continues the dialog")
                     .isEqualTo(semantic.color(dev.jasper.ui.theme.SemanticColor.SURFACE_DIALOG));
             }

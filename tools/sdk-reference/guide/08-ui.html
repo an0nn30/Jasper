@@ -165,7 +165,11 @@ ACTIONS stack, first, last or beside another separator;</li>
 {@code window}, {@code window.add} and {@code zoom}.
 They follow the theme and the look. {@code run}, IntelliJ's classic Run triangle, and {@code application}, its
 run-configuration icon, are authored artwork: controls draw them in their own colours, and panels, prompts and tiles
-draw a monochrome glyph of the same name. These two names need SDK 0.18.1.</p>
+draw a monochrome glyph of the same name. These two names need SDK 0.18.1. Under the Enterprise look a tool
+window's stripe label starts with its icon, and IntelliJ's classic art draws {@code network}, {@code folder},
+{@code tunnel}, {@code download}, {@code server} and {@code bell} there, and {@code add}, {@code split}, {@code zoom},
+{@code settings}, {@code window.add} and {@code search} in the toolbar, toolbar views, the status bar and tool-window
+headers; view bodies keep the ordinary art.</p>
 <p>A plugin adds its own with {@link UiKit#registerIcon(IconAsset)}. An {@link IconAsset}'s name is
 {@code <plugin id>:<name>}, the name a lowercase letter followed by lowercase letters, digits, dots and dashes; its artwork is SVG path data on a 16-unit grid, starting
 with a move and using only the M, L, H, V, C, S, Q, T, A and Z commands, at most 8,192 characters and 2,048 commands, with
@@ -195,4 +199,21 @@ tabs live, and {@link Appearance#workspaceOpacity(Component)} for the alpha of a
 thread, and again after {@link Appearance#onChanged(Consumer)} or {@link Appearance#onWorkspaceChanged(Consumer)}: the
 user can change the theme, and the chrome and the workspace can follow different themes. On the event bus,
 {@link AppEvents#THEME_CHANGED} announces each change of the chrome's theme or the interface font.</p>
+
+<h3>The look</h3>
+<p>Views follow the look without help too. A plugin that composes differently under a look, or custom content that needs
+the look's faces, reads {@link Appearance#presentation()}: a {@link dev.jasper.sdk.ui.Presentation} that says whether
+the look starts from the classic catalog, its icon set, whether tool windows are reached by icon rails or labelled
+stripes, the title bar and where the menus are on this platform, whether the toolbar offers Search Everywhere as a
+field or an icon, the look's UI and data faces (empty for the platform's), its body text size and its default toolbar
+height. Jasper chooses the look at start, so the value is the same for every plugin until it restarts, and it is safe
+from any thread: read it once in {@code start}. It reports the look's own faces, sizes, title bar and menus, not the
+user's font, toolbar height, decoration or view settings. Remote, Credential Vault and File Server compose their
+classic layouts when {@link dev.jasper.sdk.ui.Presentation#classic()} is true, and the Sample starts its tool window in
+the bottom strip under labelled stripes:</p>
+<pre><code class="language-java">boolean classic = context.appearance().presentation().classic();
+Anchor side = context.appearance().presentation().toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;</code></pre>
+<p>{@link Appearance#presentation()} needs SDK 0.18.2. In a test,
+{@link dev.jasper.sdk.testing.FakePluginHost#setPresentation(Presentation)} with
+{@link dev.jasper.sdk.testing.FakePresentations#CLASSIC} runs the plugin under the Enterprise look's values.</p>
 </section>

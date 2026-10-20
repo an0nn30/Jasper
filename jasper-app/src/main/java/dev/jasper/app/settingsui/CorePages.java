@@ -249,8 +249,14 @@ public final class CorePages {
     /** The whole tree for one dialog, in display order, with the notification groups and pages the application supplies. */
     public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
                                                                    NotificationGroupChoices groups, Pages supplied) {
+        return pages(appearance, system, shells, groups, supplied, com.formdev.flatlaf.util.SystemInfo.isMacOS);
+    }
+
+    /** The whole tree with an explicit workspace-glass capability, for host-specific previews. */
+    static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
+                                                          NotificationGroupChoices groups, Pages supplied, boolean glass) {
         return context -> {
-            var specs = specs(appearance, system, shells, context.navigate(), com.formdev.flatlaf.util.SystemInfo.isMacOS, groups);
+            var specs = specs(appearance, system, shells, context.navigate(), glass, groups);
             var all = new ArrayList<SettingsPage>();
             Function<String, Supplier<List<SettingsPage>>> childrenOf = id ->
                 () -> all.stream().filter(page -> page.parent().equals(Optional.of(id))).toList();

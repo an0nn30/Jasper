@@ -46,6 +46,17 @@ way. `ScopeSpec.withIcon` is checked like any other name, but neither palette dr
 run-configuration icon. Controls draw them in their own colours under every look; panels, prompts and tiles draw a
 monochrome glyph of the same name. The two names need SDK 0.18.1.
 
+## The Enterprise look's classic art
+
+Under the Enterprise look a tool window's stripe label starts with its `PanelSpec` icon at 13 pixels: `network`,
+`folder`, `tunnel`, `download`, `server` and `bell` draw IntelliJ's classic tool-window icons, and any other name,
+registered artwork included, its monochrome glyph in the label's colour; an identity name such as `more.vertical` keeps
+its authored art.
+
+IntelliJ's classic icons also draw `add`, `split`, `zoom`, `settings`, `window.add` and `search` in the toolbar (action
+buttons and toolbar views), the status bar and tool-window headers (`PanelHeader` actions and a panel's own header
+controls). In a tool window's or window's body these names keep their ordinary art.
+
 ## Registering artwork
 
 Register a monochrome path on a 16-unit grid with [`UiKit.registerIcon`](sdk-reference.html#dev.jasper.sdk.ui.UiKit)

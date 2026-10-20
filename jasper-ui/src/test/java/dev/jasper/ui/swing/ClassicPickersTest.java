@@ -73,7 +73,20 @@ class ClassicPickersTest {
                     assertThat(arrow(image, ThemePainting.painted(context, pairs.get(5)))).as(id + " ▼").isTrue();
                     if (!id.equals("credential.input")) {
                         int ink = firstInk(image, ThemePainting.color(context, SemanticColor.TEXT_PRIMARY), 2, 3, h - 3);
-                        assertThat(ink).as(id + " leads with its text, no tile").isBetween(pad - 1, pad + 4);
+                        // Rasterize the same leading text independently: glyph bearings and thin stems differ by native face.
+                        var reference = new BufferedImage(image.getWidth(), h, BufferedImage.TYPE_INT_ARGB);
+                        for (int y = 0; y < h; y++) for (int x = 0; x < reference.getWidth(); x++)
+                            reference.setRGB(x, y, image.getRGB(pad - 2, y));
+                        var graphics = reference.createGraphics();
+                        try {
+                            ThemePainting.antialias(graphics);
+                            graphics.setFont(ThemePainting.font(context, dev.jasper.ui.metrics.Typography.Role.BODY));
+                            graphics.setColor(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY));
+                            var metrics = graphics.getFontMetrics();
+                            graphics.drawString(VIA.primary(), pad, (h - metrics.getHeight()) / 2 + metrics.getAscent());
+                        } finally { graphics.dispose(); }
+                        assertThat(ink).as(id + " leads with its text, no tile").isEqualTo(
+                            firstInk(reference, ThemePainting.color(context, SemanticColor.TEXT_PRIMARY), 2, 3, h - 3));
                     }
                 }
             } finally { release(context); }

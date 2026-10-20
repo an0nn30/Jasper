@@ -30,8 +30,6 @@ public final class PanelSurfaceFixture implements AutoCloseable {
     private final StagedVaultHost vault;
     private final WorkspaceAppearanceFixture appearance;
     private final PluginClassLoader loader;
-    /** The staged Enterprise plugin's loader in Enterprise mode (plan 10a), else null. */
-    private final PluginClassLoader enterprise;
     private final ResolvedTheme theme;
     /** Enterprise mode frames the panel's header as plan 7's flush strip, as the dock does under Enterprise. */
     private final boolean flush;
@@ -47,8 +45,8 @@ public final class PanelSurfaceFixture implements AutoCloseable {
     public PanelSurfaceFixture(Path home, ResolvedTheme theme, String panel) throws Exception { this(home, theme, panel, false); }
 
     /**
-     * {@code enterprise}: the staged Enterprise plugin starts first in the same host and the plugin may see its API, so it
-     * finds Workstation and composes its classic layout (plan 10a). The caller installs the Enterprise kit and theme first
+     * {@code enterprise}: the host reports the Enterprise presentation before the plugin starts, so it composes its
+     * classic layout (plan 10a, plan 15a). The caller installs the Enterprise kit and theme first
      * ({@code EnterpriseLook.controller}) and passes the matching {@code theme}.
      */
     public PanelSurfaceFixture(Path home, ResolvedTheme theme, String panel, boolean enterprise) throws Exception {
@@ -58,9 +56,9 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         vault.createVault("synthetic-panels-password");
         onEdt(() -> vault.surface("Credential Vault").requestClose());
         vault.invoke("dev.jasper.vault.lock");
-        this.enterprise = enterprise ? StagedEnterprise.start(vault.host) : null;
-        Map<String, ClassLoader> exports = enterprise ? Map.of("dev.jasper.vault.api", vault.loader, "dev.jasper.enterprise.api", this.enterprise) : Map.of("dev.jasper.vault.api", vault.loader);
-        var optional = enterprise ? Set.of("dev.jasper.vault", "dev.jasper.enterprise") : Set.of("dev.jasper.vault");
+        if (enterprise) vault.host.presentation = StagedVaultHost.enterprisePresentation();
+        Map<String, ClassLoader> exports = Map.of("dev.jasper.vault.api", vault.loader);
+        var optional = Set.of("dev.jasper.vault");
         boolean files = panel.equals(FILE_SERVERS);
         String id = files ? "dev.jasper.fileserver" : "dev.jasper.remote";
         var staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve(id);
@@ -83,8 +81,8 @@ public final class PanelSurfaceFixture implements AutoCloseable {
             constructor.setAccessible(true);
             plugin = (Plugin) constructor.newInstance((java.util.concurrent.Executor) SwingUtilities::invokeLater,
                 (Function<Object, Optional<Object>>) c -> Optional.empty(), (BiFunction<java.time.Duration, Runnable, Runnable>) (delay, task) -> () -> { }, ssh);
-            onEdt(() -> vault.host.start(new HostedPlugin(StagedRemoteHost.REMOTE, Set.of(), enterprise ? Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise")
-                : Set.of("dev.jasper.vault", "dev.jasper.editor"), Set.of("dev.jasper.remote.api"), loader, () -> plugin)));
+            onEdt(() -> vault.host.start(new HostedPlugin(StagedRemoteHost.REMOTE, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"),
+                Set.of("dev.jasper.remote.api"), loader, () -> plugin)));
         }
         StagedVaultHost.settle();
         root = panel.equals(TUNNELS) ? "tunnels" : panel.equals(SFTP) ? "sftp" : panel.equals(SESSIONS) ? "sessions" : "fileserver.panel";
@@ -340,6 +338,6 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         catch (ReflectiveOperationException e) { throw new AssertionError(e); }
     }
     @Override public void close() throws Exception {
-        try { onEdt(site::notifyClosed); } finally { try { vault.close(); } finally { try { loader.close(); } finally { if (enterprise != null) enterprise.close(); } } }
+        try { onEdt(site::notifyClosed); } finally { try { vault.close(); } finally { loader.close(); } }
     }
 }
