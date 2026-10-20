@@ -60,12 +60,36 @@ class PreviewSearchTest {
             pane.close();
         });
     }
+    @Test void rejectedWholeWordCandidateCanOverlapTheLaterValidMatch() throws Exception {
+        var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("xa-a-a"));
+        SwingUtilities.invokeAndWait(() -> {
+            assertLiteralMatch(pane,"a-a",true,"a-a",true);
+            pane.close();
+        });
+    }
+    @Test void rejectedWholeWordCandidateRetainsOriginalUnicodeOffsets() throws Exception {
+        var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("\u0130 x\u0130-\u0130-\u0130"));
+        SwingUtilities.invokeAndWait(() -> {
+            assertLiteralMatch(pane,"\u0130-\u0130",true,"\u0130-\u0130",true);
+            pane.close();
+        });
+    }
+    @Test void acceptedWholeWordMatchesStillAdvanceWithoutOverlapping() throws Exception {
+        var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("a-a-a"));
+        SwingUtilities.invokeAndWait(() -> {
+            assertLiteralMatch(pane,"a-a",true,"a-a");
+            pane.close();
+        });
+    }
     private static void assertLiteralMatch(PreviewPane pane,String needle,boolean word,String selected) {
+        assertLiteralMatch(pane,needle,word,selected,false);
+    }
+    private static void assertLiteralMatch(PreviewPane pane,String needle,boolean word,String selected,boolean last) {
         var search=new PreviewSearch(pane);var context=query(needle,false,word);
         final String text;
         try {text=pane.editor().getDocument().getText(0,pane.editor().getDocument().getLength());}
         catch(javax.swing.text.BadLocationException impossible){throw new AssertionError(impossible);}
-        int expected=text.indexOf(selected);assertThat(expected).isNotNegative();
+        int expected=last?text.lastIndexOf(selected):text.indexOf(selected);assertThat(expected).isNotNegative();
         assertThat(search.markAll(context)).isEqualTo(1);
         var highlights=pane.editor().getHighlighter().getHighlights();assertThat(highlights).hasSize(1);
         assertThat(highlights[0].getStartOffset()).isEqualTo(expected);

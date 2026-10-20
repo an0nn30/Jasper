@@ -68,12 +68,15 @@ final class PreviewSearch {
             // Quoting keeps literal queries literal; retain Source's letter/digit word boundaries.
             var matcher = Pattern.compile(Pattern.quote(query),
                 RSyntaxUtilities.getPatternFlags(context.getMatchCase(), 0)).matcher(text);
-            while (matcher.find()) {
+            int next = 0;
+            while (matcher.find(next)) {
                 int start = matcher.start(), end = matcher.end();
                 boolean word = !context.getWholeWord()
                     || (start == 0 || !Character.isLetterOrDigit(text.charAt(start - 1)))
                     && (end == text.length() || !Character.isLetterOrDigit(text.charAt(end)));
                 if (word) result.add(new Match(start, end));
+                // A rejected boundary must not hide a later candidate overlapping this one.
+                next = word ? end : text.offsetByCodePoints(start, 1);
             }
         }
         return result;
