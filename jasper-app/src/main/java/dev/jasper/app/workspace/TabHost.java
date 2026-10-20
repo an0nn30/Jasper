@@ -35,6 +35,7 @@ final class TabHost {
             present(tab, terminal);
         };
         terminal.onEmpty = () -> owner.closeTab(tab);
+        terminal.onRenamed = owner::layoutChanged;
         terminal.onError = (message, cause) -> owner.onLaunchFailure.accept(message, cause);
         terminal.lastInWindow = () -> owner.tabCount() == 1;
         terminal.configure = ready -> configure(tab, ready);
@@ -52,6 +53,7 @@ final class TabHost {
         if (!(tab.content() instanceof TerminalContent terminal)) return;
         terminal.onChanged = () -> { };
         terminal.onEmpty = () -> { };
+        terminal.onRenamed = () -> { };
         terminal.onError = (message, cause) -> { };
         terminal.lastInWindow = () -> false;
         terminal.configure = ready -> { };
@@ -103,7 +105,11 @@ final class TabHost {
                 () -> goTo(tab, pane)));
             owner.report(new TerminalEvent.CommandFinished(pane.id(), command, exitStatus, duration, workingDirectory, remote));
         };
-        pane.onDirectoryChanged = (directory, remote) -> owner.report(new TerminalEvent.DirectoryChanged(pane.id(), directory, remote));
+        pane.onDirectoryChanged = (directory, remote) -> {
+            owner.report(new TerminalEvent.DirectoryChanged(pane.id(), directory, remote));
+            // workspace.toml saves the last local directory (workspace tabs spec 13).
+            owner.layoutChanged();
+        };
         pane.onBell = () -> owner.report(new TerminalEvent.Bell(tabId, pane.id()));
         pane.onStarted = () -> owner.report(new TerminalEvent.SessionStarted(pane.id()));
         pane.onExited = status -> owner.report(new TerminalEvent.SessionExited(pane.id(), status));

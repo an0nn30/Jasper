@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.TabContent;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.terminals.SessionRequest;
@@ -30,6 +31,8 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
     private Icon terminalIcon;
     /** The pane changed: its title, directory, state or size. */
     Runnable onChanged = () -> { };
+    /** The user renamed the tab, which {@code workspace.toml} saves. */
+    Runnable onRenamed = () -> { };
     /** The pane asked to close (its shell exited under a closing policy, its provider ended, a failed launch). */
     Runnable onEmpty = () -> { };
     BiConsumer<String, Throwable> onError = (message, cause) -> { };
@@ -66,9 +69,23 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
     /** The tab's title: the name the user gave it, else the shell's title, else its folder's name, else "Terminal". */
     String title() { return state.title(pane.tabTitle(), pane.directory()); }
     /** Names the tab; blank goes back to the automatic title. */
-    void rename(String name) { state.rename(name); onChanged.run(); }
+    void rename(String name) { state.rename(name); onChanged.run(); onRenamed.run(); }
     /** The name the user gave the tab, kept apart from the shell's title (workspace plan 6 saves it). */
     Optional<String> renamed() { return state.renamed(); }
+
+    /**
+     * What {@code workspace.toml} saves for this tab (workspace tabs spec 13): the name the user gave it, its shell's last
+     * local directory and its profile. A directory on another host is saved as where a new shell starts, and a tab that ran
+     * a program comes back as a plain shell. A session a plugin provides is not a shell: it is saved as its plugin says.
+     *
+     * @return the record; empty for a provided session's tab and once the tab has closed
+     */
+    Optional<WorkspaceFile.TabRecord.Terminal> record() {
+        if (closed || pane.snapshot().providerId().isPresent()) return Optional.empty();
+        Path directory = pane.localDirectory().isEmpty() ? null : pane.inheritableDirectory();
+        return Optional.of(new WorkspaceFile.TabRecord.Terminal(renamed().orElse(""), directory == null ? "" : directory.toString(),
+            pane.profile().orElse("")));
+    }
 
     /** The provided session's icon, or the host terminal icon for a local shell. */
     Icon icon() {
@@ -99,7 +116,7 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
         closed = true;
         pane.close();
         removeAll();
-        onChanged = () -> { }; onEmpty = () -> { }; onError = (message, cause) -> { };
+        onChanged = () -> { }; onRenamed = () -> { }; onEmpty = () -> { }; onError = (message, cause) -> { };
         lastInWindow = () -> false; configure = ready -> { };
     }
 }

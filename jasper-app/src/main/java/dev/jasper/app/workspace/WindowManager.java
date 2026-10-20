@@ -8,10 +8,14 @@ import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Origin;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.TabId;
+import dev.jasper.app.layout.WindowLayout;
+import dev.jasper.app.persistence.WorkspaceFile;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -626,6 +630,39 @@ public final class WindowManager {
         } finally {
             openings--;
         }
+    }
+
+    /**
+     * What {@code workspace.toml} saves now (workspace tabs spec 8 and 13; parent tabs spec 9): the main window, its full
+     * windows and its pane windows, each with where it is, what it holds (its parent tabs and the one that shows, or a
+     * pane window's layout and origin) and what each of its tabs needs to come back. A tab that cannot come back is taken
+     * out first, as closing it would take it out ({@code WorkspaceFile.keeping}): a parent tab left with none goes, a
+     * child window left with none is left out (workspace plan 2 Rulings 20), and the main window may be empty.
+     *
+     * @return the snapshot; empty while no main window is open, or while it opens
+     */
+    public Optional<WorkspaceFile.Snapshot> snapshot() {
+        requireEdt();
+        if (main == null || openingMain) return Optional.empty();
+        var records = new ArrayList<WorkspaceFile.WindowRecord>();
+        for (JasperWindow window : windows()) windowRecord(window).ifPresent(records::add);
+        return Optional.of(new WorkspaceFile.Snapshot(records));
+    }
+
+    private Optional<WorkspaceFile.WindowRecord> windowRecord(JasperWindow window) {
+        var tabs = new HashMap<TabId, WorkspaceFile.TabRecord>();
+        for (Tab tab : window.content().tabs()) tabRecord(tab).ifPresent(saved -> tabs.put(tab.id(), saved));
+        Optional<WindowLayout> kept = WorkspaceFile.keeping(window.content().windowLayout(), tabs::containsKey, window.isMain());
+        if (kept.isEmpty()) return Optional.empty();
+        JasperWindow.Placement placement = window.placement();
+        return Optional.of(new WorkspaceFile.WindowRecord(window.isMain() ? WorkspaceFile.Role.MAIN : WorkspaceFile.Role.CHILD,
+            placement.bounds(), placement.extendedState(), kept.get(), tabs));
+    }
+
+    /** What a tab needs to come back: a terminal tab's name, directory and profile; any other tab is not saved. */
+    private Optional<WorkspaceFile.TabRecord> tabRecord(Tab tab) {
+        if (tab.content() instanceof TerminalContent terminal) return terminal.record().map(WorkspaceFile.TabRecord.class::cast);
+        return Optional.empty();
     }
 
     /**

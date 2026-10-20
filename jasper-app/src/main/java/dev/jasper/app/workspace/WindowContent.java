@@ -157,6 +157,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     Runnable onMinimumSizeChanged = () -> {};
     /** What Close Window does: the window it belongs to sets it (workspace tabs spec 6.4). */
     Runnable onCloseWindow = () -> {};
+    /** What {@code workspace.toml} saves of this window changed: its layout, or a terminal tab's name or directory (spec 13). */
+    Runnable onLayoutChanged = () -> {};
     static final int DEFAULT_TAB_HEIGHT = 30;
     static final int MIN_TAB_HEIGHT = 20;
     static final int MAX_TAB_HEIGHT = 72;
@@ -1251,7 +1253,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (commandPalette != null && now != paletteTab) { paletteTab = now; commandPalette.tabChanged(); }
         update();
         if (refocus && view == parentTabs.active()) focusSelected();
+        // Every parent tab's layout change and every parent-tab change ends here (workspace plan 6a Rulings 8 and 28).
+        layoutChanged();
     }
+
+    /** Something {@code workspace.toml} saves of this window changed (workspace tabs spec 13). */
+    void layoutChanged() { if (!closed) onLayoutChanged.run(); }
 
     /** The selected plugin tab; null while a terminal tab is selected or the window is empty. */
     public Tab selectedContent() { Tab tab = selectedTab(); return tab != null && tab.kind() == Tab.Kind.HOSTED ? tab : null; }
@@ -2294,6 +2301,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; fileChooser = folder -> java.util.Optional.empty();
+        onLayoutChanged = () -> {};
         activityListeners.clear();
         anyWindowActive = () -> false;
         // A tab that failed to close does not leave the window half closed; its failure still reaches the caller.
