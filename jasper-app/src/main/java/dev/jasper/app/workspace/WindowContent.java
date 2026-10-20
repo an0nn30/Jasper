@@ -174,6 +174,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private String frameTitle = "Jasper";
     /** The Windows classic title bar's title under a classic title (Enterprise plan 14), or null until decorated. */
     private ClassicWindowTitle classicWindowTitle;
+    /** A Windows child window's title pane colours, which follow the theme and the window's activity; null elsewhere. */
+    private Runnable childTitleColors;
     Consumer<JComponent> showConfigDiagnostics = control -> {
         if (!followsThemeAppearance) JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
         else showOptionDialog(new JOptionPane(control, JOptionPane.PLAIN_MESSAGE), "Configuration");
@@ -436,10 +438,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, ClassicWindowTitle.BAR_HEIGHT);
                 dev.jasper.app.platform.TitleInset.publish(root, () -> root.getContentPane() == null ? 0 : root.getContentPane().getY());
             }
-            content.onThemeChanged = theme -> {
+            // FlatLaf paints the title in this one colour, active or not, so a classic title dims it here while the window is
+            // inactive, as the main window's does (Rulings 14).
+            Runnable colors = () -> {
                 root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, ThemeZone.color(null, SemanticColor.SURFACE_APP));
-                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
+                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, classic
+                    ? dev.jasper.ui.theme.SurfaceContrast.painted(dev.jasper.ui.swing.FlatLafInstaller.installedTheme(),
+                        content.active ? WindowPairs.TITLE : WindowPairs.INACTIVE_TITLE)
+                    : ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
             };
+            content.childTitleColors = colors;
+            content.onThemeChanged = theme -> colors.run();
         }
         content.onThemeChanged.accept(content.theme());
         content.followsThemeAppearance = bar == null && look.followThemeAppearance() && content.macOs;
@@ -1820,7 +1829,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
         if (!value) { dockDrag.cancel(); tabDrag.cancelFrom(this); }
         if (classicWindowTitle != null) classicWindowTitle.setActive(value);
-        active = value; update();
+        active = value;
+        if (childTitleColors != null) childTitleColors.run();
+        update();
     }
     void setToolbarMode(ToolbarMode mode) {
         toolbarMode = Objects.requireNonNull(mode); refreshChromeVisibility(); updateActions();
@@ -1867,6 +1878,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         refreshTabs();
         if (titleBand != null) { titleBand.close(); titleBand = null; }
         onThemeChanged = theme -> {};
+        childTitleColors = null;
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; fileChooser = folder -> java.util.Optional.empty();

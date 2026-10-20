@@ -44,6 +44,8 @@ class WindowManagerTest {
     /** What the closing hooks heard, with whether the window's content was still whole. */
     private final List<String> closings = new ArrayList<>();
     private boolean quitting, failFrames, reenter, failClosing, reenterAlways, failEarly;
+    /** The chrome the main window is composed with; child windows always compose with the standard one. */
+    private WorkspaceChrome mainChrome = WorkspaceChrome.STANDARD;
     /** How many times the main window was composed. */
     private int mainCompositions;
     /** The tab a plugin asked for while the main window was being composed. */
@@ -87,7 +89,8 @@ class WindowManagerTest {
         boolean macOs = System.getProperty("os.name").startsWith("Mac");
         var content = DesktopTestSupport.track(new WindowContent(opening.role(), launcher, opening.directory(), opening.empty(),
             directory -> manager.openTerminalWindow(directory), () -> { }, opening.emptied(), ThemeTestSupport.controller(true),
-            KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs,
+            opening.role() == WindowRole.MAIN ? mainChrome : WorkspaceChrome.STANDARD));
         content.connectContributions(model);
         return content;
     }
@@ -370,6 +373,31 @@ class WindowManagerTest {
             model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
             assertThat(main.content().dock().visible("test.panel")).as("still showing").isTrue();
             assertThat(events).as("and the main window comes forward").containsExactly("front main");
+        });
+        launch();
+    }
+
+    /**
+     * A user's View toggle from a child window reaches the main window as an activating show: under flush frames the panel
+     * becomes the active tool window there, and a second toggle never hides it.
+     */
+    @Test void anActivatingPanelToggleFromAChildWindowShowsAndActivatesThePanel() throws Exception {
+        mainChrome = DockChromeTest.classicDock();
+        edt(() -> {
+            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
+            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
+            MainWindow main = manager.main().orElseThrow();
+            assertThat(main.content().dock().visible("test.panel")).isFalse();
+            events.clear();
+            model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
+            assertThat(main.content().dock().visible("test.panel")).as("shown in the main window").isTrue();
+            assertThat(main.content().area().focusedSlot()).as("and the active tool window there").hasValue(Slot.LEFT_TOP);
+            assertThat(events).as("the main window comes forward").containsExactly("front main");
+            events.clear();
+            model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
+            assertThat(main.content().dock().visible("test.panel")).as("a routed toggle never hides").isTrue();
+            assertThat(main.content().area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            assertThat(events).containsExactly("front main");
         });
         launch();
     }

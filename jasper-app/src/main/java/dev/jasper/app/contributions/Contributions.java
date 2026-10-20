@@ -57,7 +57,9 @@ public final class Contributions {
         public enum Op {
             SHOW, HIDE, TOGGLE,
             /** A toggle by the user's View action: a panel it shows becomes the active tool window under flush frames (Enterprise plan 12 Rulings 18). */
-            ACTIVATING_TOGGLE
+            ACTIVATING_TOGGLE,
+            /** A user's View toggle from a child window, as the main window receives it: shows the panel and makes it the active tool window under flush frames. */
+            ACTIVATING_SHOW
         }
     }
 

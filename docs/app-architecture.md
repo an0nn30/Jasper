@@ -245,7 +245,7 @@ The Enterprise presentation's classic title (`title_bar = "classic"`) is Intelli
   auxiliary frame keeps its system title bar and shows the minimal File menu there.
 - On Windows, FlatLaf's title pane embeds `CollapsingMenuBar` and `ClassicWindowTitle`, the window title left-aligned
   after the menus, over a 1 px rule. A child window's title pane is 28 px in the toolbar's colour and holds FlatLaf's
-  title alone.
+  title alone, dimmed while the window is inactive.
 - On Linux it is the system title bar.
 
 `TitleInset` keeps classic in-window dialogs and overlays below either, and below the FlatLaf title pane of a Windows

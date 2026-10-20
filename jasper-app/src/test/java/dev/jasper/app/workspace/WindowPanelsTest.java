@@ -48,6 +48,10 @@ class WindowPanelsTest {
         model.requestPanel(new Contributions.PanelRequest(owner.id(), id, Contributions.PanelRequest.Op.TOGGLE));
     }
 
+    private static void activatingShow(Contributions model, WindowContent owner, String id) {
+        model.requestPanel(new Contributions.PanelRequest(owner.id(), id, Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+    }
+
     private static List<String> tips(DockStripe stripe) { return stripe.buttons().stream().map(AbstractButton::getToolTipText).toList(); }
 
     private static Rectangle in(JComponent root, Component component) {
@@ -168,6 +172,65 @@ class WindowPanelsTest {
             events.clear();
             toggle(model, owner, "dev.x.log");
             assertThat(events).as("a plugin's toggle still hands focus back").containsExactly("transfers:false", "focus", "log:true");
+        });
+    }
+
+    /** A child window's View toggle reaches the main window as an activating show: it shows the panel and activates it. */
+    @Test void underFlushFramesAnActivatingShowOfAHiddenPanelMakesItTheFocusedToolWindow() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            activatingShow(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            activatingShow(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("a show never hides").isNotNull();
+            activatingShow(model, owner, "dev.x.unknown");
+            assertThat(owner.area().focusedSlot()).as("a panel this window does not have changes nothing").hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    @Test void underFlushFramesAnActivatingShowThatReplacesAWindowDoesNotHandFocusBack() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            List<String> events = new ArrayList<>();
+            // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
+            model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+            for (String name : List.of("log", "transfers"))
+                model.addPanel("dev.x." + name, name, new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    site.onVisibility(visible -> events.add(name + ":" + visible));
+                    return new JLabel(name);
+                });
+            activatingShow(model, owner, "dev.x.log");
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            activatingShow(model, owner, "dev.x.transfers");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isInstanceOfSatisfying(JLabel.class, label -> assertThat(label.getText()).isEqualTo("transfers"));
+            assertThat(events).as("no hand-back to the terminal").containsExactly("log:false", "transfers:true");
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    @Test void underFlushFramesAnActivatingShowOfAVisiblePanelActivatesIt() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("a plugin's toggle activates nothing").isEmpty();
+            activatingShow(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
         });
     }
 

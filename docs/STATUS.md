@@ -1,5 +1,25 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs: local main merged in (Enterprise plans 12 to 14) — 2026-10-19** (`claude/workspace-tabs`, the merge
+`23436efc3` of local main `f78bb0385`, then the fixes `5e709850c` and `94c91e6d2` and "Merge fixes: a child window's
+activating toggle activates, its Windows title dims"). The merge had 22 conflicts; the merge commit lists the resolutions.
+Ports of main into the branch's replacements, for the user to confirm: (1) a child window takes the classic title: on
+macOS `WindowContent.mountChild` gives it `MacTitleBand`, the vibrant appearance and `TitleInset`, and unfolds the screen
+menus; on Windows it gets a 28 px FlatLaf title pane in the toolbar's colour that publishes `TitleInset` and dims while
+the window is inactive (FlatLaf paints the title in one colour, so `mountChild` repicks `WindowPairs.TITLE` or
+`INACTIVE_TITLE` from `setActive`); (2) a child window's `ACTIVATING_TOGGLE` routes to the main window as
+`Op.ACTIVATING_SHOW`, which shows the panel and makes it the active tool window under flush frames, as IntelliJ's
+detached editor does (a routed toggle never hides, and a plugin's `TOGGLE` stays non-activating). SDK 0.20.0 includes
+main's 0.18.1 additions, and Enterprise is 0.2.0. Remote 0.14.0 carries both sides' changes, main's icon-only GHOST
+buttons and the branch's SDK 0.20; v1.0.0 shipped 0.13.0, and neither 0.14.0 was released. The fixes also close the SDK
+README's parenthesis and correct `ShellLook`'s Javadoc (the main window's menu row; every window frame's classic title).
+`./gradlew check` passes: 3921 app tests, 4913 Editor, 930 UI, 544 Remote, 459 terminal, 285 File Server, 221 Vault,
+205 testkit, 151 Buddy, 99 Indexer, 94 SDK, 41 History, 14 sample, 13 Snippets and 3 Enterprise tests, 0 failures
+(19 app, 5 terminal and 1 Vault test skipped). GUI checks for the user: a child window under Enterprise on macOS shows the
+band, the traffic lights, the screen menus and Compact; a child window under Enterprise on Windows shows the 28 px title
+pane with overlays below it, and its title dims when the window is inactive; View > a tool window from a child window
+activates it in the main window. Not merged, not pushed.
+
 **Credential Vault: the manager is a dialog over the main window again — 2026-10-20** (`claude/workspace-tabs`, one
 commit on `bba5c472e`). The user decided on 2026-10-19: "Make the Vault manager a separate dialog window that floats above
 the main window. That needs no SDK change." This replaces plan 4b's tab form of the manager (`VaultManagerTab`,

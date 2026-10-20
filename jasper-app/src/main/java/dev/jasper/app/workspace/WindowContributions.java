@@ -196,17 +196,23 @@ final class WindowContributions implements AutoCloseable {
             case HIDE -> hidePanel(request.panelId());
             case TOGGLE -> togglePanel(request.panelId());
             case ACTIVATING_TOGGLE -> toggleAndActivate(request.panelId());
+            case ACTIVATING_SHOW -> showAndActivate(request.panelId());
         }
     }
 
     private void togglePanel(String id) { if (panels.containsKey(id)) dock.toggle(id); }
 
     /** A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). */
-    private void toggleAndActivate(String id) {
+    private void toggleAndActivate(String id) { changeAndActivate(id, () -> dock.toggle(id)); }
+
+    /** A show for a user gesture in another window, a child window's View toggle: the panel becomes the active tool window under flush frames. */
+    private void showAndActivate(String id) { changeAndActivate(id, () -> dock.show(id)); }
+
+    private void changeAndActivate(String id, Runnable change) {
         if (!panels.containsKey(id)) return;
         // Standard frames activate nothing, so a window replaced there still hands focus back to the terminal.
         activating = owner.area().flush() ? id : null;
-        try { dock.toggle(id); } finally { activating = null; }
+        try { change.run(); } finally { activating = null; }
         if (dock.visible(id)) owner.area().activate(id);
     }
 

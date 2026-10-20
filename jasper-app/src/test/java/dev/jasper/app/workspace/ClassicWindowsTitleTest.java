@@ -274,4 +274,33 @@ class ClassicWindowsTitleTest {
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
+
+    /**
+     * FlatLaf's title pane paints the title in one colour, active or not, so a child window's colours follow its activity
+     * (plan 14 Rulings 14, as the main window's title does): the painted title while active, the dimmed one while inactive.
+     */
+    @Test void aChildWindowsTitleDimsWhileTheWindowIsInactive() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var child = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look().chrome(), false,
+                    WindowRole.CHILD);
+                var root = new JRootPane();
+                root.setWindowDecorationStyle(JRootPane.FRAME); root.updateUI();
+                assertThat(WindowContent.mountChild(root, child, look(), false, title -> { })).isNull();
+                var installed = FlatLafInstaller.installedTheme();
+                var active = SurfaceContrast.painted(installed, WindowPairs.TITLE);
+                var inactive = SurfaceContrast.painted(installed, WindowPairs.INACTIVE_TITLE);
+                assertThat(inactive).as("the dimmed title differs").isNotEqualTo(active);
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_FOREGROUND)).as("active").isEqualTo(active);
+                child.setActive(false);
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_FOREGROUND)).as("dimmed while inactive").isEqualTo(inactive);
+                child.onThemeChanged.accept(themes.current());
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_FOREGROUND)).as("a theme change keeps it dimmed").isEqualTo(inactive);
+                child.setActive(true);
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_FOREGROUND)).as("active again").isEqualTo(active);
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_BACKGROUND)).isEqualTo(ThemeZone.color(null, SemanticColor.SURFACE_APP));
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
 }
