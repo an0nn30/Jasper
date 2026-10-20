@@ -37,6 +37,7 @@ jobs:
         run: |
           node --check website/script.js
           node --check website/workspace-tour.js
+          node --check website/meadow.js
           python -m unittest discover -s website -p test_build_site.py
       - name: Package public website
         run: python website/build_site.py "$RUNNER_TEMP/jasper-pages"
