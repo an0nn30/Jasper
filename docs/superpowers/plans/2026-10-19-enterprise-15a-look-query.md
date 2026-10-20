@@ -42,7 +42,7 @@ ls jasper-sdk/src/main/java/dev/jasper/sdk/ui/Presentation.java 2>/dev/null | wc
 
 **SDK and versions**
 - `JasperSdk.VERSION` becomes `0.18.2`. The release is additive: one record and one `Appearance` method.
-- Manifests that change in this plan move to `sdk = ">=0.18.2, <0.19"`. Those are Remote, Vault, File Server and Sample, which all read the query. Enterprise keeps `">=0.18.0, <0.19"`: it reads nothing.
+- Manifests that change in this plan move to `sdk = ">=0.18.2, <0.19"`. Remote, Vault, File Server and Sample read the query. Enterprise reads nothing, but its 0.3.0 kit uses a host feature that arrives with SDK 0.18.2: the `[defaults."<plugin id>"]` table here, and `[chrome] toolbar_search` in plan 15b. A 0.18.0 or 0.18.1 host would accept the plugin by its range and then refuse the whole kit as invalid (spec 5.9), and the range is a provider's only compatibility gate (Rulings 14).
 - Versions: Enterprise `0.3.0`, Remote `0.15.0`, Vault `0.7.0`, File Server `0.6.0`, Sample `0.4.0`. Editor, History, Indexer and Snippets are unchanged.
 - The testkit mirrors every host behaviour this plan adds. Each behaviour has a shared contract case that runs on both hosts (`FakeContractTest`, `AppContractTest`).
 - MVP rule (memory "Jasper is an MVP: no compat shims"): the Enterprise API, its gate rule and its fakes are removed outright, with no deprecation, alias or migration note. One convenience is added on purpose: `DefaultSource(Map)` means "no plugin defaults", the value for every look but one (Rulings 15).
@@ -83,7 +83,7 @@ ls jasper-sdk/src/main/java/dev/jasper/sdk/ui/Presentation.java 2>/dev/null | wc
 At `f78bb0385`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unless they start with a module or `/`.
 
 **SDK and testkit**
-1. `JasperSdk.VERSION = "0.18.1"` (`jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java:6`). It is pinned by `CapabilitiesTest.java:8`, `FilesValuesTest.java:54`, `PaletteValuesTest.java:107` and `KitBoundaryTest.java:5` (all under `jasper-sdk/src/test/java/dev/jasper/sdk/`).
+1. `JasperSdk.VERSION = "0.18.1"` (`jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java:6`). It is pinned by `CapabilitiesTest.java:8`, `FilesValuesTest.java:54`, `PaletteValuesTest.java:107` and `KitBoundaryTest.java:5` (all under `jasper-sdk/src/test/java/dev/jasper/sdk/`), and by the rejection message `"needs SDK >=0.17.0, <0.18.0; this is SDK 0.18.1"` in `jasper-app/src/test/java/dev/jasper/app/plugins/KitCompatibilityTest.java:70`.
 2. `Appearance` (`jasper-sdk/src/main/java/dev/jasper/sdk/ui/Appearance.java:11-75`) gives colours, `variant()`, palettes, `workspaceOpacity` and change hooks. It has nothing about the presentation. It is implemented by `HostedUi.appearance()` (`plugins/HostedUi.java:362-404`), `FakePluginContext.appearance()` (`jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakePluginContext.java:239-271`) and one anonymous test double (`jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java:214`). `jasper-sdk/README.md:28-30` says the application and the testkit implement every interface but `Plugin`.
 3. `dev.jasper.sdk.ui.DialogSpec.Presentation` is a nested enum (`DialogSpec.java:20`). No top-level `Presentation` exists in the SDK, the testkit or the plugins.
 4. `Variant` reads "The application's current look" (`Variant.java:3`). `AppEvents.java:8` and `:16` say "The look changed". `PluginContext.java:120` promises "theme-aware icons". `Appearance` has had no icon method since SDK 0.15 (`docs/sdk-icons.md:41`).
@@ -116,7 +116,7 @@ At `f78bb0385`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
       - Vault: `:24-27`, read at `VaultPlugin.java:110`.
       - File Server: `:24-27`, read at `FileServerPlugin.java:147`.
     - Their `plugin.toml` `requires` name `dev.jasper.enterprise` as optional. Remote `:13`, File Server `:13` and Vault `:12`.
-    - Their `build.gradle.kts` hold `compileOnly(project(":jasper-plugin-enterprise"))` and `testImplementation(project(":jasper-plugin-enterprise"))`: Remote `:11`, `:25`; Vault `:35`, `:41`; File Server `:54`, `:68`.
+    - Their `build.gradle.kts` hold `compileOnly(project(":jasper-plugin-enterprise"))` and `testImplementation(project(":jasper-plugin-enterprise"))`: Remote `:11`, `:25`; Vault `:9`, `:15`; File Server `:9`, `:23`.
 19. `gradle/plugin-architecture.gradle.kts:10` lists `dev.jasper.enterprise.api` in three `declaredImports` entries. `:14-15` define `workstationPackages`, and `:52-54` check them.
 20. Test fakes:
     - `FakeEnterprise` exists three times (`plugins/{remote,vault,fileserver}/src/test/java/dev/jasper/<plugin>/workstation/FakeEnterprise.java`).
@@ -156,7 +156,7 @@ Each ruling is what was decided, why, and the cost if it is wrong.
 11. **The `dev.jasper.<plugin>.workstation` packages keep their names.** They name the Workstation composition, and renaming touches about 60 imports with no behaviour change. Their `package-info` files are rewritten. Cost: a reader may look for Enterprise there.
 12. **Enterprise keeps `EnterprisePlugin`, whose `start` does nothing.** The descriptor requires `entry` (fact 17). Cost: none.
 13. **Enterprise is `0.3.0` once for plan 15.** 15a bumps it; 15b's kit point stays within 0.3.0. This follows the user's "Enterprise 0.3.0 (plan 14's unbumped kit change plus this plan's)". Cost: if 15b merged much later, two looks would share 0.3.0.
-14. **Consumers bump their minor version and declare `>=0.18.2`.** The Editor is not bumped: its code and manifest are unchanged, and its new look default is Enterprise's data. Cost: none.
+14. **Consumers bump their minor version and declare `>=0.18.2`, and so does Enterprise.** Enterprise reads no SDK method, but its kit's `[defaults."<plugin id>"]` table (and plan 15b's `toolbar_search`) needs a 0.18.2 host; an older host would accept it by range and then refuse the kit. The Editor is not bumped: its code and manifest are unchanged, and its new look default is Enterprise's data. Cost: none.
 15. **The format of kit defaults for plugin settings.**
     - A `[defaults]` entry whose value is a table is a plugin's table, keyed by the plugin's id. The id must match `[a-z][a-z0-9_.-]{0,127}`, contain a dot, and not be `jasper` or start `jasper.` (the SDK's rule, plus the dot, so a dotted core key written without quotes is refused rather than read as a plugin "ui").
     - Its keys are the plugin's setting keys as its settings file writes them: nested tables flatten with `.`, and each key matches `SettingSpec`'s key rule.
@@ -189,7 +189,7 @@ Each ruling is what was decided, why, and the cost if it is wrong.
 - Modify:
   - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Appearance.java`
   - `jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java:6`
-  - the four version pins of fact 1
+  - the five version pins of fact 1 (`KitCompatibilityTest.java:70` included)
   - `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakePluginHost.java`
   - `FakePluginContext.java:239-271`
   - `ContractHarness.java`
@@ -271,7 +271,7 @@ Expected:
 - `theBodySizeAndToolbarHeightHaveTheirRanges`: 5 and 97 for `bodySize`, and 27 and 65 for `toolbarHeight`, throw `IllegalArgumentException` with the messages above. 6, 96, 28 and 64 are accepted.
 - `theVersionIsZeroEighteenTwo`: `assertThat(JasperSdk.VERSION).isEqualTo("0.18.2")`.
 
-Also change the four pins of fact 1 to `"0.18.2"`.
+Also change the four SDK pins of fact 1 to `"0.18.2"`. In `KitCompatibilityTest.aZeroSeventeenRangeIsSkippedBeforeItLoads` (`:70`), build the expected text from the constant: `"needs SDK >=0.17.0, <0.18.0; this is SDK " + JasperSdk.VERSION`.
 
 Run: `./gradlew :jasper-sdk:test --tests '*PresentationValuesTest' --tests '*CapabilitiesTest'`
 Expected: FAIL to compile (`Presentation` does not exist).
@@ -331,7 +331,7 @@ Expected: PASS.
 
 - [ ] **Step 5: Versions and the README**
 
-- `VersionRangeTest.pluginsBuiltForOlderMinorsAreIncompatibleWithZeroEighteen`: keep the `>=0.18.1` line, renamed "the former Remote range". Add `assertThat(VersionRange.parse(">=0.18.2, <0.19").contains(host)).as("the look query's range").isTrue();`.
+- `VersionRangeTest.pluginsBuiltForOlderMinorsAreIncompatibleWithZeroEighteen`: keep the `>=0.18.1` line, renamed "the former Remote range". Add `assertThat(VersionRange.parse(">=0.18.2, <0.19").contains(host)).as("the look query's range").isTrue();`. Task 3 only relabels this new line.
 - `docs/examples/external-plugin/build.gradle.kts:7`: change `getOrElse("0.18.1")` to `getOrElse("0.18.2")`.
 - `jasper-sdk/README.md`:
   - add `Presentation` to the `dev.jasper.sdk.ui` row of the package table;
@@ -341,7 +341,7 @@ Expected: PASS.
     >
     > `Appearance.presentation()` returns a `Presentation`: whether the look is classic, its icon set, how tool windows are reached, the title bar and where the menus are on this platform, how the toolbar offers Search Everywhere, the look's UI and data faces, its body size and its default toolbar height. It is chosen at start and is the same for every plugin until Jasper restarts; read it from any thread. A plugin that composes differently under a classic look branches on it once in `start`. The testkit's `FakePluginHost.setPresentation` sets it, and `FakePresentations.STANDARD` and `CLASSIC` are ready values. Plugins that read it declare `sdk = ">=0.18.2, <0.19"`.
 
-Run: `./gradlew :jasper-app:test --tests '*VersionRangeTest' --tests '*AppDocumentationTest' && ./gradlew :jasper-sdk:check :jasper-sdk-testkit:check`
+Run: `./gradlew :jasper-app:test --tests '*VersionRangeTest' --tests '*KitCompatibilityTest' --tests '*AppDocumentationTest' && ./gradlew :jasper-sdk:check :jasper-sdk-testkit:check`
 Expected: PASS (`check` includes doclint and `verifySdkRelease`).
 
 - [ ] **Step 6: Commit**
@@ -380,7 +380,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - `Projections` gains a twelfth component, `PluginLook plugins`.
   - `static dev.jasper.sdk.ui.Presentation HostedPresentation.of(PluginLook look, dev.jasper.ui.kit.Kit kit, dev.jasper.app.config.DefaultSource defaults)`.
   - `standard()` becomes `of(Projections.standard(new Projections.Host(Projections.Platform.of(System.getProperty("os.name")), false)).plugins(), Kit.DEFAULT, DefaultSource.CORE)`.
-  - `public void PluginRuntime.presentation(dev.jasper.ui.kit.Kit kit, PluginLook look, DefaultSource defaults)` replaces the one-argument method and keeps its "Plugins have already started" refusal. When the host is made, it sets `created.kit` as today and `created.presentation = HostedPresentation.of(look, kit, defaults)`. Task 6 adds `created.defaults`.
+  - `public void PluginRuntime.presentation(dev.jasper.ui.kit.Kit kit, PluginLook look, DefaultSource defaults)` replaces the one-argument method and keeps its "Plugins have already started" refusal. It rejects a null argument and stores the three values together (one nullable field holding all three, or three set at once). When the host is made, and only when `presentation(...)` was called, it sets `created.kit` as today and `created.presentation = HostedPresentation.of(look, kit, defaults)`; Task 6 adds `created.defaults` under the same condition. Otherwise the host keeps its own `HostedPresentation.standard()` (and, from Task 6, `DefaultSource.CORE`): most `PluginRuntimeTest` cases never call `presentation(...)`.
 
 - [ ] **Step 1: Write the failing projection tests**
 
@@ -485,7 +485,7 @@ Expected: FAIL to compile (`HostedPresentation.of` and the three-argument `prese
   - `dataFace` is `kit.faces().dataRegular()`, empty when blank or equal to `java.awt.Font.MONOSPACED`;
   - `bodySize` is `Math.round(kit.type().body())`;
   - `toolbarHeight` is `defaults.value(dev.jasper.app.config.CoreSettings.WINDOW_TOOLBAR_HEIGHT)`.
-- `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)`: store all three, then use them when making the host.
+- `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)`: store all three together, then use them when making the host only if they were given (Interfaces). A runtime that was never given a presentation makes a host with `HostedPresentation.standard()`, so `PluginRuntimeTest`'s other cases run unchanged.
 - `JasperApplication.java:989`: `plugins.presentation(themes.kit(), presentation.projections().plugins(), presentation.defaults());`. By then the field is the fallback if the kit was blamed (`:326-334`).
 - `PluginRuntimeTest.java:650,670`: pass `Projections.standard(<the test's host>).plugins()` and `DefaultSource.CORE`.
 - `EnterpriseSettings.java:170`: pass the test's own `projections.plugins()` (`:153`) and `EnterpriseResources.facts().parsed().orElseThrow().defaults()`, as `JasperApplication` gives them under Enterprise.
@@ -545,9 +545,9 @@ In each `LayoutTest`, replace the three cases with:
 }
 ```
 
-In every other test from fact 20, replace `FakeEnterprise.start(host)` with `host.setPresentation(FakePresentations.CLASSIC)` before the plugin starts. Drop `FakeEnterprise.INFO.id()` and `"dev.jasper.enterprise"` from the optional sets, and drop the imports.
+In every other test from fact 20, delete `FakeEnterprise.start(host)` and call `host.setPresentation(FakePresentations.CLASSIC)` before the test's first `host.start`, a `FakeVault`'s included: `setPresentation` throws once any plugin has started (Task 1). `ClassicSessionsWiringTest.theComboAndTheTreeFollowTheActiveSshPaneWhileNothingIsChosen` (`:110-112`) starts `FakeVault` at `:111` before `FakeEnterprise.start` at `:112`, so its call moves above `:111`; every other site calls `FakeEnterprise.start` first and is replaced in place. Drop `FakeEnterprise.INFO.id()` and `"dev.jasper.enterprise"` from the optional sets, and drop the imports.
 
-Add `RemotePluginTest.underTheDefaultLookSessionsStaysLeft`: a default `FakePluginHost`; `host.panels()` contains the Sessions entry ending `|LEFT`. Use the Sessions panel's registered id and title as `RemotePluginTest` already spells them.
+Add `RemotePluginTest.underTheDefaultLookSessionsStaysLeft`: a default `FakePluginHost`; `assertThat(host.panels()).contains("dev.jasper.remote.panel|Sessions|LEFT|dev.jasper.remote.hosts")`. `FakePluginHost.panels()` appends `|` and the toggle action id (`FakePluginHost.java:957-958`), and Sessions names `HOSTS` (`RemotePlugin.java:243-244`).
 
 Run: `./gradlew :jasper-plugin-remote:test :jasper-plugin-vault:test :jasper-plugin-fileserver:test`
 Expected: FAIL to compile (`Layout.of(Presentation)` does not exist).
@@ -579,7 +579,7 @@ Expected: PASS.
 - `StagedVaultHost` does the same (`:49`, `:72-78`, `:321`). Put that one expression in a package-private test helper `static Presentation StagedVaultHost.enterprisePresentation()` and use it from both fixtures.
 - Delete `StagedEnterprise.java`. Rename `StagedEnterpriseTest` to `StagedClassicLayoutTest`; its class javadoc becomes "Under the Enterprise presentation a staged consumer composes CLASSIC, and ROWS under the default look." and its body is unchanged.
 - `migration.csv`: delete the `StagedEnterprise.java` and `StagedEnterpriseTest.java` rows (`:1421-1422`), and add a `StagedClassicLayoutTest.java` row copying the old test row's fields with the new path and name. Rows for the three `Layout.java` and `LayoutTest.java`, if the test now reports them, use owners `dev.jasper.remote`, `dev.jasper.vault` and `dev.jasper.fileserver`.
-- `VersionRangeTest:70`: change the Remote line to `">=0.18.2, <0.19"` with `.as("Remote's, Vault's, File Server's and Sample's range")`.
+- `VersionRangeTest`: only relabel Task 1's `">=0.18.2, <0.19"` assertion to `.as("Enterprise's, Remote's, Vault's, File Server's and Sample's range")`. Leave the `>=0.18.1` line ("the former Remote range") as Task 1 left it, and add no other line.
 
 Run: `./gradlew :jasper-app:test --tests '*StagedClassicLayoutTest' --tests '*ClassicCompositionRenderTest' --tests '*ClassicVaultRenderTest' --tests '*VersionRangeTest' --tests '*ThemeMigrationCoverageTest' && ./gradlew verifyPluginArchitecture`
 Expected: PASS. `ClassicCompositionRenderTest`'s and `ClassicVaultRenderTest`'s mock checks are unchanged: the plugins compose CLASSIC as before.
@@ -620,22 +620,22 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - [ ] **Step 1: Write the failing tests**
 
 - `EnterprisePluginTest` keeps only `startDoesNothing`: parse `EnterprisePlugin.class` as now, collect its `start` method's invoke and throw instructions, and `assertThat(steps).isEmpty()`. The javadoc: "Spec 4.6: start cannot throw, so a failed Enterprise start is never the plugin's own doing; the look is data, so start does nothing." Delete the two `Workstation` cases and `CONSUMER`. `ENTERPRISE`'s version becomes `"0.3.0"`.
-- `PresentationConformanceTest.theDescriptorIsSpecFourOnes`: `Version.parse("0.3.0")` and `assertThat(descriptor.exports()).as("no API (plan 15a)").isEmpty()`.
+- `PresentationConformanceTest.theDescriptorIsSpecFourOnes`: `Version.parse("0.3.0")`, `assertThat(descriptor.exports()).as("no API (plan 15a)").isEmpty()` and `assertThat(descriptor.sdk()).as("the kit's plugin defaults need SDK 0.18.2 (Rulings 14)").isEqualTo(VersionRange.parse(">=0.18.2, <0.19"))`. If `VersionRange` has no value equality, compare `toString()` or test `contains` on 0.18.1 (false) and 0.18.2 (true).
 
 Run: `./gradlew :jasper-plugin-enterprise:test && ./gradlew :jasper-app:test --tests '*PresentationConformanceTest'`
-Expected: FAIL (`start` still calls `services().publish`; the version is 0.2.0 and the export is still listed).
+Expected: FAIL (`start` still calls `services().publish`; the version is 0.2.0, the export is still listed and the range is `>=0.18.0`).
 
 - [ ] **Step 2: Remove the API**
 
 - `EnterprisePlugin`: delete the import. The class javadoc becomes "The Enterprise look. Its kit file, fonts and theme are data the host reads from the descriptor before the first window; its start does nothing, so it cannot fail." and `start`'s becomes "Does nothing: the look is the descriptor's data."
 - `package-info.java`: "The Enterprise plugin's entry point. The look itself is the descriptor's presentation, fonts and theme: data the host reads."
-- `plugin.toml`: `version = "0.3.0"`; delete the `exports` line.
+- `plugin.toml`: `version = "0.3.0"`, `sdk = ">=0.18.2, <0.19"`; delete the `exports` line.
 - `build.gradle.kts:1`'s comment: "// The Enterprise look: its kit file, fonts and theme are data the host reads; its code does nothing."
 - Delete `api/Workstation.java` and `api/package-info.java`.
 - `gradle/plugin-architecture.gradle.kts`: delete `:13-15` (the comment and `workstationPackages`) and `:52-54` (the `dev.jasper.enterprise.api` check).
 - AGENTS.md:
   - In the Remote sentence, delete " and the Enterprise API (named only in `dev.jasper.remote.workstation`)".
-  - Replace the Enterprise sentences "Enterprise is bundled too … (`verifyPluginArchitecture`)." with: "Enterprise is bundled too (`plugins/enterprise`, off by default): its look is descriptor data (its kit file, the IBM Plex fonts and the Enterprise theme), and its code does nothing. Plugins read the active look through the SDK (`Appearance.presentation()`), never through a plugin of their own."
+  - Replace the Enterprise sentences "Enterprise is bundled too … (`verifyPluginArchitecture`)." with: "Enterprise is bundled too (`plugins/enterprise`, off by default): its look is descriptor data (its kit file, the IBM Plex fonts and the Enterprise theme), and its code does nothing. Plugins read the active look through the SDK (`Appearance.presentation()`)."
 
 Run: `./gradlew :jasper-plugin-enterprise:test verifyPluginArchitecture && ./gradlew :jasper-app:test --tests '*PresentationConformanceTest' --tests '*AppDocumentationTest' --tests '*ThemeMigrationCoverageTest' --tests '*PresentationAttemptTest'`
 Expected: PASS. `git grep -n 'enterprise\.api\|Workstation\.class\|workstationPackages' -- ':!docs/superpowers' ':!docs/STATUS.md'` prints only `docs/plugin-authoring.md` lines, which Task 9 rewrites.
@@ -766,7 +766,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - `PluginHost`:
     - `volatile DefaultSource defaults = DefaultSource.CORE;`
     - `Consumer<String> lookDefaultProblem = message -> LOG.log(System.Logger.Level.WARNING, message);`
-    - `PluginRuntime` sets `created.defaults = defaults` beside `created.presentation`.
+    - `PluginRuntime` sets `created.defaults = defaults` beside `created.presentation`, only when `presentation(...)` was called (Task 2).
   - `DeclaredSettings(String pluginId, PluginSettingsFiles files, Containment containment, Consumer<Runnable> ui, Consumer<ConfigDiagnostic> report, Runnable written, Map<String, Object> lookDefaults, Consumer<String> problems)`. `PluginHost.start` passes `defaults.plugin(id)` and `lookDefaultProblem`.
   - `static Translated SettingTranslation.translate(SettingSpec<?> spec, UnaryOperator<Predicate<String>> guard, Optional<Object> lookDefault, Consumer<String> problem)`:
     - when `lookDefault` is present, read it with the translated kind: `kind.read(raw, defaultValue)`;
@@ -889,6 +889,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - Modify:
   - `plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml:68-73`
   - `jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java:24-50,69-87`
+  - `plugins/editor/src/test/java/dev/jasper/editor/ui/EditorSettingsTest.java`
 - Create: `jasper-app/src/test/java/dev/jasper/app/plugins/EnterpriseEditorDefaultTest.java`
 
 **Interfaces:**
@@ -902,10 +903,15 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - start a probe with id `dev.jasper.editor` that declares `SettingSpec.of("font_family", SettingKind.text(), "Monospaced").label("Font")`;
   - assert it reads `IBM Plex Mono` and that the problem list is empty.
 
-  This proves the table reaches the Editor's key. The Editor's own installed-family rule is checked by the GUI check in Task 9's STATUS entry.
+  This proves the table reaches the Editor's key.
+- `EditorSettingsTest.aLooksFontFamilyIsTheDefaultOnlyWhenItIsInstalled`, with the file's `start(host, installed)` helper and the real `EditorSettings.Declared`. The Editor accepts a family only if it is installed (`EditorSettings.java:61-62`):
+  - a `FakePluginHost` with `setKitDefault("dev.jasper.editor", "font_family", "IBM Plex Mono")` and installed `Set.of("IBM Plex Mono", "Menlo")` reads `IBM Plex Mono` from `current().fontFamily()`, and `lookDefaultProblems(ID)` is empty;
+  - a second host with the same kit default and installed `Set.of("Menlo")` reads the fallback `Menlo`, and `lookDefaultProblems(ID)` holds one line starting `dev.jasper.editor: the look's default for font_family is not used: `.
 
-Run: `./gradlew :jasper-app:test --tests '*PresentationConformanceTest' --tests '*EnterpriseEditorDefaultTest'`
-Expected: FAIL (the kit has no such table).
+  This is a test-only change in the Editor: its code and manifest stay as they are (Rulings 14).
+
+Run: `./gradlew :jasper-app:test --tests '*PresentationConformanceTest' --tests '*EnterpriseEditorDefaultTest' && ./gradlew :jasper-plugin-editor:test --tests '*EditorSettingsTest'`
+Expected: the two jasper-app tests FAIL (the kit has no such table). `EditorSettingsTest` PASSES, since Task 6 made the fake read kit defaults; keep it as the proof of the Editor's rule.
 
 - [ ] **Step 2: Add the table**
 
@@ -919,13 +925,13 @@ font_family = "IBM Plex Mono"
 
 Add the new test's `migration.csv` row if it is reported.
 
-Run: `./gradlew :jasper-app:test --tests '*PresentationConformanceTest' --tests '*EnterpriseEditorDefaultTest' --tests '*EnterpriseFixtureTest' --tests '*EnterpriseFirstWindowTest' --tests '*EnterpriseHomeTest' --tests '*ThemeMigrationCoverageTest'`
+Run: `./gradlew :jasper-app:test --tests '*PresentationConformanceTest' --tests '*EnterpriseEditorDefaultTest' --tests '*EnterpriseFixtureTest' --tests '*EnterpriseFirstWindowTest' --tests '*EnterpriseHomeTest' --tests '*ThemeMigrationCoverageTest' && ./gradlew :jasper-plugin-editor:test`
 Expected: PASS.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml jasper-app/src/test docs/design/theme-engine/migration.csv
+git add plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml plugins/editor/src/test/java/dev/jasper/editor/ui/EditorSettingsTest.java jasper-app/src/test docs/design/theme-engine/migration.csv
 git commit -m "Plan 15a Task 7: Enterprise's kit sets the Editor's font to IBM Plex Mono
 
 🤖 Generated with Claude Code at The Home Depot
@@ -1059,7 +1065,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - **Decision 4 (`:65-66`):** "discovering Enterprise through its exported API (a presence-only `Workstation` service and an optional requirement)" becomes "reading the active presentation through the SDK (`Appearance.presentation()`; since 2026-10-19, plan 15)".
 - **Decision 19 (`:101`):** "Vault consumes `Workstation` for a classic manager (14.8)" becomes "Vault composes a classic manager under a classic look (14.8)".
 - **Principle 6 (`:268`):** "plugins on whether `Workstation` is published" becomes "plugins on whether the SDK's presentation is classic".
-- **4.1:** in the descriptor block, `version = "0.2.0"` becomes `"0.3.0"`. The `description` becomes the shipped one (`plugins/enterprise/src/main/resources/plugin.toml:6`). Delete the `exports` line.
+- **4.1:** in the descriptor block, `version = "0.2.0"` becomes `"0.3.0"` and `sdk = ">=0.18.0, <0.19"` (`:288`) becomes `">=0.18.2, <0.19"`. The `description` becomes the shipped one (`plugins/enterprise/src/main/resources/plugin.toml:6`). Delete the `exports` line.
 - **4.6 (`:421-423`):** "In that last case the current session keeps the classic chrome with no `Workstation`: Remote and File Server compose their default layouts, which is a reachable, tested state. `EnterprisePlugin.start` only publishes `Workstation`, and a test pins that it cannot throw." becomes "In that last case the current session keeps the classic chrome, and plugins read its classic presentation. `EnterprisePlugin.start` does nothing, and a test pins that it cannot throw."
 - **4.7 (`:445`):** "so no `Workstation` is published" becomes "so plugins read the fallback's presentation".
 - **5.1:** in the listing, after `"window.toolbar" = "icons"` add an empty line, `[defaults."dev.jasper.editor"]` and `font_family = "IBM Plex Mono"`. In "the tables `chrome`, … and `defaults`", append to the sentence: "; `defaults` may also hold one table per plugin (5.8)".
@@ -1072,12 +1078,12 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
   > ### 8.7 SDK 0.18.2
   >
-  > An additive release (the user, 2026-10-19; plan 15): `Appearance.presentation()` returns `dev.jasper.sdk.ui.Presentation`, a record of the look Jasper runs with: `classic` (the classic base), `icons` (`NEW_UI`, `CLASSIC`), `toolWindows` (`RAILS`, `STRIPES`), `titleBar` (`UNIFIED`, `NATIVE`, `CLASSIC`, resolved for the platform), `menus` (`SCREEN_MENU_BAR`, `TITLE_BAR`, `WINDOW`), `toolbarSearch` (`FIELD`, `ICON`), the look's `uiFace` and `dataFace` (a regular face's name, empty for the platform's), its `bodySize` and its default `toolbarHeight`. It is IntelliJ's `ExperimentalUI.isNewUI()` and `JBUI.CurrentTheme` for Jasper: chosen at start, the same for every plugin and safe from any thread; values a user setting changes are reported as the look's. The host builds it in `dev.jasper.app.plugins.HostedPresentation` from the `PluginLook` projection (9.1), the kit and the look's defaults; the testkit's `FakePluginHost.setPresentation` and `FakePresentations` mirror it. Remote, File Server, Vault and Sample declare `sdk = ">=0.18.2, <0.19"`.
+  > An additive release (the user, 2026-10-19; plan 15): `Appearance.presentation()` returns `dev.jasper.sdk.ui.Presentation`, a record of the look Jasper runs with: `classic` (the classic base), `icons` (`NEW_UI`, `CLASSIC`), `toolWindows` (`RAILS`, `STRIPES`), `titleBar` (`UNIFIED`, `NATIVE`, `CLASSIC`, resolved for the platform), `menus` (`SCREEN_MENU_BAR`, `TITLE_BAR`, `WINDOW`), `toolbarSearch` (`FIELD`, `ICON`), the look's `uiFace` and `dataFace` (a regular face's name, empty for the platform's), its `bodySize` and its default `toolbarHeight`. It is IntelliJ's `ExperimentalUI.isNewUI()` and `JBUI.CurrentTheme` for Jasper: chosen at start, the same for every plugin and safe from any thread; values a user setting changes are reported as the look's. The host builds it in `dev.jasper.app.plugins.HostedPresentation` from the `PluginLook` projection (9.1), the kit and the look's defaults; the testkit's `FakePluginHost.setPresentation` and `FakePresentations` mirror it. Remote, File Server, Vault and Sample declare `sdk = ">=0.18.2, <0.19"`, and so does Enterprise: its kit's `[defaults."<plugin id>"]` table (5.8) needs a 0.18.2 host, and an older one would refuse the kit (5.9).
 - **9.1:** in the projections table, add the row `` | `PluginLook` | `classic`, `classicIcons`, `stripes`, `titleBar`, `menus`, `search` | plugins: `HostedPresentation` (the SDK's `Presentation`, 8.7) | ``. In the field table add `` | `PluginLook` | `classic` when `base = "classic"`; `classicIcons` and `stripes` with `icons = "classic"` and `tool_windows = "stripes"`; `titleBar` the title as resolved for the platform; `menus` the screen menu bar on macOS while the committed flags keep it, else in the window under a native title and in the title bar otherwise; `search` FIELD | the default look's under the committed flags | ``. In the sentence listing single readers, add "`PluginLook`'s enums only by `HostedPresentation`".
 - **14.1:** "`dev.jasper.enterprise.EnterprisePlugin`, whose `start()` only calls `context.services().publish(Workstation.class, new Workstation() { })`;" becomes "`dev.jasper.enterprise.EnterprisePlugin`, whose `start()` does nothing;". Delete the bullet "- `dev.jasper.enterprise.api.Workstation` and its `package-info`.". Delete "and imports no plugin API, and a gate check keeps it so: cycle detection counts optional edges" up to the sentence's end, so it reads "The plugin has no requirements."
 - **14.2:** retitle it "### 14.2 The presentation query" and replace its body with:
 
-  > Plugins learn the look from the SDK (8.7), not from a plugin's API: `Appearance.presentation().classic()` is the equivalent of IntelliJ's `ExperimentalUI.isNewUI()` being false. The toolbar control is generic SDK (`ToolbarItem.View`), the menus are standard menus, and anchors and compositions belong to their owners. Until 2026-10-19 (plan 15) the Enterprise plugin published a presence-only `Workstation` service for this; it is removed.
+  > Plugins learn the look from the SDK (8.7), not from a plugin's API: `Appearance.presentation().classic()` is the equivalent of IntelliJ's `ExperimentalUI.isNewUI()` being false. The toolbar control is generic SDK (`ToolbarItem.View`), the menus are standard menus, and anchors and compositions belong to their owners.
 - **14.3:** replace the bullet list with: "Remote, File Server and Vault read `Layout.of(context.appearance().presentation())` once in `start`: `Layout.CLASSIC` under a classic look, else `Layout.ROWS`. Each `Layout` lives in the plugin's `workstation` package. Tests set the testkit's `FakePresentations.CLASSIC`."
 - **15 (`:1732`):** "this session keeps the classic chrome without `Workstation`" becomes "this session keeps the classic chrome and its presentation".
 - **16.1:**
@@ -1184,10 +1190,10 @@ Expected: 0 failures and 0 errors. Record the counts; the base is 11,541 tests a
 for theme in light dark; do ./gradlew :jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryTheme=$theme -Pjasper.galleryScale=2; done
 python3 -I tools/visual/check_pairs.py "$(mktemp -d)" > "$out/pairs.txt"; echo "exit $?"
 diff <(sed 's/ agreement=.*//' "$base/pairs.txt") <(sed 's/ agreement=.*//' "$out/pairs.txt") && echo "same verdicts"
-diff "$base/pairs.txt" "$out/pairs.txt" && echo "same agreements"
+diff "$base/pairs.txt" "$out/pairs.txt" && echo "same agreements"   # or only the lines Task 2 Step 4 recorded
 ```
 
-Expected: `exit 0`, `same verdicts` (101 of 101 PASS) and `same agreements`. This plan changes no pixel; if a line differs, find the cause before going on.
+Expected: `exit 0`, `same verdicts` (101 of 101 PASS) and `same agreements`, except for pair lines whose crops hold an Enterprise Settings render that Task 2 Step 4 recorded as changed (a plugin page now composing classic under Enterprise). Each such line may differ in its agreement; list it in the STATUS entry as the user's 2026-10-19 direction, with both values. Every other line must be identical; if one differs, find the cause before going on.
 
 - [ ] **Step 6: Write `docs/STATUS.md`'s new top entry, correct the two stale lines, and write this plan's banner**
 
@@ -1200,7 +1206,7 @@ Expected: `exit 0`, `same verdicts` (101 of 101 PASS) and `same agreements`. Thi
 
 Then, in the series' style, give:
 - the request and the approval, quoted;
-- what they became: SDK 0.18.2's `Appearance.presentation()` and its facts; `PluginLook` and `HostedPresentation`; the Enterprise API removed (Enterprise 0.3.0, no exports, `start` does nothing); Remote 0.15.0, Vault 0.7.0, File Server 0.6.0 and Sample 0.4.0 at `>=0.18.2`; `[defaults."<plugin id>"]` with its precedence, warnings and Reset; Enterprise's Editor default; the Sample's bottom-strip panel and step-delay demonstration; the testkit's `setPresentation`, `FakePresentations`, `setKitDefault` and `lookDefaultProblems`;
+- what they became: SDK 0.18.2's `Appearance.presentation()` and its facts; `PluginLook` and `HostedPresentation`; the Enterprise API removed (Enterprise 0.3.0, no exports, `start` does nothing); Enterprise, Remote 0.15.0, Vault 0.7.0, File Server 0.6.0 and Sample 0.4.0 at `>=0.18.2`; `[defaults."<plugin id>"]` with its precedence, warnings and Reset; Enterprise's Editor default; the Sample's bottom-strip panel and step-delay demonstration; the testkit's `setPresentation`, `FakePresentations`, `setKitDefault` and `lookDefaultProblems`;
 - the rulings (this plan's 27, one clause each);
 - any execution rulings;
 - any Enterprise render that changed in Task 2 Step 4, as the user's 2026-10-19 direction;

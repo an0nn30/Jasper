@@ -10,14 +10,14 @@
 - the remaining documentation.
 
 **Architecture:**
-- **Activation (host only).** `HostedUi` knows which of the plugin's actions is running. A `Panels.toggle` made while the panel's own declared toggle action (`PanelSpec.withToggleActionId`) runs is sent as `PanelRequest.Op.ACTIVATING_TOGGLE`, which the window already handles. Under flush frames the tool window then takes the tint and the keyboard. Under the default look's standard frames nothing activates, as today.
+- **Activation (host only).** `HostedUi` knows which of the plugin's actions is running. A `Panels.toggle` made while the panel's own declared toggle action (`PanelSpec.withToggleActionId`) runs is sent as `PanelRequest.Op.ACTIVATING_TOGGLE`, which the window already handles. A `PanelHost.show()` made while that action runs is sent as a new `PanelRequest.Op.ACTIVATING_SHOW`, which `WindowContributions` maps to show-then-activate: Transfers' action (`TransferUi.SHOW`, ⌘⌥3) toggles only on its first open in a window and calls `host.show()` after that (`TransfersPanels.java:38-41`). Under flush frames the tool window then takes the tint and the keyboard. Under the default look's standard frames nothing activates, as today.
 - **Classic icons everywhere.** Under `[chrome] icons = "classic"`, IntelliJ's classic art is drawn for the six classic names (`add`, `split`, `zoom`, `settings`, `window.add`, `search`) in three places, besides the window header and status bar that already draw it:
   - the app-drawn `ToolWindowHeader` actions;
   - a borrowed kit header's host actions and the panel's own header controls;
   - the buttons of toolbar views.
 
   jasper-ui gains `KitView.classicChromeIcons(boolean)` and `IconRegistry.classicChromeIcon`. The app gains `AppIcons.classicChromeIcon` and passes the window's `ChromeArtwork` to `ToolWindowArea`. Every other name, every panel body and the default look are unchanged.
-- **The toolbar search icon.** A twelfth chrome point, `[chrome] toolbar_search = "field" | "icon"`, is `field` in both bases and `icon` in Enterprise's kit. It needs `palette = "run_window"` and a native or classic title bar. `WorkspaceLook.Search` (read only by `WorkspaceChrome`) gives `ClassicHeader` an icon-only "Search Everywhere" button with the classic magnifier, before Settings…, in place of the field. `PluginLook.search` reports it to plugins through SDK 0.18.2's `Presentation.toolbarSearch`.
+- **The toolbar search icon.** An eleventh chrome point, `[chrome] toolbar_search = "field" | "icon"`, is `field` in both bases and `icon` in Enterprise's kit. It needs `palette = "run_window"` and a native or classic title bar. `WorkspaceLook.Search` (read only by `WorkspaceChrome`) gives `ClassicHeader` an icon-only "Search Everywhere" button with the classic magnifier, before Settings…, in place of the field. `PluginLook.search` reports it to plugins through SDK 0.18.2's `Presentation.toolbarSearch`.
 - **Identity guard.** An architecture test scans the constant pools of the app's and jasper-ui's classes and of every bundled plugin's own classes except Enterprise's for "enterprise", so a look stays data.
 
 **Tech Stack:** Java 25 on JetBrains Runtime 25, Swing and Java2D, FlatLaf 3.7, Gradle (Kotlin DSL), JUnit 5 and AssertJ, `java.lang.classfile`, Python 3 with numpy/PIL for `tools/visual` (always `python3 -I`).
@@ -56,9 +56,9 @@ If the baseline is missing, make it as plan 15a Task 1 Step 0 does, from `f78bb0
 - `AppIcons.classicChromeIcon` is asked only under `CLASSIC`.
 - `ToolWindowArea`'s and `ToolWindowHeader`'s existing constructors mean `NEW_UI`.
 - `ChromeSpec.DEFAULT` and `ChromeSpec.CLASSIC` keep `toolbar_search = "field"`, and `ClassicHeader`'s field path is unchanged.
-- Under standard frames `ACTIVATING_TOGGLE` activates nothing (`ToolWindowArea.activate` returns at once when not flush, `ToolWindowArea.java:491-492`).
+- Under standard frames `ACTIVATING_TOGGLE` and `ACTIVATING_SHOW` activate nothing (`ToolWindowArea.activate` returns at once when not flush, `ToolWindowArea.java:491-492`).
 
-**Versions.** No SDK change: SDK 0.18.2's `Presentation.toolbarSearch` already exists, and `ICON` becomes reachable. Enterprise stays 0.3.0 (plan 15a Rulings 13). No plugin code or manifest changes, so no plugin version moves. The testkit's `FakePresentations.CLASSIC` follows Enterprise's kit (`ICON`).
+**Versions.** No SDK change: SDK 0.18.2's `Presentation.toolbarSearch` already exists, and `ICON` becomes reachable. Enterprise stays 0.3.0 (plan 15a Rulings 13), and its `sdk = ">=0.18.2, <0.19"` from plan 15a already covers `toolbar_search`, which arrives with the same host (plan 15a Rulings 14). No plugin code or manifest changes, so no plugin version moves. The testkit's `FakePresentations.CLASSIC` follows Enterprise's kit (`ICON`).
 
 **Code rules**
 - Javadoc doclint on jasper-ui, jasper-app and the testkit: every `{@link}` resolves, no raw `<`, `>`, `&` or `->` in comments, and new public members carry `@param` and `@return`.
@@ -76,8 +76,8 @@ If the baseline is missing, make it as plan 15a Task 1 Step 0 does, from `f78bb0
 
 ## Review Focus
 
-1. **A plugin toggle action that hides its panel, or toggles it in another window.** Hiding activates nothing and hands the focus back as a plain toggle does. A toggle for another panel, or one made later from `invokeLater`, a background executor or another action, stays a plain toggle.
-   - Tests: Task 1 `HostedUiTest.aPanelsOwnToggleActionActivatesAndAnythingElseToggles` and `WindowContributionsTest.anActivatingToggleThatHidesThePanelActivatesNothing`.
+1. **A plugin toggle action that hides its panel, or toggles it in another window, and a toggle action that shows through `PanelHost.show()`.** Hiding activates nothing and hands the focus back as a plain toggle does. A toggle or show for another panel, or one made later from `invokeLater`, a background executor or another action, stays plain. A `show()` inside the panel's own toggle action activates, as Transfers' does after its first open.
+   - Tests: Task 1 `HostedUiTest.aPanelsOwnToggleActionActivatesAndAnythingElseToggles`, `HostedUiTest.aShowInsideThePanelsOwnToggleActionActivates`, `WindowContributionsTest.anActivatingToggleThatHidesThePanelActivatesNothing` and `anActivatingShowUnderFlushFramesActivatesThePanel`.
 2. **A narrow Enterprise window.** The search button stays in the trailing group beside Settings… while the leading toolbar gives way; it is never hidden by the field's collapse rule and never overlaps Settings….
    - Test: Task 4 `ClassicHeaderTest.underTheSearchIconANarrowWindowKeepsTheButtonBesideSettings`.
 3. **`window.toolbar = "icons_and_labels"` and `hidden` under the search icon.** Under labels the button stays icon-only, as IntelliJ's. Under `hidden` it goes with the row, and ⇧⌘P still opens the Run window.
@@ -92,10 +92,10 @@ If the baseline is missing, make it as plan 15a Task 1 Step 0 does, from `f78bb0
 At `f78bb0385` unless stated. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unless they start with a module.
 
 **Activation**
-1. `Contributions.PanelRequest.Op` has `SHOW, HIDE, TOGGLE, ACTIVATING_TOGGLE` (`contributions/Contributions.java:55-60`). Only the host-made `<id>.toggle` (`:158-160`) and Event Log (`application/NotificationsFeature.java:63-64`) send `ACTIVATING_TOGGLE`.
+1. `Contributions.PanelRequest.Op` has `SHOW, HIDE, TOGGLE, ACTIVATING_TOGGLE` (`contributions/Contributions.java:55-60`). Only the host-made `<id>.toggle` (`:158-160`) and Event Log (`application/NotificationsFeature.java:63-64`) send `ACTIVATING_TOGGLE`. `HostedUi`'s `PanelHost.show()` calls `PanelSite.show()` (`plugins/HostedUi.java:448`), whose runnable is `WindowContributions.showPanel(id)`, a plain `dock.show` (`workspace/WindowContributions.java:327`, `:210`).
 2. `HostedUi`'s action handler runs `handler.accept(new Context(...))` inside `containment.run(pluginId, "action " + spec.id(), …)` (`plugins/HostedUi.java:200-203`). `Panels.toggle` sends `Op.TOGGLE` (`:426-432`). `HostedUi` runs on the UI thread, and registration needs it (`guard`).
 3. `WindowContributions.requested` maps `ACTIVATING_TOGGLE` to `toggleAndActivate` (`workspace/WindowContributions.java:183-191`). That method activates only when `dock.visible(id)` after the toggle, and sets `activating` only under flush frames (`:196-201`). `ToolWindowArea.activate` returns at once when not flush (`workspace/ToolWindowArea.java:491-492`).
-4. The bundled toggle actions that call `Panels.toggle`: `RemotePlugin.java:684`, `SftpUi.java:121`, `TunnelsUi.java:118`, `TransfersPanels.java:40` and `FileServerPlugin.java:158` (plan 12 STATUS, `docs/STATUS.md:224-227`). `HostedUiTest.panelsAndRailReachTheModelWithContainedFactories` asserts a plain toggle's request (`jasper-app/src/test/java/dev/jasper/app/plugins/HostedUiTest.java:396-399`).
+4. The bundled toggle actions that call `Panels.toggle`: `RemotePlugin.java:684`, `SftpUi.java:121`, `TunnelsUi.java:118`, `TransfersPanels.java:40` and `FileServerPlugin.java:158` (plan 12 STATUS, `docs/STATUS.md:224-227`). Transfers' is a show, not a toggle: `TransferUi.SHOW` (⌘⌥3, `TransferUi.java:43-45`) runs `TransfersPanels.show` (`RemotePlugin.java:181`), which calls `Panels.toggle` only while the window has no `PanelHost` yet and `host.show()` after that (`TransfersPanels.java:38-41`), so a second press keeps the panel open. `HostedUiTest.panelsAndRailReachTheModelWithContainedFactories` asserts a plain toggle's request (`jasper-app/src/test/java/dev/jasper/app/plugins/HostedUiTest.java:396-399`).
 
 **Icons**
 5. The classic set is `BuiltInArtwork.ClassicHolder.CLASSIC`'s six names (`jasper-ui/src/main/java/dev/jasper/ui/icons/BuiltInArtwork.java:41-45`). `IconRegistry.chromeIcon(name, size, CLASSIC)` returns them, else the New UI chrome original, else the catalog (`IconRegistry.java:94-101,117-125`). So a full `CLASSIC` receiver would change the other names' art too.
@@ -137,7 +137,7 @@ At `f78bb0385` unless stated. Paths are under `jasper-app/src/main/java/dev/jasp
 
 Each ruling is what was decided, why, and the cost if it is wrong.
 
-1. **Activation.** A `Panels.toggle` made synchronously inside the handler of the panel's own declared toggle action counts as activating: the same plugin, while that action's handler is running, for any window it names. A deferred toggle, another action's, or one with no running action stays a plain toggle. This is IntelliJ's ⌘1, and it answers the plan-12 STATUS question (the user: yes). Cost: a plugin that toggles from `invokeLater` loses activation.
+1. **Activation.** A `Panels.toggle`, or a `PanelHost.show()`, made synchronously inside the handler of the panel's own declared toggle action counts as activating: the same plugin, while that action's handler is running, for any window it names. A deferred call, another action's, or one with no running action stays plain. This is IntelliJ's ⌘1, and it answers the plan-12 STATUS question (the user: yes). The show path is host-only, so Transfers' action activates on every press without a Remote change; it still only shows, so a second ⌘⌥3 keeps Transfers open. Cost: a plugin that toggles from `invokeLater` loses activation.
 2. **Activation needs no SDK or testkit change.** No SDK value reports it, and the testkit has no dock or focus. `Panels.toggle`'s javadoc and the guide say it. Cost: none.
 3. **The scope of "classic icons everywhere".** The six classic names in tool-window headers (the app-drawn header's actions, a borrowed header's host actions and the panel's own header controls) and in toolbar views. Panel and window bodies keep the catalog: the classic set is IntelliJ's chrome set. Cost: a plugin's body "add" button differs from its header's.
 4. **The mechanism.** Classic art only for the six names. Every other name keeps exactly today's art, with no New UI fallback, so the default look and the other names are byte-identical and Enterprise's other header icons do not move.
@@ -170,14 +170,21 @@ Each ruling is what was decided, why, and the cost if it is wrong.
 
 **Files:**
 - Modify:
-  - `jasper-app/src/main/java/dev/jasper/app/plugins/HostedUi.java:193-212,426-432`
+  - `jasper-app/src/main/java/dev/jasper/app/plugins/HostedUi.java:193-212,415-450`
+  - `jasper-app/src/main/java/dev/jasper/app/contributions/Contributions.java:55-60`
+  - `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContributions.java:183-210`
   - `jasper-app/src/test/java/dev/jasper/app/plugins/HostedUiTest.java`
   - `jasper-app/src/test/java/dev/jasper/app/workspace/WindowContributionsTest.java`
   - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Panels.java:20-30`
   - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelSpec.java:15-17`
+  - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelHost.java:23`
 
 **Interfaces:**
-- Produces: in `HostedUi`, a private `String running` field (the id of this plugin's action whose handler is running on the UI thread, or null). The action handler sets it before `handler.accept` and restores the previous value in `finally`. `Panels.toggle` sends `Op.ACTIVATING_TOGGLE` when `running` equals the toggled panel's `PanelEntry.toggleActionId()`, else `Op.TOGGLE`.
+- Produces:
+  - in `HostedUi`, a private `String running` field (the id of this plugin's action whose handler is running on the UI thread, or null). The action handler sets it before `handler.accept` and restores the previous value in `finally`. `Panels.toggle` sends `Op.ACTIVATING_TOGGLE` when `running` equals the toggled panel's `PanelEntry.toggleActionId()`, else `Op.TOGGLE`.
+  - `Contributions.PanelRequest.Op.ACTIVATING_SHOW`, javadoc "A show by the panel's own toggle action: the panel becomes the active tool window under flush frames (plan 15b Rulings 1)."
+  - `HostedUi.host(site)` becomes `host(site, spec)`, called from the panel factory where the `PanelSpec` is known. Its `show()` sends `model.requestPanel(new Contributions.PanelRequest(site.windowId(), spec.id(), Op.ACTIVATING_SHOW))` when the host is not closed and `running` equals `spec.toggleActionId().orElse(null)`; otherwise it calls `site.show()` as today.
+  - `WindowContributions.requested` maps `ACTIVATING_SHOW` to a private `showAndActivate(id)`: like `toggleAndActivate`, it sets `activating` only under flush frames around `dock.show(id)`, then calls `owner.area().activate(id)` when `dock.visible(id)`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -203,25 +210,33 @@ In `HostedUiTest`:
 
 Qualify `PanelSpec`, `Anchor` and `WindowHandle` as the file does.
 
+Also add `aShowInsideThePanelsOwnToggleActionActivates`: register a panel `dev.x.tool.queue` with `withToggleActionId("dev.x.tool.queue.show")` whose factory keeps its `PanelHost`; build it in a window, as the file's existing panel-host tests do; register `dev.x.tool.queue.show`, whose handler calls the kept host's `show()`, and `dev.x.tool.queue.other`, whose handler does the same. Invoking the first records one request with `Op.ACTIVATING_SHOW` for that window and panel. Invoking the second, and calling `show()` outside any action, record no request: they go straight to the site, as today.
+
 In `WindowContributionsTest`, using the file's window fixture:
 - `aPanelsActivatingToggleUnderFlushFramesActivatesIt`: a flush-framed window gets `ACTIVATING_TOGGLE` for a hidden panel. The panel shows, and the area marks it focused; read `ToolWindowArea`'s focused slot as the plan-12 activation tests do.
 - `anActivatingToggleThatHidesThePanelActivatesNothing`: the same request for a showing panel hides it, and no slot is focused.
 - `underStandardFramesAnActivatingToggleIsAPlainToggle`: under standard frames the request toggles, and nothing is focused.
+- `anActivatingShowUnderFlushFramesActivatesThePanel`: `ACTIVATING_SHOW` for a hidden panel shows and focuses it; sent again while it shows, it stays shown and focused (a show never hides).
+- `underStandardFramesAnActivatingShowIsAPlainShow`: the panel shows, and nothing is focused.
 
 Copy the plan-12 tests' way of reading the focused slot.
 
 Run: `./gradlew :jasper-app:test --tests '*HostedUiTest' --tests '*WindowContributionsTest'`
-Expected: `aPanelsOwnToggleActionActivatesAndAnythingElseToggles` FAILS (`TOGGLE` first). The three `WindowContributionsTest` cases PASS, since the window already handles the op. Keep them as the guard.
+Expected: FAIL to compile (`Op.ACTIVATING_SHOW` does not exist). With the constant alone, `aPanelsOwnToggleActionActivatesAndAnythingElseToggles` would fail on `TOGGLE` first, and the three `ACTIVATING_TOGGLE` cases in `WindowContributionsTest` pass already, since the window handles that op; keep them as the guard.
 
 - [ ] **Step 2: Implement**
 
 `HostedUi`:
 - the action handler becomes `containment.run(pluginId, "action " + spec.id(), () -> { String previous = running; running = spec.id(); try { handler.accept(...); } finally { running = previous; } })`;
 - `toggle` keeps the `PanelEntry` its existing `noneMatch` check finds, and sends `ACTIVATING_TOGGLE` when `running` equals that entry's `toggleActionId()`, else `TOGGLE`.
+- `host(site, spec)` and its `show()` as in Interfaces.
+
+`Contributions.PanelRequest.Op.ACTIVATING_SHOW` and `WindowContributions.showAndActivate` as in Interfaces; `ACTIVATING_TOGGLE`'s javadoc stays.
 
 Docs in the same commit:
 - `Panels.toggle`'s javadoc gains: "Called from the panel's own toggle action ({@link PanelSpec#withToggleActionId}), as its handler runs, a toggle that shows the panel also makes it the active tool window under a look with flush tool windows, as a stripe click does (since 0.18.2)."
-- `PanelSpec`'s `@param toggleActionId` gains: "; under a look with flush tool windows its toggle also activates the panel".
+- `PanelSpec`'s `@param toggleActionId` gains: "; under a look with flush tool windows its toggle or show also activates the panel".
+- `PanelHost.show()`'s javadoc gains: "Called from the panel's own toggle action as its handler runs, it also makes the panel the active tool window under a look with flush tool windows (since 0.18.2)."
 
 Run: `./gradlew :jasper-app:test --tests '*HostedUiTest' --tests '*WindowContributionsTest' --tests '*AppContractTest' && ./gradlew :jasper-sdk:javadoc`
 Expected: PASS.
@@ -229,7 +244,8 @@ Expected: PASS.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add jasper-app jasper-sdk/src/main/java/dev/jasper/sdk/ui/Panels.java jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelSpec.java
+git add jasper-app jasper-sdk/src/main/java/dev/jasper/sdk/ui/Panels.java jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelSpec.java \
+        jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelHost.java
 git commit -m "Plan 15b Task 1: a panel's own toggle action activates its tool window
 
 🤖 Generated with Claude Code at The Home Depot
@@ -574,6 +590,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - `docs/sdk-icons.md:21-24`
   - `docs/plugin-authoring.md:196-224`
   - `docs/plugin-ui.md:61-65`
+  - `docs/command-palette.md:44`
+  - `docs/app-architecture.md:242-243`
   - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java:16-19`
   - `PanelSpec.java:8,13`
   - `Panels.java:6`
@@ -598,9 +616,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - **10.3:**
   - After "then, trailing, the title search field reading "Search everywhere" with the COMMAND_PALETTE keycap, and "Settings…"." add: "Under `toolbar_search = "icon"` (the user, 2026-10-19; Enterprise) the field is IntelliJ Classic's Search Everywhere icon: an icon-only 22 px button with the classic magnifier, tooltip "Search Everywhere" and the palette's shortcut, leading the trailing group before Settings… and doing what the field does; it stays icon-only under `icons_and_labels`."
   - After "The icons are the look's `[chrome] icons` set (5.2), IntelliJ's classic icons under Enterprise." add: "Tool-window headers and toolbar views draw the same classic art for those six names; every other name, and every panel body, keeps its catalog art."
-- **10.7:** after the sentence on activation ("…a View toggle the host declares (`PanelRequest.Op.ACTIVATING_TOGGLE`)…"), add: "A plugin's toggle made while the panel's own declared toggle action runs (`PanelSpec.withToggleActionId`) is activating too (the user, 2026-10-19; plan 15), so View › Tool Windows and the stripe-number shortcuts activate the bundled tool windows, as IntelliJ's ⌘1 does."
+- **10.7:** after the sentence on activation ("…a View toggle the host declares (`PanelRequest.Op.ACTIVATING_TOGGLE`)…"), add: "A plugin's toggle or `PanelHost.show()` made while the panel's own declared toggle action runs (`PanelSpec.withToggleActionId`) is activating too (`PanelRequest.Op.ACTIVATING_SHOW` for the show; the user, 2026-10-19; plan 15), so View › Tool Windows and the stripe-number shortcuts activate the bundled tool windows, as IntelliJ's ⌘1 does."
 - **16.1:**
-  - item 4: after "`icons` is held at `classic` in every row" insert "and `toolbar_search` at `field`";
+  - item 4: "across 9 of the ten chrome points" becomes "across 9 of the eleven chrome points", and after "`icons` is held at `classic` in every row" insert "and `toolbar_search` at `field`";
   - item 7: add the bullet "- `LookIdentityTest`: no production class of the app, jasper-ui or a bundled plugin other than Enterprise names "enterprise" (plan 15).".
 - **16.2:** add "Enterprise's Search Everywhere icon (its tooltip, the Run window it opens, a narrow window); ⌘⌥1 to ⌘⌥3 activating the bundled tool windows; the classic `add` icon in Sessions' and Tunnels' headers;" after "the Run window's drag, …".
 
@@ -615,7 +633,7 @@ for phrase in ("Twenty-four points",):
     print(text.count(phrase), "(want 0)", phrase)
 for phrase in ("Twenty-five points: 11 chrome points", "| `toolbar_search` | `field` | `icon` |", "`toolbar_search = \"icon\"` requires",
                "IntelliJ Classic's Search Everywhere icon", "`LookIdentityTest`", "a panel's own toggle action activates its tool window",
-               "is activating too (the user, 2026-10-19; plan 15)"):
+               "is activating too (`PanelRequest.Op.ACTIVATING_SHOW` for the show; the user, 2026-10-19; plan 15)"):
     print(text.count(phrase), "(want at least 1)", phrase)
 PY
 ```
@@ -627,8 +645,10 @@ Expected: one `0` line, and every other count at least `1`.
 - `docs/sdk-icons.md`: after the stripe paragraph (`:21-24`), add: "Under the Enterprise look IntelliJ's classic icons also draw `"add"`, `"split"`, `"zoom"`, `"settings"`, `"window.add"` and `"search"` in the toolbar (actions and toolbar views), the status bar and tool-window headers (your `PanelHeader` actions and your panel's header controls); in a panel's or window's body these names keep their ordinary art."
 - `docs/plugin-authoring.md`:
   - `:196`'s "stripes of icons on the window's left and right edges" becomes "stripes on the window's left and right edges: icons, or under a classic look such as Enterprise labelled buttons that start with the icon and read the panel's title".
-  - After "and Jasper registers no `<panel id>.toggle`." (`:206`) insert: "Under a look with flush tool windows (Enterprise), when your action shows the panel it also makes it the active tool window, as a stripe click does; a toggle from anything else does not."
+  - After "and Jasper registers no `<panel id>.toggle`." (`:206`) insert: "Under a look with flush tool windows (Enterprise), when your action shows the panel (through `Panels.toggle` or `PanelHost.show()`) it also makes it the active tool window, as a stripe click does; a toggle or show from anything else does not."
   - `:222-224`: "A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are its job; the content is yours." becomes "A rail button, on the left stripe after the panel icons (a labelled entry under a classic look), runs one of your actions. A plugin window is a frame Jasper builds: icon, title bar, menus (in the window, or under the Enterprise look in the screen menu bar on macOS and none on Windows and Linux), theme tracking and remembered bounds are its job; the content is yours."
+- `docs/command-palette.md:44`: "the toolbar's Search everywhere field open it" becomes "the toolbar's Search Everywhere icon open it".
+- `docs/app-architecture.md:242`: "a toolbar row of left-packed buttons with the search field and Settings… trailing" becomes "a toolbar row of left-packed buttons with the search field, or under `toolbar_search = "icon"` a Search Everywhere button, and Settings… trailing".
 - `docs/plugin-ui.md:61-65`: after "a panel's stripe label starts with its icon" and the plugin-icons link that follows it, add ", and the six classic icon names draw IntelliJ's classic art in headers and toolbar views".
 - `StandardMenu.java:16-19`: "after Tab, Session and Transfer and before plugins' own menus" becomes "after Tab, Session and Transfer and before plugins' own menus, or after plugins' menus in a classic menu bar".
 - `PanelSpec.java:8`: "A panel as the stripes show it: an icon on a tool window stripe and, while it shows, a tool window with a header." becomes "A panel as the stripes show it: an icon on a tool window stripe (under a classic look a labelled button starting with the icon) and, while it shows, a tool window with a header." `:13`'s `@param title` gains "and, under a classic look, the stripe button's label".
@@ -696,7 +716,7 @@ Then give, in the series' style:
      - ⇧⌘P still does;
      - Icons & Labels keeps it icon-only;
      - a narrow window keeps it beside the wrench.
-  2. View › Tool Windows › Sessions, SFTP, Tunnels, Transfers and File Servers, and ⌘⌥1 to ⌘⌥3: each opens its tool window with the focused header tint, and typing goes there. A second press hides it and hands the keyboard back to the terminal.
+  2. View › Tool Windows › Sessions, SFTP, Tunnels, Transfers and File Servers, and ⌘⌥1 to ⌘⌥3: each opens its tool window with the focused header tint, and typing goes there. For Sessions, SFTP, Tunnels and File Servers a second press hides it and hands the keyboard back to the terminal. Transfers' action only shows: a second View › Transfers or ⌘⌥3 keeps it open and activates it again.
   3. Sessions' and Tunnels' header `+` and any header gear in IntelliJ's classic art, next to the toolbar's.
   4. Remote's session view's Run button unchanged.
   5. The default look: the title field, the rails, the headers and the shortcuts as before (a toggle shortcut opens without the tint).
