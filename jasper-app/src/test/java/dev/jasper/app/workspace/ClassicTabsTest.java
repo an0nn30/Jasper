@@ -43,6 +43,19 @@ class ClassicTabsTest {
         return strip;
     }
 
+    /** Parent tabs spec 7: the classic tabs show every pane's strip, a pane of one tab's too. */
+    @Test void everyPaneShowsItsClassicTabs() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.split(dev.jasper.app.layout.Side.RIGHT);
+                assertThat(owner.workspace().groupViews()).hasSize(2)
+                    .allSatisfy(group -> assertThat(group.strip().component().isVisible()).isTrue());
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
     @Test void oneTabStillShowsTheStrip() throws Exception {
         edt(() -> {
             ThemeController themes = EnterpriseLook.controller(false);

@@ -113,8 +113,8 @@ public final class WorkspaceChrome {
     }
 
     /**
-     * Whether a group shows its strip in a window holding {@code count} tabs (workspace tabs spec 1, decision 4): the
-     * classic tabs always show; the equal tabs show unless the window holds a single tab.
+     * Whether a pane holding {@code count} tabs shows its strip (parent tabs spec 7): the classic tabs always show; the
+     * equal tabs show unless the pane holds a single tab.
      */
     boolean showsStrip(int count) {
         return switch (tabs) {

@@ -106,6 +106,25 @@ class WorkspaceViewTest {
         });
     }
 
+    /** Parent tabs spec 7: under the equal tabs a pane shows its strip from two tabs, whatever the other panes hold. */
+    @Test void aPaneShowsItsStripFromTwoTabsWhateverTheOtherPanesHold() throws Exception {
+        edt(() -> {
+            var owner = window(3);
+            var workspace = owner.workspace();
+            var tabs = owner.tabs();
+            var left = workspace.model().activeGroup();
+            workspace.moveToNewGroup(tabs.get(2), left, Side.RIGHT);
+            var right = workspace.model().activeGroup();
+            assertThat(workspace.groupView(left).strip().component().isVisible()).as("two tabs").isTrue();
+            assertThat(workspace.groupView(right).strip().component().isVisible()).as("one tab, though the window holds three")
+                .isFalse();
+            workspace.moveTab(tabs.get(1), right, 1);
+            assertThat(workspace.groupView(left).strip().component().isVisible()).as("one tab left").isFalse();
+            assertThat(workspace.groupView(right).strip().component().isVisible()).as("two tabs now").isTrue();
+            assertThat(((WindowTabs) workspace.groupView(right).strip()).motionRunning()).as("shown settled").isFalse();
+        });
+    }
+
     @Test void twoGroupsRenderASplitWithAStripEach() throws Exception {
         edt(() -> {
             var owner = window(2);
@@ -120,8 +139,8 @@ class WorkspaceViewTest {
             assertThat(split.orientation()).isEqualTo(Orientation.HORIZONTAL);
             var right = workspace.model().groupOf(second.id()).orElseThrow();
             assertThat(split.children()).containsExactly(workspace.groupView(left), workspace.groupView(right));
-            assertThat(workspace.groupViews()).as("a split holds two tabs: every group shows its strip")
-                .allSatisfy(view -> assertThat(view.strip().component().isVisible()).isTrue());
+            assertThat(workspace.groupViews()).as("each pane holds one tab: no pane shows its strip (parent tabs spec 7)")
+                .allSatisfy(view -> assertThat(view.strip().component().isVisible()).isFalse());
             assertThat(workspace.groupView(left).tabs()).containsExactly(first);
             assertThat(workspace.groupView(right).tabs()).containsExactly(second);
             assertThat(SwingUtilities.isDescendingFrom(second.component(), workspace.groupView(right)))
@@ -238,9 +257,12 @@ class WorkspaceViewTest {
 
     @Test void groupsReportTheirStripAndCardRectangles() throws Exception {
         edt(() -> {
-            var owner = window(2);
+            var owner = window(4);
             var workspace = owner.workspace();
-            workspace.moveToNewGroup(owner.tabs().get(1), workspace.model().activeGroup(), Side.RIGHT);
+            var tabs = owner.tabs();
+            workspace.moveToNewGroup(tabs.get(2), workspace.model().activeGroup(), Side.RIGHT);
+            // Two tabs in each pane, so each shows its strip (parent tabs spec 7).
+            workspace.moveTab(tabs.get(3), workspace.model().activeGroup(), 1);
             layout(owner);
             for (GroupView group : workspace.groupViews()) {
                 Rectangle strip = group.stripBounds(workspace), cards = group.contentBounds(workspace);

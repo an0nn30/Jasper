@@ -236,10 +236,10 @@ final class WorkspaceView extends JPanel {
         for (GroupView gone : groups.values()) gone.close();
         groups.clear();
         groups.putAll(live);
-        // Every change to the window's tab count renders here, so the strips follow it in the same turn.
-        boolean strips = owner.look().showsStrip(layout.tabs().size());
+        // Every change to a pane's tab count renders here, so its strip follows it in the same turn (parent tabs spec 7).
         for (Group group : layout.groups())
-            groups.get(group.id()).display(group.tabs().stream().map(tabs::get).toList(), group.selected().map(tabs::get).orElse(null), strips);
+            groups.get(group.id()).display(group.tabs().stream().map(tabs::get).toList(), group.selected().map(tabs::get).orElse(null),
+                owner.look().showsStrip(group.tabs().size()));
         Node shown = layout.maximized().<Node>map(id -> layout.group(id).orElseThrow()).orElse(layout.root());
         // The main window's empty workspace shows New Terminal Tab and Open File in place of its empty group (spec 10).
         boolean showEmpty = layout.isEmpty() && owner.isMain();

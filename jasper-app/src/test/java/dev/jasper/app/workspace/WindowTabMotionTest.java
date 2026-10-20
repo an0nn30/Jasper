@@ -64,7 +64,6 @@ class WindowTabMotionTest {
             assertThat(f.entry("second").getBounds()).isEqualTo(new Rectangle(400, 0, 400, 30));
             assertThat(f.strip.motionRunning()).isFalse();
             f.owner.closeTab(f.owner.currentTerminal()); f.strip.refresh();
-            assertThat(f.strip.isVisible()).as("its group view, not the strip, hides it for a window's only tab").isTrue();
             assertThat(f.strip.getPreferredSize().height).isEqualTo(30);
             assertThat(f.strip.motionRunning()).isFalse();
         });

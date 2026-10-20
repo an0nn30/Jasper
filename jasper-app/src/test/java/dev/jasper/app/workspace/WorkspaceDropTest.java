@@ -89,7 +89,8 @@ class WorkspaceDropTest {
             assertThat(first.content()).isEqualTo(view.contentBounds(workspace));
             assertThat(first.tabs()).as("the dragged tab's own place is left out").containsExactly(view.tabBounds(workspace).get(1));
             assertThat(first.splits()).isTrue();
-            assertThat(areas.get(1).tabs()).containsExactly(workspace.groupView(right).tabBounds(workspace).getFirst());
+            assertThat(areas.get(1).strip().isEmpty()).as("a pane holding one tab shows no strip (parent tabs spec 7)").isTrue();
+            assertThat(areas.get(1).tabs()).isEmpty();
             assertThat(workspace.dropAreas(tabs.get(2)).get(1).tabs()).as("a group whose only tab is dragged").isEmpty();
         });
     }

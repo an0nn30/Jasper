@@ -171,9 +171,10 @@ class TabDragTest {
             workspace.moveToNewGroup(c, before.activeGroup(), Side.RIGHT);
             relayout(frame);
             GroupId alone = workspace.model().groupOf(c.id()).orElseThrow();
-            Layout split = workspace.model();
-            drop(owner, c, inside(cards(owner, alone), 0.05, 0.5));
-            assertThat(workspace.model()).as("an edge of the group it is alone in").isEqualTo(split);
+            // A pane's only tab shows no strip in the standard look (parent tabs spec 7): there is nothing to drag it from,
+            // and an edge of its own pane would change nothing (WorkspaceDropTest.aDropThatWouldChangeNothingIsNoChange).
+            assertThat(workspace.groupView(alone).strip().component().isVisible()).isFalse();
+            assertThat(workspace.changes(c, new Drop.Edge(alone, Side.LEFT))).isFalse();
         });
     }
 

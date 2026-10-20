@@ -20,8 +20,8 @@ import java.util.function.LongSupplier;
 import javax.swing.*;
 
 /**
- * Equal-width, centered tabs of one tab group (workspace tabs spec 10), hidden by their group view while their window
- * holds a single tab (spec 1, decision 4). A tab that opens or closes moves into or out of its place; one that joins or
+ * Equal-width, centered tabs of one tab group (workspace tabs spec 10), hidden by their group view while their pane
+ * holds a single tab (parent tabs spec 7). A tab that opens or closes moves into or out of its place; one that joins or
  * leaves the group by a move, or is reordered, or arrives while the strip is hidden, takes its place at once (spec 4,
  * Rulings 27). EDT only.
  */

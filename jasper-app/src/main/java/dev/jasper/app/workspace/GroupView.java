@@ -20,7 +20,7 @@ import javax.swing.SwingUtilities;
 
 /**
  * One tab group of a window's workspace (workspace tabs spec 10): the look's tab strip over a card area showing the
- * group's selected tab. The strip shows unless its workspace hides it (spec 1, decision 4: a window's single tab in the
+ * group's selected tab. The strip shows unless its workspace hides it (parent tabs spec 7: a pane's single tab in the
  * standard look), and the card area then fills the group. The strip lists, selects, closes and opens tabs in this group
  * only and starts the tab drag (spec 12). A tab's component enters and leaves the card area as the layout puts the tab in
  * and out of the group, so a tab moved to another group leaves one group view for the other with its session untouched

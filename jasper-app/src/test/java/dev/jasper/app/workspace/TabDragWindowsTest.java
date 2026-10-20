@@ -44,9 +44,9 @@ import org.junit.jupiter.api.Test;
  * Workspace tabs spec 12, 15 and 17: one tab drag across Jasper's windows, on synthetic events, headless. The window
  * manager's windows stand in stand-in frames on a pretend screen, each under a 28 px title bar: the main window, with
  * two terminal tabs, at 0,0 (1208 x 800), a child window, with two too, beside it at 1400,100 (800 x 600), and a new
- * window far away until a test places it. Under the standard look a window's only tab shows no strip (spec 1, decision
- * 4), so it has none to drag from or drop on; a test that drags a window's only tab gives its child window the classic
- * tabs, which always show.
+ * window far away until a test places it. Under the standard look a pane's only tab shows no strip (parent tabs spec 7),
+ * so a window's only tab has none to drag from or drop on; a test that drags a window's only tab gives its child window
+ * the classic tabs, which always show (a mix of looks only these tests make; the drag reads no look).
  */
 class TabDragWindowsTest {
     private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
@@ -230,7 +230,8 @@ class TabDragWindowsTest {
             GroupId maximized = activeGroup(main);
             assertThat(to.workspace().model().maximized()).contains(maximized);
             Tab tab = child.content().tabs().get(0);
-            drop(child.content(), tab, onTab(to, right, 0.75));
+            // Each pane holds one tab, so neither shows a strip (parent tabs spec 7): the drop is on the shown pane's middle.
+            drop(child.content(), tab, inside(cards(to, maximized), 0.5, 0.5));
             assertThat(to.workspace().model().maximized()).as("a tab moving in ends it (spec 15)").isEmpty();
             assertThat(to.workspace().model().group(maximized).orElseThrow().tabs()).containsExactly(right.id(), tab.id());
         });
@@ -249,11 +250,12 @@ class TabDragWindowsTest {
             assertThat(activeGroup(main)).isEqualTo(right);
             assertThat(to.workspace().model().group(right).orElseThrow().tabs()).containsExactly(b.id(), notes.id());
             Tab tab = child.content().tabs().get(0);
-            // The registry's move puts it at the end of the active group, shown there; the drop then takes it on.
-            drop(child.content(), tab, onTab(to, a, 0.25));
+            // The registry's move puts it at the end of the active group, shown there; the drop then takes it on. The left
+            // pane holds one tab, so it shows no strip (parent tabs spec 7): the drop is on its middle.
+            drop(child.content(), tab, inside(cards(to, left), 0.5, 0.5));
             var layout = to.workspace().model();
             assertThat(tab.window()).isEqualTo(main.id());
-            assertThat(layout.group(left).orElseThrow().tabs()).as("before the group's tab").containsExactly(tab.id(), a.id());
+            assertThat(layout.group(left).orElseThrow().tabs()).as("after the group's tab").containsExactly(a.id(), tab.id());
             assertThat(layout.activeGroup()).as("the group it landed in").isEqualTo(left);
             assertThat(layout.activeTab()).contains(tab.id());
             assertThat(layout.group(right).orElseThrow().tabs()).containsExactly(b.id(), notes.id());
