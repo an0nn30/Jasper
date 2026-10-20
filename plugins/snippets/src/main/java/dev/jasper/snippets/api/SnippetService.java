@@ -13,7 +13,9 @@ public interface SnippetService {
     String SCOPE_ID = "dev.jasper.snippets.scope";
 
     /**
-     * @param name a snippet name, compared without regard to case
+     * Looks a snippet up by name in {@code snippets.toml} as the Snippets plugin last read it successfully.
+     *
+     * @param name a snippet name, compared without regard to case or surrounding white space
      * @return the snippet, if one has that name in the last successful read
      */
     Optional<SnippetView> byName(String name);
@@ -22,8 +24,8 @@ public interface SnippetService {
      * Appends a snippet to the file. The completion receives the saved snippet, or a message such as
      * "A snippet named X exists" or a file error, exactly one of the two present.
      *
-     * @param name    the name, 1 to 128 printable characters
-     * @param command the command text
+     * @param name    the name: 1 to 128 printable characters once surrounding white space is stripped
+     * @param command the command text: not blank, at most 16 KiB
      * @param done    called on the UI thread
      */
     void append(String name, String command, BiConsumer<Optional<SnippetView>, Optional<String>> done);

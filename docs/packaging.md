@@ -1,131 +1,304 @@
 # Native packaging
 
-Jasper packages a native image with the JetBrains Runtime. Packaging must run on
-the target operating system and architecture: macOS builds the macOS app and DMG,
-Windows builds the portable Windows ZIP or setup wizard, and Linux builds the
-`.deb` and `.rpm` packages. Interactive installation and desktop acceptance remain
-user-run checks.
+Jasper ships as a native application image that bundles a trimmed JetBrains Runtime, so users need no Java: a
+`Jasper.app` and DMG on macOS, a portable ZIP and a per-user setup wizard on Windows, and `.deb` and `.rpm` packages on
+Linux. Every package carries the application, all nine bundled plugins, Jasper's own launcher with its start-up recovery
+helper `jasper-watch`, and the native [`jasper` command](command-line.md). jpackage builds only for the machine it runs
+on, so each package is built on the operating system and architecture it is for (aarch64 or x64). Installing and
+using a package on the desktop is checked by hand with the [native acceptance checklist](#native-acceptance-checklist).
 
-The [Release workflow](../.github/workflows/release.yml) accepts an existing `vX.Y.Z` tag
-through **Actions → Release → Run workflow**. It builds that tag's commit and publishes
-a prerelease titled `Jasper X.Y.Z` after every build succeeds: Windows x64 and ARM64
-ZIPs and setup EXEs, Linux x64 and ARM64 DEB/RPM packages, and a macOS ARM64 DMG.
-SDK jars and `SHA256SUMS` accompany the packages. macOS AOT training runs on the hosted
-runner. A failed upload leaves a draft that a rerun can finish; published releases
-are protected from overwrite. Test suites run on PRs and pushes to `main`.
+## Requirements
 
-Install a JBR **SDK** 25 whose architecture matches the host. Gradle normally
-finds it through Java toolchain discovery. If it does not, set `JAVA_HOME` and
-put its `bin` directory on `PATH` (especially on Windows), or set
-`org.gradle.java.installations.paths` in Gradle properties. A JRE is insufficient
-because packaging requires `jpackage`. The portable Windows ZIP does not require
-WiX.
+- A **JetBrains Runtime SDK 25** (JBR SDK) of the build machine's architecture. The Gradle toolchain requires vendor
+  JetBrains and usually finds it; otherwise set `JAVA_HOME` and put its `bin` directory on `PATH` (especially on
+  Windows), or set `org.gradle.java.installations.paths` in your Gradle properties. A JRE is not enough: packaging runs
+  the SDK's `jpackage`, and fails when the SDK has none or its architecture differs from the host's.
+- A **C/C++ compiler**, because `packageApp` builds Jasper's launcher ([packaging/launcher](../packaging/launcher/README.md)),
+  `jasper-watch` and the `jasper` command ([packaging/cli](../packaging/cli/README.md)): the Xcode command line tools on
+  macOS (`xcode-select --install`), `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the
+  "Desktop development with C++" workload on Windows (found through `vswhere`). The Windows
+  [user installation](#user-installation-without-a-compiler) needs none.
+- **macOS**: Xcode 26 or later for the [macOS 26 window controls](#macos-26-window-controls); an older SDK builds an app
+  with the earlier controls and `verifyPackage` warns.
+- **Linux**: `dpkg-deb` and `fakeroot` for the `.deb`; `rpmbuild` (the `rpm` package on Debian and Ubuntu), `readelf`
+  (binutils), `rpm2cpio` and `cpio` for the `.rpm`.
+- **Windows setup wizard**: WiX 3 (`candle.exe` and `light.exe`) on `PATH`. The portable ZIP needs no WiX.
 
-Packaging also compiles Jasper's own build of jpackage's launcher ([packaging/launcher](../packaging/launcher/README.md))
-with the host's C/C++ compiler: the Xcode command line tools on macOS, `gcc` and `g++` on Linux, and Visual Studio
-or its Build Tools with the C++ workload on Windows. `./gradlew check` builds and tests it too.
+`./gradlew check` also needs Python 3.11 or later ([building from source](../README.md#building-from-source)); the
+packaging tasks do not.
 
-On macOS:
+## Tasks
+
+All tasks belong to `:jasper-app`. Only those marked in the last column start Jasper.
+
+| Task | Hosts | What it does | Starts Jasper |
+|---|---|---|---|
+| `stagePackage` | all | Stages the application jar, its runtime libraries, `config.example.toml`, `packaging/README.txt` and the bundled plugins in `jasper-app/build/packaging/input/` (on macOS also the three native bridges) | no |
+| `packageApp` | all | Builds the application image in `jasper-app/build/packaging/image/` with jpackage and Jasper's launcher | no, unless `-Pjasper.aot=true` |
+| `verifyPackage` | all | Checks the image ([what it checks](#what-verifypackage-checks)); never up to date | no, unless `-Pjasper.aot=true` |
+| `trainAotCache` | macOS | Trains the image's [start-up cache](#training-the-aot-cache) | yes, a window for a few seconds |
+| `packageDist` | macOS | Trains the cache, verifies the image and builds the DMG | yes, through `trainAotCache` |
+| `packageDist` | Windows | Verifies the image and builds the portable ZIP | no |
+| `packageInstaller` | Windows | Verifies the image and builds the setup wizard | no |
+| `packageWindowsUser` | Windows | Builds the [user installation's](#user-installation-without-a-compiler) image in `jasper-app/build/packaging/windows-user/image/`, with jpackage's standard launcher | no |
+| `installWindowsUser` | Windows | Builds that image and installs it in `%APPDATA%\JasperApp` with a Start menu shortcut | no |
+| `uninstallWindowsUser` | Windows | Removes that installation | no |
+| `packageDeb`, `packageRpm` | Linux | Verifies the image and builds one package | no |
+| `packageDist` | Linux | Both `packageDeb` and `packageRpm` | no |
+| `installDist`, `distZip`, `distTar` | all | A portable distribution without jpackage or a bundled runtime | no |
+
+`-Pjasper.aot=true` makes `packageApp` train the cache too on macOS (and `verifyPackage` then depends on the
+training). On Windows and Linux it fails at configuration with "-Pjasper.aot=true: AOT training runs on macOS only".
+`check` never builds a package; it runs jpackage only for a probe application that tests the launcher headlessly.
 
 ```bash
-./gradlew check :jasper-app:packageDist   # trains the AOT cache: a Jasper window for a few seconds
+./gradlew check :jasper-app:packageDist                       # macOS or Linux
 ./gradlew :jasper-app:packageDist -PjasperVersion=1.0.1
+./gradlew :jasper-app:packageApp :jasper-app:verifyPackage     # an image only; on macOS without training
 ```
-
-On macOS, `packageDist` launches the packaged app once to train its start-up cache; run it from your desktop session.
-It already runs `verifyPackage`. Training changes `packageApp`'s outputs, so a `packageApp` or `verifyPackage` run after
-`packageDist` rebuilds the image untrained: `jasper-app/build/packaging/image` then no longer matches the DMG, which is
-unaffected. See [Start-up performance](#start-up-performance).
-
-On Windows:
 
 ```powershell
-.\gradlew.bat check :jasper-app:packageDist
-.\gradlew.bat :jasper-app:verifyPackage
+.\gradlew.bat check :jasper-app:packageDist                   # the portable ZIP
+.\gradlew.bat :jasper-app:packageInstaller                    # the setup wizard (WiX on PATH)
 ```
 
-Without `-PjasperVersion`, the version is the commit's `vX.Y.Z` release tag, else the latest release tag behind it,
-else `1.0.0`; on a commit with a release tag, a different `-PjasperVersion` fails the build. It accepts three decimal components without
-leading zeroes; major is 1–255, minor is 0–255, and patch is 0–65535. Native
-package versions require a positive major component. Outputs are under `jasper-app/build/packaging`: the native application is
-in `image/`, and distributions are
-`jasper-app/build/packaging/dist/Jasper-<version>-macos-<aarch64|x64>.dmg`
-or `jasper-app/build/packaging/dist/Jasper-<version>-windows-<x64|aarch64>.zip`. The unpacked
-image is `jasper-app/build/packaging/image/Jasper.app` on macOS and
-`jasper-app/build/packaging/image/Jasper` on Windows.
+`installDist` writes `jasper-app/build/install/jasper-app/`: start scripts `bin/jasper-app` and `bin/jasper-app.bat`
+that run the Java found through `JAVA_HOME` or `PATH`, the jars in `lib/`, the bundled plugins in `lib/plugins/<id>/`,
+the Linux icon tree in `share/icons/hicolor/`, `LICENSE.md`, and on macOS `lib/libjasper-appearance.dylib`. `distZip`
+and `distTar` archive the same tree.
 
-## Linux packages
+## Versions
 
-`:jasper-app:packageDist` on Linux runs `packageDeb` and `packageRpm`, which build
-`jasper-app/build/packaging/dist/Jasper-<version>-linux-<amd64|arm64>.deb` and
-`Jasper-<version>-linux-<x86_64|aarch64>.rpm` from the verified application image
-(`jasper-app/build/packaging/image/Jasper`). Each format names the architecture
-its own way: Debian's `amd64`/`arm64` are RPM's `x86_64`/`aarch64`. jpackage builds
-only for its host, so an x64 machine produces the x64 pair and an aarch64 machine
-the aarch64 pair. JetBrains ships no 32-bit Linux runtime.
+The package version is `-PjasperVersion=X.Y.Z`, else the commit's `vX.Y.Z` tag (the highest, when it has several),
+else the latest `vX.Y.Z` tag behind it, else `1.0.0`. On a commit with a release tag, a `-PjasperVersion` that differs
+from it fails the build. Native packaging accepts three decimal components without leading zeroes: major 1–255, minor
+0–255, patch 0–65535, so a `v0.x.y` tag fails. The version becomes jpackage's `--app-version` (the macOS
+`CFBundleShortVersionString`, the Windows Installer `ProductVersion`, the `.deb` and `.rpm` version), the
+`-Djpackage.app-version` option in `Jasper.cfg` and part of every file name.
 
-Build on the target architecture with a JBR SDK 25 of that architecture and:
+About and error reports name the build from the git facts recorded in the jar, not from `-PjasperVersion`: a clean
+tree at a `vX.Y.Z` tag is a release, anything else a development build ([cutting a release](app-maintenance.md#cutting-a-release)).
 
-- `.deb`: `dpkg-deb` and `fakeroot`;
-- `.rpm`: `rpmbuild` (the `rpm` package on Debian and Ubuntu), `readelf` (binutils),
-  `rpm2cpio` and `cpio`.
+## Outputs
 
-```bash
-sudo apt-get install fakeroot rpm cpio binutils g++
-./gradlew :jasper-app:packageDist -PjasperVersion=1.0.1
-./gradlew :jasper-app:packageDeb    # or packageRpm, for one format only
-```
+Packages go to `jasper-app/build/packaging/dist/`:
 
-Both packages install the image to `/opt/jasper`, with the launcher at
-`/opt/jasper/bin/Jasper` and a desktop menu entry (categories `System;TerminalEmulator;`,
-icon `/opt/jasper/lib/Jasper.png`) registered through `xdg-utils`. The package name
-is `jasper`. The `.deb` depends on the Debian packages that jpackage finds for the
-runtime's shared libraries on the build machine. The `.rpm` requires the same
-libraries by soname (for example `libX11.so.6()(64bit)`), which every RPM
-distribution resolves: jpackage's own RPM lookup queries the build machine's RPM
-database, which is empty on a Debian-family host. Before publishing either
-package, the task checks its name, version and architecture, unpacks it without
-installing it, and compares every file with the verified image byte for byte.
-The packages are unsigned.
+| Package | File |
+|---|---|
+| macOS DMG | `Jasper-<version>-macos-<aarch64\|x64>.dmg` |
+| Windows portable ZIP | `Jasper-<version>-windows-<x64\|aarch64>.zip` (one folder, `Jasper`) |
+| Windows setup wizard | `Jasper-<version>-windows-<x64\|aarch64>-setup.exe` |
+| Debian package | `Jasper-<version>-linux-<amd64\|arm64>.deb` |
+| RPM package | `Jasper-<version>-linux-<x86_64\|aarch64>.rpm` |
 
-jpackage's install scripts register the menu entry with `xdg-desktop-menu` under
-`set -e`. That command fails unless `/usr/share/applications` (or
-`/usr/local/share/applications`) and `/usr/share/desktop-directories` already exist,
-which leaves a minimal or headless system (a bare container, WSL without desktop
-packages) with an unconfigured package. The package tasks therefore generate the
-`postinst`/`prerm` (`.deb`) and `jasper.spec` (`.rpm`) overrides from the selected
-JBR's own templates: the menu commands run inside a function, the install creates
-both directories first, and a menu failure only prints a warning. Every other line
-is jpackage's, and a JBR whose templates lack the expected placeholder fails the
-build. The package verification checks the generated scripts, and the CI install
-check runs in minimal images without those directories.
+The image is `jasper-app/build/packaging/image/Jasper.app` on macOS and `jasper-app/build/packaging/image/Jasper`
+on Windows and Linux. A failed installer or Linux package task keeps its work folder (`installer-work/`, `deb-work/`
+or `rpm-work/` under `jasper-app/build/packaging/`) for diagnosis and publishes nothing.
 
-The [`linux-packages` workflow](../.github/workflows/linux-packages.yml) builds both
-architectures on native GitHub runners. It uses Ubuntu 22.04 so that the detected
-`.deb` dependencies keep their pre-t64 names, which Debian 12 has and newer releases
-still provide. It then installs each package into disposable Debian 12,
-Ubuntu 24.04, Fedora and openSUSE Tumbleweed containers with
-[`packaging/linux/check-install.sh`](../packaging/linux/check-install.sh). That
-script checks that every shared library resolves, runs the bundled Java, checks
-the menu entry and removes the package. It never opens a window. Packaging changes
-on PRs and pushes to `main` trigger these checks; packages are available in the run's artifacts.
+## Image layout
 
-## Windows setup wizard
+| Item | macOS (`Jasper.app`) | Windows (`Jasper`) | Linux (`Jasper`, installed as `/opt/jasper`) |
+|---|---|---|---|
+| Launcher | `Contents/MacOS/Jasper` | `Jasper.exe` | `bin/Jasper`, with `lib/libapplauncher.so` |
+| `jasper-watch` | `Contents/MacOS/jasper-watch` | `jasper-watch.exe` | `bin/jasper-watch` |
+| `jasper` command | `Contents/Resources/bin/jasper` | `bin\jasper.exe` | `lib/bin/jasper` |
+| App folder: jars, `Jasper.cfg`, `config.example.toml`, `README.txt` | `Contents/app` | `app` | `lib/app` |
+| Bundled plugins | `Contents/app/plugins/<id>/` | `app\plugins\<id>\` | `lib/app/plugins/<id>/` |
+| Native libraries | `Contents/app/native/`, and the bridges `Contents/app/libjasper-macos.dylib`, `libjasper-glass.dylib`, `libjasper-appearance.dylib` | `app\native\` | none; the libraries extract themselves at run time |
+| Java runtime | `Contents/runtime/Contents/Home` | `runtime` | `lib/runtime` |
+| AOT start-up cache | `Contents/app/jasper.aot` | none | none |
+| Icon | `Contents/Resources/Jasper.icns` and `Assets.car` | inside `Jasper.exe` | `lib/Jasper.png` |
 
-The opt-in `:jasper-app:packageInstaller` task builds
-`jasper-app/build/packaging/dist/Jasper-<version>-windows-<x64|aarch64>-setup.exe` from the
-same verified application image as the ZIP. It bundles JBR, installs for the
-current user, offers an installation directory chooser and shortcut choices,
-and registers Jasper with Windows Installed apps for uninstall. No administrator
-installation is requested. The default installation folder is under the user's
-local application data directory. The portable ZIP task remains available.
+The `jasper` command has a `bin` folder of its own because the macOS and Windows file systems ignore case, so it
+cannot sit beside the `Jasper` launcher. `README.txt` is the package guide (`packaging/README.txt`);
+`config.example.toml` is a reference copy that is not installed into Jasper home. On Windows, `Jasper.exe`'s file
+description, which Task Manager shows as the process name, is "Jasper DevOps workstation".
 
-Build with a **JBR SDK 25 of the target architecture** (x64 or ARM64) and **WiX on PATH**. WiX is a build-time requirement
-only; users need neither WiX nor Java. This path is verified with the portable
-[WiX 3.14.1 binaries](https://github.com/wixtoolset/wix3/releases/tag/wix3141rtm):
-extract `wix314-binaries.zip` and add the directory containing `candle.exe` and
-`light.exe` to the build shell's PATH. See the
-[JDK packaging prerequisites](https://docs.oracle.com/en/java/javase/25/jpackage/packaging-overview.html).
+The app folder holds `jasper-app.jar`, `jasper-ui.jar`, `jasper-terminal.jar`, `jasper-buddy.jar`, `jasper-sdk.jar`
+and their libraries. `stagePackage` removes package sealing from any sealed jar (today `jbr-api`) and adds
+`Jasper-Modified: package sealing removed` to its manifest: classes loaded from the AOT cache cannot satisfy package
+sealing once the paths the cache was trained at are gone (JDK-8376576), which would stop the JVM.
+
+### Bundled plugins
+
+Each bundled plugin's folder holds its jar and the libraries it bundles: Remote (`dev.jasper.remote`), Credential
+Vault (`dev.jasper.vault`), Editor (`dev.jasper.editor`), File Server (`dev.jasper.fileserver`), Project Index
+(`dev.jasper.indexer`), Shell History (`dev.jasper.history`), Snippets (`dev.jasper.snippets`), Enterprise
+(`dev.jasper.enterprise`, off by default) and Sample (`dev.jasper.sample`, on but inert until its demo settings are
+set). [Plugins](plugins.md#bundled-plugins) describes each.
+
+### Bundled plugins stay off the classpath
+
+jpackage adds every jar under its `--input` folder to the class path in `Jasper.cfg`, the bundled plugins' jars
+included. Plugins load only through their own class loaders: an application-loader copy of a plugin's library shadows
+the plugin's copy through the thread context class loader (MINA sshd, which Remote bundles, resolves classes that way),
+and SSH connections then fail with `ExceptionInInitializerError`. `packageApp` therefore removes the `plugins/` entries
+from `Jasper.cfg` (before signing on macOS), and `verifyPackage` fails if any remain. `./gradlew :jasper-app:run` never
+puts them on the class path.
+
+### JVM options in Jasper.cfg
+
+`Jasper.cfg` carries exactly these options, and `verifyPackage` fails on any other:
+
+- the application's: `--enable-native-access=ALL-UNNAMED`, `-Dapple.awt.application.name=Jasper`, `-Xmx2048m`,
+  `-XX:+IgnoreUnrecognizedVMOptions`, and on macOS `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and
+  `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED` for workspace glass;
+- on macOS and Windows, the options that point the native libraries at the app's `native` folder:
+  `-Dflatlaf.nativeLibraryPath=$APPDIR/native`, `-Djna.boot.library.path=$APPDIR/native`, `-Djna.nosys=true` and
+  `-Dpty4j.preferred.native.folder=$APPDIR/native`;
+- jpackage's `-Djpackage.app-version=<version>`;
+- on a trained macOS image, `-XX:AOTCache=$APPDIR/jasper.aot`.
+
+Users add their own options in `jasper.vmoptions`, which the launcher merges over these at each start
+([custom VM options](configuration.md#custom-vm-options)); when the JVM cannot start, `jasper-watch` starts Jasper again
+without the cache and then without the user's options ([start-up recovery](diagnostics.md#start-up-recovery)).
+
+## What verifyPackage checks
+
+`verifyPackage` inspects the image without starting Jasper. It first runs the launcher's native suites
+(`testLauncherCore`, `testLauncherWatch`, `testWatcher`), then checks:
+
+- **Launcher and helpers**: the launcher is Jasper's (on Linux, `lib/libapplauncher.so` too); the `jasper` command and
+  `jasper-watch` are present, executable (macOS, Linux) and signed (macOS), and `jasper --help` prints
+  `Usage: jasper`.
+- **Contents**: every staged file and every bundled plugin file is byte-identical in the image; no jar is sealed; the
+  main class, the class path (every runtime jar, no `plugins/` entry) and the exact JVM options above.
+- **Runtime**: Java 25 from JetBrains (`jbr-`) of the host architecture; exactly the modules of `runtimeModules`; a
+  default CDS archive that `java -Xshare:on` uses; `jdeps` finds no module that the application or a bundled plugin
+  needs and the runtime lacks. It logs the runtime's module count and size.
+- **Native libraries** (macOS, Windows): each is byte-identical to its jar entry and (macOS) validly signed, and a
+  headless probe with the image's runtime, options and class path loads them from `native/` and extracts nothing.
+- **macOS**: the three bridges (architecture, signature, exported JNI symbols); `Info.plist` identifier
+  `dev.jasper.app`, version and Local Network text; the icon file and catalog; the launcher's app-specific UUID;
+  `codesign --verify --deep --strict`; a trained cache accepted by `java -XX:AOTMode=on`; the SDK the launcher was
+  linked against.
+- **Windows**: the PE machine type of `Jasper.exe`, `jasper-watch.exe`, `java.exe` and `jvm.dll`, and every frame of
+  `Jasper.ico` embedded in the launcher.
+- **Linux**: the ELF machine type of the launcher, `jasper-watch` and `java`, and `lib/Jasper.png`.
+
+## Signing
+
+- **macOS**: the app is signed ad hoc (`codesign --sign -`). The `jasper` command, `jasper-watch`, the bridges and the
+  bundled native libraries carry their own signatures, and the bundle is re-signed after every edit. There is no
+  Developer ID signature and no notarization, so macOS may ask users to confirm opening an app from an unidentified
+  developer.
+- **Windows**: `Jasper.exe`, the ZIP and the setup wizard are not Authenticode-signed; Windows may warn about an
+  unknown publisher.
+- **Linux**: the `.deb` and `.rpm` are unsigned (zypper installs them with `--allow-unsigned-rpm`).
+
+Releases list every file's SHA-256 checksum in `SHA256SUMS`.
+
+## Start-up performance
+
+`gradle/packaging-support.gradle` holds what packaging decides (the runtime's modules, the native libraries, unsealing,
+the training launch); `verifyPackagingSupport`, part of `check`, tests it with fixtures, and `verifyPackage` checks a
+built image.
+
+- **Trimmed runtime.** jpackage gets an explicit list of root modules, `runtimeRootModules`, instead of every module:
+  41 modules in all, 42 on Windows, which adds `jdk.crypto.mscapi`. It is the runtime plugins may rely on
+  ([the Java runtime](plugin-authoring.md#the-java-runtime)). jlink runs with
+  `--strip-debug --no-man-pages --no-header-files --generate-cds-archive`; `lib/modules` stays uncompressed, which loads
+  classes faster, and `bin/java` stays because the JVM runs it to assemble the AOT cache.
+- **Default CDS archive.** `--generate-cds-archive` writes `lib/server/classes.jsa` (`bin\server` on Windows), the
+  fallback whenever the AOT cache cannot be used, and `classes_nocoops.jsa` for heaps too large for compressed object
+  pointers.
+- **Native libraries in the app (macOS and Windows).** FlatLaf's window library, JNA's dispatch library and pty4j's
+  `libpty` and spawn helper (its ConPTY and WinPTY files on Windows) are copied byte for byte from their jars into the
+  app's `native` folder, keeping their vendor signatures, so no launch extracts a copy under a new name and macOS can
+  reuse its signature checks. Linux keeps extraction: FlatLaf's Linux library links GTK 3, which would become a
+  package dependency.
+- **AOT cache (macOS).** A JDK 25 AOT cache, `Contents/app/jasper.aot`, holds the classes of the JDK and of the
+  application class path; plugin classes come from their own class loaders and are not in it.
+
+## macOS
+
+### The DMG
+
+`packageDist` copies the trained image with `ditto` into a folder beside an `Applications` link, builds the DMG with
+`hdiutil create -fs HFS+ -format UDZO` (volume name `Jasper`), runs `hdiutil verify`, mounts it read-only and hidden
+from Finder, and checks the copy a user installs: its modification times, its deep signature and its AOT cache. jpackage's
+own DMG step is not used because it copies without modification times, which invalidates the cache. If a mount stays
+behind, the task names the `hdiutil detach -force` command to run.
+
+### Training the AOT cache
+
+`trainAotCache` refuses an image that already has a cache. It copies the image with `ditto` to
+`jasper-app/build/packaging/aot-training-image/` and launches the copy's `Contents/MacOS/Jasper` once, in
+`jasper-app/build/packaging/aot-training/`:
+
+- `user.home` is `aot-training/home`, whose `config.toml` turns residency off (`system.run_in_background = false`)
+  and replaces the login shell with a stand-in (`/bin/sh training-shell.sh`) that prints one `jasper-aot-training$ `
+  prompt and discards its input;
+- `JAVA_TOOL_OPTIONS` asks for the cache (`-XX:AOTCacheOutput`), the start-up trace (`-Djasper.startupTrace`) and no
+  Dock icon or menu bar (`-Dapple.awt.UIElement=true`);
+- `JASPER_HOME`, `JDK_JAVA_OPTIONS`, `_JAVA_OPTIONS`, `CLASSPATH`, `JASPER_VM_OPTIONS_SKIP`, `JASPER_AOT_CACHE_SKIP`,
+  `JASPER_LAUNCH_DIAGNOSE` and `JASPER_WATCH_REPORT` are removed from the environment, and `JASPER_VM_OPTIONS` names
+  an empty file, so your own `jasper.vmoptions` never shapes the cache;
+- the bundled plugins start in their default state: Enterprise stays off, so its look is not part of the training.
+
+It needs your desktop session: a Jasper window appears for a few seconds where macOS places new windows, and anything
+typed into it goes to the stand-in. Once the trace reports start-up settled for this process as a cold start with the
+window shown, the shell's output painted and every plugin bound (at most 90 seconds), the task sends SIGTERM and the
+JVM assembles the cache as it exits (at most 300 seconds). The task then deletes the copy, so that the build machine
+checks the cache as every user's machine runs it, with the paths it was trained at gone; copies the cache to
+`Contents/app/jasper.aot`; adds `-XX:AOTCache=$APPDIR/jasper.aot` to `Jasper.cfg`; re-signs the bundle; and checks the
+cache with `java -XX:AOTMode=on`. A launch that exits early, never settles, settles without its window, output or plugins, does
+not exit in time or writes no cache fails the task; `aot-training/` keeps the trace, `training.log` and the home.
+
+Training changes `packageApp`'s output, so a later `packageApp` or `verifyPackage` rebuilds the image untrained:
+`jasper-app/build/packaging/image` then no longer matches the DMG, which is unaffected. The Release workflow trains on
+its hosted macOS runner.
+
+### Keeping the cache valid
+
+The JVM uses the cache only while every class-path jar keeps the size and modification time it had at training;
+otherwise it logs an error and starts without the cache and without the CDS archive, slower than an untrained app.
+The JVM prints that error on standard output, not standard error, so capture stdout when you run the image's `java`
+with `-XX:AOTMode=on` by hand. Moving the app or copying it with Finder, `ditto` or the DMG keeps the times; `cp -R`
+and some sync tools do not. The start-up line in Jasper's log reports the cache as `used`, `stale` or skipped
+([start-up cache](diagnostics.md#start-up-cache-packaged-macos-app)).
+
+### macOS 26 window controls
+
+AppKit draws the macOS 26 window controls only for a process whose main executable was built against the macOS 26
+SDK or later. Jasper's launcher is linked against the installed Xcode SDK, so its build-version load command records
+that SDK; `verifyPackage` checks that it matches the installed SDK and warns when it predates macOS 26. Only the
+packaged app benefits: `./gradlew :jasper-app:run` and `installDist` launch the runtime's own `java`, which keeps the
+earlier controls.
+
+### macOS Local Network access
+
+macOS asks before an app connects to a host on the local network; without the permission, a connection fails with
+`EHOSTUNREACH` ("No route to host"), which is how a Remote SSH connection to a LAN host fails. `packageApp` sets
+`NSLocalNetworkUsageDescription` to "Jasper connects to SSH hosts on your local network." for the prompt.
+
+macOS also attributes network requests by the main executable's Mach-O `LC_UUID`, and jpackage puts the same generic
+launcher UUID in every app it builds. Before signing, `packageApp` therefore gives Jasper's launcher a UUID of its own,
+derived with SHA-256 from the bundle identifier `dev.jasper.app` and Jasper's compiled launcher. The same inputs give
+the same UUID; rebuilding the launcher with another Xcode or changed launcher sources gives a new one, and macOS then
+asks for Local Network access again. `verifyPackage` checks the UUID and the final signature, and
+`verifyMacLauncherIdentity` (part of `check`) tests the derivation. Apple recommends an Apple-issued signing identity for
+reliable permission tracking, which the ad-hoc signature is not
+([TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy),
+[TN3178](https://developer.apple.com/documentation/technotes/tn3178-checking-for-and-resolving-build-uuid-problems)).
+Command-line tools started from Apple's Terminal are exempt from the permission, so a working
+`./gradlew :jasper-app:run` there does not show that the packaged app has it.
+
+## Windows
+
+### Portable ZIP
+
+`packageDist` zips the verified image as one `Jasper` folder, in a reproducible order without timestamps. Users extract
+the whole folder and run `Jasper.exe`; the launcher, `jasper-watch.exe`, `bin`, `app` and `runtime` must stay together.
+
+### Windows setup wizard
+
+`packageInstaller` builds the setup wizard from the same verified image with jpackage and WiX: a per-user installation
+(no administrator rights), an installation folder chooser (`--win-dir-chooser`, default folder `Jasper`), shortcut choices for the Start
+menu (group `Jasper`) and the desktop, and an entry in Windows Installed apps for uninstalling. Build with a JBR SDK 25
+of the target architecture and WiX on `PATH`; users need neither. This path is verified with the portable
+[WiX 3.14.1 binaries](https://github.com/wixtoolset/wix3/releases/tag/wix3141rtm): extract `wix314-binaries.zip` and
+add the folder holding `candle.exe` and `light.exe` to the build shell's `PATH`.
 
 ```powershell
 $env:JAVA_HOME = 'C:\path\to\jbrsdk-25-windows-aarch64'   # or -x64
@@ -134,261 +307,265 @@ $env:PATH = "C:\path\to\wix;$env:JAVA_HOME\bin;$env:PATH"
     '-Dorg.gradle.java.installations.auto-detect=false' :jasper-app:packageInstaller
 ```
 
-`packaging\windows\Build-Installer.ps1` does the same without changing the calling
-shell: it finds a JBR SDK 25 of the build machine's own architecture (`JAVA_HOME`,
-`~\.jdks`, `~\.gradle\jdks`) and WiX 3 (PATH, Tauri's `%LOCALAPPDATA%\tauri\WixTools314`,
-the WiX v3 installer). Options: `-Architecture x64|aarch64` picks the target instead,
-`-Package Dist` builds the ZIP instead, `-Version 1.0.1`, `-JavaHome` and `-WixPath`
-override discovery.
+`packaging\windows\Build-Installer.ps1` does the same without changing the calling shell. It finds a JBR SDK 25 of
+the target architecture (the build machine's unless `-Architecture` names another) in `JAVA_HOME`, `~\.jdks\jbrsdk*`
+or `~\.gradle\jdks\jbrsdk*`, and WiX 3 on `PATH`, in `%LOCALAPPDATA%\tauri\WixTools314` or in
+`%ProgramFiles(x86)%\WiX Toolset v3*\bin`.
 
-The package's architecture is the Gradle JVM's and the selected JBR toolchain's, which
-must match. On Windows on Arm, build the **ARM64** package for that machine: an x64
-Jasper there runs entirely under Windows' x64 emulation, including the code the JVM
-compiles as it runs, which makes every launch and every new window markedly slower
-(a bare launch of the same build: about 150 ms native, 250 ms emulated). Build an x64 package on an ARM64 machine only for x64 machines
-(`-Architecture x64`; Gradle then runs under emulation too). `verifyPackage` reads the
-launcher's, `java.exe`'s and `jvm.dll`'s PE headers and fails if any is not the
-target architecture. Both architectures share the upgrade identity below, so an ARM64
-setup replaces an existing x64 installation. The task is not part of `check` and
-never opens the app or installs it on the build machine.
+| Option | Effect |
+|---|---|
+| `-Package Installer\|Dist` | Build the setup wizard (default) or the portable ZIP |
+| `-Architecture x64\|aarch64` | Target another architecture than the build machine's |
+| `-Version 1.0.1` | Pass `-PjasperVersion` |
+| `-JavaHome`, `-WixPath` | Name the SDK and the WiX folder instead of finding them |
 
-Use `-PjasperVersion=1.0.1` (and increasing three-part versions thereafter) to build
-upgrades. Keep the `upgradeUuid` in `gradle/packaging.gradle` unchanged across releases.
-The installer detects the previous per-user installation and replaces its program
-files. Settings, Vault data, and plugins under `%APPDATA%\jasper` (or a custom Jasper
-home outside the installation folder) are not installer-owned and are preserved on upgrade and uninstall. Quit
-Jasper, including its background resident process, before upgrading or uninstalling.
-Installing the wizard does not remove a separately extracted portable copy.
+The package's architecture is that of the selected JBR SDK, which must match the host's. On Windows on Arm, build the
+ARM64 package: an x64 Jasper there runs entirely under Windows' x64 emulation, including the code the JVM compiles as
+it runs, which makes every launch and every new window markedly slower. Build an x64 package on an ARM64 machine only
+for x64 machines (`-Architecture x64`; Gradle then runs under emulation too).
 
-Before publishing the executable, the build inspects its generated MSI payload
-without installing it: product/version/upgrade identity, x64 architecture,
-per-user scope, directory/shortcut dialogs, shortcuts, and upgrade removal action.
-The build fails if those checks do not pass. Install, upgrade, and uninstall still
-need the interactive acceptance checks below. The generated setup is unsigned;
-Windows may show an unknown-publisher warning until release signing is configured.
+Both architectures share one upgrade code (`upgradeUuid` in `gradle/packaging.gradle`; keep it unchanged), so a newer
+setup replaces the program files of an earlier per-user installation, and an ARM64 setup replaces an x64 one. Build
+upgrades with increasing versions (`-PjasperVersion`). Settings, Vault data and plugins live in Jasper home
+(`%APPDATA%\jasper`, or a `JASPER_HOME` outside the installation folder), which the installer neither owns nor removes
+on upgrade or uninstall. Quit Jasper, including its background process, before upgrading or uninstalling. Installing
+the wizard leaves a separately extracted portable copy alone.
 
-The package includes `jasper-app.jar`, `jasper-terminal.jar`, `jasper-buddy.jar`,
-their runtime dependencies and a JBR runtime; it needs no external Java.
-The Buddy test-fixtures artifact is excluded from the production distribution. Current development
-packages have only jpackage's local ad-hoc signature, not a Developer ID signature,
-and use the official Ember Jasper icon. Distribution signing and notarization remain
-outstanding. See [icon sources, platform framing and regeneration](../packaging/icons/README.md)
-for the macOS ICNS, Windows ICO, Linux PNG/hicolor and runtime PNG assets.
+Before it publishes the setup, the task inspects the MSI it embeds with `packaging\windows\Verify-Installer.ps1`,
+without installing it: product name `Jasper`, version and upgrade code, no `ALLUSERS` (per-user), the x64 Windows
+Installer platform (jpackage's template declares x64 for an ARM64 payload too; `verifyPackage` checks the binaries'
+own architecture), the folder and shortcut dialogs, at least two shortcuts, and the upgrade rows and removal action.
+The task never installs or opens Jasper.
 
-## macOS 26 window controls
+### User installation without a compiler
 
-AppKit draws the macOS 26 window controls only for a process whose main executable was
-built against the macOS 26 SDK or later. Jasper's launcher is compiled with the installed
-Xcode SDK, so its build-version load command records that SDK; `verifyPackage` checks it
-and warns when the SDK predates macOS 26. Only the packaged app benefits:
-`./gradlew :jasper-app:run` and `installDist` launch the runtime's own `java` binary, which
-keeps the legacy controls.
+`installWindowsUser` installs Jasper for the current user from the source tree with only a JBR SDK 25: no C/C++
+compiler, WiX, installer or administrator rights. In IntelliJ it is **jasper-app › distribution › installWindowsUser**
+in the Gradle tool window; from a shell:
 
-## Bundled plugins stay off the classpath
+```powershell
+.\gradlew.bat :jasper-app:installWindowsUser
+.\gradlew.bat :jasper-app:uninstallWindowsUser
+```
 
-jpackage adds every jar under its `--input` directory to the application classpath in
-`Jasper.cfg`, including the bundled plugins staged in `app/plugins/`. Plugins must load only
-through their own `PluginClassLoader`: MINA sshd resolves classes through the thread context
-class loader, which is the application loader, so an application-loader copy of sshd or
-BouncyCastle fails to cast to the plugin's copy, and every SSH connection in the packaged app
-failed with `ExceptionInInitializerError`. `packageApp` removes the `plugins/` entries from
-`Jasper.cfg` (then re-signs on macOS), and `verifyPackage` fails if any remain.
-`./gradlew :jasper-app:run` never had them on the classpath.
+`stageWindowsUser` stages the application jar, its runtime libraries, the bundled plugins and `config.example.toml` in
+`jasper-app/build/packaging/windows-user/input/`, and `packageWindowsUser` builds an app image from them in
+`windows-user/image/Jasper` on every run. It has the trimmed runtime, JVM options, native libraries and plugin-free
+class path of `packageApp`'s image, but jpackage's standard launcher in place of Jasper's, with jpackage's default file
+description (`Jasper`, the name Task Manager shows), and neither `jasper-watch` nor the `jasper` command, so this
+installation ignores `jasper.vmoptions` and has no [start-up recovery](diagnostics.md#start-up-recovery).
 
-## Start-up performance
+A Java helper in `packaging/windows/user-install/` (compiled against JNA by `compileWindowsUserInstaller`) then installs
+the image as `%APPDATA%\JasperApp` and creates the Start menu shortcut `Jasper.lnk`, through Windows APIs rather than
+PowerShell, so script execution can stay disabled; Windows must still allow the image's `Jasper.exe` to run. It copies
+the image beside that folder and swaps it in, restoring the previous installation and shortcut if a step fails. It
+refuses while that installation's `Jasper.exe` runs (exit Jasper, including its background process, first), and
+refuses a folder without its `.jasper-user-install` marker, a symbolic link or junction anywhere in the tree, and a
+shortcut that starts another installation. `uninstallWindowsUser` compiles only the helper; it removes the folder, the
+shortcut, and the `Jasper` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` when that value starts this
+installation, and leaves Jasper home (`%APPDATA%\jasper`). Start Jasper from the Start menu;
+`system.run_in_background` decides residency and the login start as in any other installation.
 
-Part 2 of the [start-up design](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) makes the packaged app
-start faster without application code. `gradle/packaging-support.gradle` holds the lists and helpers;
-`verifyPackagingSupport` (part of `check`) tests them with fixtures, and `verifyPackage` checks a built image.
+Run `installWindowsUser` in a build of its own: one that also runs `packageApp`, `packageDist`, `buildLauncher`,
+`buildWatcher`, `buildCommandClient`, `trainAotCache` or a `compileMac…` task fails with "Run installWindowsUser
+separately from native build and packaging tasks." `verifyWindowsUserInstall`, part of `check` on every host, tests the
+helper's install, update, rollback, ownership, link and data-preservation rules against a fake desktop, and on Windows
+also real shortcuts, registry values and a junction.
 
-- **Trimmed runtime.** jpackage gets an explicit module list (`runtimeRootModules`) instead of every module with
-  `--bind-services`, which also bound javac, jshell, jlink, jpackage and JBR's JCEF and JOGL. The list is the runtime
-  plugins may rely on ([The Java runtime](plugin-authoring.md#the-java-runtime)): 41 modules, 42 on Windows.
-  `verifyPackage` fails when the packaged runtime has other modules or when `jdeps` finds that the application or a
-  bundled plugin needs one it lacks, and logs the runtime's size. `lib/modules` stays uncompressed (jlink's default),
-  which loads classes faster; `bin/java` stays because the AOT cache assembly runs it. This does not shrink the
-  runtime much on disk: `lib/modules` fell from 146 MB to 96 MB, but jlink now writes two default CDS archives
-  (`classes.jsa`, 31 MB, and `classes_nocoops.jsa`, 32 MB), and other removals outside `lib/modules` (files of the
-  dropped modules) offset only part of those 63 MB, so the runtime is 189 MB against 192 MB before.
-- **Default CDS archive.** jlink's `--generate-cds-archive` writes `lib/server/classes.jsa` (`bin\server` on Windows),
-  the fallback whenever the AOT cache cannot be used, and `classes_nocoops.jsa` for heaps too large for compressed
-  object pointers. `verifyPackage` runs the bundled `java -Xshare:on`.
-- **Native libraries in the app (macOS and Windows).** FlatLaf's window library, JNA's dispatch library and pty4j's
-  `libpty` and spawn helper (its ConPTY files on Windows) are copied byte for byte from their jars into
-  `Contents/app/native/` (`app\native\`), keeping their vendor signatures, and `Jasper.cfg` points the libraries there
-  (`flatlaf.nativeLibraryPath`, `jna.boot.library.path` with `jna.nosys`, `pty4j.preferred.native.folder`). No launch
-  extracts a copy under a new name, so macOS can reuse its signature checks. `verifyPackage` compares each file with its
-  jar, checks its signature on macOS and runs `BundledNativesProbe` headless with the image's runtime, options and class
-  path: `-Xlog:library` must show the libraries loaded through `System.load` (FlatLaf's and JNA's dispatch library)
-  coming from the image, the probe must report pty4j's `libpty` and spawn helper (opened through JNA, so not in that
-  log) resolved to files under `native/`, and the probe's temporary folders must stay empty. Linux keeps extraction: FlatLaf's Linux library links GTK 3, which would become a package dependency.
-- **AOT cache (macOS).** `trainAotCache` launches a `ditto` copy of the freshly built image once (deleted before
-  verification, so the cache records paths that exist on no machine) and records a JDK 25 AOT cache,
-  `Contents/app/jasper.aot` (about 60 MB), then adds `-XX:AOTCache=$APPDIR/jasper.aot` to `Jasper.cfg` and re-signs.
-  `packageDist` always trains; `packageApp` trains only with `-Pjasper.aot=true`. The cache holds the JDK's and the
-  application class path's classes, not plugin classes, which come from their own class loaders. `verifyPackage` runs
-  the image's `java -XX:AOTMode=on` with the launcher's options and class path, which fails for a stale or broken cache
-  and reports the JVM's output. `Jasper.cfg` carries no other JVM tuning: C1-only compilation and SerialGC measured no
-  gain.
+## Linux packages
 
-### Training the AOT cache
+`packageDist` on Linux runs `packageDeb` and `packageRpm`, which build the `.deb` and `.rpm` from the verified image.
+Each format names the architecture its own way: Debian's `amd64` and `arm64` are RPM's `x86_64` and `aarch64`. An x64
+machine builds the x64 pair and an aarch64 machine the aarch64 pair; JetBrains ships no 32-bit Linux runtime.
 
-The training launch is isolated like `startupBench`: a temporary `user.home` under
-`jasper-app/build/packaging/aot-training/` whose configuration replaces the login shell with a stand-in that prints
-one prompt and discards input, keeps residency off and enables the bundled plugins, plus `-Dapple.awt.UIElement=true`
-(no Dock icon or menu bar) and `-Djasper.startupTrace`. It needs your desktop session: a Jasper window appears for a
-few seconds where macOS places new windows, and anything typed into it goes to the stand-in. When the trace reports
-start-up settled with the shell's output painted and every plugin bound, the task sends SIGTERM and the JVM assembles
-the cache as it exits. The launch settles in about 3-4 s, then the JVM writes the cache (about 1 s). A launch that
-exits early, never settles, or settles without its window, output or plugins fails the task. The trace, the log and
-the isolated home stay in `aot-training/` for diagnosis.
+```bash
+sudo apt-get install fakeroot rpm cpio binutils g++
+./gradlew :jasper-app:packageDist -PjasperVersion=1.0.1
+./gradlew :jasper-app:packageDeb    # or packageRpm, for one format only
+```
 
-### Keeping the cache valid
+Both packages are named `jasper` and install the image to `/opt/jasper`, with the launcher at `/opt/jasper/bin/Jasper`
+and a desktop menu entry (`/opt/jasper/lib/jasper-Jasper.desktop`, categories
+`System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper/lib/Jasper.png`) registered through
+`xdg-desktop-menu`. The package description, which is also the menu entry's comment, is "Jasper DevOps workstation" and
+the home page `https://github.com/an0nn30/Jasper`. The `.deb` depends on the Debian packages that jpackage finds for
+the runtime's shared libraries on the build machine. The `.rpm` requires, by soname, every shared library the image
+needs but does not bundle (for example `libX11.so.6()(64bit)`), which every RPM distribution resolves: jpackage's own
+RPM lookup asks the build machine's RPM database, which is empty on a Debian-family host. Before publishing either package,
+the task checks its name, version and architecture, unpacks it without installing it, compares every file with the
+verified image byte for byte (jpackage rewrites only `lib/app/.jpackage.xml`), checks the executable bits and the
+desktop entry, and checks the install scripts.
 
-The JVM uses the cache only while every class-path jar keeps the size and modification time it had at training;
-otherwise it logs an error and starts without the cache and without the CDS archive, slower than an untrained app.
-The JVM prints that error on standard output, not standard error, so capture stdout when you run the image's `java`
-with `-XX:AOTMode=on` by hand.
-Moving the app or copying it with Finder, `ditto` or the DMG keeps the times; `cp -R` and some sync tools do not.
-jpackage's own DMG step copies without times, so `packageDist` builds the DMG with `ditto` and `hdiutil`, mounts it
-read-only and hidden from Finder, and checks the installed copy's times, signature and cache. The DMG holds
-`Jasper.app` and an `Applications` link, without jpackage's background picture; it is about 156 MB.
+jpackage's install scripts register the menu entry under `set -e`, and `xdg-desktop-menu` fails unless
+`/usr/share/applications` (or `/usr/local/share/applications`) and `/usr/share/desktop-directories` exist, which would
+leave a minimal or headless system (a bare container, WSL without desktop packages) with an unconfigured package. The
+package tasks therefore generate the `postinst` and `prerm` (`.deb`) and `jasper.spec` (`.rpm`) overrides from the
+selected JBR's own templates: the menu commands run inside a function, the install creates both folders first, and a
+menu failure only prints "jasper: the desktop menu entry was not registered" (or "…removed"). Every other line is
+jpackage's, and a JBR whose templates lack the expected placeholder fails the build.
 
-## macOS Local Network access
-
-macOS asks before a Finder-launched app connects to the local network. A blocked connection
-can fail with `EHOSTUNREACH` ("No route to host"). `packageApp` adds
-`NSLocalNetworkUsageDescription` to explain the request; this string alone does not establish
-an app's identity or guarantee a prompt.
-
-macOS also uses the main executable's Mach-O `LC_UUID` to attribute network requests. JBR's
-jpackage copies a generic launcher UUID into every app. This caused Jasper's requests to be
-denied under the old **Moray** permission, with no Jasper prompt or Settings entry. Before
-signing, `packageApp` now gives the launcher an app-specific
-UUID derived from the bundle identifier and Jasper's compiled launcher bytes.
-Identical inputs produce the same UUID; other app identifiers and launcher templates produce
-different UUIDs. Because the seed is Jasper's compiled launcher, rebuilding it with a different
-Xcode or changed launcher sources gives a new UUID, and macOS asks for Local Network access once
-more after such an update. `verifyPackage` verifies this identity and the final bundle signature.
-`./gradlew check` includes portable binary regression checks, without launching an app.
-
-Development images still have an ad-hoc signature. Apple recommends an **Apple-issued signing
-identity** for reliable Local Network permission tracking; signing/notarization remain release
-work. A corrected UUID fixes the confirmed cross-app collision, but does not replace signing.
-Command-line tools launched from Apple's Terminal have a Local Network exception, so a
-successful `gradle run` there is not proof that the Finder-launched package has permission.
-
-To accept this fix, fully quit the old Jasper process, install the rebuilt app in Applications,
-launch it from Finder, and connect Remote to a LAN host. Allow Jasper when prompted and retry
-the connection if necessary. Confirm Jasper appears under System Settings → Privacy & Security
-→ Local Network. The new UUID is separate from Moray's old denied identity; do not edit the
-system privacy database. If no prompt appears, capture the network-service log while retrying
-and check which application identity it names. Multiple registered builds and ad-hoc signatures
-can still complicate macOS permission tracking.
-
-References: [Apple TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy)
-and [Apple TN3178](https://developer.apple.com/documentation/technotes/tn3178-checking-for-and-resolving-build-uuid-problems).
-
-## Linux icon assets
-
-Linux windows and taskbar integration use the dedicated Linux PNG set. Portable
-`installDist`, `distTar`, and `distZip` outputs carry the approved Ember icons at
-`share/icons/hicolor/<size>x<size>/apps/jasper.png`; desktop launchers can refer to
-`Icon=jasper` after that hierarchy is installed into a standard icon search path.
-`packaging/icons/Jasper.png` is a 512px package input for downstream packaging.
-The generator and tests verify it against the runtime image.
-
-The [Linux packages](#linux-packages) use the 512px `packaging/icons/Jasper.png`
-for their menu entry and do not install the hicolor hierarchy. Validate
-launcher/window appearance on the target desktop environment.
+Settings installs the `jasper` command as `~/.local/bin/jasper`
+([installing the jasper command](command-line.md#installing-the-jasper-command)). The packages do not install the
+hicolor icon tree that the portable distributions carry.
 
 ## The jasper command
 
-Each image carries the native `jasper` command ([packaging/cli](../packaging/cli/README.md)) in a `bin` folder of its
-own, because macOS and Windows file systems ignore case: `Jasper.app/Contents/Resources/bin/jasper` (signed ad hoc and
-sealed into the bundle), `bin\jasper.exe` on Windows and `lib/bin/jasper` on Linux. The installers carry it with the
-rest of the image. `verifyPackage` checks that it is there, executable and, on macOS, signed, and that `jasper --help`
-runs; the Linux install check runs it from the installed package.
+Every image carries the native `jasper` command in the place the [image layout](#image-layout) shows: signed ad hoc and
+sealed into the bundle on macOS, `bin\jasper.exe` on Windows, `lib/bin/jasper` on Linux. The installers carry it with
+the rest of the image, and Settings › Appearance & Behavior › System Settings › Command line puts it on `PATH`
+([command line](command-line.md#the-jasper-command)). `verifyPackage` runs `jasper --help`, and the Linux install check
+runs it from the installed package.
+
+## Release workflows
+
+To release, tag a clean commit `vX.Y.Z` (major 1–255, minor 0–255, patch 0–65535, no leading zeroes;
+[cutting a release](app-maintenance.md#cutting-a-release)), push the tag, and run **Actions › Release › Run workflow**
+with it.
+
+**Release** ([`release.yml`](../.github/workflows/release.yml)) runs only by hand, one run per tag at a time. It checks
+the tag and resolves its commit, then builds that commit on five runners, each with JBR 25:
+
+| Platform | Runner | Builds |
+|---|---|---|
+| Windows x64 | `windows-2025` | ZIP and setup wizard (WiX 3.14.1 downloaded) |
+| Windows ARM64 | `windows-11-arm` | ZIP and setup wizard (WiX 3.14.1 downloaded) |
+| Linux x64 | `ubuntu-22.04` | `.deb` and `.rpm`, plus the SDK jars (`sdkRelease verifySdkRelease`) |
+| Linux ARM64 | `ubuntu-22.04-arm` | `.deb` and `.rpm` |
+| macOS Apple silicon | `macos-15`, Xcode 26.3 | the trained DMG |
+
+There is no Intel macOS build. The jobs run `packageDist` (and `packageInstaller` on Windows) with `-PjasperVersion`,
+skipping the launcher's native suites (`testLauncherCore`, `testLauncherWatch`, `testWatcher`) that CI runs; the
+workflow does not run `check`. The publish job refuses to continue if the tag moved during the build, requires exactly
+the nine packages and the five SDK jars (`jasper-sdk-<v>.jar`, `jasper-sdk-<v>-sources.jar`,
+`jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and `jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is
+`JasperSdk.VERSION`, now 0.18.2), and writes `SHA256SUMS`. It creates a draft prerelease titled
+`Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds exactly those files, and
+publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which a rerun finishes; a
+published release for the tag is never overwritten.
+
+**sdk-release** ([`sdk-release.yml`](../.github/workflows/sdk-release.yml)) attaches the SDK jars to a release
+published by hand. Releases the Release workflow publishes do not trigger it, so that workflow builds the jars itself.
+Run by hand, it keeps the jars as the workflow artifact `jasper-sdk-jars`.
+
+**linux-packages** ([`linux-packages.yml`](../.github/workflows/linux-packages.yml)) runs on pushes to `main` and pull
+requests that change `gradle/packaging.gradle`, `gradle/packaging-support.gradle`, `packaging/**` or the workflow. It
+builds both packages on `ubuntu-22.04` and `ubuntu-22.04-arm`, whose detected `.deb` dependencies keep the pre-t64
+names that Debian 12 has and newer releases still provide, and uploads them as the artifacts `jasper-linux-x64` and
+`jasper-linux-aarch64` (with a `-work` artifact on failure). It then installs each package as root in disposable
+`debian:12`, `ubuntu:24.04`, `fedora:latest` and `opensuse/tumbleweed` containers of both architectures with
+[`packaging/linux/check-install.sh`](../packaging/linux/check-install.sh), which checks that the launcher,
+`jasper-watch` and the `jasper` command are executable, that `jasper --help` and the bundled `java -version` run,
+that every shared library resolves, and that the menu entry exists, then removes the package and checks that the
+program and the menu entry are gone. It never opens a window.
+
+**ci** ([`ci.yml`](../.github/workflows/ci.yml)) runs `./gradlew check --parallel --continue` on `macos-latest`,
+`ubuntu-24.04` and `windows-latest` with JBR 25 and Python 3.12, for pushes to `main` and pull requests, unless every
+changed file is Markdown or lies under `docs/` outside `docs/examples/`. Independent projects build in parallel with
+two Gradle workers on macOS and Linux and one on Windows, whose subprocess and clean-up tests miss their deadlines
+beside concurrent test JVMs; each project's tests still run one at a time, and a job times out after 30 minutes. On
+Linux it first installs the DejaVu and Noto CJK fonts (`fonts-dejavu-core`, `fonts-noto-cjk`), and afterwards builds
+the [example external plugin](examples/external-plugin) against the SDK jars that `check` wrote to `build/sdk-release/`.
+A failed job uploads its test results and reports, with the renders under `jasper-app/build/enterprise-settings/` and
+`jasper-app/build/chrome-renders/`, as the artifact `test-diagnostics-<runner>`, kept for seven days. A newer push to a
+pull request cancels its running check.
 
 ## Native acceptance checklist
 
-Perform each checklist outside the repository so source-tree classes or an external
-Java installation cannot mask a packaging problem. Windows packaging and desktop
-acceptance remain unexecuted on macOS.
+Run each checklist on an installed package, outside the repository, so that source-tree classes or an external Java
+cannot mask a packaging problem.
 
 ### macOS
 
-- [ ] Open the DMG, drag Jasper to Applications, and launch it from Finder and from the Dock.
-- [ ] After installing from the DMG with Finder, launch Jasper from the Dock: the start-up line in `~/.config/jasper/logs` reports the AOT cache as used.
-- [ ] After several launches, no new `pty4j` folders or `libflatlaf-macos-*` files appear in `$TMPDIR` and nothing new appears in `~/Library/Caches/JNA/temp`.
-- [ ] Copy the installed app with `cp -R` to another folder and launch the copy: it starts, and its start-up line reports the cache as stale.
-- [ ] Confirm the Ember Jasper icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
-- [ ] With a minimal launcher environment, confirm the shell starts and UTF-8 text renders correctly.
-- [ ] Confirm native title controls and switching between Slate Cobalt Dark and Light.
-- [ ] Confirm the window controls are the macOS 26 style (larger, glass) in the packaged app, unlike `./gradlew :jasper-app:run`.
-- [ ] Confirm multiple windows and shell-exit cleanup.
-- [ ] Confirm tmux mouse input including right-click and pane drag resizing.
-- [ ] Confirm vim and htop behavior.
-- [ ] Confirm ligatures, Nerd Font icons, emoji, CJK, and truecolor rendering.
-- [ ] Confirm Option-as-Meta and terminal resizing during streaming output.
-- [ ] Confirm split, close, zoom, pane navigation, search, and prompt navigation.
-- [ ] Confirm links, working-directory status, config live reload, and broken-config reporting.
-- [ ] Confirm the packaged app runs without a separately installed Java runtime.
-- [ ] Connect a Remote SSH host by Vault key, by agent and on a LAN address; the first LAN connection shows the Local Network prompt, and after allowing it the host connects.
-- [ ] With the default configuration, confirm `~/Library/LaunchAgents/dev.jasper.background.plist` appears after the first launch; log out and back in and confirm Jasper is running with no window, no Dock icon at any moment during login, and its menu bar item present.
-- [ ] Confirm the menu bar glyph follows the menu bar in Light and Dark appearance (and with a tinted menu bar); New Window, Settings… and Quit Jasper Completely work with Jasper in the background and with windows open, and New Window and Settings… come to the front.
-- [ ] Press Cmd+Q with two windows open: both close, the Dock icon and the Cmd+Tab entry disappear, the menu bar item stays, and `pgrep -fl Jasper.app` still lists the process. Repeat with Jasper › Quit, File › Quit and the Dock icon's Quit.
-- [ ] With an editor content tab holding unsaved changes (or another plugin window that asks before closing), press Cmd+Q and refuse: nothing closes and Jasper stays in the Dock.
-- [ ] Click the pinned Dock icon in the background: a window opens in the running process (still one process in `pgrep`), the Dock icon, Cmd+Tab entry and Jasper's menu bar return, and typing reaches the shell without a click. Repeat from Spotlight and with `open -a Jasper`.
-- [ ] Open Settings… from the menu bar item in the background: Jasper returns to the Dock for the dialog and leaves it when the dialog closes.
-- [ ] Quit Jasper Completely exits, and the next launch is cold.
-- [ ] Log out, and separately restart, once with Jasper in the background and once with a window open: Jasper never stops it.
-- [ ] Replace the installed app with a newer build while Jasper is in the background (for example `ditto` over it), then click the Dock icon: the old process exits and a window opens from the new build (the new log's start-up line). With a window open, the same click only raises it.
-- [ ] Record the warm reopen time and idle memory with the start-up benchmark's warm mode ([benchmarks](benchmarks.md#start-up-benchmark)); confirm Jasper survives sleep/wake and a monitor change in the background.
-- [ ] Set `run_in_background = false`, save, and confirm the plist is removed without restarting Jasper; after the next start Cmd+Q exits and no menu bar item appears.
-- [ ] Confirm a handoff request or a Dock click arriving while Jasper is quitting does not raise a window that is being disposed (the guard lives in `openOrRaise`; it needs a live window in flight and cannot be exercised headlessly).
+- [ ] Open the DMG, drag Jasper to Applications, and launch it from Finder and from the Dock, with no separate Java
+  installed; macOS may ask you to confirm opening an app from an unidentified developer.
+- [ ] The start-up line in `~/.config/jasper/logs` reports `AOT cache used`. Copy the installed app with `cp -R` to
+  another folder and launch the copy: it starts, and its start-up line reports `AOT cache stale`.
+- [ ] After several launches, no new `pty4j` folders or `libflatlaf-macos-*` files appear in `$TMPDIR`, and nothing new
+  appears in `~/Library/Caches/JNA/temp`.
+- [ ] The icon in Finder, the Dock and Cmd+Tab at normal and Retina sizes is Jasper's, at the size of neighbouring app
+  icons.
+- [ ] The window controls are the macOS 26 style (larger, glass), unlike `./gradlew :jasper-app:run`.
+- [ ] From a minimal launch environment, the login shell starts, UTF-8 text renders, and `tmux` (with the mouse), `vim`
+  and `htop` work.
+- [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off; Remote, Credential Vault, Editor, File
+  Server, Project Index, Shell History and Snippets work.
+- [ ] Connect a Remote SSH host by Vault key, by agent and on a LAN address. The first LAN connection shows the Local
+  Network prompt; after you allow it the host connects, and Jasper appears under System Settings › Privacy & Security ›
+  Local Network.
+- [ ] Install the `jasper` command from Settings › Appearance & Behavior › System Settings › Command line; in a new
+  terminal, `jasper` opens a window and `jasper editor <file>` opens the file in the Editor.
+- [ ] With the default configuration, `~/Library/LaunchAgents/dev.jasper.background.plist` appears after the first
+  launch. Log out and back in: Jasper is running with no window, no Dock icon at any moment during login, and its menu
+  bar item present.
+- [ ] The menu bar glyph follows the menu bar in Light and Dark appearance (and with a tinted menu bar); **New
+  Window**, **Settings…** and **Quit Jasper Completely** work with Jasper in the background and with windows open, and
+  **New Window** and **Settings…** come to the front.
+- [ ] Press Cmd+Q with two windows open: both close, the Dock icon and the Cmd+Tab entry disappear, the menu bar item
+  stays, and `pgrep -fl Jasper.app` still lists the process. Repeat with **Jasper › Quit Jasper**, **File › Quit** and
+  the Dock icon's **Quit**.
+- [ ] With an Editor tab holding unsaved changes (or another plugin window that asks before closing), press Cmd+Q and
+  refuse: nothing closes and Jasper stays in the Dock.
+- [ ] Click the pinned Dock icon while Jasper is in the background: a window opens in the running process (still one
+  process in `pgrep`), the Dock icon, Cmd+Tab entry and Jasper's menu bar return, and typing reaches the shell without
+  a click. Repeat from Spotlight and with `open -a Jasper`.
+- [ ] Open **Settings…** from the menu bar item in the background: Jasper returns to the Dock for the dialog and leaves
+  it when the dialog closes.
+- [ ] **Quit Jasper Completely** exits, and the next launch is cold.
+- [ ] Log out, and separately restart, once with Jasper in the background and once with a window open: Jasper never
+  stops either.
+- [ ] Replace the installed app with a newer build while Jasper is in the background (for example `ditto` over it),
+  then click the Dock icon: the old process exits and a window opens from the new build (the new log's start-up line).
+  With a window open, the same click only raises it.
+- [ ] Jasper survives sleep and wake and a monitor change in the background.
+- [ ] Set `system.run_in_background = false` and save: the plist is removed without a restart; after the next start
+  Cmd+Q exits and no menu bar item appears.
+- [ ] A Dock click or a second launch that arrives while Jasper is quitting does not raise a window that is being
+  closed.
 
 ### Windows
 
-- [ ] Run the setup wizard as a standard user; confirm folder selection and shortcut choices.
-- [ ] Launch through the Start menu and optional desktop shortcut, with no external Java installed.
-- [ ] Install a higher version over an existing installation; confirm one Installed apps entry and preserved settings, Vault data, and plugins.
-- [ ] Uninstall through Windows Installed apps; confirm program files and shortcuts are removed while Jasper's user data remains.
-- [ ] Build on Windows with a JBR 25 x64 SDK, extract the entire ZIP to a path containing spaces, and launch `Jasper.exe` from Explorer.
-- [ ] Confirm `app\native\` holds FlatLaf's DLL, `jnidispatch.dll` and pty4j's `win\x86-64` (x64) or `win\aarch64` (ARM64) files, and that launching Jasper creates no `flatlaf-windows-*` file, `jna*.tmp` file or `pty4j` folder under `%TEMP%`.
-- [ ] Confirm the Ember Jasper icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
-- [ ] Confirm PowerShell/PTY input and resize behavior, including Unicode text.
-- [ ] Confirm clipboard operations and tab shortcuts.
-- [ ] Confirm the Settings location and live reload.
-- [ ] Confirm switching between Slate Cobalt Dark and Light, multiple windows, and shell-exit cleanup.
-- [ ] Confirm tmux mouse input including right-click and pane drag resizing.
-- [ ] Confirm vim and htop behavior.
-- [ ] Confirm ligatures, Nerd Font icons, emoji, CJK, and truecolor rendering.
-- [ ] Confirm split, close, zoom, pane navigation, search, and prompt navigation.
-- [ ] Confirm links, working-directory status, and broken-config reporting.
-- [ ] Confirm the packaged app runs without a separately installed Java runtime.
-- [ ] Confirm `AF_UNIX` sockets work: with the default configuration, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.
-- [ ] With a resident Jasper and no window, click Jasper in the Start menu while another application is in front: the new window opens **in front, focused**. With a Jasper window open behind another application, click it again: that window comes forward (at worst about 300 ms later, the raise's retry) rather than only flashing on the taskbar.
-- [ ] On Windows on Arm, confirm Task Manager's Architecture column (Details tab) shows `ARM64` for `Jasper.exe`, not `x64`.
-- [ ] Leave a resident Jasper with no window for a few hours, then open one: the log's `Window (handoff)` line ends with `no window for … before, … page faults until shown, working set … to … MB`, and the log has `Resident Jasper keeps a soft working-set floor of … MB` from start-up. Many thousands of page faults with a much smaller starting working set mean Windows trimmed the resident despite the floor.
-- [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident. Also start Jasper by hand during sign-in: the `--background` launch then finds it resident and exits at once (`Started with --background while a resident Jasper is running; exiting`), instead of starting its plugins first.
-- [ ] Confirm Quit exits completely, that the notification-area icon appears only once start-up has settled (the first output painted, a finished `--background` warm-up, or 2 s after the first paint) rather than at launch, and that setting `run_in_background = false` removes the Run value.
+- [ ] Run the setup wizard as a standard user; folder selection and the shortcut choices work.
+- [ ] Launch Jasper from the Start menu and the optional desktop shortcut, with no Java installed.
+- [ ] Install a higher version over an existing installation: Installed apps shows one entry, and settings, Vault data
+  and plugins are kept.
+- [ ] Uninstall through Installed apps: the program files and shortcuts are removed, and Jasper home remains.
+- [ ] Extract the whole ZIP to a path containing spaces and launch `Jasper.exe` from Explorer.
+- [ ] On a machine without MSVC or WiX and with PowerShell script execution disabled,
+  `.\gradlew.bat :jasper-app:installWindowsUser` installs Jasper, which starts from its Start menu shortcut; after
+  quitting it, `uninstallWindowsUser` removes `%APPDATA%\JasperApp`, the shortcut and the Run value, and Jasper home
+  remains.
+- [ ] `app\native\` holds FlatLaf's DLL, `jnidispatch.dll` and pty4j's `win\x86-64` (x64) or `win\aarch64` (ARM64)
+  files, and launching Jasper creates no `flatlaf-windows-*` file, `jna*.tmp` file or `pty4j` folder under `%TEMP%`.
+- [ ] The icon in Explorer, the taskbar, Alt+Tab and the title bar is Jasper's at 100%, 150% and 200% display scale.
+- [ ] PowerShell input, Unicode text and resizing work in a terminal tab.
+- [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off.
+- [ ] Install the `jasper` command from Settings; in a new terminal, `jasper --help` lists the plugin commands.
+- [ ] With the default configuration, a second launch of `Jasper.exe` shows a window in the running Jasper and the
+  second process exits.
+- [ ] With a resident Jasper and no window, click Jasper in the Start menu while another application is in front: the
+  new window opens in front, focused. With a Jasper window open behind another application, click it again: that
+  window comes forward rather than only flashing on the taskbar.
+- [ ] On Windows on Arm, Task Manager's Architecture column (Details tab) shows `ARM64` for `Jasper.exe`.
+- [ ] Leave a resident Jasper with no window for a few hours, then open one: the log's `Window (handoff)` line ends with
+  `no window for … before, … page faults until shown, working set … to … MB`, and the log has
+  `Resident Jasper keeps a soft working-set floor of … MB` from start-up. Many thousands of page faults with a much
+  smaller starting working set mean Windows trimmed the resident process despite the floor.
+- [ ] The `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`; after signing out and in,
+  Jasper is resident. Start Jasper by hand during sign-in too: the `--background` launch then finds it resident and
+  exits at once (`Started with --background while a resident Jasper is running; exiting`).
+- [ ] **Quit Jasper** in the notification-area icon exits completely; the icon appears only once start-up has settled
+  (the first output painted, a finished `--background` warm-up, or 2 seconds after the first paint); setting
+  `system.run_in_background = false` removes the Run value.
 
 ### Linux
 
-- [ ] Install the `.deb` on Debian/Ubuntu and the `.rpm` on Fedora (or openSUSE), on x64 and on aarch64, with no external Java installed.
-- [ ] Launch Jasper from the desktop menu; confirm the Ember icon in the menu, the dock/taskbar and the window switcher, and that the running window groups with its launcher (not a generic icon) on GNOME and KDE, under X11 and Wayland.
-- [ ] Confirm the shell starts, UTF-8 text renders, and Settings lives under `~/.config/jasper` (or `$XDG_CONFIG_HOME/jasper`).
-- [ ] Confirm switching between Slate Cobalt Dark and Light, multiple windows, and shell-exit cleanup.
-- [ ] Confirm tmux mouse input including right-click and pane drag resizing.
-- [ ] Confirm vim and htop behavior.
-- [ ] Confirm ligatures, Nerd Font icons, emoji, CJK, and truecolor rendering.
-- [ ] Confirm clipboard (including primary selection, if supported) and links.
-- [ ] Confirm Remote SSH connections.
-- [ ] Upgrade to a higher `-PjasperVersion` package and confirm settings, Vault data and plugins are preserved; remove the package and confirm `/opt/jasper` and the menu entry are gone while `~/.config/jasper` remains.
-
-## Historical terminal readiness verification
-
-The readiness branch's macOS arm64 package at runtime revision `8d84e7d` passed a fresh `./gradlew build :jasper-app:packageDist --rerun-tasks`: 576 tests, 575 passed and one known font skip, zero failures/errors; all 16 tasks executed. Native image/runtime/dependency checks, strict bundle seal and DMG integrity passed. This automated verification and controlled fixture benchmarking do not complete the interactive checklist above.
-
-See the [readiness ledger](terminal-readiness.md) for the exact artifact checksum, measurement report and pending CI/macOS/Windows gates. After installing, also check modifier changes during tmux mouse drags, multiple mouse buttons, multi-notch scrolling, whole-word dragging, CJK/emoji selection edges, browser opening, and blinking after hide/show or pane reparenting. Leave the two-week trial unstarted until the acceptance gates are resolved.
+- [ ] Install the `.deb` on Debian or Ubuntu and the `.rpm` on Fedora or openSUSE, on x64 and on aarch64, with no Java
+  installed.
+- [ ] Launch Jasper from the desktop menu: Jasper's icon shows in the menu, the dock or taskbar and the window
+  switcher, and the running window groups with its launcher on GNOME and KDE, under X11 and Wayland.
+- [ ] The login shell starts, UTF-8 text renders, and Jasper home is `~/.config/jasper` (or `$XDG_CONFIG_HOME/jasper`).
+- [ ] The clipboard (including the primary selection, where the desktop has one) and links work.
+- [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off; a Remote SSH connection works.
+- [ ] Install the `jasper` command from Settings: `~/.local/bin/jasper --help` lists the plugin commands.
+- [ ] Upgrade to a package with a higher version: settings, Vault data and plugins are kept. Remove the package:
+  `/opt/jasper` and the menu entry are gone, and `~/.config/jasper` remains.

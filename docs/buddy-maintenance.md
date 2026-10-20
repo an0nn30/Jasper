@@ -3,7 +3,7 @@
 Read the [embedding contract](../jasper-buddy/README.md) and
 [owner map](buddy-architecture.md) before changing code. Repository builds require JBR 25
 and `./gradlew`. Buddy is a JDK-only library; native windows, persistence and app policy
-must keep their existing ownership. The app's [producer recipe](app-maintenance.md)
+must keep their existing ownership. The app's [producer recipe](app-maintenance.md#new-buddy-notice-producer)
 covers translating a terminal/workspace event into a notice.
 
 ## Add or change a notice producer
@@ -13,56 +13,71 @@ covers translating a terminal/workspace event into a notice.
    [BuddyCompanion](../jasper-buddy/src/main/java/dev/jasper/buddy/view/BuddyCompanion.java).
    Choose a distinct source and stable opaque key, and a state compatible with the kind.
 2. Keep the producer outside the library. Post on EDT; detail suppliers read a cheap
-   snapshot and activation requests return quickly. Repost an ID for a new state; use
-   `updateTitle` for wording that must not count as a new post.
+   snapshot (Buddy reads them on every paint) and activation requests return quickly.
+   Repost an ID for a new state; use `updateTitle` for wording that must not count as a
+   new post, and let the supplier carry changing detail without a repost.
 3. When the work ends, and on producer close, invalidate identity before cancelling delayed
    callbacks, then `dismiss` the notice. Report how the work ended through the host's
-   notifications, never through Buddy.
+   notifications, never through Buddy. The user can dismiss a notice from the drawer
+   without the producer hearing of it; a later post of the same ID shows it again.
 4. On host shutdown, close producers before the companion. Verify a callback saved
    before closure cannot post afterward. Hiding the companion must retain notices.
 
 Follow [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java)
-and its [tests](../jasper-app/src/test/java/dev/jasper/app/notifications/CommandNotifierTest.java).
-For model semantics, use [BuddyDeckTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/model/BuddyDeckTest.java)
+(terminal commands) or [ActivityNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/ActivityNotifier.java)
+(plugin activities and connections) and their tests. A plugin-facing change belongs in the
+SDK's activity API, which `ActivityNotifier` consumes; plugins cannot call Buddy. App tests
+that need to inspect posted notices use
+[BuddyTestSupport](../jasper-buddy/src/testFixtures/java/dev/jasper/buddy/view/BuddyTestSupport.java)
+through `testImplementation(testFixtures(project(":jasper-buddy")))`. For model semantics,
+use [BuddyDeckTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/model/BuddyDeckTest.java)
 and [BuddyNoticeTest](../jasper-buddy/src/test/java/dev/jasper/buddy/notice/BuddyNoticeTest.java).
 
 ```sh
-./gradlew :jasper-app:test --tests '*CommandNotifierTest' :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyNoticeTest'
+./gradlew :jasper-app:test --tests '*CommandNotifierTest' --tests '*ActivityNotifierTest' :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyNoticeTest' --tests '*BuddyNoticeIdTest'
 ```
 
 ## Change options or the supported API
 
 Start with [BuddyOptions](../jasper-buddy/src/main/java/dev/jasper/buddy/config/BuddyOptions.java)
 and the facade. Propagate a new option through validation, builder defaults, `toBuilder`,
-facade application, affected presentation owners and the host's options construction.
+facade application, affected presentation owners and the host's options construction
+(Jasper's [BuddyIntegration](../jasper-app/src/main/java/dev/jasper/app/application/BuddyIntegration.java)).
 Keep options resource-free and callbacks EDT-only; initial position must remain a
-first-realization input. The current font input supplies the font from which fixed
-presentation styles/sizes are derived, not a global scale factor.
+first-realization input. The font input supplies the family and attributes from which
+fixed presentation styles and sizes are derived, not a global scale factor.
 
 Update [BuddyOptionsTest](../jasper-buddy/src/test/java/dev/jasper/buddy/config/BuddyOptionsTest.java)
 to prove one-field changes preserve every unrelated value and callback. Cover
-validation and post-close behavior in [BuddyCompanionTest](../jasper-buddy/src/test/java/dev/jasper/buddy/view/BuddyCompanionTest.java).
+validation and post-close behaviour in [BuddyCompanionTest](../jasper-buddy/src/test/java/dev/jasper/buddy/view/BuddyCompanionTest.java).
 Update the README example together with [BuddyExamplesTest](../jasper-buddy/src/test/java/dev/jasper/buddy/documentation/BuddyExamplesTest.java):
 the app documentation check compares their marked bodies verbatim. An API change also
 needs the explicit five-type allowlist and signature check reviewed; making an internal
-class Java-public does not make it supported.
+class Java-public does not make it supported. [BuddyApiTest](../jasper-buddy/src/test/java/dev/jasper/buddy/architecture/BuddyApiTest.java)
+requires the facade's single `BuddyOptions` constructor and `void` returns on every
+public method except `show()`. Supported types carry Javadoc that doclint checks;
+`internal` packages are excluded from the Javadoc. On the app side,
+[BuddyVisibilityTest](../jasper-app/src/test/java/dev/jasper/app/notifications/BuddyVisibilityTest.java)
+covers when Jasper shows Buddy and
+[BuddyStateFileTest](../jasper-app/src/test/java/dev/jasper/app/persistence/BuddyStateFileTest.java)
+how `buddy.toml` saves his position.
 
 ```sh
 ./gradlew :jasper-buddy:test --tests '*BuddyOptionsTest' --tests '*BuddyCompanionTest' --tests '*BuddyApiTest' --tests '*BuddyExamplesTest'
-./gradlew :jasper-app:test --tests '*AppDocumentationTest' :jasper-buddy:javadoc verifyApplicationArchitecture
+./gradlew :jasper-app:test --tests '*AppDocumentationTest' --tests '*BuddyIntegrationTest' --tests '*BuddyVisibilityTest' --tests '*BuddyStateFileTest' :jasper-buddy:javadoc verifyApplicationArchitecture
 ```
 
 ## Change notice ordering or capacity
 
 Edit [BuddyDeck](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyDeck.java),
 then its model tests. Preserve source-plus-key identity, newest-first replacement, the
-50-notice bound and immutable snapshots. Every retained notice is live work; the column
-and the drawer read the same snapshot. Layout's three-card column limit is separate from
-retained model capacity. Exercise the panels too when a model change affects what is
-displayed.
+50-notice bound (`MAX_NOTICES`) and immutable snapshots. Every retained notice is live
+work; the column and the drawer read the same snapshot. The column's three-capsule limit
+(`BuddyDeckLayout.MAX_IN_COLUMN`) is separate from retained model capacity. Exercise the
+panels too when a model change affects what is displayed.
 
 ```sh
-./gradlew :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest'
+./gradlew :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyDeckLayoutTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest'
 ```
 
 ## Change sprite animation or capsule motion
@@ -75,8 +90,9 @@ displayed.
    `BubbleSpring` and `BuddyColumnPlacement`. Keep calculations caller-clock-driven;
    schedule Swing timers only in presentation owners.
 3. Extend clock-driven tests for interrupted motion, long clock gaps, hiding, working
-   transitions and retargeting. Verify the exact path being changed: idle deadline
-   resolution does not establish constant-time working catch-up.
+   transitions and retargeting. Verify the exact path being changed: idle postures
+   resolve absolute deadlines in constant time, while the working loop steps through
+   every elapsed typing frame.
 
 [BuddyAnimatorTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/animation/BuddyAnimatorTest.java),
 [BubbleMotionTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/animation/BubbleMotionTest.java)
@@ -90,13 +106,15 @@ are the starting tests. `BuddyColumnPanelTest` covers identity-based interrupted
 ## Change presentation, dragging or native lifetime
 
 Use [BuddyCard](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/presentation/BuddyCard.java)
-for shared text/materials; column and drawer panels own their input and paint state.
-Placement helpers own screen geometry; `BuddyDragFrames` coalesces pointer updates.
-`BuddyWindow` owns native acquisition and child disposal. Preserve nonfocusable surfaces,
-nearest-neighbor sprite sampling and the documented logical dimensions, screen clamps, drag-end position reporting and hidden
-state retention. Add cleanup when acquiring a new timer, window or global listener.
-Check both initialization failure and final disposal; no new native acquisition belongs
-in a facade constructor or a model mutation.
+for shared text/materials; column, drawer and bubble panels own their input and paint
+state. Placement helpers (`BuddyPlacement`, `BuddyColumnPlacement`, `BuddyBubblePlacement`)
+own screen geometry; `BuddyDragFrames` coalesces pointer updates. `BuddyWindow` owns
+native acquisition and child disposal. Preserve nonfocusable surfaces, nearest-neighbour
+sprite sampling and the sprite's logical size (a 42 × 48 frame at scale 2.5), screen
+clamps, drag-end position reporting and hidden state retention. Add cleanup when
+acquiring a new timer, window or global listener. Check both initialization failure and
+final disposal; no new native acquisition belongs in a facade constructor or a model
+mutation.
 
 Drive package-local panel handlers and injected clocks in headless tests. Geometry/window
 predicate tests do not instantiate a native `JWindow`; desktop layering, actual focus,
@@ -104,30 +122,42 @@ monitor changes, drag persistence, repeated hide/show and queued-event disposal 
 human-run acceptance. Do not claim those checks from image previews.
 
 ```sh
-./gradlew :jasper-buddy:test --tests '*BuddyCardTest' --tests '*BuddyShimmerTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest' --tests '*BuddyDragFramesTest' --tests '*BuddyCompanionTest'
+./gradlew :jasper-buddy:test --tests '*BuddyCardTest' --tests '*BuddyShimmerTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest' --tests '*BuddyBubblePanelTest' --tests '*BuddyDragFramesTest' --tests '*BuddyCompanionTest'
+./gradlew :jasper-buddy:test --tests '*BuddyPlacementTest' --tests '*BuddyBubblePlacementTest' --tests '*BuddyColumnWindowTest' --tests '*BuddyDeckWindowTest' --tests '*BuddySpriteTest'
 ```
 
 ## Preview and verify
 
-Both image tools use actual components headlessly and are opt-in, outside `check`:
+The three tools below use actual components headlessly (`-Djava.awt.headless=true`),
+open no window and are opt-in, outside `check`:
 
 ```sh
 ./gradlew :jasper-buddy:buddyNotificationPreview
 ./gradlew :jasper-buddy:buddyMotionPreview
+./gradlew :jasper-buddy:buddyPerformanceMeasurement
 ```
 
 The [notification preview](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyNotificationPreview.java)
-writes light/dark frame sequences and settled PNGs under
-`jasper-buddy/build/reports/buddy-notifications/`; its optional first argument overrides
-the directory (`--args='/absolute/output/path'`). The [motion preview](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyMotionPreview.java)
-writes 420 frames per theme under `jasper-buddy/build/reports/buddy-motion/` and has no
-output-directory argument. Relative defaults use the Gradle subproject working directory.
+paints one running capsule beside the typing sprite at 2× density and writes 91 frames
+(1.5 seconds at 60 Hz) per theme under `light/` and `dark/`, plus the settled
+`light.png` and `dark.png`, in `jasper-buddy/build/reports/buddy-notifications/`. Its
+optional first argument overrides the directory (`--args='/absolute/output/path'`). The
+[motion preview](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyMotionPreview.java)
+moves the sprite up and back down a 600 × 700 screen so the column flips, and writes
+420 frames (7 seconds at 60 Hz) per theme under `jasper-buddy/build/reports/buddy-motion/`;
+it takes no output-directory argument and prints the directory; both previews paint the sprite at scale 2
+(84 × 96), smaller than the app's 105 × 120. Relative paths use the
+Gradle subproject working directory.
 
-`./gradlew :jasper-buddy:buddyPerformanceMeasurement` is a separate opt-in headless paint
-measurement. It reports median/p95/p99 for three running capsules at 2× density and
-excludes native window/drag scheduling. Do not run benchmarks during an unattended
-maintenance task unless requested, and do not infer desktop throughput from this tool.
+The [performance measurement](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyPerformanceMeasurement.java)
+paints three running capsules at 2× density for 200 warm-up frames and 600 measured
+frames, and prints the median, p95 and p99 paint time; an optional first argument
+names a PNG file for the last frame. It excludes native window/drag scheduling, so do
+not infer desktop throughput from it.
 
-Finish a change with `./gradlew check`. The suite includes all three modules, compiled
-examples, Javadoc and bytecode architecture checks. `BuddyApiTest` verifies the actual
-jar sprite and JDK-only loading. Ordinary builds need neither Python nor LibreSprite.
+Finish a change with `./gradlew check`. It runs every module's tests, compiled
+documentation examples, Javadoc and the bytecode architecture checks. `BuddyApiTest`
+verifies the actual jar sprite and JDK-only loading. It reads the jar from the
+`jasper.buddyJar` property that `:jasper-buddy:test` sets after building the jar, so run it
+through Gradle. No build task runs the sprite tools or LibreSprite: Buddy builds and
+tests from the committed artwork, so Pillow (and Swift, for the atlas packer) is needed only to [export, repack or verify it](../packaging/buddy/README.md#editing-and-exporting).

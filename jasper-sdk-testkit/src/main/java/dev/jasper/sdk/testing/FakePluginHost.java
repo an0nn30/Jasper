@@ -51,7 +51,9 @@ import dev.jasper.sdk.palette.PaletteVerb;
  * A single-threaded plugin runtime for tests. It follows the same rules as the application: queued
  * ordered delivery, topic ownership, coalesced activity progress, services committed on a successful
  * start, rollback and a closed context on failure. Appearance palettes and workspace
- * subscriptions accept the creating test thread or the real Swing EDT, rejecting background workers.
+ * subscriptions accept the creating test thread or the real Swing EDT, rejecting background workers. Kit views are the
+ * exception: {@link FakeKit} and {@link FakeKitView} need the real Swing event dispatch thread, so run a test of a
+ * plugin that builds views inside {@code SwingUtilities.invokeAndWait}.
  */
 public final class FakePluginHost implements AutoCloseable {
     private static final String APP = "jasper";
@@ -273,7 +275,7 @@ public final class FakePluginHost implements AutoCloseable {
      * Gives a plugin's setting a look default, as a kit's {@code [defaults."<plugin id>"]} table does in the
      * application: when the plugin declares the key, a value its kind accepts replaces the declared default, and a
      * saved value still wins. A value the kind rejects, and a key the plugin never declares, leave the plugin's own
-     * default and are reported in {@link #lookDefaultProblems}.
+     * default and are reported in {@link #lookDefaultProblems(String)}.
      *
      * @param pluginId the plugin
      * @param key the dotted setting key
@@ -408,7 +410,9 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Builds a plugin's own settings page as Settings would, over a host whose rows are labelled placeholders.
+     * Builds a plugin's own settings page as Settings would. {@code SettingsPanelHost.row} gives the standard rows
+     * Jasper builds (ids {@code settings:<key>}, {@code settings:<key>:reset}, ...), which {@link #settingsPanelView}
+     * can drive.
      *
      * @param pluginId the plugin
      * @return the page's component; empty when the plugin gave no page or is not running
@@ -522,6 +526,10 @@ public final class FakePluginHost implements AutoCloseable {
         }
     }
 
+    /**
+     * Stops every active plugin in reverse start order, delivers every queued event, and deletes the temporary data
+     * directory when this host made it ({@link #FakePluginHost()}); a data root the caller gave is kept.
+     */
     @Override public void close() {
         stopAll();
         flush();
@@ -1195,7 +1203,9 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /** Shown producer-owned popover views, in creation order, for deterministic input/lifetime tests.
-     * @param pluginId content producer @return live mounted views */
+     * @param pluginId content producer
+     * @return live mounted views
+     */
     public List<FakeKitView> popoverViews(String pluginId){var context=contexts.get(pluginId);if(context==null)return List.of();return context.ui.popovers.stream().filter(p->p.shown&&!p.closed&&p.content!=null).map(p->p.content).toList();}
     /** The currently shown plugin windows. */
     public List<String> windows() {
@@ -1218,8 +1228,8 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Runs the Close Window command of the first open window with this id, as File → Close Window or Cmd/Ctrl+W
-     * would: its close-command handlers newest first, then, when none handled it, its closing guards.
+     * Runs the Close Window command of the first open window with this id, as File → Close Window or its shortcut (Cmd+W
+     * on macOS, Ctrl+W on Linux and Windows) would: its close-command handlers newest first, then, when none handled it, its closing guards.
      *
      * @param windowId the window id
      * @return true when the window closed; false when a handler handled the command, a guard vetoed or there is no such window
@@ -1339,7 +1349,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * What plugins asked to open or raise, in order.
      *
-     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program) or {@code front|<window id>}
+     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program), {@code session-tab|<window id>|<session title>}, {@code session-split|<pane id>|<RIGHT or DOWN>|<session title>} or {@code front|<window id>}
      */
     public List<String> openRequests() { return List.copyOf(workspace.openRequests); }
 
@@ -1446,7 +1456,9 @@ public final class FakePluginHost implements AutoCloseable {
     public String sessionState(UUID paneId) { return workspace.sessions.state(workspace.anyPane(paneId).orElse(null)); }
 
     /**
-     * The user pressed Cancel. A pane that never showed a session closes; otherwise it returns to the disconnected state.
+     * The user pressed Cancel. A pane that never showed a session closes; otherwise it returns to the disconnected state
+     * and publishes {@code SESSION_STATE_CHANGED} with {@code EXITED}, as a failed attempt does here. Jasper publishes
+     * {@code EXITED} only when an attached session ends.
      *
      * @param paneId the pane
      */
@@ -1608,12 +1620,15 @@ public final class FakePluginHost implements AutoCloseable {
                 + String.join(",", spec.verbs().stream().map(verb -> verb.role().name()).toList());
         }
 
-        /** The ids of registered scopes the palette's All tab searches, in registration order. */
+        /** The ids of registered scopes a query with no scope chosen searches (in All), in registration order. */
         public List<String> scopesInAll() {
             return scopes.values().stream().filter(registered -> registered.spec().inAll()).map(registered -> registered.spec().id()).toList();
         }
 
-        /** The ids of registered scopes the palette may offer before anything is typed, in registration order (since 0.9.2). */
+        /**
+         * The ids of registered scopes whose spec sets {@code inRecents}, in registration order (since 0.9.2). The
+         * application offers a scope's rows before anything is typed only when it is in All too.
+         */
         public List<String> scopesInRecents() {
             return scopes.values().stream().filter(registered -> registered.spec().inRecents()).map(registered -> registered.spec().id()).toList();
         }
@@ -1640,7 +1655,10 @@ public final class FakePluginHost implements AutoCloseable {
                 .orElseThrow(() -> new IllegalArgumentException("No such verb: " + verbId));
         }
 
-        /** Searches a scope as the palette would, as {@code rowId|title|enabled} lines; later row lookups use this answer. */
+        /**
+         * Searches a scope as the palette would, as {@code rowId|title|enabled} lines; later row lookups use this
+         * answer. Every palette call this host makes passes {@code maxResults} 5 and {@code macOs} true.
+         */
         public List<String> searchScope(String scopeId, String query, UUID windowId, UUID paneIdOrNull) {
             var registered = scope(scopeId);
             PaletteResults results = registered.scope().search(query, query(registered, windowId, paneIdOrNull));
@@ -1707,20 +1725,41 @@ public final class FakePluginHost implements AutoCloseable {
      * @return the fake clipboard
      */
     public FakeClipboard clipboard() { return clipboard; }
-    /** @return hosted content in registration order, for contract assertions */
+    /**
+     * The open content tabs plugins opened with {@code Windows.openTab}, plugin by plugin in start order and each
+     * plugin's in opening order; a closed tab drops out.
+     *
+     * @return hosted content in registration order, for contract assertions
+     */
     public List<dev.jasper.sdk.ui.ContentTab> contentTabs() {
         return contexts.values().stream().flatMap(c -> c.ui.contents.stream()).map(c -> (dev.jasper.sdk.ui.ContentTab)c).toList();
     }
-    /** @param tab handle from this host
+    /**
+     * The component a content tab shows: its kit view's component, the same instance after the tab moves to another
+     * window.
+     *
+     * @param tab handle from this host
      * @return the actual hosted component */
     public javax.swing.JComponent contentComponent(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).component; }
-    /** @param tab handle from this host
+    /**
+     * What a content tab's header shows: the presentation the plugin last set with {@code setPresentation}, or until
+     * then one titled after its {@code ContentSpec}.
+     *
+     * @param tab handle from this host
      * @return recorded presentation */
     public dev.jasper.sdk.ui.ContentPresentation contentPresentation(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).presentation; }
-    /** @param tab handle from this host
+    /**
+     * The terminal window a content tab is in: the window it opened in, or the one {@code move} took it to. An owner
+     * that was a content tab resolves to that tab's window, and no owner or a closed window to the first open window
+     * that no tab was moved out to, or a new one when there is none.
+     *
+     * @param tab handle from this host
      * @return originating owner */
     public dev.jasper.sdk.WindowOwner contentOwner(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).owner; }
-    /** @param tab hosted content handle
+    /**
+     * The status items a content tab last published with {@code setStatus}; empty until it publishes any.
+     *
+     * @param tab hosted content handle
      * @return published status descriptors */
     public List<dev.jasper.sdk.ui.ContentStatus> contentStatus(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).status; }
 

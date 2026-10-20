@@ -274,7 +274,10 @@ public final class TerminalView extends JComponent {
         contextMenuHandler = handler == null ? event -> { } : handler;
     }
 
-    /** Receives row-state invalidations on the Event Dispatch Thread. */
+    /**
+     * Receives {@code FindResult(0, 0, null)} on the Event Dispatch Thread when a reflow, a history reset or an
+     * alternate-screen switch drops the current find matches; null removes the listener.
+     */
     public void setFindResultListener(Consumer<FindResult> listener) {
         findResultListener = listener == null ? result -> { } : listener;
     }
@@ -380,7 +383,7 @@ public final class TerminalView extends JComponent {
             options.copyOnSelect(), options.lineHeight(), options.bell()));
     }
 
-    /** Restores the Phase 1 default of 14 points. */
+    /** Sets the font size back to 14 points. */
     public void resetFontSize() {
         setFontSize(DEFAULT_FONT_SIZE);
     }

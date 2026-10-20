@@ -6,6 +6,10 @@ import java.io.IOException;
 public final class NotConnectedException extends IOException {
     private static final long serialVersionUID = 1L;
 
-    /** @param hostName the saved host's name */
+    /**
+     * Creates the exception with the message "<i>hostName</i> is not connected".
+     *
+     * @param hostName the saved host's name
+     */
     public NotConnectedException(String hostName) { super(hostName + " is not connected"); }
 }

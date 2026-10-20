@@ -11,7 +11,8 @@ import java.util.function.BooleanSupplier;
  * @param excludes folder names never listed
  * @param maxFiles the most files to return
  * @param timeout how long all strategies together may take
- * @param cancelled polled while listing, from a worker thread
+ * @param cancelled polled while listing, from a worker thread; true fails the listing with
+ *     {@code CancellationException}
  */
 public record ListOptions(List<String> excludes, int maxFiles, Duration timeout, BooleanSupplier cancelled) {
     /** Copies the excludes and rejects a non-positive limit. */

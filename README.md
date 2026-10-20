@@ -1,207 +1,231 @@
 # Jasper
 
-A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP and tunnels, which are now bundled plugins (tunnels: plan 7b-2 on `claude/tunnels-7b2`, 7b-3 to follow); a plugin SDK already hosts bundled and user-installed plugins.
+A pluggable DevOps workstation for macOS, Linux and Windows, written in Java Swing on the JetBrains Runtime.
 
-Formerly Moray. The app, the Java packages and the Git repository
-([an0nn30/Jasper](https://github.com/an0nn30/Jasper)) are now Jasper. Existing settings can be
-carried over using the [rebrand migration notes](docs/rebranding.md).
+Jasper puts the tools you use to run systems in one window: local terminals with tabs and splits, SSH sessions, SFTP
+transfers and tunnels to your hosts, an encrypted credential vault, an editor for local and remote files, file servers
+for moving files to other machines, and a command palette that reaches all of them. It is for engineers who spend
+their day in shells and on remote hosts. Most of it is delivered as plugins on a public SDK, so the workstation can
+grow with what you need: the bundled plugins use the same API as any plugin you write or install.
 
-Jasper has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. The screenshot UI revision puts tabs beside native macOS window controls, with a horizontal Tabler toolbar below and a status bar that shares the terminal background. The default theme, Slate Cobalt, in Dark and Light, colours the complete window; its terminal schemes are Slate Cobalt Dark, Slate Cobalt Light and High Contrast. Catppuccin's four flavours are built in too, and installed Jasper theme files add more themes and schemes.
+## What's inside
 
-Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). Desktop acceptance remains user-run: [Plan 3](docs/superpowers/plans/2026-09-11-jasper-plan-3-manual-check.md) and [screenshot UI](docs/superpowers/plans/2026-09-11-jasper-mock-ui-manual-check.md). Passing the headless tests is not the Phase 1 daily-use gate.
+### The workstation core
 
-## Developing Jasper
+- **Terminal**: truecolor rendering with ligatures and fallback fonts, scrollback, mouse reporting for full-screen
+  programs, regex search, links and file paths you Cmd-click (Ctrl-click on Linux and Windows) to open, and shell
+  integration for zsh, bash and fish: jumps between prompts, new tabs and splits in the same folder, and a
+  notification when a long command finishes. See [the terminal](docs/terminal.md).
+- **Workspace**: windows with tabs, split panes, pane zoom, and a dock of tool windows that you drag between the
+  window's left, right and bottom edges. See [the workspace](docs/workspace.md).
+- **Command palette**: one search surface for commands and the plugins' scopes: saved hosts, shell history,
+  snippets, vault logins, project files and more. Under the Enterprise look it is the Run window. See
+  [the command palette](docs/command-palette.md).
+- **Notifications**: cards in the window, a Notifications tool window with history and an unread badge, and system
+  notifications while Jasper is in the background. See [notifications](docs/notifications.md).
+- **Settings**: a searchable Settings dialog over `config.toml`, a Keymap page where every action can be rebound, and
+  most changes applied without a restart. See [configuration](docs/configuration.md).
+- **Themes and looks**: Slate Cobalt in the Dark appearance and Jasper Meadow Light in the Light appearance by default;
+  Slate Cobalt's Light variant, Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru built in; import further
+  Jasper theme files. A *look* sets the chrome and controls: the default look, or a plugin's look such as Enterprise. See
+  [themes](docs/themes.md) and [looks](docs/looks.md).
+- **The `jasper` command**: open a window, start Jasper with options, or run plugin commands such as
+  `jasper editor FILE:LINE` from any shell. See [the command line](docs/command-line.md).
+- **Background residency**: by default on macOS and Windows, Jasper keeps running when its last window closes, so the
+  next window opens at once. See [running in the background](docs/getting-started.md#running-in-the-background).
+- **Desk Buddy**: an optional pixel-art companion above your windows that shows long-running commands and plugin work;
+  off by default. See [Desk Buddy](docs/notifications.md#desk-buddy).
 
-Use the [documentation index](docs/README.md) to choose an entry point:
-[application](jasper-app/README.md), [terminal library](jasper-terminal/README.md),
-or [Buddy library](jasper-buddy/README.md). All three modules have documented
-ownership, threading and extension routes. Builders, command registries and
-concrete lifecycle owners support the current features. Plugins are written against the
-[SDK](jasper-sdk/README.md); see [plugin authoring](docs/plugin-authoring.md) and
-[SDK architecture](docs/sdk-architecture.md).
+### Plugins
 
-## Requirements
+Everything below ships with Jasper as a bundled plugin, listed in Settings › Plugins, where each can be turned off.
 
-Install the **JetBrains Runtime SDK 25 (JBR SDK)**, including `jpackage`; a JRE or a JDK from another vendor is insufficient. Gradle requires vendor JetBrains and discovers the SDK automatically on the development Mac. If discovery fails, set `JAVA_HOME` to the SDK and add its `bin` directory to `PATH`, or set `org.gradle.java.installations.paths` in Gradle properties. Use the checked-in Gradle wrapper, not a system Gradle installation. The first build downloads Gradle and dependencies. `./gradlew build` and `check` also run the theme converter's tests, which need Python 3.11 or later on the `PATH` as `python3` or `python` (the `python3` in Xcode's command line tools is 3.9).
+| Plugin | Id | What it does | On by default |
+| --- | --- | --- | --- |
+| Remote | `dev.jasper.remote` | SSH terminals, an SFTP browser with persistent transfers, local, remote and SOCKS tunnels, saved hosts with groups, favourites and jump hosts, host-key trust, Vault or SSH-agent authentication, import from `~/.ssh/config`, and a Sessions tool window that also lists WSL distributions | Yes |
+| Credential Vault | `dev.jasper.vault` | Logins, SSH keys and secure notes in one encrypted file, which can be bound to this device; other plugins fetch credentials under per-plugin grants | Yes |
+| Editor | `dev.jasper.editor` | Local and remote text files in workspace tabs, with syntax highlighting, a Vim mode and the `jasper editor` command | Yes |
+| File Server | `dev.jasper.fileserver` | Shares a local folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP; servers are read-only and reachable from this computer only until you change that | Yes |
+| Project Index | `dev.jasper.indexer` | Offers to index the project a terminal enters, locally or on a saved host, and finds its files from the command palette | Yes |
+| Shell History | `dev.jasper.history` | Searches every shell's history from the command palette, to paste or run a command or save it as a snippet | Yes |
+| Snippets | `dev.jasper.snippets` | Saved commands with fill-in placeholders, from the command palette | Yes |
+| Enterprise | `dev.jasper.enterprise` | The Enterprise look: IntelliJ Classic's title bar on macOS and Windows, labelled tool-window stripes led by their icons, the Run window, classic controls and icons, IBM Plex fonts and the Enterprise theme | No |
+| Sample | `dev.jasper.sample` | Exercises the plugin runtime for plugin authors; does nothing until one of its `demo_*` settings is set | Yes |
 
-## Build and run
+See [plugins](docs/plugins.md) for managing plugins and a guide to each one.
 
-From the repository root, compile and run the headless tests:
+## Built to be extended
+
+Every plugin in the table is built on the Jasper SDK (`dev.jasper.sdk`, Java, JDK only), the same public API a
+third-party plugin compiles against. A plugin is a folder of jars, one of which carries a `plugin.toml`; Jasper loads
+each plugin in its own class loader when it starts. Through the SDK and its `plugin.toml` a plugin adds actions, menus,
+toolbar items, status bar items, tool windows, command palette scopes, settings pages, notifications, workspace tabs,
+terminal sessions, `jasper` subcommands, places in the file chooser, themes and even a whole look, which can be data
+alone, as Enterprise's is. Plugins read the look Jasper runs with through the SDK, and a look can give other plugins'
+settings their defaults.
+
+- **Capabilities and consent.** A plugin declares in `plugin.toml` what it does that you cannot see on screen, such as
+  typing into terminals, reading the clipboard or accepting network connections. Jasper shows those capabilities
+  before a plugin you installed first runs, and again when an update asks for more, and loads it only once you allow
+  them. Consent is not a sandbox: an allowed plugin runs with everything your account can reach.
+- **Plugins build on plugins.** A plugin can export an API package and publish services that other plugins look up:
+  Remote and File Server take credentials from the Vault's API, Remote and Project Index open files through the
+  Editor's, Project Index reaches saved hosts through Remote's, and Shell History saves snippets through Snippets'.
+- **Tooling.** Each release carries the SDK and test-kit jars; the test kit's fake host runs a plugin in unit tests
+  without Jasper. `jasper --plugin-dir <dir>` loads a plugin under development, and Settings › Plugins installs a
+  plugin from a zip.
+
+Start with the [SDK reference](docs/sdk-reference.html) and [writing a plugin](docs/plugin-authoring.md); the
+[documentation index](docs/README.md#building-plugins) lists the rest.
+
+## Install
+
+Jasper's [GitHub releases](https://github.com/an0nn30/Jasper/releases) are built by the Release workflow from a
+`vX.Y.Z` tag and published as prereleases, with a `SHA256SUMS` file and the SDK jars beside the packages:
+
+| Platform | Package |
+| --- | --- |
+| macOS (Apple Silicon) | `Jasper-<version>-macos-aarch64.dmg`: drag `Jasper.app` to Applications |
+| Windows x64 / ARM64 | `Jasper-<version>-windows-<x64\|aarch64>-setup.exe`, a per-user setup wizard, or `Jasper-<version>-windows-<x64\|aarch64>.zip`, a portable folder |
+| Linux x64 / ARM64 | `Jasper-<version>-linux-<amd64\|arm64>.deb` or `Jasper-<version>-linux-<x86_64\|aarch64>.rpm`, installing to `/opt/jasper` |
+
+Every package bundles its own Java runtime. The packages are not notarized or signed by a publisher, so macOS and
+Windows may ask you to confirm before opening them. [Getting started](docs/getting-started.md) covers installation,
+first launch and uninstalling on each platform.
+
+## Getting started
+
+Launch Jasper and a window opens with your shell: the login shell on macOS and Linux, PowerShell on Windows. Settings
+live in `config.toml` in Jasper's home folder (`~/.config/jasper` on macOS, `$XDG_CONFIG_HOME/jasper` or
+`~/.config/jasper` on Linux, `%APPDATA%\jasper` on Windows). The most used default shortcuts:
+
+| Action | macOS | Linux and Windows |
+| --- | --- | --- |
+| Command Palette | Cmd+Shift+P | Ctrl+Shift+P |
+| New Tab | Cmd+T | Ctrl+Shift+T |
+| New Window | Cmd+N | Ctrl+Shift+N |
+| Split Right | Cmd+D | Ctrl+Shift+D |
+| Split Down | Cmd+Shift+D | Ctrl+Alt+Shift+D |
+| Focus Pane Left / Right / Up / Down | Cmd+Option+Arrow | Ctrl+Alt+Shift+Arrow |
+| Zoom Pane | Cmd+Shift+Enter | Ctrl+Alt+Shift+Enter |
+| Close Pane | Cmd+W | Ctrl+Shift+W |
+| Close Tab | Cmd+Option+W | Ctrl+Alt+Shift+W |
+| Find | Cmd+F | Ctrl+Shift+F |
+| Settings | Cmd+, | Ctrl+Shift+, |
+| Connect to SSH Host... | Cmd+Shift+H | Ctrl+Shift+H |
+| Search Shell History | Cmd+R | Ctrl+Shift+R |
+
+Read on in [getting started](docs/getting-started.md), [the workspace](docs/workspace.md),
+[the terminal](docs/terminal.md), [keyboard shortcuts](docs/keyboard-shortcuts.md) and
+[configuration](docs/configuration.md).
+
+## Documentation
+
+The [documentation index](docs/README.md) lists every guide. The main ones:
+
+- **Using Jasper**: [getting started](docs/getting-started.md), [workspace](docs/workspace.md),
+  [terminal](docs/terminal.md), [command palette](docs/command-palette.md), [notifications](docs/notifications.md),
+  [keyboard shortcuts](docs/keyboard-shortcuts.md), [configuration](docs/configuration.md),
+  [command line](docs/command-line.md), [diagnostics](docs/diagnostics.md).
+- **Plugins**: [managing plugins](docs/plugins.md), [Remote](docs/remote.md),
+  [Credential Vault](docs/credential-vault.md), [Editor](docs/editor.md), [File Server](docs/file-server.md),
+  [Project Index](docs/project-index.md), [Shell History and Snippets](docs/history-and-snippets.md),
+  [the Enterprise look](docs/enterprise.md).
+- **Theming**: [themes](docs/themes.md), [creating themes](docs/creating-themes.md), [looks](docs/looks.md).
+- **Building plugins**: [SDK reference](docs/sdk-reference.html), [writing a plugin](docs/plugin-authoring.md),
+  [plugin UI](docs/plugin-ui.md), [plugin APIs](docs/plugin-apis.md), [SDK architecture](docs/sdk-architecture.md),
+  [external plugin example](docs/examples/external-plugin/README.md).
+- **Building from source and contributing**: [packaging](docs/packaging.md), the module guides and architecture notes
+  in the [documentation index](docs/README.md#building-jasper-and-contributing), [AGENTS.md](AGENTS.md) for coding
+  agents, and [STATUS](docs/STATUS.md) for open work.
+
+## Building from source
+
+### Requirements
+
+- The **JetBrains Runtime SDK 25** (JBR SDK) for the host's architecture, including `jpackage`; a JRE or another
+  vendor's JDK is not enough. Gradle's toolchain requires vendor JetBrains and usually finds the SDK itself. If it
+  does not, set `JAVA_HOME` to the SDK and put its `bin` directory on `PATH`, or set
+  `org.gradle.java.installations.paths` in your Gradle properties.
+- **Python 3.11 or later** on the `PATH` as `python3` or `python` for the theme converter's tests (or name an
+  interpreter with `-Pjasper.python=<path>`). The `python3` in Xcode's command line tools (3.9) is too old. Under
+  Python 3.14 `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails; use 3.11 to 3.13.
+- A **C/C++ compiler**, because `check` builds and tests Jasper's own launcher and the native `jasper` command: the Xcode
+  command line tools on macOS, `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the
+  "Desktop development with C++" workload on Windows.
+
+Use the checked-in Gradle wrapper (`./gradlew`, or `.\gradlew.bat` in PowerShell); the first build downloads Gradle
+and the dependencies.
+
+### Build, test and run
 
 ```bash
-./gradlew build
+./gradlew build                 # compile, then run every check
+./gradlew check                 # tests, architecture checks and doclint; opens no window
+./gradlew :jasper-app:run       # run Jasper from source
 ```
 
-To run from source:
+`:jasper-app:run` opens a window and starts your login shell. It keeps its own Jasper home in
+`jasper-app/build/dev-home` (choose another with `-Pjasper.home=<dir>`), so an installed Jasper's settings and plugins
+are untouched. Coding agents follow [AGENTS.md](AGENTS.md) and leave anything that opens a window to the user.
 
-```bash
-./gradlew :jasper-app:run
-```
+### Packages
 
-On Windows, use `.\gradlew.bat build` and `.\gradlew.bat :jasper-app:run` from PowerShell. To run only the headless checks, use `./gradlew check` (Windows: `.\gradlew.bat check`).
+Packages are built on the operating system and architecture they are for, with a JBR SDK of that architecture.
+Without `-PjasperVersion=X.Y.Z` the version comes from the commit's `vX.Y.Z` tag, else the latest such tag behind it,
+else `1.0.0`. Outputs land in `jasper-app/build/packaging/dist/`. [Packaging](docs/packaging.md) has the details,
+the image layouts and the acceptance checklists.
 
-`check` is headless. `run` opens windows and starts your login shell. Coding agents must follow [AGENTS.md](AGENTS.md) and leave GUI checks to the user.
+- **macOS**: `./gradlew check :jasper-app:packageDist` builds `Jasper.app` with a trimmed runtime, launches it once
+  for a few seconds (no Dock icon) to train its start-up cache, and builds the DMG for the build machine's
+  architecture. The app is ad-hoc signed. `:jasper-app:packageApp` and `:jasper-app:verifyPackage` build and check
+  the app without launching it.
+- **Linux**: `./gradlew check :jasper-app:packageDist` builds the `.deb` and the `.rpm`. It needs `fakeroot` and
+  `dpkg-deb`, plus `rpmbuild`, `readelf`, `rpm2cpio` and `cpio` (on Ubuntu:
+  `sudo apt-get install fakeroot rpm cpio binutils g++`).
+- **Windows**: `.\gradlew.bat check :jasper-app:packageDist` builds the portable ZIP;
+  `.\gradlew.bat :jasper-app:packageInstaller` builds the setup wizard and needs WiX 3 on the `PATH`.
 
-The opt-in `:jasper-app:bench` and `:jasper-app:memoryBench` tasks require explicit revision and output arguments. They open temporary windows with controlled fixture children; run them only when no game or VM is active. Use the [benchmark guide](docs/benchmarks.md) for source-tree commands, preserved macOS/Windows package commands, and the repeatable comparison protocol. The full workload targets 100 MiB; streaming acceptance is 35 MB/s, with a 45 MB/s target. Startup-inclusive timing is reported separately.
+`./gradlew pluginZips` zips every in-repo plugin into `plugins/build/zips/`, and `./gradlew sdkRelease` writes the
+SDK and test-kit jars to `build/sdk-release/`.
 
-The [terminal readiness report](docs/terminal-readiness.md) records hardening, final build evidence, memory results and the remaining native/CI gates. The two-week trial has not started.
+### Windows user installation
 
-## Build a macOS app and DMG
-
-Run this **on macOS**, with a JBR SDK matching the build architecture: Apple Silicon (`aarch64`) or Intel (`x64`). From the repository root:
-
-```bash
-./gradlew check :jasper-app:packageDist
-```
-
-This compiles Jasper, runs the headless tests, creates `Jasper.app` with its own trimmed JBR runtime, launches it once for a few seconds (no Dock icon) to train its start-up cache, verifies the application image, and builds and verifies the DMG. See [start-up performance](docs/packaging.md#start-up-performance).
-
-Without `-PjasperVersion`, the package version is the commit's `vX.Y.Z` release tag, else the latest release tag behind it, else `1.0.0`. The outputs are:
-
-| Output | Path |
-|---|---|
-| Application | `jasper-app/build/packaging/image/Jasper.app` |
-| Apple Silicon DMG | `jasper-app/build/packaging/dist/Jasper-<version>-macos-aarch64.dmg` |
-| Intel DMG | `jasper-app/build/packaging/dist/Jasper-<version>-macos-x64.dmg` |
-
-Each build produces the DMG for its own architecture. Open the DMG and drag `Jasper.app` to Applications to install it. The packaged app needs no separately installed Java runtime. Current development builds are ad-hoc signed; Developer ID signing and notarization are not included.
-
-To build only the `.app`, or verify the image without opening the desktop:
-
-```bash
-./gradlew :jasper-app:packageApp
-./gradlew :jasper-app:verifyPackage
-```
-
-To set a package version:
-
-```bash
-./gradlew check :jasper-app:packageDist -PjasperVersion=1.0.1
-```
-
-Versions use `X.Y.Z`: major 1–255, minor 0–255, patch 0–65535, with no leading zeroes. The native macOS packager requires a positive major version.
-
-## Build Linux packages
-
-Run this **on Linux x64 or aarch64**, with a JBR SDK 25 of the same architecture, plus `fakeroot` and `dpkg-deb` for the `.deb` and `rpmbuild`, `readelf`, `rpm2cpio` and `cpio` for the `.rpm` (on Ubuntu: `sudo apt-get install fakeroot rpm cpio binutils`):
-
-```bash
-./gradlew check :jasper-app:packageDist
-```
-
-This produces `jasper-app/build/packaging/dist/Jasper-<version>-linux-<amd64|arm64>.deb` and `Jasper-<version>-linux-<x86_64|aarch64>.rpm` for the build machine's architecture. Both install to `/opt/jasper` with a desktop menu entry. The [`linux-packages` workflow](.github/workflows/linux-packages.yml) builds all four on native x64 and arm64 runners and test-installs them on Debian, Ubuntu, Fedora and openSUSE. See [Linux packages](docs/packaging.md#linux-packages).
-
-## Install from IntelliJ on Windows without MSVC
-
-Run `jasper-app` → `distribution` → `installWindowsUser` in IntelliJ's Gradle panel,
-or `.\gradlew.bat :jasper-app:installWindowsUser`. This builds the Java application and
-bundled plugins with JBR SDK 25, creates a standard jpackage app image, and installs it
-in `%APPDATA%\JasperApp` with a Start Menu shortcut. It requires no MSVC, WiX, installer,
-or administrator rights. A Java helper copies files and creates the shortcut through
-Windows APIs, so PowerShell script execution can remain disabled. Windows must permit
-running the generated executable. Both tasks compile the small helper with JBR SDK 25;
-uninstall does not build the application.
+`.\gradlew.bat :jasper-app:installWindowsUser` (in IntelliJ's Gradle panel, `jasper-app` › `distribution` ›
+`installWindowsUser`) installs Jasper for the current user without a C/C++ compiler, WiX, an installer or administrator
+rights. It builds the application and the bundled plugins into a jpackage app image with the standard JBR launcher,
+installs it in `%APPDATA%\JasperApp` and adds a Start Menu shortcut, from which you then start Jasper. A small Java
+helper, compiled with the JBR SDK, copies the files and creates the shortcut through Windows APIs, so PowerShell script
+execution can stay disabled; Windows must allow the generated `Jasper.exe` to run. Run the task on its own, not with
+the native packaging tasks.
 
 Exit Jasper, including its background process, before installing an update or running
-`.\gradlew.bat :jasper-app:uninstallWindowsUser`. Uninstall removes this installation,
-its shortcut and its matching login entry, preserving settings and data in
-`%APPDATA%\jasper`. Launch Jasper from the Start Menu after installation; its existing
-background setting controls residency and login startup.
+`.\gradlew.bat :jasper-app:uninstallWindowsUser`, which does not build the application; it removes the installation,
+its shortcut and its matching login entry, keeping your settings and data in `%APPDATA%\jasper`. Jasper's background
+setting controls residency and login start-up as usual. This installation has no custom `jasper.vmoptions`, no native
+start-up recovery and no native `jasper` command.
 
-This local installation uses the standard JBR launcher: custom `jasper.vmoptions`,
-native startup recovery and the native `jasper` command are unavailable.
-
-## Build a Windows portable ZIP
-
-For a setup wizard with per-user installation, shortcut choices, upgrades, and
-Windows uninstall support, use `:jasper-app:packageInstaller` instead. It produces
-`jasper-app\build\packaging\dist\Jasper-<version>-windows-<x64|aarch64>-setup.exe` and requires
-WiX in addition to the JBR SDK 25. See the [installer build instructions](docs/packaging.md#windows-setup-wizard).
-
-Run this **on Windows x64 or ARM64**, with a JBR SDK 25 of the same architecture (on Windows on Arm, an x64 build runs entirely under emulation). From the repository root in PowerShell:
-
-```powershell
-.\gradlew.bat check :jasper-app:packageDist
-```
-
-The default output is `jasper-app\build\packaging\dist\Jasper-<version>-windows-<x64|aarch64>.zip`. Extract the complete `Jasper` folder and run `Jasper.exe`; keep the launcher, `app` and `runtime` together. No external Java or WiX installation is needed to use the ZIP; building it requires the JBR SDK. The unpacked build image is at `jasper-app\build\packaging\image\Jasper`.
-
-`jpackage` builds packages on their target operating system; the Mac build cannot produce the Windows ZIP. Windows packaging and desktop behavior still need manual verification on Windows. See the [packaging guide](docs/packaging.md) for the separate macOS and Windows acceptance checklists.
-
-## Using the application
-
-On macOS: Cmd+T new tab, Cmd+N new window, Cmd+D split right, Cmd+Shift+D split down, Cmd+Option+arrows focus a pane, Cmd+Shift+Enter zoom, Cmd+F find, F2 rename, Cmd+W close tab, Cmd+Shift+W close pane. Tabs have hover close controls, support middle-click close and drag reorder. On macOS, a single tab is represented by a centered title; multiple tabs share the available title-bar width. Opening and closing tabs animate with a quick eased settle; tab widths adjust as the row changes. Closing stops the shell immediately. A blank rename restores the shell/directory title. Cmd+1–9 selects an existing tab; Cmd+Shift+[ / Cmd+Shift+] moves to the previous/next tab and wraps at the ends.
-
-Cmd+= / Cmd+- / Cmd+0 changes or resets the focused pane's font. Cmd+Shift+K clears history while retaining the live screen; Cmd+K opens the command palette. Menus expose common actions; the command palette provides the full action list. View → View Modes → Zen hides the status bar, tool windows and rails while retaining toolbar icons and the command palette field; toggle it again to restore the layout. Zen is saved in ui-state.toml and restored on launch. Assign the initially unbound `toggle_zen_mode` action in Settings → Keymap. See [View modes](docs/configuration.md#view-modes). View controls toolbar labels/visibility and status visibility. Settings → Appearance chooses Dark, Light or Match System (`ui.appearance`), the theme each appearance shows (`ui.theme.dark`, `ui.theme.light`) and the terminal scheme (`terminal.scheme`) for every window and terminal, including hidden panes. Appearance changes retain shells, scrollback, split ratios and font choices. On macOS the tabs share the title surface, with the toolbar immediately below. The title/tab row defaults to 38 logical pixels. Settings → Window lets you change it; the command palette’s Window Settings… command opens that page. Toolbar, status and theme choices are saved to config.toml and apply to every window; Zen is saved in UI state and remains local to each open window. The default terminal font is bundled Cousine Nerd Font Mono at 12 points; Cmd+0 restores the configured size.
-
-Settings opens the TOML configuration, creating a commented template only when absent. Saved tab height, toolbar/status visibility, font family/fallback/size/ligatures/line height, cursor/input/copy/bell options, shell-exit behavior, inactive-pane dimming, theme and shortcuts reload live across windows. Shell command, exact arguments, environment and scrollback defaults apply to new pane requests; columns/lines supply the initial grid for new windows. Existing sessions continue running. Reload config forces a read; the status indicator opens file diagnostics. See [configuration](docs/configuration.md) for the complete settings table, defaults/ranges, paths, `--config`, shell/shortcut examples and error behavior.
-
-### Configuration example
-
-`terminal.on_exit` defaults to `"keep_open"`: a stopped shell retains its output and exit marker. Set it to `"close_on_success"` to close on exit code 0, or `"close"` for any shell-process exit. Add `on_exit = "close_on_success"` under the existing `[terminal]` table to opt in. Only the exited pane closes; its tab and window close when empty, while siblings keep running. A command returning to the shell does not trigger this behavior. Reload affects future exits and never closes already retained output or restarts the stopped shell.
-
-Settings (Cmd+,) edits every setting in a dialog; see [the Settings dialog](docs/configuration.md#settings-dialog).
-
-The root [config.example.toml](config.example.toml) is a copyable file containing every supported non-shortcut setting at its built-in default. From the repository or worktree root on macOS, install it with:
-
-```bash
-mkdir -p ~/.config/jasper
-cp -n config.example.toml ~/.config/jasper/config.toml
-```
-
-If `config.toml` already exists, `cp -n` leaves it unchanged. Choose another filename to inspect the example separately.
-
-`ui.appearance` (`system`, `dark`, `light`) chooses the Dark or Light appearance, or follows the operating system; `ui.theme.dark` and `ui.theme.light` name the theme each appearance shows (`slate-cobalt` by default, or an installed theme); `terminal.scheme` (`match`, or a scheme id such as `slate-cobalt/high-contrast`) colours the terminal panes. All three reload live. `[ui.font]` sets UI typography independently of `[terminal.font]`; its family and optional 8–32-point size update live. See [theme configuration](docs/configuration.md#theme). Native macOS and Windows packaging commands and acceptance checks are in the [packaging guide](docs/packaging.md). Bounded application logs and their privacy rules are described in [application diagnostics](docs/diagnostics.md). Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md).
-
-On Linux/Windows, Ctrl+1–9 selects an existing tab and Ctrl+Shift+[ / Ctrl+Shift+] selects the previous/next tab. For other actions, `cmd` maps to Ctrl+Shift. Those defaults written with an additional explicit Shift add Alt to remain distinct (for example split down is Ctrl+Alt+Shift+D). Other ordinary Ctrl combinations remain available to terminal programs. Keybinding overrides also accept `{` and `}` as Shift+[ and Shift+].
-
-Working-directory inheritance and prompt navigation use OSC 7 and OSC 133 emitted by your shell. Without those sequences, a pane retains its launch-directory fallback. Search currently matches each physical row, so matches do not span a soft wrap.
-
-## Plugins
-
-Jasper loads plugins written against `jasper-sdk`. Shell History, Snippets, Credential Vault, Remote (SSH), and a sample plugin are bundled with the application image (`lib/plugins/<id>/` in the packaged app); other plugins are installed by the user. Nothing loads or unloads in a running process: installs, removals and enable/disable changes take effect at the next launch.
-
-**Where plugins live.** Everything is under Jasper's home, the directory holding `config.toml` (on macOS `~/.config/jasper`; see [configuration](docs/configuration.md#location-and-startup-options) for Linux and Windows):
+## Repository layout
 
 | Path | Contents |
-|---|---|
-| `plugins/<id>/jars/` | An installed plugin's jar and the libraries it bundles |
-| `plugins/<id>/<id>.toml` | The plugin's settings; created by Jasper, read live |
-| `plugins/<id>/data/` | The plugin's private data |
-| `plugins/<name>.zip` | A plugin to install: unpacked at the next launch, then reviewed in Manage Plugins |
-| `plugins/.pending/<id>/` | Installs waiting for the next launch |
-| `plugins.toml` | Enabled state and consented capabilities; an entry means you reviewed the plugin |
-
-Every plugin, bundled ones too, has its own folder there with its settings file and data. A plugin's settings are that file, `plugins/<id>/<id>.toml`, seeded the first time from the plugin's own example or from an old `[plugins."<id>"]` table in `config.toml`, which is then reported as moved; see [plugin settings](docs/configuration.md#plugins).
-
-**Managing plugins.** File → Manage Plugins… (also in the command palette) opens Settings at the Plugins page, which lists every plugin with its state:
-
-- **Install from Zip…** picks a zip containing the plugin's jars, validates its `plugin.toml` and SDK range, and shows a consent dialog with the plugin's name, version, vendor and capabilities. Allow and Enable stages it; it loads after Restart Now. Consent is not a sandbox: an allowed plugin runs with everything Jasper can reach.
-- **Review…** is shown for a plugin that is installed but not yet allowed, or whose new version declares a capability you have not approved.
-- **Enable** and **Disable** change `plugins.toml`; **Remove…** asks first, then deletes the whole `plugins/<id>/` (jars, settings and data) at the next launch; Keep undoes it until then. Bundled plugins are disabled, not removed. Right-click a plugin for **Open Settings**, **Open Plugin Folder** and **Open Data Folder**. A "Restart Jasper to apply your changes" banner with Restart Now appears whenever the files on disk differ from what this process loaded, including changes made by another Jasper process.
-- `jasper --safe-mode` starts without user-installed plugins so a plugin that breaks startup can be disabled or removed; the manager then offers Restart Normally. Bundled plugins still load in safe mode.
-
-**Developing a plugin.** `jasper --plugin-dir <dir>` loads one plugin directory with consent pre-granted; `./gradlew pluginZips` builds and zips every in-repo plugin into `plugins/build/zips/`. A source launch uses its own home (`jasper-app/build/dev-home`), so your installed plugins are untouched. Details, including the plugin manifest and the test kit, are in [plugin authoring](docs/plugin-authoring.md).
-
-## Layout
-
-- `jasper-terminal/`: sessions, emulator integration, terminal rendering/input, selection, search and shell integration.
-- `jasper-app/`: packaged application composition, workspace, palette, providers and platform integration.
-- `jasper-buddy/`: independent JDK-only companion facade, notice model, animation and presentation.
-- `jasper-sdk/` and `jasper-sdk-testkit/`: the JDK-only plugin API and its fake host and contract suite.
-- `plugins/`: the bundled History, Snippets, Vault, Remote and sample plugins; each directory is a Gradle module.
-- `docs/STATUS.md`: completed work, open items and deferred findings.
-- `docs/superpowers/specs/` and `docs/superpowers/plans/`: specifications and implementation plans.
-
-## Contributor architecture guides
-
-Start with the [app onboarding](jasper-app/README.md), [terminal onboarding](jasper-terminal/README.md),
-or [Buddy embedding guide](jasper-buddy/README.md). The [documentation index](docs/README.md)
-links architecture and maintenance guides for each module. The [app architecture](docs/app-architecture.md)
-and [maintenance recipes](docs/app-maintenance.md) explain feature ownership, lifecycle and
-where to add commands, settings, providers and notices. [STATUS](docs/STATUS.md) records
-verified checkpoints and remaining manual acceptance.
+| --- | --- |
+| `jasper-app/` | The application: workspace, settings, command palette, notifications, plugin host, platform integration |
+| `jasper-terminal/` | The terminal library: sessions, emulation over JediTerm, rendering, input, selection, search and shell integration |
+| `jasper-ui/` | The theme engine and Swing UI kit: themes, kits, metrics, icons and components |
+| `jasper-buddy/` | The JDK-only desk companion library behind Desk Buddy |
+| `jasper-sdk/` | The plugin SDK, `dev.jasper.sdk` (JDK only) |
+| `jasper-sdk-testkit/` | The test kit's fake plugin host and the contract suite it shares with the real host |
+| `plugins/` | The bundled plugins, one Gradle module (`:jasper-plugin-<folder>`) per folder |
+| `packaging/` | Jasper's launcher and launch watcher, the native `jasper` command, icons, Buddy sprites, and the Linux and Windows packaging scripts |
+| `tools/` | Benchmark runners, the theme converter, the SDK reference generator, icon and tab previews, and the mock comparison tools |
+| `docs/` | The documentation, the external plugin example, and dated design records |
+| `website/` | Jasper's homepage: static HTML, CSS and JavaScript, its screenshots and the script that packages it for GitHub Pages |
+| `gradle/` | The build's shared scripts: architecture checks, packaging, launcher, SDK release |
+| `config.example.toml` | The core settings at their defaults, as a starting `config.toml` |
+| `design/` | The app icon's exploration rounds |
+| `.github/workflows/` | CI, the Linux package checks, the Release workflow, the SDK jar upload and the manual website deployment |
 
 ## License
 
-Jasper is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
+Jasper is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). About Jasper › Licenses… lists the
+third-party components Jasper ships and their licenses.

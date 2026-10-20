@@ -5,11 +5,16 @@ import dev.jasper.sdk.Variant;
 import java.util.function.Consumer;
 
 /**
- * Host-owned appearance values. Declarative views follow these automatically; specialized content
- * subscribes to refresh its domain palettes.
+ * Host-owned appearance values and the look Jasper runs with. Declarative views follow these automatically; specialized
+ * content subscribes to refresh its domain palettes.
  */
 public interface Appearance {
-    /** Read a canonical semantic color on the UI thread. @param role canonical role @return current color */
+    /**
+     * Read a canonical semantic color on the UI thread.
+     *
+     * @param role canonical role
+     * @return current color
+     */
     java.awt.Color color(SemanticColor role);
     /**
      * The current variant; safe from any thread.

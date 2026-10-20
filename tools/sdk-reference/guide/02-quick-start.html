@@ -1,0 +1,181 @@
+<section class="guide" id="quick-start">
+<h2>Quick start</h2>
+<p>This page builds a complete plugin outside the Jasper repository: one command, in the Tools menu and the command
+palette, that copies a greeting to the clipboard. It compiles against the SDK {@sdk.version} release jars with Gradle and
+any Java 25 JDK, has a unit test, runs in Jasper straight from the build folder and packages as a zip that users install.
+The same project is in the Jasper repository as <a href="examples/external-plugin/README.md">docs/examples/external-plugin</a>;
+Jasper's CI runs its {@code check pluginZip} against the jars {@code sdkRelease} makes.</p>
+
+<ol class="steps">
+<li><b>Get the SDK jars.</b> Each Jasper GitHub release carries {@code jasper-sdk-{@sdk.version}.jar} (with
+{@code -sources} and {@code -javadoc} jars) and {@code jasper-sdk-testkit-{@sdk.version}.jar} (with {@code -sources}).
+Put the two main jars in your project's {@code libs/} folder. From a Jasper checkout, {@code ./gradlew sdkRelease} builds
+the same jars into {@code build/sdk-release/}.</li>
+<li><b>Lay out the project.</b>
+<pre><code class="language-shell">hello-plugin/
+  settings.gradle.kts
+  build.gradle.kts
+  libs/jasper-sdk-{@sdk.version}.jar
+  libs/jasper-sdk-testkit-{@sdk.version}.jar
+  src/main/resources/plugin.toml
+  src/main/java/dev/example/hello/HelloPlugin.java
+  src/test/java/dev/example/hello/HelloPluginTest.java</code></pre></li>
+<li><b>Write the manifest</b>, {@code src/main/resources/plugin.toml}, so it lands at the root of the plugin's jar. The
+id namespaces everything the plugin registers; the {@code sdk} range says which SDK versions it runs on (see
+<a href="#manifest">Manifest</a> and <a href="#versions">Versions</a>). This plugin needs no capability.
+<pre><code class="language-toml">id = "dev.example.hello"
+name = "Hello"
+version = "1.0.0"
+entry = "dev.example.hello.HelloPlugin"
+sdk = "&gt;=0.18.0, &lt;0.19"
+description = "An example external plugin: a Tools menu command that copies a greeting."
+vendor = "Example"
+capabilities = []
+exports = []</code></pre></li>
+<li><b>Write the entry class.</b> It is public with a public no-argument constructor, and implements {@link Plugin}.
+{@code start} runs on the UI thread: it registers an action, which every window's command palette lists, and places it in
+the Tools menu. {@link Platform#copy(String)} needs no capability.
+<pre><code class="language-java">package dev.example.hello;
+
+import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.plugin.PluginContext;
+import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.StandardMenu;
+import java.util.List;
+
+/** An example external plugin: one command, in the Tools menu and the palette, that copies a greeting. */
+public final class HelloPlugin implements Plugin {
+    static final String COPY = "dev.example.hello.copy";
+    static final String GREETING = "Hello from an external Jasper plugin";
+
+    @Override public void start(PluginContext context) {
+        context.actions().register(ActionSpec.of(COPY, "Copy Greeting").withKeywords(List.of("hello", "greeting", "example")),
+            invoked -&gt; context.platform().copy(GREETING));
+        context.menus().standard(StandardMenu.TOOLS).add(COPY);
+    }
+}</code></pre></li>
+<li><b>Write the build.</b> {@code settings.gradle.kts} names the project:
+<pre><code class="language-kotlin">rootProject.name = "hello-plugin"</code></pre>
+{@code build.gradle.kts} compiles against the SDK jar as {@code compileOnly}, because Jasper supplies the SDK at run time,
+puts the SDK and test kit on the test classpath with JUnit and AssertJ, and adds the two packaging tasks. Libraries the
+plugin bundles go in {@code implementation}; they travel with it in the staged folder and the zip.
+<pre><code class="language-kotlin">plugins { `java-library` }
+
+val jasperSdkDir = file(providers.gradleProperty("jasperSdkDir").getOrElse("libs"))
+val jasperSdkVersion = providers.gradleProperty("jasperSdkVersion").getOrElse("{@sdk.version}")
+fun jasperJar(name: String) = files(jasperSdkDir.resolve("$name-$jasperSdkVersion.jar"))
+
+// Name the missing jar instead of failing later with "package dev.jasper.sdk... does not exist".
+tasks.withType&lt;JavaCompile&gt;().configureEach {
+    doFirst {
+        for (name in listOf("jasper-sdk", "jasper-sdk-testkit")) {
+            val jar = jasperSdkDir.resolve("$name-$jasperSdkVersion.jar")
+            check(jar.isFile) {
+                "Missing $jar: put the Jasper release's SDK jars in $jasperSdkDir, " +
+                    "or pass -PjasperSdkDir=&lt;folder&gt; and -PjasperSdkVersion=&lt;version&gt;"
+            }
+        }
+    }
+}
+
+/** The id and version come from plugin.toml, so the build keeps no second copy of either. */
+val descriptor = file("src/main/resources/plugin.toml").readText()
+fun field(name: String) = Regex("^$name\\s*=\\s*\"([^\"]+)\"", RegexOption.MULTILINE).find(descriptor)?.groupValues?.get(1)
+    ?: error("plugin.toml has no $name")
+val pluginId = field("id")
+version = field("version")
+
+repositories { mavenCentral() }
+
+// Jasper runs plugins on Java 25; any Java 25 compiles them (Jasper itself needs the JetBrains Runtime only to run).
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+
+dependencies {
+    compileOnly(jasperJar("jasper-sdk"))
+    testImplementation(jasperJar("jasper-sdk"))
+    testImplementation(jasperJar("jasper-sdk-testkit"))
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("org.assertj:assertj-core:3.27.7")
+}
+
+tasks.jar { archiveBaseName.set(pluginId) }
+
+tasks.test {
+    useJUnitPlatform()
+    systemProperty("java.awt.headless", "true")
+}
+
+// What Jasper installs: the plugin jar beside the libraries it bundles (its runtime classpath).
+//   stagePlugin -&gt; build/plugin/&lt;id&gt;/                     (jasper --plugin-dir build/plugin/&lt;id&gt;)
+//   pluginZip   -&gt; build/distributions/&lt;id&gt;-&lt;version&gt;.zip (File &gt; Manage Plugins... &gt; Install from Zip...)
+val pluginContents = files(tasks.jar, configurations.runtimeClasspath)
+
+tasks.register&lt;Sync&gt;("stagePlugin") {
+    description = "Stages $pluginId as a plugin directory for jasper --plugin-dir."
+    group = "distribution"
+    from(pluginContents)
+    into(layout.buildDirectory.dir("plugin/$pluginId"))
+}
+
+tasks.register&lt;Zip&gt;("pluginZip") {
+    description = "Zips $pluginId for File &gt; Manage Plugins... &gt; Install from Zip..."
+    group = "distribution"
+    from(pluginContents)
+    archiveFileName.set("$pluginId-$version.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+}</code></pre></li>
+<li><b>Test it.</b> {@link FakePluginHost} runs the plugin headless, with the test thread as its UI thread (see
+<a href="#testing">Testing</a>):
+<pre><code class="language-java">package dev.example.hello;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import dev.jasper.sdk.PluginInfo;
+import dev.jasper.sdk.testing.FakePluginHost;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+
+class HelloPluginTest {
+    @Test void theToolsCommandCopiesTheGreeting() {
+        try (var host = new FakePluginHost()) {
+            host.start(new PluginInfo("dev.example.hello", "Hello", "1.0.0", Set.of()), Set.of(), Set.of(), new HelloPlugin());
+            assertThat(host.menu("TOOLS")).containsExactly("item:" + HelloPlugin.COPY);
+            var window = host.addTerminalWindow();
+            assertThat(host.invoke(HelloPlugin.COPY, window, null)).isTrue();
+            assertThat(host.clipboard().copies()).containsExactly("copy|dev.example.hello|" + HelloPlugin.GREETING);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+}</code></pre></li>
+<li><b>Build and run it in Jasper.</b> The commands use a Gradle wrapper in the project ({@code gradle wrapper} makes
+one; Jasper's CI builds this example with Gradle 9.7.0). {@code stagePlugin} writes the plugin folder, the plugin jar
+beside the libraries it bundles; {@code --plugin-dir} starts a separate Jasper that loads it without a capability review:
+<pre><code class="language-shell">./gradlew check stagePlugin
+jasper --plugin-dir build/plugin/dev.example.hello</code></pre>
+The {@code jasper} command must be on your {@code PATH} (Settings › Appearance &amp; Behavior › System Settings ›
+Command line installs it); otherwise start the application executable with the same option, for example
+{@code /Applications/Jasper.app/Contents/MacOS/Jasper --plugin-dir build/plugin/dev.example.hello} on macOS. See
+<a href="command-line.md">the command line</a>. <b>Copy Greeting</b> is now in the Tools menu and the command palette,
+and Settings › Plugins lists Hello under Development. Stage again and restart that Jasper after each change: plugins load
+only at launch.</li>
+<li><b>Package and install it.</b> {@code ./gradlew pluginZip} writes {@code build/distributions/dev.example.hello-1.0.0.zip}.
+In the Jasper you use every day, choose <b>File › Manage Plugins…</b>, then <b>Install from Zip…</b> in the page's <b>Plugin options</b>
+menu (the three-dot button beside the search field), and pick the zip. The <b>Install Hello</b> sheet shows the name, version, vendor and capabilities ("It asks for no
+access to your terminals."); <b>Install</b> stages it, and it loads after <b>Restart Now</b>. See
+<a href="#distribution">Distribution</a>.</li>
+</ol>
+
+<div class="callout"><p>To build against jars you made from a checkout, pass their folder:
+{@code ./gradlew -PjasperSdkDir=/path/to/jasper/build/sdk-release check pluginZip}. {@code -PjasperSdkVersion=<v>}
+picks the jars of another release.</p></div>
+
+<h3>Next steps</h3>
+<ul>
+<li><a href="#contributions">Contributions</a> lists every way a plugin adds to the workstation, with the entry API.</li>
+<li><a href="#lifecycle">Lifecycle</a> and <a href="#threading">Threading</a> are the rules every plugin follows.</li>
+<li><a href="#ui">UI</a> builds tool windows, dialogs and pages from declarative views.</li>
+<li><a href="#capabilities">Capabilities</a> lists what a terminal, palette or session plugin must declare.</li>
+</ul>
+</section>

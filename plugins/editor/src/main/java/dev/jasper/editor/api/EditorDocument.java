@@ -8,28 +8,58 @@ import java.util.concurrent.CompletableFuture;
  * UI thread; none may block. Futures may complete on any thread.
  */
 public interface EditorDocument {
-    /** @return stable identity: two documents with equal keys are the same file */
+    /**
+     * The document's stable identity. Opening a document whose key is already open selects that tab; Recent Files
+     * records the key, and {@link Editor#reopener} resolves it by its prefix. Start it with a prefix of the plugin's
+     * own, the one it passes to {@link Editor#reopener} (for example {@code "remote:"}), never {@code "local:"}, which
+     * the Editor uses for local files.
+     *
+     * @return stable identity: two documents with equal keys are the same file
+     */
     String key();
 
-    /** @return the file name, used as the tab title */
+    /**
+     * The file name: the tab title and the name in Recent Files and prompts. With the first line of the text, it
+     * decides the syntax highlighting.
+     *
+     * @return the file name, used as the tab title
+     */
     String name();
 
-    /** @return the full location for tooltips and the status line, for example {@code dustin@prod-web:/etc/nginx/nginx.conf} */
+    /**
+     * Where the file is, in full: shown in tooltips, the status line and Recent Files. For a document with a host,
+     * the status line shows only the part from the first {@code :/} on, without the colon.
+     *
+     * @return the full location for tooltips and the status line, for example {@code dustin@prod-web:/etc/nginx/nginx.conf}
+     */
     String location();
 
-    /** @return the host a remote document lives on, shown dimmed after the name; empty for a local document */
+    /**
+     * The host a remote document lives on. A document with a host gets the server icon on its tab, a host tag in
+     * Recent Files and the host's name in its loading text and in the window title.
+     *
+     * @return the host a remote document lives on, shown dimmed after the name; empty for a local document
+     */
     Optional<String> host();
 
     /**
      * Reads the whole file. Fails with {@link TooLargeException}, before transferring content, when it is
-     * larger than {@code limitBytes}. Cancelling the future aborts the transfer.
+     * larger than {@code limitBytes}. Cancelling the future aborts the transfer. The Editor words a
+     * {@link TooLargeException}, {@link java.nio.file.NoSuchFileException} or
+     * {@link java.nio.file.AccessDeniedException} itself and shows any other failure's message.
      *
-     * @param limitBytes the largest size the editor accepts
+     * @param limitBytes the largest size the editor accepts: its {@code max_file_mib} setting, in bytes
      * @return the content and the revision it was read at
      */
     CompletableFuture<Content> read(long limitBytes);
 
-    /** @return the file's current revision, or empty when it no longer exists */
+    /**
+     * The file's current revision, which the Editor asks for before each Save (not Save As). When it differs from the
+     * revision last read or written, the user chooses whether to overwrite or reload; when the file no longer exists,
+     * whether to save anyway.
+     *
+     * @return the file's current revision, or empty when it no longer exists
+     */
     CompletableFuture<Optional<Revision>> revision();
 
     /**

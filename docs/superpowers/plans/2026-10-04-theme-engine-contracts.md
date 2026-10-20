@@ -719,7 +719,7 @@ The pure bounded evaluator supports admitted deterministic color functions, refe
 selected function cases are differentially checked against pinned FlatLaf 3.7, not a complete parity
 guarantee. Known Minor: spin(relative) hue handling and one-channel spin/rgba rounding drift remain
 for Plan 2 Task 2 correction before imported-theme visual acceptance; exact reproductions are in
-[UI maintenance](../../ui-maintenance.md#known-minor-expression-parity-gap). `systemColor` uses its explicit fallback
+[UI maintenance](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/ui-maintenance.md#known-minor-expression-parity-gap). `systemColor` uses its explicit fallback
 because the pure model has no native color source. Missing/unresolvable fallback, missing required
 references and cycles yield origin/key-aware actionable diagnostics; optional `$?` references may
 resolve to null. Function `derived`/`lazy` inputs become colors in the immutable snapshot, with

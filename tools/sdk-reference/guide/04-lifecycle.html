@@ -1,0 +1,125 @@
+<section class="guide" id="lifecycle">
+<h2>Lifecycle</h2>
+<p>Jasper loads plugins once per launch, before its first window opens, and stops them when it quits. A plugin's life is
+two calls on its entry class, {@link Plugin#start(PluginContext)} and {@link Plugin#stop()}, both on the UI thread, with
+one {@link PluginContext} that attributes everything the plugin does to it.</p>
+
+<h3>At launch</h3>
+<ol class="steps">
+<li><b>Discover.</b> Jasper looks in the application's bundled plugins, in {@code plugins/<id>/jars/} in Jasper home, and
+in the {@code --plugin-dir} folder (its {@code jars/} folder, or the jars directly in it). In Jasper home a plugin's
+folder must be named after its id. Exactly one of a plugin's jars holds its <a href="#manifest">manifest</a>.</li>
+<li><b>Pick one copy of each id.</b> The higher version wins; on equal versions the {@code --plugin-dir} copy beats an
+installed one, which beats the bundled one. The copy that loses is ignored.</li>
+<li><b>Admit.</b> The plugin's {@code sdk} range must include this Jasper's SDK, the user must not have disabled it, and an
+installed plugin must have the user's consent to every capability it declares. In safe mode no installed plugin and no
+look loads.</li>
+<li><b>Resolve.</b> Plugins in a dependency cycle are skipped, then every plugin whose hard requirement is not loading, and
+at most one look is chosen.</li>
+<li><b>Load.</b> Each plugin gets its own class loader, dependencies first. Loading refuses a jar with a class in a reserved
+package ({@code dev.jasper.sdk}, {@code dev.jasper.app}, {@code dev.jasper.terminal}, {@code dev.jasper.buddy},
+{@code java}, {@code javax}, {@code jdk}) or in a package a dependency exports, a class file larger than 16 MiB, and a
+class that refers to an SDK type or member this SDK no longer has ("rebuild it for SDK <i>version</i>"). The entry class
+must be public, have a public no-argument constructor and implement {@link Plugin}.</li>
+<li><b>Start.</b> Jasper calls each plugin's {@code start} on the UI thread, in load order.</li>
+</ol>
+<p>Load order puts every plugin a plugin {@code requires}, hard or optional, before it; otherwise plugins go in
+alphabetical order of id. A plugin whose hard requirement did not become active is skipped with the reason
+("requires <i>id</i>, which failed to start", "was skipped" or "is not running"). What became of each plugin is logged
+as one line per plugin, shown in Settings › Plugins, and, for a plugin that could not be read, loaded or started, posted
+in the Plugin problems notification group; see <a href="plugins.md">plugins</a>.</p>
+
+<h3>start</h3>
+<p>{@code start} registers the plugin's contributions and returns. It runs on the UI thread, which draws every window,
+so it must return promptly: Jasper logs any plugin callback on the UI thread that takes more than 100 ms
+("Slow plugin callback on the UI thread"). Move slow work, such as reading files or connecting, to
+{@link PluginContext#background()}. Two things are possible only while {@code start} runs: declaring settings with
+{@link PluginSettings#declare(SettingSpec)} (and giving a settings page with {@link PluginSettings#page(SettingsPanel)}),
+and publishing services with {@link Services#publish(Class,Object)} or
+{@link Services#publishPerConsumer(Class,Function)}. {@code start} is also where to look up the services of the plugins
+it requires: Jasper prepares them before it calls {@code start}, and {@link Services#find(Class)} returns them.</p>
+<pre><code class="language-java">public final class ToolPlugin implements Plugin {
+    @Override public void start(PluginContext context) {
+        Setting&lt;Boolean&gt; enabled = context.settings().declare(SettingSpec.of("enabled", SettingKind.bool(), true)
+            .label("Show the deploy action").applies(Applies.RESTART));
+        context.log().log(System.Logger.Level.INFO, "Tool " + context.plugin().version() + " started");
+        if (!enabled.get()) return;
+        context.actions().register(ActionSpec.of("dev.example.tool.deploy", "Run Deploy Checks"),
+            invoked -&gt; context.background().execute(() -&gt; runChecks(context)));
+    }
+
+    private static void runChecks(PluginContext context) {
+        // Slow work runs here, off the UI thread.
+    }
+}</code></pre>
+
+<h3>When start fails</h3>
+<p>When {@code start} throws, or the entry class cannot be created, Jasper rolls the plugin back completely: everything
+the context handed out goes, not only its registrations. Its actions, menus, toolbar and status items, tool windows,
+windows and dialogs, palette scopes, file sources, subcommand handlers and event subscriptions are removed; open
+activities end as failed with "Plugin failed to start" and connections close; its notifications expire; staged services
+are discarded, so no other plugin ever sees them; its background tasks are interrupted; and the context closes. The
+plugin is reported as failed with "<i>Name</i> failed to start" (with <b>Disable Plugin</b> and <b>Show more…</b>, which
+opens the Errors window at its stack trace), and plugins that require it are skipped. {@code stop} is never called
+after a failed start.</p>
+
+<h3>stop</h3>
+<p>{@code stop} is called once, when Jasper quits, for each plugin that started, in reverse start order. It runs before
+Jasper closes what the plugin left open, so it can save state or end connections cleanly; afterwards Jasper removes every
+registration as it does after a failed start, and activities still open end as failed with "Plugin stopped". It must not
+block: Jasper cannot abandon a blocked UI thread, and a {@code stop} that does not return ends the process at the exit
+deadline. See <a href="#threading">Threading</a> for the shutdown order.</p>
+
+<h3>The context</h3>
+<p>Each plugin gets its own {@link PluginContext}. Its members are the SDK's entry points:</p>
+<table>
+<thead><tr><th>Member</th><th>What it gives</th></tr></thead>
+<tbody>
+<tr><td>{@link PluginContext#plugin()}</td><td>The plugin's {@link PluginInfo}: id, name, normalised version and the capabilities it holds.</td></tr>
+<tr><td>{@link PluginContext#log()}</td><td>Its logger.</td></tr>
+<tr><td>{@link PluginContext#dataDirectory()}</td><td>Its private data folder.</td></tr>
+<tr><td>{@link PluginContext#background()}</td><td>Its executor for slow work.</td></tr>
+<tr><td>{@link PluginContext#settings()}</td><td><a href="#settings">Declared settings</a> and the Settings page.</td></tr>
+<tr><td>{@link PluginContext#events()}</td><td>The event bus: Jasper's topics, other plugins' topics and its own.</td></tr>
+<tr><td>{@link PluginContext#services()}</td><td><a href="#services">Services</a> it publishes and those of the plugins it requires.</td></tr>
+<tr><td>{@link PluginContext#activities()}</td><td>Activities and connections shown on Desk Buddy.</td></tr>
+<tr><td>{@link PluginContext#notifications()}</td><td>Its notification groups.</td></tr>
+<tr><td>{@link PluginContext#actions()}, {@link PluginContext#menus()}, {@link PluginContext#toolbar()}, {@link PluginContext#statusBar()}, {@link PluginContext#rail()}</td><td>Commands and where they appear; see <a href="#contributions">Contributions</a>.</td></tr>
+<tr><td>{@link PluginContext#panels()}, {@link PluginContext#windows()}</td><td>Tool windows, windows, dialogs, overlays, popovers, content tabs and file choosers.</td></tr>
+<tr><td>{@link PluginContext#kit()}, {@link PluginContext#appearance()}</td><td>Its <a href="#ui">view kit</a>, the current theme's colours and the look Jasper runs with.</td></tr>
+<tr><td>{@link PluginContext#terminals()}</td><td>Windows, tabs and panes; see <a href="#terminals">Terminals</a>.</td></tr>
+<tr><td>{@link PluginContext#palette()}</td><td>Command palette scopes; see <a href="#palette">Palette</a>.</td></tr>
+<tr><td>{@link PluginContext#fileSources()}</td><td>Places in Jasper's file chooser.</td></tr>
+<tr><td>{@link PluginContext#commandLine()}</td><td>Its {@code jasper} subcommands.</td></tr>
+<tr><td>{@link PluginContext#platform()}</td><td>Desktop integration: the editor, the browser and the clipboard.</td></tr>
+</tbody>
+</table>
+<p>After a failed start, and after {@code stop}, the context is closed: calls that contribute throw
+{@code IllegalStateException}, {@link PluginContext#background()} rejects tasks with
+{@code RejectedExecutionException}, and the handles it issued stop working. Queries and commands on window, tab and pane
+handles throw {@code IllegalStateException} ("Plugin context is closed: <i>id</i>"), and so do the kit's view methods
+("Plugin kit is closed"); sending text, bytes or a paste to a pane does nothing; and {@link Setting#set(Object)} fails
+with "The plugin has stopped." {@link PluginContext#log()} keeps working, so a
+background task that outlives the plugin can still say why it ended.</p>
+
+<h3>Logging</h3>
+<p>{@link PluginContext#log()} is a {@code System.Logger} named {@code dev.jasper.plugins.<id>}. Its records go to Jasper's
+log, {@code jasper-<u>-<g>.log} in the {@code logs} folder of Jasper home, beside Jasper's own; records at INFO and above
+are written. Every failure Jasper contains in the plugin's code is logged there at WARNING as
+"Plugin <i>id</i> failed in <i>what</i>" with its stack trace. See <a href="diagnostics.md">diagnostics</a>.</p>
+
+<h3>Data and settings</h3>
+<p>{@link PluginContext#dataDirectory()} is {@code plugins/<id>/data/} in Jasper home, created when missing. The plugin
+owns its contents. It survives updates and disabling, and is deleted, with the plugin's jars and settings file, when the
+user removes an installed plugin. The settings file beside it, {@code plugins/<id>/<id>.toml}, belongs to
+<a href="#settings">declared settings</a>; read and write it through them rather than as a file.</p>
+
+<h3>Safe mode and --plugin-dir</h3>
+<p>{@code jasper --safe-mode} starts Jasper without any plugin installed in Jasper home and without any look; bundled
+plugins that provide no look, and a {@code --plugin-dir} plugin, still load. {@code jasper --plugin-dir <folder>} loads the
+plugin in that folder beside the others, without a capability review, as a separate, standalone Jasper that never hands
+off to the one already running. Use it to run the plugin you are building; see <a href="command-line.md">the command line</a>.
+A Jasper started with {@code --plugin-dir}, {@code --safe-mode}, {@code --config} or {@code --standalone} answers the
+{@code jasper} command only in its own shells and does not update the subcommand list {@code jasper --help} prints: try
+a plugin's subcommand from a shell inside the {@code --plugin-dir} Jasper.</p>
+</section>

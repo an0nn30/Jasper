@@ -80,7 +80,7 @@ public enum SemanticColor {
 
     private final String key;
     SemanticColor(String key) { this.key = key; }
-    /** The case-sensitive native TOML key. */
+    /** The case-sensitive role key a theme file uses, such as {@code surface.app}. */
     public String key() { return key; }
     /** Finds a standard semantic name. */
     public static Optional<SemanticColor> of(String key) {
