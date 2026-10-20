@@ -220,6 +220,7 @@ class WorkspaceFileReadTest {
         String g3Tabs = "tabs = [\"" + t3 + "\"]";
         for (String[] change : new String[][] {
                 {"role = \"full\"", "role = \"side\""},
+                {"role = \"full\"", "role = \"pane\""},
                 {split, split.replace("kind = \"split\"", "kind = \"pane\"")},
                 {split, split.replace("horizontal", "diagonal")},
                 {g4Weight, g4Weight.replace("0.5", "-1.0")},

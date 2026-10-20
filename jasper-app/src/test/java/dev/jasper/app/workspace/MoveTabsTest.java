@@ -51,11 +51,16 @@ class MoveTabsTest {
             Layout before = content.workspace().model();
             List<Tab> moving = content.tabs();
             var sessions = moving.stream().map(MovesFixture::session).toList();
+            Tab active = content.selectedTab();
             content.newParentTab(HOME);
             ParentTabId second = content.activeParentTab();
+            int[] focused = {0};
+            active.focusTarget(() -> focused[0]++);
             windows.facts.clear();
             ChildWindow full = windows.manager.moveTabToNewWindow(content, first).orElseThrow();
             assertThat(full.content().windowLayout()).isEqualTo(ParentTabs.of(new ParentTab(first, before)));
+            assertThat(full.content().selectedTab()).as("the tab's active item, shown").isSameAs(active);
+            assertThat(focused[0]).as("the item has the focus in its new window").isPositive();
             assertThat(content.parentTabCount()).isEqualTo(1);
             assertThat(content.activeParentTab()).isEqualTo(second);
             assertThat(windows.tabFacts()).isEqualTo(moved(moving, main[0].id(), full.id()));
@@ -95,6 +100,9 @@ class MoveTabsTest {
             ParentTabId p2 = content.activeParentTab();
             var layouts = content.windowLayout().parentTabs();
             int tabs = content.tabCount();
+            Tab active = content.selectedTab();
+            int[] focused = {0};
+            active.focusTarget(() -> focused[0]++);
             windows.facts.clear();
             assertThat(windows.manager.moveToMainWindow(content)).containsSame(windows.main());
             assertThat(full.closed()).as("the full window closes with its last tab").isTrue();
@@ -102,6 +110,8 @@ class MoveTabsTest {
             assertThat(parents.parentTabs()).extracting(ParentTab::id).containsExactly(m1, p1, p2, m2);
             assertThat(parents.parentTabs().subList(1, 3)).as("each with its layout").containsExactlyElementsOf(layouts);
             assertThat(main.activeParentTab()).as("the tab it showed").isEqualTo(p2);
+            assertThat(main.selectedTab()).as("its active item, shown").isSameAs(active);
+            assertThat(focused[0]).as("the item has the focus in the main window").isPositive();
             assertThat(windows.tabFacts()).hasSize(tabs).allMatch(TerminalEvent.TabMoved.class::isInstance);
         });
         windows.launch();

@@ -68,11 +68,11 @@ class WorkspaceSnapshotTest {
             assertThat(snapshot.children()).extracting(WorkspaceFile.WindowRecord::layout)
                 .as("two full windows, in the order they opened")
                 .containsExactly(full.content().windowLayout(), moved.content().windowLayout());
-            WorkspaceFile.WindowRecord popped = snapshot.children().get(1);
-            assertThat(popped.role()).isEqualTo(WorkspaceFile.Role.CHILD);
-            assertThat(popped.tabs().get(tail.id())).as("renamed, in its directory, with its profile")
+            WorkspaceFile.WindowRecord movedRecord = snapshot.children().get(1);
+            assertThat(movedRecord.role()).isEqualTo(WorkspaceFile.Role.CHILD);
+            assertThat(movedRecord.tabs().get(tail.id())).as("renamed, in its directory, with its profile")
                 .isEqualTo(new WorkspaceFile.TabRecord.Terminal("tail", logs.toString(), "zsh"));
-            assertThat(popped.bounds()).as("its frame has not said where it is").isEmpty();
+            assertThat(movedRecord.bounds()).as("its frame has not said where it is").isEmpty();
         });
         windows.launch();
     }
