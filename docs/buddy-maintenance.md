@@ -93,7 +93,7 @@ Use [BuddyCard](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/presenta
 for shared text/materials; column and drawer panels own their input and paint state.
 Placement helpers own screen geometry; `BuddyDragFrames` coalesces pointer updates.
 `BuddyWindow` owns native acquisition and child disposal. Preserve nonfocusable surfaces,
-nearest-neighbor sprite scaling, screen clamps, drag-end position reporting and hidden
+nearest-neighbor sprite sampling and the documented logical dimensions, screen clamps, drag-end position reporting and hidden
 state retention. Add cleanup when acquiring a new timer, window or global listener.
 Check both initialization failure and final disposal; no new native acquisition belongs
 in a facade constructor or a model mutation.
