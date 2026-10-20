@@ -1058,36 +1058,4 @@ class TabDragWindowsTest {
             .isEqualTo(display);
         assertThat(TabDrag.dropFrame(display, null, false, false, true)).as("no display known").isEqualTo(display);
     }
-
-    @Test void aTearOutWindowIsKeptOnTheDisplayUnderTheCursor() {
-        Rectangle usable = new Rectangle(0, 25, 1440, 875);
-        assertThat(TabDrag.fitted(new Rectangle(100, 100, 800, 600), usable)).as("on it: as it is").isEqualTo(new Rectangle(100, 100, 800, 600));
-        assertThat(TabDrag.fitted(new Rectangle(1000, 600, 800, 600), usable)).as("past its right and bottom edges: moved onto it")
-            .isEqualTo(new Rectangle(640, 300, 800, 600));
-        assertThat(TabDrag.fitted(new Rectangle(-50, 0, 2000, 1200), usable)).as("larger: as large as it").isEqualTo(usable);
-        assertThat(TabDrag.fitted(new Rectangle(5, 5, 800, 600), new Rectangle())).as("no display known: as it is")
-            .isEqualTo(new Rectangle(5, 5, 800, 600));
-    }
-
-    /**
-     * A tear-out's workspace reaches right of and below the cursor by most of a group, so near the edge of a display left
-     * of or above another it mostly covers that other one: the display under the cursor takes the window all the same.
-     */
-    @Test void aTearOutWindowOpensOnTheDisplayUnderTheCursor() {
-        List<Rectangle> displays = List.of(new Rectangle(0, 0, 1440, 900), new Rectangle(1440, 0, 1920, 1080));
-        assertThat(TabDrag.displayFor(new Point(1500, 220), displays)).as("its corner on the left display, the cursor on the right")
-            .hasValue(1);
-        assertThat(TabDrag.displayFor(new Point(130, 120), displays)).as("on the left").hasValue(0);
-        assertThat(TabDrag.displayFor(new Point(1440, 0), displays)).as("on the edge: the display it begins").hasValue(1);
-        assertThat(TabDrag.displayFor(new Point(5000, 5000), displays)).as("on none: the default display").isEmpty();
-        List<Rectangle> left = List.of(new Rectangle(0, 0, 1920, 1080), new Rectangle(-1440, 0, 1440, 900));
-        Rectangle workspace = new Rectangle(-80, 280, 800, 600);
-        assertThat(workspace.intersection(left.get(0)).width).as("the workspace is mostly on the primary").isGreaterThan(700);
-        assertThat(TabDrag.displayFor(new Point(-50, 300), left)).as("the cursor on the display left of the primary").hasValue(1);
-        List<Rectangle> above = List.of(new Rectangle(0, 0, 1920, 1080), new Rectangle(0, -900, 1440, 900));
-        assertThat(TabDrag.displayFor(new Point(400, -40), above)).as("the cursor on the display above the primary").hasValue(1);
-        List<Rectangle> mirrored = List.of(new Rectangle(0, 0, 1440, 900), new Rectangle(0, 0, 1440, 900));
-        assertThat(TabDrag.displayFor(new Point(100, 100), mirrored)).as("displays that overlap: the first").hasValue(0);
-        assertThat(TabDrag.displayFor(new Point(100, 100), List.of())).as("no display known: the default").isEmpty();
-    }
 }

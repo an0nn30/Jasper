@@ -71,14 +71,6 @@ public final class UiState {
         }
     }
 
-    /** Main window's normal bounds and maximized axes (AWT bits 2 and 4); never restore minimization. */
-    public record MainWindow(Bounds bounds, int extendedState) {
-        public MainWindow {
-            Objects.requireNonNull(bounds);
-            if ((extendedState & ~6) != 0) throw new IllegalArgumentException("Invalid maximized state");
-        }
-    }
-
     /** The file chooser's remembered folders (absolute paths; recent is newest first) and its two toggles. */
     public record Chooser(List<String> recent, List<String> pinned, boolean preview, boolean showHidden) {
         public static final Chooser DEFAULT = new Chooser(List.of(), List.of(), false, true);
@@ -137,7 +129,6 @@ public final class UiState {
     private final Map<String, Bounds> windows = new TreeMap<>();
     private boolean railVisible = true;
     private boolean zenMode;
-    private MainWindow mainWindow;
     private static final int MAX_CHOOSER_PATHS = 50;
     private Chooser chooser = Chooser.DEFAULT;
     private PalettePosition palettePosition;
@@ -171,7 +162,7 @@ public final class UiState {
         } catch (IOException | RuntimeException invalid) {
             LOG.log(System.Logger.Level.WARNING, "Ignoring unreadable UI state " + file, invalid);
             state.layouts.clear(); state.layout(""); state.windows.clear(); state.railVisible = true;
-            state.chooser = Chooser.DEFAULT; state.mainWindow = null; state.zenMode = false; state.palettePosition = null; state.runWindowPosition = null;
+            state.chooser = Chooser.DEFAULT; state.zenMode = false; state.palettePosition = null; state.runWindowPosition = null;
         }
         return state;
     }
@@ -189,11 +180,6 @@ public final class UiState {
             for (String id : table.keySet())
                 if (WINDOW_ID.matcher(id).matches() && table.get(List.of(id)) instanceof TomlTable entry)
                     bounds(entry).ifPresent(bounds -> windows.put(id, bounds));
-        if (toml.get(List.of("main_window")) instanceof TomlTable table)
-            bounds(table).ifPresent(bounds -> {
-                int extended = number(table, "extended_state").filter(value -> (value & ~6) == 0).orElse(0);
-                mainWindow = new MainWindow(bounds, extended);
-            });
         if (toml.get(List.of("palette")) instanceof TomlTable table
                 && table.get(List.of("center_x")) instanceof Number x && PalettePosition.fraction(x.doubleValue())
                 && table.get(List.of("top")) instanceof Number top && PalettePosition.fraction(top.doubleValue()))
@@ -310,8 +296,6 @@ public final class UiState {
     /** The look's dock sizes and ratios. */
     public Dock dock() { return layout(look).dock; }
     public void setDock(Dock value) { layout(look).dock = Objects.requireNonNull(value); }
-    public Optional<MainWindow> mainWindow() { return Optional.ofNullable(mainWindow); }
-    public void setMainWindow(MainWindow value) { mainWindow = Objects.requireNonNull(value); }
     public Optional<Bounds> window(String id) { return Optional.ofNullable(windows.get(id)); }
     public void putWindow(String id, Bounds value) { if (WINDOW_ID.matcher(id).matches()) windows.put(id, value); }
     public boolean railVisible() { return railVisible; }
@@ -338,12 +322,6 @@ public final class UiState {
         layouts.forEach((key, layout) -> { if (!key.isEmpty()) appendDock(text, "look.\"" + key + "\".", layout); });
         windows.forEach((id, bounds) -> text.append("\n[windows.").append(quote(id)).append("]\nx = ").append(bounds.x())
             .append("\ny = ").append(bounds.y()).append("\nwidth = ").append(bounds.width()).append("\nheight = ").append(bounds.height()).append('\n'));
-        if (mainWindow != null) {
-            Bounds bounds = mainWindow.bounds();
-            text.append("\n[main_window]\nx = ").append(bounds.x()).append("\ny = ").append(bounds.y())
-                .append("\nwidth = ").append(bounds.width()).append("\nheight = ").append(bounds.height())
-                .append("\nextended_state = ").append(mainWindow.extendedState()).append('\n');
-        }
         if (palettePosition != null)
             text.append("\n[palette]\ncenter_x = ").append(palettePosition.centerX()).append("\ntop = ").append(palettePosition.top()).append('\n');
         if (runWindowPosition != null)

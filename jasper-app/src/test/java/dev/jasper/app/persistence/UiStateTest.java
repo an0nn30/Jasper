@@ -61,6 +61,16 @@ class UiStateTest {
         assertThat(again.window("dev.x.manager")).hasValue(new UiState.Bounds(-20, 40, 800, 600));
     }
 
+    /** Workspace tabs spec 8: the main window's bounds live in workspace.toml; a [main_window] table is dropped on the next save. */
+    @Test void aMainWindowTableIsNeitherReadNorWritten() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, "version = 2\nrail_visible = false\n[main_window]\nx = 10\ny = 20\nwidth = 800\nheight = 700\nextended_state = 6\n");
+        UiState state = UiState.load(file);
+        assertThat(state.railVisible()).as("the rest still reads").isFalse();
+        state.save();
+        assertThat(Files.readString(file)).doesNotContain("main_window").contains("rail_visible = false");
+    }
+
     @Test void aVersionOneFileMigratesRegionsSizesAndVisibilityAndKeepsTheOtherSections() throws Exception {
         Path file = dir.resolve("ui-state.toml");
         Files.writeString(file, """

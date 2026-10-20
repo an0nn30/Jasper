@@ -4,7 +4,6 @@ import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.platform.WindowGlass;
-import dev.jasper.app.persistence.UiState;
 import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -32,6 +31,7 @@ public final class WindowFrame {
     private final WindowGlass glass;
     private boolean closed;
     private WindowPlacement placement;
+    private java.util.function.Consumer<JasperWindow.Placement> report = placed -> { };
     private final java.awt.event.ComponentAdapter geometry = new java.awt.event.ComponentAdapter() {
         @Override public void componentMoved(java.awt.event.ComponentEvent event) { rememberBounds(); }
         @Override public void componentResized(java.awt.event.ComponentEvent event) { rememberBounds(); }
@@ -117,9 +117,17 @@ public final class WindowFrame {
         return SystemInfo.isMacOS && Boolean.getBoolean("apple.laf.useScreenMenuBar");
     }
 
-    /** The main window's bounds from {@code state}, checked against the current displays; before the frame shows. */
-    public void restoreLayout(UiState state) {
-        placement = new WindowPlacement(state);
+    /**
+     * Places the frame where {@code saved} puts it, checked against the current displays, and reports where the window is
+     * from then on (workspace tabs spec 13); a window placed nowhere goes where the platform puts a new one. Before the
+     * frame shows.
+     *
+     * @param saved where the window was saved, or {@link JasperWindow.Placement#NONE}
+     * @param report hears where the window is whenever it changes
+     */
+    public void place(JasperWindow.Placement saved, java.util.function.Consumer<JasperWindow.Placement> report) {
+        placement = new WindowPlacement(saved.bounds(), saved.extendedState());
+        this.report = java.util.Objects.requireNonNull(report, "report");
         updateMinimumSize();
         var screens = new java.util.ArrayList<Rectangle>();
         var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
@@ -157,18 +165,20 @@ public final class WindowFrame {
         var displays = java.util.Arrays.stream(environment.getScreenDevices())
             .map(java.awt.GraphicsDevice::getDefaultConfiguration).toList();
         // The workspace reaches right of and below the cursor, across a display's edge: the cursor's display takes it.
-        java.util.OptionalInt under = TabDrag.displayFor(cursor,
+        java.util.OptionalInt under = WindowPlacement.displayFor(cursor,
             displays.stream().map(java.awt.GraphicsConfiguration::getBounds).toList());
         java.awt.GraphicsConfiguration display = under.isPresent() ? displays.get(under.getAsInt())
             : environment.getDefaultScreenDevice().getDefaultConfiguration();
-        frame.setBounds(TabDrag.fitted(bounds, usableBounds(display)));
+        frame.setBounds(WindowPlacement.fitted(bounds, usableBounds(display)));
     }
 
     /** @return the native window, for painting the warm-up rehearsal */
     public java.awt.Window nativeWindow() { return frame; }
 
     private void rememberBounds() {
-        if (!closed && placement != null && frame.isShowing()) placement.observe(frame.getBounds(), frame.getExtendedState());
+        if (closed || placement == null || !frame.isShowing()) return;
+        placement.observe(frame.getBounds(), frame.getExtendedState());
+        report.accept(placement.placement(frame.getExtendedState()));
     }
 
     static Dimension minimumSize(JRootPane root, Insets decorations) {
@@ -214,22 +224,20 @@ public final class WindowFrame {
         return component == frame || SwingUtilities.getWindowAncestor(component) == frame;
     }
 
-    private void show() { frame.setVisible(true); reportState(); content.focusSelected(); }
+    private void show() { frame.setVisible(true); rememberBounds(); reportState(); content.focusSelected(); }
 
-    /** Disposes the frame without remembering its bounds: its window failed to open, or it is the rehearsal's. */
+    /** Disposes the frame, reporting nothing more: its window failed to open, or it is the rehearsal's. */
     public void discard() {
         placement = null;
         dispose();
     }
 
-    /** After the content closed: remembers the main window's bounds, then disposes the frame. */
+    /** After the content closed: disposes the frame. */
     private void dispose() {
         if (closed) return;
-        rememberBounds();
         closed = true;
         frame.removeComponentListener(geometry);
         if (glass != null) glass.close();
-        if (placement != null) placement.save(frame.getExtendedState());
         if (titleBar != null) titleBar.close();
         frame.removeWindowListener(listener); frame.dispose();
     }

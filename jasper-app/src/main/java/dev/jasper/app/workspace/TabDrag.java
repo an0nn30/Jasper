@@ -543,32 +543,6 @@ final class TabDrag {
         return new Rectangle(at.x - grab.x, at.y - grab.y, size.width, size.height);
     }
 
-    /**
-     * {@code bounds} kept on {@code usable}: no larger than it, then moved wholly onto it, as IntelliJ keeps a floating
-     * window on its screen; as they are when {@code usable} is empty (no display known). A torn-out window's frame
-     * keeps itself on its display through this.
-     */
-    static Rectangle fitted(Rectangle bounds, Rectangle usable) {
-        if (usable.isEmpty()) return new Rectangle(bounds);
-        int width = Math.min(bounds.width, usable.width), height = Math.min(bounds.height, usable.height);
-        int x = Math.max(usable.x, Math.min(bounds.x, usable.x + usable.width - width));
-        int y = Math.max(usable.y, Math.min(bounds.y, usable.y + usable.height - height));
-        return new Rectangle(x, y, width, height);
-    }
-
-    /**
-     * The display a torn-out window opens on: the one under the cursor, the first of those that hold it. The new workspace
-     * reaches right of and below the cursor, so it can cover a neighbouring display more than the cursor's.
-     *
-     * @param cursor the cursor on screen
-     * @param displays the displays' bounds on screen
-     * @return that display's index; empty when the cursor is on none, for the default display
-     */
-    static OptionalInt displayFor(Point cursor, List<Rectangle> displays) {
-        for (int i = 0; i < displays.size(); i++) if (displays.get(i).contains(cursor)) return OptionalInt.of(i);
-        return OptionalInt.empty();
-    }
-
     /** The frames on screen of Jasper's showing windows the drag does not reach, but the label's: see {@link #otherWindows}. */
     private List<Rectangle> auxiliaryFrames() {
         var reached = new HashSet<Component>();

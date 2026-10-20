@@ -1,7 +1,9 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.persistence.UiState;
 import java.awt.Component;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -29,10 +31,29 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
         }
     }
 
+    /**
+     * Where a window is (workspace tabs spec 13): what {@code workspace.toml} keeps, and where a restored window's frame
+     * puts it.
+     *
+     * @param bounds its normal bounds, kept while it is maximized or minimized; empty until its frame has any
+     * @param extendedState its maximized bits only ({@code Frame.MAXIMIZED_BOTH}'s 2 and 4)
+     */
+    public record Placement(Optional<UiState.Bounds> bounds, int extendedState) {
+        /** A window not placed yet: its frame puts it where the platform puts a new window. */
+        public static final Placement NONE = new Placement(Optional.empty(), 0);
+
+        /** Requires the bounds; only the maximized bits are kept. */
+        public Placement {
+            Objects.requireNonNull(bounds, "bounds");
+            if ((extendedState & ~6) != 0) throw new IllegalArgumentException("Only the maximized bits are kept: " + extendedState);
+        }
+    }
+
     private final WindowManager manager;
     private final WindowContent content;
     private WindowShell shell;
     private boolean closed;
+    private Placement placement = Placement.NONE;
 
     JasperWindow(WindowManager manager, WindowContent content) {
         this.manager = Objects.requireNonNull(manager, "manager");
@@ -54,6 +75,19 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
 
     /** @return whether the window has closed */
     public final boolean closed() { return closed; }
+
+    /** @return where the window is, as its frame last said; where a restored window's frame puts it */
+    public final Placement placement() { return placement; }
+
+    /**
+     * Its frame says where the window is now: after it shows, moves, resizes or is maximized. Ignored once it has closed.
+     *
+     * @param value the window's normal bounds and maximized bits
+     */
+    public final void placed(Placement value) {
+        if (closed) return;
+        placement = Objects.requireNonNull(value, "value");
+    }
 
     /** Brings the window to the front, restoring it when it is minimized, and focuses its active tab. */
     public final void toFront() {

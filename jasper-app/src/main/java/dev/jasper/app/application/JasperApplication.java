@@ -182,8 +182,8 @@ public final class JasperApplication {
     /** Test seam: how a window's native frame is made. Production builds a {@link WindowFrame}. Before the manager, which reads it. */
     Function<JasperWindow, WindowShell> frames = this::frameOnScreen;
     /**
-     * Every window: the main window and the child windows (workspace tabs spec 6.1). EDT. Its closing hooks are plan 6's,
-     * which saves the windows there; until then each frame keeps what it keeps when it closes.
+     * Every window: the main window and the child windows (workspace tabs spec 6.1). EDT. Its closing hooks are empty: no
+     * frame keeps where its window was, the window does (workspace plan 6a Rulings 7 and 10).
      */
     private final WindowManager windows = new WindowManager(contributions, new WindowManager.Hooks(this::composeContent,
         window -> frames.apply(window), this::windowOpened, this::windowActivated, this::windowClosed, this::windowStateChanged,
@@ -556,13 +556,14 @@ public final class JasperApplication {
     }
 
     /**
-     * A window's native frame under this process's look: the main window's at its saved bounds. A failure after the
-     * frame is built disposes it, since its window never gets its shell to dispose it through, and propagates. EDT.
+     * A window's native frame under this process's look, where the window was saved or, for a new window, where the
+     * platform puts it; it reports where the window is from then on (workspace tabs spec 13). A failure after the frame
+     * is built disposes it, since its window never gets its shell to dispose it through, and propagates. EDT.
      */
     private WindowShell frameOnScreen(JasperWindow window) {
         var frame = new WindowFrame(window.content(), windowLook(), configuration == null ? null : windowConfiguration(), window.events());
         try {
-            if (window.isMain()) frame.restoreLayout(uiState);
+            frame.place(window.placement(), window::placed);
             startupSteps.workstation();
             return frame.shell();
         } catch (RuntimeException | Error failure) {

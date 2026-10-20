@@ -96,7 +96,7 @@ public final class WorkspaceFile {
      *
      * @param role main or child
      * @param bounds its normal bounds; empty places it as a new window
-     * @param extendedState its maximized bits only (2 and 4), as {@code UiState.MainWindow} keeps them
+     * @param extendedState its maximized bits only (2 and 4): a window never comes back minimized
      * @param layout its workspace; only the main window's may be empty
      * @param tabs a record for exactly each tab of the layout
      */

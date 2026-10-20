@@ -13,6 +13,7 @@ import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Origin;
 import dev.jasper.app.layout.ParentTabId;
@@ -121,6 +122,23 @@ class WindowManagerTest {
             assertThat(main.content().isMain()).isTrue();
             assertThat(events).containsExactly("show main", "opened main");
             assertThat(manager.opening()).isZero();
+        });
+        launch();
+    }
+
+    /** Workspace tabs spec 13: a window keeps where its frame last said it is, which workspace.toml saves. */
+    @Test void aWindowKeepsWhereItsFrameSaysItIs() throws Exception {
+        edt(() -> {
+            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
+            assertThat(main.placement()).isEqualTo(JasperWindow.Placement.NONE);
+            var placed = new JasperWindow.Placement(Optional.of(new UiState.Bounds(40, 60, 1400, 900)), 6);
+            main.placed(placed);
+            assertThat(main.placement()).isEqualTo(placed);
+            assertThatThrownBy(() -> new JasperWindow.Placement(Optional.empty(), java.awt.Frame.ICONIFIED))
+                .as("never saved minimized").isInstanceOf(IllegalArgumentException.class);
+            main.requestClose();
+            main.placed(JasperWindow.Placement.NONE);
+            assertThat(main.placement()).as("a closed window keeps its last place").isEqualTo(placed);
         });
         launch();
     }
