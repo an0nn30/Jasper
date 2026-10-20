@@ -5,6 +5,8 @@ Status: **Approved on 2026-10-19** (the user: "Spec approved. Write the parent-t
 "spec" below) in sections 1, 6, 7, 8, 10, 11, 12, 13, 14 and 15. Where the two disagree, this document wins. It lands
 after plan 5 and before plans 6a and 6b, which are paused and will be re-planned on top of it.
 Amended 2026-10-20 (user decision): Enterprise shows no parent-tab bar (sections 2 and 7).
+Superseded 2026-10-20 by the [tabs and panes spec](2026-10-20-jasper-tabs-and-panes-design.md), the user's two-level
+model (window, tabs, panes holding one item each); where they disagree, that spec wins.
 
 ## 1. Intent
 
