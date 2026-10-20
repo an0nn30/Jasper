@@ -165,9 +165,10 @@ final class EnterpriseSettings implements AutoCloseable {
                 runtime[0] = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")), home.resolve("plugins"), null, false,
                     home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
                     PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
-                // As JasperApplication gives its runtime before the plugins start: the look's kit and the current theme, so a
-                // plugin's own page paints the Enterprise theme (plan 9b Task 7: without them, the bundled theme's #C6CCD5 boxes).
-                runtime[0].presentation(themes[0].kit());
+                // As JasperApplication gives its runtime before the plugins start: the look's kit, what plugins learn of its look,
+                // its defaults and the current theme, so a plugin's own page paints the Enterprise theme (plan 9b Task 7: without
+                // them, the bundled theme's #C6CCD5 boxes).
+                runtime[0].presentation(themes[0].kit(), projections.plugins(), defaults);
                 runtime[0].appearance(themes[0]::current, handler -> themes[0].subscribe((value, changed) -> handler.accept(value)));
                 runtime[0].start(Map.of(), dark);
                 // The application's own actions, as it registers them at start (the mock's config, commandline and

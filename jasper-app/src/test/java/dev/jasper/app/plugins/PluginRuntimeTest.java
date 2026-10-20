@@ -647,7 +647,8 @@ class PluginRuntimeTest {
         var tall = new dev.jasper.ui.kit.Kit("tall-buttons", base.metrics().with(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT, 40),
             base.type(), base.faces(), base.controls(), base.colors(), base.uiKeys());
         PluginRuntime runtime = runtime(null, root.resolve("absent"), devPlugins, false, new ArrayList<>());
-        onEdt(() -> runtime.presentation(tall));
+        var look = dev.jasper.app.presentation.Projections.standard(new dev.jasper.app.presentation.Projections.Host(dev.jasper.app.presentation.Projections.Platform.LINUX, false)).plugins();
+        onEdt(() -> runtime.presentation(tall, look, dev.jasper.app.config.DefaultSource.CORE));
         onEdt(() -> runtime.start(Map.of(), true));
         settle();
         var context = new dev.jasper.app.settingsui.PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(),
@@ -667,9 +668,41 @@ class PluginRuntimeTest {
                     assertThat(made.getPreferredSize().height).as("the plugin's button measures with the presentation's kit")
                         .isGreaterThan(standard.getPreferredSize().height);
                 } finally { view.close(); reference.close(); page.dispose(); }
-                assertThatIllegalStateException().isThrownBy(() -> runtime.presentation(base)).withMessage("Plugins have already started");
+                assertThatIllegalStateException().isThrownBy(() -> runtime.presentation(base, look, dev.jasper.app.config.DefaultSource.CORE)).withMessage("Plugins have already started");
             });
         } finally { stopAndWait(runtime); }
+    }
+
+    static final String LOOK_READER = """
+        package fix.look;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                System.setProperty("jasper.test.look", context.appearance().presentation().classic() + " "
+                    + context.appearance().presentation().toolWindows());
+            }
+        }
+        """;
+
+    /** Plan 15a Task 2: a started plugin reads the presentation the runtime was given, and the setter refuses after start. */
+    @Test void aStartedPluginReadsThePresentationTheRuntimeWasGiven() throws Exception {
+        Path devPlugins = root.resolve("dev").resolve("dev.example.look");
+        PluginJars.build(devPlugins, "look.jar", PluginJars.descriptor("dev.example.look", "1.0.0", "fix.look.Main"),
+            Map.of("fix.look.Main", LOOK_READER), List.of());
+        var enterprise = dev.jasper.app.presentation.Projections.of(dev.jasper.app.testsupport.EnterpriseLook.CHROME, true, true,
+            "dev.jasper.enterprise", new dev.jasper.app.presentation.Projections.Host(dev.jasper.app.presentation.Projections.Platform.LINUX, false)).plugins();
+        PluginRuntime runtime = runtime(null, root.resolve("absent"), devPlugins, false, new ArrayList<>());
+        try {
+            onEdt(() -> runtime.presentation(dev.jasper.ui.kit.Kit.DEFAULT, enterprise, dev.jasper.app.config.DefaultSource.CORE));
+            onEdt(() -> runtime.start(Map.of(), true));
+            settle();
+            assertThat(System.getProperty("jasper.test.look")).isEqualTo("true STRIPES");
+            onEdt(() -> assertThatIllegalStateException()
+                .isThrownBy(() -> runtime.presentation(dev.jasper.ui.kit.Kit.DEFAULT, enterprise, dev.jasper.app.config.DefaultSource.CORE))
+                .withMessage("Plugins have already started"));
+        } finally {
+            System.clearProperty("jasper.test.look");
+            stopAndWait(runtime);
+        }
     }
 
     static final String LINE_EDITOR = """
