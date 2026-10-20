@@ -97,8 +97,10 @@ Run `jasper-app` → `distribution` → `installWindowsUser` in IntelliJ's Gradl
 or `.\gradlew.bat :jasper-app:installWindowsUser`. This builds the Java application and
 bundled plugins with JBR SDK 25, creates a standard jpackage app image, and installs it
 in `%APPDATA%\JasperApp` with a Start Menu shortcut. It requires no MSVC, WiX, installer,
-or administrator rights. Windows must permit running the generated executable and the
-PowerShell installation script.
+or administrator rights. A Java helper copies files and creates the shortcut through
+Windows APIs, so PowerShell script execution can remain disabled. Windows must permit
+running the generated executable. Both tasks compile the small helper with JBR SDK 25;
+uninstall does not build the application.
 
 Exit Jasper, including its background process, before installing an update or running
 `.\gradlew.bat :jasper-app:uninstallWindowsUser`. Uninstall removes this installation,

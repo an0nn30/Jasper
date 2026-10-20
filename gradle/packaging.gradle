@@ -379,36 +379,48 @@ def packageWindowsUser = tasks.register('packageWindowsUser') {
         installBundledNatives(new File(image, 'app'), context.host)
     }
 }
-def userInstallScript = rootProject.file('packaging/windows/Install-User.ps1')
-tasks.register('installWindowsUser') {
+def userInstallerLibraries = configurations.create('windowsUserInstallerLibraries')
+dependencies.add(userInstallerLibraries.name, 'net.java.dev.jna:jna-platform:5.14.0')
+def userInstallerClasses = layout.buildDirectory.dir('windows-user-installer/classes')
+def compileUserInstaller = tasks.register('compileWindowsUserInstaller', JavaCompile) {
+    source(rootProject.fileTree('packaging/windows/user-install') { include('*.java') })
+    classpath = userInstallerLibraries
+    destinationDirectory = userInstallerClasses
+    javaCompiler = toolchains.compilerFor(java.toolchain)
+}
+def testUserInstaller = tasks.register('verifyWindowsUserInstall', JavaExec) {
+    group = 'verification'
+    description = 'Tests the Java user installer; also exercises Windows shell APIs on Windows.'
+    dependsOn(compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstallTest'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+}
+tasks.named('check') { dependsOn(testUserInstaller) }
+tasks.register('installWindowsUser', JavaExec) {
     group = 'distribution'
     description = 'Installs Jasper in APPDATA with a Start Menu shortcut, without MSVC or administrator rights.'
-    dependsOn(packageWindowsUser)
-    doLast {
-        executeNative(['powershell.exe', '-NoProfile', '-NonInteractive', '-File', userInstallScript.absolutePath,
-            '-Action', 'Install', '-Image', new File(userImage.get().asFile, 'Jasper').absolutePath],
-            'Windows user installation')
-    }
+    dependsOn(packageWindowsUser, compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstall'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+    args('install', new File(userImage.get().asFile, 'Jasper').absolutePath)
 }
-tasks.register('uninstallWindowsUser') {
+tasks.register('uninstallWindowsUser', JavaExec) {
     group = 'distribution'
     description = 'Removes the Windows user installation and its shortcut, preserving Jasper user data.'
-    doLast {
+    dependsOn(compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstall'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+    args('uninstall')
+    doFirst {
         if (normalizedHost().os != 'windows') throw new GradleException('Windows user uninstallation requires Windows.')
-        executeNative(['powershell.exe', '-NoProfile', '-NonInteractive', '-File', userInstallScript.absolutePath,
-            '-Action', 'Uninstall'], 'Windows user uninstallation')
     }
 }
-def verifyWindowsUser = tasks.register('verifyWindowsUserInstall') {
-    group = 'verification'
-    description = 'Tests Windows user install/update/uninstall with isolated temporary files and registry entries.'
-    onlyIf { normalizedHost().os == 'windows' }
-    doLast {
-        executeNative(['powershell.exe', '-NoProfile', '-NonInteractive', '-File',
-            rootProject.file('packaging/windows/Test-UserInstall.ps1').absolutePath], 'Windows user install tests')
-    }
-}
-tasks.named('check') { dependsOn(verifyWindowsUser) }
 
 def verifyPackage = tasks.register('verifyPackage') {
     group = 'verification'

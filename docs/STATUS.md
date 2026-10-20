@@ -13,6 +13,13 @@ Install dry-run and independent review passed; graph verification uses resolved 
 data to avoid cross-project state locks during parallel checks.
 Windows lifecycle tests cover updates, rollback, ownership, junctions and data preservation;
 native Windows execution and desktop/daemon acceptance remain pending. No GUI launched.
+Follow-up: Windows script policy blocked the PowerShell install step. The same tasks
+now use a Java helper with direct JNA Windows APIs for shortcuts, process checks and
+the matching login entry. Both compile only this small helper; uninstall builds no
+application artifacts. Portable filesystem/rollback tests run on every host, with
+native shortcut, registry and junction checks added on Windows.
+Full parallel headless `check`, 26 portable installer checks, install dry-run and
+independent review passed for the Java replacement. Native Windows execution remains pending.
 
 **Jasper Meadow Light — 2026-10-20**: The default light theme uses warm cream surfaces and moss #52643F accents for buttons, selections and focus. Existing saved theme choices, Enterprise defaults and the Slate Cobalt dark default are retained. Select Light appearance and Jasper Meadow Light in Settings to try it with an existing profile. After merging the current remote main, full headless `check` passed: 11,618 Java tests, zero failures/errors, 25 existing platform skips, plus theme-tool, native and architecture checks.
 
