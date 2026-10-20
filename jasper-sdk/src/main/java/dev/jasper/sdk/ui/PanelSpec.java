@@ -15,7 +15,8 @@ import java.util.regex.Pattern;
  * @param defaultAnchor the side used until the user moves the panel
  * @param toggleActionId one of the plugin's own actions, already registered, that toggles this panel:
  *                       View &gt; Tool Windows lists it, with its shortcut, instead of an application-made
- *                       {@code <id>.toggle} (since 0.8.1)
+ *                       {@code <id>.toggle} (since 0.8.1); under a look with flush tool windows its toggle or show
+ *                       also activates the panel (since 0.18.2)
  * @param split whether the panel starts in its side's secondary half: the lower half of the left or right side, or
  *              the right half of the bottom area (since 0.13.0)
  */

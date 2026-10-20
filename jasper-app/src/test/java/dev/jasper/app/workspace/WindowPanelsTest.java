@@ -140,6 +140,81 @@ class WindowPanelsTest {
         });
     }
 
+    private static void request(Contributions model, WindowContent owner, String id, Contributions.PanelRequest.Op op) {
+        model.requestPanel(new Contributions.PanelRequest(owner.id(), id, op));
+    }
+
+    /** A connected window with one panel, under flush frames (Enterprise's classic dock) or the default look's standard ones. */
+    private static WindowContent framed(Contributions model, boolean flush) {
+        var owner = flush
+            ? DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true), DockChromeTest.classicDock())
+            : window();
+        owner.connectContributions(model, UiState.inMemory());
+        model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+        return owner;
+    }
+
+    /** Plan 15b Rulings 1: a plugin's own toggle action arrives as an activating toggle, which activates what it shows. */
+    @Test void aPanelsActivatingToggleUnderFlushFramesActivatesIt() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    @Test void anActivatingToggleThatHidesThePanelActivatesNothing() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+        });
+    }
+
+    @Test void underStandardFramesAnActivatingToggleIsAPlainToggle() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, false);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+        });
+    }
+
+    /** Plan 15b Rulings 1: a show by the panel's own toggle action (Transfers' after its first open) activates it, and never hides. */
+    @Test void anActivatingShowUnderFlushFramesActivatesThePanel() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            owner.area().focusMoved(null);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("a show never hides").isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    @Test void underStandardFramesAnActivatingShowIsAPlainShow() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, false);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+        });
+    }
+
     /**
      * Final review: a window toggled in by a user gesture in place of the active one keeps the activation. Handing focus
      * back to the terminal first would post focus events that land after the activation and undo it.

@@ -19,6 +19,9 @@ public interface Panels {
     /**
      * Toggles this plugin's registered panel in a terminal window, creating it lazily.
      * Requests for a closed window have no effect.
+     * Called from the panel's own toggle action ({@link PanelSpec#withToggleActionId}), as its handler runs, a toggle
+     * that shows the panel also makes it the active tool window under a look with flush tool windows, as a stripe click
+     * does (since 0.18.2).
      * @param panelId a registered panel id owned by this plugin
      * @param window the terminal window
      * @throws IllegalArgumentException when the panel is not registered by this plugin
