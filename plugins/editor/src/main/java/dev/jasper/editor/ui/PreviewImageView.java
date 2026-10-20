@@ -15,6 +15,7 @@ final class PreviewImageView extends View {
     private float width=160;
     PreviewImageView(Element element,Map<Integer,BufferedImage> images,Map<Integer,String> reasons,Color foreground){super(element);this.reasons=reasons;this.images=images;this.foreground=foreground;
         id=PreviewPane.resourceId((String)element.getAttributes().getAttribute(HTML.Attribute.SRC),"jasper-image:");}
+    int id(){return id;}
     private BufferedImage image(){return images.get(id);}
     private float available(){var c=getContainer();if(c==null)return width;
         var viewport=(javax.swing.JViewport)javax.swing.SwingUtilities.getAncestorOfClass(javax.swing.JViewport.class,c);

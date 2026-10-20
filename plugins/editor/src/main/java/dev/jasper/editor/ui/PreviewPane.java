@@ -22,6 +22,10 @@ final class PreviewPane implements AutoCloseable {
     private final IntConsumer activateLink;
     private final Map<Integer, BufferedImage> images = new HashMap<>();
     private final Map<Integer, String> imageReasons = new HashMap<>();
+    private Set<Integer> imageIds = Set.of();
+    private final Set<Integer> changedImages = new HashSet<>();
+    private boolean imageNotificationPending;
+    private long imageNotificationGeneration;
     private Map<String,Integer> anchors = Map.of();
     private MarkdownResult installed;
     private Prepared pending;
@@ -55,15 +59,38 @@ final class PreviewPane implements AutoCloseable {
     boolean installing() { edt();return pending!=null; }
     Optional<MarkdownResult> installedResult() { edt();return Optional.ofNullable(installed); }
     void image(int id, BufferedImage image) {
-        edt();if(closed || installed==null || installed.images().stream().noneMatch(value -> value.id()==id))return;
-        if(image==null)images.remove(id);else images.put(id,image);
-        if(kit!=null)kit.imagesChanged();editor.revalidate();editor.repaint();geometryChanged.run();
+        edt(); if (closed || !imageIds.contains(id)) return;
+        var previous = image == null ? images.remove(id) : images.put(id, image);
+        if (previous != image) { changedImages.add(id); imageNotification(); }
     }
     void imageReason(int id, String reason) {
-        edt(); if (closed || installed == null || installed.images().stream().noneMatch(value -> value.id() == id)) return;
-        imageReasons.put(id, reason);
-        if (kit != null) kit.imagesChanged();
-        editor.revalidate(); editor.repaint();
+        edt(); if (closed || !imageIds.contains(id)) return;
+        if (!Objects.equals(imageReasons.put(id, reason), reason)) imageNotification();
+    }
+    void images(dev.jasper.editor.markdown.resources.ResourceSession.Update update) {
+        edt(); if (closed) return;
+        if (update.clear()) {
+            changedImages.addAll(images.keySet());
+            boolean repaint = !images.isEmpty() || !imageReasons.isEmpty();
+            images.clear(); imageReasons.clear();
+            if (repaint) imageNotification();
+        }
+        update.images().forEach((id, state) -> { image(id, state.image()); imageReason(id, state.reason()); });
+    }
+    private void imageNotification() {
+        if (imageNotificationPending) return;
+        imageNotificationPending = true;
+        long token = imageNotificationGeneration;
+        SwingUtilities.invokeLater(() -> {
+            if (closed || token != imageNotificationGeneration) return;
+            imageNotificationPending = false;
+            if (!changedImages.isEmpty()) {
+                var changed = Set.copyOf(changedImages); changedImages.clear();
+                if (kit != null) kit.imagesChanged(changed);
+                editor.revalidate(); geometryChanged.run();
+            }
+            editor.repaint();
+        });
     }
     void cancelInstall() { edt();generation++;pending=null;pendingStyle=null;installFailure=null; }
 
@@ -71,7 +98,8 @@ final class PreviewPane implements AutoCloseable {
     static final class Prepared {
         private final MarkdownResult result;
         private final List<Event> events;
-        private Prepared(MarkdownResult result,List<Event> events){this.result=result;this.events=List.copyOf(events);}
+        private final Set<Integer> imageIds;
+        private Prepared(MarkdownResult result,List<Event> events,Set<Integer> imageIds){this.result=result;this.events=List.copyOf(events);this.imageIds=Set.copyOf(imageIds);}
         MarkdownResult result(){return result;}
     }
     private record Event(int kind, HTML.Tag tag, Map<HTML.Attribute,String> attributes, String text, int position) {
@@ -125,7 +153,7 @@ final class PreviewPane implements AutoCloseable {
         try {new ParserDelegator().parse(new StringReader(result.html()),callback,true);}
         catch(IOException impossible){throw new UncheckedIOException(impossible);}
         if(Thread.currentThread().isInterrupted())throw new CancellationException();
-        return new Prepared(result,events);
+        return new Prepared(result,events,imageIds);
     }
     /** Starts a detached build. Completion publishes installedResult before invoking geometryChanged. */
     void install(Prepared prepared,TerminalTypography typography,WorkspacePalette palette,SyntaxPalette syntax,Font bodyFont,double opacity) {
@@ -151,7 +179,7 @@ final class PreviewPane implements AutoCloseable {
                 try {editor.setEditorKit(nextKit);editor.setDocument(document);}
                 catch(RuntimeException failure){editor.setEditorKit(previousKit);editor.setDocument(previousDocument);throw failure;}
                 this.typography=typography;this.palette=palette;this.syntax=syntax;this.bodyFont=bodyFont;this.opacity=opacity;
-                images.clear();imageReasons.clear();kit=nextKit;installed=prepared.result;pending=null;pendingStyle=null;
+                images.clear();imageReasons.clear();imageIds=prepared.imageIds;changedImages.clear();imageNotificationGeneration++;imageNotificationPending=false;kit=nextKit;installed=prepared.result;pending=null;pendingStyle=null;
                 editor.setForeground(palette.text());editor.setSelectionColor(palette.selection());editor.setSelectedTextColor(palette.selectionText());editor.setCaretColor(palette.text());
                 editor.setFont(nextFont);anchors=nextAnchors;
                 editor.setCaretPosition(0);editor.revalidate();editor.repaint();
@@ -195,7 +223,7 @@ final class PreviewPane implements AutoCloseable {
         try {int value=Integer.parseInt(text.substring(prefix.length()));return value<0?-1:value;}catch(NumberFormatException e){return -1;}
     }
     private static void edt(){if(!SwingUtilities.isEventDispatchThread())throw new IllegalStateException("Preview requires EDT");}
-    @Override public void close(){edt();if(closed)return;cancelInstall();closed=true;images.clear();imageReasons.clear();anchors=Map.of();installed=null;kit=null;editor.setEditorKit(new DefaultEditorKit());}
+    @Override public void close(){edt();if(closed)return;cancelInstall();closed=true;imageNotificationGeneration++;changedImages.clear();imageIds=Set.of();images.clear();imageReasons.clear();anchors=Map.of();installed=null;kit=null;editor.setEditorKit(new DefaultEditorKit());}
     private final class Surface extends JEditorPane {
         @Override public boolean getScrollableTracksViewportWidth(){return getParent() instanceof JViewport view && getMinimumSize().width<=view.getWidth();}
         @Override protected void paintComponent(Graphics graphics) {

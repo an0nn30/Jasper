@@ -24,7 +24,7 @@ final class PreviewKit extends HTMLEditorKit {
     private Font body;
     private final Map<Integer,BufferedImage> images;
     private final Map<Integer,String> imageReasons;
-    private final List<PreviewImageView> imageViews=new ArrayList<>();
+    private final Map<Integer,List<PreviewImageView>> imageViews=new java.util.HashMap<>();
     private final Map<Element,Map<Element,CodeRun>> codeLines=new java.util.IdentityHashMap<>();
     private record CodeRun(LineLayout.Row row,float origin) {
         float originAt(int offset){return origin+(offset==row.start()?0:(float)LineLayout.caret(row,offset).getBounds2D().getX());}
@@ -76,10 +76,13 @@ final class PreviewKit extends HTMLEditorKit {
         for(int level=1;level<=6;level++)s.addRule("h"+level+" { font-size: "+size*(1.9-.15*level)+"pt; margin-top: "+size*.7+"pt; margin-bottom: "+size*.4+"pt; }");
     }
     private static String hex(Color c){return String.format("#%02x%02x%02x",c.getRed(),c.getGreen(),c.getBlue());}
-    void imagesChanged(){for(var view:List.copyOf(imageViews))view.preferenceChanged(null,true,true);}
+    void imagesChanged(){imagesChanged(java.util.Set.copyOf(imageViews.keySet()));}
+    void imagesChanged(java.util.Set<Integer> ids){
+        for(int id:ids)for(var view:List.copyOf(imageViews.getOrDefault(id,List.of())))view.preferenceChanged(null,true,true);
+    }
     @Override public ViewFactory getViewFactory(){return element -> {
         Object tag=element.getAttributes().getAttribute(StyleConstants.NameAttribute);
-        if(tag==HTML.Tag.IMG){var view=new PreviewImageView(element,images,imageReasons,palette.textMuted());imageViews.add(view);return view;}
+        if(tag==HTML.Tag.IMG){var view=new PreviewImageView(element,images,imageReasons,palette.textMuted());imageViews.computeIfAbsent(view.id(),ignored->new ArrayList<>()).add(view);return view;}
         if(tag==HTML.Tag.CONTENT){
             if(element.getAttributes().isDefined(HTML.Tag.CODE)||ancestor(element,HTML.Tag.PRE))return new Code(element);
             return new InlineView(element);

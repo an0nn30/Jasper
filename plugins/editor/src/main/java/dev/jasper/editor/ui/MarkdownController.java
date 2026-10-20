@@ -39,8 +39,7 @@ final class MarkdownController implements AutoCloseable {
                        dev.jasper.editor.markdown.resources.ImageLoader loader) {
         this.tab = tab; this.worker = worker; this.ui = ui; this.changed = changed;
         resources = loader == null ? null : new dev.jasper.editor.markdown.resources.ResourceSession(loader,
-            () -> tab.session().document().orElse(null), tab.surface().preview()::image,
-            (id, reason) -> {tab.surface().preview().imageReason(id, reason); changed.run();});
+            () -> tab.session().document().orElse(null), tab.surface().preview()::images, changed);
         debounce = new Timer(250, event -> flushDebounce());
         debounce.setRepeats(false);
         hierarchy = event -> {

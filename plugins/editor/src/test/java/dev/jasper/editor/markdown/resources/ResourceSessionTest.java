@@ -21,6 +21,42 @@ class ResourceSessionTest {
         @Override public Optional<EditorDocument> resolveRelative(String path) {assertTrue(SwingUtilities.isEventDispatchThread());resolutions.incrementAndGet();return Optional.of(children.remove());}
     }
     static void edt(Runnable action) throws Exception {SwingUtilities.invokeAndWait(action);}
+    @Test void manyUnconsentedImagesPublishBoundedBatchesAndYieldAcrossRefreshAndClear() throws Exception {
+        int count=4096;var metadata=new ArrayList<MarkdownResult.Image>();
+        for(int id=0;id<count;id++)metadata.add(new MarkdownResult.Image(id,"https://example.invalid/image.png",""));
+        var result=new MarkdownResult("",List.of(),Map.of(),List.of(),metadata);
+        var seen=new AtomicInteger();var batches=new AtomicInteger();var clears=new AtomicInteger();var stateChanges=new AtomicInteger();
+        var session=new AtomicReference<ResourceSession>();
+        try(var loader=new ImageLoader(new ImageBudget(1000))) {
+            edt(()->{session.set(new ResourceSession(loader,()->null,update->{
+                if(update.clear())clears.incrementAndGet();
+                if(!update.images().isEmpty()){assertTrue(update.images().size()<=128);batches.incrementAndGet();seen.addAndGet(update.images().size());}
+            },stateChanges::incrementAndGet));session.get().active(true);session.get().refresh(result);
+                assertTrue(seen.get()<=128);});
+            ImageLoaderTest.await(()->seen.get()==count);assertEquals(32,batches.get());assertEquals(1,stateChanges.get());
+            edt(()->{assertTrue(session.get().needsConsent());session.get().invalidate();});assertEquals(2,clears.get());
+            seen.set(0);batches.set(0);edt(()->session.get().refresh(result));ImageLoaderTest.await(()->seen.get()==count);assertEquals(32,batches.get());
+            edt(()->session.get().close());assertEquals(4,clears.get());assertTrue(stateChanges.get()<=4);
+        }
+    }
+    @Test void hideBetweenDecodedBatchesDropsQueuedDeltasAndReleasesSharedLease() throws Exception {
+        var metadata=new ArrayList<MarkdownResult.Image>();for(int id=0;id<4096;id++)metadata.add(new MarkdownResult.Image(id,"same.png","alt"));
+        var parent=new Parent();var child=new ImageLoaderTest.Doc();parent.children.add(child);var budget=new ImageBudget(1000);
+        var loading=new AtomicInteger();var decoded=new AtomicInteger();var hidden=new AtomicBoolean();var ref=new AtomicReference<ResourceSession>();
+        var borrowed=new ConcurrentHashMap<Integer,BufferedImage>();
+        try(var loader=new ImageLoader(budget)) {
+            edt(()->{ref.set(new ResourceSession(loader,()->parent,update->{
+                if(update.clear())borrowed.clear();
+                update.images().forEach((id,state)->{if(state.image()!=null)borrowed.put(id,state.image());});
+                if(update.images().values().stream().anyMatch(state->state.image()!=null)) {
+                    if(decoded.getAndAdd(update.images().size())==0)SwingUtilities.invokeLater(()->{ref.get().active(false);hidden.set(true);});
+                } else loading.addAndGet(update.images().size());
+            },()->{}));ref.get().active(true);ref.get().refresh(new MarkdownResult("",List.of(),Map.of(),List.of(),metadata));});
+            ImageLoaderTest.await(()->loading.get()==4096);child.supply(ImageLoaderTest.png(2,2));ImageLoaderTest.await(hidden::get);
+            edt(()->{});assertEquals(128,decoded.get());assertTrue(borrowed.isEmpty());assertEquals(0,budget.usedBytes());assertEquals(1,parent.resolutions.get());
+            edt(()->ref.get().close());
+        }
+    }
     @Test void emptyAltUsesFilenameInFailurePlaceholder() throws Exception {
         var reasons=new ArrayList<String>();
         try(var loader=new ImageLoader(new ImageBudget(1000))) {

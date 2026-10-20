@@ -35,6 +35,17 @@ class PreviewPaneTest {
         }
         fail("Preview did not attach");
     }
+    @Test void bulkImagesAndReasonsProduceOneGeometryNotificationPerTurn() throws Exception {
+        var prepared=prepare("![alt](relative.png) ".repeat(1024));var geometry=new AtomicInteger();var ref=new java.util.concurrent.atomic.AtomicReference<PreviewPane>();
+        SwingUtilities.invokeAndWait(()->{var pane=new PreviewPane(id->{},geometry::incrementAndGet);ref.set(pane);pane.install(prepared,TYPE,palette(false),EditorThemeTest.syntax(1),new Font("Serif",0,12),1);});
+        await(ref.get(),prepared.result());SwingUtilities.invokeAndWait(()->{});geometry.set(0);
+        SwingUtilities.invokeAndWait(()->{var image=new BufferedImage(2,2,BufferedImage.TYPE_INT_ARGB);
+            for(int id=0;id<1024;id++){ref.get().imageReason(id,"Loading");ref.get().image(id,image);}
+            assertThat(geometry.get()).isZero();});
+        SwingUtilities.invokeAndWait(()->assertThat(geometry.get()).isEqualTo(1));
+        geometry.set(0);SwingUtilities.invokeAndWait(()->{for(int id=0;id<1024;id++)ref.get().image(id,null);});
+        SwingUtilities.invokeAndWait(()->{assertThat(geometry.get()).isEqualTo(1);ref.get().close();});
+    }
     @Test void preparationObservesWorkerCancellationAndCannotRunOnEdt() throws Exception {
         var result=new MarkdownRenderer().render("text",EditorThemeTest.syntax(1));
         Thread.currentThread().interrupt();
@@ -177,13 +188,13 @@ class PreviewPaneTest {
         });
     }
     @Test void imageCompletionStillReflowsAfterLiveFontRestyling() throws Exception {
-        var pane=install(prepare("Text\n\n![image](x.png)"));
+        var pane=install(prepare("Text\n\n![image](x.png)"));var before=new AtomicInteger();
         SwingUtilities.invokeAndWait(() -> {
             var editor=pane.editor();editor.setSize(320,600);editor.paint(new BufferedImage(320,600,2).getGraphics());
             pane.bodyFont(new Font("SansSerif",0,20));editor.paint(new BufferedImage(320,600,2).getGraphics());
-            int before=editor.getPreferredSize().height;pane.image(0,new BufferedImage(600,600,2));
-            assertThat(editor.getPreferredSize().height).isGreaterThan(before+100);pane.close();
+            before.set(editor.getPreferredSize().height);pane.image(0,new BufferedImage(600,600,2));
         });
+        SwingUtilities.invokeAndWait(() -> {assertThat(pane.editor().getPreferredSize().height).isGreaterThan(before.get()+100);pane.close();});
     }
     @Test void boundedInstallationYieldsAndMeasuresActualEdtWork() throws Exception {
         String source=("## Heading\n\nA paragraph with **bold** and `code`.\n\n").repeat(3000);

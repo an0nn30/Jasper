@@ -57,6 +57,16 @@ class MarkdownControllerTest {
                 assertThat(controller.mode()).isEqualTo(MarkdownMode.SOURCE);tab.area().append(" Edited");assertThat(tab.session().dirty()).isTrue();});
         }
     }
+    @Test void manyUnconsentedImagesDoNotRefreshDescriptorsPerImage() throws Exception {
+        try (var loader = new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(1024))) {
+            edt(() -> { controller.close(); controller = new MarkdownController(tab, worker, ui, ()->{changes++;tab.render();}, loader); controller.active(true); });
+            preview("![alt](https://example.invalid/a.png) ".repeat(2048));int before=changes;complete();
+            for(int i=0;i<50;i++)edt(()->{});
+            edt(()->{assertThat(controller.currentResult()).isPresent();assertThat(controller.needsImageConsent()).isTrue();assertThat(changes-before).isLessThanOrEqualTo(3);});
+            int beforeHide=changes;edt(()->controller.active(false));int after=changes;
+            assertThat(after-beforeHide).isLessThanOrEqualTo(1);
+        }
+    }
     @Test void initialPreviewRunsImmediatelyAndHundredEditsKeepOnlyLatestPending() throws Exception {
         preview("First"); assertThat(worker.size()).isEqualTo(1);
         edt(() -> { for(int i=0;i<100;i++){tab.area().setText("Latest " + i);controller.flushDebounce();} });
