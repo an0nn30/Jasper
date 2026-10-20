@@ -350,8 +350,8 @@ class WorkspaceTabsTest {
             assertThat(first.active()).isTrue();
             assertThat(second.active()).isFalse();
             assertThat(heard).containsExactly(true);
-            var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel(),
-                dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT);
+            var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            assertThat(window.parentTabOf(view)).as("a tab of its own").isNotEqualTo(window.parentTabOf(first));
             assertThat(view.active()).isTrue();
             assertThat(first.active()).isFalse();
             window.setActive(false);

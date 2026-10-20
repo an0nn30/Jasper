@@ -10,7 +10,6 @@ import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
-import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.terminals.OpenSpec;
 import dev.jasper.app.terminals.PaneEntry;
@@ -66,7 +65,7 @@ class ParentTabsViewTest {
             assertThat(before.getParent()).isSameAs(owner.parentTabs());
             assertThat(SwingUtilities.isDescendingFrom(first.component(), before)).as("its tab stays where it was").isTrue();
             assertThat(owner.tabs()).as("every tab, the parent tabs in bar order").containsExactly(first, second);
-            var parents = (ParentTabs) owner.windowLayout();
+            var parents = owner.windowLayout();
             assertThat(parents.parentTabs()).extracting(ParentTab::id).containsExactly(before.id(), owner.workspace().id());
             assertThat(parents.active()).isEqualTo(owner.activeParentTab()).isEqualTo(owner.workspace().id());
             assertThat(parents.activeParentTab().layout()).isEqualTo(owner.workspace().model());
@@ -127,7 +126,7 @@ class ParentTabsViewTest {
             assertThat(owner.parentTabCount()).isEqualTo(2);
             assertThat(owner.activeParentTab()).as("the parent tab used before it").isEqualTo(third);
             assertThat(owner.parentTabs().view(second)).isEmpty();
-            assertThat(((ParentTabs) owner.windowLayout()).parentTabs()).extracting(ParentTab::id).containsExactly(first, third);
+            assertThat(owner.windowLayout().parentTabs()).extracting(ParentTab::id).containsExactly(first, third);
             owner.closeTab(c);
             assertThat(owner.activeParentTab()).isEqualTo(first);
             owner.closeTab(a);
@@ -245,6 +244,32 @@ class ParentTabsViewTest {
             assertThat(target.parentTabOf(a)).as("beside the group it named, in that group's parent tab").contains(targetFirst);
             assertThat(target.activeParentTab()).as("which shows it").isEqualTo(targetFirst);
             assertThat(target.workspace().model().groupOf(a.id())).isPresent().isNotEqualTo(Optional.of(hidden));
+        });
+    }
+
+    /** An item of a hidden tab is selected before its tab shows: one TabSelected, for it, and no other item turns active. */
+    @Test void selectingAnItemOfAHiddenTabPublishesOneTabSelectedForIt() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(pending));
+            var registry = new TerminalRegistry();
+            var facts = new ArrayList<TerminalEvent>();
+            registry.onEvent(facts::add);
+            owner.connectTerminals(registry, () -> { });
+            Tab left = owner.selectedTab();
+            owner.split(Side.RIGHT);
+            Tab right = owner.selectedTab();
+            ParentTabId behind = owner.activeParentTab();
+            open(owner);
+            assertThat(owner.activeParentTab()).as("the split tab hides, its right pane active").isNotEqualTo(behind);
+            var heard = new ArrayList<Boolean>();
+            right.onActive(heard::add);
+            facts.clear();
+            owner.selectTab(left);
+            assertThat(facts).filteredOn(TerminalEvent.TabSelected.class::isInstance).as("one TabSelected, for the item selected")
+                .containsExactly(new TerminalEvent.TabSelected(owner.id(), left.id().value()));
+            assertThat(heard).as("the hidden tab's active item never turns active on the way").isEmpty();
+            assertThat(owner.activeParentTab()).isEqualTo(behind);
+            assertThat(owner.selectedTab()).isSameAs(left);
         });
     }
 

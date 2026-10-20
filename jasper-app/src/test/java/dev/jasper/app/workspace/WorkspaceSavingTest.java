@@ -8,7 +8,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.ParentTabId;
-import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.persistence.WorkspaceFile;
@@ -67,7 +66,7 @@ class WorkspaceSavingTest {
     private WorkspaceFile.Snapshot saved() { return ((WorkspaceFile.Loaded.Restore) WorkspaceFile.read(file())).snapshot(); }
 
     /** The saved main window's shown parent tab's layout. */
-    private Layout shown() { return ((ParentTabs) saved().main().layout()).activeParentTab().layout(); }
+    private Layout shown() { return saved().main().layout().activeParentTab().layout(); }
 
     @Test void everyChangeToWhatIsSavedIsSavedWithinASecond() throws Exception {
         windows();
@@ -291,7 +290,7 @@ class WorkspaceSavingTest {
                 assertThat(store.held()).isFalse();
                 second();
                 assertThat(saved()).as("the next save writes the windows").isEqualTo(windows.manager.snapshot().orElseThrow());
-                assertThat(((ParentTabs) saved().children().getFirst().layout()).parentTabs()).extracting(p -> p.id()).contains(moving);
+                assertThat(saved().children().getFirst().layout().parentTabs()).extracting(p -> p.id()).contains(moving);
             });
         } finally {
             logger.removeHandler(handler);

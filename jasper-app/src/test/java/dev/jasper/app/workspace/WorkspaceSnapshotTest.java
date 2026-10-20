@@ -9,7 +9,6 @@ import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
-import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.persistence.WorkspaceFile;
@@ -63,7 +62,7 @@ class WorkspaceSnapshotTest {
             assertThat(saved.extendedState()).isEqualTo(6);
             assertThat(saved.layout()).as("its parent tabs in bar order, the one that shows, their splits, groups, order and selection")
                 .isEqualTo(main.content().windowLayout());
-            assertThat(((ParentTabs) saved.layout()).parentTabs()).extracting(ParentTab::id).first().isEqualTo(firstParent);
+            assertThat(saved.layout().parentTabs()).extracting(ParentTab::id).first().isEqualTo(firstParent);
             assertThat(saved.tabs().get(first.id())).isEqualTo(new WorkspaceFile.TabRecord.Terminal("", work.toString(), ""));
             assertThat(snapshot.children()).extracting(WorkspaceFile.WindowRecord::layout)
                 .as("two full windows, in the order they opened")
@@ -94,7 +93,7 @@ class WorkspaceSnapshotTest {
             main.content().closeTab(other);
             assertThat(main.content().parentTabCount()).as("the terminal's tab, and each plugin's item in a tab of its own").isEqualTo(3);
             WorkspaceFile.Snapshot snapshot = windows.manager.snapshot().orElseThrow();
-            var saved = (ParentTabs) snapshot.main().layout();
+            var saved = snapshot.main().layout();
             assertThat(saved.parentTabs()).as("a parent tab holding only such tabs is left out").extracting(ParentTab::id).containsExactly(first);
             assertThat(saved.active()).as("and the one used before it shows, as closing its tabs would").isEqualTo(first);
             assertThat(saved.tabs()).as("a plugin's tab with no restorer is not saved").containsExactly(terminal.id());
@@ -102,7 +101,7 @@ class WorkspaceSnapshotTest {
             assertThat(snapshot.children()).as("a child window holding only Jasper's own tab is left out").isEmpty();
             assertThat(List.of(notes, away, errors)).as("taking them out of what is saved closes nothing").noneMatch(Tab::closed);
             terminal.close();
-            assertThat(((ParentTabs) windows.manager.snapshot().orElseThrow().main().layout()).isEmpty())
+            assertThat(windows.manager.snapshot().orElseThrow().main().layout().isEmpty())
                 .as("the main window may be saved empty").isTrue();
         });
         windows.launch();

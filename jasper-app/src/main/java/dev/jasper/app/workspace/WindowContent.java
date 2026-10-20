@@ -1709,12 +1709,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Shows the tab holding {@code component}, as a click on its strip entry does. */
     void selectTab(Component component) { selectTab(tab(component)); }
 
-    /** Shows {@code tab}'s parent tab, then the tab in its group, activates the group and focuses the tab. */
+    /**
+     * Selects {@code tab} in its parent tab and activates its group, before that parent tab shows, then shows it and
+     * focuses the tab: no other tab of a hidden parent tab turns active on the way.
+     */
     void selectTab(Tab tab) {
         WorkspaceView view = closed ? null : parentTabs.holding(tab).orElse(null);
         if (view == null) return;
-        parentTabs.select(view.id());
+        // The item first, while its tab may still hide, so no other item of that tab turns active on the way.
         view.select(tab);
+        parentTabs.select(view.id());
         focusSelected();
     }
 
