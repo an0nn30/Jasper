@@ -576,6 +576,10 @@ final class WindowChrome {
         JPopupMenu menu = new JPopupMenu();
         for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL,
             ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE, ActionId.CLOSE_TAB}) menu.add(owner.action(id));
+        // Pop Out and the window menu's entries, which a pane showing no strip offers only here (parent tabs spec 6).
+        menu.addSeparator();
+        menu.add(owner.action(ActionId.POP_OUT_TAB));
+        for (ActionId id : owner.windowMenuItems()) menu.add(owner.action(id));
         if (contributions != null) {
             for (MenuSection section : contributions.model().menus()) {
                 if (section.target().type() != MenuTarget.Type.CONTEXT) continue;

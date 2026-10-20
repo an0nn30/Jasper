@@ -76,6 +76,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** This window's workspace in {@link #registry}; closing it removes the tabs the window still holds. */
     private Subscription host;
     private Runnable bringToFront = () -> {};
+    /** The window manager that opened this window, which pops out, brings back and moves (parent tabs spec 5); else null. */
+    private WindowManager manager;
     /** The main window, with Jasper's chrome, or a child window, a workspace alone (workspace tabs spec 6). */
     private final WindowRole role;
     /**
@@ -933,10 +935,20 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void requestNewTerminalWindow() { newTerminalWindow.accept(directory()); }
     /** Close Window (workspace tabs spec 6.4 and 11): this window, as its title bar's close button closes it. */
     void requestCloseWindow() { onCloseWindow.run(); }
-    /** Move Tab to New Window (workspace tabs spec 6.5); the window manager decides whether it moves. */
-    void moveToNewWindow(Tab tab) { if (tab != null) registry.moveToNewWindow(tab); }
-    /** Move Tab to Main Window (workspace tabs spec 6.5). */
-    void moveToMainWindow(Tab tab) { if (tab != null) registry.moveToMainWindow(tab); }
+    /** Pop Out Tab (parent tabs spec 5): the window manager decides whether {@code tab} moves (workspace plan 7b Rulings 8). */
+    void popOutTab(Tab tab) { if (tab != null) registry.moveToNewWindow(tab); }
+    /** Pop Out Pane: {@code tab}'s pane, through the window manager; nothing in a window outside one. */
+    void popOutPane(Tab tab) {
+        if (manager != null && tab != null) parentTabs.groupOf(tab.id()).ifPresent(pane -> manager.popOutPane(this, pane));
+    }
+    /** Pop Out Parent Tab: {@code tab}'s parent tab. */
+    void popOutParentTab(Tab tab) {
+        if (manager != null && tab != null) parentTabOf(tab).ifPresent(parentTab -> manager.popOutParentTab(this, parentTab));
+    }
+    /** Bring Back: this pane window's panes go back where they came from. */
+    void bringBack() { if (manager != null) manager.bringBack(this); }
+    /** Move to Main Window: this full window's parent tabs join the main window's bar. */
+    void moveToMainWindow() { if (manager != null) manager.moveToMainWindow(this); }
     /** File › Open File…: {@link #fileChooser} from the active pane's folder, then the route a Cmd-click takes, at no line. */
     void openFile() { fileChooser.apply(java.util.Optional.ofNullable(directory())).ifPresent(file -> onOpenFile.accept(file, 0)); }
     void requestQuit() { quit.run(); }
@@ -1387,15 +1399,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return tab.content() instanceof TerminalContent terminal && terminal.pane().running();
     }
     /**
-     * A tab's menu (workspace tabs spec 11): Rename Tab for a terminal tab, Move to New Window in the main window or Move
-     * to Main Window in a child window, Close Tab, Close Others and Close Pane, then the content's commands.
+     * A tab's menu (workspace tabs spec 11; parent tabs spec 6; workspace plan 7b Rulings 15): Rename Tab for a terminal tab,
+     * Pop Out Tab and the window menu's entries for this tab's pane and parent tab, Close Tab, Close Others and Close Pane,
+     * then the content's commands.
      */
     JPopupMenu tabMenu(Tab tab) {
         var menu = new JPopupMenu();
         if (tab.kind() == Tab.Kind.TERMINAL)
             menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(tab); invoke(ActionId.RENAME_TAB); }));
-        if (isMain()) menu.add(tabMenuItem("Move to New Window", ActionId.MOVE_TAB_TO_NEW_WINDOW, () -> moveToNewWindow(tab)));
-        else menu.add(tabMenuItem("Move to Main Window", ActionId.MOVE_TAB_TO_MAIN_WINDOW, () -> moveToMainWindow(tab)));
+        var popOut = tabMenuItem("Pop Out Tab", ActionId.POP_OUT_TAB, () -> popOutTab(tab));
+        // A child window's only tab stays: that window already is its own (workspace plan 7b Rulings 8).
+        popOut.setEnabled(isMain() || tabCount() > 1);
+        menu.add(popOut);
+        for (ActionId id : windowMenuItems()) menu.add(windowItem(id, tab));
         menu.addSeparator();
         menu.add(tabMenuItem("Close Tab", ActionId.CLOSE_TAB, () -> closeTab(tab)));
         var others = tabMenuItem("Close Others", null, () -> closeOthers(tab));
@@ -1414,15 +1430,75 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * A parent tab's menu in the bar (parent tabs spec 6 and 8; workspace plan 7a Rulings 16): Close Parent Tab, for the
-     * parent tab {@code tab} shows as its active tab.
+     * A parent tab's menu in the bar (parent tabs spec 6 and 8; workspace plan 7a Rulings 16, plan 7b Rulings 15): Pop Out
+     * Parent Tab and Move to Main Window where the window menu has them, a rule, then Close Parent Tab, for the parent tab
+     * {@code tab} shows as its active tab.
      */
     JPopupMenu parentTabMenu(Tab tab) {
         var menu = new JPopupMenu();
-        parentTabOf(tab).ifPresent(parent ->
-            menu.add(tabMenuItem("Close Parent Tab", ActionId.CLOSE_PARENT_TAB, () -> closeParentTab(parent))));
+        parentTabOf(tab).ifPresent(parent -> {
+            for (ActionId id : windowMenuItems())
+                if (id == ActionId.POP_OUT_PARENT_TAB || id == ActionId.MOVE_TO_MAIN_WINDOW) menu.add(windowItem(id, tab));
+            if (menu.getComponentCount() > 0) menu.addSeparator();
+            menu.add(tabMenuItem("Close Parent Tab", ActionId.CLOSE_PARENT_TAB, () -> closeParentTab(parent)));
+        });
         dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         return menu;
+    }
+
+    /**
+     * The window menu's entries (parent tabs spec 6; workspace plan 7b Rulings 14): Pop Out Pane and Pop Out Parent Tab in
+     * the main window; Pop Out Pane, Pop Out Parent Tab while it has another parent tab, and Move to Main Window in a full
+     * window; Bring Back, then Pop Out Pane while it has another pane, in a pane window.
+     *
+     * @return the entries in menu order
+     */
+    java.util.List<ActionId> windowMenuItems() {
+        if (origin != null) return paneCount() > 1 ? java.util.List.of(ActionId.BRING_BACK, ActionId.POP_OUT_PANE)
+            : java.util.List.of(ActionId.BRING_BACK);
+        if (isMain()) return java.util.List.of(ActionId.POP_OUT_PANE, ActionId.POP_OUT_PARENT_TAB);
+        return parentTabs.count() > 1
+            ? java.util.List.of(ActionId.POP_OUT_PANE, ActionId.POP_OUT_PARENT_TAB, ActionId.MOVE_TO_MAIN_WINDOW)
+            : java.util.List.of(ActionId.POP_OUT_PANE, ActionId.MOVE_TO_MAIN_WINDOW);
+    }
+
+    /**
+     * The ⋮'s menu (parent tabs spec 6): {@link #windowMenuItems()}, each enabled as its action is, for the active pane
+     * and parent tab.
+     *
+     * @return the menu
+     */
+    JPopupMenu windowMenu() {
+        updateActions();
+        var menu = new JPopupMenu();
+        for (ActionId id : windowMenuItems()) {
+            var item = new JMenuItem(action(id));
+            item.putClientProperty("html.disable", true);
+            menu.add(item);
+        }
+        dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        return menu;
+    }
+
+    /** A menu entry for {@code id}, one of {@link #windowMenuItems()}, acting on {@code tab}'s pane or parent tab, or this window. */
+    private JMenuItem windowItem(ActionId id, Tab tab) {
+        Runnable run = switch (id) {
+            case POP_OUT_PANE -> () -> popOutPane(tab);
+            case POP_OUT_PARENT_TAB -> () -> popOutParentTab(tab);
+            case BRING_BACK -> this::bringBack;
+            case MOVE_TO_MAIN_WINDOW -> this::moveToMainWindow;
+            default -> throw new IllegalArgumentException("Not a window menu entry: " + id);
+        };
+        var item = tabMenuItem(id.label(), id, run);
+        // Enabled only while every tab the entry would move may move (workspace plan 7b Rulings 7).
+        item.setEnabled(switch (id) {
+            case POP_OUT_PANE -> parentTabs.groupOf(tab.id()).map(this::mayPopOutPane).orElse(false);
+            case POP_OUT_PARENT_TAB -> parentTabOf(tab).map(this::mayPopOutParentTab).orElse(false);
+            case BRING_BACK -> mayBringBack();
+            case MOVE_TO_MAIN_WINDOW -> mayMoveToMainWindow();
+            default -> false;
+        });
+        return item;
     }
 
     /** A tab menu item showing {@code shortcut}'s binding, if any, that runs {@code run}. */
@@ -1446,6 +1522,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     DockDrag dockDrag() { return dockDrag; }
     /** The tab drag this window's strips start. */
     TabDrag tabDrag() { return tabDrag; }
+    /** The window manager that opened this window: its pop-outs, Bring Back and Move to Main Window go through it. */
+    void manager(WindowManager value) { manager = Objects.requireNonNull(value, "value"); }
+
     /** Shares the window manager's tab drag; a drag of this window's own ends first. */
     void tabDrag(TabDrag shared) {
         tabDrag.cancel();

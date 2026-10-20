@@ -68,7 +68,8 @@ class TabMenuTest {
         edt(() -> {
             var keys = window.bindings();
             var menu = window.tabMenu(window.selectedTab());
-            assertThat(titles(menu)).containsExactly("Rename Tab", "Move to New Window", "Close Tab", "Close Others", "Close Pane");
+            assertThat(titles(menu)).containsExactly("Rename Tab", "Pop Out Tab", "Pop Out Pane", "Pop Out Parent Tab", "Close Tab",
+                "Close Others", "Close Pane");
             assertThat(item(menu, "Rename Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.RENAME_TAB).orElseThrow());
             assertThat(item(menu, "Close Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_TAB).orElseThrow());
             assertThat(item(menu, "Close Pane").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_PANE).orElseThrow());
@@ -77,7 +78,8 @@ class TabMenuTest {
             int[] saved = {0};
             view.commands(List.of(new ContentCommand("save", "Save", null, true, () -> saved[0]++)));
             var hosted = window.tabMenu(view);
-            assertThat(titles(hosted)).containsExactly("Move to New Window", "Close Tab", "Close Others", "Close Pane", "Save");
+            assertThat(titles(hosted)).containsExactly("Pop Out Tab", "Pop Out Pane", "Pop Out Parent Tab", "Close Tab", "Close Others",
+                "Close Pane", "Save");
             assertThat(item(hosted, "Close Others").isEnabled()).as("the terminal tab shares its group").isTrue();
             item(hosted, "Save").doClick();
             assertThat(saved[0]).isEqualTo(1);

@@ -59,8 +59,11 @@ final class WorkspaceActions {
                 owner.selectParentTabAt(id.ordinal() - ActionId.SELECT_PARENT_TAB_1.ordinal());
             case NEW_TERMINAL_WINDOW -> owner.requestNewTerminalWindow();
             case CLOSE_WINDOW -> owner.requestCloseWindow();
-            case MOVE_TAB_TO_NEW_WINDOW -> owner.moveToNewWindow(owner.selectedTab());
-            case MOVE_TAB_TO_MAIN_WINDOW -> owner.moveToMainWindow(owner.selectedTab());
+            case POP_OUT_TAB -> owner.popOutTab(owner.selectedTab());
+            case POP_OUT_PANE -> owner.popOutPane(owner.selectedTab());
+            case POP_OUT_PARENT_TAB -> owner.popOutParentTab(owner.selectedTab());
+            case BRING_BACK -> owner.bringBack();
+            case MOVE_TO_MAIN_WINDOW -> owner.moveToMainWindow();
             case OPEN_FILE -> owner.openFile();
             case QUIT -> owner.requestQuit();
             case CLOSE_TAB -> owner.closeTab(owner.selectedTab());
@@ -125,9 +128,14 @@ final class WorkspaceActions {
                     case RELOAD_CONFIG -> owner.configurationConnected();
                     case COMMAND_PALETTE, NEW_TAB, NEW_TAB_IN_PANE, NEW_TERMINAL_WINDOW, CLOSE_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT,
                          SPLIT_DOWN -> true;
-                    // A child window's only tab stays: that window already is its own (workspace tabs spec 6.5).
-                    case MOVE_TAB_TO_NEW_WINDOW -> owner.selectedTab() != null && (owner.isMain() || owner.tabCount() > 1);
-                    case MOVE_TAB_TO_MAIN_WINDOW -> owner.selectedTab() != null && !owner.isMain();
+                    // A child window's only tab, pane and parent tab stay: that window already is its own (workspace
+                    // plan 7b Rulings 8).
+                    case POP_OUT_TAB -> owner.selectedTab() != null && (owner.isMain() || owner.tabCount() > 1);
+                    case POP_OUT_PANE -> owner.selectedTab() != null && owner.mayPopOutPane(owner.workspace().model().activeGroup());
+                    case POP_OUT_PARENT_TAB -> owner.mayPopOutParentTab(owner.activeParentTab());
+                    // A pane, a parent tab or a window moves whole or not at all (workspace plan 7b Rulings 7).
+                    case BRING_BACK -> owner.mayBringBack();
+                    case MOVE_TO_MAIN_WINDOW -> owner.mayMoveToMainWindow();
                     case TOGGLE_ZEN_MODE -> owner.isMain();
                     case PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();

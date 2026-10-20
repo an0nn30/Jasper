@@ -143,8 +143,10 @@ class ParentTabBarTest {
             assertThat(second.closed()).isTrue();
             assertThat(owner.parentTabCount()).isEqualTo(2);
             var menu = owner.parentTabMenu(third);
-            assertThat(Arrays.stream(menu.getComponents()).map(item -> ((JMenuItem) item).getText())).containsExactly("Close Parent Tab");
-            ((JMenuItem) menu.getComponent(0)).doClick();
+            // Workspace plan 7b Rulings 15: Pop Out Parent Tab, then a rule, before Close Parent Tab.
+            assertThat(Arrays.stream(menu.getComponents()).filter(JMenuItem.class::isInstance).map(item -> ((JMenuItem) item).getText()))
+                .containsExactly("Pop Out Parent Tab", "Close Parent Tab");
+            ((JMenuItem) menu.getComponent(menu.getComponentCount() - 1)).doClick();
             assertThat(third.closed()).isTrue();
             assertThat(owner.parentTabCount()).isEqualTo(1);
         });

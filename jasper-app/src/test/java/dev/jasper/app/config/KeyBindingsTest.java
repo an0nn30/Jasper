@@ -19,7 +19,8 @@ class KeyBindingsTest {
         assertThat(EnumSet.allOf(ActionId.class)).containsExactly(
             ActionId.NEW_TAB, ActionId.NEW_TAB_IN_PANE, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE, ActionId.CLOSE_PARENT_TAB,
             ActionId.NEW_TERMINAL_WINDOW, ActionId.CLOSE_WINDOW,
-            ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TAB_TO_MAIN_WINDOW, ActionId.OPEN_FILE,
+            ActionId.POP_OUT_TAB, ActionId.POP_OUT_PANE, ActionId.POP_OUT_PARENT_TAB, ActionId.BRING_BACK,
+            ActionId.MOVE_TO_MAIN_WINDOW, ActionId.OPEN_FILE,
             ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE,
             ActionId.TOGGLE_ZEN_MODE,
             ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT,

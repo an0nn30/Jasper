@@ -344,17 +344,17 @@ class WindowManagerTest {
             child.content().invoke(ActionId.CLOSE_WINDOW);
             assertThat(child.closed()).as("Close Window").isTrue();
             Tab tab = main[0].content().selectedTab();
-            main[0].content().invoke(ActionId.MOVE_TAB_TO_NEW_WINDOW);
+            main[0].content().invoke(ActionId.POP_OUT_TAB);
             ChildWindow moved = manager.children().getFirst();
             assertThat(tab.window()).isEqualTo(moved.id());
             moved.content().updateActions();
-            assertThat(moved.content().action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("its only tab stays").isFalse();
-            assertThat(moved.content().action(ActionId.MOVE_TAB_TO_MAIN_WINDOW).isEnabled()).isTrue();
-            moved.content().invoke(ActionId.MOVE_TAB_TO_MAIN_WINDOW);
+            assertThat(moved.content().action(ActionId.POP_OUT_TAB).isEnabled()).as("its only tab stays").isFalse();
+            assertThat(moved.content().action(ActionId.BRING_BACK).isEnabled()).isTrue();
+            moved.content().invoke(ActionId.BRING_BACK);
             assertThat(tab.window()).isEqualTo(main[0].id());
             assertThat(moved.closed()).isTrue();
             main[0].content().updateActions();
-            assertThat(main[0].content().action(ActionId.MOVE_TAB_TO_MAIN_WINDOW).isEnabled()).isFalse();
+            assertThat(main[0].content().action(ActionId.BRING_BACK).isEnabled()).isFalse();
             main[0].content().invoke(ActionId.CLOSE_WINDOW);
             assertThat(manager.isEmpty()).as("Close Window on the main window closes it").isTrue();
         });
@@ -366,7 +366,8 @@ class WindowManagerTest {
             var menu = child.content().tabMenu(child.content().selectedTab());
             var titles = new ArrayList<String>();
             for (var item : menu.getComponents()) if (item instanceof javax.swing.JMenuItem entry) titles.add(entry.getText());
-            assertThat(titles).containsExactly("Rename Tab", "Move to Main Window", "Close Tab", "Close Others", "Close Pane");
+            assertThat(titles).containsExactly("Rename Tab", "Pop Out Tab", "Pop Out Pane", "Move to Main Window", "Close Tab",
+                "Close Others", "Close Pane");
         });
         launch();
     }

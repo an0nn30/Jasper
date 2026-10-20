@@ -22,8 +22,11 @@ class KeymapDefaultsTest {
     private static final List<Row> ROWS = List.of(
         new Row("new_terminal_window", KeyContext.GLOBAL, "cmd+n", "ctrl+shift+n"),            // 1, workspace tabs spec 11
         new Row("close_window", KeyContext.GLOBAL, "cmd+shift+w", "none"),                    // workspace tabs spec 11
-        new Row("move_tab_to_new_window", KeyContext.GLOBAL, "none", "none"),                 // workspace tabs spec 11
-        new Row("move_tab_to_main_window", KeyContext.GLOBAL, "none", "none"),                // workspace tabs spec 11
+        new Row("pop_out_tab", KeyContext.GLOBAL, "none", "none"),                            // parent tabs spec 8
+        new Row("pop_out_pane", KeyContext.GLOBAL, "none", "none"),
+        new Row("pop_out_parent_tab", KeyContext.GLOBAL, "none", "none"),
+        new Row("bring_back", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_to_main_window", KeyContext.GLOBAL, "none", "none"),
         new Row("quit", KeyContext.GLOBAL, "cmd+q", "ctrl+alt+shift+q"),                       // 3
         new Row("open_settings", KeyContext.GLOBAL, "cmd+,", "ctrl+shift+,"),                  // 4
         new Row("open_file", KeyContext.GLOBAL, "none", "none"),  // Enterprise spec 13: File › Open File…, unbound

@@ -257,6 +257,17 @@ class ConfigLoaderTest {
         assertThat(result.diagnostics()).singleElement().satisfies(d -> assertThat(d.message()).contains("Unknown action"));
     }
 
+    /** Parent tabs spec 8: the old move ids are a clean break too, so each is an unknown action (workspace plan 7b). */
+    @Test void aRemovedMoveIdIsReportedAsAnUnknownAction() {
+        for (String id : new String[] {"move_tab_to_new_window", "move_tab_to_main_window"}) {
+            var result = parse("[keybindings]\n" + id + " = \"cmd+w\"");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().keybindings()).doesNotContainKey(id);
+            assertDiagnostic(result, "keybindings." + id, 2, 1, ConfigDiagnostic.Severity.WARNING);
+            assertThat(result.diagnostics()).singleElement().satisfies(d -> assertThat(d.message()).contains("Unknown action"));
+        }
+    }
+
     @Test void invalidOrCollidingBindingsDefaultEntireMapAndPreserveOtherFields() {
         for (String binding : new String[]{"cmd+v", "cmd+secret-value", "cmd+{"}) {
             var result = parse("window.tab_height=44\n[keybindings]\nnew_tab='none'\ncopy='" + binding + "'");

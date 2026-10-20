@@ -582,6 +582,8 @@ public final class WindowManager {
             if (content == null) return Optional.empty();
             // Every window drags tabs with the one drag, which reaches them all (workspace tabs spec 12).
             content.tabDrag(tabDrag);
+            // Its pop-outs, Bring Back and Move to Main Window are this manager's (parent tabs spec 5).
+            content.manager(this);
             window = make.apply(content);
             window.shell(hooks.frames().apply(window));
             // A torn-out tab's window opens where it was dropped, on the cursor's display (workspace tabs plan 5).
