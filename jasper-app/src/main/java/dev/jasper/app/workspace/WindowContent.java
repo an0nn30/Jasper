@@ -69,6 +69,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final java.beans.PropertyChangeListener focusOwners = event -> {
         if (event.getNewValue() instanceof Component focused) tabFocused(tabHolding(focused));
     };
+    /**
+     * A left press on a pane's item makes its pane the active one, a view that takes no focus too (tabs and panes spec 5;
+     * workspace plan 8a Rulings 21).
+     */
+    private final AWTEventListener paneClicks = event -> {
+        if (event.getID() != MouseEvent.MOUSE_PRESSED || closed() || !(event instanceof MouseEvent press)
+            || !SwingUtilities.isLeftMouseButton(press) || !(press.getSource() instanceof Component source)) return;
+        Tab tab = tabHolding(source);
+        if (tab != null && tab != selectedTab()
+            && parentTabs().holding(tab).filter(view -> view == parentTabs().active()).isPresent()) selectTab(tab);
+    };
     /** Where this window's tabs live: a registry of its own until it joins the application's (connectContributions). */
     private TabRegistry registry = new TabRegistry();
     /** This window's workspace in {@link #registry}; closing it removes the tabs the window still holds. */
@@ -360,6 +371,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         else add(area, BorderLayout.CENTER);
         themeRegistration = themes.subscribe(this::applyTheme);
         focusManager.addPropertyChangeListener("permanentFocusOwner", focusOwners);
+        Toolkit.getDefaultToolkit().addAWTEventListener(paneClicks, AWTEvent.MOUSE_EVENT_MASK);
         host = registry.addHost(workspaceHost());
         if (!empty) {
             try { newTab(directory); }
@@ -368,6 +380,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 try { themeRegistration.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
                 try { windowCommands.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
                 focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
+                Toolkit.getDefaultToolkit().removeAWTEventListener(paneClicks);
                 throw failure;
             }
         } else setPreferredSize(new Dimension(900, 650));
@@ -1673,6 +1686,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** This window's configuration, or null before the first one arrives. */
     ConfigSnapshot configured() { return workspaceConfiguration.snapshot(); }
 
+    /** How much an inactive pane dims: the configured {@code terminal.dim_inactive_panes} (workspace plan 8a Rulings 12). */
+    float paneDim() {
+        ConfigSnapshot configured = configured();
+        return (configured == null ? ConfigSnapshot.defaults() : configured).terminal().dimInactivePanes();
+    }
+
+    /** Every tab's panes take their dim again, after the configured amount changed. */
+    void dimPanes() { if (!closed) for (WorkspaceView view : parentTabs.views()) view.dimPanes(); }
+
     /** A pane's view is ready: the first in this window runs the start-up timing, once. */
     void terminalConfigured(TerminalPane pane) {
         if (firstTerminalSeen) return;
@@ -2097,6 +2119,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
+        Toolkit.getDefaultToolkit().removeAWTEventListener(paneClicks);
         if (bodyLease != null) { bodyLease.close(); bodyLease = null; }
         dockDrag.cancel();
         tabDrag.cancelFrom(this);

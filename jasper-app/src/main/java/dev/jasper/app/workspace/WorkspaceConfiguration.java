@@ -46,6 +46,8 @@ final class WorkspaceConfiguration {
                 if (exitChanged) pane.setShellExitBehavior(next.terminal().onExit());
             }
         }
+        // A plugin's view in a pane dims under an overlay of the configured amount too (workspace plan 8a Rulings 12).
+        if (dimChanged) owner.dimPanes();
         if (previous == null || !previous.keybindings().equals(next.keybindings())) owner.setBindings(next.bindings(macOs));
         if (previous == null || previous.visibleRows() != next.visibleRows()) owner.commandPalette().setVisibleRows(next.visibleRows());
         owner.requestGlass();

@@ -185,6 +185,7 @@ final class WorkspaceView extends JPanel {
         groups.clear();
         groups.putAll(live);
         for (Group group : layout.groups()) groups.get(group.id()).display(group.selected().map(tabs::get).orElse(null));
+        dimPanes();
         Node shown = layout.maximized().<Node>map(id -> layout.group(id).orElseThrow()).orElse(layout.root());
         // The main window's empty workspace shows New Terminal Tab and Open File in place of its empty pane (spec 10).
         boolean showEmpty = layout.isEmpty() && owner.isMain();
@@ -255,6 +256,19 @@ final class WorkspaceView extends JPanel {
     }
 
     /**
+     * Dims every pane but the active one while this tab holds two or more (tabs and panes spec 5; workspace plan 8a
+     * Rulings 12), by the configured amount; a maximized pane is the active one and shows clear.
+     */
+    void dimPanes() {
+        if (closed) return;
+        boolean several = layout.groups().size() > 1;
+        for (Group group : layout.groups()) {
+            boolean dimmed = several && !group.id().equals(layout.activeGroup());
+            groups.get(group.id()).dim(dimmed, dimmed ? owner.paneDim() : 0f, dimmed ? owner.theme().surface() : null);
+        }
+    }
+
+    /**
      * Takes the theme: backgrounds, the empty state's zone, and the delegates of a pane the maximize keeps out of the tree
      * and of the empty state while an item hides it.
      */
@@ -265,6 +279,7 @@ final class WorkspaceView extends JPanel {
             if (updateDelegates && !SwingUtilities.isDescendingFrom(group, this)) SwingUtilities.updateComponentTreeUI(group);
         if (updateDelegates && empty != null && !SwingUtilities.isDescendingFrom(empty, this)) SwingUtilities.updateComponentTreeUI(empty);
         if (empty != null) WorkspaceTheme.apply(empty, theme);
+        dimPanes();
     }
 
     /** Below opacity 1 the workspace and its splits paint nothing behind the items; dividers stay solid. */
