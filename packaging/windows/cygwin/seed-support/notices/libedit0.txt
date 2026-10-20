@@ -1,0 +1,82 @@
+Package source: src/release/libedit/libedit-20251016-1-src.tar.xz
+License identifier: BSD-3-Clause AND BSD-2-Clause AND ISC
+
+--- libedit-20251016-1.src/libedit.cygport ---
+NAME="libedit"
+LICENSE="BSD-3-Clause AND BSD-2-Clause AND ISC"
+UPSTREAM_VERS="3.1"
+VERSION="20251016"
+RELEASE=1
+SUMMARY="The NetBSD Editline library"
+DESCRIPTION="Libedit is an autotool- and libtoolized port of the NetBSD Editline library.
+It provides generic line editing, history, and tokenization functions, similar
+to those found in GNU Readline."
+HOMEPAGE="https://www.thrysoee.dk/editline/"
+SRC_URI="https://www.thrysoee.dk/editline/${NAME}-${VERSION}-${UPSTREAM_VERS}.tar.gz"
+SRC_DIR="${NAME}-${VERSION}-${UPSTREAM_VERS}"
+
+PATCH_URI="cygwin-build.patch
+	   libedit.patch"
+
+SHLIB_VERSION=0
+
+PKG_NAMES="libedit-devel libedit${SHLIB_VERSION}"
+
+libedit_CATEGORY="Libs"
+libedit_REQUIRES="libedit${SHLIB_VERSION}"
+
+libedit_devel_CONTENTS="usr/include usr/lib usr/share/man/man3 usr/share/man/man7"
+libedit_devel_CATEGORY="Devel Libs"
+libedit_devel_SUMMARY="The NetBSD Editline library (devel)"
+
+# declare needed for dynamic definition of variable name
+declare libedit${SHLIB_VERSION}_CONTENTS="usr/bin usr/share/doc usr/share/man/man5"
+declare libedit${SHLIB_VERSION}_CATEGORY="Libs"
+declare libedit${SHLIB_VERSION}_SUMMARY="The NetBSD Editline library (runtime)"
+declare libedit${SHLIB_VERSION}_OBSOLETES="libedit"
+
+WANT_AUTOCONF="2.7"
+
+BUILD_REQUIRES=" \
+  autoconf \
+  automake \
+  gcc-g++ \
+  libncurses-devel \
+  libtool \
+"
+
+SCALLYWAG="notest"
+
+Source archive: src/release/libedit/libedit-20251016-1-src.tar.xz
+
+--- libedit-20251016-1.src/libedit-20251016-3.1.tar.gz!/libedit-20251016-3.1/COPYING ---
+Copyright (c) 1992, 1993
+ The Regents of the University of California.  All rights reserved.
+
+This code is derived from software contributed to Berkeley by
+Christos Zoulas of Cornell University.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. Neither the name of the University nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+

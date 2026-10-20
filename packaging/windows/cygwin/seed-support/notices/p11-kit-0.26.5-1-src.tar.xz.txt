@@ -1,0 +1,239 @@
+Package source: x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz
+License identifier: LicenseRef-Upstream-libp11-kit0
+
+--- p11-kit-0.26.5-1.src/p11-kit.cygport ---
+#|/bin/cygport
+# p11-kit.cygport - p11-kit Cygwin package build control script definitions
+
+NAME=p11-kit
+VERSION=0.26.5
+RELEASE=1
+
+CATEGORY="Security Libs"
+SUMMARY="PKCS #11 'crypto-key' API modules library"
+DESCRIPTION="OASIS Pub Key Crypto Std PKCS #11 CRYPTOgraphic TOKen Interface
+'crypto-key' API provides a standard discoverable installation
+configuration setup and way to load and enumerate modules."
+
+PROJECT=p11-glue
+CRYPTOKI=pkcs11	# OASIS Pub Key Crypto Std PKCS #11 CRYPTOgraphic TOKen Interface "crypto-key"
+HOMEPAGE=https://$PROJECT.freedesktop.org/$NAME.html	# -> GH
+HOMEPAGE=https://$PROJECT.github.io/$PROJECT/$NAME.html
+GIT_URI=https://github.com/$PROJECT/$NAME
+SRC_URI=$GIT_URI/releases/download/$VERSION/$NAME-$VERSION.tar.xz
+SRC_URI+=" $SRC_URI.sig"
+#	https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.zip
+#	https://docs.oasis-open.org/pkcs11/pkcs11-profiles/v3.1/os/pkcs11-profiles-v3.1-os.zip
+#	OASIS Standard PKCS #11 Specification and Profiles Version 3.1 23 July 2023
+#FEDORA=https://src.fedoraproject.org/rpms/$NAME/raw/main/f
+#	$SITE/$NAME-release-keyring.gpg
+#	$FEDORA/$NAME-client.service
+#	$FEDORA/trust-extract-compat
+PATCH_URI="
+	0.18.7-parallel-make.patch
+	0.23.5-module-shrext.patch
+"
+#	0.18.7-win8-x64.patch
+
+BUILD_REQUIRES="
+	bash-completion-devel gettext-devel
+	libffi-devel libglib2.0-devel libintl-devel libtasn1-devel
+	binutils cmake gcc-core gnupg2 gtk-doc libxslt meson ninja pkg-config
+"
+#	mingw64-x86_64-libffi mingw64-x86_64-libtasn1
+#	mingw64-x86_64-gcc-core mingw64-x86_64-binutils
+
+LICENSE=BSD-3-Clause
+# SPDX-License-Identifier: BSD-3-Clause
+LICENSE_SPDX="SPDX-License-Identifier: $LICENSE"
+LICENSE_URI=COPYING
+
+DOCS="AUTHORS NEWS README %{_datadir}/gtk-doc/ $LICENCE_URI"
+
+PKG_IGNORE="
+	usr/lib/$CRYPTOKI/$NAME-client.dll.a
+	usr/lib/$CRYPTOKI/$NAME-trust.dll.a
+	usr/libexec/$NAME/trust-extract-compat
+"
+
+CYGCONF_ARGS="
+	 --enable-doc=on
+	   --with-trust-paths=/etc/pki/ca-trust/source:/usr/share/pki/ca-trust-source
+"
+inherit meson					# 0.25.7
+_nproc="-j$(nproc)"				# 0.25.7
+CYGMESON_ARGS="
+	-Dbackend_max_links=$(nproc)
+	-Dgtk_doc=true
+	-Dman=true
+	-Dsystemd=disabled
+	-Dtrust_paths=/etc/pki/ca-trust/source:/usr/share/pki/ca-trust-source
+"						# 0.25.7
+#	Option			Type	Default	 Values		Description
+#	gtk_doc			boolean	false			Build documentation using gtk-doc
+#	man			boolean	false			Build manpages using xsltproc
+#	nls			boolean	true			Enable NLS support
+#	post_install_test	boolean	false			Enable running post-install test programs
+#	strict			boolean	false			Strict code compilation
+#	test			boolean	true			Enable building test programs
+#	bash_completion		feature	auto	 dis-/enabled	Install bash completion files
+#	libffi			feature	auto	 dis-/enabled	Use libffi for building closures
+#	systemd			feature	auto	 dis-/enabled	Use systemd socket activation
+#	trust_module		feature	auto	 dis-/enabled	Build the trust module
+#	zsh_completion		feature	auto	 dis-/enabled	Install zsh completion files
+#	closures		integer	64			The number of precompiled closures, used when libffi is unavailable
+#	rpc_max			integer	2	 0..2		Maximum RPC protocol version we support
+#	rpc_min			integer	0	 0..0		Minimum RPC protocol version we support
+#	hash_impl		combo	internal freebl		Hash implementation to use
+#	bashcompdir		string				Override default location for bash completion files
+#	glib_prefix		string				GLib installed prefix used for gtk-doc, taken from pkg-config if undefined
+#	module_config		string				Module configuration files shipped by packages
+#	module_path		string				Load modules with relative path names from here
+#	system_config		string				Change PKCS#11 system config directory
+#	trust_paths		string				Input paths for trust module
+#	user_config		string	~/.config/pkcs11	Change PKCS#11 user config directory
+#	zshcompdir		string				Override default location for zsh completion files
+#	env_override_paths	string				Override module and config paths with environment variables
+#	 --enable-debug			By default p11-kit is built with debug symbols assertions and and precondition checks.
+#					Enabling the debug option configures even more detailed debug build, including disabling optimization.
+#					Disabling the debug option is not recommended, as it disables all assertions, preconditions
+#					and internal consistency checks, although it may result it a slightly faster library.
+#	 --enable-doc			Enables building of the documentation and command line manual.
+#					The documentation is built in the doc/html/ directory of the build.
+#					Requires the gtk-doc and xsltproc dependencies.
+#	 --enable-strict		Enables strict checks during building of p11-kit. All compiler warnings become errors.
+#	--disable-trust-module		Disables building of the trust policy module.
+#	   --with-hash-impl=freebl	Instead of using internal hash code, link to the freebl3 library and use its hash implementations.
+#					The only advantage this brings is to meet the policy requirements of system builders.
+#	   --with-libtasn1,		Build with a dependency on the libtasn1 library.
+#					This dependency allows the trust policy module to be built as well as other code that interacts with certificates.
+#	   --with-module-path		Specify the path to look for PKCS#11 modules which were listed in a module config file with a relative path.
+#	   --with-trust-paths		Specify the files or directories to look for certificate anchors and blocklists.
+#					Multiple files and/or directories are specified with a : in between them.
+#					The first path has the highest priority when searching for certificates.
+#	   --with-system-config		Specify the path to look for p11-kit config files.
+#					This usually defaults to something like /etc/pkcs11
+#	   --with-user-config		Specify the path to look for user specific p11-kit config files.
+#					If specify a path that begins with ~/ then this is expanded to the home directory of the user running p11-kit.
+#					If you specify a path that begins with ~/.config/ then this is expanded to the
+#					$XDG_CONFIG_HOME directory, as outlined in the XDG Base Dir specification.
+#					This option defaults to ~/.pkcs11
+
+PKG_NAMES="lib$NAME-doc lib${NAME}0 lib$NAME-devel $NAME $NAME-server $NAME-trust"
+
+
+libp11_kit_doc_CATEGORY="$CATEGORY Doc"
+libp11_kit_doc_SUMMARY="$SUMMARY (documentation)"
+libp11_kit_doc_CONTENTS="usr/share/gtk-doc/"
+
+
+libp11_kit0_SUMMARY="$SUMMARY (runtime)"
+libp11_kit0_CONTENTS="usr/bin/cyg$NAME-0.dll"
+
+
+libp11_kit_devel_CATEGORY="$CATEGORY Devel"
+libp11_kit_devel_SUMMARY="$SUMMARY (development)"
+libp11_kit_devel_CONTENTS="
+	usr/include/$NAME-1/
+	usr/lib/lib$NAME.dll.a
+	usr/lib/pkgconfig/$NAME-1.pc
+"
+
+
+p11_kit_SUMMARY="$SUMMARY (utilities)"
+p11_kit_CONTENTS="
+	--exclude=trust-extract-compat
+	etc/defaults/etc/$CRYPTOKI/
+	etc/p*/$NAME.sh
+	usr/bin/$NAME.exe
+	usr/libexec/$NAME/$NAME-remote.exe
+	usr/lib/$NAME-proxy.so
+	usr/share/doc/$NAME
+	usr/share/locale/
+	usr/share/man/man5/$CRYPTOKI.conf.5*
+	usr/share/man/man8/$NAME.8*
+	usr/share/bash-completion/completions/$NAME
+	usr/share/zsh/site-functions/_$NAME
+"
+
+
+p11_kit_server_SUMMARY="$SUMMARY (forwarding)"
+p11_kit_server_CONTENTS="
+	usr/lib/$CRYPTOKI/$NAME-client.dll
+	usr/libexec/$NAME/$NAME-server.exe
+"						# 0.25.7 .so -> .dll
+
+
+#p11_kit_trust_REQUIRES="ca-certificates"  # circular dependency
+p11_kit_trust_SUMMARY="$SUMMARY (System trust)"
+p11_kit_trust_CONTENTS="
+	usr/bin/trust.exe
+	usr/lib/$CRYPTOKI/$NAME-trust.dll
+	usr/share/$NAME/modules/*trust*
+	usr/share/man/man1/trust.1*
+	usr/share/bash-completion/completions/trust
+	usr/share/zsh/site-functions/_trust
+"						# 0.25.7 .so -> .dll
+
+
+src_install() {
+	cd $S					# 0.25.7
+	meson_install				# 0.25.7
+
+	cd $B
+#	cyginstall				0.25.7
+	lndirs $S/_build.$ARCH-pc-cygwin $B	# 0.25.7
+
+	dosym ../bin/cyg$NAME-0.dll /usr/lib/$NAME-proxy.so
+
+	mv $D/etc/$CRYPTOKI/$CRYPTOKI.conf{.example,}
+	make_etc_defaults /etc/$CRYPTOKI/$CRYPTOKI.conf
+
+	dodir /usr/share/bash-completion/completions/
+	insinto /usr/share/bash-completion/completions
+	doins $S/bash-completion/{$NAME,trust}
+}
+
+
+CYGWIN_MAINTAINER=Brian%20Inglis
+CYGWIN_MAINTAINER_EMAIL=Brian.Inglis@SystematicSW.ab.ca
+
+UPSTREAM_MAINTAINER=Zoltán%20Fridrich
+UPSTREAM_MAINTAINER_EMAIL=zfridric@redhat.com
+
+SUBJECT=${OSTYPE^}%20Package%20$NAME%20$VERSION
+MAILTO=mailto:$UPSTREAM_MAINTAINER%20%3C$UPSTREAM_MAINTAINER_EMAIL%3E\
+?from=$CYGWIN_MAINTAINER%20%3C$CYGWIN_MAINTAINER_EMAIL%3E\
+\&subject=$SUBJECT\&body=$SUBJECT
+
+
+Source archive: x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz
+
+--- p11-kit-0.26.5-1.src/p11-kit-0.26.5.tar.xz!/p11-kit-0.26.5/COPYING ---
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+    * Redistributions of source code must retain the above
+      copyright notice, this list of conditions and the
+      following disclaimer.
+    * Redistributions in binary form must reproduce the
+      above copyright notice, this list of conditions and
+      the following disclaimer in the documentation and/or
+      other materials provided with the distribution.
+    * The names of contributors to this software may not be
+      used to endorse or promote products derived from this
+      software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGE.

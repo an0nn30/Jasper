@@ -1,0 +1,151 @@
+Package source: src/release/tzcode/tzcode-2026e-1-src.tar.xz
+License identifier: LicenseRef-Upstream-tzcode
+
+--- tzcode-2026e-1.src/tzcode.cygport ---
+#!/usr/bin/cygport
+# tzcode.cygport - Time Zone Database utilities Cygwin package build control script definitions
+
+NAME=tzcode
+VERSION=2026e
+RELEASE=1
+
+CATEGORY=Utils
+SUMMARY="Time Zone Database utilities"
+DESCRIPTION="The Time Zone Database (often called tz, tzdb, or zoneinfo) contains
+data that represents the history of local time for many locations around
+the world, and supports conversion of UTC time to local time at those
+locations to allow display of those local times.
+It is updated periodically to reflect changes made by political bodies to
+summer daylight saving time rules, UTC offsets, and time zone boundaries.
+This package provides the zic, zdump, and tzselect utilities."
+
+HOMEPAGE=https://www.iana.org/time-zones
+GIT_URI=git://github.com/eggert/tz.git
+SRC_URI=$HOMEPAGE/repository/releases/$NAME$VERSION.tar.gz
+SRC_URI+=" $SRC_URI.asc"
+PATCH_URI=
+
+SRC_DIR=.
+USE_DESTDIR=1
+
+REQUIRES="tzdata"
+BUILD_REQUIRES="gettext-devel libintl-devel libiconv-devel gcc-core make"
+
+cdefs="	-DALTZONE=2		\
+	-DHAVE_DECL_TIMEGM=0	\
+	-DHAVE_GETRESUID=0	\
+	-DHAVE_GETTEXT=1	\
+	-DHAVE_ISSETUGID=1	\
+	-DHAVE_MEMPCPY=1	\
+	-DHAVE_STRFTIME_L=1	\
+	-DHAVE_SYS_AUXV_H=0	\
+	-DHAVE_TZNAME=1		\
+	-DNETBSD_INSPIRED=1	\
+	-DSTD_INSPIRED=1	\
+	-DTM_GMTOFF=tm_gmtoff	\
+	-DTM_ZONE=tm_zone	\
+	-DUSE_LTZ=0		\
+	-DUSG_COMPAT=1		\
+"
+
+MAKEOPTS="
+	AR=${AR}		\
+	CC=${CC}		\
+	RANLIB=${RANLIB}	\
+	LDLIBS=-lintl		\
+	TZDOBJS=zdump.o		\
+	VERSION_DEPS=		\
+"
+
+src_compile() {
+    lndirs
+    cd $B
+    cygmake CFLAGS="${CFLAGS} ${cdefs}" tzselect zic zdump date
+}
+
+
+src_install() {
+    cd $B
+    dobin tzselect zdump.exe
+    dosbin zic.exe
+
+    dodoc calendars CONTRIBUTING LICENSE NEWS README SECURITY *.html version
+
+    MANSECTS=5,8
+    doman *.[${MANSECTS//,}]
+    # set man page .TH date stamp to version; set install path to /usr/share
+    sed -i -e "/^\.TH\s.*\s\"\"\s/s!\s\"\"\s! \"$VERSION\" !" \
+		-- $D/usr/share/man/man[${MANSECTS//,}]/*.[${MANSECTS//,}]*
+#	s!/usr/local/etc!/usr/share!g -- no longer needed from 2018a
+}
+
+
+src_test() {
+    cd $B
+
+    # get files needed to run upstream checks
+    files=$(awk '/^VERSION_DEPS=/,/^$/' Makefile	| \
+	    paste -d' ' -s -				| \
+	    sed 's/^VERSION_DEPS=\s*//;s/\n/ /g;s/\s*\\\s*/ /g;s/\s\s\+/ /g')
+
+    # symlink missing files to /dev/null to pass upstream checks
+    for f in $files
+    do
+	[ -s $f ] || ln -fsv /dev/null $f
+    done
+
+    # run upstream checks
+    cygmake -k CFLAGS="${CFLAGS} ${cdefs}" check < /dev/null
+
+    m=
+
+    # basic utility existence and functional checks
+    for tzprog in tzselect zdump zic
+    do
+	if [ ! -x $D/usr/*bin/$tzprog ] 
+	then
+	    m="$NAME: $tzprog: missing"
+	    warning "$m"
+	elif ! $D/usr/*bin/$tzprog --help > /dev/null
+	then
+	    m="$NAME: $tzprog: --help failed"
+	    warning "$m"
+	fi
+    done
+
+    [ -n "$m" ]	&& error "$m"
+
+    inform "$NAME: All tests passed: all programs exist and run"
+}
+
+
+LICENSE=LicenseRef-IANA-TZ-Public-Domain
+# SPDX-License-Identifier: LicenseRef-IANA-TZ-Public-Domain
+LICENSE_SPDX="SPDX-License-Identifier: $LICENSE"
+LICENSE_URI=LICENSE
+
+CYGWIN_MAINTAINER=Brian%20Inglis
+CYGWIN_MAINTAINER_EMAIL=Brian.Inglis@SystematicSW.ab.ca
+
+UPSTREAM_MAINTAINER=Paul%20Eggert
+UPSTREAM_MAINTAINER_EMAIL=eggert@cs.ucla.edu
+
+UPSTREAM_CO_MAINTAINER=Tim%20Parenti
+UPSTREAM_CO_MAINTAINER_EMAIL=tim@timtimeonline.com
+
+UPSTREAM_EMAIL=tz@IANA.org
+SUBJECT=${OSTYPE^}%20Package%20$NAME%20$VERSION
+MAILTO=mailto:$UPSTREAM_MAINTAINER%20%3C$UPSTREAM_MAINTAINER_EMAIL%3E\
+,$UPSTREAM_CO_MAINTAINER%20%3C$UPSTREAM_CO_MAINTAINER_EMAIL%3E\
+?from=$CYGWIN_MAINTAINER%20%3C$CYGWIN_MAINTAINER_EMAIL%3E\
+\&subject=$SUBJECT\&body=$SUBJECT
+
+
+Source archive: src/release/tzcode/tzcode-2026e-1-src.tar.xz
+
+--- tzcode-2026e-1.src/tzcode2026e.tar.gz!/LICENSE ---
+Unless specified below, all files in the tz code and data (including
+this LICENSE file) are in the public domain.
+
+If the files date.c, newstrftime.3, and strftime.c are present, they
+contain material derived from BSD and use the BSD 3-clause license.

@@ -65,6 +65,10 @@ public final class UserInstallTest {
             equal("updated", Files.readString(directory.resolve("Jasper.exe")));
             equal(directory.resolve("Jasper.exe").toString(), desktop.target(shortcut));
             desktop.failSave = false;
+            fails(() -> installer.install(source, directory, shortcut, image -> { throw new IllegalStateException("Cygwin failed"); }));
+            equal("updated", Files.readString(directory.resolve("Jasper.exe")));
+            equal(directory.resolve("Jasper.exe").toString(), desktop.target(shortcut));
+            equal("user data", Files.readString(data));
             desktop.stopped = false;
             fails(() -> installer.install(source, directory, shortcut));
             fails(() -> installer.uninstall(directory, shortcut));
@@ -119,12 +123,21 @@ public final class UserInstallTest {
     static void windows(Path root, Path source, Path directory, Path shortcut) throws Exception {
         String key = "Software\\JasperInstallTest-" + java.util.UUID.randomUUID();
         try (var desktop = new WindowsDesktop(key)) {
+            Path deep = source;
+            for (int i = 0; i < 6; i++) deep = deep.resolve("nested-seed-archive-directory-" + i + "-".repeat(20));
+            Files.createDirectories(deep);
+            Path deepFile = Files.writeString(deep.resolve("package.tar.zst"), "long path payload");
+            equal(false, WindowsDesktop.reparsePoint(deepFile));
+            Files.setAttribute(source.resolve("Jasper.exe"), "dos:readonly", true);
             var installer = new UserInstall(desktop);
             installer.install(source, directory, shortcut);
             equal(directory.resolve("Jasper.exe").toString(), desktop.target(shortcut));
+            equal("long path payload", Files.readString(directory.resolve(source.relativize(deepFile))));
             installer.install(source, directory, shortcut);
             String previous = Files.readString(directory.resolve("Jasper.exe"));
+            Files.setAttribute(source.resolve("Jasper.exe"), "dos:readonly", false);
             Files.writeString(source.resolve("Jasper.exe"), "native rollback");
+            Files.setAttribute(source.resolve("Jasper.exe"), "dos:readonly", true);
             Files.setAttribute(shortcut, "dos:readonly", true);
             try {
                 fails(() -> installer.install(source, directory, shortcut));

@@ -243,7 +243,7 @@ public final class Editors {
     /** The detected shell profiles and a button that detects them again; an empty value shows the effective profile. */
     public static Factory<String> profile(ShellChoices shells) {
         return new Factory<>((setting, context) -> new Profile(setting.label(), shells, context.draft()),
-            List.of("PowerShell", "Command Prompt", "WSL", "Custom", "default shell"));
+            List.of("PowerShell", "Command Prompt", "Cygwin", "WSL", "Custom", "default shell"));
     }
 
     /** {@code icons_and_labels} becomes "Icons and labels". */
@@ -756,8 +756,11 @@ public final class Editors {
             var options = new ArrayList<Option>();
             for (int i = 0; i < labels.size(); i++) options.add(new Option("profile-" + i, labels.get(i), Optional.empty()));
             var choice = new Nodes.Choice(id, state, Nodes.ChoiceKind.DROPDOWN, options, index < 0 ? "" : "profile-" + index, label, "");
-            return new Nodes.Stack(id + ":line", plain(state), Nodes.LayoutRole.INLINE,
-                List.of(choice, iconButton(id + ":detect", "refresh", "Detect shells again", plain(state))));
+            var controls = new ArrayList<Nodes.Node>();
+            controls.add(choice); controls.add(iconButton(id + ":detect", "refresh", "Detect shells again", plain(state)));
+            shells.manageCygwin().ifPresent(action -> controls.add(new Nodes.Button(id + ":cygwin", plain(state),
+                "Manage Cygwin packages…", "", Nodes.ButtonKind.SECONDARY, id + ":cygwin", "")));
+            return new Nodes.Stack(id + ":line", plain(state), Nodes.LayoutRole.INLINE, controls);
         }
 
         @Override public String value() { return index < 0 ? "" : ids.get(index); }
@@ -769,6 +772,7 @@ public final class Editors {
          * setting shown as its effective profile into an explicit one, so it is no edit.
          */
         @Override public boolean event(String id, UiEvent event) {
+            if (event instanceof UiEvent.Action action && action.id().equals(id + ":cygwin")) { shells.manageCygwin().ifPresent(Runnable::run); return false; }
             if (event instanceof UiEvent.Action action && action.id().equals(id + ":detect")) { shells.refresh().run(); return false; }
             if (!(event instanceof UiEvent.Selected picked) || !picked.id().equals(id)) return false;
             String option = picked.ids().stream().findFirst().orElse("");

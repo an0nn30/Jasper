@@ -28,7 +28,7 @@ public final class UserInstall {
             Path directory = WindowsDesktop.appData().resolve("JasperApp");
             Path shortcut = WindowsDesktop.programs().resolve("Jasper.lnk");
             if (args[0].equals("install")) {
-                installer.install(Path.of(args[1]).toAbsolutePath(), directory, shortcut);
+                installer.install(Path.of(args[1]).toAbsolutePath(), directory, shortcut, UserInstall::provisionCygwin);
                 System.out.println("Installed Jasper at " + directory + ". Open Jasper from the Start Menu.");
             } else {
                 installer.uninstall(directory, shortcut);
@@ -37,7 +37,12 @@ public final class UserInstall {
         }
     }
 
+    // Portable filesystem fixtures can supply their own provisioning callback.
     void install(Path source, Path directory, Path shortcut) throws IOException {
+        install(source, directory, shortcut, image -> { });
+    }
+
+    void install(Path source, Path directory, Path shortcut, java.util.function.Consumer<Path> provision) throws IOException {
         assertPlainTree(source);
         for (String file : new String[]{"Jasper.exe", "app/Jasper.cfg", "runtime/bin/java.exe"})
             if (!Files.isRegularFile(source.resolve(file))) throw new IOException("Incomplete app image: " + file);
@@ -57,6 +62,7 @@ public final class UserInstall {
             if (exists(directory)) Files.move(directory, backup);
             Files.move(stage, directory);
             installed = true;
+            provision.accept(directory);
             Files.createDirectories(shortcut.getParent());
             desktop.save(shortcut, executable);
         } catch (IOException | RuntimeException failure) {
@@ -76,6 +82,22 @@ public final class UserInstall {
             deleteTree(stage);
         }
         deleteTree(backup);
+    }
+
+    private static void provisionCygwin(Path image) {
+        Process process = null;
+        try {
+            if (!Files.isRegularFile(image.resolve("app/cygwin-tool.jar")) || !Files.isRegularFile(image.resolve("app/cygwin-seed/seed.lock.json")))
+                throw new IOException("Cygwin installation payload is incomplete");
+            process = new ProcessBuilder(image.resolve("runtime/bin/java.exe").toString(), "--enable-native-access=ALL-UNNAMED", "-cp",
+                image.resolve("app/cygwin-tool.jar").toString(), "CygwinTool", "ensure", "--seed", image.resolve("app/cygwin-seed").toString())
+                .inheritIO().start();
+            if (!process.waitFor(20, java.util.concurrent.TimeUnit.MINUTES) || process.exitValue() != 0)
+                throw new IOException("Cygwin provisioning failed; inspect the retained Cygwin logs");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt(); throw new IllegalStateException("Cygwin provisioning interrupted", interrupted);
+        } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        finally { if (process != null && process.isAlive()) { process.descendants().forEach(ProcessHandle::destroyForcibly); process.destroyForcibly(); } }
     }
 
     void uninstall(Path directory, Path shortcut) throws IOException {
@@ -120,11 +142,13 @@ public final class UserInstall {
     }
     static void deleteTree(Path path) throws IOException {
         if (!exists(path)) return;
-        if (!linked(path) && Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+        boolean link = linked(path);
+        if (!link && Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
             try (var children = Files.newDirectoryStream(path)) {
                 for (Path child : children) deleteTree(child);
             }
         }
+        if (windows() && !link) Files.setAttribute(path, "dos:readonly", false, LinkOption.NOFOLLOW_LINKS);
         Files.delete(path);
     }
 }

@@ -69,3 +69,5 @@ counts and review findings, with later integration/follow-up sections explicitly
 - [SFTP phase 1 design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md): approved file browser and persistent transfer management within Remote; implementation plan under adversarial review.
 
 - [Keyboard shortcut reference](keyboard-shortcuts.md): Help window, searching and key capture.
+
+- [Bundled Windows Cygwin](../packaging/windows/cygwin/README.md): seed, provisioning, package management and native acceptance.

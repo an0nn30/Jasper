@@ -17,7 +17,7 @@ import java.util.Set;
 public final class ShellIntegrationScripts {
     static final String RESOURCE_ROOT = "dev/jasper/app/shell-integration/";
     static final List<String> FILES = List.of("jasper.zsh", "jasper.bash", "jasper.fish",
-        "zsh/.zshenv", "zsh/.zprofile", "zsh/.zshrc", "zsh/.zlogin", "bash/rc.bash", "fish/fish/vendor_conf.d/jasper.fish");
+        "zsh/.zshenv", "zsh/.zprofile", "zsh/.zshrc", "zsh/.zlogin", "bash/rc.bash", "bash/cygwin.bash", "fish/fish/vendor_conf.d/jasper.fish");
 
     private ShellIntegrationScripts() {}
 

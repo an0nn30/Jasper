@@ -127,6 +127,7 @@ public final class JasperApplication {
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
     private final ShellProfileCatalog shellProfiles;
+    private final CygwinFeature cygwin;
     /**
      * How long a launch of a WSL or PowerShell 7 profile, resolved before the first detection completed, waits for it
      * off the EDT: both of detection's process calls may take their full timeout.
@@ -360,6 +361,11 @@ public final class JasperApplication {
         if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
+        cygwin = new CygwinFeature(work -> Thread.ofVirtual().name("jasper-cygwin-manager").start(work), SwingUtilities::invokeLater,
+            dev.jasper.app.cygwin.CygwinManager::manageSystem, shellProfiles::refresh, (failed, message) -> {
+                if (failed) notificationViews.error("Cygwin package management", message);
+                else notificationViews.info("Cygwin package management", message);
+            });
         // A supplied launcher (the benchmark, tests) never starts a detected profile, so reg.exe and wsl.exe stay
         // unrun; nothing waits on that catalog, because awaitDetection returns at once when nobody refreshed it.
         if (suppliedLauncher == null) {
@@ -499,6 +505,7 @@ public final class JasperApplication {
                 launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history, windowLook());
             if (configuration != null) configuration.register(window.content());
             window.content().connectContributions(contributions, uiState);
+            if (WINDOWS) window.content().onManageCygwinPackages = cygwin::manage;
             UUID windowId = window.content().id();
             window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
             window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
@@ -1093,7 +1100,7 @@ public final class JasperApplication {
                 configuration::migrationAvailable, Optional.of(vmOptions.hooks()), Optional.of(commandLine));
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
-                shellProfiles::refresh, shellProfiles::onChanged);
+                shellProfiles::refresh, shellProfiles::onChanged, WINDOWS ? Optional.of(cygwin::manage) : Optional.empty());
             // ThemeFolder.prepare runs on the import worker (ThemeMenu.chooseAndImport), so the folder reads the session's
             // fixed plugin tier, never ThemeController.library(), which requires the EDT.
             var pluginThemes = dev.jasper.app.appearance.ThemeLibrary.of(selection.themes());
@@ -1454,7 +1461,7 @@ public final class JasperApplication {
         };
         BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm = (requested, captured) -> {
             ShellProfile profile = captured.profile();
-            boolean checkable = profile.kind() == ShellProfile.Kind.WSL || profile.id().equals(ShellProfiles.PWSH);
+            boolean checkable = profile.kind() == ShellProfile.Kind.WSL || profile.id().equals(ShellProfiles.PWSH) || profile.id().equals(ShellProfiles.CYGWIN);
             if (!checkable || SwingUtilities.isEventDispatchThread() || !awaitDetection.getAsBoolean()) return captured;
             var confirmed = new java.util.concurrent.atomic.AtomicReference<LaunchSettings>();
             try {
@@ -1493,6 +1500,21 @@ public final class JasperApplication {
 
     private static TerminalSession startSession(Path directory, LaunchSettings settings) {
         try {
+            if (settings.profile().id().equals(dev.jasper.app.launch.ShellProfiles.CYGWIN)
+                    && !"1".equals(settings.environment().get("JASPER_CYGWIN_SKIP_RELAY"))) {
+                var layout = dev.jasper.app.cygwin.CygwinLayout.system();
+                var reservation = dev.jasper.app.cygwin.CygwinOperations.registerLaunch(layout);
+                try {
+                    String scripts = settings.environment().get("JASPER_CYGWIN_BOOTSTRAP");
+                    var requested = Optional.ofNullable(settings.environment().get("JASPER_CYGWIN_START_DIRECTORY")).map(Path::of);
+                    var prepared = dev.jasper.app.launch.CygwinLaunch.prepare(settings, requested, scripts == null ? null : Path.of(scripts), layout);
+                    var session = TerminalSession.start(sessionOptions(prepared.directory(), prepared.settings()));
+                    session.exitFuture().whenComplete((exit, failure) -> {
+                        try { reservation.close(); } catch (IOException error) { LOG.log(System.Logger.Level.WARNING, "Cygwin reservation cleanup failed", error); }
+                    });
+                    return session;
+                } catch (Exception failure) { reservation.close(); throw failure; }
+            }
             return TerminalSession.start(sessionOptions(directory, settings));
         } catch (IOException failure) {
             LOG.log(System.Logger.Level.ERROR, "Shell launch failed", failure);
@@ -1912,6 +1934,7 @@ public final class JasperApplication {
         // await() below is never reached in that case.
         shutdown.arm(() -> plugins == null ? null : plugins.executing());
         launches.close();
+        cygwin.close();
         shellProfiles.close();
         // Application-owned state first, so none of it depends on plugins behaving.
         history.close();

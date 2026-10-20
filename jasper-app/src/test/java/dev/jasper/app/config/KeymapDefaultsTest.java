@@ -24,6 +24,7 @@ class KeymapDefaultsTest {
         new Row("quit", KeyContext.GLOBAL, "cmd+q", "ctrl+alt+shift+q"),                       // 3
         new Row("open_settings", KeyContext.GLOBAL, "cmd+,", "ctrl+shift+,"),                  // 4
         new Row("open_file", KeyContext.GLOBAL, "none", "none"),  // Enterprise spec 13: File › Open File…, unbound
+        new Row("manage_cygwin_packages", KeyContext.GLOBAL, "none", "none"),
         new Row("reload_config", KeyContext.GLOBAL, "none", "none"),                           // 5
         new Row("command_palette", KeyContext.GLOBAL, "cmd+shift+p", "ctrl+shift+p"),          // 14
         new Row("new_tab", KeyContext.GLOBAL, "cmd+t", "ctrl+shift+t"),                        // 22

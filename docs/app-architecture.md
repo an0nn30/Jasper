@@ -318,3 +318,8 @@ pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifest
 The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
 rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
 content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.
+
+The `cygwin` leaf owns the JDK/JNA persistent Windows environment and is shared with
+the standalone installer helper. `launch.CygwinLaunch` prepares the verified relay
+and Bash environment off the EDT; `application.CygwinFeature` owns package-management
+workers and UI notifications. See [Cygwin lifecycle](../packaging/windows/cygwin/README.md).
