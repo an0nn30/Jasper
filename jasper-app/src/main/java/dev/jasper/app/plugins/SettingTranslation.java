@@ -61,7 +61,8 @@ final class SettingTranslation {
         if (lookDefault.isPresent()) {
             Reading<?> reading = kind.read(lookDefault.get(), defaultValue);
             if (reading.issues().isEmpty()) defaultValue = reading.value();
-            else problem.accept(reading.issues().getFirst().message().replaceFirst("; using [^;]*\\.$", "."));
+            // The reader's "; using ..." and "; configuration was not applied." speak of the settings file; only the look's default is dropped.
+            else problem.accept(reading.issues().getFirst().message().replaceFirst("; (?:using [^;]*|configuration was not applied)\\.$", "."));
         }
         Setting<?> setting = Setting.of(spec.key(), kind, defaultValue).label(spec.label()).description(spec.description())
             .keywords(spec.keywords().toArray(String[]::new))

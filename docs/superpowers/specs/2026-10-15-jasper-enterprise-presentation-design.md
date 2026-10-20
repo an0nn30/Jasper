@@ -63,7 +63,7 @@ The user's decisions (2026-10-14 and 2026-10-15):
 2. **Bundled and off by default.** The user turns Enterprise on in Settings › Plugins; a restart applies it.
 3. **Colours come from the active theme**, and every existing theme must keep working under the Enterprise kit,
    enforced by tests.
-4. **Remote adds the toolbar's session combo and Run button only when Enterprise is enabled**, reading the active
+4. **Remote adds the toolbar's session combo and Run button only under a classic look (Enterprise's)**, reading the active
    presentation through the SDK (`Appearance.presentation()`; since 2026-10-19, plan 15).
 5. The overall shape and principles (section 3) are approved as presented.
 6. The presentation provider (section 4) is approved as presented.
@@ -782,7 +782,7 @@ each and at most 8 files. A kit is rejected for:
 - `menu_bar = "window"` with `title_bar = "unified"`;
 - a `[defaults]` key outside the allowlist, or a value its setting rejects;
 - a `[defaults]` table not named by a plugin id with a dot, a key in it that is not a setting key, or a value in it that
-  is not a string, number, boolean or array;
+  is not a string, number, boolean or array, or two keys that name the same setting;
 - a `[defaults]` theme id that is neither a built-in id nor a theme file the plugin declares;
 - a path that breaks the path rule, a missing file, or a font file that is not `.ttf` or `.otf`;
 - a `window_title` token other than `{context}`, `{session}` and `{directory}`;
@@ -1837,7 +1837,8 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
      value wins; Reset gives the effective default; picking the core default under the kit stages an explicit value; the
      audit of 5.8.
    - `DeclaredSettingsTest` and the contract: a kit's plugin default replaces the declared default, a saved value wins,
-     a rejected value or an undeclared key is reported and ignored, and Reset returns to the kit's.
+     and a rejected value or an undeclared key is reported and ignored. `PluginPanelPageTest`, `PluginSettingsPageTest`
+     and the testkit's `FakeKitMountingTest`: Reset returns to the kit's.
    - Strategy-construction tests: every strategy builds for every projection value without throwing.
 9. **Behavioural contracts** (the testkit fake and the host; a disagreement is a host bug).
    - `KitContractTest` and `HostedKitContractTest` run for both kits: a checkbox click emits `Toggled`, a radio
@@ -1924,7 +1925,7 @@ its additions in the default look and adds them to the testkit fake and the cont
 | 7 | `dock-chrome` | Labelled stripes and their numbers, the bottom strip and pills, frames and header strips, horizontal drop geometry, the dock layout per look, Event Log; the chrome renders extended |
 | 8 | `run-window` | `PaletteView` and `PaletteHome` pairs, typed headings and Run copy, the modeless window and focus hand-back, the saved place per home kind, Browse…, the fixed list height; the chrome renders extended |
 | 9 | `settings` | `SettingsChrome`, the collapsible navigation, Reset in the context menu, hidden rows, the Appearance, Keymap, Notifications, Plugins and Shell compositions, ⋯ menus, the font row copy; the chrome renders extended |
-| 10 | `plugin-compositions` | The classic layout; Remote's toolbar view, Sessions tree and Properties, Tunnels table, SFTP row, Transfers panel and anchors; File Server's table, Properties and keys table; Vault's classic manager, editors and Unlock form (14.8); the confinement check; `CompositionParityTest` |
+| 10 | `plugin-compositions` | The classic layout; Remote's toolbar view, Sessions tree and Properties, Tunnels table, SFTP row, Transfers panel and anchors; File Server's table, Properties and keys table; Vault's classic manager, editors and Unlock form (14.8); `CompositionParityTest` |
 | 11 | `branding` | `[branding]` and its validation, the `Branding` projection, the Enterprise icons and splash art, the runtime application icon and `Splash` with its start-up steps (10.11); a render of the splash compared with the Boot Splash frames |
 | 12 | `intellij-classic` | The user's 2026-10-18 direction: IntelliJ's classic icons (vendored, attributed) under `[chrome] icons`, the classic header's icon buttons and `window.toolbar` as a look default, SDK 0.18.1's icon-only GHOST toolbar buttons with `run` and `application`, Remote's run-configuration combo and Run, the Enterprise theme as ports of IntelliJ Light and New UI Dark, a pressed tool window activated, the Run window's upper home |
 | 13 | `stripe-icons` | The user's 2026-10-19 direction: every labelled stripe button starts with its tool window's 13 px icon, upright at the reading start, IntelliJ's classic tool-window icons (vendored, attributed) under `[chrome] icons = "classic"`, the label's monochrome glyph for any other name, drag and the ghost keeping it |

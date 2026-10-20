@@ -66,7 +66,8 @@ kit file, IBM Plex fonts and theme its descriptor names, and its code does nothi
 one table per plugin, `[defaults."<plugin id>"]`, keyed as that plugin's settings file writes its keys: each value
 becomes the setting's default when the plugin declares it, a saved value still wins, and Reset returns to it. A value
 the setting's kind rejects, or a key the plugin does not declare, is logged and ignored. Enterprise's gives the Editor
-IBM Plex Mono.
+IBM Plex Mono. A kit that holds such a table declares `sdk = ">=0.18.2, <0.19"`: an older host accepts the plugin by its
+range and then refuses the whole kit.
 
 Any plugin can ask which look is running: `context.appearance().presentation()` (SDK 0.18.2) says whether it is classic,
 its icon set, how tool windows are reached, the title bar and where the menus are, how the toolbar offers Search

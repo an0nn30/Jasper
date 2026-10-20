@@ -288,7 +288,8 @@ class KitParserTest {
         cases.put(head + "[colors]\ndialog_surface = \"surface.card\"\n", "[colors].dialog_surface: \"surface.card\" is not one of surface.dialog, surface.app");
         cases.put(head + "[chrome]\nwindow_title = \"#1E1F22\"\n", "[chrome].window_title: \"#1E1F22\" looks like a colour; colours come from the theme");
         cases.put(head + "# the accent is #2F65CA\n", "kit file: line 3: \"#2F65CA\" looks like a colour; colours come from the theme");
-        cases.put(head + "[defaults.ui]\ntheme = 1\n", "[defaults].\"ui\": a plugin's table is named by its id, such as \"dev.jasper.editor\"");
+        cases.put(head + "[defaults.ui]\ntheme = 1\n", "[defaults].\"ui\": a plugin's table is named by its id, such as \"dev.jasper.editor\"; "
+            + "quote a dotted setting key, such as \"window.toolbar\"");
         cases.put(head + "[defaults.\"jasper.core\"]\nx = 1\n", "[defaults].\"jasper.core\": not a plugin id");
         cases.put(head + "[defaults.\"dev.x.tool\"]\n\"bad key\" = 1\n", "[defaults.\"dev.x.tool\"].\"bad key\": not a setting key");
         cases.put(head + "[defaults.\"dev.x.tool\"]\nwhen = 1979-05-27\n", "[defaults.\"dev.x.tool\"].when: expected a string, number, boolean or array");

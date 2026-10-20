@@ -40,5 +40,7 @@ class HostedPresentationTest {
         assertThat(reported.uiFace()).isEmpty();
         assertThat(reported.bodySize()).isEqualTo(13);
         assertThat(reported.toolbarHeight()).as("the kit's default, which the configuration keeps").isEqualTo(28);
+        assertThat(fallback.defaults().plugin("dev.jasper.editor")).as("the kit's plugin defaults still apply")
+            .containsEntry("font_family", "IBM Plex Mono");
     }
 }

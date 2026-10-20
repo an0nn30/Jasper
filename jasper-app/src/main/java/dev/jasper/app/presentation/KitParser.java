@@ -501,8 +501,9 @@ public final class KitParser {
         for (String key : table.keySet()) {
             String where = "[defaults].\"" + key + "\"";
             if (table.get(List.of(key)) instanceof TomlTable plugin) {
-                // Rulings 15: a dotted core key written without quotes is a table, so an id needs a dot.
-                if (!key.contains(".")) throw new Invalid(where + ": a plugin's table is named by its id, such as \"dev.jasper.editor\"");
+                // Plan 15a Rulings 15: a dotted core key written without quotes is a table, so an id needs a dot.
+                if (!key.contains(".")) throw new Invalid(where + ": a plugin's table is named by its id, such as \"dev.jasper.editor\"; "
+                    + "quote a dotted setting key, such as \"window.toolbar\"");
                 if (!PLUGIN_ID.matcher(key).matches() || key.startsWith("jasper.")) throw new Invalid(where + ": not a plugin id");
                 plugins.put(key, pluginDefaults(new Walked(plugin, new Walked(table, null, "defaults"), key)));
                 continue;

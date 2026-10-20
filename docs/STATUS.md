@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **Enterprise presentation, plan 15a: the look query at the user's direction — 2026-10-19** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, from `main` at `f78bb0385`; [plan](superpowers/plans/2026-10-19-enterprise-15a-look-query.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
-Commits `2ad889b0b..23796aaa9`, then this documentation commit; spec 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1,
+Commits `2ad889b0b..23796aaa9`, then this documentation commit and the final review fixes; spec 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1,
 4.6, 4.7, 5.1, 5.8, 5.9, 8.4, 8.7, 9.1, 14.1 to 14.3, 15, 16.1, 17, 18 and 19.1 amended, and the plugin SDK design gains
 a banner line. The user asked: "Lets make sure that the changes we made were in the enterprise kit, and are exposed via
 plugin code and all plugins are up to date with these changes so that future plugins can also leverage look-specific
@@ -56,7 +56,9 @@ and keep today's Vault compositions; E5 `KitParser.name` quotes non-bare segment
 Task 9 finds its guide anchors by text; E8 migration rows copy their neighbours' owners; E9 `sdkRelease --rerun` for
 stale jars; E10 a changed Enterprise render is recorded, never a lowered floor; E11 the `LayoutTest` javadoc; E12 Task
 6's logger, import and harness details; E13 the guide's `pluginlook` text after the `pluginpanels` notes; E14 every
-interface plan 15b relies on kept as written; E15 only the two STATUS lines of Rulings 24 are corrected. No Enterprise
+interface plan 15b relies on kept as written; E15 only the two STATUS lines of Rulings 24 are corrected; and
+`HostedPresentation.standard()` reads the default presentation (`Presentation.standard`), since only the listed classes
+may read `Kit.DEFAULT` (`StaticDefaultTest`). No Enterprise
 Settings render moved in Task 2. One Enterprise render changed, at the user's 2026-10-19 direction: Settings › Editor
 (`enterprise-settings/light/13.png`) shows the Font row's kit default, "IBM Plex Mono", where it showed "JetBrains Mono"
 (pair `enterprise-settings-13` 0.723, now 0.722). `./gradlew check --continue`: **11,567 tests, 0 failures, 0 errors, 25
@@ -76,8 +78,12 @@ hidden; choosing another font shows Reset, and Reset returns to IBM Plex Mono; (
 its own default font; (3) under Enterprise, Remote's Sessions on the right, Transfers in the bottom strip, File Servers'
 table and the Vault manager's classic layout, as before; (4) with Enterprise off, all three show their rows; (5) with
 `demo_ui = true`, the Sample panel starts in the bottom strip under Enterprise and on the left without it; (6) Settings
-› Plugins shows Enterprise 0.3.0, Remote 0.15.0, Vault 0.7.0, File Server 0.6.0 and Sample 0.4.0. Not merged, not
-pushed.
+› Plugins shows Enterprise 0.3.0, Remote 0.15.0, Vault 0.7.0, File Server 0.6.0 and Sample 0.4.0. The final review's
+fixes add `PresentationReachTest.theApplicationHandsTheLooksPluginDefaultsToThePlugins` (the application hands the look's
+plugin defaults to a started plugin) and `PluginSettingsPageTest.stagingThePluginsOwnDefaultUnderAKitDefaultSavesItAndResetReturnsToTheKits`,
+so the suite holds 11,569 tests (only the touched classes were re-run); a `[defaults]` table named without a dot now
+also says to quote a dotted setting key, and a rejected look default's report no longer ends "configuration was not
+applied". Not merged, not pushed.
 
 **Enterprise presentation, plan 14: IntelliJ Classic's title bar at the user's direction — 2026-10-19** (`claude/enterprise-title-bar`, worktree `.claude/worktrees/enterprise-14`, from `main` at `3a36993ba`; [plan](superpowers/plans/2026-10-19-enterprise-14-title-bar.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
 Commits `200367316..98dedc443`, then this documentation commit; spec 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1

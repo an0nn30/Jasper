@@ -168,6 +168,50 @@ class PluginSettingsPageTest {
         onEdt(() -> assertThat(page.modified()).as("the draft follows the saved file").isFalse());
     }
 
+    /**
+     * Plan 15a: on the generated page the look's default is the row's default. Reset is hidden at it, the plugin's own
+     * default saves as an explicit value, and Reset then removes the key.
+     */
+    @Test @SuppressWarnings("unchecked") void stagingThePluginsOwnDefaultUnderAKitDefaultSavesItAndResetReturnsToTheKits() throws Exception {
+        host.defaults = new dev.jasper.app.config.DefaultSource(Map.of(), Map.of(ID, Map.of("size", 15L)));
+        start(ID, "Pages", settings -> settings.declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+        var page = page();
+        var size = (Setting<Integer>) page.declared().handles().get(0).appSetting();
+        String reset = size.name() + ":reset";
+        onEdt(() -> {
+            page.component();
+            assertThat(page.draft().value(size)).isEqualTo(15);
+            assertThat(resetShown(page, reset)).as("at the look's default").isFalse();
+            page.draft().stage(size, Optional.of(13));
+            assertThat(page.modified()).as("the plugin's own default differs from the look's").isTrue();
+            assertThat(resetShown(page, reset)).isTrue();
+        });
+        applyNow(page);
+        assertThat(TomlDocument.leaves(Files.readString(file(ID)))).as("an explicit value").containsEntry(List.of("size"), 13L);
+        onEdt(() -> {
+            assertThat(resetShown(page, reset)).isTrue();
+            dev.jasper.app.testsupport.KitTestSupport.require(page.component(), reset, javax.swing.JButton.class).doClick(0);
+            assertThat(page.draft().value(size)).as("Reset returns to the look's default").isEqualTo(15);
+        });
+        applyNow(page);
+        assertThat(TomlDocument.leaves(Files.readString(file(ID)))).as("Reset removes the saved value").doesNotContainKey(List.of("size"));
+        onEdt(() -> assertThat(resetShown(page, reset)).as("no longer resettable").isFalse());
+    }
+
+    /** Whether the row's Reset button is mounted and visible. */
+    private static boolean resetShown(PluginSettingsPage page, String reset) {
+        var button = dev.jasper.app.testsupport.KitTestSupport.find(page.component(), reset, javax.swing.JButton.class);
+        return button != null && button.isVisible();
+    }
+
+    /** Applies the page and waits for the write. */
+    private static void applyNow(PluginSettingsPage page) throws Exception {
+        var applied = new AtomicReference<java.util.concurrent.CompletableFuture<Void>>();
+        onEdt(() -> applied.set(page.apply()));
+        applied.get().get(5, TimeUnit.SECONDS);
+        onEdt(() -> { });
+    }
+
     @Test @SuppressWarnings("unchecked") void aRejectedFileShowsItsMessageAndBlocksItsEditsUntilFixed() throws Exception {
         write(ID, "font_size = \"big\"\n");
         start(ID, "Pages", PluginSettingsPageTest::declareEditor);

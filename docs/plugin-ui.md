@@ -238,7 +238,7 @@ track, strong secondary text and the secondary button edge), or the
 a color across a change. A role that carries opacity is painted as given; the kit applies treatments such as focus
 rings and hovers on top. Content in the workspace area of a translucent window paints its background with
 `workspaceOpacity(component)`. Specialized content that needs the look's faces reads them from
-`appearance().presentation()` (`uiFace`, `dataFace`, `bodySize`; SDK 0.18.2).
+`appearance().presentation()` (`uiFace`, `dataFace`, `bodySize`; SDK 0.18.2) (the look's own; the user's font settings are not reported).
 
 ## Testing
 

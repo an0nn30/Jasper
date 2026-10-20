@@ -677,25 +677,32 @@ class PluginRuntimeTest {
         package fix.look;
         public final class Main implements dev.jasper.sdk.plugin.Plugin {
             @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                var size = context.settings().declare(dev.jasper.sdk.settings.SettingSpec.of("size",
+                    dev.jasper.sdk.settings.SettingKind.integer(8, 48), 13).label("Size"));
                 System.setProperty("jasper.test.look", context.appearance().presentation().classic() + " "
-                    + context.appearance().presentation().toolWindows());
+                    + context.appearance().presentation().toolWindows() + " " + size.get());
             }
         }
         """;
 
-    /** Plan 15a Task 2: a started plugin reads the presentation the runtime was given, and the setter refuses after start. */
+    /**
+     * Plan 15a Task 2: a started plugin reads the presentation the runtime was given, and the look's defaults for its
+     * settings; the setter refuses after start.
+     */
     @Test void aStartedPluginReadsThePresentationTheRuntimeWasGiven() throws Exception {
         Path devPlugins = root.resolve("dev").resolve("dev.example.look");
         PluginJars.build(devPlugins, "look.jar", PluginJars.descriptor("dev.example.look", "1.0.0", "fix.look.Main"),
             Map.of("fix.look.Main", LOOK_READER), List.of());
         var enterprise = dev.jasper.app.presentation.Projections.of(dev.jasper.app.testsupport.EnterpriseLook.CHROME, true, true,
             "dev.jasper.enterprise", new dev.jasper.app.presentation.Projections.Host(dev.jasper.app.presentation.Projections.Platform.LINUX, false)).plugins();
+        var defaults = new dev.jasper.app.config.DefaultSource(Map.of(), Map.of("dev.example.look", Map.of("size", 15L)));
         PluginRuntime runtime = runtime(null, root.resolve("absent"), devPlugins, false, new ArrayList<>());
         try {
-            onEdt(() -> runtime.presentation(dev.jasper.ui.kit.Kit.DEFAULT, enterprise, dev.jasper.app.config.DefaultSource.CORE));
+            onEdt(() -> runtime.presentation(dev.jasper.ui.kit.Kit.DEFAULT, enterprise, defaults));
             onEdt(() -> runtime.start(Map.of(), true));
             settle();
-            assertThat(System.getProperty("jasper.test.look")).isEqualTo("true STRIPES");
+            assertThat(System.getProperty("jasper.test.look")).as("the presentation and the look's default for the plugin's setting")
+                .isEqualTo("true STRIPES 15");
             onEdt(() -> assertThatIllegalStateException()
                 .isThrownBy(() -> runtime.presentation(dev.jasper.ui.kit.Kit.DEFAULT, enterprise, dev.jasper.app.config.DefaultSource.CORE))
                 .withMessage("Plugins have already started"));

@@ -174,7 +174,7 @@ class DeclaredSettingsTest {
         assertThat(size.get().get()).isEqualTo(13);
         assertThat(name.get().get()).isEqualTo("ok");
         assertThat(lookProblems).containsExactly(
-            ID + ": the look's default for size is not used: Expected an integer; configuration was not applied.",
+            ID + ": the look's default for size is not used: Expected an integer.",
             ID + ": the look's default for name is not used: Bad name.");
         assertThat(host.failures(ID)).as("the plugin's rule ran contained").isPositive();
         assertThat(reports()).as("a look default is not the settings file").isEmpty();

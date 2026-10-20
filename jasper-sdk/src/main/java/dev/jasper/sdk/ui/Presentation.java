@@ -6,7 +6,8 @@ import java.util.Optional;
 /**
  * Facts about the look Jasper runs with, read through {@link Appearance#presentation()}. The look is chosen at start
  * and stays for the run. The faces, the body size and the toolbar height are the look's own: the user's settings for
- * them are not reported.
+ * them are not reported. The title bar and the menus are the look's in the Normal view with the platform's default
+ * decorations; the user's decoration and view-mode settings are not reported.
  *
  * @param classic whether the look starts from the classic catalog: classic controls and IntelliJ Classic's layout
  * @param icons the icon set the look paints with
