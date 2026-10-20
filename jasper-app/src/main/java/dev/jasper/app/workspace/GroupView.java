@@ -88,8 +88,14 @@ final class GroupView extends JPanel {
     JPopupMenu menu(Tab tab) { return owner.tabMenu(tab); }
     void select(Tab tab) { owner.selectTab(tab); }
     void close(Tab tab) { owner.closeTab(tab); }
-    /** A left press on {@code tab}'s entry in the strip: the tab drag may start from it (workspace tabs spec 12). */
-    void pressed(Tab tab, MouseEvent event) { owner.tabDrag().pressed(this, tab, event); }
+    /**
+     * A left press on {@code tab}'s entry in the strip: the tab drag may start from it (workspace tabs spec 12). A dock
+     * drag still running lost its release, so it ends first.
+     */
+    void pressed(Tab tab, MouseEvent event) {
+        owner.dockDrag().cancel();
+        owner.tabDrag().pressed(this, tab, event);
+    }
     /** A drag event from the strip, which the tab drag follows. */
     void dragged(MouseEvent event) { owner.tabDrag().dragged(event); }
     /** A release on the strip, which ends the tab drag. */

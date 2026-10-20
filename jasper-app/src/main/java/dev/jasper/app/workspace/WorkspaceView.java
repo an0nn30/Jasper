@@ -199,17 +199,21 @@ final class WorkspaceView extends JPanel {
     private void apply(Layout next) { apply(next, true); }
 
     /**
-     * Renders {@code next}; with {@code refocus} the active tab takes focus when it or the shape changed (Rulings 10),
-     * provided the workspace held focus when the change began.
+     * Renders {@code next}; with {@code refocus} the active tab takes focus when it, its group or the shape changed
+     * (Rulings 10), provided the workspace held focus when the change began. The active tab changes group only when it
+     * moves to another group (a tab drag's drop): its component then leaves one card area for another, which takes the
+     * focus from it, and AWT hands the focus on to the next component, which may be another tab's and would select it.
      */
     private void apply(Layout next, boolean refocus) {
         if (closed) return;
         Tab before = selected();
+        GroupId group = layout.activeGroup();
         Object previous = shape;
         boolean held = refocus && holdsFocus();
         layout = next;
         render();
-        owner.workspaceChanged(held && (selected() != before || !Objects.equals(previous, shape)));
+        owner.workspaceChanged(held
+            && (selected() != before || !layout.activeGroup().equals(group) || !Objects.equals(previous, shape)));
     }
 
     /**

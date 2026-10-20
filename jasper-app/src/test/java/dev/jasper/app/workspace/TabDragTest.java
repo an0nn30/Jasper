@@ -8,7 +8,9 @@ import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.AnimationSettings;
+import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.dock.WorkspaceDropResolver.Drop;
 import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.GroupId;
@@ -16,6 +18,7 @@ import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Orientation;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
+import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import java.awt.Component;
 import java.awt.KeyboardFocusManager;
@@ -25,7 +28,11 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
 import java.util.Optional;
+import javax.swing.AbstractButton;
+import javax.swing.ImageIcon;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,6 +120,8 @@ class TabDragTest {
             assertThat(drag.active()).isFalse();
             assertThat(drag.label().showing()).isFalse();
             assertThat(drag.overlay().getParent()).as("the landing goes").isNull();
+            assertThat(keys.dispatchers).as("the Esc dispatcher goes").isEmpty();
+            assertThat(motionListeners()).as("the lost-release listener goes").isEqualTo(listeners);
         });
     }
 
@@ -188,6 +197,78 @@ class TabDragTest {
         });
     }
 
+    /**
+     * A tab dropped into another group leaves one card area for another, which takes the focus from its component; AWT
+     * hands the focus on to the next component, which may be another tab's and would select that tab. So the dropped tab
+     * takes the focus again, as long as the workspace held it (plan 3a's rule: never from a showing component elsewhere).
+     */
+    @Test void aTabDroppedIntoAnotherGroupTakesTheFocusTheWorkspaceHeld() throws Exception {
+        var outside = new JPanel();
+        try {
+            edt(() -> {
+                var workspace = owner.workspace();
+                GroupId left = workspace.model().activeGroup();
+                workspace.moveToNewGroup(c, left, Side.RIGHT);
+                relayout(frame);
+                GroupId right = workspace.model().groupOf(c.id()).orElseThrow();
+                keys.own(a.component());
+                assertThat(keys.getPermanentFocusOwner()).as("the focus is in the workspace").isSameAs(a.component());
+                Point centre = inside(cards(owner, right), 0.5, 0.5);
+                Component source = start(owner, a, centre);
+                int[] focused = {0};
+                a.focusTarget(() -> focused[0]++);
+                mouse(source, MouseEvent.MOUSE_RELEASED, centre);
+                assertThat(workspace.groupView(right).tabs()).containsExactly(c, a);
+                assertThat(workspace.groupView(left).tabs()).as("its old group stays").containsExactly(b);
+                assertThat(focused[0]).as("the dropped tab takes the focus once").isEqualTo(1);
+                // A field the person sees, outside the workspace: the palette's query, the Run window, a tool window.
+                var field = new JTextField();
+                outside.add(field);
+                outside.addNotify();
+                assertThat(field.isShowing()).isTrue();
+                keys.own(field);
+                relayout(frame);
+                Point back = inside(cards(owner, left), 0.5, 0.5);
+                source = start(owner, c, back);
+                int[] elsewhere = {0};
+                c.focusTarget(() -> elsewhere[0]++);
+                mouse(source, MouseEvent.MOUSE_RELEASED, back);
+                assertThat(workspace.groupView(left).tabs()).containsExactly(b, c);
+                assertThat(owner.selectedTab()).isSameAs(c);
+                assertThat(elsewhere[0]).as("focus outside the workspace stays there").isZero();
+            });
+        } finally {
+            edt(() -> {
+                keys.own(null);
+                outside.removeNotify();
+            });
+        }
+    }
+
+    /** Swing can lose a dock drag's release too: a press on a tab means it never came, so the dock drag ends there. */
+    @Test void aPressOnATabEndsADockDragWhoseReleaseWasLost() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.sessions", "Sessions", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("sessions"));
+            relayout(frame);
+            try {
+                AbstractButton sessions = owner.leftStripe().buttons().getFirst();
+                Point from = middle(sessions);
+                mouse(sessions, MouseEvent.MOUSE_PRESSED, from);
+                mouse(sessions, MouseEvent.MOUSE_DRAGGED, new Point(from.x, from.y + UIScale.scale(owner.area().dragThreshold()) + 2));
+                assertThat(owner.dockDrag().active()).as("past the dock's threshold").isTrue();
+                Component tab = entry(owner, owner.selectedTab());
+                mouse(tab, MouseEvent.MOUSE_PRESSED, middle(tab));
+                assertThat(owner.dockDrag().active()).as("the press on a tab ends it").isFalse();
+                assertThat(owner.dockDrag().overlay().getParent()).isNull();
+                mouse(tab, MouseEvent.MOUSE_RELEASED, middle(tab));
+            } finally {
+                owner.dockDrag().cancel();
+            }
+        });
+    }
+
     @Test void anEdgeDropInAMaximizedGroupSplitsItAndEndsTheMaximize() throws Exception {
         edt(() -> {
             var workspace = owner.workspace();
@@ -249,6 +330,8 @@ class TabDragTest {
             // A modal dialog opening, or another application coming forward, takes the focus and the release with it.
             owner.setActive(false);
             assertThat(owner.tabDrag().active()).isFalse();
+            assertThat(keys.dispatchers).as("the Esc dispatcher goes").isEmpty();
+            assertThat(motionListeners()).as("the lost-release listener goes").isEqualTo(listeners);
             mouse(source, MouseEvent.MOUSE_RELEASED, pastC);
             assertThat(owner.tabs()).containsExactly(a, b, c);
         });
@@ -261,6 +344,8 @@ class TabDragTest {
             owner.closeTab(a);
             assertThat(owner.tabDrag().active()).isFalse();
             assertThat(owner.tabDrag().label().showing()).isFalse();
+            assertThat(keys.dispatchers).as("the Esc dispatcher goes").isEmpty();
+            assertThat(motionListeners()).as("the lost-release listener goes").isEqualTo(listeners);
             mouse(source, MouseEvent.MOUSE_RELEASED, pastC);
             assertThat(owner.tabs()).containsExactly(b, c);
         });

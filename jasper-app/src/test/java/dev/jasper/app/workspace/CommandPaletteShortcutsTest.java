@@ -284,6 +284,8 @@ class CommandPaletteShortcutsTest {
                 if (dispatcher.dispatchKeyEvent(event)) return true;
             return false;
         }
+        /** Sets the permanent focus owner as a click into a component does, without a native window. */
+        void own(Component component) { setGlobalPermanentFocusOwner(component); }
         @Override public void addKeyEventDispatcher(KeyEventDispatcher dispatcher) {
             super.addKeyEventDispatcher(dispatcher); dispatchers.add(dispatcher);
         }
