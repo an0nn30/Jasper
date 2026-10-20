@@ -38,6 +38,25 @@ class MarkdownControllerTest {
     void preview(String text) throws Exception { edt(() -> { tab.area().setText(text); controller.mode(MarkdownMode.PREVIEW); }); }
     String visible() { return tab.surface().preview().editor().getText(); }
 
+    @Test void resourceControlsAppearOnlyAfterMatchingPreviewInstall() throws Exception {
+        try (var loader = new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(1024))) {
+            edt(() -> { controller.close(); controller = new MarkdownController(tab, worker, ui, tab::render, loader); controller.active(true); });
+            preview("![alt](https://example.invalid/a.png)");
+            edt(() -> assertThat(controller.needsImageConsent()).isFalse());
+            complete();
+            edt(() -> {assertThat(controller.needsImageConsent()).isTrue(); controller.active(false);});
+            edt(() -> assertThat(controller.currentResult()).isEmpty());
+        }
+    }
+    @Test void imageFailuresLeavePreviewTextSourceEditingAndSourceActionUsable() throws Exception {
+        try (var loader = new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(1024))) {
+            edt(() -> { controller.close(); controller = new MarkdownController(tab, worker, ui, tab::render, loader); controller.active(true); });
+            preview("Before\n\n![alt](file:/unsupported.png)\n\nAfter"); complete();
+            edt(() -> {assertThat(controller.failure()).isEmpty();assertThat(controller.imageFailures()).isTrue();
+                assertThat(visible()).contains("Before", "After");dev.jasper.editor.testsupport.Kits.click(tab.view(), "markdown.source");
+                assertThat(controller.mode()).isEqualTo(MarkdownMode.SOURCE);tab.area().append(" Edited");assertThat(tab.session().dirty()).isTrue();});
+        }
+    }
     @Test void initialPreviewRunsImmediatelyAndHundredEditsKeepOnlyLatestPending() throws Exception {
         preview("First"); assertThat(worker.size()).isEqualTo(1);
         edt(() -> { for(int i=0;i<100;i++){tab.area().setText("Latest " + i);controller.flushDebounce();} });

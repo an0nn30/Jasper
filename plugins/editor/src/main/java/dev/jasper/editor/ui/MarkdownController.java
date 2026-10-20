@@ -17,6 +17,7 @@ import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN;
 /** EDT-owned preview lifetime and a single worker with one replaceable immutable snapshot. */
 final class MarkdownController implements AutoCloseable {
     private final EditorTab tab;
+    private final dev.jasper.editor.markdown.resources.ResourceSession resources;
     private final Executor worker, ui;
     private final Runnable changed;
     private final Timer debounce;
@@ -32,7 +33,14 @@ final class MarkdownController implements AutoCloseable {
     private DocumentSession.State state;
 
     MarkdownController(EditorTab tab, Executor worker, Executor ui, Runnable changed) {
+        this(tab, worker, ui, changed, null);
+    }
+    MarkdownController(EditorTab tab, Executor worker, Executor ui, Runnable changed,
+                       dev.jasper.editor.markdown.resources.ImageLoader loader) {
         this.tab = tab; this.worker = worker; this.ui = ui; this.changed = changed;
+        resources = loader == null ? null : new dev.jasper.editor.markdown.resources.ResourceSession(loader,
+            () -> tab.session().document().orElse(null), tab.surface().preview()::image,
+            (id, reason) -> {tab.surface().preview().imageReason(id, reason); changed.run();});
         debounce = new Timer(250, event -> flushDebounce());
         debounce.setRepeats(false);
         hierarchy = event -> {
@@ -53,6 +61,11 @@ final class MarkdownController implements AutoCloseable {
     Optional<String> failure() { return Optional.ofNullable(failure); }
     MarkdownMode mode() { return mode; }
     boolean active() { return active; }
+    boolean needsImageConsent() { return resources != null && resources.needsConsent(); }
+    boolean imageFailures() { return resources != null && resources.hasFailures(); }
+    void allowImages() { if (resources != null) {resources.allowExternal(); changed.run();} }
+    void retryImages() { if (resources != null) {resources.retryFailed(); changed.run();} }
+    void sourceReloaded() { if (resources != null) resources.reload(); sourceChanged(); }
     void sourceChanged() {
         if (closed) return;
         invalidate();
@@ -67,6 +80,7 @@ final class MarkdownController implements AutoCloseable {
         if (closed) return;
         var session = tab.session();
         if (identity == session.document().orElse(null) && java.util.Objects.equals(language, session.style()) && state == session.state()) return;
+        if (resources != null && identity != session.document().orElse(null)) resources.identityChanged();
         rememberSession();
         if (!SYNTAX_STYLE_MARKDOWN.equals(language)) mode(MarkdownMode.SOURCE);
         invalidate();
@@ -100,6 +114,7 @@ final class MarkdownController implements AutoCloseable {
     private void invalidate() {
         if (closed) return;
         generation++;
+        if (resources != null) { if (eligible()) resources.invalidate(); else resources.active(false); }
         debounce.stop(); pending = null; installing = null; current = null; dirty = true;
         tab.surface().preview().cancelInstall();
         if (running != null) running.cancel();
@@ -162,7 +177,9 @@ final class MarkdownController implements AutoCloseable {
         if (pane.installFailure().isPresent()) {
             installing = null; fail(pane.installFailure().get().getMessage());
         } else if (pane.installedResult().orElse(null) == job.result) {
-            current = job.result; installing = null; failure = null; changed.run();
+            current = job.result; installing = null; failure = null;
+            if (resources != null) { resources.refresh(current); resources.active(true); }
+            changed.run();
         }
     }
     private void fail(String message) {
@@ -173,6 +190,7 @@ final class MarkdownController implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         invalidate(); closed = true;
+        if (resources != null) resources.close();
         tab.surface().removeHierarchyListener(hierarchy);
         tab.surface().controllerGeometry = () -> {};
         tab.surface().styleChanged = () -> {};

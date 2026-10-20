@@ -90,6 +90,10 @@ public final class EditorTab {
     void previews(java.util.concurrent.Executor worker, java.util.concurrent.Executor ui) {
         new MarkdownController(this, worker, ui, this::render);
     }
+    void previews(java.util.concurrent.Executor worker, java.util.concurrent.Executor ui,
+                  dev.jasper.editor.markdown.resources.ImageLoader loader) {
+        new MarkdownController(this, worker, ui, this::render, loader);
+    }
     void active(boolean value) { if (markdown != null) markdown.active(value); }
 
     /** Creates an owned kit view; closing the hosted view ends document refreshes as well. */
@@ -190,7 +194,7 @@ public final class EditorTab {
         try { area().setCaretPosition(area().getLineStartOffset(Math.min(line, area().getLineCount() - 1))); }
         catch (BadLocationException impossible) { area().setCaretPosition(0); }
         if (vim != null) vim.textReplaced();
-        if (markdown != null) markdown.sourceChanged();
+        if (markdown != null) markdown.sourceReloaded();
     }
     private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true, session.wrap()); }
     private void refresh() {
@@ -216,6 +220,8 @@ public final class EditorTab {
             case "document.preview.source", "markdown.source" -> markdownMode(MarkdownMode.SOURCE, true);
             case "markdown.split" -> markdownMode(MarkdownMode.SPLIT, true);
             case "markdown.preview" -> markdownMode(MarkdownMode.PREVIEW, true);
+            case "markdown.images.allow" -> { if (markdown != null) markdown.allowImages(); }
+            case "markdown.images.retry" -> { if (markdown != null) markdown.retryImages(); }
             case "markdown.scroll-sync" -> { if (showingText() && markdownEligible()) { linkedScrolling = !linkedScrolling; render(); } }
             case RETRY -> { if (session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
             case DISMISS -> { session.cancelLoad(); close.accept(this); }
@@ -228,6 +234,7 @@ public final class EditorTab {
         boolean ready = showingText(), failed = session.state() == DocumentSession.State.FAILED;
         var children = new ArrayList<Nodes.Node>();
         children.add(MarkdownToolbar.node(markdown == null ? MarkdownMode.SOURCE : markdown.mode(), linkedScrolling, ready, markdownEligible(), icons));
+        if (markdown != null) children.add(MarkdownToolbar.resources(markdown.mode(), markdown.needsImageConsent(), markdown.imageFailures()));
         if (markdown != null && markdown.failure().isPresent() && markdown.mode() != dev.jasper.editor.markdown.MarkdownMode.SOURCE) {
             children.add(new Nodes.Stack("document.preview.failure", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
                 new Nodes.Text("document.preview.message", ControlState.READY, markdown.failure().orElseThrow(), Nodes.TextRole.BODY),

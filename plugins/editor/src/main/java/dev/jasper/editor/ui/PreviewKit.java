@@ -23,13 +23,14 @@ final class PreviewKit extends HTMLEditorKit {
     private WorkspacePalette palette;
     private Font body;
     private final Map<Integer,BufferedImage> images;
+    private final Map<Integer,String> imageReasons;
     private final List<PreviewImageView> imageViews=new ArrayList<>();
     private final Map<Element,Map<Element,CodeRun>> codeLines=new java.util.IdentityHashMap<>();
     private record CodeRun(LineLayout.Row row,float origin) {
         float originAt(int offset){return origin+(offset==row.start()?0:(float)LineLayout.caret(row,offset).getBounds2D().getX());}
     }
-    PreviewKit(TerminalTypography typography,WorkspacePalette palette,Font body,Map<Integer,BufferedImage> images){
-        this.images=images;configure(typography,palette,body);
+    PreviewKit(TerminalTypography typography,WorkspacePalette palette,Font body,Map<Integer,BufferedImage> images,Map<Integer,String> imageReasons){
+        this.imageReasons=imageReasons;this.images=images;configure(typography,palette,body);
     }
     private void configure(TerminalTypography typography,WorkspacePalette palette,Font body){this.typography=typography;this.palette=palette;this.body=body;
         fonts=new EditorFonts(typography,new FontRenderContext(null,true,true));codeLines.clear();}
@@ -78,7 +79,7 @@ final class PreviewKit extends HTMLEditorKit {
     void imagesChanged(){for(var view:List.copyOf(imageViews))view.preferenceChanged(null,true,true);}
     @Override public ViewFactory getViewFactory(){return element -> {
         Object tag=element.getAttributes().getAttribute(StyleConstants.NameAttribute);
-        if(tag==HTML.Tag.IMG){var view=new PreviewImageView(element,images,palette.textMuted());imageViews.add(view);return view;}
+        if(tag==HTML.Tag.IMG){var view=new PreviewImageView(element,images,imageReasons,palette.textMuted());imageViews.add(view);return view;}
         if(tag==HTML.Tag.CONTENT){
             if(element.getAttributes().isDefined(HTML.Tag.CODE)||ancestor(element,HTML.Tag.PRE))return new Code(element);
             return new InlineView(element);

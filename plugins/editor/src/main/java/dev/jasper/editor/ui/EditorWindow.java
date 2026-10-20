@@ -51,6 +51,8 @@ public final class EditorWindow {
     private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment");
 
     private final EditorEnvironment environment;
+    private final dev.jasper.editor.markdown.resources.ImageLoader imageLoader;
+    private final boolean ownsImageLoader;
     private final PluginContext context;
     private final Runnable onClosed;
     private final java.util.function.Consumer<EditorDocument> opened;
@@ -133,6 +135,19 @@ public final class EditorWindow {
      */
     public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
                         Predicate<OpenRequest> openers, Locations locations) {
+        this(environment, onClosed, opened, openers, locations,
+            new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(64L * 1024 * 1024)), true);
+    }
+
+    /** Uses the plugin-wide image loader across every hosted window and tab. */
+    public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                        Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader) {
+        this(environment, onClosed, opened, openers, locations, imageLoader, false);
+    }
+    private EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                         Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader, boolean ownsImageLoader) {
+        this.imageLoader = java.util.Objects.requireNonNull(imageLoader);
+        this.ownsImageLoader = ownsImageLoader;
         this.locations = java.util.Objects.requireNonNull(locations);
         this.environment = environment;
         this.context = environment.context();
@@ -614,6 +629,7 @@ public final class EditorWindow {
         ticker.stop();
         noticeTimer.stop();
         for (DocumentSession session : model.sessions()) session.cancelLoad();
+        if (ownsImageLoader) imageLoader.close();
         onClosed.run();
     }
 
@@ -761,7 +777,7 @@ public final class EditorWindow {
         EditorSettings settings = environment.settings().get();
         session.setWrap(settings.softWrap());
         var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
-        tab.previews(context.background(), environment.ui());
+        tab.previews(context.background(), environment.ui(), imageLoader);
         tab.markdownPreferences(environment.markdownPreferences(), failed -> environment.ui().execute(() -> {
             if (!disposed) context.notifications().group().error("Could not save the Markdown default view", failed);
         }));

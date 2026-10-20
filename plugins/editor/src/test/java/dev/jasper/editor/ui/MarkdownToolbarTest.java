@@ -12,6 +12,13 @@ class MarkdownToolbarTest {
         return new Presentation(classicBase, icons, Presentation.ToolWindows.RAILS, Presentation.TitleBar.NATIVE,
             Presentation.Menus.WINDOW, Presentation.ToolbarSearch.FIELD, Optional.empty(), Optional.empty(), 13, 40);
     }
+    @Test void imageActionsAreDescriptorsAndDisappearInSourceMode() {
+        var row = MarkdownToolbar.resources(MarkdownMode.PREVIEW, true, true);
+        assertThat(row.children()).filteredOn(Nodes.Button.class::isInstance)
+            .map(Nodes.Button.class::cast).extracting(Nodes.Button::action)
+            .containsExactly("markdown.images.allow", "markdown.images.retry");
+        assertThat(MarkdownToolbar.resources(MarkdownMode.SOURCE, true, true).state().visible()).isFalse();
+    }
     @Test void modeTogglesAreExclusiveNamedAndChooseArtworkByIconsAlone() {
         for (boolean base : List.of(false, true)) for (var icons : Presentation.Icons.values()) for (var mode : MarkdownMode.values()) {
             var row = MarkdownToolbar.node(mode, true, true, true, presentation(base, icons));

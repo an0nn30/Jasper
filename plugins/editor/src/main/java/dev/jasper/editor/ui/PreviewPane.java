@@ -21,6 +21,7 @@ final class PreviewPane implements AutoCloseable {
     private final Runnable geometryChanged;
     private final IntConsumer activateLink;
     private final Map<Integer, BufferedImage> images = new HashMap<>();
+    private final Map<Integer, String> imageReasons = new HashMap<>();
     private Map<String,Integer> anchors = Map.of();
     private MarkdownResult installed;
     private Prepared pending;
@@ -57,6 +58,12 @@ final class PreviewPane implements AutoCloseable {
         edt();if(closed || installed==null || installed.images().stream().noneMatch(value -> value.id()==id))return;
         if(image==null)images.remove(id);else images.put(id,image);
         if(kit!=null)kit.imagesChanged();editor.revalidate();editor.repaint();geometryChanged.run();
+    }
+    void imageReason(int id, String reason) {
+        edt(); if (closed || installed == null || installed.images().stream().noneMatch(value -> value.id() == id)) return;
+        imageReasons.put(id, reason);
+        if (kit != null) kit.imagesChanged();
+        editor.revalidate(); editor.repaint();
     }
     void cancelInstall() { edt();generation++;pending=null;pendingStyle=null;installFailure=null; }
 
@@ -126,7 +133,7 @@ final class PreviewPane implements AutoCloseable {
         Objects.requireNonNull(typography);Objects.requireNonNull(palette);Objects.requireNonNull(syntax);
         if(!Double.isFinite(opacity)||opacity<0||opacity>1)throw new IllegalArgumentException("Opacity must be from 0 to 1");
         cancelInstall();pending=prepared;pendingStyle=new Style(typography,palette,syntax,bodyFont,opacity);long token=generation;
-        var nextKit=new PreviewKit(typography,palette,bodyFont,images);
+        var nextKit=new PreviewKit(typography,palette,bodyFont,images,imageReasons);
         var document=nextKit.createDefaultDocument();document.putProperty("IgnoreCharsetDirective",Boolean.TRUE);
         var reader=((HTMLDocument)document).getReader(0);
         Runnable[] continuation={null};int[] index={0};
@@ -144,7 +151,7 @@ final class PreviewPane implements AutoCloseable {
                 try {editor.setEditorKit(nextKit);editor.setDocument(document);}
                 catch(RuntimeException failure){editor.setEditorKit(previousKit);editor.setDocument(previousDocument);throw failure;}
                 this.typography=typography;this.palette=palette;this.syntax=syntax;this.bodyFont=bodyFont;this.opacity=opacity;
-                images.clear();kit=nextKit;installed=prepared.result;pending=null;pendingStyle=null;
+                images.clear();imageReasons.clear();kit=nextKit;installed=prepared.result;pending=null;pendingStyle=null;
                 editor.setForeground(palette.text());editor.setSelectionColor(palette.selection());editor.setSelectedTextColor(palette.selectionText());editor.setCaretColor(palette.text());
                 editor.setFont(nextFont);anchors=nextAnchors;
                 editor.setCaretPosition(0);editor.revalidate();editor.repaint();
@@ -188,7 +195,7 @@ final class PreviewPane implements AutoCloseable {
         try {int value=Integer.parseInt(text.substring(prefix.length()));return value<0?-1:value;}catch(NumberFormatException e){return -1;}
     }
     private static void edt(){if(!SwingUtilities.isEventDispatchThread())throw new IllegalStateException("Preview requires EDT");}
-    @Override public void close(){edt();if(closed)return;cancelInstall();closed=true;images.clear();anchors=Map.of();installed=null;kit=null;editor.setEditorKit(new DefaultEditorKit());}
+    @Override public void close(){edt();if(closed)return;cancelInstall();closed=true;images.clear();imageReasons.clear();anchors=Map.of();installed=null;kit=null;editor.setEditorKit(new DefaultEditorKit());}
     private final class Surface extends JEditorPane {
         @Override public boolean getScrollableTracksViewportWidth(){return getParent() instanceof JViewport view && getMinimumSize().width<=view.getWidth();}
         @Override protected void paintComponent(Graphics graphics) {

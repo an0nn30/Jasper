@@ -51,6 +51,7 @@ public final class EditorPlugin implements Plugin {
     private final BiFunction<System.Logger, NotificationGroup, DefaultEditor.Launcher> launchers;
     private EditorEnvironment environment;
     private EditorWindow window;
+    private dev.jasper.editor.markdown.resources.ImageLoader imageLoader;
     private Subscription typography = () -> { };
     private RecentFiles recent;
     private Openers openers;
@@ -78,6 +79,7 @@ public final class EditorPlugin implements Plugin {
 
     @Override public void start(PluginContext context) {
         Languages.register();
+        imageLoader = new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(64L * 1024 * 1024));
         // Set.copyOf tolerates a platform that lists a family twice; Set.of would throw.
         Set<String> fonts = Set.copyOf(Arrays.asList(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()));
         EditorSettings.Declared settings = new EditorSettings.Declared(context.settings(), fonts);
@@ -139,10 +141,11 @@ public final class EditorPlugin implements Plugin {
         typography.close();
         typography = () -> { };
         if (window != null) window.dispose();
+        if (imageLoader != null) imageLoader.close();
     }
 
     private EditorWindow window() {
-        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle, locations);
+        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle, locations, imageLoader);
         return window;
     }
 }

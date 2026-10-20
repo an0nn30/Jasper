@@ -27,6 +27,12 @@ public final class MarkdownToolbar {
         if (mode == MarkdownMode.SPLIT) children.add(toggle("scroll-sync", "Synchronize scrolling", linked, suffix, state));
         return new Nodes.Stack("markdown.toolbar", new ControlState(eligible, ready, false, ""), Nodes.LayoutRole.INLINE, children);
     }
+    static Nodes.Stack resources(MarkdownMode mode, boolean consent, boolean failed) {
+        var buttons = new ArrayList<Nodes.Node>();
+        if (consent) buttons.add(new Nodes.Button("markdown.images.allow", ControlState.READY, "Load external images", "", Nodes.ButtonKind.GHOST, "markdown.images.allow", "Load web images for this document"));
+        if (failed) buttons.add(new Nodes.Button("markdown.images.retry", ControlState.READY, "Retry images", "", Nodes.ButtonKind.GHOST, "markdown.images.retry", "Retry failed image loads"));
+        return new Nodes.Stack("markdown.images", new ControlState(mode != MarkdownMode.SOURCE && !buttons.isEmpty(), true, false, ""), Nodes.LayoutRole.INLINE, buttons);
+    }
     private static Nodes.Button toggle(String name, String tooltip, boolean selected, String suffix, ControlState state) {
         String id = "markdown." + name;
         return new Nodes.Button(id, state, "", "editor." + name + suffix, Nodes.ButtonKind.GHOST, id, tooltip,
