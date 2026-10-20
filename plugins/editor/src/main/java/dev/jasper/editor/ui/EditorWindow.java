@@ -751,6 +751,7 @@ public final class EditorWindow {
         EditorSettings settings = environment.settings().get();
         session.setWrap(settings.softWrap());
         var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
+        tab.previews(context.background(), environment.ui());
         tab.appearance(context.appearance());
         tab.settings(settings);
         tab.typography(environment.typography());
@@ -771,7 +772,8 @@ public final class EditorWindow {
         var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab.view());
         hosted.put(tab, handle); ownerRef.set(handle);
         handle.setFocusTarget(tab::focusText);
-        handle.onActive(active -> { if (active) activate(tab); });
+        handle.onActive(active -> { tab.active(active); if (active) activate(tab); });
+        tab.active(handle.isActive());
         handle.onClosed(() -> remove(tab));
         var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
         for (var command : commands) {

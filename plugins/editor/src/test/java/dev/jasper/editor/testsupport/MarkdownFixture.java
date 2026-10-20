@@ -82,4 +82,13 @@ public final class MarkdownFixture {
             }
         }
     }
+    /** Independently released worker/UI work, including deterministic rejection. */
+    public static final class ManualExecutor implements java.util.concurrent.Executor {
+        private final java.util.ArrayDeque<Runnable> tasks = new java.util.ArrayDeque<>();
+        public boolean reject;
+        @Override public void execute(Runnable task) { if (reject) throw new java.util.concurrent.RejectedExecutionException("executor unavailable"); tasks.add(task); }
+        public int size() { return tasks.size(); }
+        public void runNext() { tasks.remove().run(); }
+        public void drain() { while (!tasks.isEmpty()) runNext(); }
+    }
 }

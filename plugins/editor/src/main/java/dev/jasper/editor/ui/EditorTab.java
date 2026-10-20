@@ -39,6 +39,13 @@ public final class EditorTab {
     private final VimBar vimBar = new VimBar(this::render, this::reveal);
     private int tabSize = 4;
     private FindBar find;
+    private MarkdownController markdown;
+    void markdown(MarkdownController value) { markdown = value; }
+    MarkdownController markdown() { return markdown; }
+    void previews(java.util.concurrent.Executor worker, java.util.concurrent.Executor ui) {
+        new MarkdownController(this, worker, ui, this::render);
+    }
+    void active(boolean value) { if (markdown != null) markdown.active(value); }
 
     /** Creates an owned kit view; closing the hosted view ends document refreshes as well. */
     public EditorTab(UiKit kit, DocumentSession session, Consumer<EditorTab> close, boolean debounce) {
@@ -68,6 +75,7 @@ public final class EditorTab {
         closed = true;
         focusPending = false;
         edits.stop();
+        if (markdown != null) markdown.close();
         area().getDocument().removeDocumentListener(editListener);
         if (vim != null) { vimBar.detach(); vim.close(); vim = null; }
         document.close();
@@ -122,6 +130,7 @@ public final class EditorTab {
 
     private void edited() {
         if (closed || replacing) return;
+        if (markdown != null) markdown.sourceChanged();
         if (debounce) edits.restart(); else session.textEdited();
     }
     private void replaceText(String text, boolean keepPosition) {
@@ -133,6 +142,7 @@ public final class EditorTab {
         try { area().setCaretPosition(area().getLineStartOffset(Math.min(line, area().getLineCount() - 1))); }
         catch (BadLocationException impossible) { area().setCaretPosition(0); }
         if (vim != null) vim.textReplaced();
+        if (markdown != null) markdown.sourceChanged();
     }
     private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true, session.wrap()); }
     private void refresh() {
@@ -143,6 +153,7 @@ public final class EditorTab {
         area().setWrapStyleWord(vim == null);
         area().setTabsEmulated(!session.tabs());
         if (vim != null) vim.editorDefaults(defaults());
+        if (markdown != null) markdown.sessionChanged();
         render();
         if (showingText() && focusPending) { focusPending = false; focusArea.run(); }
     }
@@ -151,6 +162,8 @@ public final class EditorTab {
         if (find != null && find.event(event)) return;
         if (!(event instanceof UiEvent.Action action)) return;
         switch (action.id()) {
+            case "document.preview.retry" -> { if (markdown != null) markdown.retry(); }
+            case "document.preview.source" -> { if (markdown != null) markdown.mode(dev.jasper.editor.markdown.MarkdownMode.SOURCE); }
             case RETRY -> { if (session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
             case DISMISS -> { session.cancelLoad(); close.accept(this); }
             case FIRST -> { if (session.banner() == DocumentSession.Banner.DELETED) close.accept(this); else if (session.banner() == DocumentSession.Banner.CHANGED) session.reloadFromBanner(); }
@@ -161,6 +174,11 @@ public final class EditorTab {
     private ViewSpec spec() {
         boolean ready = showingText(), failed = session.state() == DocumentSession.State.FAILED;
         var children = new ArrayList<Nodes.Node>();
+        if (markdown != null && markdown.failure().isPresent() && markdown.mode() != dev.jasper.editor.markdown.MarkdownMode.SOURCE) {
+            children.add(new Nodes.Stack("document.preview.failure", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Text("document.preview.message", ControlState.READY, markdown.failure().orElseThrow(), Nodes.TextRole.BODY),
+                button("document.preview.source", "Source", true), button("document.preview.retry", "Retry", true))));
+        }
         boolean banner = session.banner() != DocumentSession.Banner.NONE;
         boolean deleted = session.banner() == DocumentSession.Banner.DELETED;
         children.add(new Nodes.Stack(BANNER, visible(banner), Nodes.LayoutRole.INLINE, List.of(

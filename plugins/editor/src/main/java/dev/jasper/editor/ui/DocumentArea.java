@@ -36,6 +36,15 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private boolean restoringDivider;
     private java.util.function.IntConsumer activateLink = id -> {};
     private Runnable geometryChanged = () -> {};
+    Runnable controllerGeometry = () -> {};
+    Runnable styleChanged = () -> {};
+    record PreviewStyle(TerminalTypography typography, dev.jasper.sdk.ui.WorkspacePalette palette, SyntaxPalette syntax) { }
+    private PreviewStyle previewStyle;
+    PreviewStyle previewStyle() { return previewStyle; }
+    void previewStyle(TerminalTypography type, dev.jasper.sdk.ui.WorkspacePalette palette, SyntaxPalette syntax) {
+        previewStyle = new PreviewStyle(type, palette, syntax);
+        styleChanged.run();
+    }
 
     PreviewPane preview() { return preview; }
     void previewCallbacks(java.util.function.IntConsumer links, Runnable geometry) { activateLink=links;geometryChanged=geometry; }
@@ -67,7 +76,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
 
     DocumentArea() {
         setLayout(new BorderLayout());
-        preview=new PreviewPane(id -> activateLink.accept(id), () -> geometryChanged.run());
+        preview=new PreviewPane(id -> activateLink.accept(id), () -> { controllerGeometry.run(); geometryChanged.run(); });
         previewScroll=new JScrollPane(preview.editor());previewScroll.setBorder(BorderFactory.createEmptyBorder());
         previewScroll.setOpaque(false);previewScroll.getViewport().setOpaque(false);
         split=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);split.setOpaque(false);split.setBorder(BorderFactory.createEmptyBorder());split.setResizeWeight(.5);
@@ -75,7 +84,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
             int extent=split.getWidth()-split.getDividerSize();
             if(!restoringDivider && mode==MarkdownMode.SPLIT && extent>0)dividerRatio=Math.max(0,Math.min(1,split.getDividerLocation()/(double)extent));
         });
-        addPropertyChangeListener("font",event -> {if(getFont()!=null)preview.bodyFont(getFont());});
+        addPropertyChangeListener("font",event -> {if(getFont()!=null){preview.bodyFont(getFont());styleChanged.run();}});
         area.setCodeFoldingEnabled(true);
         area.setMarkOccurrences(true);
         area.setBracketMatchingEnabled(true);
@@ -119,6 +128,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private void refreshAppearance() {
         if (!closed && appearance != null && settings != null)
             { apply(settings, theme, appearance.editorPalette(), appearance.syntaxPalette(), appearance.workspaceOpacity(this));
+                if(typography!=null)previewStyle(typography,appearance.workspacePalette(),appearance.syntaxPalette());
                 if(typography!=null && getFont()!=null)preview.restyle(typography,appearance.workspacePalette(),appearance.syntaxPalette(),getFont(),appearance.workspaceOpacity(this)); }
     }
 

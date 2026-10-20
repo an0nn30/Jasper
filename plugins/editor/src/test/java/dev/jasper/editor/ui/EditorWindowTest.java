@@ -161,6 +161,30 @@ class EditorWindowTest {
         assertThat(handle.isSeparate()).isFalse();
     }
 
+    @Test void markdownActivationFollowsEachHostWindowAndMovesKeepPreviewState() throws Exception {
+        var first = opened(file("first.md", "# First"));
+        var firstHandle = host.contentTabs().getFirst();
+        first.markdown().mode(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        first.area().append(" dirty");
+        var document = first.area().getDocument();
+        var second = opened(file("second.md", "# Second"));
+        var secondHandle = host.contentTabs().getLast();
+        assertThat(first.markdown().active()).isFalse();
+        assertThat(second.markdown().active()).isTrue();
+        firstHandle.move(true);
+        assertThat(first.markdown().active()).isTrue();
+        assertThat(second.markdown().active()).as("another window keeps its active tab").isTrue();
+        assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        assertThat(first.area().getDocument()).isSameAs(document);
+        assertThat(first.area().getText()).contains("dirty");
+        firstHandle.move(false);
+        assertThat(first.markdown().active()).isTrue();
+        assertThat(second.markdown().active()).isFalse();
+        secondHandle.select();
+        assertThat(first.markdown().active()).isFalse();
+        assertThat(second.markdown().active()).isTrue();
+    }
+
     @Test void openingAFileThatIsStillLoadingSelectsItsTab() throws Exception {
         Path file = file("config.toml", "a = 1\n");
         window.openLocal(file);
