@@ -30,8 +30,8 @@ public final class WindowManager {
      * @param directory where its terminal tab starts; null for where a new shell starts
      * @param trigger what asked for it, for its start-up timing line
      * @param emptied what its content runs when its last tab has gone
-     * @param bounds where a child window opens on screen, a torn-out tab's (workspace tabs plan 5); empty for where the
-     *     platform puts it
+     * @param bounds where a child window's workspace opens on screen, a torn-out tab's (workspace tabs plan 5); empty
+     *     for where the platform puts it
      */
     public record Opening(WindowRole role, boolean empty, Path directory, String trigger, Runnable emptied,
                           Optional<Rectangle> bounds) {
@@ -81,6 +81,9 @@ public final class WindowManager {
     private final List<ChildWindow> children = new ArrayList<>();
     /** The windows that came to the front, the last one first. */
     private final List<JasperWindow> activations = new ArrayList<>();
+    /** The one tab drag of every window this manager opens (workspace tabs spec 12): it reaches them all, top first. */
+    private final TabDrag tabDrag = new TabDrag(() -> windowsByActivation().stream().map(JasperWindow::content).toList(),
+        (tab, bounds) -> moveToNewWindow(tab, bounds));
     private MainWindow main;
     private JasperWindow lastActive;
     private int openings;
@@ -157,6 +160,9 @@ public final class WindowManager {
         return List.copyOf(ordered);
     }
 
+    /** @return the tab drag every window of this manager shares */
+    TabDrag tabDrag() { return tabDrag; }
+
     /** @return the window that came to the front last while it is open; else the main window; else the first child window */
     public Optional<JasperWindow> lastActive() {
         if (lastActive != null && !lastActive.closed()) return Optional.of(lastActive);
@@ -221,11 +227,12 @@ public final class WindowManager {
     public Optional<ChildWindow> moveToNewWindow(Tab tab) { return moveToNewWindow(tab, null); }
 
     /**
-     * As {@link #moveToNewWindow(Tab)}, the new child window at {@code bounds} on screen: a tab torn out of its window
+     * As {@link #moveToNewWindow(Tab)}, the new child window's workspace at {@code bounds} on screen: a tab torn out of
+     * its window
      * (workspace tabs plan 5).
      *
      * @param tab a tab of one of these windows
-     * @param bounds where the new window goes on screen; null for where the platform puts it
+     * @param bounds where the new window's workspace goes on screen; null for where the platform puts it
      * @return the new child window; empty when the tab stayed
      */
     public Optional<ChildWindow> moveToNewWindow(Tab tab, Rectangle bounds) {
@@ -329,6 +336,8 @@ public final class WindowManager {
         try {
             WindowContent content = hooks.content().apply(opening);
             if (content == null) return Optional.empty();
+            // Every window drags tabs with the one drag, which reaches them all (workspace tabs spec 12).
+            content.tabDrag(tabDrag);
             window = make.apply(content);
             window.shell(hooks.frames().apply(window));
             // A torn-out tab's window opens where it was dropped (workspace tabs plan 5).

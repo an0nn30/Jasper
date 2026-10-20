@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import com.formdev.flatlaf.util.SystemInfo;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.dock.WorkspaceDropResolver;
@@ -10,7 +11,9 @@ import dev.jasper.ui.swing.NativeStyles;
 import java.awt.AWTEvent;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.Dimension;
 import java.awt.Frame;
+import java.awt.GraphicsConfiguration;
 import java.awt.KeyEventDispatcher;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
@@ -20,10 +23,13 @@ import java.awt.Window;
 import java.awt.event.AWTEventListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import javax.swing.AbstractButton;
 import javax.swing.JLayeredPane;
@@ -33,18 +39,22 @@ import javax.swing.SwingUtilities;
 /**
  * The tab drag (workspace tabs spec 12). A left press on a tab in a strip of either face that moves past the kit's tab
  * drag threshold ({@code TAB_REORDER_THRESHOLD}, 5 px by default) starts it. It is the strips' only drag, so reordering a
- * strip and moving a tab to another group are one gesture. It uses plain mouse events in screen coordinates, never AWT
- * drag and drop: Swing keeps sending the pressed component its drag events wherever the cursor goes, and synthetic events
- * drive it in tests. While it runs, {@link TabDragLabel} shows the tab's label beside the cursor and the target window's
- * layered pane shows where the tab would land ({@link DockDropOverlay}, from {@link WorkspaceDropResolver#landing});
- * nothing moves until the release.
- * <p>The target: of the windows under the cursor, the most recently active; over its workspace, the resolver's drop
- * unless it would change nothing; anywhere else in that window (its dock, chrome or title bar), and outside every
- * window, nothing. A pinned tab (a modal owner holds it in its window) takes targets in its own window only. Releasing
- * the left button carries the target out through the workspace's layout operations, which never touch a tab's content
- * or session. Releasing on no target, Esc, another press or a plain move (both mean Swing lost the release), the drag's
- * window losing the focus (a modal dialog, another application), and the dragged tab closing or leaving its window or
- * its group (a command moving it) end the drag without a drop. EDT only.
+ * strip, moving a tab to another group or window and tearing it out are one gesture. It uses plain mouse events in screen
+ * coordinates, never AWT drag and drop: Swing keeps sending the pressed component its drag events wherever the cursor
+ * goes, and synthetic events drive it in tests. While it runs, {@link TabDragLabel} shows the tab's label beside the
+ * cursor and the target window's layered pane shows where the tab would land ({@link DockDropOverlay}, from
+ * {@link WorkspaceDropResolver#landing}); nothing moves until the release.
+ * <p>The target: of the windows under the cursor that can take a drop (on macOS none in full screen but the drag's own),
+ * the most recently active; over its workspace, the resolver's drop unless it would change nothing; anywhere else in that
+ * window (its dock, chrome or title bar), and over any other window of Jasper's (Settings, About, a dialog), nothing;
+ * outside every window, a new child window whose workspace is the size of the tab's old group, with the tab where the
+ * cursor holds it and kept on the display there, except for a child window's only tab, whose window already is its own.
+ * A pinned tab (a modal owner holds it in its window) takes targets in its own window only. Releasing the left button
+ * carries the target out: within a window through the workspace's layout operations, into another window through the tab
+ * registry's moves, out of every window through the window manager's; none touches a tab's content or session.
+ * Releasing on no target, Esc, another press or a plain move (both mean Swing lost the release), the drag's window losing
+ * the focus (a modal dialog, another application), and the dragged tab closing or leaving its window or its group (a
+ * command moving it) end the drag without a drop. EDT only.
  */
 final class TabDrag {
     /** Where a release would put the dragged tab. */
@@ -56,14 +66,28 @@ final class TabDrag {
          * @param drop the drop over its workspace
          */
         record Into(WindowContent window, Drop drop) implements Target { }
+
+        /**
+         * Out of every window, into a new child window whose workspace takes {@code bounds}.
+         *
+         * @param bounds the new window's workspace on screen; its frame adds its title bar
+         */
+        record TearOut(Rectangle bounds) implements Target { }
     }
 
     /** How far right of and below the cursor the label's corner sits, so no window is ever under the pointer's tip. */
     static final int LABEL_OFFSET = 8;
 
     private final Supplier<List<WindowContent>> windows;
+    private final BiConsumer<Tab, Rectangle> tearOut;
     private final DockDropOverlay overlay = new DockDropOverlay();
     private final TabDragLabel label = new TabDragLabel();
+    /**
+     * Test seam: the frames on screen of Jasper's other showing windows (Settings, About, Licenses, a dialog, a popup),
+     * where a release drops nothing; none of the windows the drag reaches, nor the label's. Production reads
+     * {@link Window#getWindows()}, which a headless JVM leaves empty.
+     */
+    Supplier<List<Rectangle>> otherWindows = this::auxiliaryFrames;
     private final KeyEventDispatcher escape = this::dispatchKeyEvent;
     private final AWTEventListener lostRelease = this::lostRelease;
     /** The focus manager the Esc dispatcher went to, while a drag runs. */
@@ -73,14 +97,21 @@ final class TabDrag {
     private Tab tab;
     private Component source;
     private Point pressedAt;
+    /** Where the press held the tab, from the tab's top-left corner, and the tab's group's size: a tear-out's window. */
+    private Point grab;
+    private Dimension groupSize;
     private boolean dragging;
     /** End the drag when the dragged tab closes, or changes so that it is no longer where the press found it. */
     private Subscription closing, changed;
     private Optional<Target> target = Optional.empty();
 
-    /** @param windows the windows a drag can reach, the most recently active first */
-    TabDrag(Supplier<List<WindowContent>> windows) {
+    /**
+     * @param windows the windows a drag can reach, the most recently active first
+     * @param tearOut opens a new child window for a tab, its frame at screen bounds, or leaves the tab where it is
+     */
+    TabDrag(Supplier<List<WindowContent>> windows, BiConsumer<Tab, Rectangle> tearOut) {
         this.windows = Objects.requireNonNull(windows, "windows");
+        this.tearOut = Objects.requireNonNull(tearOut, "tearOut");
     }
 
     /** @return whether a drag runs: from the threshold to its release or its end */
@@ -102,11 +133,16 @@ final class TabDrag {
      */
     void pressed(GroupView group, Tab tab, MouseEvent event) {
         if (this.tab != null) cancel();
-        if (!SwingUtilities.isLeftMouseButton(event) || event.isPopupTrigger() || !group.tabs().contains(tab)) return;
+        int index = group.tabs().indexOf(tab);
+        List<Rectangle> places = group.tabBounds(group);
+        if (!SwingUtilities.isLeftMouseButton(event) || event.isPopupTrigger() || index < 0 || index >= places.size()) return;
         this.group = group;
         this.tab = tab;
         source = event.getComponent();
         pressedAt = screen(event);
+        Point inGroup = SwingUtilities.convertPoint(source, event.getPoint(), group);
+        grab = new Point(inGroup.x - places.get(index).x, inGroup.y - places.get(index).y);
+        groupSize = group.getSize();
     }
 
     /**
@@ -208,11 +244,15 @@ final class TabDrag {
         label.move(labelAt(at));
         target = Optional.empty();
         List<WindowContent> open = windows.get().stream().filter(window -> !window.closed()).toList();
-        OptionalInt under = WorkspaceDropResolver.windowAt(at, open.stream().map(TabDrag::onScreen).toList());
+        OptionalInt under = WorkspaceDropResolver.windowAt(at, open.stream().map(window -> onScreen(window, window == group.owner())).toList());
         if (under.isPresent()) {
             WindowContent window = open.get(under.getAsInt());
             // A pinned tab stays in its window, as the registry keeps it there: no other window takes it.
             if (!tab.pinned() || window == group.owner()) target = into(window, at);
+        } else if (WorkspaceDropResolver.windowAt(at, otherWindows.get()).isEmpty() && !tab.pinned()
+                && (group.owner().isMain() || group.owner().tabCount() > 1)) {
+            // Outside every window of Jasper's: a new child window, except for a child window's only tab (spec 12).
+            target = Optional.of(new Target.TearOut(tearOutBounds(at)));
         }
         showLanding();
     }
@@ -258,6 +298,8 @@ final class TabDrag {
         tab = null;
         source = null;
         pressedAt = null;
+        grab = null;
+        groupSize = null;
         target = Optional.empty();
         if (closing != null) {
             closing.close();
@@ -277,10 +319,63 @@ final class TabDrag {
         showLanding();
     }
 
-    /** Carries a release out: the window's workspace places the tab; its content and session are never touched. */
+    /**
+     * Carries a release out; nothing touches the tab's content or session. Within a window the workspace places the tab.
+     * Into another window the tab registry moves it (both windows' maximizes end, TAB_MOVED reports it, a child window it
+     * empties closes after the move): an edge drop straight into a new group beside its group, any other to the end of
+     * the window's active group, where the drop then puts it in place. Out of every window, the window manager's tear-out.
+     */
     private void drop(Tab moving, Target where) {
-        if (moving.closed() || !(where instanceof Target.Into into) || into.window().closed()) return;
-        into.window().workspace().drop(moving, into.drop());
+        if (moving.closed()) return;
+        switch (where) {
+            case Target.Into into -> {
+                WindowContent window = into.window();
+                if (window.closed()) return;
+                WorkspaceView workspace = window.workspace();
+                if (!workspace.contains(moving)) {
+                    if (into.drop() instanceof Drop.Edge edge) {
+                        window.tabRegistry().move(moving, window.id(), edge.group(), edge.side());
+                        return;
+                    }
+                    window.tabRegistry().move(moving, window.id());
+                    if (!workspace.contains(moving)) return;
+                }
+                workspace.drop(moving, into.drop());
+            }
+            case Target.TearOut out -> tearOut.accept(moving, out.bounds());
+        }
+    }
+
+    /**
+     * A tear-out's workspace on screen: the size of the tab's old group, with the tab where the cursor holds it, as
+     * IntelliJ and VS Code size a window from the content dragged out of it. The new frame grows it by its own title
+     * bar and keeps itself on the display there ({@code WindowFrame}).
+     */
+    private Rectangle tearOutBounds(Point at) {
+        return new Rectangle(at.x - grab.x, at.y - grab.y, groupSize.width, groupSize.height);
+    }
+
+    /**
+     * {@code bounds} kept on {@code usable}: no larger than it, then moved wholly onto it, as IntelliJ keeps a floating
+     * window on its screen; as they are when {@code usable} is empty (no display known). A torn-out window's frame
+     * keeps itself on its display through this.
+     */
+    static Rectangle fitted(Rectangle bounds, Rectangle usable) {
+        if (usable.isEmpty()) return new Rectangle(bounds);
+        int width = Math.min(bounds.width, usable.width), height = Math.min(bounds.height, usable.height);
+        int x = Math.max(usable.x, Math.min(bounds.x, usable.x + usable.width - width));
+        int y = Math.max(usable.y, Math.min(bounds.y, usable.y + usable.height - height));
+        return new Rectangle(x, y, width, height);
+    }
+
+    /** The frames on screen of Jasper's showing windows the drag does not reach, but the label's: see {@link #otherWindows}. */
+    private List<Rectangle> auxiliaryFrames() {
+        var reached = new HashSet<Component>();
+        for (WindowContent window : windows.get()) reached.add(outermost(window));
+        var frames = new ArrayList<Rectangle>();
+        for (Window window : Window.getWindows())
+            if (window.isShowing() && !reached.contains(window) && !label.owns(window)) frames.add(window.getBounds());
+        return frames;
     }
 
     /** Where the label's corner goes for the cursor at {@code at}. */
@@ -304,18 +399,40 @@ final class TabDrag {
     }
 
     /**
-     * {@code window}'s frame on screen, title bar and all: its native window's bounds, or its outermost component's for
-     * content in no native window; empty while it does not show or is minimized.
+     * {@code window}'s frame on screen, title bar and all, where it can take a drop: its native window's bounds (empty while
+     * it does not show, is minimized, or by {@link #dropFrame} is out of sight in full screen), or its outermost component's
+     * for content in no native window.
      */
-    private static Rectangle onScreen(WindowContent window) {
+    private static Rectangle onScreen(WindowContent window, boolean source) {
         Component top = outermost(window);
-        boolean shows = top instanceof Window frame
-            ? frame.isShowing() && !(frame instanceof Frame decorated && (decorated.getExtendedState() & Frame.ICONIFIED) != 0)
-            : top.isVisible();
-        if (!shows) return new Rectangle();
+        if (top instanceof Window frame) {
+            if (!frame.isShowing() || frame instanceof Frame decorated && (decorated.getExtendedState() & Frame.ICONIFIED) != 0)
+                return new Rectangle();
+            GraphicsConfiguration display = frame.getGraphicsConfiguration();
+            return dropFrame(frame.getBounds(), display == null ? null : display.getBounds(), source, SystemInfo.isMacOS);
+        }
+        if (!top.isVisible()) return new Rectangle();
         Point origin = new Point();
         SwingUtilities.convertPointToScreen(origin, top);
         return new Rectangle(origin, top.getSize());
+    }
+
+    /**
+     * Where a window takes drops. On macOS a window other than the drag's own whose frame is exactly its display's bounds is
+     * in full screen (which covers the menu bar too), on a Space of its own that the user cannot see while dragging from
+     * another window: it takes none. Java sees no other Space, so a window on one that is not in full screen still takes
+     * drops where its frame lies. Elsewhere a window covering its display is in sight (a tiling window manager's), so the
+     * rule is macOS's alone.
+     *
+     * @param frame the window's frame on screen
+     * @param display its display's bounds, or null when unknown
+     * @param source whether it is the drag's own window
+     * @param macOs whether this is macOS
+     * @return the frame, or an empty rectangle where it takes no drop
+     */
+    static Rectangle dropFrame(Rectangle frame, Rectangle display, boolean source, boolean macOs) {
+        if (macOs && !source && frame.equals(display)) return new Rectangle();
+        return new Rectangle(frame);
     }
 
     private static JLayeredPane layers(WindowContent window) {

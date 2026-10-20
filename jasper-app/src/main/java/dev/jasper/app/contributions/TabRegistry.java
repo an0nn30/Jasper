@@ -383,25 +383,44 @@ public final class TabRegistry {
      * @param window the window to move it to
      * @throws IllegalArgumentException when no workspace {@code window} is registered
      */
-    public void move(Tab tab, UUID window) {
+    public void move(Tab tab, UUID window) { move(tab, window, next -> next.attach().accept(tab)); }
+
+    /**
+     * As {@link #move(Tab, UUID)}, into a new group on {@code side} of {@code group} in that window: a tab dropped on a
+     * group's edge in another window (workspace tabs spec 12).
+     *
+     * @param tab the tab
+     * @param window the window to move it to
+     * @param group a group of that window
+     * @param side where the new group goes
+     * @throws IllegalArgumentException when no workspace {@code window} is registered
+     */
+    public void move(Tab tab, UUID window, GroupId group, Side side) {
+        Objects.requireNonNull(group, "group");
+        Objects.requireNonNull(side, "side");
+        move(tab, window, next -> next.attachBeside().attach(tab, group, side));
+    }
+
+    /** Moves {@code tab} to {@code window}, where {@code attach} shows it. */
+    private void move(Tab tab, UUID window, Consumer<WorkspaceHost> attach) {
         requireEdt();
         var next = hosts.get(Objects.requireNonNull(window, "window"));
         if (next == null) throw new IllegalArgumentException("No workspace " + window);
         if (tab.closed() || tab.pinned() || pending.contains(tab) || window.equals(tab.window())) return;
         var old = hosts.get(tab.window());
         if (old == null) return;
-        transfer(tab, old, next);
+        transfer(tab, old, next, attach);
     }
 
     /**
-     * Detaches the tab from {@code old} and attaches it to {@code next}, then selects it. A change listener that throws
-     * as the tab takes {@code next} leaves it in {@code old}, and its failure propagates. When {@code next} fails, the
-     * tab goes back to {@code old}, or another window, or stays in no window, and the failure propagates. When
-     * {@code old} fails to let the tab go, the move still goes on, so the tab is shown in the window it names, and that
-     * failure propagates afterwards. The window the tab left hears of the move after it, then the tab is selected
-     * (workspace plan 4a); a failure of either is kept behind the move's own.
+     * Detaches the tab from {@code old} and attaches it to {@code next} as {@code attach} does, then selects it. A
+     * change listener that throws as the tab takes {@code next} leaves it in {@code old}, and its failure propagates.
+     * When {@code next} fails, the tab goes back to {@code old}, or another window, or stays in no window, and the
+     * failure propagates. When {@code old} fails to let the tab go, the move still goes on, so the tab is shown in the
+     * window it names, and that failure propagates afterwards. The window the tab left hears of the move after it, then
+     * the tab is selected (workspace plan 4a); a failure of either is kept behind the move's own.
      */
-    private void transfer(Tab tab, WorkspaceHost old, WorkspaceHost next) {
+    private void transfer(Tab tab, WorkspaceHost old, WorkspaceHost next, Consumer<WorkspaceHost> attach) {
         // Change ownership before removal: an emptied old window may unregister itself synchronously.
         boolean wasActive = tab.active();
         tab.active(false);
@@ -422,7 +441,7 @@ public final class TabRegistry {
         try {
             try { old.detach().accept(tab); }
             catch (RuntimeException | Error leaving) { failure = leaving; }
-            try { next.attach().accept(tab); arrived = true; }
+            try { attach.accept(next); arrived = true; }
             catch (RuntimeException | Error attaching) {
                 failure = Tab.keep(failure, attaching);
                 rollbackAttach(next, tab, attaching);

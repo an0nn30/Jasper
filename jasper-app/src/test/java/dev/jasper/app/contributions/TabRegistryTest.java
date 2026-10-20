@@ -1,6 +1,7 @@
 package dev.jasper.app.contributions;
 
 import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.util.*;
@@ -262,6 +263,23 @@ class TabRegistryTest {
         assertThat(heard).as("closed: it goes nowhere").isEmpty();
         assertThatIllegalArgumentException().isThrownBy(() -> registry.move(tab, UUID.randomUUID())).withMessageStartingWith("No workspace");
     }
+    /** Workspace tabs spec 12: a tab dropped on a group's edge in another window lands beside that group, as a move. */
+    @Test void aTabMovesIntoANewGroupBesideAGroupOfAnotherWindow() {
+        var beside = new ArrayList<String>();
+        var group = GroupId.random();
+        registry.addHost(new WorkspaceHost(main, mounted::add, mounted::remove, tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(detached, mounted::add, mounted::remove, tab -> {}, () -> {}, tab -> Optional.empty(),
+            (tab, at, side) -> { beside.add(tab.title() + " " + at.equals(group) + " " + side + " moving " + tab.moving()); mounted.add(tab); }));
+        registry.windows(windows(main, detached));
+        var tab = registry.open("plugin.file", "notes", "Notes", main, new JPanel());
+        registry.move(tab, detached, group, Side.DOWN);
+        assertThat(beside).containsExactly("Notes true DOWN moving true");
+        assertThat(tab.window()).isEqualTo(detached);
+        assertThat(tab.moving()).isFalse();
+        registry.move(tab, detached, group, Side.UP);
+        assertThat(beside).as("a tab already there stays").hasSize(1);
+    }
+
     @Test void failedOpenLeavesNoEntryAndSameKeyCanMountAgain() {
         var fail = new boolean[] {true};
         registry.addHost(new WorkspaceHost(main, tab -> {

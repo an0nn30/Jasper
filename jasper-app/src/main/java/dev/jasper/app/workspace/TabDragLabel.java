@@ -68,6 +68,9 @@ final class TabDragLabel {
         }
     }
 
+    /** @return whether {@code other} is the label's own window */
+    boolean owns(Window other) { return window != null && window == other; }
+
     /** @return whether the label shows */
     boolean showing() { return location != null; }
 

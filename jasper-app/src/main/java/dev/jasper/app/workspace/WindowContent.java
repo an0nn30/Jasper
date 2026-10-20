@@ -111,8 +111,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final DockStripe leftStripe, rightStripe;
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
-    /** Drags a tab from any of this window's strips (workspace tabs spec 12). */
-    private final TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this));
+    /**
+     * Drags a tab from any of this window's strips (workspace tabs spec 12): the window manager's, which every window it
+     * opens shares; until it gives that, one of this window's own, which drops within this window and tears nothing out.
+     */
+    private TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this), (tab, bounds) -> { });
     private UiState uiState = UiState.inMemory();
     private boolean railVisible = true;
     /** False once {@link #forgetLayout} ran: closing then saves nothing. */
@@ -1137,6 +1140,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     DockDrag dockDrag() { return dockDrag; }
     /** The tab drag this window's strips start. */
     TabDrag tabDrag() { return tabDrag; }
+    /** Shares the window manager's tab drag; a drag of this window's own ends first. */
+    void tabDrag(TabDrag shared) {
+        tabDrag.cancel();
+        tabDrag = Objects.requireNonNull(shared, "shared");
+    }
     boolean railVisible() { return railVisible; }
 
     void setRailVisible(boolean value) {

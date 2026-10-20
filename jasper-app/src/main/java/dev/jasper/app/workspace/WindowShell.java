@@ -18,7 +18,8 @@ import java.util.function.Supplier;
  * @param discard disposes the frame and remembers nothing: a window that failed to open
  * @param window the frame, for parenting dialogs; null in a headless test
  * @param owns whether a component is the frame or sits inside it
- * @param place puts the frame at screen bounds before it first shows: a torn-out tab's window (workspace tabs plan 5)
+ * @param place puts the frame, before it first shows, so that its workspace takes screen bounds: a torn-out tab's
+ *     window (workspace tabs plan 5)
  */
 public record WindowShell(Runnable show, Runnable toFront, Runnable dispose, Runnable discard, Supplier<Window> window,
                           Predicate<Component> owns, Consumer<Rectangle> place) {

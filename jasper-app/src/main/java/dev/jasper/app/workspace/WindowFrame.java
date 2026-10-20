@@ -10,6 +10,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GraphicsEnvironment;
 import java.awt.Insets;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.WindowAdapter;
@@ -135,7 +136,29 @@ public final class WindowFrame {
 
     /** @return what this frame does for its window */
     public WindowShell shell() {
-        return new WindowShell(this::show, this::toFront, this::dispose, this::discard, () -> frame, this::owns, frame::setBounds);
+        return new WindowShell(this::show, this::toFront, this::dispose, this::discard, () -> frame, this::owns, this::placeWorkspace);
+    }
+
+    /**
+     * Puts the frame, before it first shows, so that its workspace takes {@code workspace} on screen: the workspace
+     * grown by the chrome the packed frame has around it (its title bar: the system's, the unified macOS bar or
+     * FlatLaf's title pane), then kept on the usable part of the display there. A torn-out tab's window (workspace tabs
+     * plan 5).
+     */
+    private void placeWorkspace(Rectangle workspace) {
+        // Laid out at the frame's present size: the constructor may have resized it after pack().
+        frame.validate();
+        JComponent area = content.workspace();
+        Point corner = SwingUtilities.convertPoint(area, 0, 0, frame);
+        int chromeWidth = frame.getWidth() - area.getWidth(), chromeHeight = frame.getHeight() - area.getHeight();
+        Rectangle bounds = new Rectangle(workspace.x - corner.x, workspace.y - corner.y, workspace.width + chromeWidth,
+            workspace.height + chromeHeight);
+        java.awt.GraphicsConfiguration display = frame.getGraphicsConfiguration();
+        for (var device : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
+            java.awt.GraphicsConfiguration candidate = device.getDefaultConfiguration();
+            if (candidate.getBounds().contains(workspace.getLocation())) display = candidate;
+        }
+        frame.setBounds(TabDrag.fitted(bounds, usableBounds(display)));
     }
 
     /** @return the native window, for painting the warm-up rehearsal */
