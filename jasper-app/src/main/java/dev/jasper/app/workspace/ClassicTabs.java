@@ -93,6 +93,8 @@ final class ClassicTabs extends JPanel implements TabStrip {
 
     @Override public void close() { disposed = true; entries.clear(); removeAll(); selected = null; }
 
+    @Override public List<Rectangle> tabBounds() { return entries.stream().map(Entry::getBounds).toList(); }
+
     List<Entry> entries() { return List.copyOf(entries); }
     JComponent add() { return add; }
 

@@ -104,6 +104,12 @@ final class WindowTabs extends JPanel implements TabStrip {
         return menu;
     }
 
+    @Override public List<Rectangle> tabBounds() {
+        var bounds = new ArrayList<Rectangle>(order.size());
+        for (Tab tab : order) bounds.add(SwingUtilities.convertRectangle(viewport, entries.get(tab).getBounds(), this));
+        return bounds;
+    }
+
     @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(group.owner().tabHeight())); }
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 

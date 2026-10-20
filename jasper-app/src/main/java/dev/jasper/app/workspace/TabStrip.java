@@ -1,6 +1,8 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.AnimationSettings;
+import java.awt.Rectangle;
+import java.util.List;
 import javax.swing.JComponent;
 import javax.swing.JPopupMenu;
 
@@ -20,6 +22,8 @@ sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs 
     void setAnimations(AnimationSettings settings);
     /** The group's tabs, as a menu of literal titles of at most {@code WindowTabs.TITLE_LIMIT} characters. */
     JPopupMenu tabList();
+    /** Each tab's rectangle in this strip's coordinates, in its group's tab order: a tab drag drops between them. */
+    List<Rectangle> tabBounds();
     /** Releases the tabs. */
     @Override void close();
 }

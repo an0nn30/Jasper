@@ -98,6 +98,10 @@ final class GroupView extends JPanel {
     Rectangle stripBounds(Component target) { return SwingUtilities.convertRectangle(this, strip.component().getBounds(), target); }
     /** The card area's rectangle in {@code target}'s coordinates. */
     Rectangle contentBounds(Component target) { return SwingUtilities.convertRectangle(this, cards.getBounds(), target); }
+    /** Each tab's rectangle in the strip, in strip order, in {@code target}'s coordinates: a tab drag drops between them. */
+    List<Rectangle> tabBounds(Component target) {
+        return strip.tabBounds().stream().map(bounds -> SwingUtilities.convertRectangle(strip.component(), bounds, target)).toList();
+    }
 
     /** The group left the layout: its strip is released and its card area keeps no tab. */
     void close() {
