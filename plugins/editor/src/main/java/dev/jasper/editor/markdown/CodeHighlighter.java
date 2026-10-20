@@ -47,10 +47,13 @@ final class CodeHighlighter {
         if (maker == null) { MarkdownRenderer.text(out, line); return; }
         char[] chars = line.toCharArray();
         var segment = new Segment(chars, 0, chars.length);
-        int next = maker.getLastTokenTypeOnLine(segment, state);
         var token = maker.getTokenList(segment, state, 0);
-        for (; token != null && token.isPaintable(); token = token.getNextToken()) {
+        int next = TokenTypes.NULL;
+        for (; token != null; token = token.getNextToken()) {
             if (Thread.currentThread().isInterrupted()) throw new CancellationException("Markdown highlighting interrupted");
+            // The final token carries continuation state even when it has no paintable text.
+            next = token.getType();
+            if (!token.isPaintable()) continue;
             var role = TokenRoles.role(token.getType());
             if (role == null) MarkdownRenderer.text(out, token.getLexeme());
             else {
