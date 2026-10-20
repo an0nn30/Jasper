@@ -1,8 +1,8 @@
-# Windows Cygwin integration probes
+# Windows Cygwin integration
 
-These are development probes for the approved bundled-Cygwin design. They do not
-add Cygwin to Jasper yet. `check` runs their portable evidence checks; native
-probes are explicit tasks and fail on non-Windows hosts.
+The production integration uses a persistent per-user root and prebuilt POSIX PTY
+relay. `check` runs portable lifecycle and launch checks; native probes are explicit
+tasks and fail on non-Windows hosts. The final distribution seed remains in preparation.
 
 ## Portable verification
 
@@ -106,14 +106,13 @@ Sources for the candidate hook and Setup flags:
 The terminal probe uses a separate JVM, checks initial dimensions, and waits for
 both command results and the next Bash prompt. It then requires twenty immediate
 resize/write cycles. Native testing reproduces first-character input loss despite
-the initial size query; production launch remains gated. See
+the initial size query; the production adapter therefore uses the POSIX PTY relay. See
 [the evidence record](../../../docs/superpowers/plans/2026-10-20-jasper-cygwin-probe-results.md).
 
-The approved implementation plan requires native evidence before production
-packaging or shell integration starts. Run both probes on Windows x64 and ARM64;
-retain failures as evidence for revising the hook or launch mechanism.
+The user authorized production integration after relay validation on Windows ARM64
+and x64 emulation. Native x64 Windows and interactive-app acceptance remain release checks.
 
-## Experimental POSIX PTY relay
+## POSIX PTY relay
 
 The user authorized this investigation after direct Cygwin console input lost
 characters during resize. The experiment keeps the existing terminal facade:
@@ -141,4 +140,17 @@ using a unique temporary backend executable.
 Production integration requires pinned prebuilt frontends for both Windows
 architectures and one x86_64 Cygwin backend, with hashes, sources and notices.
 The Gradle user installer must consume those artifacts without a native compiler.
-The experiment has not yet been wired into shipped shell profiles or installers.
+The production `cygwin` shell profile uses the verified manager generation's relay.
+`probeCygwinProduction` takes `jasper.cygwinProbeRoot` (new directory) and
+`jasper.cygwinProbeRuntime` (existing probe Cygwin root). It copies the runtime into
+an isolated fixture, then exercises `CygwinLaunch`, the bundled bootstrap, launch
+leases and exclusion of a renamed external process loading the owned Cygwin DLL.
+Its small fixture manifest tests launch validation; distribution acceptance uses the real seed.
+
+`verifyCygwinManifest`, `verifyCygwinLifecycle`, and `verifyCygwinProvisioning` run
+portable manifest, ownership, concurrency and preservation checks. `stageCygwinSeed`
+requires `-Pjasper.cygwinSnapshot=<retained snapshot>` and the checked-in seed lock;
+missing or mismatched artifacts fail the build. `cygwinToolJar` packages the shared
+helper used by MSI, `installWindowsUser`, and `provision-cygwin.cmd`. Neither installer
+compiles the relay. The Windows settings button and palette action start a copied
+supervisor runtime so app replacement does not interrupt package management.

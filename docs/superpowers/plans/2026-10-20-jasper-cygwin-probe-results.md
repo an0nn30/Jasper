@@ -215,3 +215,12 @@ frontend. Six reports/session evidence files were exported to
 report remains historical; its semicolon-bearing OSC title truncated the evidence.
 Final scoped Gradle checks pass: 31 portable assertions, helper runtime check and
 native protocol checks. Source hygiene and `git diff --check` pass.
+
+
+## Production integration — 2026-10-20
+
+Actual `CygwinLaunch.prepare` and bundled Bash integration pass in fresh `production-launch-arm64-03` and `production-launch-x64-03` fixtures in the authorized Windows VM: startup/profile/cwd, OSC 7/133, Unicode, twenty immediate resize/input cycles, wrapping, native cmd, Ctrl+C and clean exit. A renamed external executable loading the owned Cygwin DLL is correctly excluded from concurrent management. Lifecycle verification passes 34 checks on each guest JBR and 35 portable checks (the extra symlink case is non-Windows). x64 execution is emulated on ARM64 Windows.
+
+Independent review's six findings were fixed with regressions: abandoned manager requests, interrupted initialization, saved-profile startup fallback, case-insensitive environment precedence, stale staged artifacts and retained manager runtime cleanup. Manifest, provisioning, resolver (five tests), user-install (30 checks), launch and focused UI checks pass. Full headless check reports the same three baseline editor failures: ThemeMigrationCoverageTest, EditorDocumentPreservationTest and SettingsPagesMockTest.
+
+Remaining: approve the seed lock and source/license inventory (205 candidate archives retained and verified, 114 packages/91 source archives), then run real seeded production MSI/user-install and package-management acceptance. Native x64 Windows and interactive-app validation remain release checks. Windows distribution staging requires the approved lock and retained snapshot; this milestone is not a completed distribution.

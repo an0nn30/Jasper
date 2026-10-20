@@ -14,7 +14,10 @@ import java.util.function.Supplier;
  * @param refresh asks for detection to run again
  * @param onChanged calls a listener after each change until its subscription closes
  */
-public record ShellChoices(Supplier<List<Choice>> choices, Runnable refresh, Function<Runnable, Subscription> onChanged) {
+public record ShellChoices(Supplier<List<Choice>> choices, Runnable refresh, Function<Runnable, Subscription> onChanged, java.util.Optional<Runnable> manageCygwin) {
+    public ShellChoices(Supplier<List<Choice>> choices, Runnable refresh, Function<Runnable, Subscription> onChanged) {
+        this(choices, refresh, onChanged, java.util.Optional.empty());
+    }
     /** The profile id the Custom entry stands for. */
     public static final String CUSTOM = "custom";
     /** No detected shells, for pages built without an application: only Custom. */
@@ -24,6 +27,7 @@ public record ShellChoices(Supplier<List<Choice>> choices, Runnable refresh, Fun
         Objects.requireNonNull(choices, "choices");
         Objects.requireNonNull(refresh, "refresh");
         Objects.requireNonNull(onChanged, "onChanged");
+        Objects.requireNonNull(manageCygwin, "manageCygwin");
     }
 
     /**

@@ -35,6 +35,17 @@ class ShellProfilesTest {
         assertThat(bare.get(1).command()).as("no ComSpec").containsExactly("cmd.exe");
     }
 
+    @Test void cygwinIsWindowsOnlyAndFollowsCommandPrompt() {
+        var profiles = ShellProfiles.available("Windows 11", WINDOWS_ENV, List.of(new WslDistro("Ubuntu", 2, true)),
+            Optional.empty(), Optional.of("C:\\Users\\test\\cygwin\\root\\bin\\bash.exe"), DEFAULT);
+        assertThat(profiles).extracting(ShellProfile::id).containsExactly("powershell", "cmd", "cygwin", "wsl:Ubuntu", "custom");
+        assertThat(profiles.get(2).name()).isEqualTo("Cygwin Bash");
+        assertThat(ShellProfiles.available("Linux", Map.of(), List.of(), Optional.empty(), Optional.of("/fake/bash"), DEFAULT))
+            .extracting(ShellProfile::id).doesNotContain("cygwin");
+        assertThat(ShellProfiles.resolve(Optional.of("cygwin"), List.of(), false, "Windows 11", WINDOWS_ENV, DEFAULT).profile().id())
+            .isEqualTo("cygwin");
+    }
+
     @Test void macOsAndLinuxOfferTheLoginShellAndCustom() {
         var profiles = ShellProfiles.available("Mac OS X", Map.of("SHELL", "/opt/homebrew/bin/fish"),
             List.of(new WslDistro("Ubuntu", 2, false)), Optional.of("pwsh"), new TerminalConfig.Shell("/bin/zsh", List.of("-i")));

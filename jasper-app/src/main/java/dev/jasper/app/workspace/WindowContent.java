@@ -133,6 +133,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private WindowTerminals terminals;
     private boolean active = true;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
+    public Runnable onManageCygwinPackages;
     private Runnable openSettings, reloadConfiguration, migrateConfiguration;
     private java.util.function.Function<dev.jasper.app.config.SettingsEdit, java.util.concurrent.CompletableFuture<?>> saveSettings;
     private Consumer<String> openSettingsAt;

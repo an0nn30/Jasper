@@ -27,7 +27,7 @@ class ShortcutHelpTest {
             var base = KeyBindings.withOverrides(true, Map.of("new_tab", "cmd+y", "copy", "none",
                 "dev.test.remote.connect", "ctrl+alt+h"));
             var rows = ShortcutCatalog.rows(base, contributions.actions(), Map.of("dev.test.remote", "Remote"), true);
-            assertThat(rows.stream().map(ShortcutEntry::id)).containsAll(List.of(ActionId.values()).stream().map(ActionId::id).toList());
+            assertThat(rows.stream().map(ShortcutEntry::id)).containsAll(List.of(ActionId.values()).stream().filter(id -> id.availableOn(System.getProperty("os.name", ""))).map(ActionId::id).toList());
             assertThat(rows).filteredOn(row -> row.id().equals("new_tab")).singleElement()
                 .satisfies(row -> assertThat(ShortcutText.format(row.stroke())).isEqualTo("Cmd+Y"));
             assertThat(rows).filteredOn(row -> row.id().equals("copy")).singleElement()

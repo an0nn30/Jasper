@@ -42,14 +42,16 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
     /** These settings with {@code variables} added last, over everything they resolved. */
     public LaunchSettings withVariables(Map<String, String> variables) {
         if (variables.isEmpty()) return this;
-        var merged = new HashMap<>(environment);
-        merged.putAll(variables);
+        boolean cygwin = profile.id().equals(ShellProfiles.CYGWIN);
+        var merged = new HashMap<>(environmentNames(environment, cygwin));
+        merged.putAll(environmentNames(variables, cygwin));
         return new LaunchSettings(command, merged, columns, lines, scrollback, profile);
     }
 
     /** These settings running {@code program} instead of the shell: the same environment, profile and grid. */
     public LaunchSettings withCommand(List<String> program) {
-        return new LaunchSettings(program, environment, columns, lines, scrollback, profile);
+        return new LaunchSettings(program, environment, columns, lines, scrollback, profile)
+            .withVariables(profile.id().equals(ShellProfiles.CYGWIN) ? Map.of("JASPER_CYGWIN_SKIP_RELAY", "1") : Map.of());
     }
 
     /** Where a launch runs: the PTY's directory, and the settings with a WSL profile's {@code --cd} argument added. */
@@ -88,7 +90,8 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
                                   Function<Map<String, String>, Map<String, String>> contributions) {
         TerminalConfig terminal = snapshot.terminal();
         var command = new ArrayList<>(profile.command());
-        var environment = new HashMap<>(inherited);
+        boolean cygwin = profile.id().equals(ShellProfiles.CYGWIN);
+        var environment = new HashMap<>(environmentNames(inherited, cygwin));
         // JASPER_* goes too: the scripts export JASPER_INTEGRATION_LOADED and return early when they
         // see it, so a Jasper launched from an integrated pane would get no marks in any pane.
         environment.keySet().removeIf(name -> name.equals("TERM_PROGRAM") || name.equals("TERM_PROGRAM_VERSION")
@@ -102,8 +105,8 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
         if (integrationDir != null && terminal.shellIntegration() != ShellIntegrationMode.OFF) {
             environment.put("JASPER_SHELL_INTEGRATION", integrationDir.toString());
         }
-        if (profile.kind() != ShellProfile.Kind.WSL) environment.putAll(contributions.apply(inherited));
-        environment.putAll(terminal.env());
+        if (profile.kind() != ShellProfile.Kind.WSL) environment.putAll(environmentNames(contributions.apply(inherited), cygwin));
+        environment.putAll(environmentNames(terminal.env(), cygwin));
         if (osName.toLowerCase(Locale.ROOT).startsWith("mac")
                 && environment.getOrDefault("LANG", "").isBlank()) {
             environment.put("LANG", "en_US.UTF-8");
@@ -134,7 +137,19 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
                 // A [terminal.env] value that is not a path: the variables only, as for any other program.
             }
         }
+        if (profile.id().equals(ShellProfiles.CYGWIN)) {
+            environment.put("JASPER_CYGWIN_MODE", terminal.shellIntegration().name().toLowerCase(Locale.ROOT));
+            if (integrationDir != null) environment.put("JASPER_CYGWIN_BOOTSTRAP", integrationDir.toString());
+            if (terminal.env().keySet().stream().anyMatch(key -> key.equalsIgnoreCase("HOME"))) environment.put("JASPER_CYGWIN_HOME_OVERRIDE", "1");
+        }
         return new LaunchSettings(command, environment, windowColumns, windowLines, terminal.scrollback(), profile);
+    }
+
+    private static Map<String,String> environmentNames(Map<String,String> values, boolean windowsNames) {
+        if (!windowsNames) return values;
+        var normalized = new HashMap<String,String>();
+        values.forEach((name, value) -> normalized.put(name.toUpperCase(Locale.ROOT), value));
+        return normalized;
     }
 
     /** {@code existing} WSLENV entries, then each of {@code entries} whose variable is not already listed. */
@@ -177,7 +192,8 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
         }
         if (onShare) return new Start(home, this);
         if (!isDirectory.test(directory)) throw new IllegalArgumentException("Directory is unavailable: " + directory);
-        return new Start(directory, this);
+        return new Start(directory, profile.id().equals(ShellProfiles.CYGWIN) && requested.isPresent()
+            ? withVariables(Map.of("JASPER_CYGWIN_START_DIRECTORY", requested.get().toString())) : this);
     }
 
     /**

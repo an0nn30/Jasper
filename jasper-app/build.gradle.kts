@@ -12,6 +12,7 @@ dependencies {
     testImplementation(project(":jasper-sdk-testkit"))
     testImplementation(testFixtures(project(":jasper-sdk-testkit")))
     implementation("org.tomlj:tomlj:1.1.1")
+    implementation("net.java.dev.jna:jna-platform:5.14.0")
     implementation("com.formdev:flatlaf:3.7")
     implementation("org.jetbrains.runtime:jbr-api:1.9.0")
     implementation("com.formdev:flatlaf-extras:3.7")

@@ -65,6 +65,10 @@ public final class UserInstallTest {
             equal("updated", Files.readString(directory.resolve("Jasper.exe")));
             equal(directory.resolve("Jasper.exe").toString(), desktop.target(shortcut));
             desktop.failSave = false;
+            fails(() -> installer.install(source, directory, shortcut, image -> { throw new IllegalStateException("Cygwin failed"); }));
+            equal("updated", Files.readString(directory.resolve("Jasper.exe")));
+            equal(directory.resolve("Jasper.exe").toString(), desktop.target(shortcut));
+            equal("user data", Files.readString(data));
             desktop.stopped = false;
             fails(() -> installer.install(source, directory, shortcut));
             fails(() -> installer.uninstall(directory, shortcut));

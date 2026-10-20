@@ -1,10 +1,10 @@
 # Jasper bundled Cygwin for Windows
 
 Status: approved by the user on 2026-10-20. The [implementation plan](../plans/2026-10-20-jasper-bundled-cygwin.md)
-is approved for execution. Task 1 installer probes pass in the Windows VM; repeated-resize input loss
-keeps the terminal launch gate open before production work begins. The user authorized
-a dedicated POSIX PTY relay investigation; its candidate mechanism and evidence are
-recorded below and in the probe results.
+is approved for execution. The user authorized production POSIX PTY relay integration on
+2026-10-20 after the relay resolved repeated-resize input loss. Production launch probes
+pass on native ARM64 and x64 emulation. Native x64 Windows and interactive-app acceptance
+remain outstanding release checks; seed/source inventory and installer acceptance are in progress.
 
 ## 1. Outcome and scope
 
