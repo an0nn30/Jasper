@@ -245,32 +245,64 @@ class ParentTabBarTest {
         });
     }
 
-    @Test void enterpriseAlwaysShowsTheBarAndItsPlusOpensAParentTab() throws Exception {
+    /** The names of the entries {@code strip} lists, in order. */
+    private static List<String> names(ClassicTabs strip) {
+        return strip.entries().stream().map(entry -> entry.getAccessibleContext().getAccessibleName()).toList();
+    }
+
+    /**
+     * The user's decision of 2026-10-20: Enterprise never shows a parent-tab bar. Each pane's strip is the window's only
+     * tab row; New Tab (Cmd+T and the toolbar's New Session) opens a parent tab, whose tabs the row then shows alone, and
+     * Select Parent Tab 1 (Cmd+1) shows the first parent tab's tab again.
+     */
+    @Test void enterpriseShowsNoParentTabBarAndItsOnlyTabRowIsThePanesStrip() throws Exception {
         edt(() -> {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 var owner = DesktopTestSupport.content(idleLauncher(pending), themes, ClassicTabsTest.classic());
+                owner.currentTerminal().rename("first");
+                owner.update();
                 var bar = (ClassicTabs) owner.parentTabBar();
-                assertThat(bar.isVisible()).as("one parent tab: the bar shows").isTrue();
-                assertThat(bar.add().getToolTipText()).as("the bar's + opens a parent tab").isEqualTo("New Tab");
+                assertThat(bar.isVisible()).as("one parent tab: no bar").isFalse();
+                var pane = (ClassicTabs) owner.tabBar();
+                assertThat(pane).as("a pane's strip is another strip").isNotSameAs(bar);
+                assertThat(pane.component().isVisible()).as("the pane's strip is the only tab row").isTrue();
+                assertThat(names(pane)).containsExactly("first");
+                ParentTabId first = owner.activeParentTab();
+
+                owner.invoke(ActionId.NEW_TAB);
+                owner.currentTerminal().rename("second");
+                owner.update();
+                assertThat(owner.parentTabCount()).as("New Tab opens a parent tab").isEqualTo(2);
+                assertThat(bar.isVisible()).as("two parent tabs: still no bar").isFalse();
+                assertThat(owner.tabBar().component().isVisible()).isTrue();
+                assertThat(names((ClassicTabs) owner.tabBar())).as("the row shows only the new parent tab's tab").containsExactly("second");
+
+                owner.invoke(ActionId.NEW_TAB);
+                owner.currentTerminal().rename("third");
+                owner.update();
+                assertThat(owner.parentTabCount()).isEqualTo(3);
+                assertThat(bar.isVisible()).as("three parent tabs: still no bar").isFalse();
+                assertThat(names((ClassicTabs) owner.tabBar())).containsExactly("third");
+
+                owner.invoke(ActionId.SELECT_PARENT_TAB_1);
+                assertThat(owner.activeParentTab()).isEqualTo(first);
+                assertThat(bar.isVisible()).isFalse();
+                assertThat(names((ClassicTabs) owner.tabBar())).as("Select Parent Tab 1 shows the first parent tab's tab again")
+                    .containsExactly("first");
+                assertThat(owner.tabBar().component().isVisible()).isTrue();
+
+                // No visible bar exercises the bar's two names; the source gives them.
+                assertThat(owner.parentTabs().bar().newTabName()).isEqualTo("New Tab");
+                assertThat(owner.parentTabs().bar().closeName()).isEqualTo("Close Parent Tab");
                 assertThat(((ClassicTabs) owner.tabBar()).add().getToolTipText()).as("a pane's + stacks in its pane")
                     .isEqualTo("New Tab in Pane");
-                assertThat(bar.entries()).hasSize(1);
-                assertThat(bar.entries().getFirst().getAccessibleContext().getAccessibleAction().getAccessibleActionDescription(1))
-                    .as("the bar's × closes a parent tab").isEqualTo("Close Parent Tab");
-                assertThat(((ClassicTabs) owner.tabBar()).entries().getFirst().getAccessibleContext().getAccessibleAction()
-                    .getAccessibleActionDescription(1)).as("a pane's × closes a tab").isEqualTo("Close tab");
-                ((AbstractButton) bar.add()).doClick();
-                assertThat(owner.parentTabCount()).as("its + opens a parent tab").isEqualTo(2);
-                assertThat(bar.entries()).hasSize(2);
-                assertThat(owner.tabBar()).as("and the pane's strip shows under it").isInstanceOf(ClassicTabs.class).isNotSameAs(bar);
-                assertThat(owner.tabBar().component().isVisible()).isTrue();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
 
-    /** Review Focus 3. */
-    @Test void enterprisesBarShowsNoEntryForTheEmptyMainWorkspace() throws Exception {
+    /** Review Focus 3, under the 2026-10-20 one-row rule: the main window's empty workspace shows no bar, and New Tab fills it. */
+    @Test void enterprisesEmptyMainWorkspaceShowsNoBarAndNewTabFillsIt() throws Exception {
         edt(() -> {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
@@ -278,11 +310,13 @@ class ParentTabBarTest {
                 var main = track(new WindowContent(WindowRole.MAIN, idleLauncher(pending), null, true, path -> { }, () -> { },
                     () -> { }, themes, KeyBindings.defaults(macOs), new CommandHistory(), macOs, ClassicTabsTest.classic()));
                 var bar = (ClassicTabs) main.parentTabBar();
-                assertThat(bar.isVisible()).isTrue();
+                assertThat(bar.isVisible()).as("no bar over the empty workspace").isFalse();
                 assertThat(bar.entries()).as("its only parent tab is empty").isEmpty();
-                ((AbstractButton) bar.add()).doClick();
-                assertThat(main.parentTabCount()).as("its + fills the empty workspace").isEqualTo(1);
-                assertThat(bar.entries()).hasSize(1);
+                main.invoke(ActionId.NEW_TAB);
+                assertThat(main.parentTabCount()).as("New Tab fills the empty workspace").isEqualTo(1);
+                assertThat(bar.isVisible()).as("and still no bar").isFalse();
+                assertThat(((ClassicTabs) main.tabBar()).entries()).hasSize(1);
+                assertThat(main.tabBar().component().isVisible()).isTrue();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }

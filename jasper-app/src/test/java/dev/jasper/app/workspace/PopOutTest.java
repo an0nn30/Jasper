@@ -188,15 +188,15 @@ class PopOutTest {
         windows.launch();
     }
 
-    /** Spec 7: Enterprise always shows the parent-tab bar, but a pane window has none. */
-    @Test void enterprisesPaneWindowShowsNoParentTabBar() throws Exception {
+    /** Spec 7, by the user's decision of 2026-10-20: Enterprise shows no parent-tab bar in any window. */
+    @Test void enterpriseShowsNoParentTabBarInAnyWindow() throws Exception {
         edt(() -> {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 boolean macOs = System.getProperty("os.name").startsWith("Mac");
                 var pane = track(new WindowContent(WindowRole.CHILD, idleLauncher(new ArrayDeque<>()), null, true, path -> { },
                     () -> { }, () -> { }, themes, KeyBindings.defaults(macOs), new CommandHistory(), macOs, ClassicTabsTest.classic()));
-                assertThat(pane.parentTabBar().component().isVisible()).as("as a full window's").isTrue();
+                assertThat(pane.parentTabBar().component().isVisible()).as("as a full window's").isFalse();
                 pane.paneWindow(new Origin(ParentTabId.random(), GroupId.random(), Side.RIGHT, 0.5));
                 assertThat(pane.parentTabBar().component().isVisible()).isFalse();
                 pane.newTab(HOME);

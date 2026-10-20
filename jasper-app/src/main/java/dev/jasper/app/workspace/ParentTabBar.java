@@ -12,10 +12,10 @@ import javax.swing.JPopupMenu;
 /**
  * A window's parent-tab bar (parent tabs spec 7): the look's strip over the window's parent tabs, each shown as its
  * active tab, as terminal apps title a tab by its active pane (spec 4). It shows while the look says so for the window's
- * count of parent tabs: from two under the equal tabs, always under the classic tabs, which show no entry for the main
- * window's empty workspace. A click shows a parent tab, its close button and its menu close one after its tabs' guards,
- * the classic "+" is New Tab. A press on an entry may start the tab drag, which carries the whole parent tab (parent
- * tabs spec 5); the entries never slide, and a drop puts them in their new places at once. EDT only.
+ * count of parent tabs: from two under the equal tabs, never under the classic tabs, whose pane strips are the only tab
+ * row (the user's decision of 2026-10-20). A click shows a parent tab, its close button and its menu close one after
+ * its tabs' guards. A press on an entry may start the tab drag, which carries the whole parent tab (parent tabs spec 5);
+ * the entries never slide, and a drop puts them in their new places at once. EDT only.
  */
 final class ParentTabBar implements StripSource {
     private final WindowContent owner;

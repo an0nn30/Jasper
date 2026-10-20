@@ -4,6 +4,7 @@ Status: **Approved on 2026-10-19** (the user: "Spec approved. Write the parent-t
 [`2026-10-16-jasper-workspace-tabs-design.md`](2026-10-16-jasper-workspace-tabs-design.md) (the workspace tabs spec,
 "spec" below) in sections 1, 6, 7, 8, 10, 11, 12, 13, 14 and 15. Where the two disagree, this document wins. It lands
 after plan 5 and before plans 6a and 6b, which are paused and will be re-planned on top of it.
+Amended 2026-10-20 (user decision): Enterprise shows no parent-tab bar (sections 2 and 7).
 
 ## 1. Intent
 
@@ -40,7 +41,8 @@ tabs that each hold split terminals.
    It holds Bring Back and the other window options, and leaves room for future options.
 8. **Defaults the user accepted:**
    - Cmd+T opens a new parent tab.
-   - Enterprise always shows the parent-tab bar and every pane strip.
+   - Enterprise never shows the parent-tab bar: each pane's strip, which always shows, is the window's only row of tabs,
+     and parent tabs are reached through the Tab menu and Cmd+1 to 9 (the user's decision of 2026-10-20).
    - New Terminal Window and New Editor Window open full windows.
    - Bring Back falls back to the main window when the origin is gone.
    - Saving and restoring covers every window kind.
@@ -124,7 +126,9 @@ group (section 8).
 - **The parent-tab bar** sits above the workspace: below the header in the main window, at the top of a full window.
   Pane windows have none.
   - **Standard look:** it hides while the window has one parent tab.
-  - **Enterprise:** it always shows.
+  - **Enterprise:** it never shows; each pane's strip is the window's only row of tabs, and parent tabs are reached
+    through the Tab menu and Cmd+1 to 9 (the user's decision of 2026-10-20). Cmd+T and New Session still open a
+    parent tab.
   - It reuses the look's `TabStrip` (`WindowTabs` or `ClassicTabs`).
 - **Pane strips** (`GroupView`):
   - **Standard look:** a pane holding one item shows no strip. This replaces the window-level rule landing now ("a

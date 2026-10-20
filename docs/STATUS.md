@@ -1,5 +1,32 @@
 # Jasper — Status and Handoff
 
+**Enterprise: one row of tabs — 2026-10-20** (`claude/workspace-tabs`, worktree `.claude/worktrees/workspace-tabs`, on
+`0463d5d1c`; [spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md), section 7). The user, testing the branch:
+"There is a bug in Enterprise mode where the tabs stack instead of go side by side": an Enterprise window with one parent
+tab and one tab showed the same tab twice, the parent-tab bar as the top row and the pane's classic strip under it. Asked
+how Enterprise should show its tabs, the user chose: "One row in Enterprise. Enterprise never shows a separate
+parent-tab row; each pane's strip is the only tab row, and parent tabs are reached through the Tab menu and Cmd+1 to 9."
+Asked about Cmd+T, the user chose "New parent tab": Cmd+T and the toolbar's New Session still open a parent tab, the row
+then showing only that parent tab's tabs, and Cmd+1 to 9 switch back. This supersedes the parent tabs spec's section 7
+("Enterprise: it always shows") and plan 7a's Rulings 17, so the 7a, 7b and 7c entries below that say Enterprise always
+shows the bar are history; they are not edited. What changed: `WorkspaceChrome.showsParentTabBar` returns false for
+the classic tabs (the equal tabs still show it from two parent tabs), so under Enterprise every window's `ParentTabBar`
+stays hidden, takes no row and starts no drag, and `showsStrip` is as it was (every pane's strip shows). Tests:
+`ParentTabBarTest` replaces its Enterprise "always shows the bar" test with one pinning no bar at one and three parent
+tabs, New Tab opening a parent tab whose tab the pane's strip shows alone, Select Parent Tab 1 showing the first again,
+and the bar's `newTabName()` and `closeName()` read from its source, and turns the empty-main-workspace test to no bar
+with New Tab filling it; `EnterpriseWorkstationMockTest.theTabsAreTheMocks` reads the strip at the toolbar's rule again
+(`25 + TOOLBAR + 1`, as before plan 7a) and asserts the first tab sits there; `PopOutTest` has no bar in a full window
+either; `TabDragTest` replaces "Enterprise's bar drags its parent tabs" with the bar never showing, so no press starts a
+drag; `TabDragWindowsTest` moves a full window's only parent tab through `WindowManager.moveParentTab`, since no look
+shows a bar over it to drag from (the window still closes after `TAB_MOVED`). `./gradlew check --continue`: **12,059
+tests, 0 failures, 0 errors, 25 skipped** (`jasper-app` 4,087 with 19 skipped). GUI checks for the user:
+- an Enterprise window with one parent tab and with two shows one row of tabs, the pane's strip, under the toolbar;
+- Cmd+T under Enterprise opens a parent tab: the row shows only its tab, and Cmd+1 shows the first parent tab's tabs
+  again; the Tab menu's Select Parent Tab items do the same.
+
+Not merged, not pushed.
+
 **Workspace tabs, plan 7c: dragging parent tabs — 2026-10-20** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `c789f0ec7`, `16a458a03` and `537db9b06` (plan 7b's final fix wave lies between the
 first two), then this documentation commit, then its final fix wave ("Parent tab drag: final review fixes");

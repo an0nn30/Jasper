@@ -681,7 +681,8 @@ saves light/dark local/remote/narrow previews under `build/render-preview`.
 
 Workspace tabs use centered text and equal-width cells; a pane holding a single tab hides
 its strip (`WorkspaceChrome.showsStrip`, applied to each group on every `WorkspaceView` render), and a window holding a
-single parent tab its parent-tab bar (`WorkspaceChrome.showsParentTabBar`, applied by `ParentTabBar.refresh`); both
+single parent tab its parent-tab bar (`WorkspaceChrome.showsParentTabBar`, applied by `ParentTabBar.refresh`; the
+classic tabs never show it, as each pane's strip is Enterprise's only row of tabs); both
 show and hide at once, without motion. The bar is the look's strip over a `StripSource` (`ParentTabBar`, beside
 `GroupView`), and its entries never slide: a parent tab dragged along it takes its new place at once.
 `WindowTabs` derives selected/inactive surfaces from the workspace palette while

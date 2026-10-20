@@ -124,13 +124,14 @@ public final class WorkspaceChrome {
     }
 
     /**
-     * Whether a window holding {@code count} parent tabs shows its parent-tab bar (parent tabs spec 7): the classic tabs
-     * (Enterprise) always; the equal tabs from two parent tabs.
+     * Whether a window holding {@code count} parent tabs shows its parent-tab bar (parent tabs spec 7): the equal tabs
+     * from two parent tabs; the classic tabs (Enterprise) never, as each pane's strip is the window's only tab row (the
+     * user's decision of 2026-10-20).
      */
     boolean showsParentTabBar(int count) {
         return switch (tabs) {
             case EQUAL -> count > 1;
-            case CLASSIC -> true;
+            case CLASSIC -> false;
         };
     }
 

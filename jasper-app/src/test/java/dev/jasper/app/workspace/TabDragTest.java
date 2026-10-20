@@ -536,21 +536,26 @@ class TabDragTest {
         });
     }
 
-    /** Parent tabs spec 7: Enterprise's bar, the classic tabs, always shows, and its parent tabs drag along it too. */
-    @Test void enterprisesBarDragsItsParentTabsAlongItToo() throws Exception {
+    /**
+     * The user's decision of 2026-10-20: Enterprise, the classic tabs, shows no parent-tab bar, so no bar press starts a
+     * drag: with two parent tabs the bar is hidden and takes no row, and the pane's strip, the window's only row of tabs,
+     * sits at the top of the parent tabs.
+     */
+    @Test void enterprisesBarNeverShowsSoNoParentTabDragStartsFromIt() throws Exception {
         edt(() -> {
             ThemeController themes = EnterpriseLook.controller(false);
             WindowContent classic = null;
             try {
                 classic = DesktopTestSupport.content(idleLauncher(pending), themes, ClassicTabsTest.classic());
-                ParentTabId first = classic.activeParentTab();
                 classic.newParentTab(HOME);
-                ParentTabId second = classic.activeParentTab();
+                assertThat(classic.parentTabCount()).isEqualTo(2);
                 frame(classic, 100, 50, 1208, 760);
                 assertThat(classic.parentTabBar()).isInstanceOf(ClassicTabs.class);
-                var entries = classic.parentTabs().bar().tabs();
-                dropParentTab(classic, entries.get(1), onParentTab(classic, entries.get(0), 0.25));
-                assertThat(classic.parentTabs().model().parentTabs()).extracting(ParentTab::id).containsExactly(second, first);
+                assertThat(classic.parentTabBar().component().isVisible()).as("no bar to press").isFalse();
+                assertThat(classic.parentTabBar().component().getHeight()).as("and it takes no row").isZero();
+                assertThat(classic.workspace().getY()).as("the workspace starts at the top of the parent tabs").isZero();
+                assertThat(classic.tabBar().component().isVisible()).as("the pane's strip is the only row of tabs").isTrue();
+                assertThat(classic.tabDrag().active()).isFalse();
             } finally {
                 if (classic != null) classic.tabDrag().cancel();
                 DesktopTestSupport.closeOwnersNow();

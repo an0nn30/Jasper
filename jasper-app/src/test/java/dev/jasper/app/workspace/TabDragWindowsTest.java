@@ -553,33 +553,26 @@ class TabDragWindowsTest {
     }
 
     /**
-     * Review Focus 3 and workspace plan 7c Rulings 7: a full window's only parent tab stays when released outside every
-     * window, as its window already is its own, but moves onto another window's bar, and its window closes after the move.
+     * Review Focus 3 and workspace plan 7c Rulings 7, under the user's decision of 2026-10-20: no look shows a bar over a
+     * window's only parent tab (the standard look hides it, Enterprise never shows it), so none can be dragged. The window
+     * manager still moves it, as Move to Main Window does, onto another window's bar; it never pops it out, and its
+     * window closes after the move.
      */
-    @Test void aFullWindowsOnlyParentTabStaysOutsideButMovesOntoAnotherWindowsBar() throws Exception {
-        edt(() -> {
-            classicChild();
-            secondParentTab(main);
-        });
+    @Test void aFullWindowsOnlyParentTabMovesOntoAnotherWindowsBarAndItsWindowClosesAfterTheMove() throws Exception {
+        edt(() -> secondParentTab(main));
         launch();
         edt(() -> {
             WindowContent from = child.content(), to = main.content();
             ParentTabId only = from.activeParentTab();
             Tab moving = entryOf(from, only);
-            Point outside = new Point(3000, 1500);
-            Component source = startParentTab(from, moving, outside);
-            assertThat(manager.tabDrag().active()).isTrue();
-            assertThat(manager.tabDrag().target()).as("its window already is its own").isEmpty();
-            mouse(source, MouseEvent.MOUSE_DRAGGED, onParentTab(from, moving, 0.75));
-            assertThat(manager.tabDrag().target()).as("and its own bar has no other place for it").isEmpty();
-            mouse(source, MouseEvent.MOUSE_RELEASED, outside);
-            assertThat(manager.children()).containsExactly(child);
-            assertThat(placed).isEmpty();
+            assertThat(from.parentTabBar().component().isVisible()).as("no bar over it to drag it from").isFalse();
+            assertThat(from.mayPopOutParentTab(only)).as("a full window's only parent tab stays in its window").isFalse();
             List<ParentTabId> before = parentTabIds(to);
             facts.clear();
-            dropParentTab(from, moving, onParentTab(to, to.parentTabs().bar().tabs().getLast(), 0.75));
+            assertThat(manager.moveParentTab(from, only, to, before.size())).isTrue();
             assertThat(parentTabIds(to)).as("at the end of the main window's bar").containsExactly(before.get(0), before.get(1), only);
             assertThat(child.closed()).as("its last parent tab moved out").isTrue();
+            assertThat(manager.children()).isEmpty();
             int moved = facts.indexOf(new TerminalEvent.TabMoved(moving.id().value(), child.id(), main.id()));
             int closed = facts.indexOf(new TerminalEvent.WindowClosed(child.id()));
             assertThat(moved).as("TAB_MOVED").isNotNegative();
