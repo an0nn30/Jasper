@@ -61,7 +61,7 @@ interface plan 15b relies on kept as written; E15 only the two STATUS lines of R
 may read `Kit.DEFAULT` (`StaticDefaultTest`). No Enterprise
 Settings render moved in Task 2. One Enterprise render changed, at the user's 2026-10-19 direction: Settings › Editor
 (`enterprise-settings/light/13.png`) shows the Font row's kit default, "IBM Plex Mono", where it showed "JetBrains Mono"
-(pair `enterprise-settings-13` 0.723, now 0.722). `./gradlew check --continue`: **11,567 tests, 0 failures, 0 errors, 25
+(pair `enterprise-settings-13` 0.723, now 0.722). `./gradlew check --continue`: **11,569 tests, 0 failures, 0 errors, 25
 skipped**; `check_pairs.py` passes 101 of 101 gated pairs with the same verdicts as the Task 1 baseline (`f78bb0385`),
 and every agreement is the same except that line and `composition-light-vault-manager` (0.730, now 0.729), whose status
 bar prints the vault file's path under a fresh JUnit temporary directory on every run; the headless gallery is
