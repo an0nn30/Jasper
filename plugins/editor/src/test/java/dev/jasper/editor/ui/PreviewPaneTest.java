@@ -35,6 +35,69 @@ class PreviewPaneTest {
         }
         fail("Preview did not attach");
     }
+    @Test void aWrappedLargeHeadingReservesBothRowsBeforeFollowingProse() throws Exception {
+        for(String sample:List.of(PreviewRenderTest.SAMPLE,PreviewRenderTest.SAMPLE.replace("日本語 é","ASCII"),
+            "# Native preview\n\nProse after the heading.\n\n```\n"+"wide ".repeat(100)+"\n```\n")) {
+        var prepared=prepare(sample);var pane=install(prepared);
+        SwingUtilities.invokeAndWait(() -> pane.install(prepared,new TerminalTypography("Monospaced",28,List.of("Serif"),true,1.3),palette(false),EditorThemeTest.syntax(1),new Font("Serif",0,12),1));
+        await(pane,prepared.result());
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                var editor=pane.editor();var scroll=new JScrollPane(editor);scroll.setSize(300,1000);
+                for(int pass=0;pass<4;pass++){scroll.doLayout();scroll.getViewport().doLayout();editor.doLayout();}
+                var image=new BufferedImage(300,1000,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();scroll.paint(g);g.dispose();
+                String text=editor.getDocument().getText(0,editor.getDocument().getLength());
+                var lastHeading=editor.modelToView2D(text.indexOf("preview")+6);
+                var prose=editor.modelToView2D(text.indexOf("Prose"));
+                assertThat(prose.getY()).as("following prose must clear the wrapped heading").isGreaterThanOrEqualTo(lastHeading.getMaxY());
+            }catch(javax.swing.text.BadLocationException failure){throw new AssertionError(failure);}
+            finally {pane.close();}
+        });
+        }
+    }
+    @Test void boundedFlowCandidatesKeepNativeBreaksWithoutMeasuringTheWholeRemainingLeaf() throws Exception {
+        var pane=install(prepare("a_long_unbroken_word_".repeat(100)+" **bold text** "+"word ".repeat(100)));
+        SwingUtilities.invokeAndWait(() -> {
+            var editor=pane.editor();editor.setSize(320,300);editor.getPreferredSize();
+            var paragraph=(javax.swing.text.FlowView)allViews(editor.getUI().getRootView(editor)).stream()
+                .filter(v -> v instanceof javax.swing.text.FlowView && v.getEndOffset()-v.getStartOffset()>100).findFirst().orElseThrow();
+            class NativeFlow extends javax.swing.text.FlowView.FlowStrategy {
+                javax.swing.text.View candidate(int offset,int span){return super.createView(paragraph,offset,span,0);}
+            }
+            var nativeFlow=new NativeFlow();var bounded=new PreviewKit.BoundedFlow();
+            for(int offset:new int[]{paragraph.getStartOffset(),paragraph.getStartOffset()+500})for(int width:new int[]{1,50,200}) {
+                var expected=nativeFlow.candidate(offset,width);var actual=bounded.createView(paragraph,offset,width,0);
+                float x=paragraph.getFlowStart(0)+paragraph.getFlowSpan(0)-width;
+                if(width>1)assertThat(actual.getEndOffset()-actual.getStartOffset()).isLessThan(100);
+                else assertThat(actual.getEndOffset()).isEqualTo(expected.getEndOffset());
+                assertThat(actual.getBreakWeight(0,x,width)).isEqualTo(expected.getBreakWeight(0,x,width));
+                assertThat(actual.breakView(0,offset,x,width).getEndOffset()).isEqualTo(expected.breakView(0,offset,x,width).getEndOffset());
+            }
+            pane.close();
+        });
+    }
+    @Test void denseAsciiInlineBreaksMatchNativeAndShareOneParagraphIndex() throws Exception {
+        var pane=install(prepare("alpha **bold words** *italic words* `code` tail ".repeat(30)));
+        SwingUtilities.invokeAndWait(() -> {
+            var editor=pane.editor();editor.setSize(320,300);editor.getPreferredSize();
+            for(var view:allViews(editor.getUI().getRootView(editor))) if(view instanceof javax.swing.text.html.InlineView inline
+                && !view.getElement().getAttributes().isDefined(javax.swing.text.html.HTML.Tag.CODE)) {
+                var original=new javax.swing.text.html.InlineView(view.getElement());original.setParent(view.getParent());
+                var nativeView=(javax.swing.text.GlyphView)original.createFragment(view.getStartOffset(),view.getEndOffset());
+                assertThat(inline.getMinimumSpan(0)).isCloseTo(nativeView.getMinimumSpan(0),within(.01f));
+                for(float width:new float[]{1,20,60,500}) {
+                    assertThat(inline.getBreakWeight(0,13,width)).isEqualTo(nativeView.getBreakWeight(0,13,width));
+                    var actual=inline.breakView(0,inline.getStartOffset(),13,width);
+                    var expected=nativeView.breakView(0,nativeView.getStartOffset(),13,width);
+                    assertThat(actual.getEndOffset()).isEqualTo(expected.getEndOffset());
+                }
+            }
+            try {var field=PreviewKit.class.getDeclaredField("paragraphBreaks");field.setAccessible(true);
+                assertThat(((java.util.Map<?,?>)field.get(editor.getEditorKit())).size()).isBetween(1,2);}
+            catch(ReflectiveOperationException e){throw new AssertionError(e);}
+            pane.close();
+        });
+    }
     @Test void bulkImagesAndReasonsProduceOneGeometryNotificationPerTurn() throws Exception {
         var prepared=prepare("![alt](relative.png) ".repeat(1024));var geometry=new AtomicInteger();var ref=new java.util.concurrent.atomic.AtomicReference<PreviewPane>();
         SwingUtilities.invokeAndWait(()->{var pane=new PreviewPane(id->{},geometry::incrementAndGet);ref.set(pane);pane.install(prepared,TYPE,palette(false),EditorThemeTest.syntax(1),new Font("Serif",0,12),1);});

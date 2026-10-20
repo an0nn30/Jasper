@@ -26,6 +26,30 @@ final class PreviewKit extends HTMLEditorKit {
     private final Map<Integer,String> imageReasons;
     private final Map<Integer,List<PreviewImageView>> imageViews=new java.util.HashMap<>();
     private final Map<Element,Map<Element,CodeRun>> codeLines=new java.util.IdentityHashMap<>();
+    private final Map<Element,int[]> paragraphBreaks=new java.util.IdentityHashMap<>();
+    private final Map<Document,Boolean> asciiDocuments=new java.util.IdentityHashMap<>();
+    private boolean ascii(Document document) {
+        return asciiDocuments.computeIfAbsent(document,doc -> {
+            try {String text=doc.getText(0,doc.getLength());return text.chars().allMatch(c -> c<128);}
+            catch(BadLocationException impossible){throw new IllegalStateException(impossible);}
+        });
+    }
+    private int[] breaks(Element paragraph) {
+        return paragraphBreaks.computeIfAbsent(paragraph,element -> {
+            int begin=element.getStartOffset(),end=element.getEndOffset();
+            try {
+                String text=element.getDocument().getText(begin,end-begin);
+                var offsets=new java.util.ArrayList<Integer>();offsets.add(begin);boolean whitespace=false;
+                for(int i=0;i<text.length();i++) {
+                    boolean current=Character.isWhitespace(text.charAt(i));
+                    if(whitespace && !current)offsets.add(begin+i);
+                    whitespace=current;
+                }
+                if(!text.isEmpty())offsets.add(end);
+                return offsets.stream().mapToInt(Integer::intValue).toArray();
+            }catch(BadLocationException impossible){throw new IllegalStateException(impossible);}
+        });
+    }
     private record CodeRun(LineLayout.Row row,float origin) {
         float originAt(int offset){return origin+(offset==row.start()?0:(float)LineLayout.caret(row,offset).getBounds2D().getX());}
     }
@@ -85,7 +109,7 @@ final class PreviewKit extends HTMLEditorKit {
         if(tag==HTML.Tag.IMG){var view=new PreviewImageView(element,images,imageReasons,palette.textMuted());imageViews.computeIfAbsent(view.id(),ignored->new ArrayList<>()).add(view);return view;}
         if(tag==HTML.Tag.CONTENT){
             if(element.getAttributes().isDefined(HTML.Tag.CODE)||ancestor(element,HTML.Tag.PRE))return new Code(element);
-            return new InlineView(element);
+            return new Inline(element);
         }
         if(tag==HTML.Tag.P || tag==HTML.Tag.IMPLIED || tag==HTML.Tag.H1 || tag==HTML.Tag.H2 || tag==HTML.Tag.H3 || tag==HTML.Tag.H4 || tag==HTML.Tag.H5 || tag==HTML.Tag.H6)
             return new Paragraph(element,ancestor(element,HTML.Tag.PRE)||ancestor(element,HTML.Tag.TABLE));
@@ -94,7 +118,7 @@ final class PreviewKit extends HTMLEditorKit {
     private static boolean ancestor(Element e,HTML.Tag tag){for(;e!=null;e=e.getParentElement())if(e.getAttributes().getAttribute(StyleConstants.NameAttribute)==tag)return true;return false;}
     private final class Paragraph extends javax.swing.text.html.ParagraphView {
         private final boolean pre;
-        Paragraph(Element element,boolean pre){super(element);this.pre=pre;setLineSpacing(ancestor(getElement(),HTML.Tag.PRE)?0:(float)typography.lineHeight()-1);}
+        Paragraph(Element element,boolean pre){super(element);this.pre=pre;if(!pre && strategy.getClass()==FlowView.FlowStrategy.class)strategy=new BoundedFlow();setLineSpacing(ancestor(getElement(),HTML.Tag.PRE)?0:(float)typography.lineHeight()-1);}
         @Override public int getFlowSpan(int index){if(pre)return Integer.MAX_VALUE/16;
             int span=super.getFlowSpan(index);var container=getContainer();
             if(container instanceof JComponent c){var viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,c);span=Math.min(span,Math.max(1,(viewport==null?c.getWidth():viewport.getWidth())-Math.max(16,getFlowStart(index))-16));}
@@ -102,7 +126,66 @@ final class PreviewKit extends HTMLEditorKit {
         @Override public float getMinimumSpan(int axis){return axis==X_AXIS&&pre?getPreferredSpan(axis):axis==X_AXIS?0:super.getMinimumSpan(axis);}
         @Override protected void setPropertiesFromAttributes(){super.setPropertiesFromAttributes();if(typography!=null)setLineSpacing(ancestor(getElement(),HTML.Tag.PRE)?0:(float)typography.lineHeight()-1);}
     }
-    private final class Code extends InlineView {
+    /** Fit one candidate plus an overflow character, retaining the native break decision and painter. */
+    static final class BoundedFlow extends FlowView.FlowStrategy {
+        @Override public void layout(FlowView flow) {
+            super.layout(flow);
+            // Native FlowStrategy appends empty rows before filling them. A preferred-size query
+            // during that process can cache their old height; publish the completed row requirements.
+            flow.preferenceChanged(null,false,true);
+        }
+        @Override protected View createView(FlowView flow,int offset,int spanLeft,int rowIndex) {
+            View candidate=super.createView(flow,offset,spanLeft,rowIndex);
+            if(candidate instanceof PreviewKit.Inline inline && !(candidate instanceof PreviewKit.Code) && inline.ascii()) {
+                float x=flow.getFlowStart(rowIndex)+(float)flow.getFlowSpan(rowIndex)-spanLeft;
+                int fitted=inline.bounded(offset,x,spanLeft);
+                if(fitted==offset)return candidate;
+                int end=Math.min(candidate.getEndOffset(),Math.max(offset+1,fitted+1));
+                if(end<candidate.getEndOffset())return candidate.createFragment(offset,end);
+            }
+            return candidate;
+        }
+    }
+    /** Shared paragraph boundaries retain native ASCII wrapping without rescanning the paragraph per styled leaf. */
+    private class Inline extends InlineView {
+        private float minimum=-1;
+        Inline(Element element){super(element);}
+        private boolean ascii(){return PreviewKit.this.ascii(getDocument());}
+        private int bounded(int begin,float pos,float length){checkPainter();return getGlyphPainter().getBoundedPosition(this,begin,pos,length);}
+        private int breakSpot(int begin,int end) {
+            Element element=getElement(),paragraph=element.getParentElement();
+            int[] values=breaks(paragraph);
+            int ceiling=Math.min(end,element.getEndOffset()-(element.getEndOffset()==paragraph.getEndOffset()?1:0));
+            int found=java.util.Arrays.binarySearch(values,ceiling);int index=found>=0?found:-found-2;
+            return index>=0 && values[index]>Math.max(begin,element.getStartOffset())?values[index]:-1;
+        }
+        @Override public float getMinimumSpan(int axis) {
+            if(axis!=X_AXIS || !ascii())return super.getMinimumSpan(axis);
+            if(minimum>=0)return minimum;
+            float value=0;int begin=getStartOffset(),end=getEndOffset();
+            while(end>begin) {int spot=breakSpot(begin,end);if(spot<0)spot=begin;value=Math.max(value,getPartialSpan(spot,end));end=spot-1;}
+            return minimum=value;
+        }
+        @Override public int getBreakWeight(int axis,float pos,float len) {
+            if(axis!=X_AXIS || !ascii())return super.getBreakWeight(axis,pos,len);
+            if("nowrap".equals(String.valueOf(getAttributes().getAttribute(CSS.Attribute.WHITE_SPACE))))return BadBreakWeight;
+            checkPainter();int begin=getStartOffset(),end=getGlyphPainter().getBoundedPosition(this,begin,pos,len);
+            return end==begin?BadBreakWeight:breakSpot(begin,end)>=0?ExcellentBreakWeight:GoodBreakWeight;
+        }
+        @Override public View breakView(int axis,int begin,float pos,float len) {
+            if(axis!=X_AXIS || !ascii())return super.breakView(axis,begin,pos,len);
+            checkPainter();int end=getGlyphPainter().getBoundedPosition(this,begin,pos,len);int spot=breakSpot(begin,end);if(spot>=0)end=spot;
+            if(begin==getStartOffset() && end==getEndOffset())return this;
+            var fragment=(GlyphView)createFragment(begin,end);fragment.getTabbedSpan(pos,getTabExpander());return fragment;
+        }
+        @Override public View createFragment(int begin,int end) {
+            var fragment=(Inline)super.createFragment(begin,end);fragment.minimum=-1;return fragment;
+        }
+        @Override public void changedUpdate(javax.swing.event.DocumentEvent e,Shape allocation,ViewFactory factory) {
+            minimum=-1;super.changedUpdate(e,allocation,factory);
+        }
+    }
+    private final class Code extends Inline {
         Code(Element element){super(element);setGlyphPainter(new ShapedPainter());}
         @Override public float getPreferredSpan(int axis) {
             float span=super.getPreferredSpan(axis);

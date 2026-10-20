@@ -10,13 +10,21 @@
 
 **Spec:** [Approved Editor fonts and Markdown preview design](../specs/2026-10-04-editor-markdown-preview-design.md).
 
+**Execution ruling (Task 13):** Integrated measurements demonstrated repeated source-width invalidation and quadratic native break/attribute scans. Indexed native source breaks and immutable attribute runs preserve shaping semantics; ASCII preview leaves share paragraph break indices and bound flow candidates through supported Swing APIs; anchor geometry publishes generation-guarded batches. Canonical source width prevents preferred-size probes from reshaping unchanged lines. Measured cold exact layout remains a documented limitation (about 1.28 s for a 2 MiB source line and 2.12 s for 140,000 dense units, recurring on invalidation); no reduced content bound or new asynchronous layout subsystem. The vendor tokenizer's bulk call may delay worker cancellation about 27 s on the pathological Java fixture. Maximum-size responsiveness and native acceptance are not claimed. Native Unicode flow remains intact, and completed-row height invalidation prevents wrapped headings overlapping following prose. Task 13 updates stale integer-font/settings-section test expectations and adds migration-ledger classifications without lowering visual thresholds.
+
+**Execution ruling (Task 9):** Stale hosted menu commands resolve by stable ID against the host current selection; Editor callbacks guard inactive/closed handles. This avoids adding a host ownership query to the SDK.
+
+**Execution ruling (Task 7):** Prepare immutable HTML events on the existing render worker, then install in cancellable EDT slices. This replaces the original direct-result install signature; completion exposes only the successfully attached result for scroll mapping. No pane-owned executor.
+
+**Execution ruling (Task 4):** PreviewLimitException is public final with a package-private constructor so the UI controller can catch it across packages; the exported Editor API is unchanged. ThirdPartyNotices recognizes the new BSD-2-Clause dependency.
+
 **Execution ruling (Task 3):** Task 3 uses a uniform line box from maximum natural metrics across the configured resolved font/style set, multiplied once; EditorTextView extends SyntaxView and Vim physical viewport adapters consume shared geometry. Keep stock gutter with logical-line child allocations. This replaces the plan's per-row varying height algorithm, not the approved configurable line-height behavior. Public RSTA contracts require SyntaxView and uniform gutter metrics; no vendor patch or new gutter subsystem. Cost if wrong: fallback font metrics may produce more spacing than expected, requiring tuning; physical Vim integration needs additional regression coverage.
 
 **Execution ruling (Task 2):** Task 2 adds default SettingsPanel.pendingChanged() called by real/fake hosts after standard-row draft events/reset, and Editor rerenders from it — preserves standard Reset and kit defaults without a custom follow toggle or default-query API — cost if wrong: an additive SDK callback and host ordering contract to maintain.
 
 **Execution ruling (Task 1):** JasperApplication passes FontConfig to a PluginRuntime overload; SDK conversion stays inside app.plugins to preserve the architecture gate.
 
-**Status:** Approved October 20 for subagent-driven implementation and per-task review. Tasks 1–2 implemented and independently reviewed; Task 3 in progress; tasks 4–13 pending. Written-spec approval received October 20. Local `main` at `34aa868fe` was merged into `codex/editor-markdown-preview` as `c74465f5d` before planning. No remote-main freshness claim. One runnable deliverable, one commit per task, focused red/green checks and independent review during execution. No product code changed during planning.
+**Status:** Approved October 20 for subagent-driven implementation and per-task review. Tasks 1–12 implemented and independently reviewed; Task 13 implemented and headless verification passed (11,843 tests, zero failures/errors, 29 skips; SDK release and headless package verification passed). Native acceptance and independent Task 13/whole-branch review remain pending. Task 3 also adapts ViewCommands to physical wrapped rows and supplies the vendor classpath to architecture self-tests; its first review fixed syntax-event invalidation, bidi caret mapping and layout/indexing costs. Written-spec approval received October 20. Local `main` at `34aa868fe` was merged into `codex/editor-markdown-preview` as `c74465f5d` before planning. No remote-main freshness claim. One runnable deliverable, one commit per task, focused red/green checks and independent review during execution. No product code changed during planning.
 
 ## Global Constraints
 
@@ -303,8 +311,8 @@ HTML attributes refer only to IDs, never original destinations. Complete metadat
 `MarkdownResult(String html, List<BlockAnchor> blocks, Map<String,Integer> headings,
 List<Link> links, List<Image> images)`; `Link(int id,String destination)`;
 `Image(int id,String destination,String alt)`; copy every collection in the compact constructor.
-`MarkdownLimits.requireSource(String): void` throws `PreviewLimitException` (a new package-local runtime
-exception) before parsing; HTML and anchor builders throw the same exception at their bounds. The controller
+`MarkdownLimits.requireSource(String): void` throws `PreviewLimitException` (a public final runtime
+exception with package-private constructor for the cross-package controller catch) before parsing; HTML and anchor builders throw the same exception at their bounds. The controller
 maps it to "This document is too large to preview" with a Source action.
 
 - [ ] **Write parser tests** using a golden fixture covering headings, nested lists/quotes, tables and alignment,
@@ -412,8 +420,10 @@ Relative(String path, Optional<String> fragment), Fragment(String id), Unsupport
 **Files:** Create `E/ui/PreviewPane.java`, PreviewKit, PreviewImageView; modify DocumentArea and architecture
 checker; tests `ET/ui/PreviewPaneTest.java`, PreviewRenderTest and checker negative fixtures.
 
-**Interfaces:** `PreviewPane.install(MarkdownResult, TerminalTypography, WorkspacePalette, SyntaxPalette,
+**Interfaces:** `PreviewPane.prepare(MarkdownResult): Prepared` runs on the existing render worker; immutable events feed
+`PreviewPane.install(Prepared, TerminalTypography, WorkspacePalette, SyntaxPalette,
 Font bodyFont, double opacity): void`; `PreviewPane.editor(): JEditorPane`;
+`PreviewPane.cancelInstall(): void`; `installedResult(): Optional<MarkdownResult>` is updated only after successful attachment, announced through geometryChanged. `installFailure(): Optional<RuntimeException>` reports async failure with the old installed result retained; reset on install/cancel.
 `PreviewPane.anchor(String): OptionalInt`; `PreviewPane.image(int, BufferedImage): void`; `close()`.
 `DocumentArea.preview(): PreviewPane`, `mode(MarkdownMode): void`, `dividerRatio(): double`.
 PreviewPane supplies link ID callbacks; it never navigates or loads resources itself.
@@ -619,14 +629,14 @@ Add `ET/ui/MarkdownAcceptanceTest.java` and headless render fixtures; update pac
 
 **Interfaces:** No new API. Tests exercise the shipped plugin through FakePluginHost and staged host contracts.
 
-- [ ] **Write the failing integrated acceptance test**: open local and fake-SFTP Markdown in two host windows,
+- [x] **Write the failing integrated acceptance test**: open local and fake-SFTP Markdown in two host windows,
   edit unsaved content, follow fonts, change theme, select Split/Preview, search, navigate into an already dirty
   tab, load an allowed image, move/hide/reactivate, save/reload/Save As, then close during pending work.
   Assert source identity/undo, no cross-tab preference changes, consent reset, route preservation and zero retained
   subscriptions/leases/work after shutdown. Include classic and modern toolbar rendering at narrow widths.
-- [ ] **Run red** before any missing integration fixes, then fix only demonstrated failures in the owning class.
+- [x] **Run red** before any missing integration fixes, then fix only demonstrated failures in the owning class.
   If all cases already pass, record the first observed passing run; do not manufacture a red test by breaking code.
-- [ ] **Run headless final checks:**
+- [x] **Run headless final checks:**
 
 ```sh
 ./gradlew check
@@ -642,10 +652,10 @@ git diff --check
   narrow panes, tables/code/images, glass and selection. Compare established default/Enterprise screenshots;
   intended changes are Editor font rows/document toolbar only. No lowered visual thresholds to hide regressions.
   Run the AGENTS.md source-hygiene Python check and validate all changed local Markdown links.
-- [ ] **Update documentation** with actual behavior/version/dependency evidence and user-run GUI acceptance.
+- [x] **Update documentation** with actual behavior/version/dependency evidence and user-run GUI acceptance.
   Keep native acceptance explicitly pending: trackpad sync, IME, font fallback/ligatures, physical keyboard focus,
   window moves, SFTP sign-in and late cancellation. Do not claim these from headless images.
-- [ ] **Commit:** `docs(editor): document typography and Markdown preview verification`.
+- [x] **Commit:** `docs(editor): document typography and Markdown preview verification`.
 - [ ] **Independent whole-branch review:** audit every spec section, source geometry, async ownership, URI handling,
   architecture exceptions and rendered evidence. Fix findings in focused commits and rerun affected checks.
   Keep branch unmerged/unpushed until the user authorizes integration.

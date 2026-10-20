@@ -156,3 +156,48 @@ unverified.
 - [ ] 112. `dzab` deletes up to `ab`; `.` repeats it at the next `ab`.
 - [ ] 113. `v` then `sab` extends the Visual area to `ab`.
 - [ ] 114. `3sab` only stops at an `ab` within about three columns of the cursor.
+
+
+## Fonts and Markdown preview
+
+Editor 0.11.0 requires SDK 0.18.3. Remote 0.15.1 supplies provider-relative resources while retaining its older-Editor
+optional dependency range. CommonMark core, GFM tables, strikethrough and task-list extensions are pinned to 0.30.0
+and bundled only with Editor; the BSD-2-Clause notice is included in the generated dependency inventory.
+
+Automated acceptance uses the shipped Editor plugin in `FakePluginHost`, two host windows, real temporary local files
+and an opaque fake SFTP provider. It covers unsaved preview, independent modes, followed fractional typography,
+theme changes, preview search, undo/redo, dirty-target navigation, relative image resolution, save/reload/Save As,
+window moves and shutdown during queued work. Actual staged-host tests render classic/modern document controls at
+260 and 760 pixels. Headless source/preview renders cover 6, 13.5 and 72 points with line heights 0.5, 1 and 3,
+light/dark glass and selection, alongside the existing tables/code/images fixtures.
+
+The opt-in `JASPER_MARKDOWN_PERFORMANCE=true` `MarkdownPerformanceTest` measures real scroll containers, source and
+preview cold layout, complete-map rebuilding, and three simultaneously retained previews. It reports timing and
+heap observations rather than imposing machine-dependent test thresholds. Source attribution and legal breaks are
+indexed; ASCII preview leaves share paragraph breaks and bound flow candidates; scroll geometry yields between
+batches. On the development Mac, the final headless sample measured warmed complete-map rebuilds of 0.98 ms for
+one 2 MiB line, 0.58 ms for 140,000 units of dense inline markup, 135 ms across yielded batches for 50,000 anchors,
+and 6–11 ms for each of three retained 165,000-unit previews. Exact cold source layout took 1.28 s for the giant line
+and 2.12 s for dense markup; preview cold layout took 0.36 s and 1.11 s respectively. These costs can recur when an
+edit, resize or font change invalidates the affected layout. The three-preview fixture's largest EDT dispatch was
+420 ms. These measurements do not establish responsive maximum-size editing. A 10 ms sampler observed up to
+510 MiB used heap across the sequential fixtures; this includes retained heap from prior cases and is neither
+per-document retained memory nor a process RSS limit.
+
+The vendor's single bulk Java-tokenizer call remains noninterruptible: the 2 MiB `int ` fixture measured
+about 27 seconds from interruption to return. It runs on the render worker with one replaceable pending snapshot.
+
+Final headless `check` passed on October 20 with the installed Python 3.13 override: 11,843 tests, zero failures/errors,
+29 skips (25 existing platform skips and four opt-in performance cases, which passed separately). `sdkRelease`,
+`packageApp` and `verifyPackage` passed; the macOS arm64 image has no trained AOT cache.
+
+User-run desktop acceptance remains pending:
+
+- [ ] Follow saved terminal fonts in two windows, keep an unapplied independent draft, then turn following off.
+- [ ] Check fractional sizes, installed fallback glyphs, ligatures, IME, wrapped combining marks/emoji, selection and pointer/caret alignment.
+- [ ] Check classic/modern toolbar tooltips, physical keyboard focus, Source/Split/Preview, divider dragging and restart persistence.
+- [ ] Scroll both panes with a trackpad, disable synchronization, edit/delete the visible heading, resize and change fonts while preserving passages.
+- [ ] Find and copy preview text, activate links by keyboard, and verify Replace/Go to Line reveal the source without changing the default mode.
+- [ ] Check light/dark/glass, large fonts, dense markup and long-document typing on the target desktop.
+- [ ] Move hidden and active tabs between real windows while rendering, then reactivate and verify focus.
+- [ ] Load relative images through SFTP sign-in and distinct routes, grant web-image consent, Save As and close during late image completion.

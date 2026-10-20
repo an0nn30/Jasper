@@ -59,9 +59,8 @@ public final class EditorTextView extends SyntaxView {
     private RSyntaxTextArea area() { return (RSyntaxTextArea)getContainer(); }
     private void configure() {
         RSyntaxTextArea area=area();
-        var insets=area.getInsets();
-        float available=area.getWidth()-insets.left-insets.right;
-        if(available>0 && width!=available) {width=available;if(area.getLineWrap()) clearLayouts();}
+        float available=effectiveWidth(width);
+        if(width!=available) {width=available;if(area.getLineWrap()) clearLayouts();}
         if(foldManager!=area.getFoldManager()) {
             if(foldManager!=null) foldManager.removePropertyChangeListener(foldChanges);
             foldManager=area.getFoldManager();
@@ -160,8 +159,18 @@ public final class EditorTextView extends SyntaxView {
         var g=geometry(); return axis==X_AXIS?Math.max(1,g.width()+1):g.height();
     }
     @Override public float getMinimumSpan(int axis) { return axis==X_AXIS?1:getPreferredSpan(axis); }
+    // RSTA's visible editor rectangle includes the caret margin that BasicTextUI's preferred-size
+    // probe subtracts. Use the actual editor allocation in both paths to avoid reshaping on every probe.
+    private float effectiveWidth(float offered) {
+        if(getContainer()!=null) {
+            var insets=area().getInsets();
+            int available=area().getWidth()-insets.left-insets.right;
+            if(available>0) return available;
+        }
+        return Math.max(1,offered);
+    }
     @Override public void setSize(float width,float height) {
-        float next=Math.max(1,width);
+        float next=effectiveWidth(width);
         if(this.width!=next) {
             this.width=next;
             if(getContainer()!=null && area().getLineWrap()) {clearLayouts();preferenceChanged(null,true,true);}

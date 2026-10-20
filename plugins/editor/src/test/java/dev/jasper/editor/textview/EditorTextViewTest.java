@@ -12,6 +12,21 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(EdtTests.class)
 class EditorTextViewTest {
+    @Test void preferredSizeProbesKeepWrappedLayoutsUntilTheActualEditorWidthChanges() throws Exception {
+        try(var area=new dev.jasper.editor.testsupport.RasterTextArea()) {
+            area.typography(new TerminalTypography("Monospaced",13.5,List.of(),true,1));
+            area.setText("alpha beta gamma delta ".repeat(100));area.setLineWrap(true);area.setSize(360,300);
+            area.modelToView2D(100);
+            var geometry=EditorTextView.class.getDeclaredField("currentGeometry");geometry.setAccessible(true);
+            var view=area.textView();var warm=geometry.get(view);
+            for(int i=0;i<3;i++) {
+                area.getPreferredSize();area.modelToView2D(100);
+                assertSame(warm,geometry.get(view),"preferred-size caret margins must not invalidate actual wrap width");
+            }
+            area.setSize(260,300);area.modelToView2D(100);
+            assertNotSame(warm,geometry.get(view),"a real resize still reflows");
+        }
+    }
     @Test void firstPaintRefreshAndUiReplacementKeepSharedGeometry() throws Exception {
         var area = new dev.jasper.editor.testsupport.RasterTextArea();
         area.typography(new TerminalTypography("Monospaced",13.5,List.of(),true,1.5));

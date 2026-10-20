@@ -38,7 +38,7 @@ final class ScrollLink implements AutoCloseable {
     private boolean linked = true, split, closed, adjusting, queued, replacing;
     private Pane leader;
     private Integer replacementY;
-    private long generation, epoch, adjustmentToken;
+    private long generation, epoch, adjustmentToken, geometryRevision;
     private record Knot(Position position, int previewOffset) { }
     private record Geometry(int offset, double sourceY, double previewY) { }
     private record Reading(Position start, Position end, double fraction, boolean bottom) { }
@@ -89,52 +89,68 @@ final class ScrollLink implements AutoCloseable {
         if (value && linked) { leader = source; source.reading = null; geometryChanged(); }
     }
 
-    /** Coalesce image, font, fold and viewport changes; no Markdown parsing occurs here. */
+    /** Coalesce geometry changes and bound each correspondence-building EDT turn. */
     void geometryChanged() {
-        if (closed || result == null || queued) return;
+        if (closed || result == null) return;
+        geometryRevision++;
+        if (queued) return;
         queued = true;
         long token = epoch, installedGeneration = generation;
         long sourceSequence = source.sequence, previewSequence = rendered.sequence;
         SwingUtilities.invokeLater(() -> {
             if (closed || token != epoch || installedGeneration != generation) return;
-            queued = false;
             adjusting = true;
-            try {
-                area.scroll.getViewport().doLayout(); area.previewScroll.getViewport().doLayout();
-                rebuild();
-                restoreIfCurrent(source, sourceSequence);
-                restoreIfCurrent(rendered, previewSequence);
-                replacementY = null;
-                if (linked && split) align();
-                remember(source); remember(rendered);
-                source.savedSequence = source.sequence; rendered.savedSequence = rendered.sequence;
-            } finally { adjusting = false; }
+            try { area.scroll.getViewport().doLayout(); area.previewScroll.getViewport().doLayout(); }
+            finally { adjusting = false; }
+            geometry = List.of();
+            new Rebuild(token, installedGeneration, geometryRevision, sourceSequence, previewSequence).step();
         });
     }
 
-    private void rebuild() {
-        var collapsed = new TreeMap<Integer, Integer>();
-        if (area.area.isCodeFoldingEnabled()) {
-            var manager = area.area.getFoldManager();
-            for (int i=0;i<manager.getFoldCount();i++) collapsed(manager.getFold(i), collapsed);
+    private final class Rebuild {
+        private final long token, installedGeneration, revision, sourceSequence, previewSequence;
+        private final TreeMap<Integer,Integer> collapsed = new TreeMap<>();
+        private final ArrayList<Geometry> next = new ArrayList<>();
+        private int index;
+        private double previousSource, previousPreview;
+        Rebuild(long token, long installedGeneration, long revision, long sourceSequence, long previewSequence) {
+            this.token=token; this.installedGeneration=installedGeneration; this.revision=revision;
+            this.sourceSequence=sourceSequence; this.previewSequence=previewSequence;
+            if (area.area.isCodeFoldingEnabled()) {
+                var manager=area.area.getFoldManager();
+                for(int i=0;i<manager.getFoldCount();i++)collapsed(manager.getFold(i),collapsed);
+            }
         }
-        var next = new ArrayList<Geometry>();
-        double previousSource = 0, previousPreview = 0;
-        for (var knot : knots) {
-            int offset = knot.position.getOffset(), visible = offset;
-            var fold = collapsed.floorEntry(offset);
-            if (fold != null && offset <= fold.getValue()) visible = fold.getKey();
+        void step() {
+            if(closed || token!=epoch || installedGeneration!=generation) return;
+            if(revision!=geometryRevision) {queued=false;geometryChanged();return;}
+            long deadline=System.nanoTime()+4_000_000L;
+            for(int count=0;index<knots.size() && count<128;count++,index++) {
+                var knot=knots.get(index);
+                int offset=knot.position.getOffset(),visible=offset;
+                var fold=collapsed.floorEntry(offset);
+                if(fold!=null && offset<=fold.getValue())visible=fold.getKey();
+                try {
+                    var sourceBounds=area.area.modelToView2D(visible);
+                    var previewBounds=preview.editor().modelToView2D(knot.previewOffset);
+                    if(sourceBounds!=null && previewBounds!=null) {
+                        previousSource=Math.max(previousSource,sourceBounds.getY());
+                        previousPreview=Math.max(previousPreview,previewBounds.getY());
+                        next.add(new Geometry(offset,previousSource,previousPreview));
+                    }
+                } catch(BadLocationException impossible) {throw new IllegalStateException(impossible);}
+                if(System.nanoTime()>=deadline){index++;break;}
+            }
+            if(index<knots.size()){SwingUtilities.invokeLater(this::step);return;}
+            queued=false;geometry=List.copyOf(next);adjusting=true;
             try {
-                var s = area.area.modelToView2D(visible);
-                var p = preview.editor().modelToView2D(knot.previewOffset);
-                if (s == null || p == null) continue;
-                // A nested container marker may share a row with its first child.
-                previousSource = Math.max(previousSource, s.getY());
-                previousPreview = Math.max(previousPreview, p.getY());
-                next.add(new Geometry(offset, previousSource, previousPreview));
-            } catch (BadLocationException impossible) { throw new IllegalStateException(impossible); }
+                restoreIfCurrent(source,sourceSequence);restoreIfCurrent(rendered,previewSequence);
+                replacementY=null;
+                if(linked && split)align();
+                remember(source);remember(rendered);
+                source.savedSequence=source.sequence;rendered.savedSequence=rendered.sequence;
+            } finally {adjusting=false;}
         }
-        geometry = List.copyOf(next);
     }
     private void collapsed(org.fife.ui.rsyntaxtextarea.folding.Fold fold, TreeMap<Integer,Integer> target) {
         if (fold.isCollapsed()) {

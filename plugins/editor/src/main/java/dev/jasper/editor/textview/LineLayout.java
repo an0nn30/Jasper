@@ -9,7 +9,6 @@ import java.awt.font.TextLayout;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
-import java.text.AttributedString;
 import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.List;
@@ -68,9 +67,6 @@ public final class LineLayout {
         var matcher=GRAPHEME.matcher(text);
         while(matcher.find()) boundaries.add(startOffset+matcher.end());
         if(text.isEmpty()) return List.of(new Row(startOffset,startOffset,List.of(),0,fonts,boundaries));
-        var attributed=new AttributedString(text);
-        attributed.addAttribute(TextAttribute.LIGATURES,fonts.ligatures()?1:0);
-        attributed.addAttribute(TextAttribute.KERNING,fonts.ligatures()?1:0);
         var runs=new ArrayList<AttributeRun>();
         int styleIndex=0;
         matcher.reset();
@@ -97,8 +93,9 @@ public final class LineLayout {
                 }
             }
         }
-        for(var run:runs) attributed.addAttributes(java.util.Map.of(TextAttribute.FONT,run.font(),
-            TextAttribute.FOREGROUND,run.foreground()),run.start(),run.end());
+        var attributed=new AttributedRuns(text,runs.stream().map(run -> new AttributedRuns.Run(run.start(),run.end(),
+            java.util.Map.of(TextAttribute.FONT,run.font(),TextAttribute.FOREGROUND,run.foreground(),
+                TextAttribute.LIGATURES,fonts.ligatures()?1:0,TextAttribute.KERNING,fonts.ligatures()?1:0))).toList());
         float limit=wrap?Math.max(1,width):Float.MAX_VALUE;
         float stop=Math.max(1,tabSize)*fonts.spaceAdvance();
         var rows=new ArrayList<Row>();
@@ -114,10 +111,10 @@ public final class LineLayout {
                 }
                 segments.add(new Segment(startOffset+p,startOffset+p+1,x,null)); x=next; p++;
             } else {
-                int end=text.indexOf('\t',p); if(end<0) end=text.length();
+                int end=breaker!=null && p<breakerEnd?breakerEnd:text.indexOf('\t',p); if(end<0) end=text.length();
                 if(breaker==null || breakerEnd!=end) {
-                    breaker=new LineBreakMeasurer(attributed.getIterator(null,p,end),
-                        wordWrap?BreakIterator.getLineInstance(Locale.ROOT):BreakIterator.getCharacterInstance(Locale.ROOT),fonts.context());
+                    breaker=new LineBreakMeasurer(attributed.iterator(p,end),
+                        new IndexedBreakIterator(wordWrap?BreakIterator.getLineInstance(Locale.ROOT):BreakIterator.getCharacterInstance(Locale.ROOT)),fonts.context());
                     breakerEnd=end;
                 }
                 int next=breaker.nextOffset(Math.max(.01f,limit-x),end,false);
@@ -129,7 +126,7 @@ public final class LineLayout {
                     segments=new ArrayList<>(); rowStart=p; x=0; rowOrigin=0; continue;
                 }
                 if(safe==p) safe=boundaries.get(java.util.Collections.binarySearch(boundaries,startOffset+p)+1)-startOffset;
-                var layout=new TextLayout(attributed.getIterator(null,p,safe),fonts.context());
+                var layout=new TextLayout(attributed.iterator(p,safe),fonts.context());
                 segments.add(new Segment(startOffset+p,startOffset+safe,x,layout)); x+=layout.getAdvance(); p=safe;
                 breaker.setPosition(p);
                 if(p<end) {

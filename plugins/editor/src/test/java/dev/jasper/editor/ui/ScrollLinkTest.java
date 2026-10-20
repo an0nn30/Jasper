@@ -47,6 +47,24 @@ class ScrollLinkTest {
         int preview() { return area.previewScroll.getViewport().getViewPosition().y; }
         public void close() throws Exception {edt(area::close);}
     }
+    @Test void largeGeometryYieldsBetweenSlicesAndAnEditCancelsItsContinuation() throws Exception {
+        try(var f=new Fixture("paragraph\n\n".repeat(600))) {
+            for(int i=0;i<20;i++)edt(() -> {});
+            var queued=ScrollLink.class.getDeclaredField("queued");queued.setAccessible(true);
+            edt(() -> f.area.scrollLink.geometryChanged());
+            edt(() -> {
+                try {assertThat(queued.getBoolean(f.area.scrollLink)).as("geometry must yield before all 600 anchors").isTrue();}
+                catch(IllegalAccessException e){throw new AssertionError(e);}
+                f.area.area.insert("changed\n\n",0);
+            });
+            for(int i=0;i<20;i++)edt(() -> {});
+            edt(() -> {
+                int before=f.preview();f.source(120);assertThat(f.preview()).isEqualTo(before);
+                try {assertThat(queued.getBoolean(f.area.scrollLink)).isFalse();}
+                catch(IllegalAccessException e){throw new AssertionError(e);}
+            });
+        }
+    }
     @Test void actualWrappedNestedTableAndCodePassagesMapInBothDirections() throws Exception {
         try(var f=new Fixture(TEXT)) {
             edt(() -> { for(String passage:new String[]{"> Quote","| row two","int two","# Target"}) {

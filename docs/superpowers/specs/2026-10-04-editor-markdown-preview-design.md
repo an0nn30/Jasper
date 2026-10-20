@@ -2,11 +2,11 @@
 
 **Date:** 2026-10-04; amended 2026-10-20
 
-**Status:** Written specification approved October 20, including font/toolbar additions. Implementation plan written for review; implementation has not started.
+**Status:** Written specification approved October 20, including font/toolbar additions. Implementation plan approved October 20; Tasks 1–12 implemented and independently reviewed, Task 13 implementation and headless verification passed. Independent Task 13/whole-branch review and native desktop acceptance remain pending.
 
 **Baseline:** Refreshed against local main `34aa868fe` by merge `c74465f5d` on `codex/editor-markdown-preview`; SDK 0.18.2, Editor 0.10.0 and Remote 0.15.0. Original design baseline was `d82efd6a`.
 
-**Delivery:** One runnable deliverable; [implementation plan](../plans/2026-10-20-editor-fonts-markdown-preview.md) awaiting review.
+**Delivery:** One runnable deliverable; [implementation plan](../plans/2026-10-20-editor-fonts-markdown-preview.md) approved October 20.
 
 ## 1. Intent and authority
 
@@ -414,7 +414,7 @@ Reviewed inline for scope, contradictory mode persistence, source/preview focus,
 ownership, render bounds, unsupported destinations and missing test evidence. The file-chooser route mismatch is
 addressed by provider-relative document resolution. Dependency and visual-rendering feasibility remain validations
 for the implementation plan, not unverified claims in this design. There are no unresolved product choices; the
-amended written specification was approved October 20; its implementation plan awaits review.
+amended written specification was approved October 20; its implementation plan was approved October 20.
 The October 20 self-review checked font precedence,
 SDK boundaries, toolbar/banner ordering and removal of stale fixed-version assumptions. Synchronized scrolling and
 remembered view mode retain their original semantics.
