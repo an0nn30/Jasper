@@ -1,8 +1,8 @@
 # Keyboard shortcuts
 
-Every built-in action, and every action Jasper or a plugin registers, can have a shortcut; the View › Show/Hide items
-cannot. Built-in actions have one default for macOS and one for Linux and Windows; plugins suggest their own. Menus,
-toolbar tooltips and the command palette always show the shortcut in effect. Change any of them in
+Every built-in action, and every action Jasper or a plugin registers, can have a shortcut; the View › Show/Hide ›
+Toolbar items cannot. Built-in actions have one default for macOS and one for Linux and Windows; plugins suggest their
+own. Menus, toolbar tooltips and the command palette always show the shortcut in effect. Change any of them in
 [Settings › Keymap](#settings--keymap) or in [`config.toml`](#in-configtoml).
 
 macOS shortcuts are written with Cmd (Command), Ctrl (Control), Option and Shift. The Linux and Windows defaults use
@@ -84,6 +84,8 @@ These apply only while a terminal pane (or its find bar) has the focus.
 | New Window | `new_window` | Cmd+N | Ctrl+Shift+N |
 | Open File… | `open_file` | none | none |
 | Zen (Enter Zen Mode / Exit Zen Mode) | `toggle_zen_mode` | none | none |
+| Rail (Show Rail / Hide Rail) | `toggle_rail` | none | none |
+| Status Bar (Show Status Bar / Hide Status Bar) | `toggle_status_bar` | none | none |
 | Settings | `open_settings` | Cmd+, | Ctrl+Shift+, |
 | Reload Config | `reload_config` | none | none |
 | Quit | `quit` | Cmd+Q | Ctrl+Alt+Shift+Q |
@@ -114,8 +116,8 @@ A plugin's tool window that has no toggle action of its own gets **Toggle** *tit
 Under the [Enterprise look](enterprise.md#windows-and-menus) a tool window's toggle shortcut makes it the active tool
 window; pressed while the window shows but is not the active one, it activates the window instead of hiding it.
 
-The palette's view commands (**Toolbar: Icons and Labels**, **Show Rail**, **Themes…**, **Terminal Scheme: …** and the
-like) and their View › Show/Hide menu items (Toolbar, Status Bar, Rail) are not in the keymap and take no shortcut.
+The palette's view commands (**Toolbar: Icons and Labels**, **Themes…**, **Terminal Scheme: …** and the like) and the
+View › Show/Hide › Toolbar items are not in the keymap and take no shortcut.
 
 ## Bundled plugins
 

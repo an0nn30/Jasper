@@ -53,6 +53,8 @@ final class WindowCommands implements AutoCloseable {
                 case RELOAD_CONFIG -> List.of("configuration", "refresh");
                 case ZOOM_PANE -> List.of("maximize", "restore");
                 case TOGGLE_ZEN_MODE -> List.of("view mode", "focus", "distraction free", "hide tools", "restore layout");
+                case TOGGLE_RAIL -> List.of("view", "panels", "sidebar", "tool window bars");
+                case TOGGLE_STATUS_BAR -> List.of("view");
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> List.of("search");
                 case CLEAR_SCROLLBACK -> List.of("history", "clear");
                 case CLEAR_TERMINAL -> List.of("clear", "screen");
@@ -70,8 +72,6 @@ final class WindowCommands implements AutoCloseable {
             add(registry, "view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT), label,
                 "Toolbar: " + label, () -> owner.chooseToolbarMode(mode));
         }
-        add(registry, "view.status_bar", "Status Bar", "Hide Status Bar", () -> owner.chooseStatusVisible(!owner.status().isVisible()));
-        add(registry, "view.rail", "Rail", "Hide Rail", () -> owner.setRailVisible(!owner.railVisible()), List.of("panels", "sidebar"));
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
         themeListening = owner.themes().subscribe((theme, chrome) -> syncSchemes());
@@ -136,12 +136,12 @@ final class WindowCommands implements AutoCloseable {
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Command.TITLE, zen ? "Exit Zen Mode" : "Enter Zen Mode");
         owner.action(ActionId.ZOOM_PANE).putValue(Command.TITLE,
             owner.currentTab() != null && owner.currentTab().tree().zoomed() ? "Restore Pane" : "Zoom Pane");
-        view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
-        view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
-        view("view.status_bar").setEnabled(!zen);
-        view("view.rail").putValue(Command.TITLE, !zen && owner.railVisible() ? "Hide Rail" : "Show Rail");
-        view("view.rail").putValue(Action.SELECTED_KEY, !zen && owner.railVisible());
-        view("view.rail").setEnabled(!zen);
+        var status = owner.action(ActionId.TOGGLE_STATUS_BAR);
+        status.putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
+        status.putValue(Action.SELECTED_KEY, owner.status().isVisible());
+        var rail = owner.action(ActionId.TOGGLE_RAIL);
+        rail.putValue(Command.TITLE, !zen && owner.railVisible() ? "Hide Rail" : "Show Rail");
+        rail.putValue(Action.SELECTED_KEY, !zen && owner.railVisible());
         boolean buddy = owner.buddyEnabled.getAsBoolean();
         view("view.buddy").putValue(Command.TITLE, buddy ? "Hide Jasper" : "Show Jasper");
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);

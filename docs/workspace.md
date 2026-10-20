@@ -164,8 +164,9 @@ Clicking it shows the path and every problem, with a **Migrate Config…** butto
 See [Configuration](configuration.md).
 
 While a plugin tab is selected, the bar shows that tab's location and its own items instead of the shell, folder and
-size. View › Show/Hide › Status Bar (palette: **Show Status Bar** / **Hide Status Bar**) shows or hides it in every
-window and saves `window.status_bar`; Settings › Window also sets its height.
+size. View › Show/Hide › Status Bar (palette: **Show Status Bar** / **Hide Status Bar**; no default shortcut,
+`toggle_status_bar`) shows or hides it in every window and saves `window.status_bar`; Settings › Window also sets its
+height.
 
 ## Menus
 
@@ -243,9 +244,9 @@ window shows; click it to show or hide the window. A dot on a button marks unrea
 tooltip gives the count; see [the Notifications panel](notifications.md#the-notifications-panel)). Right-click a button
 for **Move to** and **Hide**.
 
-A rail shows only while it holds a button. View › Show/Hide › Rail (palette: **Show Rail** / **Hide Rail**) hides or
-shows both rails in the window, and Jasper remembers the choice in `ui-state.toml`. `window.rail_width` (Settings ›
-Window › Panel rail width) sets their width.
+A rail shows only while it holds a button. View › Show/Hide › Rail (palette: **Show Rail** / **Hide Rail**; no default
+shortcut, `toggle_rail`) hides or shows both rails in the window, and Jasper remembers the choice in `ui-state.toml`.
+`window.rail_width` (Settings › Window › Panel rail width) sets their width.
 
 Each tool window has a header: its title, the plugin's buttons, **Options** (⋯) with **Move to** and **Hide**, and
 **Hide** (the chevron).
@@ -272,10 +273,10 @@ new window, and the next start, use the last saved layout.
 **Zen** (View › View Modes › Zen; palette **Enter Zen Mode** / **Exit Zen Mode**; no default shortcut,
 `toggle_zen_mode`) hides the status bar, both rails and every tool window that was showing, which Jasper remembers.
 The header, toolbar and tabs stay. A tool window you open while in Zen shows in its slot as usual, without the
-rails. Leaving Zen hides those and shows the remembered ones again. View › Show/Hide › Status Bar and Rail are
-unavailable in Zen. Zen applies to the window you toggle it in; Jasper saves the last choice in `ui-state.toml`, and new
-windows and the next start begin in it. The saved layout keeps the tool windows that showed before Zen, so one opened in
-Zen is not saved as showing.
+rails. Leaving Zen hides those and shows the remembered ones again. View › Show/Hide › Status Bar and Rail, and their
+shortcuts, are unavailable in Zen. Zen applies to the window you toggle it in; Jasper saves the last choice in
+`ui-state.toml`, and new windows and the next start begin in it. The saved layout keeps the tool windows that showed
+before Zen, so one opened in Zen is not saved as showing.
 
 **Compact** (Settings › Appearance › View mode, `window.view_mode = "compact"`, after a restart) uses the system's
 title bar on every platform and removes the header row, so there is no search field or toolbar; the command palette

@@ -571,7 +571,7 @@ class WindowPanelsTest {
             assertThat(owner.rightStripe().buttons()).as("rail actions live on the left stripe").isEmpty();
             assertThat(seen).hasSize(1);
 
-            owner.dispatchCommand(owner.commands().find("view.rail").orElseThrow());
+            owner.dispatchCommand(owner.commands().find("toggle_rail").orElseThrow());
             assertThat(owner.leftStripe().isVisible()).isFalse();
             assertThat(owner.rightStripe().isVisible()).isFalse();
             assertThat(state.railVisible()).isFalse();

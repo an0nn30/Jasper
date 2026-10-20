@@ -30,8 +30,8 @@ bundled plugins on the public plugin SDK. The [documentation index](README.md) l
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** `./gradlew check` with Desk Buddy's new sprites (2026-10-20): 11,621 tests, 0 failures,
-  0 errors, 25 skipped. The Windows user installation entry ran it with Python 3.13 (`-Pjasper.python`), because
+- **Last recorded checks.** `./gradlew check` with the Rail and Status Bar shortcuts (2026-10-20): 11,630 tests,
+  0 failures, 0 errors, 25 skipped. The Windows user installation entry ran it with Python 3.13 (`-Pjasper.python`), because
   `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
   macOS, Ubuntu and every Linux packaging and install check passed, and so did the single-worker Windows check.
 
@@ -71,6 +71,12 @@ Open items, as the entries below record them:
 ## Handoff log
 
 Newest first. Each entry describes its change as it stood when the entry was written.
+
+**Rail and Status Bar shortcuts — 2026-10-20** (`claude/rail-status-keys`): View › Show/Hide › Rail and Status Bar
+are Keymap actions `toggle_rail` and `toggle_status_bar` (keymap spec rows 57 and 59): Global, unbound by default and
+disabled in Zen like their menu items. They replace the palette-only `view.rail` and `view.status_bar` commands; the
+menu items and palette entries use the actions. Full headless `check` passed on macOS after the rebase onto
+`origin/main` at `bee2c9f28`: 11,630 Java tests, zero failures/errors, 25 expected skips. GUI check pending.
 
 **V1 documentation overhaul — 2026-10-19** (`claude/v1-docs`, worktree `.claude/worktrees/v1-docs`, from `main` at
 `faeec76f3`). The current guides describe Jasper as a pluggable DevOps workstation, its core and its bundled plugins,

@@ -109,8 +109,8 @@ final class WindowChrome {
             toolbarModes.add(item); modes.add(item);
         }
         visibility.add(modes); visibility.add(statusVisible); visibility.add(railVisible);
-        statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
-        railVisible.setAction(owner.windowCommands().view("view.rail"));
+        statusVisible.setAction(owner.action(ActionId.TOGGLE_STATUS_BAR));
+        railVisible.setAction(owner.action(ActionId.TOGGLE_RAIL));
         pluginSeparator.setName("pluginSeparator");
         composition.build(this);
         owner.action(ActionId.COMMAND_PALETTE).addPropertyChangeListener(event -> {
