@@ -39,7 +39,7 @@ class PresentationConformanceTest {
         "type/data/family", "type/data/regular", "type/data/medium",
         "colors/dialog_surface", "colors/navigation_surface",
         "defaults/ui.theme.light", "defaults/ui.theme.dark", "defaults/palette.visible_rows", "defaults/window.toolbar_height",
-        "defaults/window.toolbar",
+        "defaults/window.toolbar", "defaults/dev.jasper.editor/font_family",
         "branding/product", "branding/icons", "branding/splash_art");
     /** The official IBM Plex 1.1.0 files (verified fact 11), by their name in the plugin. */
     static final Map<String, String> SUMS = Map.of(
@@ -85,6 +85,8 @@ class PresentationConformanceTest {
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.
         assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR_HEIGHT)).isEqualTo(28);
         assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR)).isEqualTo(dev.jasper.app.config.ToolbarMode.ICONS);
+        assertThat(parsed.defaults().plugin("dev.jasper.editor")).as("the Editor in the data face (plan 15a)")
+            .containsExactly(java.util.Map.entry("font_family", "IBM Plex Mono"));
     }
 
     @Test void theFontsAreIbmsDecodeAndEveryWeightResolvesToItsFamily() throws Exception {
