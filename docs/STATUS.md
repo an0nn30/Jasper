@@ -10,7 +10,7 @@ coordinates, with its label in a small undecorated window beside the cursor (`Ta
 target window's `DockDropOverlay`. `dock.WorkspaceDropResolver` (pure; `dock` may now name the layout's group ids and
 sides) maps the cursor to a drop: a place in a strip, a group's centre, a group's outer quarter on a side (the empty
 main workspace is all centre), and picks the most recently active window under the cursor; on macOS a window in full
-screen on the drag's display, other than the drag's own, takes no drop. Within a window `WorkspaceView.drop` reorders,
+screen on the display of the drag's own window, other than that window, takes no drop. Within a window `WorkspaceView.drop` reorders,
 moves or splits; into
 another window the tab registry moves the tab (TAB_MOVED, both maximizes end, an emptied child window closes after it)
 and the drop places it, an edge drop beside the target group directly (`TabRegistry.move(Tab, UUID, GroupId, Side)`);

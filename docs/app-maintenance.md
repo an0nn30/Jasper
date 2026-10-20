@@ -696,7 +696,7 @@ the target window's `DockDropOverlay`. Where a tab would drop is `WorkspaceDropR
 `WorkspaceView.drop`; one into another window goes through the tab registry first, and a tear-out through the window
 manager. A child window's only tab and a pinned tab have no tear-out target, and a pinned tab takes targets in its own
 window only. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in
-full screen on the drag's display, other than the drag's own, takes no drop (`TabDrag.dropFrame`). Esc, a plain move or
+full screen on the display of the drag's own window, other than that window, takes no drop (`TabDrag.dropFrame`). Esc, a plain move or
 a press anywhere (a lost release), the source window losing the focus and the dragged tab closing or leaving its window
 or group end a drag. `TabDragTest` and `TabDragWindowsTest` drive it headlessly over stand-in frames on a pretend screen
 (`TabDragTestSupport`).

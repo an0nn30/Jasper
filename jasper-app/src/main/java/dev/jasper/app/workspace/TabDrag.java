@@ -45,18 +45,17 @@ import javax.swing.SwingUtilities;
  * goes, and synthetic events drive it in tests. While it runs, {@link TabDragLabel} shows the tab's label beside the
  * cursor and the target window's layered pane shows where the tab would land ({@link DockDropOverlay}, from
  * {@link WorkspaceDropResolver#landing}); nothing moves until the release.
- * <p>The target: of the windows under the cursor that can take a drop (on macOS none in full screen on the drag's
- * display but the drag's own), the most recently active; over its workspace, the resolver's drop unless it would change
- * nothing; anywhere else in that window (its dock, chrome or title bar), and over any other window of Jasper's (Settings,
- * About, a dialog), nothing; outside every window, a new child window whose workspace is the size of the tab's old group,
- * with the tab where the cursor holds it and kept on the display under the cursor, except for a child window's only tab,
- * whose window already is its own.
- * A pinned tab (a modal owner holds it in its window) takes targets in its own window only. Releasing the left button
- * carries the target out: within a window through the workspace's layout operations, into another window through the tab
- * registry's moves, out of every window through the window manager's; none touches a tab's content or session.
- * Releasing on no target, Esc, another press or a plain move (both mean Swing lost the release), the drag's window losing
- * the focus (a modal dialog, another application), and the dragged tab closing or leaving its window or its group (a
- * command moving it) end the drag without a drop. EDT only.
+ * <p>The target: of the windows under the cursor that can take a drop (on macOS none in full screen on the display of
+ * the drag's own window but that window), the most recently active; over its workspace, the resolver's drop unless it
+ * would change nothing; anywhere else in that window (its dock, chrome or title bar), and over any other window of
+ * Jasper's (Settings, About, a dialog), nothing; outside every window, a new child window whose workspace is the size
+ * of the tab's old group, with the tab where the cursor holds it and kept on the display under the cursor, except for a
+ * child window's only tab, whose window already is its own. A pinned tab (a modal owner holds it in its window) takes
+ * targets in its own window only. Releasing the left button carries the target out: within a window through the
+ * workspace's layout operations, into another window through the tab registry's moves, out of every window through the
+ * window manager's; none touches a tab's content or session. Releasing on no target, Esc, another press or a plain move
+ * (both mean Swing lost the release), the drag's window losing the focus (a modal dialog, another application), and the
+ * dragged tab closing or leaving its window or its group (a command moving it) end the drag without a drop. EDT only.
  */
 final class TabDrag {
     /** Where a release would put the dragged tab. */
