@@ -395,8 +395,8 @@ name; the platform dialog confirms replacing an existing file. The testkit answe
 in an application workspace. The application owns tabs, rounded frames, overflow, menus,
 status controls and native window lifetime. Keys are scoped to the contributing plugin;
 opening an existing key selects its live tab. Null or closed originating windows use the
-main window, restoring it when needed; a `TabPlacement` (SDK 0.20) opens the tab in the active
-group of the window's shown parent tab, a new group beside it or a new child window. Foreign
+main window, restoring it when needed; a `TabPlacement` (SDK 0.20) opens the tab in a new tab
+of the window, a new pane beside the focused one or a new child window. Foreign
 owners are rejected.
 
 `ContentTab` updates literal presentation, commands and typed status items, supplies its

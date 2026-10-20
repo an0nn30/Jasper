@@ -1,7 +1,18 @@
 # Workspace tabs 8a: tabs hold panes Implementation Plan
 
-**Status: not executed.** Written against `claude/workspace-tabs` at `2d7233474` ("Docs: tabs and panes spec, dimming
-and the strip's motion kept as today"); see Workspace. Record every deviation from this text here and in `docs/STATUS.md`.
+**Status: executed on 2026-10-20** (`4f2884089..a49e33f69`); see `docs/STATUS.md`. Written against
+`claude/workspace-tabs` at `2d7233474` ("Docs: tabs and panes spec, dimming and the strip's motion kept as today"); see
+Workspace. Deviations from the plan's text: (1) Task 1: two `TabDragTest` pins for a press whose item closes, or whose
+entry shows another pane, before the threshold; each also asserts the drag label never showed a title, since the
+review's assertions alone passed with the guard removed. (2) Task 2: `MoveTabsTest` pins that a tab moved to a new
+window, or back to the main window, takes the focus there (the deleted `BringBackTest` held the only such pin);
+`WorkspaceFileReadTest` reads a legacy `role = "pane"` window and drops it alone. (3) Task 3:
+`ClassicTabsTest.thePlusAndTheCloseActLikeButtons` keeps its strip after the "+" (which now opens a tab). (4) Task 4:
+`ClassicTabsTest` expects the window strip's "Close Tab"; a controller-ruled pin,
+`TabDragTest.aPressOnAnEntrysCloseStartsNoTabDrag`; and `WindowContent.selectTab` selects an item in a hidden tab before
+its tab shows, so no other item of that tab turns active on the way (no stray `onActive` or SDK `TAB_SELECTED`), pinned
+by `WorkspaceTabsTest` and `ParentTabsViewTest.selectingAnItemOfAHiddenTabPublishesOneTabSelectedForIt`. No anchor of
+Task 6 needed refreshing.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

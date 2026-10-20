@@ -679,12 +679,15 @@ dedicated connections, OS support and failure limits still apply. `PathBreadcrum
 saves light/dark local/remote/narrow previews under `build/render-preview`.
 
 
-Workspace tabs use centered text and equal-width cells; a pane holding a single tab hides
-its strip (`WorkspaceChrome.showsStrip`, applied to each group on every `WorkspaceView` render), and a window holding a
-single parent tab its parent-tab bar (`WorkspaceChrome.showsParentTabBar`, applied by `ParentTabBar.refresh`; the
-classic tabs never show it, as each pane's strip is Enterprise's only row of tabs); both
-show and hide at once, without motion. The bar is the look's strip over a `StripSource` (`ParentTabBar`, beside
-`GroupView`), and its entries never slide: a parent tab dragged along it takes its new place at once.
+Workspace tabs use centered text and equal-width cells in the window's one strip, the parent-tab bar (`ParentTabBar`
+over the look's `TabStrip`); a group (`GroupView`), a pane, shows its one tab and no strip. The strip shows from two
+parent tabs under the equal tabs and always under the classic tabs (`WorkspaceChrome.showsTabStrip`, applied by
+`ParentTabBar.refresh`), and shows and hides at once, without motion. An entry is its parent tab's
+(`ParentTabBar.id`): it keeps its place while the parent tab shows another of its groups, and a parent tab moved in or
+out, or dragged along the strip, takes its new place at once. While a parent tab holds two or more groups,
+`WorkspaceView.dimPanes` dims every group but the active one by `terminal.dim_inactive_panes` (`WindowContent.paneDim`):
+a terminal through its view, which `TerminalPane.setActive` dims as before (every terminal but its window's active
+one), any other tab under the group's overlay (`GroupView.dim`).
 `WindowTabs` derives selected/inactive surfaces from the workspace palette while
 preserving glass alpha. Child repaints start at the strip to reconstruct translucent pixels
 once. Width animations interpolate the sampled Alacritty reference; resize/reorder/animation
@@ -693,25 +696,20 @@ disable settle, and closed content is released before its empty gap contracts. S
 The toolbar and shortcuts own new-tab actions; close is hover-only and titles retain literal,
 bounded tooltips. The fixed list/add controls and scrolling/underline motion are retired.
 
-Tab drags use plain mouse events too (`TabDrag`), never AWT drag and drop. A strip's left press hands the drag its tab
-(`GroupView.pressed`), and a parent-tab bar's its whole parent tab (`ParentTabBar.pressed`); past the kit's
-`TAB_REORDER_THRESHOLD` it follows the cursor in screen coordinates over the
-windows the `WindowManager` lists, most recently active first, with `TabDragLabel` beside the cursor and the landing on
-the target window's `DockDropOverlay`. Where a tab would drop is `WorkspaceDropResolver`'s job, over
-`WorkspaceView.dropAreas`, and a parent tab's place in a bar (`place`): change the zones in the resolver and its tests
-first. A drop within a window is `WorkspaceView.drop`, or `ParentTabsView.reorder` for a parent tab; one into another
-window goes through the tab registry first (a parent tab's through `WindowManager.moveParentTab`; a window whose bar
-hides takes it over the band at its top, the main window's empty workspace anywhere over it), and a tear-out through
-the window manager (`popOutTab` makes a pane window,
-`popOutParentTab` a full window). A parent tab drops on bars alone. A child window's only tab, a full window's only
-parent tab and a pinned tab have no tear-out target, and a pinned tab or one being closed, or a parent tab holding one,
-takes targets in its own window only. A release over another window of Jasper's (`TabDrag.otherWindows`) drops
-nothing, and on macOS a window in
-full screen on the display of the drag's own window, other than that window, takes no drop (`TabDrag.dropFrame`). Esc, a plain move or
-a press anywhere (a lost release), the source window losing the focus, the dragged tab closing or leaving its window
-or group, and a dragged parent tab's entry showing another of its tabs end a drag. `TabDragTest` and
-`TabDragWindowsTest` drive it headlessly over stand-in frames on a pretend screen
-(`TabDragTestSupport`).
+Tab drags use plain mouse events too (`TabDrag`), never AWT drag and drop. A left press on a strip entry hands the drag
+its whole parent tab (`ParentTabBar.pressed`); past the kit's `TAB_REORDER_THRESHOLD` it follows the cursor in screen
+coordinates over the windows the `WindowManager` lists, most recently active first, with `TabDragLabel` beside the
+cursor and the landing on the target window's `DockDropOverlay`. A parent tab's place in a strip is
+`WorkspaceDropResolver.place`: change the rule in the resolver and its tests first. A drop along its own strip is
+`WindowContent.reorderParentTab`; one into another window goes through `WindowManager.moveParentTab` (a window whose
+strip hides takes it over the band at its top, the main window's empty workspace anywhere over it), and a tear-out
+through `WindowManager.moveTabToNewWindow`, a full window. A parent tab drops on strips alone; a window's only parent
+tab has no tear-out target, and a parent tab holding a pinned tab or one being closed takes targets along its own strip
+only. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in
+full screen on the display of the drag's own window, other than that window, takes no drop (`TabDrag.dropFrame`). Esc,
+a plain move or a press anywhere (a lost release), the source window losing the focus, and the tab its entry shows
+closing, leaving its parent tab or giving way to another of its groups end a drag. `TabDragTest` and
+`TabDragWindowsTest` drive it headlessly over stand-in frames on a pretend screen (`TabDragTestSupport`).
 
 Startup keyboard focus belongs to the active terminal. `WindowContent` provides the
 native frame's default focus traversal target: the pending `TerminalPane` until its

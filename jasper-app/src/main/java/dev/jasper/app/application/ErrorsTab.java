@@ -13,8 +13,8 @@ import java.util.UUID;
 import javax.swing.SwingUtilities;
 
 /**
- * The Errors tab (spec section 5; workspace tabs spec 6.6): one content tab over this session's incidents, in the main
- * window's active group, opened by an incident's Show more… link with that incident selected, and by Notifications: Show
+ * The Errors tab (spec section 5; workspace tabs spec 6.6): one content tab over this session's incidents, in a new tab
+ * of the main window, opened by an incident's Show more… link with that incident selected, and by Notifications: Show
  * Errors. Jasper owns it ({@link TabRegistry#APP_OWNER}); its tab strip closes it, closing it stops its view, and the tab
  * registry closes it at shutdown. EDT only.
  */

@@ -509,7 +509,7 @@ View menu choices save: Toolbar and Status Bar write `window.toolbar` and `windo
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses bundled Cousine Nerd Font Mono at 12 points by default. The app ships regular, bold, italic and bold-italic faces, including Nerd Font symbols, and registers them for its own process; no system font installation is needed. Explicitly saved font family and size settings take precedence.
 
-On macOS, `option_as_meta` controls which Option key sends Meta input; `"none"` leaves Option character entry available. Application shortcuts retain priority over terminal encoding. Cursor settings supply the fallback: a program's cursor shape/blink escape sequence takes precedence until the program resets that choice. Configured pane dimming persists through focus and theme changes. Copy-on-select copies a completed local selection to the clipboard.
+On macOS, `option_as_meta` controls which Option key sends Meta input; `"none"` leaves Option character entry available. Application shortcuts retain priority over terminal encoding. Cursor settings supply the fallback: a program's cursor shape/blink escape sequence takes precedence until the program resets that choice. While a tab holds two or more panes, every pane but the active one dims by `dim_inactive_panes`, and a window in the background dims every terminal; the dimming persists through focus and theme changes. Copy-on-select copies a completed local selection to the clipboard.
 
 A visual bell flashes a short foreground overlay for 150ms. Sound uses the system beep; none disables both. Only attached views handle bells. Detaching a view clears its visual bell and discards queued bell delivery.
 
@@ -710,7 +710,7 @@ or **Exit Zen Mode**, and the menu toggle remains usable even after removing its
 
 ## Shortcuts
 
-The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_tab_in_pane`, `new_terminal_window`, `close_window`, `close_tab`, `close_pane`, `close_parent_tab`, `split_right`, `split_down`, `next_parent_tab`, `previous_parent_tab`, `select_parent_tab_1`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `clear_terminal`, `open_settings` and `reload_config`.
+The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_terminal_window`, `close_window`, `close_pane`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `select_tab_1`, `move_tab_to_new_window`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `clear_terminal`, `open_settings` and `reload_config`.
 
 Settings › Keymap edits these bindings without opening the file; it writes the same `[keybindings]` entries.
 
@@ -720,8 +720,8 @@ On macOS, `cmd` means Command and `alt`/`option` means Option. For example:
 [keybindings]
 new_tab = "cmd+t"
 split_down = "cmd+shift+d"
-previous_parent_tab = "cmd+{"
-next_parent_tab = "cmd+}"
+previous_tab = "cmd+{"
+next_tab = "cmd+}"
 reload_config = "ctrl+F12"
 ```
 
@@ -731,8 +731,8 @@ Outside macOS, `cmd` maps to Ctrl+Shift. Defaults that also name Shift add Alt t
 [keybindings]
 new_tab = "ctrl+shift+t"
 split_down = "ctrl+alt+shift+d"
-previous_parent_tab = "ctrl+pageup"
-next_parent_tab = "ctrl+pagedown"
+previous_tab = "ctrl+pageup"
+next_tab = "ctrl+pagedown"
 reload_config = "ctrl+F12"
 ```
 
@@ -877,10 +877,9 @@ turning it off and clicking Apply finishes running transitions immediately in op
 use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
 
 Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): opening takes 475 ms and
-closing 425 ms. Selection is immediate. A pane holding a single tab shows no tab strip, and its second tab shows the
-strip at once, without motion; under the Enterprise look the strip always shows and is the window's only row of tabs,
-with no parent-tab bar. The standard look's parent-tab bar shows and hides at once too, and its tabs never slide: a
-parent tab dragged along it takes its new place at once.
+closing 425 ms. Selection is immediate. A window's tab strip shows and hides at once, with its second tab (under the
+Enterprise look it always shows, and its tabs never move); a tab dragged along it, moved between windows or showing
+another of its panes takes its new place at once.
 
 The command palette drips open: over 300 ms its bottom edge eases down from the top of the card (quartic ease-out,
 fast then slow) while its rows stay in place, so the query field takes typing at once. Only a fresh open animates;

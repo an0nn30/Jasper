@@ -53,8 +53,8 @@ Appearance icon loaders, arbitrary Icon arguments and palette fallback readers w
 Jasper has one main window, which keeps an empty workspace when its last tab leaves, and any number of child windows,
 which close with their last tab; `WindowHandle.isMain()` tells them apart. Panels, the toolbar and the status bar are the
 main window's: a panel has one instance, there, and a toggle from a child window shows it in the main window.
-`Windows.openTab(spec, owner, view, placement)` takes a `TabPlacement`: `ACTIVE_GROUP` (the three-argument form),
-`SPLIT_RIGHT` or `SPLIT_DOWN` (a new tab group beside the active one) or `NEW_WINDOW` (a new child window).
+`Windows.openTab(spec, owner, view, placement)` takes a `TabPlacement`: `ACTIVE_GROUP` (the three-argument form: a new
+tab of the window), `SPLIT_RIGHT` or `SPLIT_DOWN` (a new pane beside the focused one) or `NEW_WINDOW` (a new child window).
 `ContentTab.moveToNewWindow()` moves a tab to a new child window, `moveToMainWindow()` to the main window, and `window()`
 is the window that holds it. A plugin's own view is a panel or a content tab; a dialog belongs to a Jasper window, a
 content tab or an anchor, and a shortcut context is global, a terminal, the plugin's content tabs or one of its panels.
@@ -64,9 +64,9 @@ a window's tabs sit in groups, and `contentTab` and `contentView` find a plugin'
 ## Tabs of every kind (SDK 0.19.0)
 
 A window's tabs are terminal tabs and content tabs (an editor, a tool view, a plugin's view), and a split is a terminal
-tab in a new tab group. `WindowHandle.tabs()` lists every tab in workspace order and `activeTab()` is the active
-group's selected tab; `TabHandle.kind()` says which kind a tab is and `terminal()` is a terminal tab's one pane.
-`Terminals.split` opens a terminal tab beside the pane's group. `TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover
+tab in a new pane. `WindowHandle.tabs()` lists every tab in workspace order and `activeTab()` is the focused
+pane's; `TabHandle.kind()` says which kind a tab is and `terminal()` is a terminal tab's one pane.
+`Terminals.split` opens a terminal tab beside the pane. `TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover
 every tab, and `TAB_MOVED` reports a tab moving to another window: a moved terminal tab reports no `PANE_OPENED` or
 `PANE_CLOSED`, and its pane keeps its id; a window opened for the move reports `WINDOW_OPENED` before the `TAB_MOVED`,
 and a window the move empties `WINDOW_CLOSED` after it. The Tab menu (`StandardMenu.TAB`) holds the split, group-focus

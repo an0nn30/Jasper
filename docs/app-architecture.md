@@ -98,9 +98,9 @@ The process shutdown hook backs up endpoint cleanup and drains logging separatel
 Windows are one main window and any number of child windows (workspace tabs spec 6), all made and closed by the
 application's `WindowManager` (workspace): the main window has every piece of chrome around its workspace and keeps an
 empty workspace when its last tab closes; a child window (`WindowRole.CHILD` content) shows a title bar over its
-workspace and closes with its last tab. A child window is a full window, with parent tabs, or a pane window, whose
-content has one layout and an `Origin` (layout). `WindowManager` pops tabs, panes and parent tabs out, brings a pane window
-back and moves a full window's parent tabs to the main window: `WindowContent.receive` lands each tab through the tab
+workspace and closes with its last tab. A child window is a full window, with parent tabs (the code's name for a window's
+tabs; each group, a pane, holds one tab, its item). `WindowManager` moves a parent tab into a new full window and a full
+window's parent tabs to the main window: `WindowContent.receive` lands each tab through the tab
 registry, then, when every tab arrived, `WorkspaceView.rearrange` gives the parent tab its planned layout. Every outside request, a plugin's tab
 with no window and the menu bar item
 restore the main window first; closing the main window, Quit and going to the background close the child windows, then
@@ -176,9 +176,9 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT arguments, the home's instance lock and the handoff, and EDT composition. StartupResources owns rollback until explicit transfer; the owner's Instance keeps its lock for the life of the process. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
-| `workspace` | EDT windows (`WindowManager`, `MainWindow`, `ChildWindow`, their `WindowFrame`s), their parent tabs (`ParentTabsView`, with the parent-tab bar `ParentTabBar`), each a workspace of tab groups (`WorkspaceView`, `GroupView`, `SplitContainer`), terminal tabs and panes, the tab drag (`TabDrag`, the window manager's one, shared by its windows, for tabs and parent tabs), the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
+| `workspace` | EDT windows (`WindowManager`, `MainWindow`, `ChildWindow`, their `WindowFrame`s), their parent tabs (`ParentTabsView`, with the parent-tab bar `ParentTabBar`), each a workspace of groups, its panes, one tab each (`WorkspaceView`, `GroupView`, `SplitContainer`), terminal tabs and panes, the tab drag (`TabDrag`, the window manager's one, shared by its windows, for parent tabs), the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`; and the tab drag's `WorkspaceDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, and the layout's group ids and sides, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
-| `layout` | Pure workspace layout model: a window's content (`WindowLayout`: `ParentTabs`, its parent tabs with the shown one and their order of use, or a `PaneLayout` with its `Origin`), parent tab, tab and group ids, a workspace's tab groups in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximized group and the groups' order of use, the operations that return a new layout, and each group's region of the unit square with its directional neighbours. JDK-only (nothing from Swing or AWT, enforced by `verifyApplicationArchitecture`); immutable values, safe on any thread. `persistence.WorkspaceFile` reads and writes a workspace's `Layout` as `workspace.toml`. |
+| `layout` | Pure workspace layout model: a window's parent tabs (`ParentTabs`, with the shown one and their order of use), parent tab, tab and group ids, a workspace's groups (its panes, one tab each) in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximized group and the groups' order of use, the operations that return a new layout, and each group's region of the unit square with its directional neighbours. JDK-only (nothing from Swing or AWT, enforced by `verifyApplicationArchitecture`); immutable values, safe on any thread. `persistence.WorkspaceFile` reads and writes a workspace's `Layout` as `workspace.toml`. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the palette's two views behind `PaletteView` (the card, `CardView`, and the Run window, `RunWindowView`, built by `PaletteViews.of` from the look's `PaletteLook`) and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
 | `config` | Immutable values and pure parsing through CoreSettings.SCHEMA; ConfigService owns background watch/reload, the save transaction (settings, shortcuts) and Migrate Config, and marshals delivery to EDT. Application closes the service. |
@@ -228,7 +228,7 @@ Javadoc and copied guide examples are normal check dependencies. See the
 
 ## Window chrome
 
-The main window has a header row above its parent tabs: the parent-tab bar, then the shown parent tab's workspace of tab groups, each with its own tab strip (in the standard look, none while it holds a single tab); a child window has only its title bar, which ends with the window's ⋮, above its parent tabs, or above the one workspace of a pane window, which has no parent-tab bar. `WindowHeader` (workspace) centres
+The main window has a header row above its parent tabs: the parent-tab bar, the window's one tab strip (in the standard look, none while the window holds a single parent tab), then the shown parent tab's workspace of groups, its panes; a child window has only its title bar, which ends with the window's ⋮, above its parent tabs. `WindowHeader` (workspace) centres
 `TitleSearchField` on the window and packs `WindowChrome`'s IntelliJ-style toolbar (tab/window,
 pane, plugin, then Find/Settings groups, then the window's ⋮, `WindowMenuButton`; tooltips carry live shortcuts) against the trailing edge.
 The field is always centred on the window; the sides give way first (toolbar labels, then controls into
@@ -261,7 +261,7 @@ Windows and Linux system title bar no appearance hint (JBR has none). `Workspace
 `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).
 `WindowTitle` fills the look's title template. `WorkspaceChrome.of` also picks the window content: `HeaderComposition`
 (`UnifiedHeader`, or `ClassicHeader`, a toolbar row of left-packed buttons with the search field and Settings…
-trailing), `TabStrip` (one per tab group and one for the parent-tab bar: `WindowTabs`, or the content-sized `ClassicTabs`), `StatusCells` (`SlashSegments`, or
+trailing), `TabStrip` (the parent-tab bar's: `WindowTabs`, or the content-sized `ClassicTabs`), `StatusCells` (`SlashSegments`, or
 `RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's dialog mapping and marks the surfaces
 it makes; `NativeShells` draws a marked modal overlay or attached sheet whose window is showing in that window as a
 `ClassicDialog`. The title search field shows `WindowHeaderContext` and opens the palette, which `WindowCommandPalette`

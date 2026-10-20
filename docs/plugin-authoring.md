@@ -293,8 +293,8 @@ private static void installPanelAndAboutTab(PluginContext context, long stepMill
 
 `context.terminals()` finds windows, tabs and panes; an action's context names the window and pane
 it was invoked on. A window's tabs are terminal tabs, each holding one pane, and content tabs such as an editor
-(SDK 0.19: `TabHandle.kind()` and `terminal()`); a split opens a terminal tab in a new tab group beside the pane's
-group. Handles keep an id, never a Swing object, and two handles for the same pane are
+(SDK 0.19: `TabHandle.kind()` and `terminal()`); a split opens a terminal tab in a new pane beside the pane.
+Handles keep an id, never a Swing object, and two handles for the same pane are
 equal. Finding things needs no capability. What a handle may do does:
 
 | Capability | Lets your plugin |
@@ -921,8 +921,8 @@ and set a focus callback. Pass the handle as the owner of save pickers and dialo
 follow moves to another window. `moveToNewWindow()` moves the tab to a new child window, and leaves a child window's
 only tab where it is; `moveToMainWindow()` moves it to the main window, and `window()` is the window that holds it; since
 SDK 0.20 `openTab(spec, owner, view, placement)` opens
-it in the active group (`TabPlacement.ACTIVE_GROUP`), in a new group beside it (`SPLIT_RIGHT`, `SPLIT_DOWN`) or in a
-new child window (`NEW_WINDOW`). Preserve the component/session during moves. The tab is a
+it in a new tab of the window (`TabPlacement.ACTIVE_GROUP`), in a new pane beside the focused one (`SPLIT_RIGHT`,
+`SPLIT_DOWN`) or in a new child window (`NEW_WINDOW`). Preserve the component/session during moves. The tab is a
 content tab of its window: `WindowHandle.tabs()` lists it and the `TAB_*` topics report it.
 
 Register one `onTabsClosing` guard per plugin. It receives the closing subset and a batch

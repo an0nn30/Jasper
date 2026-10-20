@@ -2,7 +2,7 @@
 
 Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or type `>ssh` in the
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
-new tab group beside the current one, Shift+Enter edits the host. The **Sessions** panel shows searchable
+new pane beside the current one, Shift+Enter edits the host. The **Sessions** panel shows searchable
 compact tree-style rows grouped by folder, favorites first, with slightly larger text.
 Choose **Session › Toggle SSH hosts** or press **Cmd+Alt+1** (Alt+1 elsewhere) to show or hide
 the panel in the current window. Opening the sidebar highlights the first visible host and focuses
@@ -30,7 +30,7 @@ SFTP on the left.
 On Windows with WSL installed, the Sessions panel starts with a read-only **WSL** group: the
 distributions Jasper detected for its shell profiles, each with its WSL version (WSL 1 or WSL 2) as a
 badge. Double-click or Enter, **Open** on the card, or **Open in new tab** in the context menu opens
-the distribution in a new local tab; **Open in split** opens it in a new tab group beside the current one. A dot and count mark
+the distribution in a new local tab; **Open in split** opens it in a new pane beside the current one. A dot and count mark
 the panes Remote opened for it whose shell still runs. Distributions are never saved in `hosts.toml`
 and cannot be edited, duplicated, deleted or browsed with SFTP; the group's collapsed state is saved
 as its own `wsl_collapsed` flag in `panel-state.toml` (a host group named "wsl" keeps its own state),
@@ -166,7 +166,7 @@ For the WSL group (Windows with at least one WSL 1 and one WSL 2 distribution), 
     collapses and expands on its own, without moving the WSL group.
 15. The toolbar's **Sessions** dropdown lists the distributions first (for example "Ubuntu (WSL 2)");
     choosing one opens it in a new tab. In `>ssh`, distributions are rows tagged `WSL`: Enter opens a
-    tab, Cmd/Ctrl+Enter opens it in a new tab group beside the current one, and Shift+Enter (edit) does nothing.
+    tab, Cmd/Ctrl+Enter opens it in a new pane beside the current one, and Shift+Enter (edit) does nothing.
 
 For native acceptance of the UI changes, resize the app while connecting and confirm the overlay
 stays centered; Escape/outside clicks and underlying menus should not interrupt it. Cancel should
