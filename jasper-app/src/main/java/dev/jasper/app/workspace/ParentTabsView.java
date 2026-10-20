@@ -207,7 +207,7 @@ final class ParentTabsView extends JPanel {
             }
     }
 
-    /** The window closed: every parent tab's strips are released; the tabs are its registry's to close. */
+    /** The window closed: the bar and every parent tab's strips are released; the tabs are its registry's to close. */
     void close() {
         if (closed) return;
         closed = true;

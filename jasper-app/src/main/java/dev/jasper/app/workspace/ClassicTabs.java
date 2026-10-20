@@ -38,9 +38,10 @@ import javax.swing.UIManager;
 /**
  * Classic editor tabs of one tab group (spec 10.5; the Workstation mocks): always visible, content-sized, each with a
  * status dot for a terminal tab, its label and a persistent ×, a "+" after the last one (at the trailing edge, over the
- * tabs a crowded strip clips) that opens a tab in this group; the active tab on {@code surface.card} with a 2 px
- * {@code tab.indicator} underline; 1 px {@code border.window} dividers and the strip's rule on {@code surface.tabstrip}.
- * Never moves. It shows a window's parent tabs too, each as its active tab (parent tabs spec 7).
+ * tabs a crowded strip clips) that opens what its source names (New Tab in Pane in a pane's strip, New Tab in the bar);
+ * the active tab on {@code surface.card} with a 2 px {@code tab.indicator} underline; 1 px {@code border.window}
+ * dividers and the strip's rule on {@code surface.tabstrip}. Never moves. It shows a window's parent tabs too, each as
+ * its active tab (parent tabs spec 7).
  */
 final class ClassicTabs extends JPanel implements TabStrip {
     private final StripSource source;

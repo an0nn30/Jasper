@@ -77,7 +77,7 @@ class WorkspaceViewTest {
         });
     }
 
-    /** The strip follows the window's tab count in the same EDT turn, shown and hidden at once, without motion. */
+    /** The strip follows its pane's tab count in the same EDT turn, shown and hidden at once, without motion. */
     @Test void theStripShowsWithASecondTabAndHidesWithTheLastButOne() throws Exception {
         edt(() -> {
             var owner = window(2);
@@ -125,7 +125,7 @@ class WorkspaceViewTest {
         });
     }
 
-    @Test void twoGroupsRenderASplitWithAStripEach() throws Exception {
+    @Test void twoOneTabPanesRenderASplitWithNoStrip() throws Exception {
         edt(() -> {
             var owner = window(2);
             var workspace = owner.workspace();

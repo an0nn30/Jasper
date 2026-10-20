@@ -1,6 +1,8 @@
 # Workspace tabs 7a: parent tabs Implementation Plan
 
-**Status: executed on 2026-10-20** (`c9cd1e2d8..05521e053`); see `docs/STATUS.md`. Deviations from the plan's text:
+**Status: executed on 2026-10-20** (`8e129ff34..05521e053`; the Vault dialog commits, Remote 0.15.0 and plans 7b and
+7c's documents lie between; then its final fix wave, "Parent tabs: final review fixes"); see `docs/STATUS.md`. Deviations
+from the plan's text:
 `ParentTabs.java` got a ledger row (`new ArrayList` matches `CANDIDATE`); a new parent tab takes the window's theme and
 glass; `ParentTabsView` keeps its views in bar order; a strip in a hidden parent tab runs no motion; pins for Rulings 3,
 10 and 21; `MockUiTest` measures the content height relative to its own value; `WindowTabsTest` overrides

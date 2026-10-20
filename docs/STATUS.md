@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 7a: parent tabs — 2026-10-20** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `c9cd1e2d8..05521e053` (the Vault dialog commits and plans 7b and 7c's documents lie
-between), then this documentation commit;
+`.claude/worktrees/workspace-tabs`, `8e129ff34..05521e053` (the Vault dialog commits, Remote 0.15.0 and plans 7b and
+7c's documents lie between), then this documentation commit, then its final fix wave ("Parent tabs: final review fixes");
 [plan](superpowers/plans/2026-10-19-workspace-7a-parent-tabs.md),
 [spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md)). A window holds parent tabs, each an unnamed set of
 panes (the split grid of plans 3 to 5), and shows one at a time. The model joins `layout` (`ParentTabId`, `ParentTab`,
@@ -36,8 +36,9 @@ parent tab as its active tab, with "+" New Tab and a × and menu that close a pa
 bar is the parent-tabs view's top row; (18) the mock test reads the pane's strip under the bar; (19) the bar is named
 `parentTabBar` and stays the view's last child; (20) new files take ledger rows `nonvisual-helper,none,none`; (21) a
 split beside a hidden parent tab's terminal opens there and does not show it. Spec issues: 1 (spec 8's Alt+1-9 for
-Select Parent Tab 1-9 is taken by Remote's tool-window toggles and is readline's digit argument) is open: Ctrl+1-9 moved
-from Select Tab to Select Parent Tab off macOS, and Alt+1-9 would first move Remote's three toggles. Deviations:
+Select Parent Tab 1-9 is taken by Remote's tool-window toggles and is readline's digit argument) was decided by the
+controller, for the user to confirm: Ctrl+1-9 moved from Select Tab to Select Parent Tab off macOS; Alt+1-9 would first
+need Remote's three toggles moved (a Remote change and version bump). Deviations:
 `ParentTabs.java` got a ledger row, because `new ArrayList` matches `CANDIDATE`; a new parent tab takes the window's
 theme and glass, which the plan omitted; `ParentTabsView` keeps its views in bar order (`add(view, index)`); a strip in
 a hidden parent tab runs no motion (`WindowTabs.shown()`); pins were added for Rulings 3, 10 and 21; `MockUiTest`
@@ -47,17 +48,25 @@ search assertion names the first view's strip; tests pin a whole parent tab's cl
 plan 7b: `PaneLayout`'s origin and the pane windows that hold it, and Pop Out Parent Tab and Move to Main Window in
 `WindowContent.parentTabMenu`; for plan 7c: a drag from `ParentTabBar.pressed` (the bar's entries start none), with moves
 between parent tabs of one window still refused by the registry; for plans 6a and 6b: `WindowContent.windowLayout()` is
-what a window saves, and `workspaceChanged(WorkspaceView, boolean)` runs on every layout and parent-tab change.
+what a window saves, and `workspaceChanged(WorkspaceView, boolean)` runs on every layout and parent-tab change; for plan
+6a (SDK 0.21.0): the SDK Javadoc still describes one workspace (`WindowHandle.tabs()` "in workspace order (group by group,
+…)" at `WindowHandle.java:18`; "the active group of the owner's window" in `TabPlacement.java:10` and `Windows.java:19`;
+"the window's active group" in `Terminals.openTab`), to be reworded as "parent tab by parent tab in bar order, then group
+by group" and "the active pane of the shown parent tab"; for plans 7b and 7c: `ParentTabs` refuses a one-step move of a
+parent tab's last tab into another parent tab of the same window, so callers remove, then replace.
 `./gradlew check --continue`: **BUILD SUCCESSFUL, 11,948 tests, 0 failures, 0 errors, 25 skipped (app 3,976 with 19 skipped, terminal 459 with 5, ui 930, buddy 151, sdk 94, sdk-testkit 205, editor 4,913, enterprise 3, fileserver 285, history 41, indexer 99, remote 544, sample 14, snippets 13, vault 221 with 1)**. GUI checks for the user: in the standard
 look one parent tab shows no bar, ⌘T (Ctrl+Shift+T) and the toolbar's New tab show it at once above the panes, each
 opening a parent tab, and each entry is its parent tab's active tab's title; clicking an entry, ⌘1-9 / Ctrl+1-9 and
 ⌘⇧[ ⌘⇧] / Ctrl+PageUp Ctrl+PageDown switch parent tabs with every shell still running (a `top` in a hidden parent tab is
 current when it shows) and the focus on the shown parent tab's tab, also with the focus in the Editor or a tool window's
-table; ⌃⇥ ⌃⇧⇥ (Ctrl+Tab, Ctrl+Shift+Tab) move within the active pane; a parent tab's last tab closing (Cmd+W, its shell
-exiting, the bar's ×, Close Parent Tab) shows the one used before it, and closing to one parent tab hides the bar; a bar
-entry's × and middle-click close every tab of that parent tab, without a prompt; under the Enterprise look the bar
-always shows above the pane strips, its "+" (New Tab) and the toolbar's New Session open a parent tab (a bar entry), a
-pane strip's "+" (New Tab in Pane) stacks in its pane, and the main window's empty workspace shows a bar with "+" alone;
+table; switching to a parent tab whose right pane is active keeps that pane active (AWT's focus hand-off on hide must not
+leave another pane active); ⌃⇥ ⌃⇧⇥ (Ctrl+Tab, Ctrl+Shift+Tab) move within the active pane; a parent tab's last tab
+closing (Cmd+W, its shell exiting, the bar's ×, Close Parent Tab) shows the one used before it, and closing to one
+parent tab hides the bar; a bar entry's × and middle-click close every tab of that parent tab: terminal tabs without a
+prompt; a plugin tab's close guard (an Editor file with unsaved changes) asks once first, and a refusal closes nothing;
+under the Enterprise look the bar always shows above the pane strips, its "+" (New Tab) and the toolbar's New Session
+open a parent tab (a bar entry), a pane strip's "+" (New Tab in Pane) stacks in its pane, and the main window's empty
+workspace shows a bar with "+" alone;
 a pane holding one tab shows no strip in the standard look, in a split too; the File menu's Close Pane and Close Parent
 Tab, the Tab menu's new order and the Keymap's Panes category; Remote's Alt+1/2/3 still toggle its tool windows on
 Windows and Linux; a `jasper` request and a plugin's tab open in the shown parent tab; New Terminal Window and New Editor

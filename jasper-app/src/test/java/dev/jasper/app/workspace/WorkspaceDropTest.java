@@ -91,7 +91,11 @@ class WorkspaceDropTest {
             assertThat(first.splits()).isTrue();
             assertThat(areas.get(1).strip().isEmpty()).as("a pane holding one tab shows no strip (parent tabs spec 7)").isTrue();
             assertThat(areas.get(1).tabs()).isEmpty();
-            assertThat(workspace.dropAreas(tabs.get(2)).get(1).tabs()).as("a group whose only tab is dragged").isEmpty();
+            var hidden = workspace.groupView(right);
+            assertThat(areas.get(1).content()).as("the hidden-strip pane's content").isEqualTo(hidden.contentBounds(workspace));
+            assertThat(areas.get(1).splits()).as("in a split window").isTrue();
+            assertThat(workspace.dropAreas(tabs.get(1)).getFirst().tabs()).as("dragging the pane's second tab leaves the first")
+                .containsExactly(view.tabBounds(workspace).get(0));
         });
     }
 

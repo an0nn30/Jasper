@@ -16,15 +16,15 @@ import javax.swing.JPopupMenu;
 sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs {
     /** The component mounted above the group's cards. */
     JComponent component();
-    /** Takes the group's tabs, titles, selection and states. */
+    /** Takes its source's tabs (a pane's, or the parent tabs' in the bar), titles, selection and states. */
     void refresh();
     /** Whether the strip shows as active: its window active and its group the active group. */
     void setActive(boolean active);
     /** The configured animations; classic tabs never move. */
     void setAnimations(AnimationSettings settings);
-    /** The group's tabs, as a menu of literal titles of at most {@code WindowTabs.TITLE_LIMIT} characters. */
+    /** Its source's tabs, as a menu of literal titles of at most {@code WindowTabs.TITLE_LIMIT} characters. */
     JPopupMenu tabList();
-    /** Each tab's rectangle in this strip's coordinates, in its group's tab order: a tab drag drops between them. */
+    /** Each tab's rectangle in this strip's coordinates, in its source's tab order: a tab drag drops between them. */
     List<Rectangle> tabBounds();
     /** Releases the tabs. */
     @Override void close();

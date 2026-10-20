@@ -235,7 +235,7 @@ class TabMenuTest {
         });
     }
 
-    @Test void theFileViewAndTabMenusNameTabsAndGroups() throws Exception {
+    @Test void theFileViewAndTabMenusNameTabsPanesAndParentTabs() throws Exception {
         var window = window(1);
         edt(() -> {
             assertThat(items(window, "File")).containsSubsequence("New Tab", "New Terminal Window", "Open File…", "Close Tab", "Close Pane",
