@@ -164,8 +164,7 @@ class VaultPluginTest {
             host.runBackground();
             host.flush();
             assertThat(plugin.lockManager().state()).isEqualTo(LockState.UNLOCKED);
-            assertThat(host.windows()).isEmpty();
-            assertThat(host.contentTabs()).as("no manager").isEmpty();
+            assertThat(host.windows()).as("no manager window").isEmpty();
             assertThat(host.paletteOpens()).as("back on the Vault chip").containsExactly(window + " dev.jasper.vault.scope - -", window + " dev.jasper.vault.scope - -");
             assertThat(host.searchScope("dev.jasper.vault.scope", "pro", window, null)).containsExactly("cred." + id + "|prod|true");
             host.executeInScope("dev.jasper.vault.scope", "cred." + id, "copy_password", window, null);
@@ -293,6 +292,12 @@ class VaultPluginTest {
         }
     }); }
 
+    /** Closes the open sheet {@code title} as Escape does, leaving the manager open. */
+    private static void escape(FakePluginHost host, String title) {
+        var sheet = host.windowView("dev.jasper.vault", title).orElseThrow();
+        dev.jasper.vault.testsupport.KitViews.press(sheet, ((dev.jasper.sdk.ui.Nodes.Form) sheet.spec().root()).cancelAction());
+    }
+
     @Test void passwordAndGrantsAreVaultCommandsInTheFileMenu() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
@@ -302,12 +307,11 @@ class VaultPluginTest {
             plugin.lockManager().create("test-password".toCharArray(), false);
             host.runBackground();
             host.invoke(VaultPlugin.CHANGE_PASSWORD, window, null);
-            assertThat(host.contentView("dev.jasper.vault", "Credential Vault")).isPresent();
-            assertThat(host.windows()).contains("dialog|Change Master Password|true");
-            host.requestClose("dialog");
+            assertThat(host.windows()).containsExactly("dialog|Credential Vault|true", "dialog|Change Master Password|true");
+            escape(host, "Change Master Password");
             host.invoke(VaultPlugin.GRANTS, window, null);
-            assertThat(host.windows()).isEmpty();
-            var manager = host.contentView("dev.jasper.vault", "Credential Vault").orElseThrow();
+            assertThat(host.windows()).containsExactly("dialog|Credential Vault|true");
+            var manager = host.windowView("dev.jasper.vault", "Credential Vault").orElseThrow();
             assertThat(dev.jasper.vault.testsupport.KitViews.find(manager, "grants")).as("the grants card is shown").isPresent();
             plugin.lockManager().lock();
             host.invoke(VaultPlugin.CHANGE_PASSWORD, window, null);
@@ -329,9 +333,8 @@ class VaultPluginTest {
             sheets.forEach((id, title) -> {
                 assertThat(host.actionSpec(id).orElseThrow().defaultBinding()).as("unbound until the user binds it").isEmpty();
                 host.invoke(id, window, null);
-                assertThat(host.contentView("dev.jasper.vault", "Credential Vault")).isPresent();
-                assertThat(host.windows()).contains("dialog|" + title + "|true");
-                host.requestClose("dialog");
+                assertThat(host.windows()).containsExactly("dialog|Credential Vault|true", "dialog|" + title + "|true");
+                escape(host, title);
             });
             plugin.lockManager().lock();
             host.invoke(VaultPlugin.ADD_LOGIN, window, null);
@@ -350,21 +353,19 @@ class VaultPluginTest {
             host.runBackground();
             host.invoke(VaultPlugin.OPEN, window, null);
             host.invoke(VaultPlugin.OPEN, window, null);
-            assertThat(host.contentTabs()).as("one manager").hasSize(1);
-            assertThat(host.windows()).isEmpty();
+            assertThat(host.windows()).as("one manager").containsExactly("dialog|Credential Vault|true");
+            assertThat(host.contentTabs()).as("no tab").isEmpty();
             host.invoke("dev.jasper.vault.generate_key", window, null);
             assertThat(host.windows()).contains("dialog|Generate SSH Key|true");
-            host.requestClose("dialog");
+            escape(host, "Generate SSH Key");
             host.invoke(VaultPlugin.LOCK, window, null);
             host.invoke(VaultPlugin.OPEN, window, null);
-            assertThat(host.windows()).as("the existing manager hosts the shared unlock form").isEmpty();
-            assertThat(host.contentTabs()).hasSize(1);
+            assertThat(host.windows()).as("the existing manager hosts the shared unlock form").containsExactly("dialog|Credential Vault|true");
             assertThat(plugin.currentUnlock()).isNotNull();
             plugin.currentUnlock().submit("test-password".toCharArray());
             host.runBackground();
             assertThat(plugin.lockManager().state()).isEqualTo(LockState.UNLOCKED);
-            assertThat(host.windows()).isEmpty();
-            assertThat(host.contentTabs()).hasSize(1);
+            assertThat(host.windows()).hasSize(1);
             assertThat(host.failures()).isEmpty();
         }
     }); }

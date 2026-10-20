@@ -2,7 +2,7 @@
 
 Credential Vault is bundled with Jasper. Press **Cmd+Shift+\\** (Ctrl+Alt+Shift+\\ on Windows and Linux), click the vault button in the rail, or
 choose **Open Vault...** in the command palette. First use creates a vault with a master password
-and an optional device binding. Later use unlocks the vault and opens its manager in a tab. Creating and unlocking
+and an optional device binding. Later use unlocks the vault and opens its manager, a dialog over the main window. Creating and unlocking
 are modal overlays inside the window that asked: it dims, and the prompt fades up over it (instantly with animations
 off). While the manager is open, it unlocks in place.
 
@@ -14,14 +14,14 @@ public key and lock the vault; each has a tooltip and accessible name.
 Under the Enterprise look the manager is a toolbar row (**New** with the add menu, **Edit...**, **Delete**, **Copy
 Username**, **Copy Password**, **Lock Vault** and the search) over a Categories tree with counts, a
 Name/Username/Type/Modified table that sorts by its headers and counts what shows, and a Details pane whose stored values
-have **Show** and **Copy**, with the lock state, auto-lock and vault file in the status row. The add and
+have **Show** and **Copy**, with the lock state, auto-lock and vault file in the status row beside **Done**. The add and
 edit sheets carry their kind's colour, and Unlock Vault shows the auto-lock in its footer.
 
 The **+** menu adds a login, imports an SSH key, adds a secure note, or generates a new SSH key. The palette's
 **Add Login...**, **Add SSH Key...** and **Add Secure Note...** open the manager on the same sheets, creating or unlocking the vault first.
 **File → Vault Plugin Grants...** (or the palette) opens the manager on the saved plugin grants, and **File → Change
 Vault Master Password...** asks for a new master password over it; both unlock first. Grant revocation has a **Back to
-entries** button. The tab's close button closes the manager; changes made in
+entries** button. **Done** or Escape closes the manager; changes made in
 individual editors are saved immediately and are not rolled back by closing the manager.
 The footer retains device-secret source, auto-lock setting and vault path, with full text in its
 tooltip when the window is narrow.
@@ -94,7 +94,7 @@ clipboard timing. The following checks need a user-run Jasper window:
    Use Browse beside both SSH key paths and the login key path; verify the chooser opens above
    the editor, starts from its current path, and cancellation keeps the value. Then
    verify the key works with your SSH client. Leave both passphrase fields empty to test that path.
-3. Press Cmd+Shift+\\ repeatedly; verify only one manager tab opens. Lock with an editor open; verify
+3. Press Cmd+Shift+\\ repeatedly; verify only one manager dialog opens. Lock with an editor open; verify
    its secret fields disappear and the manager offers inline unlock.
 4. Lock the vault, press Cmd+\\ and press Enter on the locked row; after unlocking, the palette is back on the Vault
    scope. Copy a password and username, check each confirmation card, check 30-second clearing, then copy

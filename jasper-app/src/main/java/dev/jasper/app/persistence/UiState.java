@@ -115,6 +115,8 @@ public final class UiState {
 
     private static final System.Logger LOG = System.getLogger(UiState.class.getName());
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
+    /** A window's key: an id, or a plugin dialog's plugin id and title ({@code dev.jasper.vault|Credential Vault}), quoted. */
+    private static final Pattern WINDOW_ID = Pattern.compile("[^\\p{Cntrl}]{1,255}");
     private static final int MAX_BYTES = 256 * 1024;
     /** One look's dock: where each panel docks, and the dock's sizes and ratios. */
     private static final class Layout {
@@ -180,7 +182,7 @@ public final class UiState {
         zenMode = Boolean.TRUE.equals(toml.get(List.of("zen_mode")));
         if (toml.get(List.of("windows")) instanceof TomlTable table)
             for (String id : table.keySet())
-                if (ID.matcher(id).matches() && table.get(List.of(id)) instanceof TomlTable entry)
+                if (WINDOW_ID.matcher(id).matches() && table.get(List.of(id)) instanceof TomlTable entry)
                     bounds(entry).ifPresent(bounds -> windows.put(id, bounds));
         if (toml.get(List.of("main_window")) instanceof TomlTable table)
             bounds(table).ifPresent(bounds -> {
@@ -306,7 +308,7 @@ public final class UiState {
     public Optional<MainWindow> mainWindow() { return Optional.ofNullable(mainWindow); }
     public void setMainWindow(MainWindow value) { mainWindow = Objects.requireNonNull(value); }
     public Optional<Bounds> window(String id) { return Optional.ofNullable(windows.get(id)); }
-    public void putWindow(String id, Bounds value) { if (ID.matcher(id).matches()) windows.put(id, value); }
+    public void putWindow(String id, Bounds value) { if (WINDOW_ID.matcher(id).matches()) windows.put(id, value); }
     public boolean railVisible() { return railVisible; }
     public void setRailVisible(boolean value) { railVisible = value; }
     public boolean zenMode() { return zenMode; }
@@ -322,14 +324,14 @@ public final class UiState {
     public void setRunWindowPosition(RunWindowPosition value) { runWindowPosition = value; }
     public void setChooser(Chooser value) { chooser = Objects.requireNonNull(value); }
 
-    /** Writes version 2. Ids are restricted to characters that need no TOML escaping. */
+    /** Writes version 2. Look and panel ids are restricted to characters that need no TOML escaping; window keys are quoted. */
     public void save() {
         if (file == null) return;
         var text = new StringBuilder("version = 2\nrail_visible = ").append(railVisible).append('\n');
         text.append("zen_mode = ").append(zenMode).append('\n');
         appendDock(text, "", layout(""));
         layouts.forEach((key, layout) -> { if (!key.isEmpty()) appendDock(text, "look.\"" + key + "\".", layout); });
-        windows.forEach((id, bounds) -> text.append("\n[windows.\"").append(id).append("\"]\nx = ").append(bounds.x())
+        windows.forEach((id, bounds) -> text.append("\n[windows.").append(quote(id)).append("]\nx = ").append(bounds.x())
             .append("\ny = ").append(bounds.y()).append("\nwidth = ").append(bounds.width()).append("\nheight = ").append(bounds.height()).append('\n'));
         if (mainWindow != null) {
             Bounds bounds = mainWindow.bounds();

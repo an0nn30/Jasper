@@ -74,7 +74,7 @@ class AnchoredImportIntegrationTest {
    });Kits.settle(host);
    Kits.edt(()->{assertThat(remote.store().hosts()).hasSize(1);assertThat(VaultTestAccess.grantedConsumers(vault)).containsExactly("dev.jasper.remote");assertThat(Kits.node(remote.currentImport().view(),"import.choose.0",Nodes.Choice.class).face().orElseThrow().primary()).isEqualTo("fixture login");assertThat(host.failures()).isEmpty();});
    // Reopen the real Import route locked; invalidate its child anchor while another unlock waiter survives.
-   Kits.edt(()->{cancelImport(remote.currentImport());host.contentTab("dev.jasper.vault","Credential Vault").ifPresent(manager->manager.requestClose());host.invoke(VaultPlugin.LOCK,window,null);host.invoke(RemotePlugin.IMPORT,window,null);});Kits.settle(host);
+   Kits.edt(()->{cancelImport(remote.currentImport());host.windowView("dev.jasper.vault","Credential Vault").ifPresent(manager->manager.emit(new UiEvent.Action(((Nodes.Form)manager.spec().root()).cancelAction())));host.invoke(VaultPlugin.LOCK,window,null);host.invoke(RemotePlugin.IMPORT,window,null);});Kits.settle(host);
    var survivor=Kits.value(()->{chooseCredential(remote.currentImport(),0);var old=host.windowView("dev.jasper.vault","Unlock Vault").orElseThrow();
     old.setSecret("password","discard-me".toCharArray());var waiting=api.ensureUnlocked(context.terminals().window(window).orElseThrow());
     refreshImport(remote.currentImport());assertThat(waiting).isNotDone();assertThatThrownBy(old::spec).isInstanceOf(IllegalStateException.class);return waiting;

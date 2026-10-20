@@ -32,7 +32,7 @@ public final class TunnelSurfaceFixture implements AutoCloseable {
         appearance = onEdtValue(() -> new WorkspaceAppearanceFixture(theme));
         vault = new StagedVaultHost(home, theme.chrome().dark(), appearance);
         vault.createVault("synthetic-tunnel-password");
-        vault.requestCloseManager();
+        onEdt(() -> vault.surface("Credential Vault").requestClose());
         vault.invoke("dev.jasper.vault.lock");
         var ssh = Files.createDirectories(home.resolve("synthetic-ssh"));
         var staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve("dev.jasper.remote");

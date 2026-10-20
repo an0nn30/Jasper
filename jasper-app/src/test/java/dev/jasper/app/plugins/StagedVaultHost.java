@@ -47,8 +47,6 @@ final class StagedVaultHost implements AutoCloseable {
     final UUID window;
     /** The staged Enterprise plugin's loader in Enterprise mode (plan 10b), else null. */
     final PluginClassLoader enterpriseLoader;
-    /** The main window's workspace: the Vault's manager opens there as a tab (workspace tabs spec 1 decision 2). */
-    final JComponent workspace;
 
     StagedVaultHost(Path data, boolean dark) throws Exception { this(data, dark, null); }
 
@@ -68,7 +66,6 @@ final class StagedVaultHost implements AutoCloseable {
             return next == null ? List.of() : List.of(dev.jasper.app.files.Location.local(next));
         }));
         terminals = onEdtValue(TerminalFixture::new);
-        workspace = onEdtValue(() -> new javax.swing.JPanel(new java.awt.BorderLayout()));
         host = AppContractTest.host(data, Duration.ofMillis(200), contributions, new AtomicBoolean(dark), auxiliary, terminals.registry,
             new NotificationsFixture(problems), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(),
             PluginRuntime.ShellProfiles.NONE, new CopyOnWriteArrayList<>(), appearance, GlassSource.NONE);
@@ -80,9 +77,8 @@ final class StagedVaultHost implements AutoCloseable {
         onEdt(() -> {
             host.start(new HostedPlugin(VAULT, Set.of(), enterprise ? Set.of("dev.jasper.enterprise") : Set.of(), Set.of("dev.jasper.vault.api"),
                 loader, () -> plugin));
+            // The main window: the Vault's manager is a dialog over it.
             opened.set(terminals.addMainWindow()); terminals.activateWindow(opened.get());
-            contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(opened.get(),
-                tab -> workspace.add(tab.component()), tab -> workspace.remove(tab.component()), tab -> tab.active(true), () -> { }));
         });
         window = opened.get();
     }
@@ -112,31 +108,6 @@ final class StagedVaultHost implements AutoCloseable {
         return surface(title);
     }
 
-    /** The open manager, the Vault's Credential Vault tab. UI thread. */
-    private Optional<dev.jasper.app.contributions.Tab> managerTab() {
-        return contributions.tabs().hosted().stream().filter(tab -> tab.title().equals("Credential Vault") && !tab.closed()).findFirst();
-    }
-
-    /** The manager tab's component, its kit view, while it is open; else null. */
-    JComponent managerOrNull() { return onEdtValue(() -> managerTab().map(dev.jasper.app.contributions.Tab::component).orElse(null)); }
-
-    JComponent manager() {
-        var found = managerOrNull();
-        assertThat(found).as("open manager tab").isNotNull();
-        return found;
-    }
-
-    JComponent awaitManager() throws InterruptedException {
-        await(() -> managerOrNull() != null, "the manager tab");
-        return manager();
-    }
-
-    /** Closes the manager tab at once, as stopping the plugin does. */
-    void closeManager() { onEdt(() -> managerTab().ifPresent(dev.jasper.app.contributions.Tab::close)); }
-
-    /** Closes the manager tab as Close Tab does, through its plugin's guard. */
-    void requestCloseManager() { onEdt(() -> managerTab().ifPresent(dev.jasper.app.contributions.Tab::requestClose)); }
-
     /** Polls a UI-thread condition while the host's background work and UI completions run. */
     static void await(BooleanSupplier condition, String description) throws InterruptedException {
         long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
@@ -159,7 +130,7 @@ final class StagedVaultHost implements AutoCloseable {
             UnboundVault.assertUnbound(kitView(create));
             click(create, "submit");
         });
-        awaitManager();
+        awaitSurface("Credential Vault");
     }
 
     /** Real synthetic domain writes and a reviewed managed-key import, never descriptor-only sample rows. */
@@ -202,14 +173,14 @@ final class StagedVaultHost implements AutoCloseable {
         readyImport.accept(review);
         onEdt(() -> click(review,"commit")); pending.get(20, java.util.concurrent.TimeUnit.SECONDS);
         await(() -> review.closed(),"managed import closed");
-        var managerTabField = plugin.getClass().getDeclaredField("managerTab"); managerTabField.setAccessible(true);
+        var managerDialogField = plugin.getClass().getDeclaredField("managerDialog"); managerDialogField.setAccessible(true);
         onEdt(() -> {
             try {
-                Object managerTab = managerTabField.get(plugin);
-                managerTab.getClass().getMethod("show",dev.jasper.sdk.terminal.WindowHandle.class,Optional.class)
-                    .invoke(managerTab,consumer.get().terminals().window(window).orElseThrow(),Optional.of(selected));
+                Object managerDialog = managerDialogField.get(plugin);
+                managerDialog.getClass().getMethod("show",dev.jasper.sdk.terminal.WindowHandle.class,Optional.class)
+                    .invoke(managerDialog,consumer.get().terminals().window(window).orElseThrow(),Optional.of(selected));
             } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
-            var rows = (dev.jasper.ui.model.Nodes.ItemList)node(manager(),"rows");
+            var rows = (dev.jasper.ui.model.Nodes.ItemList)node(surface("Credential Vault"),"rows");
             assertThat(rows.items()).hasSize(5);
             assertThat(rows.selectedIds()).containsExactly(selected.toString());
         });
@@ -245,7 +216,7 @@ final class StagedVaultHost implements AutoCloseable {
     void dispatchToManager(dev.jasper.sdk.ui.UiEvent event) throws InterruptedException {
         onEdt(() -> {
             try {
-                Object managerTab = field(plugin, "managerTab"), panel = field(managerTab, "panel");
+                Object managerDialog = field(plugin, "managerDialog"), panel = field(managerDialog, "panel");
                 var view = panel.getClass().getDeclaredMethod("view"); view.setAccessible(true);
                 ((HostedKitView) view.invoke(panel)).dispatch(event);
             } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
@@ -275,17 +246,6 @@ final class StagedVaultHost implements AutoCloseable {
     static void click(AuxiliarySurface surface, String name) { ((AbstractButton) require(surface, name)).doClick(0); }
 
     static void type(AuxiliarySurface surface, String name, String text) { ((JTextComponent) require(surface, name)).setText(text); }
-
-    /** As the surface forms above, inside a tab's component, such as the manager's. */
-    static Component require(Container root, String name) {
-        var found = named(root, name);
-        assertThat(found).as("component %s", name).isNotNull();
-        return found;
-    }
-
-    static void click(Container root, String name) { ((AbstractButton) require(root, name)).doClick(0); }
-
-    static void type(Container root, String name, String text) { ((JTextComponent) require(root, name)).setText(text); }
     /** Spec 13: a File Server folder is read-only, so tests choose it: queue it, then press Choose…. EDT. */
     static void chooseFolder(StagedVaultHost host, AuxiliarySurface surface, Path folder) {
         host.chosenFolders.add(folder); click(surface, "server.folder.choose");
@@ -312,8 +272,6 @@ final class StagedVaultHost implements AutoCloseable {
     }
 
     static dev.jasper.ui.swing.KitView kitView(Container root) {
-        // A tab's component is its kit view.
-        if (root instanceof dev.jasper.ui.swing.KitView view) return view;
         for (var child : root.getComponents()) {
             if (child instanceof dev.jasper.ui.swing.KitView view) return view;
             if (child instanceof Container nested) { var found = kitView(nested); if (found != null) return found; }
@@ -330,11 +288,6 @@ final class StagedVaultHost implements AutoCloseable {
     /** A node of the surface's live descriptor, through the containers Vault views use. */
     static dev.jasper.ui.model.Nodes.Node node(AuxiliarySurface surface, String id) {
         return find(kitView(surface).spec().root(), id);
-    }
-
-    /** A node of the live descriptor of the kit view in {@code root}, such as the manager tab's. */
-    static dev.jasper.ui.model.Nodes.Node node(Container root, String id) {
-        return find(kitView(root).spec().root(), id);
     }
 
     static dev.jasper.ui.model.Nodes.Node find(dev.jasper.ui.model.Nodes.Node node, String id) {

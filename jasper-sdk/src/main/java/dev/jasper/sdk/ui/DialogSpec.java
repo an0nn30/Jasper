@@ -18,7 +18,11 @@ import java.util.Objects;
 public record DialogSpec(String title, WindowOwner owner, boolean modal, Presentation presentation, Nodes.Hue swatch) {
     /** Placement, independent of the form's content kind; a hint the presentation may place another way. */
     public enum Presentation {
-        /** A native dialog centred over its owner, sized to its content; the user cannot resize it. */
+        /**
+         * A native dialog centred over its owner, sized to its content, which the user cannot resize, except that a modeless
+         * dialog whose content is a {@link Nodes.FormKind#WINDOW} form opens at a window's size, can be resized and remembers
+         * its bounds.
+         */
         CENTERED,
         /** A native sheet hanging from the owner's title edge. */
         ATTACHED_SHEET,

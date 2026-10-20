@@ -93,8 +93,8 @@ class ClassicEditorsTest {
                 host.addTerminalWindow(); WindowHandle owner = context.terminals().windows().getFirst();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), prompt -> { }, p -> { }, p -> { },
                     new FakeNotifications().group("dev.jasper.vault"));
-                var window = new VaultManagerTab(context, f.lock, f.manager, service,
-                    () -> new VaultManagerTab.Status("test", "15 min", "/synthetic/vault.jv"), () -> { }, layout);
+                var window = new VaultManagerDialog(context, f.lock, f.manager, service,
+                    () -> new VaultManagerDialog.Status("test", "15 min", "/synthetic/vault.jv"), () -> { }, layout);
                 window.show(owner, Optional.empty());
                 window.add(VaultManager.Type.LOGIN);
                 swatch.set(host.dialogSwatch("dev.jasper.vault", "Add Login"));

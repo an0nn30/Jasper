@@ -35,13 +35,12 @@ import java.util.function.Function;
 
 /**
  * Searchable category/list/detail manager on one host-rendered kit view. Rows are keyed by entry id; only non-secret row
- * metadata is retained. Enter in the list edits the selected entry, and while an unlock prompt shows, Enter in its field
- * unlocks. The tab that shows the manager holds its title and closes it. UI thread only.
+ * metadata is retained. Enter in the list edits the selected entry; elsewhere it presses Done, and while an unlock prompt shows, Enter in its field unlocks. UI thread only.
  */
 final class ManagerPanel implements AutoCloseable {
     static final String ROOT = "manager", SEARCH = "search", KIND = "kind", ADD = "add", EDIT = "edit", DELETE = "delete",
         COPY_PUBLIC = "copy-public", LOCK = "lock", ROWS = "rows", EMPTY = "empty", LOCKED = "locked", UNLOCK = "unlock",
-        GRANTS = "grants", BACK = "back", REVOKE = "revoke", STATUS = "status", CANCEL = "cancel",
+        GRANTS = "grants", BACK = "back", REVOKE = "revoke", STATUS = "status", CANCEL = "cancel", OKAY = "okay", CLOSE = "close",
         ADD_GENERATE = "add.generate", UNLOCK_PREFIX = "unlock.", TOOLBAR = "toolbar";
     /** The Lock Vault action's default binding as the platform writes it (plan 10b Rulings 8). */
     static final String LOCK_SHORTCUT = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac") ? "\u21E7\u2318L" : "Ctrl+Shift+L";
@@ -57,7 +56,7 @@ final class ManagerPanel implements AutoCloseable {
     private final Consumer<VaultManager.Type> onAdd;
     private final Consumer<UUID> onEdit, onDelete, onCopy;
     private final Consumer<Grant> onRevoke;
-    private final Runnable onGenerate, onLock, onUnlock;
+    private final Runnable onGenerate, onLock, onUnlock, onClose;
     private final UiView view;
     private final Layout layout;
     private List<VaultManager.Row> allRows = List.of(), visible = List.of();
@@ -69,7 +68,7 @@ final class ManagerPanel implements AutoCloseable {
     private String sortColumn = COLUMN_NAME;
     private boolean ascending = true;
     private final Set<String> collapsed = new HashSet<>();
-    private VaultManagerTab.Status status = new VaultManagerTab.Status("", "", "");
+    private VaultManagerDialog.Status status = new VaultManagerDialog.Status("", "", "");
     private UUID selection, shownSecret;
     private java.time.Instant shownSecretVersion;
     private int grantSelection = -1;
@@ -81,19 +80,19 @@ final class ManagerPanel implements AutoCloseable {
     ManagerPanel(UiKit kit, Function<UUID, Optional<Object>> entry, Consumer<VaultManager.Type> onAdd,
                  Consumer<UUID> onEdit, Consumer<UUID> onDelete, Consumer<UUID> onCopy,
                  Consumer<Grant> onRevoke, Runnable onGenerate,
-                 Runnable onLock, Runnable onUnlock) {
-        this(kit, Layout.ROWS, entry, onAdd, onEdit, onDelete, onCopy, onRevoke, onGenerate, onLock, onUnlock);
+                 Runnable onLock, Runnable onUnlock, Runnable onClose) {
+        this(kit, Layout.ROWS, entry, onAdd, onEdit, onDelete, onCopy, onRevoke, onGenerate, onLock, onUnlock, onClose);
     }
 
     /** The manager in {@code layout}'s composition (Enterprise presentation spec 14.8), kept for its life. */
     ManagerPanel(UiKit kit, Layout layout, Function<UUID, Optional<Object>> entry, Consumer<VaultManager.Type> onAdd,
                  Consumer<UUID> onEdit, Consumer<UUID> onDelete, Consumer<UUID> onCopy,
                  Consumer<Grant> onRevoke, Runnable onGenerate,
-                 Runnable onLock, Runnable onUnlock) {
+                 Runnable onLock, Runnable onUnlock, Runnable onClose) {
         this.layout = layout;
         this.entry = entry; this.onAdd = onAdd; this.onEdit = onEdit; this.onDelete = onDelete; this.onCopy = onCopy;
         this.onRevoke = onRevoke; this.onGenerate = onGenerate;
-        this.onLock = onLock; this.onUnlock = onUnlock;
+        this.onLock = onLock; this.onUnlock = onUnlock; this.onClose = onClose;
         view = kit.create(new ViewSpec(node()), this::handle);
     }
 
@@ -103,7 +102,7 @@ final class ManagerPanel implements AutoCloseable {
     List<VaultManager.Row> visibleRows() { return visible; }
     PasswordPanel unlockForm() { return unlock; }
 
-    void refresh(List<VaultManager.Row> nextRows, List<Grant> nextGrants, VaultManagerTab.Status text, boolean unlocked) {
+    void refresh(List<VaultManager.Row> nextRows, List<Grant> nextGrants, VaultManagerDialog.Status text, boolean unlocked) {
         if (closed) return;
         boolean stateChanged = this.unlocked != unlocked; this.unlocked = unlocked;
         allRows = unlocked ? List.copyOf(nextRows) : List.of();
@@ -189,6 +188,7 @@ final class ManagerPanel implements AutoCloseable {
             case ADD_GENERATE -> onGenerate.run();
             case BACK -> { card = Card.ENTRIES; render(); }
             case REVOKE -> { if (grantSelection >= 0 && grantSelection < grants.size()) onRevoke.accept(grants.get(grantSelection)); }
+            case CLOSE -> onClose.run();
             default -> {
                 if (id.startsWith("detail.") && id.endsWith(".copy")) copyDetail(id);
                 for (var type : VaultManager.Type.values()) if (id.equals("add." + type.name())) onAdd.accept(type);
@@ -392,14 +392,13 @@ final class ManagerPanel implements AutoCloseable {
             if (!unlocked && unlock == null) body = lockedCard().getFirst();
             body = new Nodes.Split("classic", ControlState.READY, Nodes.SplitKind.DOCUMENT, List.of(toolbar(), body));
         }
-        // A tab has no title bar: the Lock and Add actions are the first row, over the body (workspace tabs plan 4b).
+        // The Lock and Add actions are the first row, over the body (workspace tabs plan 4b).
         else body = new Nodes.Split("rows.layout", ControlState.READY, Nodes.SplitKind.DOCUMENT, List.of(actions(), body));
         boolean prompting = unlock != null && !unlocked;
-        // One full-bleed body over its status row, the kit's WINDOW form, whose title is only the view's name; no Done and no
-        // Escape: the tab strip closes the manager (workspace tabs plan 4b). While it prompts, Unlock is its one action.
-        List<Nodes.Button> actions = prompting ? List.of(unlock.submitButton()) : List.of();
+        var actions = new ArrayList<Nodes.Button>(List.of(new Nodes.Button(OKAY, ControlState.READY, "Done", "", prompting ? Nodes.ButtonKind.SECONDARY : Nodes.ButtonKind.PRIMARY, CLOSE, "")));
+        if (prompting) actions.add(unlock.submitButton());
         return new Nodes.Form(ROOT, ControlState.READY, Nodes.FormKind.WINDOW, "Credential Vault", Optional.empty(), List.of(body),
-            Optional.of(layout == Layout.CLASSIC ? classicStatus() : status()), actions, prompting ? unlock.cancel : "");
+            Optional.of(layout == Layout.CLASSIC ? classicStatus() : status()), actions, prompting ? unlock.cancel : CLOSE);
     }
 
     private static String date(java.time.Instant timestamp) {
@@ -649,7 +648,7 @@ final class ManagerPanel implements AutoCloseable {
             text("status.path", status.path(), Nodes.TextRole.MONO_CAPTION)));
     }
 
-    /** The tab closed (it already disposed the view and erased its storage) or is closing. */
+    /** The dialog closed (its surface already disposed the view and erased its storage) or is closing. */
     @Override public void close() {
         if (closed) return;
         closed = true;

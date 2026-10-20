@@ -506,7 +506,21 @@ final class HostedUi {
         @Override public void close() { subscription(surface::close).close(); }
     }
 
-    private final class OwnedDialog extends Surface implements PluginDialog { OwnedDialog(AuxiliarySurface surface) { super(surface); } }
+    private final class OwnedDialog extends Surface implements PluginDialog {
+        OwnedDialog(AuxiliarySurface surface) { super(surface); }
+        /**
+         * A modeless dialog showing a WINDOW form is a window (the Credential Vault manager): from its first show it can be
+         * resized, opens at least a window's size and remembers its bounds under this plugin's id and its title.
+         */
+        @Override public void show() {
+            requireUi("show");
+            if (surface.kind() == AuxiliarySurface.Kind.DIALOG && !surface.modal() && !surface.shown() && mounted != null
+                    && mounted.component().spec().root() instanceof dev.jasper.ui.model.Nodes.Form form
+                    && form.kind() == dev.jasper.ui.model.Nodes.FormKind.WINDOW)
+                surface.windowSized(pluginId + "|" + surface.title());
+            surface.show();
+        }
+    }
 
     private final java.util.Map<dev.jasper.app.contributions.Tab, OwnedContent> ownedContent = new java.util.IdentityHashMap<>();
     private final class OwnedContent implements dev.jasper.sdk.ui.ContentTab {

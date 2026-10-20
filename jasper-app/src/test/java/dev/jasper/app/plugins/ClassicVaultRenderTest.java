@@ -26,10 +26,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Plan 10b's mock matching (spec 16.1.4): the staged Vault's classic composition in the real host, under the shipped
  * Enterprise kit, Plex fonts and theme (Light: the 07 mocks have no Dark), against the 07 Credential Vault mocks. Images
- * go to jasper-app/build/enterprise-compositions/light/, paired in tools/visual/pairs.json. The manager is a content tab
- * (workspace tabs spec 14), mounted as the host mounts one: it has no Done and no dialog band, which the mocks' window
- * shows, and its panes take the workspace ground, so its status row, the columns' foot and the Details pane are pinned
- * to the render, not to the mocks.
+ * go to jasper-app/build/enterprise-compositions/light/, paired in tools/visual/pairs.json.
  */
 class ClassicVaultRenderTest {
     static final String V = "07 Credential Vault/Credential Vault ";
@@ -39,10 +36,11 @@ class ClassicVaultRenderTest {
     /** Down the manager's toolbar at x 1600: the search field on the kit's dialog surface (surface.app), then the frame's rule. */
     static final String TOOLBAR = "0+6 surface.app, 6+1 border.input, 7+20 surface.input, 27+1 border.input, 28+6 surface.app, 34+1 border.window";
     /**
-     * The status row at device column 1600: the tab's own row on surface.sidebar under its faint rule, where the mocks'
-     * window shows Done over a dialog band.
+     * Down the status band and Done at x 1600: the band's guarded rule, the band, and Done's accent.edge ring around its
+     * accent, where the mock draws #2655AE (the user's 2026-10-18 direction).
      */
-    static final String STATUS = "0+1 " + ClassicCompositionRenderTest.rule(false, "surface.sidebar") + ", 1+29 surface.sidebar";
+    static final String STATUS = "0+1 " + ClassicCompositionRenderTest.painted(dev.jasper.ui.swing.ClassicDialog.BAND_RULE)
+        + ", 1+6 surface.footer, 7+1 accent.edge, 8+22 accent, 30+1 accent.edge, 31+6 surface.footer";
     @TempDir Path root;
 
     /**
@@ -55,34 +53,23 @@ class ClassicVaultRenderTest {
         return vault;
     }
 
-    /** As below for the manager, a tab: its kit view as the host mounts it, on the workspace route over its own surface. */
-    static BufferedImage render(javax.swing.JComponent manager, int width, int height) {
-        return onEdtValue(() -> {
-            manager.setSize(width, height);
-            for (int i = 0; i < 3; i++) SessionsSurfaceFixture.layout(manager);
-            var image = new BufferedImage(width * 2, height * 2, BufferedImage.TYPE_INT_ARGB);
-            var graphics = image.createGraphics();
-            try { graphics.scale(2, 2); manager.printAll(graphics); } finally { graphics.dispose(); }
-            Color under = EnterpriseLook.resolved(false).workspace().semantic().color(SemanticColor.SURFACE_DIALOG);
-            return MockMatch.onto(image, under);
-        });
-    }
-
     /**
      * The surface's kit view and everything below it in its holder, {@code width} by {@code height} logical pixels,
      * painted at 2x over {@code surface.dialog}: what the mock crops show under a title bar or a dialog's header strip.
      * The headless windows run no shell, so a dialog's holder and view first take what the Enterprise host gives the
      * dialogs it draws in their window (plan 6b's {@code NativeShells.classicContent}: a transparent holder and
-     * {@code CLASSIC_FLAGS}, {@code hostTitled}, {@code dialogBand} and {@code dialogCard}).
+     * {@code CLASSIC_FLAGS}, {@code hostTitled}, {@code dialogBand} and {@code dialogCard}), modal overlays and attached
+     * sheets; the manager, a modeless native dialog, takes the band its dialog gives it ({@code NativeShells.nativeMarks},
+     * spec 10.8).
      */
     static BufferedImage render(AuxiliarySurface surface, int width, int height) {
         return onEdtValue(() -> {
             var holder = surface.holder();
             var content = StagedVaultHost.kitView(holder);
-            if (surface.kind() != AuxiliarySurface.Kind.WINDOW) {
+            if (surface.modal() && (surface.kind() == AuxiliarySurface.Kind.OVERLAY || surface.attachedSheet())) {
                 holder.setOpaque(false);
                 content.hostTitled(true); content.dialogBand(true); content.dialogCard(true);
-            }
+            } else content.dialogBand(true);
             holder.setSize(width, height);
             for (int i = 0; i < 3; i++) SessionsSurfaceFixture.layout(holder);
             var view = StagedVaultHost.kitView(holder);
@@ -152,28 +139,22 @@ class ClassicVaultRenderTest {
         ClassicCompositionRenderTest.under(false, () -> {
             try (var vault = vault(root.resolve("frame"))) {
                 vault.seedLogins(LOGINS);
-                var render = render(vault.manager(), NO_SELECTION.logicalWidth(), NO_SELECTION.logicalHeight());
+                var render = render(vault.surface("Credential Vault"), NO_SELECTION.logicalWidth(), NO_SELECTION.logicalHeight());
                 MockMatch.save("light/vault-frame", NO_SELECTION.read(), render);
                 bands("the toolbar row", render, 1600, 0, 70, TOOLBAR);
-                bands("the status row", render, 1600, 1082, 1142, STATUS);
+                bands("the status row and Done", render, 1600, 1068, 1142, STATUS);
                 assertThat(MockMatch.present(render, MockProfile.role(false, "border.window"))).as("the classic rules").isTrue();
                 assertThat(vault.problems).isEmpty();
             }
         });
     }
 
-    /**
-     * The Categories column, on surface.sidebar: the IntelliJ Light port's sidebar is not its panel (the user's 2026-10-18
-     * direction). Its foot is the tab's status row's faint rule.
-     */
+    /** The Categories column, on surface.sidebar: the IntelliJ Light port's sidebar is not its panel (the user's 2026-10-18 direction). */
     static final String CATEGORIES = "0+34 surface.app, 34+1 border.window, 35+24 surface.header, 59+1 border.window, 60+4 surface.sidebar, "
-        + "64+22 selection.bg, 86+455 surface.sidebar, 541+1 " + ClassicCompositionRenderTest.rule(false, "surface.sidebar");
-    /**
-     * The Items column: its last row's rule is border.row, where the mock draws #DDE0E4 (the user's 2026-10-18 direction);
-     * its foot is the tab's status row's faint rule.
-     */
-    static final String ITEMS = "0+20 surface.tableHeader, 20+1 border.divider, 21+22 selection.bg, 43+22 surface.zebra, 65+420 surface.card, "
-        + "485+1 border.row, 486+20 surface.zebra, 506+1 " + ClassicCompositionRenderTest.rule(false, "surface.sidebar");
+        + "64+22 selection.bg, 86+448 surface.sidebar, 534+1 border.window";
+    /** The Items column: its last row's rule is border.row, where the mock draws #DDE0E4 (the user's 2026-10-18 direction). */
+    static final String ITEMS = "0+20 surface.tableHeader, 20+1 border.divider, 21+22 selection.bg, 43+22 surface.zebra, 65+413 surface.card, "
+        + "478+1 border.row, 479+20 surface.zebra, 499+1 border.window";
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
     void theCategoriesAndItemsMatchTheItemSelectedMock() throws Exception {
@@ -181,10 +162,10 @@ class ClassicVaultRenderTest {
             try (var vault = vault(root.resolve("columns"))) {
                 var ids = vault.seedLogins(LOGINS);
                 vault.dispatchToManager(new UiEvent.Selected("rows", Set.of(ids.getFirst().toString())));
-                var render = render(vault.manager(), SELECTED.logicalWidth(), SELECTED.logicalHeight());
+                var render = render(vault.surface("Credential Vault"), SELECTED.logicalWidth(), SELECTED.logicalHeight());
                 MockMatch.save("light/vault-columns", SELECTED.read(), render);
-                bands("the Categories column", render, 6, 0, 1084, CATEGORIES);
-                bands("the Items column", render, 854, 70, 1084, ITEMS);
+                bands("the Categories column", render, 6, 0, 1070, CATEGORIES);
+                bands("the Items column", render, 854, 70, 1070, ITEMS);
                 assertThat(MockMatch.present(render, MockProfile.role(false, "surface.tableHeader"))).as("the table's header band").isTrue();
                 assertThat(MockMatch.present(render, MockProfile.role(false, "surface.header"))).as("the pane header strip").isTrue();
                 assertThat(vault.problems).isEmpty();
@@ -194,37 +175,35 @@ class ClassicVaultRenderTest {
 
     /**
      * The Details pane of amp at x 1085: its header strip and rule, the Fields grid (border.row between its rows), the rule
-     * over the actions and a button's gradient, on surface.panel, the tab's ground. The mock draws the pane on #ECEDEF and
-     * the grid's rule #E6E8EB; the render's are surface.panel and border.row (the user's 2026-10-18 direction). Under the
-     * IntelliJ Light port the "Modified:" label's ink at x 1085 reads as a run of its own, so the pane is read there down to
-     * its rule at logical row 166 ({@link #DETAILS}) and from that row at x {@link #DETAILS_LOWER_X}, clear of the labels
-     * ({@link #DETAILS_LOWER}), down to the tab's status row's faint rule.
+     * over the actions and a button's gradient, on surface.panel. The mock draws the pane on #ECEDEF and the grid's rule
+     * #E6E8EB; the render's are surface.panel and border.row (the user's 2026-10-18 direction). Under the IntelliJ Light port
+     * the "Modified:" label's ink at x 1085 reads as a run of its own, so the pane is read there down to its rule at logical
+     * row 166 ({@link #DETAILS}) and from that row at x {@link #DETAILS_LOWER_X}, clear of the labels ({@link #DETAILS_LOWER}).
      */
     static final String DETAILS = "0+24 surface.header, 24+1 border.window, 25+77 surface.panel, 102+1 border.divider, 103+26 surface.card, "
         + "129+1 border.row, 130+26 surface.card, 156+1 border.divider, 157+8 surface.panel, 165+1 border.window";
-    static final String DETAILS_LOWER = "0+60 surface.panel, 60+1 button.secondary.border, 61+22 button.secondary.bg~button.end, "
-        + "83+1 button.secondary.border, 84+256 surface.panel, 340+1 " + ClassicCompositionRenderTest.rule(false, "surface.sidebar");
+    static final String DETAILS_LOWER = "0+61 surface.panel, 61+1 button.secondary.border, 62+22 button.secondary.bg~button.end, "
+        + "84+1 button.secondary.border, 85+248 surface.panel, 333+1 border.window";
     static final int DETAILS_LOWER_X = 1200;
-    static final String DETAILS_NONE = "0+24 surface.header, 24+1 border.window, 25+481 surface.panel, 506+1 "
-        + ClassicCompositionRenderTest.rule(false, "surface.sidebar");
+    static final String DETAILS_NONE = "0+24 surface.header, 24+1 border.window, 25+474 surface.panel, 499+1 border.window";
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
     void theManagerMatchesItsMocksWithAndWithoutASelection() throws Exception {
         ClassicCompositionRenderTest.under(false, () -> {
             try (var vault = vault(root.resolve("details"))) {
                 var ids = vault.seedLogins(LOGINS);
-                var manager = vault.manager();
+                var manager = vault.surface("Credential Vault");
                 var none = render(manager, NO_SELECTION.logicalWidth(), NO_SELECTION.logicalHeight());
                 MockMatch.save("light/vault-manager", NO_SELECTION.read(), none);
-                bands("the Details pane without a selection", none, 1600, 70, 1084, DETAILS_NONE);
+                bands("the Details pane without a selection", none, 1600, 70, 1070, DETAILS_NONE);
                 MockCrops.fontsFloor("light/vault-manager edge agreement", MockMatch.agreement(NO_SELECTION.read(), none), 0.55);
                 vault.dispatchToManager(new UiEvent.Selected("rows", Set.of(ids.getFirst().toString())));
                 var selected = render(manager, SELECTED.logicalWidth(), SELECTED.logicalHeight());
                 MockMatch.save("light/vault-manager-selected", SELECTED.read(), selected);
                 bands("the Details pane of amp", selected, 1085, 70, 70 + 2 * 166, DETAILS);
-                bands("the Details pane of amp below its rule", selected, DETAILS_LOWER_X, 70 + 2 * 166, 1084, DETAILS_LOWER);
-                bands("the Categories column", selected, 6, 0, 1084, CATEGORIES);
-                bands("the Items column", selected, 854, 70, 1084, ITEMS);
+                bands("the Details pane of amp below its rule", selected, DETAILS_LOWER_X, 70 + 2 * 166, 1070, DETAILS_LOWER);
+                bands("the Categories column", selected, 6, 0, 1070, CATEGORIES);
+                bands("the Items column", selected, 854, 70, 1070, ITEMS);
                 bands("the toolbar row", selected, 1600, 0, 70, TOOLBAR);
                 toolbarVerbs(selected);
                 // The Fields grid (plan 10b final review): the mask row's 12 dots from the value column, and the username's Copy
@@ -235,7 +214,7 @@ class ClassicVaultRenderTest {
                 int copy = inkRuns(selected, 290, 315, 1400, 1580, 200, 0).getFirst()[0], show = inkRuns(selected, 345, 372, 1400, 1580, 200, 0).getFirst()[0];
                 assertThat(copy).as("the username's Copy shares the password's Show column").isEqualTo(show);
                 assertThat(show).as("the action lane, the mock's x 711").isBetween(707, 713);
-                bands("the status row", selected, 1600, 1082, 1142, STATUS);
+                bands("the status row and Done", selected, 1600, 1068, 1142, STATUS);
                 for (String colour : List.of("selection.bg", "surface.header", "surface.tableHeader", "surface.zebra", "surface.footer", "border.window"))
                     assertThat(MockMatch.present(selected, MockProfile.role(false, colour))).as("shows " + colour).isTrue();
                 MockCrops.fontsFloor("light/vault-manager-selected edge agreement", MockMatch.agreement(SELECTED.read(), selected), 0.55);
@@ -299,7 +278,8 @@ class ClassicVaultRenderTest {
         ClassicCompositionRenderTest.under(false, () -> {
             try (var vault = vault(root.resolve("unlock"))) {
                 vault.invoke("dev.jasper.vault.lock");
-                vault.requestCloseManager();
+                var manager = vault.surface("Credential Vault");
+                onEdt(manager::requestClose);
                 vault.invoke("dev.jasper.vault.open");
                 var unlock = vault.awaitSurface("Unlock Vault");
                 ClassicCompositionRenderTest.check("light/vault-unlock", UNLOCK, render(unlock, UNLOCK.logicalWidth(), UNLOCK.logicalHeight()),

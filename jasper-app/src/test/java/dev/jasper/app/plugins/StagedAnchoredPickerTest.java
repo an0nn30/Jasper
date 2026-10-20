@@ -28,7 +28,7 @@ class StagedAnchoredPickerTest {
   var pair=ThemeTestSupport.resolved(true);
   var appearance=onEdtValue(()->new WorkspaceAppearanceFixture(pair));
   try(var vault=new StagedVaultHost(root.resolve("home"),true,appearance)){
-   vault.createVault("synthetic-preview-password");vault.closeManager();
+   vault.createVault("synthetic-preview-password");onEdt(()->vault.surface("Credential Vault").close());
    var ssh=Files.createDirectories(root.resolve("ssh"));Files.writeString(ssh.resolve("config"),"Host picker-demo\n HostName picker-demo.invalid\n User fixture\n");
    var staged=Path.of(System.getProperty("jasper.stagedPlugins")).resolve("dev.jasper.remote");
    try(var loader=new PluginClassLoader("dev.jasper.remote",ManagedVaultLoadingTest.jars(staged),getClass().getClassLoader(),Map.of("dev.jasper.vault.api",vault.loader))){

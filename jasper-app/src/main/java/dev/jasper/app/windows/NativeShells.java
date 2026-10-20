@@ -402,10 +402,31 @@ public final class NativeShells {
             .orElseThrow(() -> new IllegalArgumentException("Attached sheet needs a registered measured owner body"));
     }
     /**
-     * Whether the user may resize this dialog's native window: only one that remembers its bounds. A dialog sized to its
-     * content (every plugin dialog, a confirmation) and an attached sheet are fixed-size; their content still re-packs them.
+     * Whether the user may resize this dialog's native window: only one that remembers its bounds, a window-sized plugin
+     * dialog among them. A dialog sized to its content (a plugin's dialog, a confirmation) and an attached sheet are
+     * fixed-size; their content still re-packs them.
      */
     static boolean resizable(AuxiliarySurface surface) { return !surface.attachedSheet() && !surface.id().isEmpty(); }
+
+    /**
+     * Whether the shell packs this dialog to its content at each show and re-packs it as the content changes ({@link
+     * DialogFit}): not a dialog that remembers its bounds, whose size is the user's, nor an attached sheet.
+     */
+    static boolean fitted(AuxiliarySurface surface) { return surface.id().isEmpty() && !surface.attachedSheet(); }
+
+    /** A window-sized dialog's least content size: the Credential Vault manager window's before workspace tabs plan 4b. */
+    static java.awt.Dimension windowContent(boolean classic) { return classic ? new java.awt.Dimension(820, 571) : new java.awt.Dimension(900, 555); }
+
+    /**
+     * A window-sized dialog's first size when it remembers none: its content's preferred size, at least {@link
+     * #windowContent} in each dimension, plus {@code chrome}, within the usable screen.
+     */
+    static java.awt.Dimension windowSize(AuxiliarySurface surface, java.awt.Dimension chrome, Rectangle usable) {
+        var content = surface.holder().getPreferredSize();
+        var least = windowContent(surface.classic());
+        return new java.awt.Dimension(Math.min(Math.max(content.width, least.width) + chrome.width, usable.width),
+            Math.min(Math.max(content.height, least.height) + chrome.height, usable.height));
+    }
 
     private AuxiliarySurface.Shell dialog(AuxiliarySurface surface) {
         Window owner = owner(surface);
@@ -445,7 +466,11 @@ public final class NativeShells {
             if (bar != null) bar.attach(dialog);
             dialog.pack();
             if (remembered) {
-                dialog.setSize(surface.preferredSize()); dialog.setLocationRelativeTo(owner);
+                // A window-sized dialog starts as a window: its content at least a window's, plus the chrome the pack measured.
+                var packed = dialog.getSize(); var body = surface.holder().getSize();
+                dialog.setSize(surface.windowSized() ? windowSize(surface, new java.awt.Dimension(Math.max(0, packed.width - body.width),
+                    Math.max(0, packed.height - body.height)), usableBounds(dialog)) : surface.preferredSize());
+                dialog.setLocationRelativeTo(owner);
                 state.window(surface.id()).map(saved -> new Rectangle(saved.x(), saved.y(), saved.width(), saved.height())).filter(NativeShells::onSomeScreen).ifPresent(dialog::setBounds);
             } else if (!attached) dialog.setLocationRelativeTo(owner);
             resources.theme = themes.subscribe((resolved, chromeChanged) -> {
@@ -455,7 +480,7 @@ public final class NativeShells {
                 if (resources.attachment != null) resources.attachment.changed();
             });
             resources.floating = surface.modal() ? FloatWhileActive.attach(dialog) : null;
-            DialogFit fit = remembered || attached ? null : new DialogFit(surface.holder(), fitTarget(dialog));
+            DialogFit fit = fitted(surface) ? new DialogFit(surface.holder(), fitTarget(dialog)) : null;
             if (fit != null) surface.fitWith(fit);
             boolean[] watching = {false};
             if (attached && (!liveOwner(surface, owner) || body(owner) != ownerBody)) throw new IllegalArgumentException("Sheet owner changed during construction");
@@ -469,7 +494,7 @@ public final class NativeShells {
                         resources.unwatch = watchOwner(owner, resources.attachment);
                     }
                     resources.attachment.fitNow();
-                } else if (!remembered) {
+                } else if (fit != null) {
                     dialog.pack(); dialog.setLocationRelativeTo(owner); fit.packed();
                     if (!watching[0]) {
                         watching[0] = true;

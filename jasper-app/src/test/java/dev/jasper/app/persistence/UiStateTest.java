@@ -342,6 +342,22 @@ class UiStateTest {
         assertThat(state.window("dev.x.lost")).isEmpty();
     }
 
+    /** A window-sized plugin dialog remembers its bounds under its plugin id and title, which TOML quotes. */
+    @Test void aPluginDialogsKeyWithItsTitleRoundTrips() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        String key = "dev.jasper.vault|Credential \"Vault\"";
+        state.putWindow(key, new UiState.Bounds(10, 20, 900, 583));
+        state.putWindow("bad\nkey", new UiState.Bounds(10, 20, 900, 583));
+        state.putWindow("", new UiState.Bounds(10, 20, 900, 583));
+        state.save();
+        assertThat(Files.readString(file)).contains("[windows.\"dev.jasper.vault|Credential \\\"Vault\\\"\"]");
+        UiState again = UiState.load(file);
+        assertThat(again.window(key)).hasValue(new UiState.Bounds(10, 20, 900, 583));
+        assertThat(again.window("bad\nkey")).as("a control character").isEmpty();
+        assertThat(again.window("")).isEmpty();
+    }
+
     @Test void invalidValuesAreRejectedAndInvalidFilesFallBackToDefaults() throws Exception {
         assertThatNullPointerException().isThrownBy(() -> new UiState.Panel(null, 0, true));
         assertThatIllegalArgumentException().isThrownBy(() -> new UiState.Panel(Slot.LEFT_TOP, -1, true));

@@ -18,9 +18,6 @@ public final class KitViewTestAccess implements AutoCloseable {
     private final String surfaceId;
     StagedVaultHost vault() { return vault; }
     public AuxiliarySurface surface() { return surface; }
-    /** The manager tab's component for {@code vault-manager}, which is a tab and no surface; else null. */
-    private javax.swing.JComponent manager;
-    public javax.swing.JComponent manager() { return manager; }
 
     public KitViewTestAccess(Path home, String id, ResolvedTheme theme) throws Exception {
         surfaceId = id;
@@ -29,7 +26,7 @@ public final class KitViewTestAccess implements AutoCloseable {
         try {
             if (id.equals("fileserver-add")) {
                 vault.createVault("synthetic-preview-password");
-                vault.closeManager();
+                onEdt(() -> vault.surface("Credential Vault").close());
                 var staged=Path.of(System.getProperty("jasper.stagedPlugins")).resolve("dev.jasper.fileserver");
                 remoteLoader=new PluginClassLoader("dev.jasper.fileserver",ManagedVaultLoadingTest.jars(staged),getClass().getClassLoader(),java.util.Map.of("dev.jasper.vault.api",vault.loader));
                 var pluginClass=remoteLoader.loadClass("dev.jasper.fileserver.FileServerPlugin");
@@ -46,7 +43,7 @@ public final class KitViewTestAccess implements AutoCloseable {
             }
             if (id.equals("host-add")) {
                 vault.createVault("synthetic-preview-password");
-                vault.closeManager();
+                onEdt(() -> vault.surface("Credential Vault").close());
                 var ssh=java.nio.file.Files.createDirectories(home.resolve("synthetic-ssh"));
                 var staged=Path.of(System.getProperty("jasper.stagedPlugins")).resolve("dev.jasper.remote");
                 remoteLoader=new PluginClassLoader("dev.jasper.remote",ManagedVaultLoadingTest.jars(staged),getClass().getClassLoader(),java.util.Map.of("dev.jasper.vault.api",vault.loader));
@@ -71,10 +68,10 @@ public final class KitViewTestAccess implements AutoCloseable {
             if (java.util.Set.of("vault-manager", "vault-login", "vault-key").contains(id)) {
                 vault.createVault("synthetic-preview-password");
                 vault.seedReferenceItems(home.resolve("synthetic-keys"));
-                var shown = vault.awaitManager();
-                if (id.equals("vault-manager")) { manager = shown; surface = null; return; }
+                var manager = vault.awaitSurface("Credential Vault");
+                if (id.equals("vault-manager")) { surface = manager; return; }
                 onEdt(() -> {
-                    var menu = ((javax.swing.JComponent)StagedVaultHost.named(shown, "add")).getComponentPopupMenu();
+                    var menu = ((javax.swing.JComponent)StagedVaultHost.named(manager.holder(), "add")).getComponentPopupMenu();
                     String label = id.equals("vault-login") ? "Login" : "SSH Key";
                     java.util.Arrays.stream(menu.getComponents()).filter(c -> c instanceof AbstractButton b && b.getText().equals(label))
                         .map(AbstractButton.class::cast).findFirst().orElseThrow().doClick(0);
@@ -83,7 +80,7 @@ public final class KitViewTestAccess implements AutoCloseable {
             }
             if (id.equals("vault-unlock")) {
                 vault.createVault("synthetic-preview-password");
-                vault.requestCloseManager();
+                onEdt(() -> vault.surface("Credential Vault").requestClose());
                 vault.invoke("dev.jasper.vault.lock");
             } else if (!id.equals("vault-create")) throw new IllegalArgumentException("Unknown surface: " + id);
             vault.invoke("dev.jasper.vault.open");

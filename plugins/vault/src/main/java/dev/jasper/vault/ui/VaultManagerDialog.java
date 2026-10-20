@@ -2,9 +2,9 @@ package dev.jasper.vault.ui;
 
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
-import dev.jasper.sdk.ui.ContentSpec;
-import dev.jasper.sdk.ui.ContentTab;
+import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.vault.api.LockState;
 import dev.jasper.vault.lock.LockManager;
@@ -22,12 +22,11 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * The manager, one content tab (workspace tabs spec 1 decision 2), and its modal editors, which the tab owns. The plugin
- * forwards state/save/config changes here.
+ * The manager, one modeless dialog over the main window, and its modal editors, which hang from it. The plugin forwards
+ * state/save/config changes here.
  */
-public final class VaultManagerTab implements AutoCloseable {
-    /** The manager tab's key: opening it again selects the open one. */
-    public static final String KEY = "manager";
+public final class VaultManagerDialog implements AutoCloseable {
+    private static final String TITLE = "Credential Vault";
     private final PluginContext context;
     private final LockManager lock;
     private final VaultManager manager;
@@ -39,49 +38,57 @@ public final class VaultManagerTab implements AutoCloseable {
     private final EntryPresenter editors;
     private final Layout layout;
     private final CopyCards copies;
-    private ContentTab tab;
+    private PluginDialog dialog;
+    /** The window that owns the open dialog, the main window; the passive Unlock asks over it. */
+    private WindowHandle owner;
     private UnlockPrompt unlockPrompt;
     ManagerPanel panel;
     PasswordPanel passwordPanel;
 
-    public VaultManagerTab(PluginContext context, LockManager lock, VaultManager manager,
-                           VaultService service, Supplier<Status> status, Runnable generate) {
+    public VaultManagerDialog(PluginContext context, LockManager lock, VaultManager manager,
+                              VaultService service, Supplier<Status> status, Runnable generate) {
         this(context, lock, manager, service, status, generate, Layout.ROWS);
     }
 
     /** The manager in {@code layout}'s composition (Enterprise presentation spec 14.8). */
-    public VaultManagerTab(PluginContext context, LockManager lock, VaultManager manager,
-                           VaultService service, Supplier<Status> status, Runnable generate, Layout layout) {
+    public VaultManagerDialog(PluginContext context, LockManager lock, VaultManager manager,
+                              VaultService service, Supplier<Status> status, Runnable generate, Layout layout) {
         this.layout = layout;
         this.context = context; this.lock = lock; this.manager = manager; this.service = service;
         this.status = status; this.generate = generate;this.editors=new EntryPresenter(context, layout);
         this.copies = CopyCards.declare(context);
     }
-    public boolean isOpen() { return tab != null; }
-    /** The plugin's kit, for the forms this tab owns. */
+    public boolean isOpen() { return dialog != null; }
+    /** The plugin's kit, for the forms the manager owns. */
     public UiKit kit() { return context.kit(); }
-    /** Opens the manager as a tab in {@code owner}'s window, or selects the open one, with {@code selection} selected. */
-    public void show(WindowHandle owner, Optional<UUID> selection) {
-        if (tab == null) {
-            // The passive Unlock asks over the window that holds the tab, wherever it has moved.
-            var shown = new ManagerPanel(context.kit(), layout, manager::entry, this::add, this::edit, this::delete, this::copyPublic,
-                grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
-                () -> { if (tab != null) service.requestUnlock(tab.window()); });
-            shown.copies(copies);
-            panel = shown;
-            tab = context.windows().openTab(new ContentSpec(KEY, "Credential Vault"), owner, shown.view());
-            tab.onClosed(() -> {
-                // The tab has already disposed the view and erased its storage; nothing touches it from here.
-                tab = null; shown.close(); closeDialogs();
-                if (unlockPrompt != null) unlockPrompt.cancel();
-                passwordPanel = null; unlockPrompt = null;
-            });
-        }
-        changed(); selection.ifPresent(panel::select); tab.select();
+    /**
+     * Opens the manager as a dialog over the main window, whichever window asked ({@code requester} when there is no main
+     * window), or raises the open one, with {@code selection} selected.
+     */
+    public void show(WindowHandle requester, Optional<UUID> selection) {
+        // A dialog whose window has closed went with it: a new one opens instead of raising it.
+        if (dialog != null && !owner.isOpen()) dialog.close();
+        if (dialog != null) { changed(); selection.ifPresent(panel::select); dialog.toFront(); return; }
+        owner = context.terminals().windows().stream().filter(WindowHandle::isMain).findFirst().orElse(requester);
+        var shown = new ManagerPanel(context.kit(), layout, manager::entry, this::add, this::edit, this::delete, this::copyPublic,
+            grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
+            () -> service.requestUnlock(owner), this::close);
+        shown.copies(copies);
+        panel = shown;
+        PluginDialog opened = context.windows().dialog(new DialogSpec(TITLE, owner, false));
+        dialog = opened;
+        opened.setContent(shown.view());
+        opened.onClosed(() -> {
+            // The dialog has already disposed the view and erased its storage; nothing touches it from here.
+            dialog = null; shown.close(); closeDialogs();
+            if (unlockPrompt != null) unlockPrompt.cancel();
+            passwordPanel = null; unlockPrompt = null;
+        });
+        changed(); selection.ifPresent(panel::select); opened.show();
     }
     /** Refresh existing content; never opens the manager in response to an unrelated consumer unlock. */
     public void changed() {
-        if (tab == null) return;
+        if (dialog == null) return;
         boolean unlocked = lock.state() == LockState.UNLOCKED;
         if (!unlocked) closeDialogs();
         panel.refresh(manager.rows(), manager.grants(), status.get(), unlocked);
@@ -89,7 +96,7 @@ public final class VaultManagerTab implements AutoCloseable {
     }
     /** Routes the service's existing shared prompt into the manager, with no second unlock attempt. */
     public boolean showUnlock(UnlockPrompt prompt) {
-        if (tab == null) return false;
+        if (dialog == null) return false;
         unlockPrompt = prompt; passwordPanel = panel.showUnlock(prompt);
         PasswordPanel shown = passwordPanel;
         boolean[] active = {true};
@@ -105,14 +112,16 @@ public final class VaultManagerTab implements AutoCloseable {
             shown.clear();
             if (unlockPrompt == prompt && passwordPanel == shown) { unlockPrompt = null; passwordPanel = null; changed(); }
         });
-        tab.select(); return true;
+        dialog.toFront(); return true;
     }
     /** Every form, including the generator, gets the same modal ownership and close-time wipe. */
     public void dialog(String title, Function<Runnable, ? extends EditorForm> factory) { dialog(title, Nodes.Hue.NONE, factory); }
     /** As {@link #dialog(String, Function)}, the sheet's swatch in {@code hue} under the classic layout (plan 10b Rulings 5). */
     public void dialog(String title, Nodes.Hue hue, Function<Runnable, ? extends EditorForm> factory) {
-        if (tab == null || lock.state() != LockState.UNLOCKED) return;
-        editors.show(tab,title,hue,factory,()->{});
+        if (dialog == null || lock.state() != LockState.UNLOCKED) return;
+        // A dialog owns a sheet through an anchor on one of its controls: Done, which the manager always shows.
+        var anchor = panel.view().anchor(ManagerPanel.OKAY);
+        editors.show(anchor, title, hue, factory, anchor::close);
     }
     /** Opens the sheet for a new entry of the type over the open manager; does nothing when it is closed or locked. */
     public void add(VaultManager.Type type) {
@@ -157,7 +166,7 @@ public final class VaultManagerTab implements AutoCloseable {
         }));
     }
     /** Shows the saved plugin grants in the open manager; does nothing when it is closed or locked. */
-    public void showGrants() { if (tab != null) { panel.showGrants(); tab.select(); } }
+    public void showGrants() { if (dialog != null) { panel.showGrants(); dialog.toFront(); } }
     /** Asks for a new master password over the open manager; does nothing when it is closed or locked. */
     public void changePassword() {
         dialog("Change Master Password", close -> new ChangePasswordForm(context.kit(), lock, close, failure -> {
@@ -182,7 +191,7 @@ public final class VaultManagerTab implements AutoCloseable {
     private void closeDialogs() {editors.close();}
     @Override public void close() {
         closeDialogs();
-        if (tab != null) tab.close();
+        if (dialog != null) dialog.close();
         if (panel != null) panel.close();
     }
 }

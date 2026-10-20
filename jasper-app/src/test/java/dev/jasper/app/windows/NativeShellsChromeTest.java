@@ -10,6 +10,7 @@ import javax.swing.JRootPane;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(EdtTestExtension.class)
 class NativeShellsChromeTest {
@@ -61,7 +62,10 @@ class NativeShellsChromeTest {
         } finally { controller.close(); }
     }
 
-    /** A dialog sized to its content (every plugin dialog, a confirmation) is fixed-size; only a dialog that remembers its bounds resizes. */
+    /**
+     * A dialog sized to its content (a plugin's dialog, a confirmation) is fixed-size; only a dialog that remembers its
+     * bounds resizes, a window-sized plugin dialog among them.
+     */
     @Test void onlyADialogThatRemembersItsBoundsCanBeResized() {
         java.util.function.BiFunction<String, Boolean, AuxiliarySurface> dialog = (id, sheet) -> {
             var surface = new AuxiliarySurface(id, "New Tunnel", AuxiliarySurface.Kind.DIALOG, true, new Dimension(1, 1), null, null,
@@ -72,6 +76,44 @@ class NativeShellsChromeTest {
         assertThat(NativeShells.resizable(dialog.apply("", false))).as("a dialog packed to its content").isFalse();
         assertThat(NativeShells.resizable(dialog.apply("", true))).as("an attached sheet").isFalse();
         assertThat(NativeShells.resizable(dialog.apply("file-chooser", false))).as("a dialog with remembered bounds").isTrue();
+        assertThat(NativeShells.resizable(windowSized())).as("a window-sized plugin dialog").isTrue();
+    }
+
+    /** A modeless plugin dialog showing a WINDOW form, as HostedUi makes it window-sized before its first show. */
+    private static AuxiliarySurface windowSized() {
+        var surface = new AuxiliarySurface("", "Credential Vault", AuxiliarySurface.Kind.DIALOG, false, new Dimension(1, 1), null, null,
+            ignored -> { throw new AssertionError("No native shell in tests"); });
+        surface.windowSized("dev.jasper.vault|Credential Vault");
+        return surface;
+    }
+
+    /**
+     * A window-sized dialog remembers its bounds under its plugin and title, opens at least a window's content size (900 x
+     * 555, 820 x 571 under the classic mapping) plus its chrome, within the usable screen, and the shell never re-packs it,
+     * so the user's size stands; a plugin dialog packed to its content keeps following it.
+     */
+    @Test void aWindowSizedDialogOpensAtAWindowsSizeAndIsNeverRepacked() {
+        java.util.function.Function<Boolean, AuxiliarySurface> plain = modal -> new AuxiliarySurface("", "Manager", AuxiliarySurface.Kind.DIALOG,
+            modal, new Dimension(1, 1), null, null, ignored -> { throw new AssertionError("No native shell in tests"); });
+        assertThat(NativeShells.fitted(plain.apply(false))).as("a modeless dialog packed to its content follows it").isTrue();
+        assertThat(NativeShells.fitted(plain.apply(true))).as("so does a modal one").isTrue();
+        assertThatThrownBy(() -> plain.apply(true).windowSized("test.kit|Manager")).as("a modal dialog stays packed")
+            .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> new AuxiliarySurface("", "Busy", AuxiliarySurface.Kind.OVERLAY, false, new Dimension(1, 1), null, null,
+            ignored -> { throw new AssertionError(); }).windowSized("test.kit|Busy")).isInstanceOf(IllegalStateException.class);
+        var surface = windowSized();
+        assertThat(surface.windowSized()).isTrue();
+        assertThat(surface.id()).as("remembered under its plugin and title").isEqualTo("dev.jasper.vault|Credential Vault");
+        assertThat(NativeShells.fitted(surface)).as("never re-packed: the user's size stands").isFalse();
+        var content = new JPanel(); content.setPreferredSize(new Dimension(810, 185)); surface.setContent(content);
+        var chrome = new Dimension(0, 28); var screen = new java.awt.Rectangle(0, 0, 2000, 1500);
+        assertThat(NativeShells.windowSize(surface, chrome, screen)).as("the floor, a smaller content's").isEqualTo(new Dimension(900, 583));
+        surface.classic(true);
+        assertThat(NativeShells.windowSize(surface, chrome, screen)).as("the classic floor").isEqualTo(new Dimension(820, 599));
+        content.setPreferredSize(new Dimension(964, 640));
+        assertThat(NativeShells.windowSize(surface, chrome, screen)).as("a larger content, per dimension").isEqualTo(new Dimension(964, 668));
+        assertThat(NativeShells.windowSize(surface, chrome, new java.awt.Rectangle(0, 0, 800, 500))).as("within the usable screen")
+            .isEqualTo(new Dimension(800, 500));
     }
 
     @Test void compactPromptPackingUsesContentWidthAndUnifiedUntitledChrome() {

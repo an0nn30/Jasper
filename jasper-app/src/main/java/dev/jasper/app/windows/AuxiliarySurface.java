@@ -31,7 +31,7 @@ public final class AuxiliarySurface {
     public enum Kind { WINDOW, DIALOG, OVERLAY }
 
     private static final System.Logger LOG = System.getLogger(AuxiliarySurface.class.getName());
-    private final String id;
+    private String id;
     private final Kind kind;
     private final boolean modal;
     private final Dimension preferredSize;
@@ -90,7 +90,7 @@ public final class AuxiliarySurface {
      */
     public void integratedTitle(java.util.function.IntSupplier height) { integratedTitle = Objects.requireNonNull(height); }
     public Optional<java.util.function.IntSupplier> integratedTitle() { return Optional.ofNullable(integratedTitle); }
-    private boolean fitContent;
+    private boolean fitContent, windowSized;
     private DialogFit fit;
     private AttachedSheet attachment;
     void attachWith(AttachedSheet value) { attachment = value; if (closed) value.close(); }
@@ -108,6 +108,21 @@ public final class AuxiliarySurface {
     }
 
     public String id() { return id; }
+    /** Whether this modeless dialog opens window-sized ({@link #windowSized(String)}). */
+    public boolean windowSized() { return windowSized; }
+    /**
+     * Before the first show, this modeless dialog opens as a window does: it remembers its bounds under {@code key}, the user
+     * can resize it, and with none remembered it opens at least a window's size ({@code NativeShells.windowSize}). Once its
+     * native shell exists this changes nothing.
+     *
+     * @throws IllegalStateException for an overlay, a modal dialog or a window
+     */
+    public void windowSized(String key) {
+        if (kind != Kind.DIALOG || modal) throw new IllegalStateException("Only a modeless dialog opens window-sized");
+        if (key == null || key.isBlank()) throw new IllegalArgumentException("A window-sized dialog needs a key");
+        if (shell != null || closed) return;
+        id = key; windowSized = true;
+    }
     public Kind kind() { return kind; }
     public boolean modal() { return modal; }
     public Dimension preferredSize() { return new Dimension(preferredSize); }
