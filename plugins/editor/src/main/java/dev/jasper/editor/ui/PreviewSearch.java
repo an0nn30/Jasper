@@ -64,21 +64,16 @@ final class PreviewSearch {
             // Matcher.find advances after an empty match. Source mark-all likewise omits empty ranges.
             while (matcher.find()) if (matcher.start() != matcher.end()) result.add(new Match(matcher.start(), matcher.end()));
         } else {
-            // The literal Source path uses String case folding and Character.isLetterOrDigit boundaries.
-            // Fold once and scan without allocating a suffix for every occurrence.
-            String haystack = context.getMatchCase() ? text : text.toLowerCase();
-            String needle = context.getMatchCase() ? query : query.toLowerCase();
-            int start = 0;
-            while (start <= haystack.length() - needle.length()) {
-                int offset = haystack.indexOf(needle, start);
-                if (offset < 0) break;
-                int end = offset + needle.length();
+            // Match the original document so Unicode case conversion cannot expand or shift offsets.
+            // Quoting keeps literal queries literal; retain Source's letter/digit word boundaries.
+            var matcher = Pattern.compile(Pattern.quote(query),
+                RSyntaxUtilities.getPatternFlags(context.getMatchCase(), 0)).matcher(text);
+            while (matcher.find()) {
+                int start = matcher.start(), end = matcher.end();
                 boolean word = !context.getWholeWord()
-                    || (offset == 0 || !Character.isLetterOrDigit(haystack.charAt(offset - 1)))
-                    && (end == haystack.length() || !Character.isLetterOrDigit(haystack.charAt(end)));
-                // Preserve valid document offsets even when locale-sensitive folding changes length.
-                if (word && end <= text.length()) result.add(new Match(offset, end));
-                start = word ? end : offset + 1;
+                    || (start == 0 || !Character.isLetterOrDigit(text.charAt(start - 1)))
+                    && (end == text.length() || !Character.isLetterOrDigit(text.charAt(end)));
+                if (word) result.add(new Match(start, end));
             }
         }
         return result;

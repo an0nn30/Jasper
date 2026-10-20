@@ -39,6 +39,43 @@ class PreviewSearchTest {
             search.clear();assertThat(pane.editor().getHighlighter().getHighlights()).isEmpty();pane.close();
         });
     }
+    @Test void expandingLowercaseInsideQueryRetainsOriginalHighlightAndSelectionWidth() throws Exception {
+        var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("\u0130x"));
+        SwingUtilities.invokeAndWait(() -> {
+            assertLiteralMatch(pane,"\u0130",false,"\u0130");
+            pane.close();
+        });
+    }
+    @Test void expandingLowercaseBeforeMatchRetainsOriginalHighlightAndSelectionOffsets() throws Exception {
+        var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("\u0130 target tail"));
+        SwingUtilities.invokeAndWait(() -> {
+            assertLiteralMatch(pane,"target",true,"target");
+            pane.close();
+        });
+    }
+    @Test void expandingLowercaseBeforeFinalMatchDoesNotDiscardIt() throws Exception {
+        var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("\u0130 target"));
+        SwingUtilities.invokeAndWait(() -> {
+            assertLiteralMatch(pane,"target",true,"target");
+            pane.close();
+        });
+    }
+    private static void assertLiteralMatch(PreviewPane pane,String needle,boolean word,String selected) {
+        var search=new PreviewSearch(pane);var context=query(needle,false,word);
+        final String text;
+        try {text=pane.editor().getDocument().getText(0,pane.editor().getDocument().getLength());}
+        catch(javax.swing.text.BadLocationException impossible){throw new AssertionError(impossible);}
+        int expected=text.indexOf(selected);assertThat(expected).isNotNegative();
+        assertThat(search.markAll(context)).isEqualTo(1);
+        var highlights=pane.editor().getHighlighter().getHighlights();assertThat(highlights).hasSize(1);
+        assertThat(highlights[0].getStartOffset()).isEqualTo(expected);
+        assertThat(highlights[0].getEndOffset()).isEqualTo(expected+selected.length());
+        pane.editor().setCaretPosition(0);assertThat(search.find(context)).isTrue();
+        assertThat(pane.editor().getSelectionStart()).isEqualTo(expected);
+        assertThat(pane.editor().getSelectionEnd()).isEqualTo(expected+selected.length());
+        assertThat(pane.editor().getSelectedText()).isEqualTo(selected);
+    }
+
     @Test void openFindRecomputesMatchesOnlyWhenTheReplacementDocumentIsInstalled() throws Exception {
         var pane=PreviewPaneTest.install(PreviewPaneTest.prepare("old old"));var bar=new FindBar[1];
         SwingUtilities.invokeAndWait(() -> {
