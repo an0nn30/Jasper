@@ -3,6 +3,9 @@ import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JvmVendorSpec
 
+@Suppress("UNCHECKED_CAST")
+val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.gradle.api.artifacts.Configuration>
+
 // SDK modules may reference only the JDK and dev.jasper.sdk, and their package graphs are acyclic.
 // A module listed here must have the java plugin applied and produce classes/java/main.
 val sdkModules = listOf(":jasper-sdk", ":jasper-sdk-testkit")
@@ -10,6 +13,7 @@ val sdkModules = listOf(":jasper-sdk", ":jasper-sdk-testkit")
 val sdkProjects = sdkModules.associateWith { project(it) }
 val verifySdkArchitecture = tasks.register("verifySdkArchitecture") {
     sdkModules.forEach { dependsOn("$it:classes") }
+    inputs.files(sdkModules.map { verificationClasspaths.getValue(it) })
     doLast {
         val launcher = sdkProjects.values.first().extensions.getByType<JavaToolchainService>().launcherFor {
             languageVersion = JavaLanguageVersion.of(25)
@@ -23,13 +27,16 @@ val verifySdkArchitecture = tasks.register("verifySdkArchitecture") {
             val output = process.inputStream.bufferedReader().readText()
             check(process.waitFor() == 0) { output }; return output
         }
+        val checker = file("gradle/architecture/PluginPresentationCheck.java").absolutePath
+        tool("java", listOf(checker, "--sdk-self-test", layout.buildDirectory.dir("sdk-signature-fixtures").get().asFile.absolutePath))
         fun jdk(name: String) = name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.")
         fun packageOf(name: String) = name.substringBeforeLast('.')
         val edge = Regex("^\\s*(dev\\.jasper\\.sdk\\.\\S+)\\s+->\\s+(\\S+).*$")
         for (path in sdkModules) {
             val module = sdkProjects.getValue(path)
             val classes = module.layout.buildDirectory.dir("classes/java/main").get().asFile
-            val classpath = module.configurations.getByName("runtimeClasspath").asPath
+            if (path == ":jasper-sdk") tool("java", listOf(checker, "--sdk", classes.absolutePath))
+            val classpath = verificationClasspaths.getValue(module.path).asPath
             val args = mutableListOf("--multi-release", "25", "--ignore-missing-deps", "-verbose:class", "-filter:none")
             if (classpath.isNotEmpty()) args += listOf("--class-path", classpath)
             val output = tool("jdeps", args + classes.absolutePath)

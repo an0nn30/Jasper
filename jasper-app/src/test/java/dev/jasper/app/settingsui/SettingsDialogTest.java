@@ -1,5 +1,6 @@
 package dev.jasper.app.settingsui;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static dev.jasper.app.workspace.DesktopTestSupport.until;
 import static org.assertj.core.api.Assertions.*;
@@ -10,6 +11,9 @@ import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.SettingsEdit;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.testsupport.KitTestSupport;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import java.awt.Rectangle;
@@ -51,22 +55,142 @@ class SettingsDialogTest {
                 return saveResult != null ? saveResult : CompletableFuture.completedFuture(state("[window]\ntab_height = 50\n"));
             }, () -> state, listener -> { listeners.add(listener); return new Subscription(() -> listeners.remove(listener)); },
             () -> opened.add("config"), () -> opened.add("migrate"), browsed::add,
-            (parent, count) -> { asked[0] = count; return discard[0]; });
+            (parent, count) -> { asked[0] = count; return discard[0]; }, KitTestSupport::context);
     }
+
+    static javax.swing.JButton button(SettingsDialog dialog, String id) { return dialog.view().control(id, javax.swing.JButton.class); }
+    static String label(SettingsDialog dialog, String id) { return dialog.view().control(id, javax.swing.JLabel.class).getText(); }
+    /** Presses a kit number field's arrow-key step, as the user does to change a value without typing. */
+    static void step(javax.swing.JComponent input, int key) {
+        var name = input.getInputMap(javax.swing.JComponent.WHEN_FOCUSED).get(javax.swing.KeyStroke.getKeyStroke(key, 0));
+        input.getActionMap().get(name).actionPerformed(new java.awt.event.ActionEvent(input, 0, ""));
+    }
+    static java.awt.Component page(SettingsDialog dialog) { return dialog.view().body.getViewport().getView(); }
 
     private SettingsDialog dialog() {
         return new SettingsDialog(windows, context -> {
             contexts.add(context);
-            return CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark", "IntelliJ Light")), new CorePages.SystemActions(() -> FILE,
-                    () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
+            return CorePages.pages(AppearanceFixtures.CHOICES, new CorePages.SystemActions(() -> FILE,
+                    () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
                 page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context);
         }, hooks());
     }
 
+    @Test void fullSpanNotificationSearchRevealsAndHighlightsPopulatedAndEmptyGroups() throws Exception {
+        for (boolean populated : List.of(false, true)) {
+            var groups = new NotificationGroupChoices(() -> populated
+                ? List.of(new NotificationGroupChoices.Group("configuration", "Configuration", "Jasper", "sticky")) : List.of());
+            var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
+                new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false, Optional.empty()), ShellChoices.NONE,
+                groups, new CorePages.Pages(page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), page -> List.of())).apply(context), hooks());
+            try {
+                edt(() -> {
+                    dialog.open(null, "window");
+                    dialog.search("notification groups");
+                    assertThat(dialog.currentPage()).isEqualTo("notifications");
+                    assertThat(button(dialog, "back").isEnabled()).isTrue();
+                    assertThat(button(dialog, "ok").isEnabled()).isTrue();
+                    String target = populated ? "notifications.groups:row-0" : "notifications.groups:empty-row";
+                    var row = KitTestSupport.require(page(dialog), target, javax.swing.JComponent.class);
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
+                    dialog.search("sticky");
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
+                    dialog.search("");
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isNotEqualTo("Matches search");
+                });
+            } finally { edt(dialog::cancel); }
+        }
+    }
+
+    @Test void fullSpanAppearanceSearchHighlightsTheRetainedCompoundRows() throws Exception {
+        var dialog = dialog();
+        try {
+            edt(() -> {
+                dialog.open(null, "appearance");
+                var targets = new java.util.HashMap<>(java.util.Map.of("platform font size", "row:ui.font.size", "theme", "row:ui.appearance"));
+                // Workspace glass, and with it the Opacity row, exists only on macOS.
+                if (com.formdev.flatlaf.util.SystemInfo.isMacOS) targets.put("opacity", "row:ui.workspace.opacity");
+                for (var entry : targets.entrySet()) {
+                    var row = KitTestSupport.require(page(dialog), entry.getValue(), javax.swing.JComponent.class);
+                    dialog.search(entry.getKey());
+                    assertThat(KitTestSupport.require(page(dialog), entry.getValue(), javax.swing.JComponent.class)).isSameAs(row);
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
+                    dialog.search("");
+                    assertThat(row.getAccessibleContext().getAccessibleDescription()).isNotEqualTo("Matches search");
+                }
+            });
+        } finally { edt(dialog::cancel); }
+    }
+
+    @Test void explicitSearchRevealWinsOverDeferredRememberedPageScroll() throws Exception {
+        var dialog = dialog();
+        try {
+            edt(() -> {
+                dialog.open(null, "appearance"); dialog.view().setSize(980, 330); KitTestSupport.layout(dialog.view());
+                dialog.view().body.getViewport().setViewPosition(new java.awt.Point(0, 0));
+                dialog.select("window"); KitTestSupport.layout(dialog.view());
+                dialog.search("animations"); KitTestSupport.layout(dialog.view());
+            });
+            edt(() -> {});
+            edt(() -> {
+                var row = KitTestSupport.require(page(dialog), "row:ui.animations.enabled", javax.swing.JComponent.class);
+                var bounds = javax.swing.SwingUtilities.convertRectangle(row.getParent(), row.getBounds(), page(dialog));
+                assertThat(dialog.view().body.getViewport().getViewRect().intersects(bounds)).as("search target remains visible after pending page restoration").isTrue();
+                assertThat(dialog.view().body.getViewport().getViewPosition().y).isGreaterThan(0);
+            });
+        } finally { edt(dialog::cancel); }
+    }
+
+    @Test void narrowEnlargedToolbarModesKeepTheirFullVisibleMeaning() throws Exception {
+        edt(() -> {
+            try (var themes = ThemeTestSupport.controller(true)) {
+                themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system", 20));
+                var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
+                    new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false, Optional.empty()), page -> fake,
+                    page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)),
+                    new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> {}),
+                        () -> {}, () -> {}, uri -> {}, (parent, count) -> true, () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
+                try {
+                    dialog.open(null, "window"); dialog.view().setSize(640, 681);
+                    for (int i = 0; i < 4; i++) KitTestSupport.layout(dialog.view());
+                    for (String id : List.of("icons_and_labels", "icons", "hidden")) {
+                        var button = KitTestSupport.require(page(dialog), "window.toolbar.option." + id, javax.swing.JButton.class);
+                        var inset = button.getInsets();
+                        String painted = javax.swing.SwingUtilities.layoutCompoundLabel(button, button.getFontMetrics(button.getFont()), button.getText(), button.getIcon(),
+                            javax.swing.SwingConstants.CENTER, button.getHorizontalAlignment(), javax.swing.SwingConstants.CENTER, javax.swing.SwingConstants.RIGHT,
+                            new Rectangle(inset.left, inset.top, button.getWidth() - inset.left - inset.right, button.getHeight() - inset.top - inset.bottom), new Rectangle(), new Rectangle(), button.getIconTextGap());
+                        assertThat(painted).as(id + " painted meaning").isEqualTo(button.getText());
+                    }
+                } finally {
+                    dialog.cancel();
+                    themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
+                }
+            }
+        });
+    }
+
+    @Test void returningToAPageRestoresScrollAndRetainsTheEditedDocument() throws Exception {
+        var dialog=dialog();final Object[] document={null};final java.awt.Point[] position={null};
+        try{
+            edt(()->{
+                dialog.open(null,"appearance");dialog.view().setSize(980,400);KitTestSupport.layout(dialog.view());
+                var input=KitTestSupport.require(page(dialog),"ui.font.family.input",javax.swing.JComboBox.class);
+                var text=(javax.swing.text.JTextComponent)input.getEditor().getEditorComponent();document[0]=text.getDocument();text.setText("Retained Font");text.select(2,7);
+                dialog.view().body.getViewport().setViewPosition(new java.awt.Point(0,100));position[0]=dialog.view().body.getViewport().getViewPosition();
+                dialog.select("window");KitTestSupport.layout(dialog.view());dialog.back();KitTestSupport.layout(dialog.view());
+            });
+            edt(()->{
+                var input=KitTestSupport.require(page(dialog),"ui.font.family.input",javax.swing.JComboBox.class);var text=(javax.swing.text.JTextComponent)input.getEditor().getEditorComponent();
+                assertThat(text.getDocument()).isSameAs(document[0]);assertThat(text.getText()).isEqualTo("Retained Font");
+                assertThat(dialog.view().body.getViewport().getViewPosition()).isEqualTo(position[0]);
+            });
+        }finally{edt(()->{dialog.cancel();windows.close();});}
+    }
+
     @Test void aFragmentRevealsItsPartBeforeThePageIsSelectedEvenWhenItIsAlreadyShown() throws Exception {
         var revealed = new ArrayList<String>();
-        var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark")),
-                new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), ShellChoices.NONE,
+        var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
+                new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE,
                 page -> fake, page -> new Revealing(new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), revealed), page -> List.of()).apply(context), hooks());
         edt(() -> {
             dialog.open(null, "appearance");
@@ -95,30 +219,30 @@ class SettingsDialogTest {
         @Override public void selected() { header.selected(); revealed.add("selected"); }
     }
 
-    @Test void themeAndWorkspaceSchemeShareOneSaveRetainFailedDraftAndCancelDiscardsThem() throws Exception {
-        var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Darcula", "Jasper Dark", "Jasper Light")),
-            new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false),
+    @Test void appearanceAndTerminalSchemeShareOneSaveRetainFailedDraftAndCancelDiscardsThem() throws Exception {
+        var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
+            new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false, Optional.empty()),
             page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context), hooks());
         saveResult = CompletableFuture.failedFuture(new IllegalStateException("Setting changed on disk"));
         edt(() -> {
             dialog.open(null, "appearance");
-            dialog.draft().stage(CoreSettings.UI_THEME_NAME, Optional.of("Jasper Light"));
-            dialog.draft().stage(CoreSettings.UI_THEME_WORKSPACE, Optional.of("Darcula"));
+            dialog.draft().stage(CoreSettings.UI_APPEARANCE, Optional.of(dev.jasper.app.config.AppearanceMode.LIGHT));
+            dialog.draft().stage(CoreSettings.TERMINAL_SCHEME, Optional.of("slate-cobalt/high-contrast"));
             dialog.apply();
         });
         edt(() -> {});
         edt(() -> {
             assertThat(saved).hasSize(1);
-            assertThat(saved.getFirst().changes()).containsKeys(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE);
+            assertThat(saved.getFirst().changes()).containsKeys(CoreSettings.UI_APPEARANCE, CoreSettings.TERMINAL_SCHEME);
             assertThat(dialog.draft().modified()).isTrue();
         });
-        state = state("ui.theme.name='Jasper Light'\nui.theme.workspace='Darcula'\n"); saveResult = CompletableFuture.completedFuture(state);
+        state = state("ui.appearance='light'\nterminal.scheme='slate-cobalt/high-contrast'\n"); saveResult = CompletableFuture.completedFuture(state);
         edt(dialog::apply); edt(() -> {});
         edt(() -> {
             assertThat(saved).hasSize(2); assertThat(dialog.draft().modified()).isFalse();
-            dialog.draft().stage(CoreSettings.UI_THEME_WORKSPACE, Optional.of("Jasper Dark")); dialog.cancel();
+            dialog.draft().stage(CoreSettings.TERMINAL_SCHEME, Optional.of("slate-cobalt/dark")); dialog.cancel();
             assertThat(dialog.isOpen()).isFalse(); dialog.open(null,"appearance");
-            assertThat(dialog.draft().value(CoreSettings.UI_THEME_WORKSPACE)).isEqualTo("Darcula"); dialog.cancel();
+            assertThat(dialog.draft().value(CoreSettings.TERMINAL_SCHEME)).isEqualTo("slate-cobalt/high-contrast"); dialog.cancel();
         });
     }
 
@@ -130,49 +254,68 @@ class SettingsDialogTest {
             assertThat(dialog.view().tree.visibleIds()).contains("appearance-behavior", "appearance", "terminal.shell", "plugins")
                 .doesNotContain("tools");
             assertThat(dialog.currentPage()).isEqualTo("appearance");
-            assertThat(dialog.view().breadcrumb.getText()).isEqualTo("Appearance & Behavior › Appearance");
-            assertThat(dialog.view().apply.isEnabled()).isFalse();
+            assertThat(dialog.view().breadcrumb()).isEqualTo("Appearance & Behavior › Appearance");
+            assertThat(button(dialog, "apply").isEnabled()).isFalse();
+            assertThat(((Nodes.Stack) dialog.view().navigation.spec().root()).children().getFirst()).as("the page tree is the kit's").isInstanceOf(Nodes.Tree.class);
+            assertThat(dialog.view().search.spec().root()).isEqualTo(new Nodes.Field("search", dev.jasper.ui.model.ControlState.READY,
+                Nodes.FieldKind.SEARCH, "", "Search settings", "Search settings", ""));
         });
     }
 
-    @Test void pickingAThemeFromTheListEnablesApply() throws Exception {
+    @Test void pickingTheLightTileEnablesApply() throws Exception {
         var dialog = dialog();
         edt(() -> {
             dialog.open(null, "appearance");
             // The dialog's window replays the current theme when it opens, which updates every component's UI.
             javax.swing.SwingUtilities.updateComponentTreeUI(dialog.view());
-            @SuppressWarnings("unchecked") var box = (javax.swing.JComboBox<String>) find(dialog.view(), javax.swing.JComboBox.class);
-            box.setSelectedIndex(1);
-            assertThat(dialog.view().apply.isEnabled()).isTrue();
+            KitTestSupport.require(dialog.view(), "ui.appearance:policy.option.light", javax.swing.JButton.class).doClick(0);
+            assertThat(dialog.draft().value(CoreSettings.UI_APPEARANCE)).isEqualTo(dev.jasper.app.config.AppearanceMode.LIGHT);
+            assertThat(button(dialog, "apply").isEnabled()).isTrue();
         });
     }
 
-    @Test void changingANumberWithItsSpinnerEnablesApply() throws Exception {
+    @Test void steppingANumberEnablesApply() throws Exception {
         var dialog = dialog();
         edt(() -> {
             dialog.open(null, "window");
             javax.swing.SwingUtilities.updateComponentTreeUI(dialog.view());
-            var spinner = (javax.swing.JSpinner) find(dialog.view(), javax.swing.JSpinner.class);
-            spinner.setValue(spinner.getNextValue());
-            assertThat(dialog.view().apply.isEnabled()).as("Apply after a spinner step").isTrue();
+            var field = KitTestSupport.require(dialog.view(), "window.tab_height.input", javax.swing.JTextField.class);
+            assertThat(field.getText()).isEqualTo("44");
+            step(field, java.awt.event.KeyEvent.VK_UP);
+            assertThat(dialog.draft().value(CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(45);
+            assertThat(button(dialog, "apply").isEnabled()).as("Apply after a step").isTrue();
         });
     }
 
-    @Test void turningBlurOnAndChangingOpacityEnableApply() throws Exception {
+    @Test void aNumberOutsideItsRangeIsRefusedInlineAndBlocksOk() throws Exception {
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "window");
+            var field = KitTestSupport.require(dialog.view(), "window.tab_height.input", javax.swing.JTextField.class);
+            field.setText("99");
+            assertThat(KitTestSupport.require(dialog.view(), "window.tab_height.error", javax.swing.JLabel.class).getText()).isNotBlank();
+            assertThat(dialog.draft().value(CoreSettings.WINDOW_TAB_HEIGHT)).as("not staged").isEqualTo(44);
+            assertThat(button(dialog, "ok").isEnabled()).isFalse();
+            field.setText("50");
+            assertThat(dialog.draft().value(CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(50);
+            assertThat(button(dialog, "ok").isEnabled()).isTrue();
+        });
+    }
+
+    @Test @org.junit.jupiter.api.condition.EnabledOnOs(value = org.junit.jupiter.api.condition.OS.MAC, disabledReason = "workspace glass exists only on macOS")
+    void turningBlurOnAndChangingOpacityEnableApply() throws Exception {
         var dialog = dialog();
         edt(() -> {
             dialog.open(null, "appearance");
             javax.swing.SwingUtilities.updateComponentTreeUI(dialog.view());
-            var boxes = new java.util.ArrayList<javax.swing.JComboBox<?>>();
-            collect(dialog.view(), javax.swing.JComboBox.class, boxes);
-            var blur = boxes.stream().filter(box -> box.getItemCount() == 3).findFirst().orElseThrow();
-            blur.setSelectedIndex(1);
-            assertThat(dialog.view().apply.isEnabled()).as("Apply after Blur: On").isTrue();
-            var checks = new java.util.ArrayList<javax.swing.JCheckBox>();
-            collect(dialog.view(), javax.swing.JCheckBox.class, checks);
-            var useTheme = checks.stream().filter(box -> box.getText().equals("Use theme's value")).findFirst().orElseThrow();
-            useTheme.doClick();
-            assertThat(dialog.view().apply.isEnabled()).as("Apply after unticking Use theme's value").isTrue();
+            var blur = KitTestSupport.require(dialog.view(), "ui.workspace.blur", javax.swing.JButton.class);
+            blur.doClick(0);
+            assertThat(button(dialog, "apply").isEnabled()).as("Apply after Blur: On").isTrue();
+            var enable = KitTestSupport.require(dialog.view(), "ui.workspace.opacity:default", javax.swing.JButton.class);
+            assertThat(enable.getAccessibleContext().getAccessibleName()).isEqualTo("Enable opacity");
+            enable.doClick();
+            assertThat(dialog.draft().modified(CoreSettings.UI_WORKSPACE_OPACITY)).isTrue();
+            assertThat(button(dialog, "apply").isEnabled()).as("Apply after turning on Enable opacity").isTrue();
         });
     }
 
@@ -198,11 +341,11 @@ class SettingsDialogTest {
             assertThat(dialog.currentPage()).isEqualTo("terminal.font");
             dialog.back();
             assertThat(dialog.currentPage()).isEqualTo("window");
-            assertThat(dialog.view().back.isEnabled()).isFalse();
+            assertThat(button(dialog, "back").isEnabled()).isFalse();
             dialog.forward();
             assertThat(dialog.currentPage()).isEqualTo("terminal.font");
             dialog.select("desk-buddy");
-            assertThat(dialog.view().forward.isEnabled()).isFalse();
+            assertThat(button(dialog, "forward").isEnabled()).isFalse();
         });
     }
 
@@ -214,6 +357,10 @@ class SettingsDialogTest {
             assertThat(dialog.view().tree.visibleIds()).containsExactly("terminal", "terminal.font");
             assertThat(dialog.view().tree.count("terminal.font")).isPositive();
             assertThat(dialog.currentPage()).isEqualTo("terminal.font");
+            dialog.view().navigation.setSize(260, 600);
+            KitTestSupport.layout(dialog.view().navigation);
+            assertThat(KitTestSupport.require(dialog.view().navigation, "@tree/pages/terminal.font/count", javax.swing.JLabel.class).getText())
+                .as("the count shows at the row's end").isEqualTo(Integer.toString(dialog.view().tree.count("terminal.font")));
             dialog.search("shortcuts");
             assertThat(dialog.view().tree.visibleIds()).containsExactly("keymap");
             assertThat(fake.highlights).contains("shortcuts");
@@ -230,8 +377,10 @@ class SettingsDialogTest {
             dialog.draft().stage(CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(50));
             fake.modified = true;
             dialog.refreshNow();
-            assertThat(dialog.view().apply.isEnabled()).isTrue();
+            assertThat(button(dialog, "apply").isEnabled()).isTrue();
             assertThat(dialog.view().tree.isModified("window")).isTrue();
+            assertThat(item((Nodes.Tree) ((Nodes.Stack) dialog.view().navigation.spec().root()).children().getFirst(), "window").emphasized()).as("unsaved pages stand out").isTrue();
+            assertThat(item((Nodes.Tree) ((Nodes.Stack) dialog.view().navigation.spec().root()).children().getFirst(), "terminal").emphasized()).isFalse();
             dialog.apply();
         });
         until(() -> fake.applied == 1);
@@ -240,11 +389,33 @@ class SettingsDialogTest {
             assertThat(dialog.draft().modified()).isFalse();
             fake.modified = false;
             dialog.refreshNow();
-            assertThat(dialog.view().apply.isEnabled()).isFalse();
+            assertThat(button(dialog, "apply").isEnabled()).isFalse();
             dialog.draft().stage(CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(60));
             dialog.ok();
         });
         until(() -> !dialog.isOpen());
+    }
+
+    @Test void anExternalRowsEditIsAppliedWithoutWritingConfigToml() throws Exception {
+        var saves = new CopyOnWriteArrayList<Integer>();
+        int[] stored = {2048};
+        var dialog = new SettingsDialog(windows, context -> List.of(SchemaPage.page("vm", "VM")
+            .external(new SchemaPage.External("vm.heap", "Maximum heap size", "MiB", List.of("heap"), new Nodes.Numeric(512, 1_048_576, 256, 0),
+                () -> stored[0], () -> 2048, value -> value < 512 ? "Use 512 MiB or more." : "", value -> "",
+                value -> { saves.add(value); stored[0] = value; return CompletableFuture.completedFuture(null); }, () -> true))
+            .build(context)), hooks());
+        edt(() -> {
+            dialog.open(null, "vm");
+            KitTestSupport.require(page(dialog), "vm.heap.input", javax.swing.JTextField.class).setText("4096");
+            assertThat(button(dialog, "apply").isEnabled()).isTrue();
+            dialog.apply();
+        });
+        until(() -> saves.equals(List.of(4096)));
+        edt(() -> {
+            assertThat(saved).as("an external edit leaves config.toml alone").isEmpty();
+            dialog.refreshNow();
+            assertThat(button(dialog, "apply").isEnabled()).isFalse();
+        });
     }
 
     @Test void aFailedSaveKeepsTheEditsAndSaysWhy() throws Exception {
@@ -255,9 +426,10 @@ class SettingsDialogTest {
             dialog.draft().stage(CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(50));
             dialog.ok();
         });
-        until(() -> !dialog.view().message.getText().isEmpty());
+        until(() -> !dialog.view().message().isEmpty());
         edt(() -> {
-            assertThat(dialog.view().message.getText()).contains("changed on disk");
+            assertThat(label(dialog, "message")).contains("changed on disk");
+            assertThat(dialog.view().control("message-status", java.awt.Component.class).isVisible()).isTrue();
             assertThat(dialog.isOpen()).isTrue();
             assertThat(dialog.draft().modified()).isTrue();
         });
@@ -284,16 +456,19 @@ class SettingsDialogTest {
         edt(() -> {
             dialog.open(null, "window");
             assertThat(dialog.view().banner.isVisible()).isTrue();
-            assertThat(dialog.view().bannerText.getText()).isEqualTo("config.toml uses old setting names.");
-            dialog.view().bannerButton.doClick();
+            assertThat(label(dialog, "banner-text")).isEqualTo("config.toml uses old setting names.");
+            assertThat(button(dialog, "banner-action").getText()).isEqualTo("Migrate Config…");
+            button(dialog, "banner-action").doClick();
             assertThat(opened).containsExactly("migrate");
             var broken = state("[window\n");
             listeners.forEach(listener -> listener.accept(new ConfigService.State(broken.snapshot(), broken.diagnostics(), FILE, true,
                 List.of(), List.of(), state.values(), true)));
-            assertThat(dialog.view().bannerText.getText()).isEqualTo("config.toml has errors, so changes can't be saved until they're fixed.");
+            assertThat(label(dialog, "banner-text")).isEqualTo("config.toml has errors, so changes can't be saved until they're fixed.");
+            button(dialog, "banner-action").doClick();
+            assertThat(opened).containsExactly("migrate", "config");
             dialog.draft().stage(CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(50));
-            assertThat(dialog.view().apply.isEnabled()).isFalse();
-            assertThat(dialog.view().ok.isEnabled()).isFalse();
+            assertThat(button(dialog, "apply").isEnabled()).isFalse();
+            assertThat(button(dialog, "ok").isEnabled()).isFalse();
         });
     }
 
@@ -312,7 +487,7 @@ class SettingsDialogTest {
         var dialog = dialog();
         edt(() -> {
             dialog.open(null, "terminal.font");
-            dialog.view().help.doClick();
+            button(dialog, "help").doClick();
         });
         assertThat(browsed).containsExactly(URI.create(SettingsDialog.HELP_URL + "terminal-colors"));
     }
@@ -341,6 +516,320 @@ class SettingsDialogTest {
             assertThat(surface.title()).isEqualTo("Settings");
             dialog.cancel();
             assertThat(contexts.getLast().surface().get()).as("gone once the dialog closes").isNull();
+        });
+    }
+
+    static dev.jasper.ui.model.TreeItem item(Nodes.Tree tree, String id) {
+        var pending = new java.util.ArrayDeque<>(tree.roots());
+        while (!pending.isEmpty()) {
+            var next = pending.removeFirst();
+            if (next.id().equals(id)) return next;
+            pending.addAll(next.children());
+        }
+        throw new AssertionError("No tree item " + id);
+    }
+
+    /**
+     * Before Plan 2 the page tree was a JTree, which binds no Enter key, and OK was the root pane's default button:
+     * Enter on the tree pressed OK. The kit tree has no activate action, so its Enter passes on to the same OK.
+     */
+    @Test void enterOnThePageTreePressesOkAsTheOldDefaultButtonDid() throws Exception {
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "window");
+            var view = dialog.view();
+            var root = new javax.swing.JRootPane();
+            root.getContentPane().add(view);
+            view.addNotify();
+            view.navigation.setSize(260, 600);
+            KitTestSupport.layout(view.navigation);
+            var canvas = (javax.swing.JComponent) KitTestSupport.require(view.navigation, "pages", javax.swing.JScrollPane.class).getViewport().getView();
+            javax.swing.SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(canvas, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_DOWN, java.awt.event.KeyEvent.CHAR_UNDEFINED));
+            assertThat(dialog.isOpen()).isTrue();
+            var enter = new java.awt.event.KeyEvent(canvas, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, '\n');
+            assertThat(javax.swing.SwingUtilities.processKeyBindings(enter)).as("neither the tree nor the dialog's panels take Enter").isFalse();
+            // Swing then offers the key to the window's bindings, where OK sits as the default button did.
+            var name = root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).get(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0));
+            assertThat(name).isEqualTo("okSettings");
+            root.getActionMap().get(name).actionPerformed(new java.awt.event.ActionEvent(root, 0, ""));
+        });
+        until(() -> !dialog.isOpen());
+    }
+
+    /**
+     * A disabled default button takes no Enter: the root pane's press action is disabled, so the key is not consumed.
+     * Enter's window binding follows OK the same way while the page is invalid or a save is in flight (spec §6).
+     */
+    @Test void enterDoesNothingWhileOkIsDisabledAsADisabledDefaultButton() throws Exception {
+        saveResult = new CompletableFuture<>();
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "window");
+            var view = dialog.view();
+            var root = new javax.swing.JRootPane();
+            root.getContentPane().add(view);
+            view.addNotify();
+            var stroke = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0);
+            var okSettings = root.getActionMap().get(root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).get(stroke));
+            java.util.function.BooleanSupplier enter = () -> javax.swing.SwingUtilities.notifyAction(okSettings, stroke,
+                new java.awt.event.KeyEvent(root, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, '\n'), root, 0);
+            assertThat(okSettings.isEnabled()).as("OK is enabled, so Enter is too").isTrue();
+
+            var field = KitTestSupport.require(view, "window.tab_height.input", javax.swing.JTextField.class);
+            field.setText("99");
+            assertThat(button(dialog, "ok").isEnabled()).isFalse();
+            assertThat(okSettings.isEnabled()).as("invalid: Enter follows the disabled OK").isFalse();
+            assertThat(enter.getAsBoolean()).as("and the key is not consumed").isFalse();
+            assertThat(dialog.isOpen()).isTrue();
+
+            field.setText("50");
+            assertThat(okSettings.isEnabled()).as("valid again").isTrue();
+            assertThat(enter.getAsBoolean()).as("Enter presses OK, which starts the save").isTrue();
+            assertThat(saved).hasSize(1);
+            assertThat(button(dialog, "ok").isEnabled()).as("busy while the save is in flight").isFalse();
+            assertThat(okSettings.isEnabled()).as("busy: Enter follows the disabled OK").isFalse();
+            assertThat(enter.getAsBoolean()).isFalse();
+            assertThat(saved).as("a second Enter starts no second save").hasSize(1);
+            assertThat(dialog.isOpen()).isTrue();
+        });
+    }
+
+    @Test void theTreeNavigatesThroughKitEventsAndKeepsEveryGroupOpen() throws Exception {
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "window");
+            var tree = dialog.view().navigation;
+            tree.setSize(260, 600);
+            KitTestSupport.layout(tree);
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).selectedIds()).containsExactly("window");
+            // A row click reaches the dialog as a kit selection event naming the page.
+            var row = KitTestSupport.require(tree, "@tree/pages/terminal.cursor/title", javax.swing.JLabel.class);
+            for (var listener : row.getMouseListeners())
+                listener.mouseClicked(new java.awt.event.MouseEvent(row, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 1, 1, 1, false, java.awt.event.MouseEvent.BUTTON1));
+            assertThat(dialog.currentPage()).isEqualTo("terminal.cursor");
+            assertThat(dialog.view().breadcrumb()).isEqualTo("Terminal › Cursor");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).selectedIds()).containsExactly("terminal.cursor");
+            dialog.select("window");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).contains("appearance-behavior", "terminal");
+            assertThat(SettingsView.find(tree, "@tree/pages/terminal/expand", javax.swing.JButton.class)).as("a group heading has no disclosure button").isNull();
+            dialog.search("ligatures");
+            dialog.search("");
+            assertThat(((Nodes.Tree) ((Nodes.Stack)tree.spec().root()).children().getFirst()).expandedIds()).contains("appearance-behavior", "terminal");
+        });
+    }
+
+    @Test void searchHighlightAndQuerySurviveAThemeSwitch() throws Exception {
+        var bindings = new dev.jasper.app.appearance.AppearanceBindings[1];
+        edt(() -> bindings[0] = KitTestSupport.bindings(true));
+        var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
+            new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
+            page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
+            new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
+                () -> { }, () -> { }, uri -> { }, (parent, count) -> true,
+                () -> bindings[0].context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
+        edt(() -> {
+            try {
+                dialog.open(null, "appearance");
+                var query = KitTestSupport.require(dialog.view().search, "search.input", javax.swing.JTextField.class);
+                query.setText("ligatures");
+                assertThat(dialog.currentPage()).isEqualTo("terminal.font");
+                var row = KitTestSupport.require(page(dialog), "row:terminal.font.ligatures", javax.swing.JComponent.class);
+                assertThat(row.getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
+                var light = dev.jasper.app.appearance.ThemeTestSupport.pair(false);
+                bindings[0].binding().publish(light);
+                assertThat(query.getText()).as("the query survives").isEqualTo("ligatures");
+                assertThat(KitTestSupport.require(dialog.view().search, "search.input", javax.swing.JTextField.class)).isSameAs(query);
+                assertThat(dialog.view().tree.visibleIds()).containsExactly("terminal", "terminal.font");
+                assertThat(KitTestSupport.require(page(dialog), "row:terminal.font.ligatures", javax.swing.JComponent.class))
+                    .as("the same row, still highlighted").isSameAs(row);
+                assertThat(row.getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
+                row.setSize(400, 48); row.doLayout();
+                var image = new java.awt.image.BufferedImage(400, 48, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var g = image.createGraphics(); try { row.paint(g); } finally { g.dispose(); }
+                assertThat(image.getRGB(3, 24)).as("painted in the new theme's highlight").isEqualTo(light.chrome().semantic().color(dev.jasper.ui.theme.SemanticColor.SELECTION_BG).getRGB());
+                dialog.cancel();
+            } finally { bindings[0].close(); }
+        });
+    }
+
+    @Test void appearanceSelectionsApplyAndReopenAfterAnExternalChange(@org.junit.jupiter.api.io.TempDir Path home) throws Exception {
+        for (String action : List.of("dark", "light", "reset")) {
+            Path file = home.resolve(action + ".toml");
+            String saved = action.equals("reset") ? "light" : "system";
+            java.nio.file.Files.writeString(file, "[ui]\nappearance='" + saved + "'\n");
+            try (var service = new ConfigService(file, false)) {
+                var current = new ConfigService.State[]{service.initialState()};
+                var external = new ArrayList<Consumer<ConfigService.State>>();
+                var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
+                    new CorePages.SystemActions(() -> file, () -> {}, () -> {}, () -> {}, () -> {}, () -> false, Optional.empty()), page -> fake,
+                    page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)),
+                    new SettingsDialog.Hooks(edit -> service.save(edit).thenApply(next -> current[0] = next), () -> current[0], listener -> { external.add(listener); return new Subscription(() -> external.remove(listener)); },
+                        () -> {}, () -> {}, uri -> {}, (parent, count) -> true, KitTestSupport::context));
+                var wanted = new Object[1];
+                var pending = new SettingsEdit[1];
+                try {
+                    edt(() -> {
+                        dialog.open(null, "appearance");
+                        if (!action.equals("reset")) KitTestSupport.require(page(dialog), "ui.appearance:policy.option." + action, javax.swing.JButton.class).doClick(0);
+                        else KitTestSupport.require(page(dialog), "ui.appearance:reset", javax.swing.JButton.class).doClick(0);
+                        wanted[0] = dialog.draft().value(CoreSettings.UI_APPEARANCE);
+                        assertThat(dialog.draft().modified()).isTrue();
+                        pending[0] = dialog.draft().edit();
+                    });
+                    String other = action.equals("dark") ? "light" : "dark";
+                    java.nio.file.Files.writeString(file, "[ui]\nappearance='" + other + "'\n");
+                    assertThatThrownBy(() -> service.save(pending[0]).get(5, java.util.concurrent.TimeUnit.SECONDS)).hasRootCauseMessage("ui.appearance changed on disk. Review the new value and try again.");
+                    current[0] = service.reload().get(5, java.util.concurrent.TimeUnit.SECONDS);
+                    edt(() -> { List.copyOf(external).forEach(listener -> listener.accept(current[0])); dialog.apply(); });
+                    until(() -> !dialog.draft().modified());
+                    // Plan 2 finding 7: a reset removes the key from the file rather than writing the default.
+                    if (action.equals("reset")) assertThat(java.nio.file.Files.readString(file)).doesNotContain("appearance");
+                    edt(() -> {
+                        dialog.cancel(); dialog.open(null, "appearance");
+                        assertThat(dialog.draft().value(CoreSettings.UI_APPEARANCE)).as(action).isEqualTo(wanted[0]);
+                    });
+                } finally { edt(dialog::cancel); }
+            }
+        }
+    }
+
+    @Test void cancelLeavesConfigBytesUntouchedWhileApplyWritesThem(@org.junit.jupiter.api.io.TempDir Path home) throws Exception {
+        Path file = home.resolve("config.toml");
+        String original = "# my settings\n[window]\ntab_height = 44 # tall tabs\n";
+        java.nio.file.Files.writeString(file, original);
+        try (var service = new ConfigService(file, false)) {
+            var current = new ConfigService.State[]{service.initialState()};
+            var dialog = new SettingsDialog(windows, context -> CorePages.pages(AppearanceFixtures.CHOICES,
+                new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
+                page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
+                new SettingsDialog.Hooks(edit -> service.save(edit).thenApply(next -> current[0] = next), () -> current[0],
+                    listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true, KitTestSupport::context));
+            edt(() -> {
+                dialog.open(null, "window");
+                KitTestSupport.require(dialog.view(), "window.status_bar", javax.swing.JButton.class).doClick();
+                KitTestSupport.require(dialog.view(), "window.tab_height.input", javax.swing.JTextField.class).setText("50");
+                assertThat(dialog.draft().modified()).isTrue();
+                button(dialog, "cancel").doClick();
+                assertThat(dialog.isOpen()).isFalse();
+            });
+            assertThat(java.nio.file.Files.readString(file)).as("Cancel writes nothing").isEqualTo(original);
+            edt(() -> {
+                dialog.open(null, "window");
+                assertThat(dialog.draft().modified()).as("a new opening starts from the file").isFalse();
+                assertThat(KitTestSupport.require(dialog.view(), "window.tab_height.input", javax.swing.JTextField.class).getText()).isEqualTo("44");
+                KitTestSupport.require(dialog.view(), "window.tab_height.input", javax.swing.JTextField.class).setText("50");
+                button(dialog, "ok").doClick();
+            });
+            until(() -> !dialog.isOpen());
+            assertThat(java.nio.file.Files.readString(file)).as("OK writes the edit, keeping comments").contains("# my settings", "tab_height = 50");
+        }
+    }
+
+    /**
+     * The kit discard confirmation over Settings. The fake native shell answers the modal sheet while it is shown, as
+     * the user does, through the sheet's own buttons or its Enter/Escape bindings.
+     */
+    @Test void discardingAsksWithAKitSheetOverSettingsAndKeepsEditingUnlessDiscarded() throws Exception {
+        var answer = new String[1];
+        var sheets = new ArrayList<AuxiliarySurface>();
+        var texts = new ArrayList<String>();
+        var fronted = new int[1];
+        var confirming = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> {
+                if (!surface.title().equals("Discard Changes")) return;
+                sheets.add(surface);
+                texts.addAll(KitTestSupport.texts(surface.holder()));
+                var form = KitTestSupport.require(surface.holder(), "discard-sheet", javax.swing.JComponent.class);
+                switch (answer[0]) {
+                    case "discard", "keep" -> KitTestSupport.require(surface.holder(), answer[0], javax.swing.JButton.class).doClick();
+                    case "enter" -> form.getActionMap().get("primary").actionPerformed(new java.awt.event.ActionEvent(form, 0, ""));
+                    case "escape" -> form.getActionMap().get("cancel").actionPerformed(new java.awt.event.ActionEvent(form, 0, ""));
+                    default -> surface.close();
+                }
+            }, () -> { if (surface.title().equals("Settings")) fronted[0]++; }, () -> { }, title -> { }, () -> new Rectangle(0, 0, 1000, 700),
+            (title, initial) -> Optional.empty()));
+        var holder = new SettingsDialog[1];
+        holder[0] = new SettingsDialog(confirming, context -> CorePages.pages(AppearanceFixtures.CHOICES,
+            new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
+            page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
+            new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
+                () -> { }, () -> { }, uri -> { }, (parent, count) -> holder[0].askDiscard(parent, count), KitTestSupport::context));
+        var dialog = holder[0];
+        edt(() -> {
+            dialog.open(null, "window");
+            dialog.draft().stage(CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(50));
+            for (String keep : List.of("keep", "escape", "closed")) {
+                answer[0] = keep;
+                int before = fronted[0];
+                dialog.cancel();
+                assertThat(dialog.isOpen()).as(keep + " keeps editing").isTrue();
+                assertThat(dialog.draft().modified()).isTrue();
+                assertThat(sheets.getLast().closed()).as("the sheet closes").isTrue();
+                assertThat(sheets.getLast().ownerSurface()).as("owned by Settings").hasValueSatisfying(owner -> assertThat(owner.title()).isEqualTo("Settings"));
+                assertThat(fronted[0]).as("focus returns to Settings").isEqualTo(before + 1);
+            }
+            assertThat(texts).contains("Discard 1 unsaved change?");
+            dialog.draft().stage(CoreSettings.WINDOW_STATUS_BAR, Optional.of(false));
+            answer[0] = "enter";
+            dialog.cancel();
+            assertThat(dialog.isOpen()).as("Enter discards, as the default answer did").isFalse();
+            assertThat(texts).contains("Discard 2 unsaved changes?");
+            dialog.open(null, "window");
+            dialog.draft().stage(CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(50));
+            answer[0] = "discard";
+            dialog.cancel();
+            assertThat(dialog.isOpen()).isFalse();
+            assertThat(sheets).allSatisfy(sheet -> assertThat(sheet.closed()).isTrue());
+            confirming.close();
+        });
+    }
+
+    /**
+     * Plan 9b Rulings 13 and 14: under the classic composition, Add Variable… asks the real value sheet over Settings; its
+     * fields' edits reach the answer, its primary button (or Enter) stages the variable, and Cancel, Escape or a closed
+     * sheet change nothing.
+     */
+    @Test void addVariableAsksTheValueSheetOverSettingsAndStagesOnlyAConfirmedAnswer() throws Exception {
+        var answer = new String[1];
+        var typed = new String[2];
+        var sheets = new ArrayList<AuxiliarySurface>();
+        var asking = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> {
+                if (!surface.title().equals("Add Variable")) return;
+                sheets.add(surface);
+                KitTestSupport.require(surface.holder(), "sheet-name.input", javax.swing.text.JTextComponent.class).setText(typed[0]);
+                KitTestSupport.require(surface.holder(), "sheet-value.input", javax.swing.text.JTextComponent.class).setText(typed[1]);
+                var form = KitTestSupport.require(surface.holder(), "value-sheet", javax.swing.JComponent.class);
+                switch (answer[0]) {
+                    case "confirm", "cancel" -> KitTestSupport.require(surface.holder(), answer[0], javax.swing.JButton.class).doClick();
+                    case "enter" -> form.getActionMap().get("primary").actionPerformed(new java.awt.event.ActionEvent(form, 0, ""));
+                    case "escape" -> form.getActionMap().get("cancel").actionPerformed(new java.awt.event.ActionEvent(form, 0, ""));
+                    default -> surface.close();
+                }
+            }, () -> { }, () -> { }, title -> { }, () -> new Rectangle(0, 0, 1000, 700), (title, initial) -> Optional.empty()));
+        var dialog = new SettingsDialog(asking, context -> CorePages.pages(AppearanceFixtures.CHOICES,
+            new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
+            page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
+            new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
+                () -> { }, () -> { }, uri -> { }, (parent, count) -> true, KitTestSupport::context, SettingsChromeTest.CLASSIC,
+                dev.jasper.app.presentation.Composition.CLASSIC));
+        String add = CoreSettings.TERMINAL_ENV.name() + ":add";
+        edt(() -> {
+            dialog.open(null, "terminal.shell");
+            for (String keep : List.of("cancel", "escape", "closed")) {
+                answer[0] = keep; typed[0] = "KEEP"; typed[1] = "out";
+                KitTestSupport.require(page(dialog), add, javax.swing.JButton.class).doClick();
+                assertThat(dialog.draft().modified(CoreSettings.TERMINAL_ENV)).as(keep + " changes nothing").isFalse();
+                assertThat(sheets.getLast().closed()).as("the sheet closes").isTrue();
+                assertThat(sheets.getLast().ownerSurface()).as("owned by Settings").hasValueSatisfying(owner -> assertThat(owner.title()).isEqualTo("Settings"));
+            }
+            answer[0] = "confirm"; typed[0] = "EDITOR"; typed[1] = "vim";
+            KitTestSupport.require(page(dialog), add, javax.swing.JButton.class).doClick();
+            assertThat(dialog.draft().value(CoreSettings.TERMINAL_ENV)).as("the typed variable, staged").containsExactly(java.util.Map.entry("EDITOR", "vim"));
+            answer[0] = "enter"; typed[0] = "LANG"; typed[1] = "C";
+            KitTestSupport.require(page(dialog), add, javax.swing.JButton.class).doClick();
+            assertThat(dialog.draft().value(CoreSettings.TERMINAL_ENV)).containsEntry("LANG", "C").hasSize(2);
+            assertThat(sheets).hasSize(5).allSatisfy(sheet -> assertThat(sheet.closed()).isTrue());
+            dialog.cancel();
+            asking.close();
         });
     }
 

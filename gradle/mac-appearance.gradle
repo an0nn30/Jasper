@@ -1,0 +1,28 @@
+// Application appearance is independent from the packaged-only notification/Dock bridge.
+import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.jvm.toolchain.JavaToolchainService
+if (!System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('mac')) return
+
+def sdk = extensions.getByType(JavaToolchainService).launcherFor(extensions.getByType(JavaPluginExtension).toolchain).map { it.metadata.installationPath }
+def source = file('src/main/native/MacAppearance.m')
+def testSource = file('src/test/native/MacAppearanceTest.m')
+def library = layout.buildDirectory.file('native/libjasper-appearance.dylib')
+def executable = layout.buildDirectory.file('native/appearance-tests')
+def arguments = { ['-fobjc-arc', '-fblocks', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-mmacosx-version-min=11.0', '-framework', 'AppKit', '-I' + sdk.get().dir('include').asFile.absolutePath, '-I' + sdk.get().dir('include/darwin').asFile.absolutePath] }
+def bridge = tasks.register('compileMacAppearance', Exec) {
+    inputs.file(source); inputs.property('sdk', sdk.map { it.asFile.absolutePath }); inputs.property('architecture', System.getProperty('os.arch')); outputs.file(library)
+    doFirst { library.get().asFile.parentFile.mkdirs(); commandLine(['/usr/bin/xcrun', 'clang'] + arguments() + ['-dynamiclib', '-install_name', '@rpath/libjasper-appearance.dylib', source.absolutePath, '-o', library.get().asFile.absolutePath]) }
+    doLast { providers.exec { commandLine('/usr/bin/codesign', '--force', '--sign', '-', library.get().asFile.absolutePath) }.result.get() }
+}
+def compileTest = tasks.register('compileMacAppearanceTests', Exec) {
+    inputs.files(source, testSource); inputs.property('sdk', sdk.map { it.asFile.absolutePath }); outputs.file(executable)
+    doFirst { executable.get().asFile.parentFile.mkdirs(); commandLine(['/usr/bin/xcrun', 'clang'] + arguments() + [testSource.absolutePath, '-o', executable.get().asFile.absolutePath]) }
+}
+def nativeTest = tasks.register('testMacAppearance', Exec) {
+    group = 'verification'; description = 'Tests application appearance KVO classification and disposal without windows.'
+    dependsOn(compileTest, bridge); commandLine(executable.get().asFile.absolutePath)
+}
+tasks.named('check') { dependsOn(nativeTest) }
+tasks.named('run', JavaExec) { dependsOn(bridge); systemProperty('jasper.appearanceLibrary', library.get().asFile.absolutePath) }
+tasks.named('stagePackage', Sync) { from(bridge) }
+distributions.main.contents { from(bridge) { into('lib') } }

@@ -63,4 +63,18 @@ class CellStyleTest {
 
         assertThat(CellStyle.resolve(EmulationFixture.attributes(link), palette).underline()).isTrue();
     }
+
+    @Test
+    void boldTextInTheDefaultColorTakesTheBoldForeground() {
+        Palette bold = new Palette(palette.foreground(), palette.background(), palette.cursor(), palette.selection(),
+            palette.ansi(), new Color(0x12ab34));
+        CellStyle plain = CellStyle.resolve(EmulationFixture.attributes(TextStyle.EMPTY), bold);
+        CellStyle strong = CellStyle.resolve(EmulationFixture.attributes(new TextStyle(null, null, EnumSet.of(Option.BOLD))), bold);
+        CellStyle red = CellStyle.resolve(EmulationFixture.attributes(new TextStyle(TerminalColor.index(1), null, EnumSet.of(Option.BOLD))), bold);
+        CellStyle inverse = CellStyle.resolve(EmulationFixture.attributes(new TextStyle(null, null, EnumSet.of(Option.BOLD, Option.INVERSE))), bold);
+        assertThat(plain.foreground()).isEqualTo(palette.foreground());
+        assertThat(strong.foreground()).isEqualTo(new Color(0x12ab34));
+        assertThat(red.foreground()).as("an explicit color stays").isEqualTo(palette.ansi().get(1));
+        assertThat(inverse.background()).as("inverse bold text has the bold color behind it").isEqualTo(new Color(0x12ab34));
+    }
 }

@@ -1,6 +1,0 @@
-resource	source	sha256
-license	license	25ac8188d670bd2ad2ce2f4f55ab88573010ee9f7a4502543cb1eea1e2274f8a
-readme.md	readme.md	2c56dd995f5825913deb18e5d2dc2e78b79a3f43c5b591ea42c8c978cfea1108
-resources/META-INF/plugin.xml	resources/META-INF/plugin.xml	c5550887726f726bb54d15d5cc0f3221d56875f021ac7eee165e8703bc5fbe0b
-resources/themes/nord.xml	resources/themes/nord.xml	563178308b1fc0ad286d6742c0b8ae169656c83a96dc642ac490375feb54c0aa
-src/nord.theme.json	src/nord.theme.json	4e148f5b6a6bc90d5a24680e652202bfcaba2e79a4f3d7c3b28b89b5af187a6f

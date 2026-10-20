@@ -47,7 +47,8 @@ public final class TunnelsScope implements PaletteScope {
     }
 
     @Override public ScopeSpec spec() {
-        return ScopeSpec.of(ID, "Tunnels", "Search tunnels", List.of(TOGGLE, BROWSE, EDIT)).withDescription("Start, stop or edit an SSH tunnel");
+        return ScopeSpec.of(ID, "Tunnels", "Search tunnels", List.of(TOGGLE, BROWSE, EDIT)).withDescription("Start, stop or edit an SSH tunnel")
+            .withItemNoun("tunnel");
     }
 
     @Override public PaletteResults search(String query, PaletteQuery context) {

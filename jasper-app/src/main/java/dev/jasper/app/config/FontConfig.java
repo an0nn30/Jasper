@@ -25,7 +25,7 @@ public record FontConfig(String family, float size, List<String> fallback, boole
     }
 
     public static FontConfig defaults() {
-        return new FontConfig("JetBrains Mono", 16f,
+        return new FontConfig("Cousine Nerd Font Mono", 12f,
             List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true, 1f);
     }
 

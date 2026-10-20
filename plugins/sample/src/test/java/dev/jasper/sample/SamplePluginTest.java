@@ -3,6 +3,7 @@ package dev.jasper.sample;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.testing.FakePresentations;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import dev.jasper.sdk.Capabilities;
@@ -17,11 +18,16 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SamplePluginTest {
+    private static void start(FakePluginHost host,PluginInfo info,Set<String> requires,Set<String> optional,dev.jasper.sdk.plugin.Plugin plugin) {
+        Runnable start=() -> host.start(info,requires,optional,plugin);
+        if(javax.swing.SwingUtilities.isEventDispatchThread()){start.run();return;}
+        try{javax.swing.SwingUtilities.invokeAndWait(start);}catch(Exception failure){throw new AssertionError(failure);}
+    }
     private static final PluginInfo INFO = new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of());
 
     @Test void isInertByDefault() {
         try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.active("dev.jasper.sample")).isTrue();
             assertThat(host.runBackground()).isZero();
             host.flush();
@@ -34,7 +40,7 @@ class SamplePluginTest {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_activity", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.runBackground()).isEqualTo(1);
             host.flush();
             assertThat(host.activityLog()).first().satisfies(event -> {
@@ -52,24 +58,91 @@ class SamplePluginTest {
     @Test void reportsAnOutOfRangeStepDelay() {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_step_millis", 60_000L);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.settingsReports("dev.jasper.sample")).containsExactly("demo_step_millis: Use a whole number from 0–5000.");
         }
     }
 
-    @Test void offersItsOwnSettingsPage() {
-        try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+    @Test void offersItsOwnSettingsPage() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.declared("dev.jasper.sample"))
                 .containsExactly("demo_activity", "demo_ui", "demo_terminal", "demo_session", "demo_scope", "demo_step_millis");
             var page = host.settingsPanel("dev.jasper.sample").orElseThrow();
-            assertThat(((javax.swing.JLabel) page.getComponent(0)).getText()).isEqualTo("Run the Buddy activity at start");
-            var slider = find(page, javax.swing.JSlider.class);
-            assertThat(slider.getValue()).isEqualTo(300);
-            slider.setValue(1200);
+            assertThat(host.failures()).isEmpty();
+            var view = host.settingsPanelView("dev.jasper.sample").orElseThrow();
+            // The canonical Settings page: section labels above settings cards of the host's rows.
+            var root = (dev.jasper.sdk.ui.Nodes.Stack) view.spec().root();
+            assertThat(root.role()).isEqualTo(dev.jasper.sdk.ui.Nodes.LayoutRole.SETTINGS_PAGE);
+            assertThat(root.children()).extracting(node -> ((dev.jasper.sdk.ui.Nodes.Section) node).title()).containsExactly("Demos", "Timing");
+            assertThat(root.children()).allSatisfy(node -> assertThat(((dev.jasper.sdk.ui.Nodes.Section) node).body())
+                .isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Card.class, card -> assertThat(card.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.CardKind.SETTINGS)));
+            assertThat(rows(view)).hasSize(6);
+            assertThat(find(page, javax.swing.JSlider.class)).isNull();
+            var stepRow = rows(view).getLast();
+            var controls = (dev.jasper.sdk.ui.Nodes.Stack) stepRow.control();
+            assertThat(controls.role()).as("the generated pages' trailing control slot").isEqualTo(dev.jasper.sdk.ui.Nodes.LayoutRole.SETTINGS_TRAILING);
+            var step = (dev.jasper.sdk.ui.Nodes.Field) controls.children().getFirst();
+            var reset = (dev.jasper.sdk.ui.Nodes.Button) controls.children().getLast();
+            assertThat(reset.label()).as("an icon-only Reset").isEmpty();
+            assertThat(reset.icon()).as("the Settings reset glyph").isEqualTo("reset");
+            assertThat(reset.state().visible()).as("nothing to reset at the default").isFalse();
+            assertThat(step.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.NUMBER);
+            assertThat(step.value()).isEqualTo("300");
+            assertThat(step.numeric()).contains(new dev.jasper.sdk.ui.Nodes.Numeric(0, 5000, 1, 0));
+            host.highlightSettingsPanel("dev.jasper.sample", "step delay");
+            assertThat(rows(view).getLast().highlighted()).isTrue();
+            view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("settings:demo_step_millis", "1200"));
             assertThat(host.pendingSettings("dev.jasper.sample")).containsEntry("demo_step_millis", 1200);
+            assertThat(rows(view).getLast().highlighted()).isTrue();
+            assertThat(((dev.jasper.sdk.ui.Nodes.Stack) rows(view).getLast().control()).children().getLast().state().visible())
+                .as("a changed value can be reset").isTrue();
+            host.highlightSettingsPanel("dev.jasper.sample", "milliseconds");
+            assertThat(rows(view).getLast().highlighted()).isTrue();
+            host.highlightSettingsPanel("dev.jasper.sample", "");
+            assertThat(rows(view).getLast().highlighted()).isFalse();
             assertThat(host.settingsPanelChanges("dev.jasper.sample")).isPositive();
+        } });
+    }
+
+    @Test void mountedPanelAndWindowButtonsDispatchTheirDeclaredActions() throws Exception {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            host.setSetting("dev.jasper.sample", "demo_ui", true);
+            host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                host.openPanel("dev.jasper.sample.panel", window);
+                var panel = host.panelView("dev.jasper.sample.panel", window).orElseThrow();
+                var body = (dev.jasper.sdk.ui.Nodes.Empty) ((dev.jasper.sdk.ui.Nodes.Panel) panel.spec().root()).body();
+                assertThat(body.title()).isEqualTo("Sample Activity");
+                var run = (dev.jasper.sdk.ui.Nodes.Button) body.actions().getLast();
+                assertThat(run.kind()).as("an empty state's one secondary action").isEqualTo(dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY);
+                panel.emit(new dev.jasper.sdk.ui.UiEvent.Action(run.action()));
+                assertThat(host.invoke("dev.jasper.sample.about", window, null)).isTrue();
+                var about = host.windowView("dev.jasper.sample", "About Sample").orElseThrow();
+                var details = (dev.jasper.sdk.ui.Nodes.Button) ((dev.jasper.sdk.ui.Nodes.Empty) about.spec().root()).actions().getLast();
+                about.emit(new dev.jasper.sdk.ui.UiEvent.Action(details.action()));
+                var dialog = host.windowView("dev.jasper.sample", "Sample Details").orElseThrow();
+                var sheet = (dev.jasper.sdk.ui.Nodes.Form) dialog.spec().root();
+                assertThat(sheet.sections()).singleElement().isInstanceOf(dev.jasper.sdk.ui.Nodes.Card.class);
+                assertThat(sheet.actions()).singleElement().satisfies(close -> assertThat(close.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY));
+                dialog.emit(new dev.jasper.sdk.ui.UiEvent.Action(sheet.cancelAction()));
+                assertThat(host.windowView("dev.jasper.sample", "Sample Details")).isEmpty();
+            });
+            assertThat(host.runBackground()).isEqualTo(1);
+            host.flush();
+            assertThat(host.activityLog()).anyMatch(event -> event.state() == ActivityEvent.State.STARTED);
+            assertThat(host.failures()).isEmpty();
         }
+    }
+
+    /** The page's setting rows, in order, across its section cards. */
+    private static java.util.List<dev.jasper.sdk.ui.Nodes.SettingRow> rows(dev.jasper.sdk.testing.FakeKitView view) {
+        return ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children().stream()
+            .flatMap(section -> ((dev.jasper.sdk.ui.Nodes.Card) ((dev.jasper.sdk.ui.Nodes.Section) section).body()).children().stream())
+            .map(dev.jasper.sdk.ui.Nodes.SettingRow.class::cast).toList();
     }
 
     private static <T> T find(java.awt.Container root, Class<T> type) {
@@ -82,7 +155,7 @@ class SamplePluginTest {
 
     @Test void contributesNothingToTheChromeByDefault() {
         try (var host = new FakePluginHost()) {
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.actions()).isEmpty();
             assertThat(host.toolbar()).isEmpty();
             assertThat(host.status()).isEmpty();
@@ -93,12 +166,13 @@ class SamplePluginTest {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_ui", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.actions()).contains("dev.jasper.sample.demo|Run Sample Activity|true");
             assertThat(host.toolbar()).containsExactly("button:dev.jasper.sample.demo");
             assertThat(host.menu("top:dev.jasper.sample.menu")).containsExactly("item:dev.jasper.sample.demo");
-            assertThat(host.menu("VIEW")).containsExactly("item:dev.jasper.sample.demo");
+            assertThat(host.menu("TOOLS")).containsExactly("item:dev.jasper.sample.demo");
+            assertThat(host.menu("VIEW")).isEmpty();
             assertThat(host.menu("context")).containsExactly("item:dev.jasper.sample.demo");
             assertThat(host.status()).containsExactly("dev.jasper.sample.status|RIGHT|Sample: idle|Run the sample activity|dev.jasper.sample.demo");
 
@@ -111,11 +185,11 @@ class SamplePluginTest {
         }
     }
 
-    @Test void theDemoUiAddsAPanelARailButtonAndAWindow() {
-        try (var host = new FakePluginHost()) {
+    @Test void theDemoUiAddsAPanelARailButtonAndAWindow() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_ui", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.panels()).containsExactly("dev.jasper.sample.panel|Sample|LEFT");
             assertThat(host.rail()).containsExactly("dev.jasper.sample.about");
@@ -125,6 +199,27 @@ class SamplePluginTest {
             assertThat(host.invoke("dev.jasper.sample.about", java.util.UUID.randomUUID(), null)).isTrue();
             assertThat(host.windows()).as("a singleton").containsExactly("dev.jasper.sample.about-window|About Sample|true");
             assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    @Test void underLabelledStripesTheSamplePanelStartsInTheBottomStrip() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.setPresentation(FakePresentations.CLASSIC);
+            host.setSetting("dev.jasper.sample", "demo_ui", true);
+            start(host, INFO, Set.of(), Set.of(), new SamplePlugin());
+            assertThat(host.panels()).containsExactly("dev.jasper.sample.panel|Sample|BOTTOM");
+        } });
+    }
+
+    @Test void aLooksKitDefaultSetsTheStepDelayAndASavedValueStillWins() {
+        try (var host = new FakePluginHost()) {
+            host.setKitDefault("dev.jasper.sample", "demo_step_millis", 150L);
+            var settings = new java.util.concurrent.atomic.AtomicReference<SampleSettings>();
+            start(host, INFO, Set.of(), Set.of(), context -> settings.set(new SampleSettings(context.settings())));
+            assertThat(settings.get().stepMillis.get()).isEqualTo(150);
+            host.setSetting("dev.jasper.sample", "demo_step_millis", 40L);
+            assertThat(settings.get().stepMillis.get()).isEqualTo(40);
+            assertThat(host.lookDefaultProblems("dev.jasper.sample")).isEmpty();
         }
     }
 
@@ -138,7 +233,7 @@ class SamplePluginTest {
                 SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));
             host.activateTerminalWindow(window);
             host.setSetting("dev.jasper.sample", "demo_terminal", true);
-            host.start(OBSERVING, Set.of(), Set.of(), new SamplePlugin());
+            start(host,OBSERVING, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.menu("context")).contains("item:dev.jasper.sample.greet");
             assertThat(host.status()).as("hidden until a command finishes").noneMatch(line -> line.startsWith("dev.jasper.sample.last"));
@@ -157,7 +252,7 @@ class SamplePluginTest {
     @Test void theTerminalDemoIsSkippedWithoutItsCapabilities() {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_terminal", true);
-            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.active("dev.jasper.sample")).isTrue();
             assertThat(host.failures()).isEmpty();
             assertThat(host.actions()).noneMatch(line -> line.startsWith("dev.jasper.sample.greet"));
@@ -170,7 +265,7 @@ class SamplePluginTest {
             host.activateTerminalWindow(window);
             host.setSetting("dev.jasper.sample", "demo_session", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
-            host.start(new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.SESSION_PROVIDE)), Set.of(), Set.of(), new SamplePlugin());
+            start(host,new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.SESSION_PROVIDE)), Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.invoke("dev.jasper.sample.echo", window, null)).isTrue();
             assertThat(host.openRequests()).containsExactly("session-tab|" + window + "|Sample echo");
@@ -194,10 +289,11 @@ class SamplePluginTest {
                 UUID pane = host.addTerminalPane(tab, new PaneInfo("zsh", Optional.of(Path.of("/src")), Optional.empty(), 80, 24, true,
                     SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));
                 host.setSetting("dev.jasper.sample", "demo_scope", true);
-                host.start(new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT)),
+                start(host,new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT)),
                     Set.of(), Set.of(), new SamplePlugin());
                 assertThat(host.failures()).isEmpty();
                 assertThat(host.scopes()).containsExactly("dev.jasper.sample.greetings|Greetings|paste,paste_run");
+                assertThat(host.scopePresentation("dev.jasper.sample.greetings")).as("spec 14.6").isEqualTo("NEUTRAL|greeting|STANDARD,STANDARD");
                 assertThat(host.searchScope("dev.jasper.sample.greetings", "", window, pane)).hasSize(3);
                 assertThat(host.searchScope("dev.jasper.sample.greetings", "morn", window, pane)).containsExactly("greeting.0|good morning|true");
                 assertThat(host.availableInScope("dev.jasper.sample.greetings", "greeting.0", "paste", window, null)).as("needs an origin pane").isFalse();
@@ -208,32 +304,12 @@ class SamplePluginTest {
             }
         }
 
-    @Test void theDemoActionAndStatusItemUseThePluginFlaskSvg() {
-        try (var host = new FakePluginHost()) {
-            host.setSetting("dev.jasper.sample", "demo_ui", true);
-            var delegate = new SamplePlugin();
-            var paths = new java.util.ArrayList<String>();
-            host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
-                public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
-                    var appearance = (dev.jasper.sdk.ui.Appearance) java.lang.reflect.Proxy.newProxyInstance(
-                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Appearance.class}, (proxy, method, args) -> {
-                            if (method.getName().equals("icon") && args != null && args.length == 1 && args[0] instanceof String path)
-                                paths.add(path);
-                            try { return method.invoke(context.appearance(), args); }
-                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
-                        });
-                    var wrapped = (dev.jasper.sdk.plugin.PluginContext) java.lang.reflect.Proxy.newProxyInstance(
-                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.plugin.PluginContext.class}, (proxy, method, args) -> {
-                            if (method.getName().equals("appearance")) return appearance;
-                            try { return method.invoke(context, args); }
-                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
-                        });
-                    delegate.start(wrapped);
-                }
-                public void stop() { delegate.stop(); }
-            });
+    @Test void demoActionAndPanelUseRegisteredMonochromeFlask() {
+        try(var host=new FakePluginHost()) {
+            host.setSetting("dev.jasper.sample","demo_ui",true);
+            start(host,INFO,Set.of(),Set.of(),new SamplePlugin());
             assertThat(host.failures()).isEmpty();
-            assertThat(paths).containsExactly("dev/jasper/sample/flask.svg", "dev/jasper/sample/flask.svg");
+            assertThat(host.actionSpec("dev.jasper.sample.demo").orElseThrow().icon()).contains("dev.jasper.sample:flask");
         }
     }
 }

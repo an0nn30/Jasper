@@ -24,6 +24,7 @@ public final class SettingSpec<T> {
     private String section = "";
     private Applies applies = Applies.LIVE;
     private EditorHint editor;
+    private String unit = "";
 
     private SettingSpec(String key, SettingKind<T> kind, T defaultValue) {
         this.key = key; this.kind = kind; this.defaultValue = defaultValue;
@@ -101,6 +102,19 @@ public final class SettingSpec<T> {
     public SettingSpec<T> editor(EditorHint value) { editor = Objects.requireNonNull(value, "value"); return this; }
 
     /**
+     * Sets the unit Settings shows after a number, such as {@code min} or {@code MiB}. Only a numeric kind shows it.
+     *
+     * @param value a short unit; empty for none
+     * @return this declaration
+     */
+    public SettingSpec<T> unit(String value) {
+        if (Objects.requireNonNull(value, "value").length() > 16 || value.chars().anyMatch(Character::isISOControl))
+            throw new IllegalArgumentException("Not a setting unit: " + key);
+        unit = value.strip();
+        return this;
+    }
+
+    /**
      * The dotted key.
      *
      * @return the key
@@ -162,4 +176,11 @@ public final class SettingSpec<T> {
      * @return the hint, if any
      */
     public Optional<EditorHint> editor() { return Optional.ofNullable(editor); }
+
+    /**
+     * The unit Settings shows after a number.
+     *
+     * @return the unit; empty for none
+     */
+    public String unit() { return unit; }
 }

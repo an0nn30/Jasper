@@ -70,7 +70,7 @@ class WindowDragTest {
         void layout() { LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root); }
 
         AbstractButton button(String title) {
-            for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe()))
+            for (DockStripe stripe : List.of(owner.leftStripe(), owner.rightStripe()))
                 for (AbstractButton button : stripe.buttons()) if (title.equals(button.getToolTipText())) return button;
             throw new AssertionError("No stripe button " + title);
         }
@@ -84,6 +84,15 @@ class WindowDragTest {
 
         /** A point well inside the slot's workspace zone. */
         Point zone(Slot slot) { return DockTestSupport.zone(workspace(), slot); }
+
+        /**
+         * Near the top of the empty right stripe's place: the workspace's outer stripe-wide edge while the stripe is
+         * hidden, which is exactly where the stripe stands once it shows.
+         */
+        Point rightRailTop() {
+            Rectangle workspace = workspace();
+            return new Point(workspace.x + workspace.width - owner.rightStripe().getPreferredSize().width / 2, workspace.y + 10);
+        }
 
         void mouse(JComponent source, int id, Point inOwner) {
             Point at = SwingUtilities.convertPoint(owner, inOwner, source);
@@ -198,12 +207,15 @@ class WindowDragTest {
             Rectangle guide = SwingUtilities.convertRectangle(f.root.getLayeredPane(), f.owner.dockDrag().overlay().highlight(), f.owner);
             assertThat(guide.width).as("the right half of the bottom area, not all of it").isLessThan(workspace.width * 6 / 10);
             assertThat(guide.x).isGreaterThan(workspace.x + workspace.width * 4 / 10);
-            assertThat(guide.x + guide.width).as("out to the right stripe").isEqualTo(workspace.x + workspace.width);
+            assertThat(guide.x + guide.width).as("out to where the right stripe shows once Files is on it")
+                .isEqualTo(workspace.x + workspace.width - f.owner.rightStripe().getPreferredSize().width);
             assertThat(f.owner.area().content(Slot.BOTTOM_RIGHT)).as("the real layout does not reflow").isNull();
 
             f.mouse(files, MouseEvent.MOUSE_RELEASED, f.zone(Slot.BOTTOM_RIGHT));
             f.layout();
             assertThat(f.owner.dock().slot("dev.x.files")).hasValue(Slot.BOTTOM_RIGHT);
+            assertThat(f.owner.rightStripe().isVisible()).isTrue();
+            workspace = f.workspace();
             Rectangle alone = frame(f, Slot.BOTTOM_RIGHT);
             assertThat(alone.x).as("alone in the bottom area, Files fills its whole width").isEqualTo(workspace.x);
             assertThat(alone.width).isEqualTo(workspace.width);
@@ -248,8 +260,7 @@ class WindowDragTest {
             var f = new Fixture();
             f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.sessions", Contributions.PanelRequest.Op.SHOW));
             f.layout();
-            Rectangle stripe = SwingUtilities.convertRectangle(f.owner.rightStripe().getParent(), f.owner.rightStripe().getBounds(), f.owner);
-            Point emptyRightTop = new Point(stripe.x + stripe.width / 2, stripe.y + 10);
+            Point emptyRightTop = f.rightRailTop();
 
             var files = f.drag(f.button("Files"), emptyRightTop);
             assertThat(f.owner.dockDrag().target()).hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
@@ -268,6 +279,122 @@ class WindowDragTest {
             assertThat(f.owner.dockDrag().overlay().highlight()).as("a showing panel moves with its frame").isNotNull();
             assertThat(f.owner.dockDrag().overlay().placeholder()).isNotNull();
             f.mouse(sessions, MouseEvent.MOUSE_RELEASED, emptyRightTop);
+        });
+    }
+
+    @Test void anEmptyHiddenStripeTakesADropAtItsEdgeWithoutShowingAndShowsOnceSomethingLands() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            assertThat(f.owner.rightStripe().isVisible()).as("nothing on the right").isFalse();
+            Rectangle terminal = SwingUtilities.convertRectangle(f.owner.tabStrip().getParent(), f.owner.tabStrip().getBounds(), f.owner);
+            Rectangle workspace = f.workspace();
+            int width = f.owner.rightStripe().getPreferredSize().width;
+            Point edge = f.rightRailTop();
+
+            var files = f.drag(f.button("Files"), edge);
+            assertThat(f.owner.dockDrag().target()).hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
+            assertThat(f.owner.rightStripe().isVisible()).as("the stripe itself stays hidden while it is a target").isFalse();
+            Rectangle placeholder = SwingUtilities.convertRectangle(f.root.getLayeredPane(), f.owner.dockDrag().overlay().placeholder(), f.owner);
+            assertThat(placeholder.x).as("the guide sits in the stripe's place at the edge").isGreaterThanOrEqualTo(workspace.x + workspace.width - width);
+            assertThat(placeholder.x + placeholder.width).isLessThanOrEqualTo(workspace.x + workspace.width);
+            f.layout();
+            assertThat(SwingUtilities.convertRectangle(f.owner.tabStrip().getParent(), f.owner.tabStrip().getBounds(), f.owner))
+                .as("the terminal neither moves nor resizes for the drag").isEqualTo(terminal);
+            f.mouse(files, MouseEvent.MOUSE_RELEASED, edge);
+            f.layout();
+            assertThat(f.owner.dock().slot("dev.x.files")).hasValue(Slot.RIGHT_TOP);
+            assertThat(f.owner.rightStripe().isVisible()).as("something landed: the stripe shows").isTrue();
+            assertThat(f.owner.rightStripe().buttons()).extracting(AbstractButton::getToolTipText).containsExactly("Files");
+
+            Rectangle left = SwingUtilities.convertRectangle(f.owner.leftStripe().getParent(), f.owner.leftStripe().getBounds(), f.owner);
+            f.drop(f.button("Files"), new Point(left.x + left.width / 2, left.y + 10));
+            assertThat(f.owner.dock().slot("dev.x.files")).hasValue(Slot.LEFT_TOP);
+            assertThat(f.owner.rightStripe().isVisible()).as("emptied again, the stripe hides").isFalse();
+            assertThat(f.events).isEmpty();
+        });
+    }
+
+    @Test void aResizeMidDragMovesTheHiddenStripesPlaceToTheNewEdge() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            var files = f.drag(f.button("Files"), f.rightRailTop());
+            assertThat(f.owner.dockDrag().target()).hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
+            f.root.setSize(1100, 800);
+            f.layout();
+            f.owner.dispatchEvent(new java.awt.event.ComponentEvent(f.owner, java.awt.event.ComponentEvent.COMPONENT_RESIZED));
+            Point edge = f.rightRailTop();
+            f.mouse(files, MouseEvent.MOUSE_DRAGGED, edge);
+            assertThat(f.owner.dockDrag().target()).as("the new edge").hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
+            Rectangle workspace = f.workspace();
+            Rectangle placeholder = SwingUtilities.convertRectangle(f.root.getLayeredPane(), f.owner.dockDrag().overlay().placeholder(), f.owner);
+            assertThat(placeholder.x + placeholder.width).isLessThanOrEqualTo(workspace.x + workspace.width);
+            assertThat(placeholder.x).isGreaterThanOrEqualTo(workspace.x + workspace.width - f.owner.rightStripe().getPreferredSize().width);
+            f.mouse(files, MouseEvent.MOUSE_RELEASED, edge);
+            f.layout();
+            assertThat(f.owner.dock().slot("dev.x.files")).hasValue(Slot.RIGHT_TOP);
+        });
+    }
+
+    @Test void anEmptyHiddenLeftStripeTakesADropAtTheLeftEdgeAndTheGuideAllowsForItShowing() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            f.owner.dock().move("dev.x.sessions", Slot.RIGHT_TOP, 0);
+            f.owner.dock().move("dev.x.files", Slot.RIGHT_TOP, 1);
+            f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.sessions", Contributions.PanelRequest.Op.SHOW));
+            f.layout();
+            assertThat(f.owner.leftStripe().isVisible()).as("everything is on the right").isFalse();
+            Rectangle workspace = f.workspace();
+            Point edge = new Point(workspace.x + f.owner.leftStripe().getPreferredSize().width / 2, workspace.y + 10);
+            var sessions = f.drag(f.button("Sessions"), edge);
+            assertThat(f.owner.dockDrag().target()).hasValue(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 0));
+            Rectangle guide = SwingUtilities.convertRectangle(f.root.getLayeredPane(), f.owner.dockDrag().overlay().highlight(), f.owner);
+            f.mouse(sessions, MouseEvent.MOUSE_RELEASED, edge);
+            f.layout();
+            assertThat(f.owner.leftStripe().isVisible()).isTrue();
+            assertThat(f.owner.dock().slot("dev.x.sessions")).hasValue(Slot.LEFT_TOP);
+            assertThat(frame(f, Slot.LEFT_TOP)).as("the guide allowed for the left stripe showing").isEqualTo(guide);
+        });
+    }
+
+    @Test void theGuideAllowsForTheStripeADropEmpties() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            f.drop(f.button("Files"), f.rightRailTop());
+            f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.files", Contributions.PanelRequest.Op.SHOW));
+            f.layout();
+            assertThat(f.owner.rightStripe().isVisible()).as("Files alone on the right").isTrue();
+            var files = f.drag(f.button("Files"), f.zone(Slot.BOTTOM_LEFT));
+            assertThat(f.owner.dockDrag().target()).hasValue(DockDropResolver.Target.workspace(Slot.BOTTOM_LEFT));
+            Rectangle guide = SwingUtilities.convertRectangle(f.root.getLayeredPane(), f.owner.dockDrag().overlay().highlight(), f.owner);
+            f.mouse(files, MouseEvent.MOUSE_RELEASED, f.zone(Slot.BOTTOM_LEFT));
+            f.layout();
+            assertThat(f.owner.rightStripe().isVisible()).as("Files left it empty").isFalse();
+            assertThat(frame(f, Slot.BOTTOM_LEFT)).as("the guide allowed for the stripe hiding").isEqualTo(guide);
+        });
+    }
+
+    @Test void aCancelledDragLeavesTheEmptyStripeHiddenAndWithTheRailOffTheEdgeIsWorkspace() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            Point edge = f.rightRailTop();
+            var files = f.drag(f.button("Files"), edge);
+            assertThat(f.owner.dockDrag().target()).hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
+            f.owner.dockDrag().cancel();
+            f.mouse(files, MouseEvent.MOUSE_RELEASED, edge);
+            f.layout();
+            assertThat(f.owner.rightStripe().isVisible()).isFalse();
+            assertThat(f.owner.rightStripe().dragging()).isFalse();
+            assertThat(f.owner.rightStripe().getBounds().isEmpty()).as("its place lasted only for the drag").isTrue();
+            assertThat(f.owner.dock().slot("dev.x.files")).as("nothing dropped").hasValue(Slot.LEFT_TOP);
+
+            f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.sessions", Contributions.PanelRequest.Op.SHOW));
+            f.owner.setRailVisible(false);
+            f.layout();
+            var title = f.drag(f.owner.area().headerOf(Slot.LEFT_TOP).titleLabel(), f.rightRailTop());
+            assertThat(f.owner.dockDrag().target()).as("View > Rail off: no stripe takes drops, the edge docks and shows")
+                .hasValue(DockDropResolver.Target.workspace(Slot.RIGHT_TOP));
+            assertThat(f.owner.rightStripe().dragging()).isFalse();
+            f.mouse(title, MouseEvent.MOUSE_RELEASED, f.rightRailTop());
         });
     }
 
@@ -297,8 +424,7 @@ class WindowDragTest {
             var f = new Fixture();
             f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.sessions", Contributions.PanelRequest.Op.SHOW));
             f.layout();
-            Rectangle stripe = SwingUtilities.convertRectangle(f.owner.rightStripe().getParent(), f.owner.rightStripe().getBounds(), f.owner);
-            Point emptyRightTop = new Point(stripe.x + stripe.width / 2, stripe.y + 10);
+            Point emptyRightTop = f.rightRailTop();
             f.drop(f.button("Sessions"), emptyRightTop);
             assertThat(f.owner.dock().slot("dev.x.sessions")).as("into the empty right stripe's drop space").hasValue(Slot.RIGHT_TOP);
             assertThat(f.owner.dock().visible("dev.x.sessions")).isTrue();

@@ -13,6 +13,32 @@ class VersionRangeTest {
             assertThatIllegalArgumentException().as(bad).isThrownBy(() -> Version.parse(bad));
     }
 
+    /** A range a guide tells authors to declare must load on this host; the template is what a new plugin copies. */
+    @Test void everySdkRangeThePluginGuidesTellAuthorsToDeclareAdmitsThisSdk() throws Exception {
+        var root = java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
+        var sdk = Version.parse(dev.jasper.sdk.JasperSdk.VERSION);
+        for (String guide : new String[]{"docs/plugin-authoring.md", "jasper-sdk/README.md", "docs/sdk-icons.md",
+                "docs/examples/external-plugin/src/main/resources/plugin.toml"}) {
+            var declared = java.util.regex.Pattern.compile("sdk = \"([^\"]+)\"").matcher(java.nio.file.Files.readString(root.resolve(guide)));
+            int found = 0;
+            while (declared.find()) {
+                found++;
+                assertThat(VersionRange.parse(declared.group(1)).contains(sdk)).as(guide + ": " + declared.group()).isTrue();
+            }
+            assertThat(found).as(guide).isPositive();
+        }
+    }
+
+    /** The example external plugin is what a developer copies: its default jars are this SDK's release jars. */
+    @Test void theExampleExternalPluginBuildsAgainstThisSdkByDefault() throws Exception {
+        var root = java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
+        String build = java.nio.file.Files.readString(root.resolve("docs/examples/external-plugin/build.gradle.kts"));
+        var version = java.util.regex.Pattern.compile("gradleProperty\\(\"jasperSdkVersion\"\\)\\.getOrElse\\(\"([^\"]+)\"\\)").matcher(build);
+        assertThat(version.find()).as("the example's jasperSdkVersion default").isTrue();
+        assertThat(version.group(1)).as("docs/examples/external-plugin/build.gradle.kts jasperSdkVersion default")
+            .isEqualTo(dev.jasper.sdk.JasperSdk.VERSION);
+    }
+
     @Test void rangesCombineComparators() {
         VersionRange range = VersionRange.parse(">=0.1, <0.2");
         assertThat(range.contains(Version.parse("0.1.0"))).isTrue();
@@ -29,12 +55,19 @@ class VersionRangeTest {
             assertThatIllegalArgumentException().as(bad).isThrownBy(() -> VersionRange.parse(bad));
     }
 
-    @Test void pluginsBuiltForOlderMinorsAreIncompatibleWithZeroFourteen() {
+    @Test void pluginsBuiltForOlderMinorsAreIncompatibleWithZeroEighteen() {
         var host = Version.parse(dev.jasper.sdk.JasperSdk.VERSION);
         assertThat(VersionRange.parse(">=0.10.1, <0.11").contains(host)).isFalse();
         assertThat(VersionRange.parse(">=0.11.0, <0.12").contains(host)).isFalse();
         assertThat(VersionRange.parse(">=0.12.0, <0.13").contains(host)).isFalse();
         assertThat(VersionRange.parse(">=0.13.0, <0.14").contains(host)).isFalse();
-        assertThat(VersionRange.parse(">=0.14.0, <0.15").contains(host)).isTrue();
+        assertThat(VersionRange.parse(">=0.14.0, <0.15").contains(host)).isFalse();
+        assertThat(VersionRange.parse(">=0.15.0, <0.16").contains(host)).isFalse();
+        assertThat(VersionRange.parse(">=0.16.0, <0.17").contains(host)).isFalse();
+        assertThat(VersionRange.parse(">=0.17.0, <0.18").contains(host)).isFalse();
+        assertThat(VersionRange.parse(">=0.17.1, <0.18").contains(host)).as("the former Editor range").isFalse();
+        assertThat(VersionRange.parse(">=0.18.0, <0.19").contains(host)).as("every bundled range").isTrue();
+        assertThat(VersionRange.parse(">=0.18.1, <0.19").contains(host)).as("the former Remote range").isTrue();
+        assertThat(VersionRange.parse(">=0.18.2, <0.19").contains(host)).as("Enterprise's, Remote's, Vault's, File Server's and Sample's range").isTrue();
     }
 }

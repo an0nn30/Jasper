@@ -18,7 +18,7 @@ class ConfigServiceMigrationTest {
         try (var service = new ConfigService(file, true)) {
             assertThat(service.initialState().migratable()).isTrue();
             var first = service.migrate(id -> id.equals("dev.jasper.history")).get(5, TimeUnit.SECONDS);
-            assertThat(first.changes()).isEqualTo(6);
+            assertThat(first.changes()).isEqualTo(5);
             assertThat(first.backup()).hasValue(directory.resolve("config.toml.v1.bak").toRealPath());
             assertThat(Files.readString(directory.resolve("config.toml.v1.bak"))).isEqualTo(ConfigMigrationTest.VERSION_ONE);
             assertThat(Files.readString(file)).isEqualTo(ConfigMigrationTest.VERSION_TWO);

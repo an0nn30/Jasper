@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.notifications.NotificationCenter;
@@ -55,18 +56,35 @@ class BundledSamplePluginTest {
                     dev.jasper.app.contributions.MenuTarget.Slot.FILE));
                 assertThat(menu.entries()).contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.vault.open"));
             });
+            // Bundled plugins start in PluginResolver's order (File Server before Remote), and sections compose in that order.
+            var transfer = dev.jasper.app.contributions.MenuTarget.standard(dev.jasper.app.contributions.MenuTarget.Slot.TRANSFER);
+            assertThat(contributions.menus()).filteredOn(menu -> menu.target().equals(transfer))
+                .extracting(dev.jasper.app.contributions.MenuSection::entries).as("Transfer: File Server's section, then Remote's")
+                .containsExactly(
+                    List.of(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.fileserver.share-folder"),
+                        new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.fileserver.new")),
+                    List.of(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.remote.sftp"),
+                        new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.remote.transfers")));
+            var session = dev.jasper.app.contributions.MenuTarget.standard(dev.jasper.app.contributions.MenuTarget.Slot.SESSION);
+            assertThat(contributions.menus()).filteredOn(menu -> menu.target().equals(session)).as("Session holds Remote's one section")
+                .singleElement().satisfies(menu -> assertThat(menu.entries())
+                    .contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.remote.hosts.new")));
+            assertThat(contributions.menus()).noneMatch(menu -> menu.target().type() == dev.jasper.app.contributions.MenuTarget.Type.TOP_LEVEL
+                && menu.target().key().equals("dev.jasper.remote.menu"));
             assertThat(contributions.status()).hasSize(6)
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
-        assertThat(runtime.get().statusLines()).as("the sample and the six bundled feature plugins").hasSize(7)
-            .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.2.1", "BUNDLED", "ACTIVE"))
+        assertThat(runtime.get().statusLines()).as("the sample, the seven bundled feature plugins and Enterprise, off by default").hasSize(9)
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.enterprise", "BUNDLED", "DISABLED", "off by default"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.4.0", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.remote", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.editor", "BUNDLED", "ACTIVE"))
-            .anySatisfy(line -> assertThat(line).contains("dev.jasper.fileserver", "BUNDLED", "ACTIVE"));
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.fileserver", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.indexer", "BUNDLED", "ACTIVE"));
         String outcome = "dev.jasper.sample.activities|INFO|Sample plugin|Ready";
         var lines = new AtomicReference<List<String>>(List.of());
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
@@ -77,9 +95,11 @@ class BundledSamplePluginTest {
         }
         assertThat(lines.get()).contains(outcome);
         onEdt(() -> assertThat(deck.notices()).as("Buddy keeps live work only").isEmpty());
+        var workers = PluginShutdownTestSupport.capture(runtime.get());
         var pending = new AtomicReference<List<CompletableFuture<?>>>();
         onEdt(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        workers.await();
     }
     @Test void everyBundledPluginShipsAnIconAndRemoteNamesItsHomepage() throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
@@ -96,13 +116,15 @@ class BundledSamplePluginTest {
             var outcome = new CompletableFuture<PluginRuntime.Outcome>();
             onEdt(() -> runtime.get().snapshot(outcome::complete));
             var rows = outcome.get(10, TimeUnit.SECONDS).snapshot().rows();
-            assertThat(rows).hasSize(7).allSatisfy(row -> assertThat(row.icon()).as(row.id()).isPresent());
+            assertThat(rows).hasSize(9).allSatisfy(row -> assertThat(row.icon()).as(row.id()).isPresent());
             assertThat(rows).filteredOn(row -> row.id().equals("dev.jasper.remote")).singleElement()
                 .satisfies(row -> assertThat(row.homepage()).isEqualTo("https://github.com/an0nn30/Jasper"));
         } finally {
+            var workers = PluginShutdownTestSupport.capture(runtime.get());
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
             onEdt(() -> pending.set(runtime.get().stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            workers.await();
         }
     }
 
@@ -125,7 +147,7 @@ class BundledSamplePluginTest {
         var deck = new BuddyTestSupport();
         var contributions = new dev.jasper.app.contributions.Contributions();
         onEdt(() -> {
-            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeTestSupport.controller(false);
             runtime.set(new PluginRuntime(new PluginRuntime.Options(remoteOnly, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> {}),
                 PluginRuntime.SettingsReports.IGNORED, contributions, AppContractTest.headlessWindows(),
@@ -137,24 +159,29 @@ class BundledSamplePluginTest {
             onEdt(() -> {
                 var icon = contributions.action("dev.jasper.remote.hosts").orElseThrow().icon();
                 assertThat(icon.getIconWidth()).isEqualTo(16);
-                assertThat(icon).isSameAs(dev.jasper.app.platform.AppIcons.named("NETWORK"));
-                assertThat(contributions.action("dev.jasper.remote.connect").orElseThrow().icon()).isSameAs(icon);
-                assertThat(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon()).isSameAs(icon);
+                assertThat(icon).isInstanceOfSatisfying(dev.jasper.app.platform.PresentationIcon.class,
+                    named -> assertThat(named.name()).isEqualTo("network"));
+                assertThat(dev.jasper.app.testsupport.IconPixels.of(icon)).isEqualTo(
+                    dev.jasper.app.testsupport.IconPixels.of(new dev.jasper.ui.icons.IconRegistry().icon("network",
+                        dev.jasper.app.platform.ThemeZone.theme(null), dev.jasper.ui.model.Nodes.Hue.NONE, 16)));
+                assertThat(dev.jasper.app.testsupport.IconPixels.of(contributions.action("dev.jasper.remote.connect").orElseThrow().icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon));
+                assertThat(dev.jasper.app.testsupport.IconPixels.of(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon));
                 assertThat(contributions.panels()).hasSize(3).allSatisfy(panel -> {
                     assertThat(panel.icon()).isNotNull();
-                    // The tunnels panel has no semantic icon name, so it takes the catalog's swap-panels icon.
-                    assertThat(panel.icon()).isIn(dev.jasper.app.platform.AppIcons.named("FOLDER"), dev.jasper.app.platform.AppIcons.named("NETWORK"),
-                        dev.jasper.app.platform.AppIcons.bundled("actions/swapPanels"));
+                    assertThat(panel.icon()).isInstanceOfSatisfying(dev.jasper.app.platform.PresentationIcon.class,
+                        named -> assertThat(named.name()).isIn("folder", "network", "tunnel"));
                 });
-                assertThat(contributions.status()).hasSize(3).anySatisfy(status -> assertThat(status.icon()).isSameAs(icon));
+                assertThat(contributions.status()).hasSize(3).anySatisfy(status -> assertThat(dev.jasper.app.testsupport.IconPixels.of(status.icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon)));
                 assertThat(contributions.toolbar()).singleElement().isInstanceOfSatisfying(
-                    dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, menu -> assertThat(menu.icon()).isSameAs(icon));
+                    dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, menu -> assertThat(dev.jasper.app.testsupport.IconPixels.of(menu.icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon)));
             });
         } finally {
+            var workers = PluginShutdownTestSupport.capture(runtime.get());
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
             onEdt(() -> pending.set(runtime.get().stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
-            onEdt(() -> new dev.jasper.app.appearance.ThemeController());
+            workers.await();
+            onEdt(() -> ThemeTestSupport.controller(true));
         }
     }
 

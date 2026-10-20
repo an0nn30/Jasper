@@ -70,4 +70,22 @@ public final class ConfigEditor {
         }
         throw failure;
     }
+
+    /**
+     * Opens a file for editing with the desktop's edit action, else reveals it in the file manager; never the desktop's
+     * open action, which runs programs and scripts. For files a program printed or linked, whatever their visible text.
+     * Never on the EDT.
+     *
+     * @param path the file
+     * @throws IllegalStateException on the EDT, or when neither worked (each attempt's failure is suppressed in it)
+     */
+    public void editOrReveal(Path path) {
+        if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor operations require a worker thread");
+        var failure = new IllegalStateException("Could not edit or reveal: " + path);
+        for (Consumer<Path> attempt : List.of(attempts.get(0), attempts.get(2))) {
+            try { attempt.accept(path); return; }
+            catch (RuntimeException exception) { failure.addSuppressed(exception); }
+        }
+        throw failure;
+    }
 }

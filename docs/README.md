@@ -1,7 +1,7 @@
 # Jasper documentation
 
 Use these guides for the code currently in the repository. Jasper's application composes
-two independent libraries and hosts plugins written against `jasper-sdk`. Public Java
+three independent libraries and hosts plugins written against `jasper-sdk`. Public Java
 visibility inside the app does not constitute a plugin API; the SDK does.
 
 ## Contributor routes
@@ -9,9 +9,10 @@ visibility inside the app does not constitute a plugin API; the SDK does.
 | Module | Start here | Architecture | Maintenance and extensions |
 | --- | --- | --- | --- |
 | `jasper-terminal` | [Onboarding and embedding](../jasper-terminal/README.md) | [Owners, API and threading](terminal-architecture.md) | [Keys, protocols, options and lifecycle](terminal-maintenance.md) |
+| `jasper-ui` | [Engine and kit](../jasper-ui/README.md) | [Packages, API and ownership](ui-architecture.md) | [Gallery, extensions and distribution](ui-maintenance.md) |
 | `jasper-app` | [Onboarding](../jasper-app/README.md) | [Composition and feature ownership](app-architecture.md) | [Commands, scopes, settings, providers and platform hooks](app-maintenance.md) |
 | `jasper-buddy` | [Embedding](../jasper-buddy/README.md) | [Facade, model and presentation](buddy-architecture.md) | [Notices, options, animation and assets](buddy-maintenance.md) |
-| `jasper-sdk` and plugins | [SDK packages](../jasper-sdk/README.md) | [Loading, threading and lifetimes](sdk-architecture.md) | [Writing and testing a plugin](plugin-authoring.md) |
+| `jasper-sdk` and plugins | [SDK packages](../jasper-sdk/README.md) | [Loading, threading and lifetimes](sdk-architecture.md) | [Writing and testing a plugin](plugin-authoring.md), [building plugin UI](plugin-ui.md) |
 
 The [current handoff](STATUS.md) records integration and pending acceptance. The
 [documentation audit](documentation-audit.md) records source checks and corrected drift.
@@ -30,7 +31,7 @@ then assembles the application distribution. It opens no native window. Native
 
 - [Configuration](configuration.md): defaults, saved/live settings, data paths and shell integration.
 - [Notifications](notifications.md): cards, the Notifications panel and its badge, groups and system notifications.
-- [Themes](themes.md): choosing a theme, installing IntelliJ Marketplace themes and how a theme colours the terminal.
+- [Themes](themes.md): the built-in and installed themes, the terminal schemes, the Jasper theme format and the token rule.
 - [Command palette](command-palette.md): commands, the bundled History and Snippets plugins, and scope registration.
 - [Editor](editor.md): editing local and remote files in tabs in the Editor window, saving safely, and outside changes; [verification](editor-verification.md). Vim mode: [supported keys](editor-vim-reference.md) and [differences from Vim](vim-divergences.md).
 - [Plugins](../README.md#plugins): where installed plugins live, File → Manage Plugins…, safe mode and `--plugin-dir`.
@@ -63,7 +64,8 @@ counts and review findings, with later integration/follow-up sections explicitly
 
 - [Credential Vault](credential-vault.md): manager, credentials, grants, key generation and native acceptance.
 - [Remote](remote.md): SSH hosts, import from ~/.ssh/config, host-key trust, shared sessions, and the Sessions panel with WSL distributions.
-- [File Server](file-server.md): share a folder over HTTP, HTTPS, FTP and FTPS from the File Servers panel (SFTP and TFTP follow).
+- [File Server](file-server.md): share a folder over HTTP, HTTPS, FTP, FTPS, SFTP and TFTP from the File Servers panel.
+- [Project Index](project-index.md): offers to index the project a terminal enters and finds its files from the palette's Files tab.
 - [SFTP phase 1 design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md): approved file browser and persistent transfer management within Remote; implementation plan under adversarial review.
 
 - [Keyboard shortcut reference](keyboard-shortcuts.md): Help window, searching and key capture.

@@ -21,14 +21,14 @@ public final class Places {
      *
      * @param heading   the section title
      * @param label     untrusted display text
-     * @param icon      an {@code AppIcons} catalog id
+     * @param icon      a named kit glyph
      * @param location  where it goes
      * @param tooltip   untrusted text
      * @param connected a source root that needs no connection first
      */
     public record Place(Section section, String heading, String label, String icon, Location location, String tooltip, boolean connected) { }
 
-    static final String SERVER_ICON = "webReferences/server";
+    static final String SERVER_ICON = "server";
 
     private Places() { }
 
@@ -39,19 +39,19 @@ public final class Places {
         for (ChooserSource source : sources) byId.putIfAbsent(source.id(), source);
         var places = new ArrayList<Place>();
         terminalFolder.filter(folder -> folder.isLocal() ? isFolder.test(folder.localPath()) : byId.containsKey(folder.source()))
-            .ifPresent(folder -> places.add(new Place(Section.PLACES, "Places", "Terminal folder", "terminal/toolwindow/terminal",
+            .ifPresent(folder -> places.add(new Place(Section.PLACES, "Places", "Terminal folder", "terminal",
                 folder, tooltip(folder, byId), false)));
         Location homeFolder = Location.local(home);
-        places.add(new Place(Section.PLACES, "Places", label(home), "nodes/homeFolder", homeFolder, home.toString(), false));
-        for (var standard : List.of(Map.entry("Desktop", "nodes/desktop"), Map.entry("Downloads", "general/download"))) {
+        places.add(new Place(Section.PLACES, "Places", label(home), "home", homeFolder, home.toString(), false));
+        for (var standard : List.of(Map.entry("Desktop", "desktop"), Map.entry("Downloads", "download"))) {
             Path folder = home.resolve(standard.getKey());
             if (isFolder.test(folder))
                 places.add(new Place(Section.PLACES, "Places", standard.getKey(), standard.getValue(), Location.local(folder), folder.toString(), false));
         }
         for (Location folder : pinned)
-            if (offered(folder, byId)) places.add(new Place(Section.PINNED, "Pinned", label(folder, byId), "general/pin", folder, tooltip(folder, byId), false));
+            if (offered(folder, byId)) places.add(new Place(Section.PINNED, "Pinned", label(folder, byId), "bookmark", folder, tooltip(folder, byId), false));
         for (Location folder : recent)
-            if (offered(folder, byId)) places.add(new Place(Section.RECENT, "Recent", label(folder, byId), "general/history", folder, tooltip(folder, byId), false));
+            if (offered(folder, byId)) places.add(new Place(Section.RECENT, "Recent", label(folder, byId), "history", folder, tooltip(folder, byId), false));
         for (ChooserSource source : byId.values()) {
             if (source.id().equals(Location.LOCAL)) continue;
             for (ChooserSource.Root root : source.roots())

@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.StatusEntry;
 import dev.jasper.app.testsupport.EdtTestExtension;
@@ -16,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class WindowStatusBarContributionsTest {
     @Test void itemsRenderInPriorityOrderOnTheirSideAndClickTheirAction() {
-        new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+        ThemeTestSupport.controller(false);
         var model = new Contributions();
         List<String> clicks = new ArrayList<>();
         Action run = new AbstractAction("Run") {
@@ -51,7 +52,7 @@ class WindowStatusBarContributionsTest {
         bar.setContributed(List.of(), id -> null);
         assertThat(bar.contributedItems(false)).isEmpty();
         assertThat(bar.contributedItems(true)).isEmpty();
-        new dev.jasper.app.appearance.ThemeController();
+        ThemeTestSupport.controller(true);
     }
 
     @Test void progressUpdatesInPlaceAndInvokesCurrentActions() {
@@ -87,7 +88,7 @@ class WindowStatusBarContributionsTest {
 
     @Test void progressFitsNarrowBarsAndLargerUiFonts() {
         try {
-            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeTestSupport.controller(false);
             for (int size : new int[]{12, 18, 32}) {
                 javax.swing.UIManager.put("Label.font", new java.awt.Font("Dialog", java.awt.Font.PLAIN, size));
                 var view = new StatusProgressView();
@@ -105,7 +106,7 @@ class WindowStatusBarContributionsTest {
                     var g = image.createGraphics(); try { view.paint(g); } finally { g.dispose(); }
                 }
             }
-        } finally { new dev.jasper.app.appearance.ThemeController(); }
+        } finally { ThemeTestSupport.controller(true); }
     }
 
     private static java.util.stream.Stream<java.awt.Component> descendants(java.awt.Container parent) {

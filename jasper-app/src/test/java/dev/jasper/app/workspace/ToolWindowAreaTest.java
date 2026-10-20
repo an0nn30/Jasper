@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.appearance.Theme;
+
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.DockState;
@@ -32,6 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class ToolWindowAreaTest {
+    @org.junit.jupiter.api.BeforeEach void installModuleTheme() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeTestSupport.install(true));
+    }
+
     private static Rectangle in(ToolWindowArea area, Component component) {
         return SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), area);
     }
@@ -50,7 +54,7 @@ class ToolWindowAreaTest {
     @Test void theCenterKeepsItsRoundedFrameWhenPanelsOpenAndClose() {
         var deck = new JPanel();
         var area = new ToolWindowArea(deck, new DockState());
-        area.setStripesVisible(true);
+        area.setStripesVisible(true, true);
         deck.setMinimumSize(new Dimension(420, 320));
         assertThat(area.getMinimumSize()).as("terminal minimum plus the top and bottom gutters and the lower inset")
             .isEqualTo(new Dimension(420, 340));
@@ -65,7 +69,7 @@ class ToolWindowAreaTest {
         layout(area);
         assertThat(area.content(Slot.LEFT_TOP)).isSameAs(left);
         assertThat(in(area, left.getParent())).as("the frame").isEqualTo(new Rectangle(0, 0, 250, 600));
-        int header = UIScale.scale(ToolWindowHeader.HEIGHT);
+        int header = UIScale.scale(dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT));
         assertThat(in(area, area.headerOf(Slot.LEFT_TOP))).isEqualTo(new Rectangle(0, 6, 250, header));
         assertThat(in(area, left)).as("content under the header, inside the gutters").isEqualTo(new Rectangle(0, 6 + header, 250, 588 - header));
         assertThat(in(area, deck)).isEqualTo(new Rectangle(256, 6, 744, 580));
@@ -81,7 +85,7 @@ class ToolWindowAreaTest {
     @Test void theBottomAreaSpansTheFullWidthUnderTheSides() {
         var deck = new JPanel();
         var area = new ToolWindowArea(deck, new DockState());
-        area.setStripesVisible(true);
+        area.setStripesVisible(true, true);
         var left = new JLabel("left"); var right = new JLabel("right"); var bottom = new JLabel("bottom");
         DockTestSupport.show(area, Slot.LEFT_TOP, left, 200);
         DockTestSupport.show(area, Slot.RIGHT_TOP, right, 300);
@@ -107,7 +111,7 @@ class ToolWindowAreaTest {
 
     @Test void bothSlotsOfASideStackWithTheirOwnHeadersAndGutters() {
         var area = new ToolWindowArea(new JPanel(), new DockState());
-        area.setStripesVisible(true);
+        area.setStripesVisible(true, true);
         var upper = new JLabel("sessions"); var lower = new JLabel("sftp");
         DockTestSupport.show(area, Slot.LEFT_TOP, upper, 260);
         DockTestSupport.show(area, Slot.LEFT_BOTTOM, lower, 260);
@@ -193,7 +197,7 @@ class ToolWindowAreaTest {
         assertThat(bottom.getParent().getInsets()).isEqualTo(new Insets(0, 6, 6, 6));
         assertThat(deck.getParent().getInsets()).isEqualTo(new Insets(0, 0, 0, 0));
         assertThat(in(area, deck)).as("no lower inset either").isEqualTo(in(area, deck.getParent()));
-        area.setStripesVisible(true); area.setHeaderVisible(true); area.setStatusVisible(true);
+        area.setStripesVisible(true, true); area.setHeaderVisible(true); area.setStatusVisible(true);
         assertThat(left.getParent().getInsets()).isEqualTo(new Insets(0, 0, 0, 0));
         assertThat(bottom.getParent().getInsets()).isEqualTo(new Insets(0, 0, 0, 0));
         assertThat(((javax.swing.JComponent) left.getParent()).getClientProperty("Jasper.zone")).isEqualTo("chrome");
@@ -209,8 +213,8 @@ class ToolWindowAreaTest {
             DockTestSupport.show(area, Slot.LEFT_TOP, panel, 250);
             List<DockState.Change> changes = new ArrayList<>();
             state.addListener(changes::add);
-            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                ThemeTestSupport.install(theme);
+            for (boolean themeDark : new boolean[]{true, false}) {
+                ThemeTestSupport.install(themeDark);
                 SwingUtilities.updateComponentTreeUI(area);
                 area.refreshTheme();
                 layout(area);
@@ -220,9 +224,9 @@ class ToolWindowAreaTest {
                 try { area.paint(g); } finally { g.dispose(); }
                 var gap = divider.getBounds();
                 assertThat(gap).isEqualTo(new Rectangle(250, 0, 6, 600));
-                int chrome = UIManager.getColor("Jasper.titleBackground").getRGB();
+                int chrome = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB();
                 for (int x = gap.x; x < gap.x + gap.width; x++) for (int y = gap.y; y < gap.y + gap.height; y += 7)
-                    assertThat(image.getRGB(x, y)).as("the gap has no border or grip, %s", theme).isEqualTo(chrome);
+                    assertThat(image.getRGB(x, y)).as("the gap has no border or grip, %s", (themeDark ? "dark" : "light")).isEqualTo(chrome);
                 assertThat(divider.getCursor().getType()).isEqualTo(Cursor.E_RESIZE_CURSOR);
             }
 
@@ -342,7 +346,7 @@ class ToolWindowAreaTest {
         var registered = new ArrayList<javax.swing.JComponent>();
         area.dragSource = (component, id) -> registered.add(component);
         String id = DockTestSupport.id(Slot.LEFT_TOP);
-        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        var icon = dev.jasper.app.platform.AppIcons.named("ADD");
         area.setHeader(id, new dev.jasper.app.contributions.PanelHeaderState("prod-web-1", true, List.of(
             new dev.jasper.app.contributions.PanelHeaderState.Action("Add", icon, () -> {}))));
         DockTestSupport.show(area, Slot.LEFT_TOP, new JPanel(), 260);
@@ -358,7 +362,7 @@ class ToolWindowAreaTest {
         String id = "panel.sessions";
         var content = new JPanel();
         var calls = new ArrayList<String>();
-        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        var icon = dev.jasper.app.platform.AppIcons.named("ADD");
         area.setHeader(id, new dev.jasper.app.contributions.PanelHeaderState("5", false, List.of(
             new dev.jasper.app.contributions.PanelHeaderState.Action("Add session", icon, () -> calls.add("first")))));
         area.setContent(id, "Sessions", content);

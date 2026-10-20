@@ -79,7 +79,7 @@ public final class KeymapPage implements SettingsPage {
 
     @Override public JComponent component() {
         if (body != null) return body;
-        panel = new ShortcutPanel(hooks.macOs(), this::stage);
+        panel = new ShortcutPanel(context.kit().get(), hooks.macOs(), this::stage, shape(context));
         panel.setRows(rows());
         body = new FillingPage(panel);
         return body;
@@ -115,10 +115,10 @@ public final class KeymapPage implements SettingsPage {
         if (panel == null) return;
         String text = query == null ? "" : query.strip();
         if (!text.isEmpty()) {
-            panel.search.setText(text);
+            panel.setQuery(text);
             highlighted = text;
-        } else if (highlighted != null && panel.search.getText().equals(highlighted)) {
-            panel.search.setText("");
+        } else if (highlighted != null && panel.query().equals(highlighted)) {
+            panel.setQuery("");
             highlighted = null;
         }
     }
@@ -158,4 +158,9 @@ public final class KeymapPage implements SettingsPage {
     }
 
     private void refreshRows() { if (panel != null) panel.setRows(rows()); }
+
+    /** The composition root's one reading of the look's composition (spec 9.1, 12.2). */
+    private static KeymapShape shape(PageContext context) {
+        return context.composition() == dev.jasper.app.presentation.Composition.CLASSIC ? KeymapShape.CLASSIC : KeymapShape.ROWS;
+    }
 }

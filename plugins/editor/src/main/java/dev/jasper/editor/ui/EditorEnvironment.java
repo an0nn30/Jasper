@@ -30,7 +30,7 @@ public record EditorEnvironment(PluginContext context, Executor ui, Function<Win
      * @return modal dialogs, the nested-loop wait and running timers
      */
     public static EditorEnvironment production(PluginContext context, Executor ui, EditorSettings.Declared settings) {
-        return new EditorEnvironment(context, ui, owner -> new DialogAsker(context.windows(), owner),
-            owner -> new SaveWait(context.windows(), owner), settings::current, settings::saveVim, true);
+        return new EditorEnvironment(context, ui, owner -> new DialogAsker(context.windows(), context.kit(), owner),
+            owner -> new SaveWait(context.windows(), context.kit(), owner), settings::current, settings::saveVim, true);
     }
 }

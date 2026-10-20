@@ -58,6 +58,7 @@ class VaultServiceTest {
     final List<LockState> states = new ArrayList<>();
     final WindowHandle window = window();
     java.util.concurrent.Executor importBackground = Runnable::run;
+    java.util.concurrent.Executor lockBackground = Runnable::run;
     LockManager lock;
     VaultService service;
 
@@ -65,7 +66,7 @@ class VaultServiceTest {
     VaultService service(Path dir) {
         var keychain = new KeychainStore("Linux", command -> { throw new UncheckedIOException(new IOException("none")); }, dir.resolve("x"));
         var secrets = new DeviceSecrets(keychain, new FileStore(dir.resolve("device.secret")));
-        lock = new LockManager(new VaultFile(dir.resolve("vault.jv")), secrets, Runnable::run, Runnable::run, state -> { states.add(state); if (service != null) service.lockStateChanged(state); });
+        lock = new LockManager(new VaultFile(dir.resolve("vault.jv")), secrets, lockBackground, Runnable::run, state -> { states.add(state); if (service != null) service.lockStateChanged(state); });
         service = new VaultService(lock, () -> Optional.of(window), unlocks::add, grants::add, picks::add, notifications.group("dev.jasper.vault"), importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> {});
         return service;
     }

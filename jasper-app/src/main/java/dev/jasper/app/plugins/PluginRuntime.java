@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -121,31 +122,60 @@ public final class PluginRuntime {
     }
 
     /**
-     * A plugin's icon as its jar holds it; the Plugins page decodes it.
+     * A plugin's immutable declared bytes and shared prepared receiving artwork.
      *
-     * @param name the path in the jar, ending in {@code .svg} or {@code .png}
-     * @param data the file's bytes
      */
-    public record PluginIcon(String name, byte[] data) {
-        /** Copies the bytes. */
-        public PluginIcon {
-            Objects.requireNonNull(name, "name");
-            data = data.clone();
+    public static final class PluginIcon {
+        private final String name;
+        private final byte[] data;
+        private dev.jasper.ui.icons.EncodedArtwork artwork;
+        private dev.jasper.ui.icons.IdentityArtwork identity;
+        private final dev.jasper.ui.model.Nodes.Hue tileHue;
+        private final dev.jasper.ui.icons.IdentityArtwork.SelectedInk selectedInk;
+        /** Copies the declared jar path and bytes. */
+        public PluginIcon(String name, byte[] data) {
+            this(name, data, dev.jasper.ui.model.Nodes.Hue.NEUTRAL);
         }
+        /** Copies bytes and declared hue from the same shown candidate. */
+        public PluginIcon(String name, byte[] data, dev.jasper.ui.model.Nodes.Hue tileHue) {
+            this(name,data,tileHue,dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED);
+        }
+        /** Copies the complete identity declaration from the same shown candidate. */
+        public PluginIcon(String name, byte[] data, dev.jasper.ui.model.Nodes.Hue tileHue, dev.jasper.ui.icons.IdentityArtwork.SelectedInk selectedInk) {
+            this.name=Objects.requireNonNull(name,"name");this.data=data.clone();
+            this.selectedInk=Objects.requireNonNull(selectedInk);
+            this.tileHue=Objects.requireNonNull(tileHue);
+            if(tileHue==dev.jasper.ui.model.Nodes.Hue.NONE) throw new IllegalArgumentException("Invalid identity hue");
+        }
+        PluginIcon withMetadata(dev.jasper.ui.model.Nodes.Hue hue, dev.jasper.ui.icons.IdentityArtwork.SelectedInk ink) {
+            if(tileHue==hue && selectedInk==ink)return this;
+            var result=new PluginIcon(name,data,hue,ink);result.artwork=artwork();return result;
+        }
+        public String name(){return name;}
 
         /** @return a copy of the bytes */
-        @Override public byte[] data() { return data.clone(); }
+        public byte[] data() { return data.clone(); }
 
         /** @return whether the icon is an SVG rather than a PNG */
         public boolean svg() { return name.toLowerCase(java.util.Locale.ROOT).endsWith(".svg"); }
 
         @Override public boolean equals(Object other) {
-            return other instanceof PluginIcon icon && icon.name.equals(name) && java.util.Arrays.equals(icon.data, data);
+            return other instanceof PluginIcon icon && icon.name.equals(name) && icon.tileHue==tileHue && icon.selectedInk==selectedInk && java.util.Arrays.equals(icon.data, data);
         }
 
-        @Override public int hashCode() { return 31 * name.hashCode() + java.util.Arrays.hashCode(data); }
+        @Override public int hashCode() { return Objects.hash(name,java.util.Arrays.hashCode(data),tileHue,selectedInk); }
 
-        @Override public String toString() { return "PluginIcon[" + name + ", " + data.length + " bytes]"; }
+        /** Shared receiving value, retaining the declared format and authored bytes. */
+        public synchronized dev.jasper.ui.icons.EncodedArtwork artwork() {
+            if(artwork==null)artwork=new dev.jasper.ui.icons.EncodedArtwork(svg() ? dev.jasper.ui.icons.EncodedArtwork.Format.SVG : dev.jasper.ui.icons.EncodedArtwork.Format.PNG, data);
+            return artwork;
+        }
+        /** Shared receiving identity; bytes and hue have one immutable owner. */
+        public synchronized dev.jasper.ui.icons.IdentityArtwork identityArtwork() {
+            if(identity==null) identity=new dev.jasper.ui.icons.IdentityArtwork(artwork(),tileHue,selectedInk);
+            return identity;
+        }
+        @Override public String toString() { return "PluginIcon[" + name + ", " + data.length + " bytes, " + tileHue + "]"; }
     }
 
     /**
@@ -154,10 +184,19 @@ public final class PluginRuntime {
      * @param rows the plugins
      * @param restartNeeded whether the next launch would run a different plugin set than this process
      * @param safeMode whether this process runs without user plugins
+     * @param turnedOff the presentation providers the change just made turned off, for the banner; empty for none
      */
-    public record Snapshot(List<Row> rows, boolean restartNeeded, boolean safeMode) {
+    public record Snapshot(List<Row> rows, boolean restartNeeded, boolean safeMode, Optional<String> turnedOff) {
         /** Copies the rows. */
-        public Snapshot { rows = List.copyOf(rows); }
+        public Snapshot { rows = List.copyOf(rows); Objects.requireNonNull(turnedOff, "turnedOff"); }
+
+        /** A snapshot that turned no look off. */
+        public Snapshot(List<Row> rows, boolean restartNeeded, boolean safeMode) { this(rows, restartNeeded, safeMode, Optional.empty()); }
+
+        /** This snapshot naming the providers an enable turned off, joined with " and "; none leaves it unchanged. */
+        public Snapshot withTurnedOff(java.util.Collection<String> names) {
+            return names.isEmpty() ? this : new Snapshot(rows, restartNeeded, safeMode, Optional.of(String.join(" and ", names)));
+        }
     }
 
     /**
@@ -334,6 +373,52 @@ public final class PluginRuntime {
         appearanceSubscriber = Objects.requireNonNull(subscribe);
     }
 
+    private java.util.function.BooleanSupplier animations = () -> true;
+    private java.util.function.Function<String, String> shortcuts = action -> "";
+    /** Supplies the live keymap text plugin menus show beside an item's action, before plugin startup. */
+    public void shortcuts(java.util.function.Function<String, String> labels) {
+        if(host!=null)throw new IllegalStateException("Plugins have already started");
+        shortcuts = Objects.requireNonNull(labels);
+    }
+    private dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
+    /** Supplies the application's clipboard before plugin startup, so plugins share it with Jasper's own copies. */
+    public void clipboard(dev.jasper.app.platform.HostClipboard value) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        clipboard = Objects.requireNonNull(value);
+    }
+    /** The presentation given before plugin startup: its kit, what plugins learn of its look, and its defaults. */
+    private record Given(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) { }
+    private Given given;
+    /**
+     * Supplies the presentation before plugin startup: the kit plugins' views are made with (spec 4.9), and the look and
+     * defaults every plugin's appearance reports (plan 15a).
+     *
+     * @param kit the kit the look installed
+     * @param look what plugins learn of the look
+     * @param defaults the look's defaults
+     */
+    public void presentation(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        given = new Given(Objects.requireNonNull(kit, "kit"), Objects.requireNonNull(look, "look"), Objects.requireNonNull(defaults, "defaults"));
+    }
+    /** Supplies the live application motion policy before plugin startup. */
+    public void animations(java.util.function.BooleanSupplier enabled) {
+        if(host!=null)throw new IllegalStateException("Plugins have already started");
+        animations = Objects.requireNonNull(enabled);
+    }
+    private Consumer<String> starting = plugin -> { };
+
+    /**
+     * Hears each selected plugin's name just before it loads, in start order: the splash's steps (spec 10.11). Before
+     * plugin startup.
+     *
+     * @param plugin receives the plugin's name
+     */
+    public void starting(Consumer<String> plugin) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        starting = Objects.requireNonNull(plugin, "plugin");
+    }
+
     private GlassSource glass = GlassSource.NONE;
 
     /** Supplies window opacity for plugins before they start. UI thread.
@@ -348,11 +433,14 @@ public final class PluginRuntime {
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<Problem> startupProblems = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
+    private final CompletableFuture<Void> resourcesClosed = new CompletableFuture<>();
+    private boolean stopped;
     private final PluginSettingsFiles settingsFiles;
     private java.util.concurrent.ScheduledExecutorService settingsPoller;
     private volatile Map<String, PluginCandidate> launched = Map.of();
     private volatile Consumer<Failure> failureSink = failure -> { };
     private volatile PluginHost host;
+    private PluginSelection selection = PluginSelection.none();
     private Subscription bridge, connectionBridge;
     private volatile PluginCatalog.Launch launch;
     private PluginAdmin admin;
@@ -424,14 +512,14 @@ public final class PluginRuntime {
      * The bundled plugin directory: the {@code jasper.plugins.bundled} system property when set (Gradle
      * run and tests), otherwise {@code plugins} beside the application jar. A classes directory has none.
      *
-     * @param codeSource the application's code source, or null
+     * @param codeLocation the application's code location ({@code HandoffSocket.codeLocation()}), or null
      * @return the directory, which need not exist, or null
      */
-    public static Path bundledDirectory(Path codeSource) {
+    public static Path bundledDirectory(Path codeLocation) {
         String override = System.getProperty("jasper.plugins.bundled");
         if (override != null && !override.isBlank()) return Path.of(override);
-        if (codeSource == null || !Files.isRegularFile(codeSource)) return null;
-        return codeSource.toAbsolutePath().getParent().resolve("plugins");
+        if (codeLocation == null || !Files.isRegularFile(codeLocation)) return null;
+        return codeLocation.toAbsolutePath().getParent().resolve("plugins");
     }
 
     /**
@@ -464,16 +552,125 @@ public final class PluginRuntime {
      * @param pluginTables the {@code [plugins."<id>"]} tables of the configuration, used only to seed a missing settings file
      * @param dark whether the current look is dark
      */
+    private volatile Map<String,PluginIcon> pluginIcons=Map.of();
+    private final Object artworkLock=new Object();
+    private long artworkEpoch;
+    private boolean artworkStopped;
+    /** Cached catalog-subject identity; no jar access occurs in this accessor. */
+    public Map<String,PluginIcon> pluginIcons(){return pluginIcons;}
+    private void publishIcons(Snapshot snapshot,long epoch) {
+        var next=new LinkedHashMap<String,PluginIcon>();
+        for(var row:snapshot.rows())row.icon().ifPresent(icon->{
+            try {icon.artwork().prepare();}catch(IllegalArgumentException malformed){/* Receiving owners use the truthful generic fallback. */}
+            next.put(row.id(),icon);
+        });
+        synchronized(artworkLock){if(!artworkStopped && epoch==artworkEpoch)pluginIcons=Map.copyOf(next);}
+    }
+
+    private java.nio.file.Path subcommandList;
+
+    /** Where {@code jasper --help} reads the subcommands; before {@link #start}, and never for a private launch. */
+    public void subcommandList(java.nio.file.Path file) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        subcommandList = file;
+    }
+
+    /** Runs {@code jasper <subcommand>} calls in the plugins that answer them. */
+    public dev.jasper.app.commandline.CommandDispatcher commands() {
+        return invocation -> {
+            PluginHost current = host;
+            if (current != null) return current.commands.dispatch(invocation);
+            invocation.err("jasper: Jasper's plugins are not running\n");
+            return java.util.concurrent.CompletableFuture.completedFuture(1);
+        };
+    }
+
+    /**
+     * What running plugins add to a new local shell ({@code Terminals.environment}), given Jasper's own environment.
+     * UI thread. Empty before the plugins start and after they stop.
+     *
+     * @param jasperEnvironment Jasper's own environment, untouched
+     * @return the variables, never null
+     * @throws IllegalStateException off the UI thread
+     */
+    public Map<String, String> shellVariables(Map<String, String> jasperEnvironment) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Shell variables are read on the UI thread");
+        PluginHost current = host;
+        return current == null ? Map.of() : current.shellContributions.variables(jasperEnvironment);
+    }
+
+    /**
+     * Opens a file for editing, on a worker thread: the editor a plugin provides ({@code Platform.editor}), asked on the
+     * UI thread with the active terminal window, then {@code desktop} on this thread when no plugin provides one, it
+     * declines or throws, or it does not answer within 30 seconds. Before the plugins start, {@code desktop} alone. Once
+     * they run, an interrupted worker, such as one Jasper's quit interrupts, opens nothing and keeps its interrupt.
+     *
+     * @param file the file
+     * @param desktop the desktop's opener, such as {@code ConfigEditor::open}; its failure propagates
+     * @throws IllegalStateException on the UI thread
+     */
+    public void open(Path file, Consumer<Path> desktop) {
+        openFromWorker(file, OptionalInt.empty(), () -> terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id), desktop);
+    }
+
+    /**
+     * As {@link #open(Path, Consumer)}, at {@code line} and with {@code window} instead of the active one: what a
+     * Cmd-click on a file in a terminal opens. The desktop opens the file without the line.
+     *
+     * @param file the file
+     * @param line the 1-based line, or empty for the file's start
+     * @param window the terminal window the click came from, or empty for none
+     * @param desktop the desktop's opener, such as {@code ConfigEditor::open}, or {@code ConfigEditor::editOrReveal} for a
+     *        file a program named; its failure propagates
+     * @throws IllegalStateException on the UI thread
+     */
+    public void open(Path file, OptionalInt line, Optional<UUID> window, Consumer<Path> desktop) {
+        Objects.requireNonNull(window, "window");
+        openFromWorker(file, line, () -> window, desktop);
+    }
+
+    private void openFromWorker(Path file, OptionalInt line, Supplier<Optional<UUID>> window, Consumer<Path> desktop) {
+        if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor operations require a worker thread");
+        Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(line, "line");
+        Objects.requireNonNull(desktop, "desktop");
+        PluginHost current = host;
+        if (current == null) desktop.accept(file);
+        else current.fileEditors.openFromWorker(file, line, window, desktop);
+    }
+
+    private Optional<Path> commandClient = Optional.empty();
+
+    /**
+     * Sets the {@code jasper} command plugins see in {@code CommandLine.client()}; before {@link #start}.
+     *
+     * @param client the command's path; empty when this Jasper names none
+     * @throws IllegalStateException once the plugins have started
+     */
+    public void commandClient(Optional<Path> client) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        commandClient = Objects.requireNonNull(client, "client");
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
+        start(PluginSelection.scan(options, "", Version.parse(JasperSdk.VERSION), PluginSelection.host()), pluginTables, dark);
+    }
+
+    /**
+     * Loads and starts, in dependency order, the plugins {@code selection} chose; nothing is discovered again. Call once,
+     * before the first window.
+     *
+     * @param selection the bootstrap's selection, made with this runtime's options
+     * @param pluginTables the {@code [plugins."<id>"]} tables of the configuration, used only to seed a missing settings file
+     * @param dark whether the current look is dark
+     */
+    public void start(PluginSelection selection, Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
+        this.selection = Objects.requireNonNull(selection, "selection");
         this.dark = dark;
         long began = System.nanoTime();
-        List<String> problems = new ArrayList<>();
-        List<PluginCandidate> candidates = new ArrayList<>(
-            PluginDiscovery.scan(options.bundledDirectory(), PluginCandidate.Origin.BUNDLED, problems));
-        candidates.addAll(PluginDiscovery.scan(options.userDirectory(), PluginCandidate.Origin.USER, problems));
-        if (options.developmentDirectory() != null)
-            PluginDiscovery.single(options.developmentDirectory(), PluginCandidate.Origin.DEV, problems).ifPresent(candidates::add);
+        List<String> problems = new ArrayList<>(selection.problems());
+        List<PluginCandidate> candidates = new ArrayList<>(selection.candidates());
                 for (PluginCandidate candidate : candidates) {
                     try { PluginSettingsFiles.prepare(options.userDirectory(), candidate, pluginTables.get(candidate.id())); }
                     catch (IOException failure) { LOG.log(System.Logger.Level.WARNING, "Could not prepare the settings of " + candidate.id(), failure); }
@@ -481,25 +678,36 @@ public final class PluginRuntime {
         var byId = new LinkedHashMap<String, PluginCandidate>();
         for (PluginCandidate candidate : candidates) byId.putIfAbsent(candidate.id(), candidate);
         launched = Map.copyOf(byId);
-        Map<String, PluginStateStore.Entry> state;
-        try { state = new PluginStateStore(options.stateFile(), options.lockFile(), LOCK_WAIT).read(); }
-        catch (IOException unreadable) {
-            // Without readable consent, user plugins stay inert rather than running unreviewed.
-            LOG.log(System.Logger.Level.WARNING, "Plugin state is unreadable; user plugins will need consent", unreadable);
-            state = Map.of();
-        }
         for (String problem : problems)
             startupProblems.add(new Problem(Problem.Kind.UNREADABLE, Optional.empty(), Optional.empty(), problem, Optional.empty()));
-        var resolution = PluginResolver.resolve(candidates, state, Version.parse(JasperSdk.VERSION), options.safeMode());
+        var resolution = selection.resolution();
         statuses.addAll(resolution.rejected());
         for (PluginStatus rejected : resolution.rejected())
-            if (rejected.state() == PluginStatus.State.SKIPPED && !rejected.superseded())
+            // Spec 5.9: an invalid kit's notice appears once per digest, not at every start.
+            if (rejected.state() == PluginStatus.State.SKIPPED && !rejected.quiet()
+                    && (!rejected.reason().startsWith(PluginStatus.INVALID) || selection.announceInvalid(rejected.id(), rejected.origin())))
                 startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(rejected.id()), Optional.of(rejected.name()),
                     rejected.reason(), Optional.empty()));
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
             dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
+        created.animations = animations;
+        if (given != null) {
+            var chosen = given;
+            created.kit = chosen::kit;
+            created.presentation = HostedPresentation.of(chosen.look(), chosen.kit(), chosen.defaults());
+            created.defaults = chosen.defaults();
+        }
+        created.shortcuts = shortcuts;
+        created.clipboard = clipboard;
+        created.commandClient = commandClient;
+        Set<String> loadingIds = new HashSet<>();
+        for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());
+        List<PluginCandidate> notLoading = byId.values().stream().filter(discovered -> !loadingIds.contains(discovered.id())).toList();
+        created.commands.declare(Subcommands.choose(resolution.load(), notLoading, notifications.problem()));
+        created.fileEditors.bundled(resolution.load().stream().filter(candidate -> candidate.origin() == PluginCandidate.Origin.BUNDLED)
+            .map(PluginCandidate::id).collect(java.util.stream.Collectors.toSet()));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);
@@ -511,6 +719,7 @@ public final class PluginRuntime {
                 }, 1, 1, java.util.concurrent.TimeUnit.SECONDS);
         Map<String, PluginLoader.Loaded> loaded = new LinkedHashMap<>();
         for (PluginCandidate candidate : resolution.load()) {
+            starting.accept(candidate.descriptor().name());
             PluginLoader.Loaded unit;
             try { unit = PluginLoader.load(candidate, loaded, PluginRuntime.class.getClassLoader()); }
             catch (PluginLoader.LoadFailure failure) {
@@ -525,15 +734,43 @@ public final class PluginRuntime {
             for (var requirement : candidate.descriptor().requires())
                 (requirement.optional() ? optional : hard).add(requirement.id());
             PluginHost.Outcome outcome = created.start(new HostedPlugin(candidate.descriptor().info(), hard, optional,
-                candidate.descriptor().exports(), unit.loader(), unit::instantiate));
+                candidate.descriptor().exports(), unit.loader(), unit::instantiate, candidate.descriptor().iconHue()));
             statuses.add(PluginStatus.of(candidate, outcome.state(), outcome.reason()));
             if (outcome.state() == PluginStatus.State.SKIPPED)
                 startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),
                     outcome.reason(), Optional.empty()));
         }
-        launch = new PluginCatalog.Launch(candidates, statuses, PluginCatalog.versions(resolution.load()), options.safeMode());
+        // The splash's steps are past the plugins: keep nothing of the splash.
+        starting = plugin -> { };
+        // Spec 4.6: a provider that fails to load or start fails its look; this session keeps the chrome, without its services.
+        resolution.presentation().ifPresent(provider -> {
+            if (statuses.stream().anyMatch(status -> status.id().equals(provider.id()) && status.state() == PluginStatus.State.FAILED))
+                selection.attempt().failed();
+        });
+        launch = new PluginCatalog.Launch(candidates, statuses, PluginCatalog.versions(resolution.load()), options.safeMode(), selection.build());
         admin = new PluginAdmin(options, Version.parse(JasperSdk.VERSION), () -> launch, created.containment::failures, LOCK_WAIT);
         adminWorker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-plugin-admin").factory());
+        // Startup already discovers plugins before the first window. Perform catalog artwork I/O
+        // on the same serial admin worker used by later management snapshots.
+        try { adminWorker.submit(() -> { publishIcons(admin.snapshot(), artworkEpoch); return null; }).get(); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); LOG.log(System.Logger.Level.DEBUG, "Plugin artwork startup interrupted", interrupted); }
+        catch (java.util.concurrent.ExecutionException failure) { LOG.log(System.Logger.Level.DEBUG, "Plugin artwork unavailable at startup", failure); }
+        if (subcommandList != null) {
+            Set<String> running = new HashSet<>();
+            for (PluginStatus status : statuses) if (status.state() == PluginStatus.State.ACTIVE) running.add(status.id());
+            List<Subcommands.Owner> owners = created.commands.owners();
+            java.nio.file.Path file = subcommandList;
+            adminWorker.execute(() -> {
+                try {
+                    dev.jasper.app.commandline.SubcommandList.write(file, owners.stream()
+                        .filter(owner -> running.contains(owner.pluginId()))
+                        .map(owner -> new dev.jasper.app.commandline.SubcommandList.Entry(owner.name(), owner.summary(), owner.pluginName()))
+                        .toList());
+                } catch (IOException | RuntimeException failure) {
+                    LOG.log(System.Logger.Level.WARNING, "Could not write the subcommand list " + file, failure);
+                }
+            });
+        }
         problems.forEach(problem -> LOG.log(System.Logger.Level.WARNING, "Plugin discovery: " + problem));
         statusLines().forEach(line -> LOG.log(System.Logger.Level.INFO, "Plugin " + line));
         LOG.log(System.Logger.Level.INFO, "Plugins started in " + (System.nanoTime() - began) / 1_000_000 + " ms");
@@ -617,25 +854,33 @@ public final class PluginRuntime {
     }
 
     /**
-     * Stops plugins in reverse order. The futures complete when background work has drained and the
-     * classloaders are closed; the caller bounds the wait.
+     * Stops plugins in reverse order. The futures bound the background work grace before interruption.
+     * Classloaders close once workers actually terminate, so their cleanup can still load classes.
      *
      * @return asynchronous remainders of the shutdown
      */
     public List<CompletableFuture<?>> stop() {
+        if (stopped) return List.of();
+        stopped = true;
+        synchronized(artworkLock){artworkStopped=true;artworkEpoch++;pluginIcons=Map.of();}
         if (settingsPoller != null) settingsPoller.shutdownNow();
         PluginHost current = host;
-        if (current == null) return List.of();
+        if (current == null) { resourcesClosed.complete(null); return List.of(); }
         if (adminWorker != null) adminWorker.shutdown();
         List<CompletableFuture<?>> pending = new ArrayList<>(current.stop());
         List<PluginClassLoader> closing = List.copyOf(loaders);
         loaders.clear();
-        pending.add(CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).whenComplete((done, failure) -> {
+        var adminTerminated = adminWorker == null ? CompletableFuture.completedFuture(null)
+            : HostedContext.terminated(adminWorker, "admin");
+        CompletableFuture.allOf(current.workersTerminated(), adminTerminated,
+            CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new))).whenComplete((done, failure) -> {
+            if (failure != null) { resourcesClosed.completeExceptionally(failure); return; }
             for (PluginClassLoader loader : closing) {
                 try { loader.close(); }
                 catch (IOException ignored) { LOG.log(System.Logger.Level.DEBUG, "Could not close " + loader.getName()); }
             }
-        }));
+            resourcesClosed.complete(null);
+        });
         return pending;
     }
 
@@ -643,9 +888,10 @@ public final class PluginRuntime {
     private void manage(Callable<Snapshot> work, Consumer<Outcome> done) {
         Objects.requireNonNull(done, "done");
         if (adminWorker == null || adminWorker.isShutdown()) { done.accept(new Outcome(false, "Plugins are not running", null)); return; }
+        final long epoch; synchronized(artworkLock){epoch=artworkEpoch;}
         adminWorker.execute(() -> {
             Outcome outcome;
-            try { outcome = new Outcome(true, "", work.call()); }
+            try { var snapshot=work.call(); publishIcons(snapshot,epoch); outcome = new Outcome(true, "", snapshot); }
             catch (Exception failure) {
                 LOG.log(System.Logger.Level.WARNING, "A plugin manager operation failed", failure);
                 outcome = new Outcome(false, failure.getMessage() == null ? failure.toString() : failure.getMessage(), null);
@@ -828,7 +1074,7 @@ public final class PluginRuntime {
         PluginCatalog.Launch started = launch;
         if (current == null || started == null) return List.of();
         return withStubs(current.settingsPages(context), started.statuses(),
-            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id())));
+            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id()), context.kit()));
     }
 
     /**
@@ -877,7 +1123,7 @@ public final class PluginRuntime {
         Thread.ofVirtual().name("jasper-plugin-settings-open").start(() -> {
             try {
                 prepareSettings(id);
-                editor.accept(PluginSettingsFiles.file(options.userDirectory(), id));
+                open(PluginSettingsFiles.file(options.userDirectory(), id), editor);
             } catch (IOException | RuntimeException failure) {
                 String name = Optional.ofNullable(launched.get(id)).map(candidate -> candidate.descriptor().name()).orElse(id);
                 String reason = failure.getMessage() == null ? failure.toString() : failure.getMessage();

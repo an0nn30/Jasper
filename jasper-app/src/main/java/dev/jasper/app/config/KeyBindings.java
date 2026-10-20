@@ -263,6 +263,29 @@ public final class KeyBindings {
     }
 
     /** Parses a saved binding; none means explicitly unassigned. */
+    /** A stroke as menus and the palette show it: "\u21e7\u2318P" on macOS, "Ctrl+Shift+P" elsewhere, "" for none. */
+    public static String display(KeyStroke stroke, boolean macOs) {
+        if (stroke == null) return "";
+        int modifiers = stroke.getModifiers();
+        String key = stroke.getKeyCode() == 0
+            ? String.valueOf(stroke.getKeyChar()) : java.awt.event.KeyEvent.getKeyText(stroke.getKeyCode());
+        if (macOs) {
+            var text = new StringBuilder();
+            if ((modifiers & java.awt.event.InputEvent.CTRL_DOWN_MASK) != 0) text.append("\u2303");
+            if ((modifiers & java.awt.event.InputEvent.ALT_DOWN_MASK) != 0) text.append("\u2325");
+            if ((modifiers & java.awt.event.InputEvent.SHIFT_DOWN_MASK) != 0) text.append("\u21e7");
+            if ((modifiers & java.awt.event.InputEvent.META_DOWN_MASK) != 0) text.append("\u2318");
+            return text.append(key).toString();
+        }
+        var names = new java.util.ArrayList<String>();
+        if ((modifiers & java.awt.event.InputEvent.CTRL_DOWN_MASK) != 0) names.add("Ctrl");
+        if ((modifiers & java.awt.event.InputEvent.ALT_DOWN_MASK) != 0) names.add("Alt");
+        if ((modifiers & java.awt.event.InputEvent.SHIFT_DOWN_MASK) != 0) names.add("Shift");
+        if ((modifiers & java.awt.event.InputEvent.META_DOWN_MASK) != 0) names.add("Meta");
+        names.add(key);
+        return String.join("+", names);
+    }
+
     public static Optional<KeyStroke> parse(String binding, boolean macOs) {
         if (binding == null) {
             throw new IllegalArgumentException("keybinding must not be null");

@@ -8,8 +8,28 @@ is the binding reference.
 
 - **Open in Editor…** (Cmd+O on macOS, Ctrl+O elsewhere) in a terminal window's File menu or the
   palette, and **Open…** inside the Editor window.
+- **Open File…** in a terminal window's File menu or the palette (no default shortcut) opens the file you choose in
+  the [default editor](#default-editor), as a Cmd-click does.
 - **New Editor File**, or **New File** (Cmd/Ctrl+N) inside the Editor window, for an untitled tab.
 - Drop files from the desktop onto the Editor window. Folders are ignored.
+- `jasper editor FILE[:LINE[:COLUMN]]...` from a terminal, once the
+  [jasper command](configuration.md#the-jasper-command) is installed. The caret goes to the
+  line and column. A file that does not exist yet opens as an empty tab and is created when you save it. A folder, or
+  a file in a folder that does not exist, is reported and the other files still open. With `--wait` (`-w`) the command
+  returns once every tab it opened has closed, so `git config --global core.editor "jasper editor --wait"` edits commit
+  messages here; Ctrl-C stops waiting and leaves the tabs open.
+- Cmd-click (Ctrl-click on Linux and Windows) a file path in a local terminal pane: `src/Foo.java:42`,
+  `Foo.java:42:5`, `Foo.cs(42,5)`, `./notes.md`, `~/a.txt`, `/tmp/x.log`, on Windows also `C:\…` and backslash
+  paths, or a `file://` link to this machine, as `ls --hyperlink` prints; a plain-text `file://` URL may end in
+  `:LINE[:COLUMN]`, as Kotlin's compiler prints. A relative path is relative to the directory
+  the shell last reported, else the one the pane started in. An existing file opens in the
+  [default editor](#default-editor), at the line when the editor takes one; anything else does nothing. Where a file
+  would open with the system's default app, a clicked file opens in the system's editor for its type (on macOS, the
+  default text editor), else is shown in the file manager; where the desktop supports neither, as on most Linux
+  desktops, the click opens nothing. On Windows, a path on a network share (`\\server\share\…`) opens nothing, except
+  a WSL share in a WSL tab. A path with spaces opens only from a link. Inside a program that uses the mouse, use Ctrl+Shift-click on
+  Linux and Windows. A pane whose shell reports a directory on another host, and a session a plugin provides, such as
+  Remote's ssh, open nothing.
 
 Opening a file that is already open selects its tab. Files larger than `max_file_mib` and binary
 files (a NUL byte near the start) are refused with a message in the tab.
@@ -76,14 +96,53 @@ plain text. TOML uses the Editor's own lexer.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `font_family` | first installed of JetBrains Mono, Menlo, Consolas, DejaVu Sans Mono, else Monospaced | editor font |
+| `font_family` | first installed of JetBrains Mono, Menlo, Consolas, DejaVu Sans Mono, else Monospaced; IBM Plex Mono under the Enterprise look | editor font |
 | `font_size` | 13 | points, 8–48 |
 | `tab_size` | 4 | columns, 1–16 |
 | `soft_wrap` | false | wrapping for new tabs |
 | `max_file_mib` | 10 | larger files are refused, 1–256 |
 | `vim` | false | Vim mode (below); the Vim status item and Toggle Vim Mode change it |
+| `recent_files_days` | 30 | Recent files not opened for this many days are forgotten, 0–365; 0 keeps none |
+| `default_editor` | `"jasper"` | the [default editor](#default-editor): `jasper`, `system`, `custom` or an installed editor's id |
+| `custom_command` | `""` | for `custom`: the command; the file's path is added at the end |
+| `custom_in_terminal` | true | for `custom`: run it in a terminal tab |
+| `keep_environment_editor` | true | when Jasper's own environment has `EDITOR` or `VISUAL`, its shells keep both |
 
 A bad value is reported and its default used.
+
+## Default editor
+
+**Default editor** on the Editor's page (Settings › Tools › Editor) chooses the editor for the files Jasper opens itself
+(Open in Editor for `config.toml`, from the configuration banner and notices, for a plugin's settings file and for the
+VM options file, and plugins' Open in Editor) and the `EDITOR` of Jasper's shells, which `git commit`,
+`crontab -e` and `kubectl edit` use:
+
+- **Jasper Editor**, the default: files open in a tab here. `EDITOR` is the `jasper` command's path followed by
+  `editor --wait`.
+- **An installed editor**, by name. Neovim, Vim, vi, nano, micro, Helix and Emacs open in a new terminal tab, at the
+  line when one is given, in the window the file was opened from, else the active one; the tab closes when the editor
+  exits cleanly. They run with Jasper's own `PATH`, so when Jasper starts from the Dock their `:!` commands may need
+  full paths. Visual Studio Code, Cursor, Zed, Sublime Text, BBEdit, TextMate, IntelliJ IDEA, Notepad++ and Notepad
+  start on their own, at the line when one is given (Notepad takes none). `EDITOR` is the editor's path, with `-nw`
+  for Emacs and the app editors' wait options (`--wait`, `-w`, `-multiInst -nosession`).
+- **System default app**: files open with your system's app for them, and Jasper sets no `EDITOR`.
+- **Custom command**: `custom_command` with the file's path added, in a terminal tab, or on its own when
+  `custom_in_terminal` is off. `/bin/sh` runs it with Jasper's `PATH` plus `/opt/homebrew/bin`, `/usr/local/bin` and
+  `~/.local/bin`; on Windows, `cmd` runs it. `EDITOR` is the command as written. Until you enter one, files open with
+  the system's default app.
+
+The page lists the editors Jasper finds on its `PATH` and, except on Windows, in `/opt/homebrew/bin`,
+`/usr/local/bin` and `~/.local/bin`, as the command-line tools inside the apps in `/Applications` and `~/Applications`
+on macOS, and in Notepad++'s and Notepad's own folders on Windows; BBEdit and IntelliJ IDEA are found only through their
+`bbedit` and `idea` commands in the folders listed first. It looks when the Editor starts and each time the page opens.
+A saved editor it no longer finds shows "(not found)" and acts as System
+default app. When Jasper itself was started with `EDITOR` or `VISUAL` set, for example from a terminal, its shells keep
+both and Jasper sets neither until you turn off `keep_environment_editor`; then Jasper replaces `EDITOR`, and `VISUAL`
+too when Jasper was started with one. Jasper sets `VISUAL` only then, so an export of `EDITOR` or `VISUAL` in a shell
+startup file, such as `~/.zshrc`, still wins. The page shows what Jasper's environment has. When the chosen editor
+cannot open a file (a terminal editor with no terminal window open, an app that does not start) or the Editor is off,
+the file opens with the system's default app. An app editor or custom command started on its own that exits with an
+error posts a notification naming its program.
 
 ## Vim mode
 

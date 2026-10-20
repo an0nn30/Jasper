@@ -43,6 +43,18 @@ final class ShortcutText {
         return prefix + key;
     }
 
+    static java.util.Optional<dev.jasper.ui.swing.KeycapSequence> keycaps(KeyStroke stroke,boolean macOs) {
+        if(stroke==null)return java.util.Optional.empty();
+        var keys=new java.util.ArrayList<String>();int modifiers=stroke.getModifiers();
+        if((modifiers&InputEvent.CTRL_DOWN_MASK)!=0)keys.add(macOs?"\u2303":"Ctrl");
+        if((modifiers&InputEvent.ALT_DOWN_MASK)!=0)keys.add(macOs?"\u2325":"Alt");
+        if((modifiers&InputEvent.ALT_GRAPH_DOWN_MASK)!=0)keys.add("AltGraph");
+        if((modifiers&InputEvent.META_DOWN_MASK)!=0)keys.add(macOs?"\u2318":"Meta");
+        if((modifiers&InputEvent.SHIFT_DOWN_MASK)!=0)keys.add(macOs?"\u21e7":"Shift");
+        keys.add(format(KeyStroke.getKeyStroke(stroke.getKeyCode(),0)));
+        return java.util.Optional.of(new dev.jasper.ui.swing.KeycapSequence(keys,format(stroke)));
+    }
+
     static boolean matches(ShortcutEntry row, String query, KeyStroke captured) {
         if (captured != null) return captured.equals(row.stroke());
         String q = normalize(query);

@@ -1,432 +1,432 @@
 package dev.jasper.remote.ui.tunnels;
 
-import dev.jasper.sdk.ui.WorkspacePalette;
-import dev.jasper.sdk.ui.PanelHeader;
-import dev.jasper.remote.ui.PanelStyle;
 import dev.jasper.remote.tunnels.Tunnel;
+import dev.jasper.remote.tunnels.TunnelKind;
 import dev.jasper.remote.tunnels.TunnelState;
-import dev.jasper.sdk.ui.BundledIcon;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.CardLayout;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.Rectangle;
-import java.awt.event.ActionEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import dev.jasper.remote.workstation.Layout;
+import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.ListItem;
+import dev.jasper.sdk.ui.MenuItem;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.PanelHeader;
+import dev.jasper.sdk.ui.TableRow;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
-import javax.swing.AbstractAction;
-import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
-import javax.swing.Icon;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
-import javax.swing.JToolTip;
-import javax.swing.KeyStroke;
-import javax.swing.ListSelectionModel;
-import javax.swing.ScrollPaneConstants;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 
 /**
- * The "Tunnels" rail panel: a filter, saved tunnels by name, then quick forwards under their own heading. Each row
- * shows a state dot, name and host, mapping and start/stop switch. Problems remain visible and live counters are in the tooltip. One per window.
+ * The "Tunnels" rail panel on one host-rendered kit view: a filter, saved tunnels by name, then quick forwards under
+ * their own heading. Each row shows a state dot, the name and host, the mapping and a start/stop switch; problems stay
+ * visible and the live counters are in the row tooltip. One per window.
+ *
+ * <p>Rows are keyed by the tunnel's id. The switch shows only the confirmed state the plugin passes in (on while Up,
+ * pending while Starting, an error while Failed) and never flips by itself; operating it, Enter or Space stops a running
+ * tunnel and starts any other. A double click edits a saved tunnel or offers Save as Tunnel for a quick forward; Delete
+ * and Backspace delete a saved one. Each row has its own context menu, whose actions name that row. The count and New
+ * Tunnel action are the window's: {@link #onHeaderChanged} feeds {@code PanelHost.setHeader}. UI thread only; after
+ * {@link #close()} nothing touches the view.
+ *
+ * <p>Under {@link Layout#CLASSIC} (Enterprise presentation spec 14.4) the same rows are a Type, Local, Remote and Via
+ * table over the selected (else the first) tunnel's status line; Enter or a double click starts or stops a row, in
+ * place of the switch, and the row menu holds the other gestures.
  */
-public final class TunnelsPanel extends JPanel {
+public final class TunnelsPanel implements AutoCloseable {
     /** What the panel asks for; the plugin decides how. */
     public record Actions(Consumer<Tunnel> start, Consumer<Tunnel> stop, Consumer<Tunnel> edit, Consumer<Tunnel> duplicate,
                           Consumer<Tunnel> delete, Consumer<Tunnel> save, Consumer<Tunnel> browse, Consumer<Tunnel> copyAddress,
                           Runnable add) { }
 
-    /** A line in the list. */
-    sealed interface Row permits Item, Heading, Problem { }
-    /** A tunnel. */
-    record Item(Tunnel tunnel) implements Row { }
-    /** The quick forwards' heading. */
-    record Heading(String text) implements Row { }
-    /** The broken-file message. */
-    record Problem(String message) implements Row { }
+    public static final String ROOT = "tunnels", HEADER = "tunnels.header", FILTER = "tunnels.filter", ROWS = "tunnels.rows",
+        NO_MATCH = "tunnels.no-match", EMPTY = "tunnels.empty", EMPTY_NEW = "tunnels.empty.new", PROBLEM = "tunnels.problem",
+        QUICK_HEADING = "heading.quick", PROBLEM_ROW = "problem", ACTIVATE = "activate", TOGGLE = "toggle", DELETE = "delete";
+    /** A row's switch is this prefix and the tunnel's id; menu actions are {@code menu:<verb>:<row id>}. */
+    static final String SWITCH = "switch:", MENU = "menu:", ROW = "tunnel:";
 
-    final JTextField filter = new JTextField() {
-        @Override public Color getBackground() { return WorkspacePalette.current(this).surfaceSunken(); }
-        @Override public Dimension getPreferredSize() {
-            var size = super.getPreferredSize();
-            return new Dimension(size.width, Math.max(PanelStyle.scale(this, 28), getFontMetrics(getFont()).getHeight() + 8));
-        }
-    };
-    final JButton add = new JButton("+");
-    final JTextArea empty = new WrappedNote();
-    final JList<Row> list;
-    final JButton emptyAction = new JButton("New Tunnel");
-    final JPanel emptyState;
-    private final JTextArea emptyProblem = new WrappedNote(true);
-    private final JPanel cards = new JPanel(new CardLayout());
-    private final JPanel north = new JPanel(new BorderLayout(0, 6));
-    private final DefaultListModel<Row> model = new DefaultListModel<>();
     private final Actions actions;
-    private final Function<BundledIcon, Icon> icons;
+    /** Which composition this panel takes, fixed at construction (spec 3.6). */
+    private final Layout layout;
+    private final LongSupplier nanos;
+    private final long multiClickNanos;
+    private final UiView view;
     private List<Tunnel> saved = List.of(), quick = List.of();
     private Optional<String> error = Optional.empty();
     private Function<UUID, TunnelState> states = id -> TunnelState.STOPPED;
     private Function<UUID, Optional<String>> hostNames = id -> Optional.empty();
     private Supplier<Instant> clock = Instant::now;
     private Consumer<PanelHeader> headerChanged;
+    private String query = "", selectedRow, lastSwitch;
+    private long lastSwitchAt;
+    private boolean closed;
 
-    public TunnelsPanel(Actions actions, Function<BundledIcon, Icon> icons) {
-        this(actions, icons, icons.apply(BundledIcon.ACTIONS_SWAP_PANELS));
+    /** {@code icons} supplies the header action's artwork, which the window draws. */
+    public TunnelsPanel(UiKit kit, Actions actions) {
+        this(kit, actions, System::nanoTime, multiClickInterval());
     }
 
-    public TunnelsPanel(Actions actions, Function<BundledIcon, Icon> icons, Icon emptyIcon) {
-        super(new BorderLayout(0, 6));
-        this.actions = actions;
-        this.icons = icons;
-        setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(this, 7), PanelStyle.scale(this, 10), 8, PanelStyle.scale(this, 10)));
-        // The tool window header carries the title.
-        add.setToolTipText("New Tunnel…");
-        add.putClientProperty("JButton.buttonType", "toolBarButton");
-        filter.putClientProperty("JTextField.placeholderText", "Filter tunnels");
-        filter.putClientProperty("JTextField.leadingIcon", icons.apply(BundledIcon.GENERAL_SEARCH));
-        filter.putClientProperty("FlatLaf.style", "arc: 8");
-        filter.getAccessibleContext().setAccessibleName("Filter tunnels");
-
-        north.add(filter, BorderLayout.CENTER);
-        add(north, BorderLayout.NORTH);
-        list = new JList<>(model) {
-            @Override public boolean getScrollableTracksViewportWidth() { return true; }
-            // A row's tooltip starts with the tunnel's name; it is shown as text, whatever the name looks like.
-            @Override public JToolTip createToolTip() {
-                JToolTip tip = super.createToolTip();
-                tip.putClientProperty("html.disable", true);
-                return tip;
-            }
-        };
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setCellRenderer((owner, value, index, selected, focused) -> render(owner, value, selected));
-        var scroll = new JScrollPane(list);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        var center = new JPanel(new BorderLayout());
-        center.add(scroll, BorderLayout.CENTER);
-        center.add(empty, BorderLayout.SOUTH);
-        cards.add(center, "populated");
-        emptyState = PanelStyle.emptyState(emptyIcon, "No Tunnels",
-            "Forward a local port to a remote host, or use Forward Port from an SSH pane.", emptyAction);
-        var emptyPage = new JPanel(new BorderLayout());
-        emptyPage.add(emptyProblem, BorderLayout.NORTH);
-        emptyPage.add(emptyState, BorderLayout.CENTER);
-        cards.add(emptyPage, "empty");
-        add(cards, BorderLayout.CENTER);
-        emptyAction.addActionListener(event -> actions.add().run());
-
-        filter.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent e) { rebuild(); }
-            @Override public void removeUpdate(DocumentEvent e) { rebuild(); }
-            @Override public void changedUpdate(DocumentEvent e) { rebuild(); }
-        });
-        list.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent event) {
-                int index = list.locationToIndex(event.getPoint());
-                if (index < 0) return;
-                Rectangle cell = list.getCellBounds(index, index);
-                if (cell == null || !cell.contains(event.getPoint())) return;
-                list.setSelectedIndex(index);
-                if (SwingUtilities.isRightMouseButton(event)) {
-                    JPopupMenu menu = menuFor(index);
-                    if (menu != null) menu.show(list, event.getX(), event.getY());
-                } else if (SwingUtilities.isLeftMouseButton(event)) {
-                    if (event.getX() >= cell.x + cell.width - PanelStyle.scale(list, 42)) {
-                        if (event.getClickCount() == 1) toggle(index);
-                    } else if (event.getClickCount() == 2) activate(index);
-                }
-            }
-        });
-        bind("ENTER", "toggleTunnel", () -> toggle(list.getSelectedIndex()));
-        bind("SPACE", "toggleTunnel", () -> toggle(list.getSelectedIndex()));
-        bind("shift F10", "tunnelMenu", () -> {
-            int index = list.getSelectedIndex();
-            JPopupMenu menu = menuFor(index);
-            Rectangle cell = index < 0 ? null : list.getCellBounds(index, index);
-            if (menu != null && cell != null) menu.show(list, cell.x + 8, cell.y + cell.height);
-        });
-        bind("DELETE", "deleteTunnel", () -> delete(list.getSelectedIndex()));
-        bind("BACK_SPACE", "deleteTunnel", () -> delete(list.getSelectedIndex()));
-        add.addActionListener(event -> actions.add().run());
-        rebuild();
+    /** The panel in {@code layout}'s composition. */
+    public TunnelsPanel(UiKit kit, Actions actions, Layout layout) {
+        this(kit, actions, System::nanoTime, multiClickInterval(), layout);
     }
 
-    /** Supplies the window-owned count and add action. Called on the UI thread. */
-    public void onHeaderChanged(Consumer<PanelHeader> listener) { headerChanged = listener; publishHeader(); }
+    /**
+     * {@code nanos} and {@code multiClickNanos} (the desktop's double-click interval) tell a double click on a switch from
+     * two separate operations: the old switch acted once per gesture.
+     */
+    TunnelsPanel(UiKit kit, Actions actions, LongSupplier nanos, long multiClickNanos) { this(kit, actions, nanos, multiClickNanos, Layout.ROWS); }
 
-    private void publishHeader() {
-        if (headerChanged == null) return;
-        headerChanged.accept(new PanelHeader(saved.isEmpty() && quick.isEmpty() ? "" : String.valueOf(saved.size() + quick.size()), false,
-            List.of(new PanelHeader.Action("New Tunnel…", icons.apply(BundledIcon.GENERAL_ADD), actions.add()))));
+    TunnelsPanel(UiKit kit, Actions actions, LongSupplier nanos, long multiClickNanos, Layout layout) {
+        this.layout = Objects.requireNonNull(layout);
+        this.actions = Objects.requireNonNull(actions); this.nanos = Objects.requireNonNull(nanos);
+        if (multiClickNanos < 0) throw new IllegalArgumentException("multiClickNanos must not be negative");
+        this.multiClickNanos = multiClickNanos;
+        view = kit.create(new ViewSpec(node()), this::handle);
     }
+
+    public UiView view() { return view; }
+
+    /** Supplies the window-owned count and add action, now and whenever the tunnels change. Called on the UI thread. */
+    public void onHeaderChanged(Consumer<PanelHeader> listener) { headerChanged = Objects.requireNonNull(listener); publishHeader(); }
 
     /** Replaces what the panel lists: saved tunnels by name, then quick forwards under their own heading. */
     public void setTunnels(List<Tunnel> saved, List<Tunnel> quick, Optional<String> error, Function<UUID, TunnelState> states,
                            Function<UUID, Optional<String>> hostNames) {
+        if (closed) return;
         this.saved = saved.stream().sorted(Comparator.comparing((Tunnel tunnel) -> tunnel.name().toLowerCase(Locale.ROOT))).toList();
         this.quick = List.copyOf(quick);
         this.error = error;
         this.states = states;
         this.hostNames = hostNames;
         publishHeader();
-        rebuild();
+        render();
     }
 
-    /** Repaints counters and uptimes; the plugin calls this once a second while a tunnel is up. */
-    public void refresh() { list.repaint(); }
+    /** Shows the counters and uptimes as they are now; the plugin calls this once a second while a tunnel is up. */
+    public void refresh() { render(); }
 
-    void setClock(Supplier<Instant> value) { clock = value; list.repaint(); }
+    void setClock(Supplier<Instant> value) { clock = value; render(); }
 
-    /** The row button, Enter and Space: stop a running tunnel, start any other. */
-    void toggle(int index) {
-        tunnelAt(index).ifPresent(tunnel -> (states.apply(tunnel.id()).running() ? actions.stop() : actions.start()).accept(tunnel));
+    /** The rows shown now, in order: tunnels by row id, the quick forwards' heading and the broken-file row. */
+    List<String> rowIds() { return shown().stream().map(Row::id).toList(); }
+
+    /** The row id of a tunnel. */
+    static String rowId(UUID tunnel) { return ROW + tunnel; }
+
+    // ---- the classic composition (Enterprise presentation spec 14.4)
+
+    /** The classic table's columns, in the Workstation mock's proportions. */
+    static final List<Column> COLUMNS = List.of(new Column("type", "Type", Nodes.TextRole.BODY, false, 76, Optional.empty()),
+        new Column("local", "Local", Nodes.TextRole.MONO, false, 87, Optional.empty()), new Column("remote", "Remote", Nodes.TextRole.MONO, false, 110, Optional.empty()),
+        new Column("via", "Via", Nodes.TextRole.BODY, false, 77, Optional.empty()));
+    public static final String FOOTER = "tunnels.footer", TOP = "tunnels.top";
+
+    private Nodes.Panel classicNode() {
+        var header = new Nodes.Header(HEADER, ControlState.READY, "Tunnels", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        List<Row> rows = shown();
+        if (selectedRow != null && rows.stream().noneMatch(row -> row.id().equals(selectedRow) && row.tunnel() != null)) selectedRow = null;
+        boolean none = saved.isEmpty() && quick.isEmpty();
+        var tableRows = new ArrayList<TableRow>();
+        for (Row row : rows) {
+            if (row.id().equals(QUICK_HEADING)) tableRows.add(TableRow.heading(QUICK_HEADING, "Quick forwards", OptionalInt.empty(), ""));
+            else if (row.tunnel() != null) tableRows.add(tableRow(row));
+        }
+        Optional<Nodes.Empty> empty = none ? Optional.of(new Nodes.Empty(EMPTY, ControlState.READY,
+            new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "tunnel", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Tunnels"), "No Tunnels",
+            "Forward a local port to a remote host, or use Forward Port from an SSH pane.",
+            List.of(new Nodes.Button(EMPTY_NEW, ControlState.READY, "New Tunnel…", "", Nodes.ButtonKind.SECONDARY, EMPTY_NEW, "")))) : Optional.empty();
+        boolean filtered = !none && tableRows.stream().noneMatch(row -> row.heading().isEmpty());
+        var table = new Nodes.Table(ROWS, ControlState.READY, COLUMNS, tableRows, selectedRow == null ? Set.of() : Set.of(selectedRow), TOGGLE, List.of(),
+            Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD, empty, filtered ? "No tunnels match" : "");
+        var top = new ArrayList<Nodes.Node>();
+        error.ifPresent(message -> top.add(new Nodes.Notice(PROBLEM, ControlState.READY, Nodes.Severity.DANGER, problemText(), List.of())));
+        if (!none) top.add(new Nodes.Field(FILTER, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Filter tunnels", "Filter tunnels", ""));
+        Optional<Nodes.Node> search = top.isEmpty() ? Optional.empty()
+            : top.size() == 1 && top.getFirst() instanceof Nodes.Field ? Optional.of(top.getFirst())
+            : Optional.of(new Nodes.Stack(TOP, ControlState.READY, Nodes.LayoutRole.VERTICAL, top));
+        Optional<Nodes.Node> footer = selected().or(() -> rows.stream().map(Row::tunnel).filter(Objects::nonNull).findFirst())
+            .map(tunnel -> new Nodes.Text(FOOTER, ControlState.READY, footerText(tunnel), Nodes.TextRole.CAPTION));
+        return new Nodes.Panel(ROOT, ControlState.READY, header, search, table, footer);
     }
 
-    /** Double-click: edit a saved tunnel, name a quick forward. */
-    void activate(int index) { tunnelAt(index).ifPresent(tunnel -> (tunnel.quick() ? actions.save() : actions.edit()).accept(tunnel)); }
-
-    /** Delete and Backspace: only saved tunnels; a quick forward goes away when stopped. */
-    void delete(int index) { tunnelAt(index).filter(tunnel -> !tunnel.quick()).ifPresent(actions.delete()); }
-
-    JPopupMenu menuFor(int index) {
-        Optional<Tunnel> found = tunnelAt(index);
-        if (found.isEmpty()) return null;
-        Tunnel tunnel = found.get();
+    private TableRow tableRow(Row row) {
+        Tunnel tunnel = row.tunnel(); String id = row.id();
         TunnelState state = states.apply(tunnel.id());
-        var menu = new JPopupMenu();
-        if (state.running()) menu.add(item("Stop", true, () -> actions.stop().accept(tunnel)));
-        else menu.add(item("Start", true, () -> actions.start().accept(tunnel)));
-        if (state instanceof TunnelState.Failed) menu.add(item("Stop", true, () -> actions.stop().accept(tunnel)));
-        menu.addSeparator();
-        menu.add(item("Open in Browser", TunnelRows.browseUri(tunnel, state).isPresent(), () -> actions.browse().accept(tunnel)));
-        menu.add(item("Copy Address", state instanceof TunnelState.Up || tunnel.bindPort() != 0, () -> actions.copyAddress().accept(tunnel)));
-        menu.addSeparator();
-        if (tunnel.quick()) menu.add(item("Save as Tunnel…", true, () -> actions.save().accept(tunnel)));
+        Optional<String> hostName = hostNames.apply(tunnel.hostId());
+        String word = switch (tunnel.kind()) { case LOCAL -> "Local"; case REMOTE -> "Remote"; case DYNAMIC -> "Dynamic"; };
+        var type = new Nodes.Stack("row." + id + ".type", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.StatusDot("row." + id + ".dot", ControlState.READY, dot(state)), new Nodes.Text("row." + id + ".kind", ControlState.READY, word, Nodes.TextRole.BODY)));
+        String port = TunnelRows.port(tunnel, state);
+        String listen = (tunnel.bindAddress().equals(Tunnel.LOCALHOST) ? "" : bracketed(tunnel.bindAddress())) + ":" + port;
+        String target = bracketed(tunnel.targetHost()) + ":" + tunnel.targetPort();
+        String local = tunnel.kind() == TunnelKind.REMOTE ? target : listen;
+        String remote = switch (tunnel.kind()) { case LOCAL -> target; case REMOTE -> listen; case DYNAMIC -> "SOCKS5"; };
+        String detail = TunnelRows.detail(tunnel, state, hostName, clock.get());
+        return new TableRow(id, Map.of("local", local, "remote", remote, "via", hostName.orElse("—")), Optional.empty(), false,
+            Optional.of(menu(id, tunnel, state)), TunnelRows.title(tunnel, state) + ", " + TunnelRows.mapping(tunnel, state) + ", " + detail,
+            Map.of("type", type), Optional.empty());
+    }
+
+    private static String bracketed(String host) { return host.contains(":") ? "[" + host + "]" : host; }
+
+    /** The selected tunnel's, else the first one's, line: its name, its confirmed state and the gesture. */
+    private String footerText(Tunnel tunnel) {
+        TunnelState state = states.apply(tunnel.id());
+        String word = switch (state) {
+            case TunnelState.Up up -> "active";
+            case TunnelState.Starting starting -> "starting";
+            case TunnelState.Failed failed -> "failed: " + failed.reason();
+            case TunnelState.Stopped stopped -> "inactive";
+        };
+        return TunnelRows.title(tunnel, state) + " — " + word + ". Click to toggle.";
+    }
+
+    @Override public void close() {
+        if (closed) return;
+        closed = true;
+        headerChanged = null;
+        view.close();
+    }
+
+    // ---- events
+
+    private void handle(UiEvent event) {
+        if (closed) return;
+        switch (event) {
+            case UiEvent.Edited edited when edited.id().equals(FILTER) -> { query = edited.text(); render(); }
+            case UiEvent.Selected selected when selected.id().equals(ROWS) -> {
+                selectedRow = selected.ids().stream().findFirst().filter(id -> tunnel(id).isPresent()).orElse(null);
+                render();
+            }
+            case UiEvent.Toggled toggled when toggled.id().startsWith(SWITCH) -> switched(toggled.id().substring(SWITCH.length()));
+            case UiEvent.Action action -> act(action.id());
+            default -> { }
+        }
+    }
+
+    /**
+     * The row's switch. The second click of a double click is not a second operation, as the old switch acted once per
+     * gesture. The value it reports is ignored: what happens follows the confirmed state.
+     */
+    private void switched(String id) {
+        long now = nanos.getAsLong();
+        boolean second = id.equals(lastSwitch) && now - lastSwitchAt < multiClickNanos;
+        lastSwitch = id; lastSwitchAt = now;
+        if (!second) tunnel(ROW + id).ifPresent(this::toggle);
+    }
+
+    private void act(String id) {
+        switch (id) {
+            case ACTIVATE -> selected().ifPresent(tunnel -> (tunnel.quick() ? actions.save() : actions.edit()).accept(tunnel));
+            case TOGGLE -> selected().ifPresent(this::toggle);
+            // Only saved tunnels; a quick forward goes away when stopped.
+            case DELETE -> selected().filter(tunnel -> !tunnel.quick()).ifPresent(actions.delete());
+            case EMPTY_NEW -> actions.add().run();
+            default -> menu(id);
+        }
+    }
+
+    private void menu(String id) {
+        if (!id.startsWith(MENU)) return;
+        String rest = id.substring(MENU.length());
+        int colon = rest.indexOf(':');
+        if (colon < 0) return;
+        String verb = rest.substring(0, colon);
+        tunnel(rest.substring(colon + 1)).ifPresent(tunnel -> {
+            switch (verb) {
+                case "start" -> actions.start().accept(tunnel);
+                case "stop" -> actions.stop().accept(tunnel);
+                case "browse" -> actions.browse().accept(tunnel);
+                case "copy" -> actions.copyAddress().accept(tunnel);
+                case "save" -> actions.save().accept(tunnel);
+                case "edit" -> actions.edit().accept(tunnel);
+                case "duplicate" -> actions.duplicate().accept(tunnel);
+                case "delete" -> { if (!tunnel.quick()) actions.delete().accept(tunnel); }
+                default -> { }
+            }
+        });
+    }
+
+    /** Stops a running tunnel (Starting or Up) and starts any other, by the confirmed state. */
+    private void toggle(Tunnel tunnel) {
+        (states.apply(tunnel.id()).running() ? actions.stop() : actions.start()).accept(tunnel);
+    }
+
+    private Optional<Tunnel> selected() { return selectedRow == null ? Optional.empty() : tunnel(selectedRow); }
+
+    /** The tunnel listed now under this row id. */
+    private Optional<Tunnel> tunnel(String rowId) {
+        return shown().stream().filter(row -> row.id().equals(rowId) && row.tunnel() != null).map(Row::tunnel).findFirst();
+    }
+
+    /** The desktop's double-click interval, 500 ms where it has none. */
+    private static long multiClickInterval() {
+        Object interval = null;
+        try { interval = java.awt.Toolkit.getDefaultToolkit().getDesktopProperty("awt.multiClickInterval"); }
+        catch (RuntimeException | java.awt.AWTError headless) { }
+        return TimeUnit.MILLISECONDS.toNanos(interval instanceof Integer millis ? millis : 500);
+    }
+
+    // ---- descriptors
+
+    /** A line of the list: a tunnel, or (with no tunnel) the quick forwards' heading or the broken-file row. */
+    private record Row(String id, Tunnel tunnel) { }
+
+    private List<Row> shown() {
+        var rows = new ArrayList<Row>();
+        if (error.isPresent()) rows.add(new Row(PROBLEM_ROW, null));
+        saved.stream().filter(this::matches).forEach(tunnel -> rows.add(new Row(rowId(tunnel.id()), tunnel)));
+        List<Tunnel> quickShown = quick.stream().filter(this::matches).toList();
+        if (!quickShown.isEmpty()) {
+            rows.add(new Row(QUICK_HEADING, null));
+            quickShown.forEach(tunnel -> rows.add(new Row(rowId(tunnel.id()), tunnel)));
+        }
+        return rows;
+    }
+
+    private boolean matches(Tunnel tunnel) { return TunnelRows.matches(tunnel, hostNames.apply(tunnel.hostId()).orElse(""), query); }
+
+    private void publishHeader() {
+        if (headerChanged == null || closed) return;
+        headerChanged.accept(new PanelHeader(saved.isEmpty() && quick.isEmpty() ? "" : String.valueOf(saved.size() + quick.size()), false,
+            List.of(new PanelHeader.Action("New Tunnel…", "add", () -> { if (!closed) actions.add().run(); }))));
+    }
+
+    private void render() { if (!closed && view != null) view.update(new ViewSpec(node())); }
+
+    private String problemText() { return error.map(message -> "tunnels.toml has errors: " + message).orElse(""); }
+
+    private static Nodes.Icon severity(String id, String glyph, String name, Nodes.Severity severity, Nodes.IconSize size) {
+        return new Nodes.Icon(id, ControlState.READY, glyph, Nodes.Hue.NONE, size, name, Optional.of(severity));
+    }
+
+    private Nodes.Panel node() { return layout == Layout.CLASSIC ? classicNode() : rowsNode(); }
+
+    private Nodes.Panel rowsNode() {
+        var header = new Nodes.Header(HEADER, ControlState.READY, "Tunnels", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        if (saved.isEmpty() && quick.isEmpty()) {
+            Nodes.Node empty = new Nodes.Empty(EMPTY, ControlState.READY,
+                new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "tunnel", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Tunnels"), "No Tunnels",
+                "Forward a local port to a remote host, or use Forward Port from an SSH pane.",
+                List.of(new Nodes.Button(EMPTY_NEW, ControlState.READY, "New Tunnel", "", Nodes.ButtonKind.SECONDARY, EMPTY_NEW, "")));
+            // The empty state fills the body and centers there. A broken file shows above it, its message wrapping at the
+            // panel's width; the empty state then fills what the note leaves (a document split's filling child).
+            if (error.isPresent()) empty = new Nodes.Split(ROOT + ".body", ControlState.READY, Nodes.SplitKind.DOCUMENT, List.of(
+                new Nodes.Stack(PROBLEM + ".note", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                    new Nodes.Stack(PROBLEM + ".line", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                        severity(PROBLEM + ".icon", "error", "Error", Nodes.Severity.DANGER, Nodes.IconSize.CAPTION),
+                        new Nodes.Text(PROBLEM + ".title", ControlState.READY, "tunnels.toml has errors", Nodes.TextRole.BODY_STRONG))),
+                    new Nodes.Text(PROBLEM, ControlState.READY, problemText(), Nodes.TextRole.BODY))),
+                empty));
+            return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.empty(), empty, Optional.empty());
+        }
+        List<Row> rows = shown();
+        if (selectedRow != null && rows.stream().noneMatch(row -> row.id().equals(selectedRow) && row.tunnel() != null)) selectedRow = null;
+        var filter = new Nodes.Field(FILTER, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Filter tunnels", "Filter tunnels", "");
+        var list = new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.DOUBLE, rows.stream().map(this::item).toList(),
+            selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(),
+            TOGGLE, DELETE);
+        Optional<Nodes.Node> footer = rows.stream().noneMatch(row -> row.tunnel() != null)
+            ? Optional.of(new Nodes.Text(NO_MATCH, ControlState.READY, "No tunnels match", Nodes.TextRole.DESCRIPTION)) : Optional.empty();
+        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(filter), list, footer);
+    }
+
+    private ListItem item(Row row) {
+        if (row.id().equals(QUICK_HEADING))
+            return new ListItem(QUICK_HEADING, Optional.empty(),
+                List.of(new Nodes.Text(QUICK_HEADING + ".text", ControlState.READY, "Quick forwards", Nodes.TextRole.SECTION_LABEL)), List.of(), List.of(), true);
+        if (row.tunnel() == null) {
+            // The broken file: a row of its own with no switch and no menu, as before; the tooltip has the whole message.
+            return new ListItem(PROBLEM_ROW, Optional.of(severity("row.problem.icon", "error", "Error", Nodes.Severity.DANGER, Nodes.IconSize.CONTROL)),
+                List.of(new Nodes.Text("row.problem.text", ControlState.READY, problemText(), Nodes.TextRole.BODY_STRONG)),
+                List.of(), List.of(), false, Optional.empty(), problemText());
+        }
+        Tunnel tunnel = row.tunnel();
+        String id = row.id();
+        TunnelState state = states.apply(tunnel.id());
+        Optional<String> hostName = hostNames.apply(tunnel.hostId());
+        String title = TunnelRows.title(tunnel, state);
+        String mapping = TunnelRows.mapping(tunnel, state);
+        String shortMapping = tunnel.bindAddress().equals(Tunnel.LOCALHOST) && tunnel.kind() != TunnelKind.REMOTE
+            ? mapping.substring(tunnel.bindAddress().length()) : mapping;
+        // The compact row's first line is the name and the host, or in its place what is happening or wrong (the old third
+        // line), which the panel's width would otherwise squeeze beside the route; the second line is the route alone.
+        var titleLine = new ArrayList<Nodes.Node>();
+        titleLine.add(new Nodes.Text("row." + id + ".name", ControlState.READY, title, Nodes.TextRole.BODY));
+        String problem = "row." + id + ".problem";
+        switch (state) {
+            case TunnelState.Failed failed -> {
+                titleLine.add(severity(problem + ".icon", "error", "Failed", Nodes.Severity.DANGER, Nodes.IconSize.CAPTION));
+                titleLine.add(new Nodes.Text(problem, ControlState.READY, failed.reason(), Nodes.TextRole.DESCRIPTION));
+            }
+            case TunnelState.Starting starting -> titleLine.add(new Nodes.Text(problem, ControlState.READY, starting.stage(), Nodes.TextRole.DESCRIPTION));
+            default -> {
+                if (hostName.isEmpty()) titleLine.add(new Nodes.Text(problem, ControlState.READY, "Host missing · Edit to choose a host", Nodes.TextRole.DESCRIPTION,
+                    Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()));
+                else if (state instanceof TunnelState.Up up && up.counters().warning().isPresent()) {
+                    titleLine.add(severity(problem + ".icon", "warning", "Warning", Nodes.Severity.WARNING, Nodes.IconSize.CAPTION));
+                    titleLine.add(new Nodes.Text(problem, ControlState.READY, up.counters().warning().orElseThrow(), Nodes.TextRole.DESCRIPTION));
+                } else titleLine.add(new Nodes.Text("row." + id + ".via", ControlState.READY, "via " + hostName.orElseThrow(), Nodes.TextRole.DESCRIPTION));
+            }
+        }
+        var subtitle = List.<Nodes.Node>of(new Nodes.Text("row." + id + ".mapping", ControlState.READY, shortMapping, Nodes.TextRole.MONO_SMALL));
+        // Confirmed state only: on while Up, pending (operable) while Starting, the reason while Failed.
+        var toggle = new Nodes.Toggle(SWITCH + tunnel.id(),
+            new ControlState(true, true, false, state instanceof TunnelState.Failed failed ? failed.reason() : ""),
+            state.running() ? "Stop tunnel" : "Start tunnel", state instanceof TunnelState.Up, SWITCH + tunnel.id(), true, "",
+            state instanceof TunnelState.Starting);
+        String detail = TunnelRows.detail(tunnel, state, hostName, clock.get());
+        return new ListItem(id,
+            Optional.of(new Nodes.StatusDot("row." + id + ".dot", ControlState.READY, dot(state))),
+            titleLine, subtitle, List.of(toggle), false, Optional.of(menu(id, tunnel, state)), title + ", " + mapping + ", " + detail);
+    }
+
+    /** Up is success (a warning while up is a warning), Starting a warning, Failed danger, Stopped idle. */
+    static Nodes.StatusKind dot(TunnelState state) {
+        return switch (state) {
+            case TunnelState.Up up -> up.counters().warning().isPresent() ? Nodes.StatusKind.WARNING : Nodes.StatusKind.SUCCESS;
+            case TunnelState.Starting starting -> Nodes.StatusKind.WARNING;
+            case TunnelState.Failed failed -> Nodes.StatusKind.DANGER;
+            case TunnelState.Stopped stopped -> Nodes.StatusKind.IDLE;
+        };
+    }
+
+    private static List<MenuItem> menu(String rowId, Tunnel tunnel, TunnelState state) {
+        var menu = new ArrayList<MenuItem>();
+        menu.add(state.running() ? item("stop", rowId, "Stop", true) : item("start", rowId, "Start", true));
+        if (state instanceof TunnelState.Failed) menu.add(item("stop", rowId, "Stop", true));
+        menu.add(separator(1));
+        menu.add(item("browse", rowId, "Open in Browser", TunnelRows.browseUri(tunnel, state).isPresent()));
+        menu.add(item("copy", rowId, "Copy Address", state instanceof TunnelState.Up || tunnel.bindPort() != 0));
+        menu.add(separator(2));
+        if (tunnel.quick()) menu.add(item("save", rowId, "Save as Tunnel…", true));
         else {
-            menu.add(item("Edit…", true, () -> actions.edit().accept(tunnel)));
-            menu.add(item("Duplicate", true, () -> actions.duplicate().accept(tunnel)));
-            menu.add(item("Delete…", true, () -> actions.delete().accept(tunnel)));
+            menu.add(item("edit", rowId, "Edit…", true));
+            menu.add(item("duplicate", rowId, "Duplicate", true));
+            menu.add(item("delete", rowId, "Delete…", true));
         }
         return menu;
     }
 
-    private void bind(String stroke, String name, Runnable action) {
-        list.getInputMap().put(KeyStroke.getKeyStroke(stroke), name);
-        list.getActionMap().put(name, new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) { action.run(); }
-        });
+    private static MenuItem item(String verb, String rowId, String label, boolean enabled) {
+        return new MenuItem("menu." + verb, label, "", MENU + verb + ":" + rowId, enabled, false);
     }
 
-    private Optional<Tunnel> tunnelAt(int index) {
-        if (index < 0 || index >= model.size()) return Optional.empty();
-        return model.get(index) instanceof Item item ? Optional.of(item.tunnel()) : Optional.empty();
-    }
-
-    private static JMenuItem item(String title, boolean enabled, Runnable action) {
-        var item = new JMenuItem(title);
-        item.setEnabled(enabled);
-        item.addActionListener(event -> action.run());
-        return item;
-    }
-
-    private void rebuild() {
-        Optional<UUID> keep = list == null || !(list.getSelectedValue() instanceof Item item) ? Optional.empty() : Optional.of(item.tunnel().id());
-        model.clear();
-        error.ifPresent(message -> model.addElement(new Problem("tunnels.toml has errors: " + message)));
-        String query = filter.getText();
-        saved.stream().filter(tunnel -> matches(tunnel, query)).forEach(tunnel -> model.addElement(new Item(tunnel)));
-        List<Tunnel> quickShown = quick.stream().filter(tunnel -> matches(tunnel, query)).toList();
-        if (!quickShown.isEmpty()) {
-            model.addElement(new Heading("Quick forwards"));
-            quickShown.forEach(tunnel -> model.addElement(new Item(tunnel)));
-        }
-        boolean none = saved.isEmpty() && quick.isEmpty();
-        empty.setText("No tunnels match");
-        empty.setVisible(!none && model.size() == (error.isPresent() ? 1 : 0));
-        north.setVisible(!none);
-        filter.setVisible(!none);
-        list.setVisible(!none);
-        emptyState.setVisible(none);
-        emptyProblem.setText(error.map(message -> "tunnels.toml has errors: " + message).orElse(""));
-        emptyProblem.setVisible(none && error.isPresent());
-        ((CardLayout) cards.getLayout()).show(cards, none ? "empty" : "populated");
-        revalidate();
-        repaint();
-        keep.ifPresent(id -> {
-            for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof Item item && item.tunnel().id().equals(id)) { list.setSelectedIndex(i); return; }
-        });
-    }
-
-    private boolean matches(Tunnel tunnel, String query) {
-        return TunnelRows.matches(tunnel, hostNames.apply(tunnel.hostId()).orElse(""), query);
-    }
-
-    private Component render(JList<? extends Row> owner, Row value, boolean selected) {
-        if (value instanceof Item item) return row(owner, item.tunnel(), selected);
-        var label = new JLabel();
-        label.putClientProperty("html.disable", true);
-        label.setOpaque(selected);
-        label.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-        label.setForeground(selected ? owner.getSelectionForeground() : value instanceof Problem ? WorkspacePalette.current(owner).error() : WorkspacePalette.current(owner).textMuted());
-        label.setBorder(BorderFactory.createEmptyBorder(8, 4, 4, 4));
-        label.setFont(owner.getFont().deriveFont(Font.BOLD));
-        label.setText(value instanceof Heading heading ? heading.text() : ((Problem) value).message());
-        if (value instanceof Problem) label.setToolTipText(label.getText());
-        return label;
-    }
-
-    private Component row(JList<?> owner, Tunnel tunnel, boolean selected) {
-        TunnelState state = states.apply(tunnel.id());
-        Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
-        Color muted = selected ? foreground : WorkspacePalette.current(owner).textMuted();
-        Font font = owner.getFont();
-        var row = new JPanel(new BorderLayout(PanelStyle.scale(owner, 8), 0)) {
-                @Override public java.awt.Dimension getPreferredSize() {
-                    var size = super.getPreferredSize();
-                    size.height = Math.max(size.height, PanelStyle.scale(owner, 46));
-                    return size;
-                }
-            };
-        row.setOpaque(true);
-        row.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-        row.setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(owner, 7), PanelStyle.scale(owner, 5), PanelStyle.scale(owner, 7), PanelStyle.scale(owner, 4)));
-        var dot = text("●", dotColor(state, WorkspacePalette.current(owner)), font.deriveFont(Math.max(8f, font.getSize2D() - 2f)));
-        dot.setVerticalAlignment(SwingConstants.TOP);
-        row.add(dot, BorderLayout.WEST);
-        String title = TunnelRows.title(tunnel, state);
-        String mapping = TunnelRows.mapping(tunnel, state);
-        String detail = TunnelRows.detail(tunnel, state, hostNames.apply(tunnel.hostId()), clock.get());
-        var lines = new JPanel();
-        lines.setLayout(new BoxLayout(lines, BoxLayout.Y_AXIS));
-        lines.setOpaque(false);
-        var titleLabel = text(title, foreground, font);
-        var viaLabel = text(hostNames.apply(tunnel.hostId()).map(host -> "via " + host).orElse("Host missing"), muted,
-            font.deriveFont(Math.max(10f, font.getSize2D() - 1)));
-        var titleLine = new JPanel(null) {
-            @Override public Dimension getPreferredSize() {
-                return new Dimension(titleLabel.getPreferredSize().width + PanelStyle.scale(owner, 6) + viaLabel.getPreferredSize().width,
-                    Math.max(titleLabel.getPreferredSize().height, viaLabel.getPreferredSize().height));
-            }
-            @Override public void doLayout() {
-                int gap = PanelStyle.scale(owner, 6);
-                int titleWidth = Math.min(titleLabel.getPreferredSize().width, Math.max(0, getWidth() - Math.min(viaLabel.getPreferredSize().width, getWidth() / 3) - gap));
-                titleLabel.setBounds(0, 0, titleWidth, getHeight());
-                viaLabel.setBounds(titleWidth + gap, 0, Math.max(0, getWidth() - titleWidth - gap), getHeight());
-            }
-        };
-        titleLine.setOpaque(false);
-        titleLine.add(titleLabel);
-        titleLine.add(viaLabel);
-        titleLine.setAlignmentX(Component.LEFT_ALIGNMENT);
-        lines.add(titleLine);
-        String shortMapping = tunnel.bindAddress().equals(Tunnel.LOCALHOST) && tunnel.kind() != dev.jasper.remote.tunnels.TunnelKind.REMOTE
-            ? mapping.substring(tunnel.bindAddress().length()) : mapping;
-        lines.add(text(shortMapping, muted, new Font(Font.MONOSPACED, Font.PLAIN, font.getSize()).deriveFont(Math.max(10f, font.getSize2D() - 1))));
-        if (state instanceof TunnelState.Failed failed) lines.add(text(failed.reason(), selected ? foreground : WorkspacePalette.current(owner).error(), font));
-        else if (state instanceof TunnelState.Starting starting) lines.add(text(starting.stage(), muted, font));
-        else if (hostNames.apply(tunnel.hostId()).isEmpty()) lines.add(text("Edit to choose a host", muted, font));
-        else if (state instanceof TunnelState.Up up && up.counters().warning().isPresent())
-            lines.add(text(up.counters().warning().orElseThrow(), selected ? foreground : WorkspacePalette.current(owner).warning(), font));
-        row.add(lines, BorderLayout.CENTER);
-        var button = new JLabel(new TunnelSwitch(state instanceof TunnelState.Up, state instanceof TunnelState.Starting));
-        button.setPreferredSize(new Dimension(PanelStyle.scale(owner, 34), PanelStyle.scale(owner, 16)));
-        button.getAccessibleContext().setAccessibleName(state.running() ? "Stop tunnel" : "Start tunnel");
-        row.add(button, BorderLayout.EAST);
-        String description = title + ", " + mapping + ", " + detail;
-        row.setToolTipText(description);
-        row.getAccessibleContext().setAccessibleName(description);
-        return row;
-    }
-
-    private static Color dotColor(TunnelState state, WorkspacePalette palette) {
-        Color background = palette.background();
-        boolean dark = background.getRed() * .299 + background.getGreen() * .587 + background.getBlue() * .114 < 128;
-        return switch (state) {
-            case TunnelState.Up up -> up.counters().warning().isPresent() ? palette.warning() : new Color(dark ? 0x38ba54 : 0x248943);
-            case TunnelState.Starting starting -> palette.warning();
-            case TunnelState.Failed failed -> palette.error();
-            case TunnelState.Stopped stopped -> new Color(dark ? 0x49515c : 0x858d97);
-        };
-    }
-
-    private static JLabel text(String value, Color foreground, Font font) {
-        var label = new JLabel();
-        label.putClientProperty("html.disable", true); // before the text: a label builds its HTML view when the text is set
-        label.setText(value);
-        label.setForeground(foreground);
-        label.setFont(font);
-        label.setAlignmentX(Component.LEFT_ALIGNMENT);
-        return label;
-    }
-
-    /**
-     * A label that wraps: the empty-state message must fit a rail-wide panel. Container.validateTree lays out hidden
-     * children too, at 0x0, and a wrapped text area keeps measuring at that size; a degenerate size is taken as none, which
-     * the text UI measures as never laid out. The wrapped height depends on the width, which the layout only fixes after it
-     * asked for the height, so a new width asks for another pass.
-     */
-    static final class WrappedNote extends JTextArea {
-        private Color semanticForeground;
-        private final boolean problem;
-        WrappedNote() { this(false); }
-        WrappedNote(boolean problem) {
-            this.problem = problem;
-            setEditable(false);
-            setFocusable(false);
-            setOpaque(false);
-            setLineWrap(true);
-            setWrapStyleWord(true);
-            setBorder(BorderFactory.createEmptyBorder(12, 4, 12, 4));
-        }
-
-        @Override public void updateUI() {
-            super.updateUI();
-            Font font = UIManager.getFont("Label.font");
-            if (font != null) setFont(font);
-
-        }
-
-        @Override protected void paintComponent(java.awt.Graphics graphics) {
-            var palette = WorkspacePalette.current(this);
-            Color foreground = problem ? palette.error() : palette.text();
-            // The host may compose more keys into FlatLaf.style; compare our semantic value instead.
-            if (!foreground.equals(semanticForeground)) {
-                semanticForeground = foreground;
-                putClientProperty("FlatLaf.style", java.util.Map.of("foreground", foreground));
-            }
-            setForeground(foreground);
-            super.paintComponent(graphics);
-        }
-
-        @Override public void setBounds(int x, int y, int width, int height) {
-            if (width <= 0 || height <= 0) { width = 0; height = 0; }
-            boolean wider = width > 0 && width != getWidth();
-            super.setBounds(x, y, width, height);
-            if (wider) revalidate();
-        }
-    }
+    private static MenuItem separator(int index) { return new MenuItem("menu.separator." + index, "", "", "", false, true); }
 }

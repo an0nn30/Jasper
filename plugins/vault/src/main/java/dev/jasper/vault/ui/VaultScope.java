@@ -1,7 +1,6 @@
 package dev.jasper.vault.ui;
 
 import dev.jasper.sdk.Subscription;
-import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteResults;
 import dev.jasper.sdk.palette.PaletteRow;
@@ -22,32 +21,38 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
-/** Palette rows for vault accounts and SSH keys. */
+/** Palette rows for vault logins (accounts); SSH keys stay in the manager. */
 public final class VaultScope implements PaletteScope {
     public static final String ID = "dev.jasper.vault.scope";
     public static final PaletteVerb COPY_PASSWORD = new PaletteVerb("copy_password", "Copy password");
     public static final PaletteVerb COPY_USERNAME = new PaletteVerb("copy_username", "Copy username");
     public static final PaletteVerb OPEN = new PaletteVerb("open", "Open in Vault");
     public static final String LOCKED_ROW = "locked";
-    private static final String OPEN_ACTION = "dev.jasper.vault.open";
+    private static final String SEARCH_ACTION = "dev.jasper.vault.search";
 
     private final LockManager lock;
     private final VaultService service;
-    private final SecretClipboard clipboard;
+    private final CopyCards copies;
     private final BiConsumer<WindowHandle, Optional<UUID>> openManager;
-    private final NotificationGroup notifications;
+    private final Consumer<WindowHandle> unlockThenSearch;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
-    public VaultScope(LockManager lock, VaultService service, SecretClipboard clipboard,
-                      BiConsumer<WindowHandle, Optional<UUID>> openManager, NotificationGroup notifications) {
-        this.lock = lock; this.service = service; this.clipboard = clipboard; this.openManager = openManager;
-        this.notifications = notifications;
+    /**
+     * Copies are secret copies through {@code copies}, so Jasper clears them after 30 seconds and a card confirms each.
+     * The locked row's Enter runs {@code unlockThenSearch}; with no vault yet it opens the manager to create one.
+     */
+    public VaultScope(LockManager lock, VaultService service, CopyCards copies,
+                      BiConsumer<WindowHandle, Optional<UUID>> openManager, Consumer<WindowHandle> unlockThenSearch) {
+        this.lock = lock; this.service = service; this.copies = copies;
+        this.openManager = openManager; this.unlockThenSearch = unlockThenSearch;
     }
 
     @Override public ScopeSpec spec() {
-        return ScopeSpec.of(ID, "Vault", "Search accounts and keys", List.of(COPY_PASSWORD, COPY_USERNAME, OPEN))
-            .withDescription("Copy a password or username from the vault").withShortcutActionId(OPEN_ACTION).withInAll(false);
+        return ScopeSpec.of(ID, "Vault", "Search logins", List.of(COPY_PASSWORD, COPY_USERNAME, OPEN))
+            .withDescription("Copy a password or username from the vault").withShortcutActionId(SEARCH_ACTION).withInAll(false)
+            .withItemNoun("login");
     }
 
     @Override public PaletteResults search(String query, PaletteQuery context) {
@@ -60,6 +65,7 @@ public final class VaultScope implements PaletteScope {
         var rows = new ArrayList<PaletteRow>();
         for (CredentialDescriptor descriptor : service.descriptors()) {
             if (rows.size() == context.maxResults()) break;
+            if (descriptor.kind() == Kind.SSH_KEY) continue;
             String haystack = (descriptor.name() + " " + descriptor.subtitle()).toLowerCase(Locale.ROOT);
             boolean matches = true;
             for (String token : tokens) if (!token.isEmpty() && !haystack.contains(token)) { matches = false; break; }
@@ -76,27 +82,28 @@ public final class VaultScope implements PaletteScope {
         if (row.id().equals(LOCKED_ROW)) return lock.state() != LockState.UNLOCKED;
         if (lock.state() != LockState.UNLOCKED || !(row.token() instanceof CredentialDescriptor stale)) return false;
         CredentialDescriptor descriptor = service.descriptors().stream().filter(d -> d.id().equals(stale.id())).findFirst().orElse(null);
-        if (descriptor == null) return false;
+        if (descriptor == null || descriptor.kind() == Kind.SSH_KEY) return false;
         if (verb.equals(COPY_PASSWORD)) return descriptor.kind() == Kind.ACCOUNT_PASSWORD || descriptor.kind() == Kind.ACCOUNT_KEY_AND_PASSWORD;
-        if (verb.equals(COPY_USERNAME)) return descriptor.kind() != Kind.SSH_KEY;
-        return verb.equals(OPEN);
+        return verb.equals(COPY_USERNAME) || verb.equals(OPEN);
     }
 
     @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context) {
         if (!available(row, verb, context)) return;
-        if (row.id().equals(LOCKED_ROW)) { openManager.accept(context.window(), Optional.empty()); return; }
+        if (row.id().equals(LOCKED_ROW)) {
+            if (lock.state() == LockState.LOCKED) unlockThenSearch.accept(context.window());
+            else openManager.accept(context.window(), Optional.empty());
+            return;
+        }
         if (!(row.token() instanceof CredentialDescriptor descriptor) || lock.state() != LockState.UNLOCKED) return;
         if (verb.equals(OPEN)) { openManager.accept(context.window(), Optional.of(descriptor.id())); return; }
         lock.vault().account(descriptor.id()).ifPresent(account -> {
-            try {
-                if (verb.equals(COPY_USERNAME)) { clipboard.copySecret(account.username()); return; }
-                char[] password = switch (account.auth()) {
-                    case Auth.Password p -> p.password();
-                    case Auth.KeyAndPassword both -> both.password();
-                    case Auth.Key key -> null;
-                };
-                if (password != null) clipboard.copySecret(new String(password));
-            } catch (RuntimeException failure) { notifications.error("Could not copy from the vault", failure); }
+            if (verb.equals(COPY_USERNAME)) { copies.secret("username", account.name(), account.username()); return; }
+            char[] password = switch (account.auth()) {
+                case Auth.Password p -> p.password();
+                case Auth.KeyAndPassword both -> both.password();
+                case Auth.Key key -> null;
+            };
+            if (password != null) copies.secret("password", account.name(), new String(password));
         });
     }
 

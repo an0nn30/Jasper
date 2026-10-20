@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.testing.FakePluginHost;
@@ -36,15 +37,19 @@ class ManagedVaultLoadingTest {
             Plugin plugin = (Plugin) loader.loadClass("dev.jasper.vault.VaultPlugin").getConstructor().newInstance();
             var api = new AtomicReference<Object>(); var owner = new AtomicReference<WindowHandle>();
             onEdt(() -> {
-                new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+                ThemeTestSupport.controller(false);
+                UnboundVault.settings(host); // the staged no-arg plugin uses the platform keychain for bound vaults only
                 host.start(new PluginInfo("dev.jasper.vault", "Credential Vault", "0.2.0", Set.of(dev.jasper.sdk.Capabilities.PALETTE_CONTRIBUTE)), Set.of(), Set.of(), plugin);
                 var consumer = host.start(new PluginInfo("dev.jasper.remote", "Remote", "0.2.0", Set.of()), Set.of("dev.jasper.vault"), Set.of(), context -> api.set(context.services().require(apiType)));
                 UUID id = host.addTerminalWindow(); host.activateTerminalWindow(id); owner.set(consumer.terminals().window(id).orElseThrow());
                 host.invoke("dev.jasper.vault.open", id, null);
-                var create = host.windowContent("dev.jasper.vault", "Create Vault").orElseThrow();
-                assertThat(((JPanel) create).getUI()).as("host LAF is visible to plugin panels").isNotNull();
-                fields(create, JPasswordField.class).forEach(f -> f.setText("fixture-password")); fields(create, JCheckBox.class).forEach(c -> c.setSelected(false));
-                button(create, "Create Vault").doClick();
+                var create = host.windowView("dev.jasper.vault", "Create Vault").orElseThrow();
+                assertThat(node(create.spec().root(), "password")).isInstanceOf(dev.jasper.sdk.ui.Nodes.Secret.class);
+                UnboundVault.assertUnbound(create);
+                create.setSecret("password", "fixture-password".toCharArray()); create.setSecret("confirm", "fixture-password".toCharArray());
+                UnboundVault.assertUnbound(create);
+                create.emit(new dev.jasper.sdk.ui.UiEvent.Action("submit"));
+                assertThat(create.spec().toString()).doesNotContain("fixture-password");
             });
             settle(host);
             var result = new AtomicReference<CompletableFuture<?>>();
@@ -57,14 +62,17 @@ class ManagedVaultLoadingTest {
             settle(host);
             assertThat(result.get()).as("import request before passphrase: " + host.failures()).isNotDone();
             onEdt(() -> {
-                var prompt = host.windowContent("dev.jasper.vault", "Import SSH keys").orElseThrow();
-                render(prompt, "passphrase");
-                fields(prompt, JPasswordField.class).getFirst().setText("phrase"); button(prompt, "Unlock key").doClick();
+                var prompt = host.windowView("dev.jasper.vault", "Import SSH keys").orElseThrow();
+                assertThat(node(prompt.spec().root(), "passphrase").state().visible()).as("the passphrase is asked for").isTrue();
+                prompt.setSecret("passphrase", "phrase".toCharArray()); prompt.emit(new dev.jasper.sdk.ui.UiEvent.Action("unlock-key"));
             });
             settle(host);
             onEdt(() -> {
-                var prompt = host.windowContent("dev.jasper.vault", "Import SSH keys").orElseThrow();
-                assertThat(button(prompt, "Import and use").isEnabled()).isTrue(); render(prompt, "review"); button(prompt, "Import and use").doClick();
+                var prompt = host.windowView("dev.jasper.vault", "Import SSH keys").orElseThrow();
+                var commit = (dev.jasper.sdk.ui.Nodes.Button) node(prompt.spec().root(), "commit");
+                assertThat(commit.label()).isEqualTo("Import and use"); assertThat(commit.state().enabled()).isTrue();
+                assertThat(node(prompt.spec().root(), "passphrase").state().visible()).isFalse();
+                prompt.emit(new dev.jasper.sdk.ui.UiEvent.Action("commit"));
             });
             settle(host);
             assertThat((Optional<?>) result.get().get(5, TimeUnit.SECONDS)).isPresent();
@@ -92,35 +100,29 @@ class ManagedVaultLoadingTest {
             }
             onEdt(() -> {
                 host.invoke("dev.jasper.vault.open", owner.get().id(), null);
-                var manager = host.windowContent("dev.jasper.vault", "Credential Vault").orElseThrow(); render(manager, "manager");
+                var manager = host.windowView("dev.jasper.vault", "Credential Vault").orElseThrow();
+                assertThat(((dev.jasper.sdk.ui.Nodes.ItemList) node(manager.spec().root(), "rows")).items()).hasSize(1);
                 assertThat(host.failures()).isEmpty();
             });
-        } finally { onEdt(() -> new dev.jasper.app.appearance.ThemeController()); }
+        } finally { onEdt(() -> ThemeTestSupport.controller(true)); }
     }
     static List<Path> jars(Path directory) throws Exception { try (var files = Files.list(directory)) { return files.filter(p -> p.toString().endsWith(".jar")).toList(); } }
     static void settle(FakePluginHost host) throws Exception { for (int i = 0; i < 8; i++) { host.runBackground(); onEdt(host::flush); } }
-    static <T extends Component> List<T> fields(Container root, Class<T> type) {
-        var result = new ArrayList<T>(); for (Component c : root.getComponents()) { if (type.isInstance(c)) result.add(type.cast(c)); if (c instanceof Container nested) result.addAll(fields(nested, type)); } return result;
-    }
-    static JButton button(Container root, String text) { return fields(root, JButton.class).stream().filter(b -> text.equals(b.getText())).findFirst().orElseThrow(); }
-    static void layout(Container c) { c.doLayout(); for (Component child : c.getComponents()) if (child instanceof Container nested) layout(nested); }
-    static void render(JComponent component, String name) {
-        try {
-            component.addNotify();
-            component.setSize(name.equals("manager") ? 980 : 660, name.equals("manager") ? 580 : 360);
-            layout(component); layout(component); component.validate();
-            if (name.equals("passphrase")) {
-                var field = fields(component, JPasswordField.class).getFirst();
-                assertThat(SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), component).y).isBetween(0, component.getHeight() - 20);
-            }
-            if (name.equals("manager")) assertThat(fields(component, JList.class).getFirst().getModel().getSize()).isEqualTo(1);
-            Path output = Path.of(System.getProperty("java.io.tmpdir"), "jasper-managed-import-previews"); Files.createDirectories(output);
-            for (int scale : List.of(1, 2)) {
-                var image = new java.awt.image.BufferedImage(component.getWidth() * scale, component.getHeight() * scale, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                var graphics = image.createGraphics(); graphics.scale(scale, scale); component.printAll(graphics); graphics.dispose();
-                javax.imageio.ImageIO.write(image, "png", output.resolve("modern-" + name + "-" + scale + "x.png").toFile());
-            }
-        } catch (Exception failure) { throw new AssertionError(failure); }
-        finally { component.removeNotify(); }
+    /** A descriptor node by id, through the containers Vault views use. */
+    static dev.jasper.sdk.ui.Nodes.Node node(dev.jasper.sdk.ui.Nodes.Node root, String id) {
+        if (root.id().equals(id)) return root;
+        var children = new ArrayList<dev.jasper.sdk.ui.Nodes.Node>();
+        switch (root) {
+            case dev.jasper.sdk.ui.Nodes.Form n -> { children.addAll(n.sections()); n.preview().ifPresent(children::add); children.addAll(n.actions()); }
+            case dev.jasper.sdk.ui.Nodes.Stack n -> children.addAll(n.children());
+            case dev.jasper.sdk.ui.Nodes.Card n -> children.addAll(n.children());
+            case dev.jasper.sdk.ui.Nodes.Split n -> children.addAll(n.children());
+            case dev.jasper.sdk.ui.Nodes.Panel n -> { children.add(n.header()); n.searchOrNavigation().ifPresent(children::add); children.add(n.body()); n.footer().ifPresent(children::add); }
+            case dev.jasper.sdk.ui.Nodes.FormRow n -> children.add(n.control());
+            case dev.jasper.sdk.ui.Nodes.Empty n -> children.addAll(n.actions());
+            default -> { }
+        }
+        for (var child : children) { var found = node(child, id); if (found != null) return found; }
+        return null;
     }
 }

@@ -3,189 +3,185 @@ package dev.jasper.remote.ui.tunnels;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.tunnels.Tunnel;
 import dev.jasper.remote.tunnels.TunnelKind;
-import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.Option;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.function.Consumer;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.ButtonGroup;
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JRadioButton;
-import javax.swing.JTextField;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 
-/** Add or edit one tunnel, or name a quick forward to keep it. Validation is inline; Save hands back the tunnel. */
-public final class TunnelEditor extends JPanel {
-    final JTextField name = new JTextField(20);
-    final JComboBox<RemoteHost> host = new JComboBox<>();
-    final JRadioButton local = new JRadioButton("Local"), remote = new JRadioButton("Remote"), dynamic = new JRadioButton("Dynamic (SOCKS)");
-    final JLabel explanation = new JLabel(), listenLabel = new JLabel(), forwardLabel = new JLabel();
-    final JTextField listenAddress = new JTextField(Tunnel.LOCALHOST, 12), listenPort = new JTextField(6);
-    final JTextField forwardHost = new JTextField("localhost", 14), forwardPort = new JTextField(6);
-    final JCheckBox allowOthers = new JCheckBox("Allow other computers to connect");
-    final JLabel exposure = new JLabel(" "), preview = new JLabel(" "), warning = new JLabel(" "), message = new JLabel(" ");
-    final JButton save, cancel = new JButton("Cancel");
-    private final JPanel forwardFields;
+/**
+ * Add or edit one tunnel, or name a quick forward to keep it, on a host-rendered grouped kit form: a Tunnel card (name,
+ * the host it goes through, its type and what that type does) and a Ports card (where it listens and where it forwards
+ * to, a preview of the route, and whether other computers may connect). The footer previews the equivalent ssh command,
+ * or shows a save error or the shared-port warning. The primary Add Tunnel (or Save) is enabled while the draft is a
+ * valid tunnel; a name another tunnel has, or a port out of range, is marked on its field. As in Add Host the form
+ * opts out of submission, so Enter saves nothing (the former dialog had no default button); Escape cancels. Saving
+ * hands the tunnel to the owner, which closes the dialog or reports an error here; until it does the form waits. A save
+ * error arriving after {@link #close()} is ignored. UI thread only.
+ */
+public final class TunnelEditor implements AutoCloseable {
+    public static final String FORM = "tunnel", NAME = "tunnel.name", HOST = "tunnel.host", TYPE = "tunnel.type",
+        EXPLANATION = "tunnel.explanation", LISTEN_ROW = "tunnel.listen", LISTEN_ADDRESS = "tunnel.listen.address", LISTEN_PORT = "tunnel.listen.port",
+        ALLOW_OTHERS = "tunnel.allow-others", FORWARD_ROW = "tunnel.forward", FORWARD_HOST = "tunnel.forward.host",
+        FORWARD_PORT = "tunnel.forward.port", ROUTE = "tunnel.route", PREVIEW = "tunnel.preview", WARNING_ROW = "tunnel.warning.row",
+        WARNING = "tunnel.warning", MESSAGE = "tunnel.message", SAVE = "tunnel.save", CANCEL = "tunnel.cancel";
+    /** The type choice's options. */
+    public static final String LOCAL = "local", REMOTE = "remote", DYNAMIC = "dynamic";
+    /** The two cards, as sections and their cards. */
+    static final String TUNNEL_SECTION = "tunnel.section", PORTS_SECTION = "tunnel.ports";
+
+    private final List<RemoteHost> hosts;
     private final List<Tunnel> others;
+    private final Optional<Tunnel> editing;
     private final UUID editingId;
+    private final UiView view;
+    private String name = "", host = "", listenAddress = Tunnel.LOCALHOST, listenPort = "", forwardHost = "localhost", forwardPort = "", message = "";
+    private TunnelKind kind = TunnelKind.LOCAL;
+    private boolean allowOthers, saving, closed;
 
-    public TunnelEditor(List<RemoteHost> hosts, List<Tunnel> others, Optional<Tunnel> editing, Optional<UUID> preferredHost,
+    public TunnelEditor(UiKit kit, List<RemoteHost> hosts, List<Tunnel> others, Optional<Tunnel> editing, Optional<UUID> preferredHost,
                         Consumer<Tunnel> onSave, Runnable onCancel) {
-        super(new BorderLayout(0, 8));
-        // These show host and tunnel names and what was typed; none of it is markup, and the property must precede the text.
-        for (JLabel label : List.of(explanation, listenLabel, forwardLabel, exposure, preview, warning, message)) label.putClientProperty("html.disable", true);
+        this.hosts = List.copyOf(hosts);
         this.others = List.copyOf(others);
+        this.editing = editing;
         this.editingId = editing.map(Tunnel::id).orElse(null);
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
-        save = new JButton(editing.isEmpty() ? "Add Tunnel" : "Save");
-        hosts.forEach(host::addItem);
-        host.setRenderer(new DefaultListCellRenderer() {
-            @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
-                putClientProperty("html.disable", true);
-                super.getListCellRendererComponent(list, value instanceof RemoteHost via ? via.name() + " — " + via.label() : "", index, selected, focus);
-                return this;
-            }
-        });
         UUID wanted = editing.map(Tunnel::hostId).or(() -> preferredHost).orElse(null);
-        host.setSelectedIndex(-1);
-        for (int i = 0; i < host.getItemCount(); i++) if (host.getItemAt(i).id().equals(wanted)) host.setSelectedIndex(i);
-        if (host.getSelectedIndex() < 0 && editing.isEmpty() && host.getItemCount() > 0) host.setSelectedIndex(0);
-        var types = new ButtonGroup();
-        types.add(local); types.add(remote); types.add(dynamic);
-        editing.ifPresentOrElse(tunnel -> {
-            name.setText(tunnel.name());
-            (tunnel.kind() == TunnelKind.REMOTE ? remote : tunnel.kind() == TunnelKind.DYNAMIC ? dynamic : local).setSelected(true);
-            listenAddress.setText(tunnel.bindAddress());
-            listenPort.setText(String.valueOf(tunnel.bindPort()));
-            allowOthers.setSelected(tunnel.bindAddress().equals(Tunnel.ALL));
+        host = this.hosts.stream().filter(via -> via.id().equals(wanted)).findFirst()
+            // A new tunnel goes through the first host unless another was asked for; an edited one keeps its own, or none.
+            .or(() -> editing.isEmpty() ? this.hosts.stream().findFirst() : Optional.empty())
+            .map(via -> via.id().toString()).orElse("");
+        editing.ifPresent(tunnel -> {
+            name = tunnel.name();
+            kind = tunnel.kind();
+            listenAddress = tunnel.bindAddress();
+            listenPort = String.valueOf(tunnel.bindPort());
+            allowOthers = tunnel.bindAddress().equals(Tunnel.ALL);
             if (tunnel.kind() != TunnelKind.DYNAMIC) {
-                forwardHost.setText(tunnel.targetHost());
-                forwardPort.setText(String.valueOf(tunnel.targetPort()));
+                forwardHost = tunnel.targetHost();
+                forwardPort = String.valueOf(tunnel.targetPort());
             }
-        }, () -> local.setSelected(true));
-        listenAddress.setEnabled(!allowOthers.isSelected());
-
-        var form = new JPanel(new GridBagLayout());
-        var at = new GridBagConstraints();
-        at.insets = new Insets(3, 3, 3, 3);
-        at.anchor = GridBagConstraints.WEST;
-        at.gridy = 0;
-        row(form, at, new JLabel("Name"), name);
-        row(form, at, new JLabel("Via host"), host);
-        var typeRow = new JPanel();
-        typeRow.setLayout(new BoxLayout(typeRow, BoxLayout.X_AXIS));
-        typeRow.add(local); typeRow.add(Box.createHorizontalStrut(8)); typeRow.add(remote); typeRow.add(Box.createHorizontalStrut(8)); typeRow.add(dynamic);
-        row(form, at, new JLabel("Type"), typeRow);
-        row(form, at, new JLabel(""), explanation);
-        row(form, at, listenLabel, pair(listenAddress, listenPort));
-        row(form, at, new JLabel(""), allowOthers);
-        row(form, at, new JLabel(""), exposure);
-        forwardFields = pair(forwardHost, forwardPort);
-        row(form, at, forwardLabel, forwardFields);
-        row(form, at, new JLabel(""), preview);
-        add(form, BorderLayout.CENTER);
-        var south = new JPanel();
-        south.setLayout(new BoxLayout(south, BoxLayout.Y_AXIS));
-        warning.setAlignmentX(Component.LEFT_ALIGNMENT);
-        message.setAlignmentX(Component.LEFT_ALIGNMENT);
-        south.add(warning);
-        south.add(message);
-        var buttons = new JPanel();
-        buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.setAlignmentX(Component.LEFT_ALIGNMENT);
-        buttons.add(Box.createHorizontalGlue()); buttons.add(cancel); buttons.add(Box.createHorizontalStrut(8)); buttons.add(save);
-        south.add(buttons);
-        add(south, BorderLayout.SOUTH);
-
-        DocumentListener changed = new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent e) { refresh(); }
-            @Override public void removeUpdate(DocumentEvent e) { refresh(); }
-            @Override public void changedUpdate(DocumentEvent e) { refresh(); }
-        };
-        for (JTextField field : List.of(listenAddress, listenPort, forwardHost, forwardPort)) field.getDocument().addDocumentListener(changed);
-        for (JRadioButton type : List.of(local, remote, dynamic)) type.addActionListener(event -> refresh());
-        host.addActionListener(event -> refresh());
-        allowOthers.addActionListener(event -> {
-            listenAddress.setText(allowOthers.isSelected() ? Tunnel.ALL : Tunnel.LOCALHOST);
-            listenAddress.setEnabled(!allowOthers.isSelected());
-            refresh();
         });
-        cancel.addActionListener(event -> onCancel.run());
-        save.addActionListener(event -> {
-            Tunnel tunnel;
-            try { tunnel = tunnel(editing); }
-            catch (IllegalArgumentException invalid) { message.setText(invalid.getMessage()); return; }
-            onSave.accept(tunnel);
+        view = kit.create(new ViewSpec(form()), event -> {
+            if (closed) return;
+            // While the owner saves, only Cancel acts: the draft it holds stays the one shown.
+            if (saving && !(event instanceof UiEvent.Action action && action.id().equals(CANCEL))) return;
+            switch (event) {
+                case UiEvent.Edited edited -> edited(edited.id(), edited.text());
+                case UiEvent.Selected selected when selected.id().equals(HOST) && !selected.ids().isEmpty() -> { host = selected.ids().iterator().next(); render(); }
+                case UiEvent.Selected selected when selected.id().equals(TYPE) && !selected.ids().isEmpty() -> {
+                    kind = switch (selected.ids().iterator().next()) { case REMOTE -> TunnelKind.REMOTE; case DYNAMIC -> TunnelKind.DYNAMIC; default -> TunnelKind.LOCAL; };
+                    render();
+                }
+                case UiEvent.Toggled toggled when toggled.id().equals(ALLOW_OTHERS) -> {
+                    allowOthers = toggled.checked();
+                    listenAddress = allowOthers ? Tunnel.ALL : Tunnel.LOCALHOST;
+                    render();
+                }
+                case UiEvent.Action action when action.id().equals(SAVE) -> save(onSave);
+                case UiEvent.Action action when action.id().equals(CANCEL) -> onCancel.run();
+                default -> { }
+            }
         });
-        refresh();
     }
 
-    public void showError(String error) { message.setText(error); }
+    public UiView view() { return view; }
 
-    private Tunnel tunnel(Optional<Tunnel> editing) {
-        String nameValue = name.getText().strip();
+    /** The validation or save message as shown. */
+    public String message() { return message; }
+
+    /** The owner could not save the tunnel: the form shows why and can be saved again. */
+    public void showError(String error) { if (closed) return; saving = false; message = error; render(); }
+
+    private void edited(String id, String text) {
+        switch (id) {
+            case NAME -> name = text;
+            case LISTEN_ADDRESS -> listenAddress = text;
+            case LISTEN_PORT -> listenPort = text;
+            case FORWARD_HOST -> forwardHost = text;
+            case FORWARD_PORT -> forwardPort = text;
+            default -> { return; }
+        }
+        message = "";
+        render();
+    }
+
+    private void save(Consumer<Tunnel> onSave) {
+        Tunnel tunnel;
+        try { tunnel = tunnel(); }
+        catch (IllegalArgumentException invalid) { message = invalid.getMessage(); render(); return; }
+        message = ""; saving = true; render();
+        onSave.accept(tunnel);
+    }
+
+    private Tunnel tunnel() {
+        String nameValue = name.strip();
         if (nameValue.isEmpty()) throw new IllegalArgumentException("A tunnel needs a name");
-        for (Tunnel other : others)
-            if (!other.id().equals(editingId) && other.name().equalsIgnoreCase(nameValue)) throw new IllegalArgumentException("A tunnel named " + other.name() + " exists");
+        duplicate().ifPresent(other -> { throw new IllegalArgumentException("A tunnel named " + other.name() + " exists"); });
         RemoteHost via = selectedHost().orElseThrow(() -> new IllegalArgumentException("Choose a host to go through"));
-        TunnelKind kind = kind();
         int bindPort = port(listenPort, 0, "The listen port must be a number from 0 to 65535");
         int targetPort = kind == TunnelKind.DYNAMIC ? 0 : port(forwardPort, 1, "The target port must be a number from 1 to 65535");
-        return editing.map(existing -> existing.withEdited(nameValue, via.id(), kind, listenAddress.getText(), bindPort, forwardHost.getText(), targetPort))
-            .orElseGet(() -> Tunnel.create(nameValue, via.id(), kind, listenAddress.getText(), bindPort, forwardHost.getText(), targetPort));
+        return editing.map(existing -> existing.withEdited(nameValue, via.id(), kind, listenAddress, bindPort, forwardHost, targetPort))
+            .orElseGet(() -> Tunnel.create(nameValue, via.id(), kind, listenAddress, bindPort, forwardHost, targetPort));
     }
 
-    private void refresh() {
-        TunnelKind kind = kind();
-        boolean server = kind == TunnelKind.REMOTE;
-        String via = selectedHost().map(RemoteHost::name).orElse("the host");
-        listenLabel.setText(server ? "Listen on (the server)" : "Listen on (this computer)");
-        forwardLabel.setText(server ? "Forward to (as seen from this computer)" : "Forward to (as seen from " + via + ")");
-        forwardLabel.setVisible(kind != TunnelKind.DYNAMIC);
-        forwardFields.setVisible(kind != TunnelKind.DYNAMIC);
-        explanation.setText(switch (kind) {
-            case LOCAL -> "Connections to a port on this computer go through " + via + " to the target.";
-            case REMOTE -> "Connections to a port on the server come back through this computer to the target.";
-            case DYNAMIC -> "A SOCKS5 proxy on this computer; each connection goes out through " + via + ".";
-        });
-        exposure.setText(allowOthers.isSelected()
-            ? "Other computers on the network can connect to this port." + (server ? " The server's GatewayPorts setting must allow it." : "") : " ");
-        preview.setText(preview(kind, via));
-        warning.setText(sharedPort(kind).map(other -> other.name() + " listens on the same port; they cannot run at once.").orElse(" "));
-        revalidate();
+    /** Whether the draft is a tunnel that can be saved, which enables the primary action. */
+    private boolean ready() {
+        try { tunnel(); return true; } catch (IllegalArgumentException invalid) { return false; }
     }
 
-    private String preview(TunnelKind kind, String via) {
-        String port = listenPort.getText().strip();
-        String listen = listenAddress.getText().strip() + ":" + (port.isEmpty() ? "?" : port.equals("0") ? "any port" : port);
-        String target = forwardHost.getText().strip() + ":" + (forwardPort.getText().strip().isEmpty() ? "?" : forwardPort.getText().strip());
-        return switch (kind) {
-            case LOCAL -> listen + " on this computer → " + target + " as seen from " + via;
-            case REMOTE -> listen + " on " + via + " → " + target + " as seen from this computer";
-            case DYNAMIC -> "A SOCKS5 proxy on " + listen + "; connections leave from " + via;
-        };
+    /** Another tunnel already has this name, ignoring case. */
+    private Optional<Tunnel> duplicate() {
+        String nameValue = name.strip();
+        return others.stream().filter(other -> !other.id().equals(editingId) && !nameValue.isEmpty() && other.name().equalsIgnoreCase(nameValue)).findFirst();
+    }
+
+    private Optional<RemoteHost> selectedHost() { return hosts.stream().filter(via -> via.id().toString().equals(host)).findFirst(); }
+
+    private static int port(String text, int minimum, String problem) {
+        try {
+            int value = Integer.parseInt(text.strip());
+            if (value < minimum || value > 65535) throw new IllegalArgumentException(problem);
+            return value;
+        } catch (NumberFormatException bad) { throw new IllegalArgumentException(problem); }
+    }
+
+    /** The listen address's inline problem: the field is locked to every interface while others may connect. */
+    private String listenProblem() {
+        if (allowOthers) return "";
+        String address = listenAddress.strip();
+        return address.isEmpty() ? "Enter localhost, * or an IP address" : Tunnel.validBindAddress(address) ? "" : "Use localhost, * or an IP address";
+    }
+
+    /** The target host's inline problem; a SOCKS proxy has no target. */
+    private String forwardProblem() { return kind != TunnelKind.DYNAMIC && forwardHost.isBlank() ? "Enter the host to forward to" : ""; }
+
+    /** The Via host choice's inline problem: an edited tunnel's host was removed, or there is no saved host at all. */
+    private String hostProblem() {
+        if (selectedHost().isPresent()) return "";
+        return hosts.isEmpty() ? "Add a host in Sessions first" : "Choose a host to go through";
+    }
+
+    /** A port field's inline problem: nothing while it is blank (the primary waits for it), else a value out of range. */
+    private static String portProblem(String text, int minimum) {
+        if (text.isBlank()) return "";
+        try { int value = Integer.parseInt(text.strip()); return value < minimum || value > 65535 ? "Use " + minimum + " to 65535" : ""; }
+        catch (NumberFormatException bad) { return "Use " + minimum + " to 65535"; }
     }
 
     /** Another saved tunnel on the same side, address and port: both may exist, but not run at once. */
-    private Optional<Tunnel> sharedPort(TunnelKind kind) {
+    private Optional<Tunnel> sharedPort() {
         int port;
-        try { port = Integer.parseInt(listenPort.getText().strip()); } catch (NumberFormatException none) { return Optional.empty(); }
+        try { port = Integer.parseInt(listenPort.strip()); } catch (NumberFormatException none) { return Optional.empty(); }
         if (port <= 0) return Optional.empty();
-        String address = listenAddress.getText().strip();
+        String address = listenAddress.strip();
         UUID via = selectedHost().map(RemoteHost::id).orElse(null);
         return others.stream()
             .filter(other -> !other.id().equals(editingId) && other.bindPort() == port && other.bindAddress().equals(address))
@@ -193,28 +189,122 @@ public final class TunnelEditor extends JPanel {
             .findFirst();
     }
 
-    private TunnelKind kind() { return remote.isSelected() ? TunnelKind.REMOTE : dynamic.isSelected() ? TunnelKind.DYNAMIC : TunnelKind.LOCAL; }
-
-    private Optional<RemoteHost> selectedHost() { return Optional.ofNullable((RemoteHost) host.getSelectedItem()); }
-
-    private static int port(JTextField field, int minimum, String problem) {
-        try {
-            int value = Integer.parseInt(field.getText().strip());
-            if (value < minimum || value > 65535) throw new IllegalArgumentException(problem);
-            return value;
-        } catch (NumberFormatException bad) { throw new IllegalArgumentException(problem); }
+    /** The equivalent OpenSSH command, with placeholders for what is still missing. */
+    String command() {
+        String bind = allowOthers || !listenAddress.strip().equals(Tunnel.LOCALHOST) ? bracketed(listenAddress.strip()) + ":" : "";
+        String listen = bind + (listenPort.isBlank() ? "<port>" : listenPort.strip());
+        String target = bracketed(forwardHost.strip().isEmpty() ? "<host>" : forwardHost.strip()) + ":" + (forwardPort.isBlank() ? "<port>" : forwardPort.strip());
+        String destination = selectedHost().map(via -> (via.username().isEmpty() ? "" : via.username() + "@") + via.hostname() + (via.port() == 22 ? "" : " -p " + via.port()))
+            .orElse("<host>");
+        return switch (kind) {
+            case LOCAL -> "ssh -L " + listen + ":" + target + " " + destination;
+            case REMOTE -> "ssh -R " + listen + ":" + target + " " + destination;
+            case DYNAMIC -> "ssh -D " + listen + " " + destination;
+        };
     }
 
-    private static JPanel pair(JTextField address, JTextField port) {
-        var pair = new JPanel();
-        pair.setLayout(new BoxLayout(pair, BoxLayout.X_AXIS));
-        pair.add(address); pair.add(new JLabel(" : ")); pair.add(port);
-        return pair;
+    /** A host as it reads before {@code :port}: an IPv6 literal goes in brackets, anything else as it is. */
+    private static String bracketed(String value) { return value.contains(":") ? "[" + value + "]" : value; }
+
+    /** An endpoint as the route shows it, {@code ?} for a port not chosen yet; a listening port 0 is any free port. */
+    private static String endpoint(String address, String port, boolean listening) {
+        String shown = port.isBlank() ? "?" : listening && port.strip().equals("0") ? "any port" : port.strip();
+        return bracketed(address.strip().isEmpty() ? "?" : address.strip()) + ":" + shown;
     }
 
-    private static void row(JPanel form, GridBagConstraints at, JLabel label, Component field) {
-        at.gridx = 0; form.add(label, at);
-        at.gridx = 1; form.add(field, at);
-        at.gridy++;
+    private void render() { if (!closed) view.update(new ViewSpec(form())); }
+
+    private static ControlState state(boolean visible, boolean enabled) { return new ControlState(visible, enabled, false, ""); }
+
+    private Nodes.Field field(String id, Nodes.FieldKind fieldKind, String value, String hint, String label, boolean enabled, String error, Nodes.FieldPresentation presentation) {
+        return new Nodes.Field(id, new ControlState(true, enabled && !saving, false, error), fieldKind, value, hint, label, "", Optional.empty(), presentation);
     }
+
+    private static Nodes.FormRow row(String id, String label, String caption, Nodes.Node control, Optional<Nodes.Node> trailing) {
+        return new Nodes.FormRow(id, ControlState.READY, label, caption, control, trailing);
+    }
+
+    private static Nodes.Section section(String id, String title, Nodes.CardKind kind, List<Nodes.Node> children) {
+        return new Nodes.Section(id, ControlState.READY, title, new Nodes.Card(id + ".card", ControlState.READY, kind, children));
+    }
+
+    /** A host's face and option caption: its endpoint, then its group when it has one. */
+    private static String caption(RemoteHost via) { return via.label() + (via.group().isEmpty() ? "" : " · " + via.group()); }
+
+    /** One route step: its tile's artwork and hue, what it is, and where (a technical endpoint in mono, else plain text). */
+    private static Nodes.Node step(String id, String icon, Nodes.Hue hue, String what, String where, boolean technical, String name) {
+        return new Nodes.Stack(id, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Icon(id + ".icon", ControlState.READY, icon, hue, Nodes.IconSize.CONTROL, name),
+            new Nodes.Text(id + ".what", ControlState.READY, what, Nodes.TextRole.DESCRIPTION),
+            new Nodes.Text(id + ".where", ControlState.READY, where, technical ? Nodes.TextRole.MONO_SMALL : Nodes.TextRole.BODY)));
+    }
+
+    /** The route the tunnel's connections take, left to right, as the strip under the ports shows it. */
+    private Nodes.Node route(String via) {
+        String listen = endpoint(listenAddress, listenPort, true), target = endpoint(forwardHost, forwardPort, false);
+        var steps = switch (kind) {
+            case LOCAL -> List.of(step(ROUTE + ".from", "laptop", Nodes.Hue.NEUTRAL, "This computer", listen, true, "This computer"),
+                step(ROUTE + ".via", "server", Nodes.Hue.BLUE, "Via", via, true, "Host"),
+                step(ROUTE + ".to", "target", Nodes.Hue.GREEN, "Target on " + via, target, true, "Target"));
+            case REMOTE -> List.of(step(ROUTE + ".from", "server", Nodes.Hue.BLUE, "On " + via, listen, true, "Host"),
+                step(ROUTE + ".via", "laptop", Nodes.Hue.NEUTRAL, "Via", "this computer", false, "This computer"),
+                step(ROUTE + ".to", "target", Nodes.Hue.GREEN, "Target", target, true, "Target"));
+            case DYNAMIC -> List.of(step(ROUTE + ".from", "laptop", Nodes.Hue.NEUTRAL, "SOCKS5 proxy", listen, true, "This computer"),
+                step(ROUTE + ".via", "server", Nodes.Hue.BLUE, "Via", via, true, "Host"),
+                step(ROUTE + ".to", "target", Nodes.Hue.GREEN, "Destinations", "as each client asks", false, "Target"));
+        };
+        return new Nodes.Stack(ROUTE, ControlState.READY, Nodes.LayoutRole.ROUTE, steps);
+    }
+
+    private Nodes.Form form() {
+        boolean server = kind == TunnelKind.REMOTE, dynamic = kind == TunnelKind.DYNAMIC, editable = !saving;
+        Optional<RemoteHost> chosen = selectedHost();
+        String via = chosen.map(RemoteHost::name).orElse("the host");
+        var hostOptions = hosts.stream().map(option -> new Option(option.id().toString(), option.name(), "server", caption(option))).toList();
+        // The closed face describes the chosen host as the Sessions panel does: its tile, its name and its endpoint.
+        Optional<Nodes.PickerFace> face = chosen.map(option -> new Nodes.PickerFace(option.name(), caption(option), "server", Nodes.Hue.BLUE, Nodes.PickerDensity.DEFAULT));
+        String nameProblem = duplicate().map(other -> "A tunnel named " + other.name() + " exists").orElse("");
+        var tunnel = section(TUNNEL_SECTION, "Tunnel", Nodes.CardKind.FORM, List.of(
+            row("row." + NAME, "Name", "", field(NAME, Nodes.FieldKind.TEXT, name, "e.g. Postgres", "Name", true, nameProblem, Nodes.FieldPresentation.STANDARD), Optional.empty()),
+            row("row." + HOST, "Via host", "", new Nodes.Choice(HOST, new ControlState(true, editable, false, hostProblem()), Nodes.ChoiceKind.DROPDOWN, hostOptions, host, "Via host", "", "",
+                Optional.empty(), face), Optional.empty()),
+            row("row." + TYPE, "Type", "", new Nodes.Choice(TYPE, state(true, editable), Nodes.ChoiceKind.EXCLUSIVE, List.of(
+                new Option(LOCAL, "Local", Optional.empty()), new Option(REMOTE, "Remote", Optional.empty()), new Option(DYNAMIC, "Dynamic (SOCKS)", Optional.empty())),
+                switch (kind) { case LOCAL -> LOCAL; case REMOTE -> REMOTE; case DYNAMIC -> DYNAMIC; }, "Type", ""), Optional.empty()),
+            row("row." + EXPLANATION, "", "", new Nodes.Text(EXPLANATION, ControlState.READY, switch (kind) {
+                case LOCAL -> "Connections to a port on this computer go through " + via + " to the target.";
+                case REMOTE -> "Connections to a port on " + via + " come back through this computer to the target.";
+                case DYNAMIC -> "A SOCKS5 proxy on this computer; each connection goes out through " + via + ".";
+            }, Nodes.TextRole.SUPPORTING), Optional.empty())));
+        var ports = new ArrayList<Nodes.Node>();
+        ports.add(row(LISTEN_ROW, "Listen on", server ? "on " + via : "this computer",
+            field(LISTEN_ADDRESS, Nodes.FieldKind.TEXT, listenAddress, "localhost", "Listen address", !allowOthers, listenProblem(), Nodes.FieldPresentation.TECHNICAL),
+            Optional.of(field(LISTEN_PORT, Nodes.FieldKind.PORT, listenPort, dynamic ? "1080" : "8080", "Listen port", true, portProblem(listenPort, 0), Nodes.FieldPresentation.STANDARD))));
+        ports.add(new Nodes.FormRow(FORWARD_ROW, state(!dynamic, true), "Forward to", server ? "as seen from this computer" : "as seen from " + via,
+            field(FORWARD_HOST, Nodes.FieldKind.TEXT, forwardHost, "localhost", "Target host", true, forwardProblem(), Nodes.FieldPresentation.TECHNICAL),
+            Optional.of(field(FORWARD_PORT, Nodes.FieldKind.PORT, forwardPort, "5432", "Target port", true, portProblem(forwardPort, 1), Nodes.FieldPresentation.STANDARD))));
+        ports.add(route(via));
+        ports.add(new Nodes.SettingRow("row." + ALLOW_OTHERS, ControlState.READY, "Allow other computers to connect",
+            allowOthers ? server ? "Listens on all of the server's interfaces; its GatewayPorts setting must allow it" : "Listens on all network interfaces"
+                : "Listens on all network interfaces, not just localhost",
+            new Nodes.Toggle(ALLOW_OTHERS, state(true, editable), "Allow other computers to connect", allowOthers, ALLOW_OTHERS, false), false));
+        Optional<Tunnel> shared = sharedPort();
+        // The footer: a save problem, else the shared-port warning, else the equivalent command.
+        Nodes.Node preview = !message.isEmpty()
+            ? new Nodes.Text(MESSAGE, ControlState.READY, message, Nodes.TextRole.BODY, Optional.of(Nodes.Severity.DANGER), OptionalInt.empty())
+            : shared.isPresent()
+            ? new Nodes.Stack(WARNING_ROW, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Icon(WARNING + ".icon", ControlState.READY, "warning", Nodes.Hue.NONE, Nodes.IconSize.CAPTION, "Warning", Optional.of(Nodes.Severity.WARNING)),
+                new Nodes.Text(WARNING, ControlState.READY, shared.get().name() + " listens on the same port; they cannot run at once.", Nodes.TextRole.BODY)))
+            : new Nodes.Text(PREVIEW, ControlState.READY, command(), Nodes.TextRole.MONO_CAPTION);
+        var actions = List.of(
+            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
+            new Nodes.Button(SAVE, new ControlState(true, editable && ready(), saving, ""), saving ? "Saving…" : editing.isEmpty() ? "Add Tunnel" : "Save", "",
+                Nodes.ButtonKind.PRIMARY, SAVE, ""));
+        String title = editing.isEmpty() ? "New Tunnel" : editing.get().quick() ? "Save as Tunnel" : "Edit " + editing.get().name();
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, title, Optional.empty(),
+            List.of(tunnel, section(PORTS_SECTION, "Ports", Nodes.CardKind.MIXED, ports)), Optional.of(preview), actions, CANCEL, Nodes.FormSubmission.NONE);
+    }
+
+    @Override public void close() { if (closed) return; closed = true; saving = false; view.close(); }
 }

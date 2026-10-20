@@ -9,7 +9,7 @@ plugin writer's view.
 | --- | --- | --- |
 | `jasper-sdk` | Interfaces and values plugins compile against | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
-| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `appearance`, `contributions`, `dock`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
+| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `appearance`, `commandline`, `contributions`, `dock`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
 | `dev.jasper.app.terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane | `lifecycle` |
 | `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `dock`, `lifecycle` |
 | `dev.jasper.app.dock` | The tool window dock model: the six slots, each window's `DockState` and the pure `DockGeometry`; JDK-only | none |
@@ -26,14 +26,17 @@ enforce those columns from bytecode. SDK types appear in the application only in
 
 ## Launch
 
-`JasperApplication.startPlugins` runs once on the EDT before the first window:
+`PluginSelection` discovers and resolves once on the bootstrap thread, before AWT and before the configuration is
+read; `JasperApplication.startPlugins` then loads and starts its plugins once on the EDT before the first window:
 
 1. `PluginDiscovery` reads `plugin.toml` from the bundled directory (`plugins/` beside the
    application jar, or `-Djasper.plugins.bundled`), the user directory (under the home, which
    `-Djasper.home` or `JASPER_HOME` moves for development launches) and `--plugin-dir`.
 2. `PluginResolver` drops user plugins in safe mode, keeps the higher version of a duplicate
-   id, checks the SDK range, applies `plugins.toml` (disabled, marked for removal, consent),
-   removes dependency cycles and unmet hard dependencies, and orders dependencies first.
+   id, checks the SDK range, applies `plugins.toml` (disabled, marked for removal, consent, and the opt-in of a bundled
+   plugin that is off by default), removes dependency cycles and unmet hard dependencies, elects one presentation
+   provider (development, then bundled, then installed, then the lowest id; the others, an invalid kit and a look the
+   attempt record skips are skipped; safe mode disables every provider), and orders dependencies first.
 3. `PluginLoader` refuses jars that define reserved or imported packages and builds a
    `PluginClassLoader`: SDK from the application, exported packages of declared dependencies
    from their loaders, then the platform loader and the plugin's jars. Application classes and
@@ -91,8 +94,9 @@ in the window's `DockState` (per slot an ordered list with at most one active wi
 sizes and ratios). One listener on that state builds what starts showing, lays out
 `ToolWindowArea` (the terminal column, the tab strip over the deck, and a rounded frame with a
 `ToolWindowHeader` for each showing slot, placed by the pure `DockGeometry`: the bottom area spans
-the full width, the sides and the terminal column run from the toolbar to it), renders the two
-`ToolStripe`s, tells the panels and saves. `DockDrag` drags a window from its stripe button or its
+the full width, the sides and the terminal column run from the toolbar to it), renders the window's
+stripes (the two `ToolStripe` rails, or under the Enterprise look the labelled `LabelledStripe`s and the
+`BottomStrip`, all `DockStripe`s of its `StripeSet`), tells the panels and saves. `DockDrag` drags a window from its stripe button or its
 header with plain mouse events: `DockDropResolver` finds the target under the cursor (a stripe
 group and a position, or one of the workspace's six edge zones: the nearest of its left, right and
 bottom edges, a side split at half the side panels' visible height and the bottom at half its
@@ -103,7 +107,7 @@ side or the bottom area. A stripe drop moves the
 window and keeps its visibility, so a hidden window's stripe drop previews no frame; a workspace
 drop moves and shows it. A window with nothing contributed has no stripes and its old layout.
 Requests to show, hide or toggle a panel travel through the model tagged with a window id, so an
-action or a `PanelHost` reaches exactly one window. Every panel gets a View → Tools entry for its
+action or a `PanelHost` reaches exactly one window. Every panel gets a View › Tool Windows entry for its
 toggle action: the application-registered `<panel id>.toggle`, or, since SDK 0.8.1, the plugin's
 own action named by `PanelSpec.toggleActionId` (which must already be registered by that plugin),
 so a plugin action that toggles a panel appears once in the menu and the palette.
@@ -117,9 +121,9 @@ Title-only surfaces hide the unused tab component so the entire header uses `Jas
 The rail and toolbar use that same semantic color in both themes. Dialogs are parented through
 `WindowOwner`, so an SDK type never exposes a frame or needs its own chrome API.
 Ordinary Swing buttons, fields, lists and dropdowns in any plugin layout, including content
-added later, are drawn by FlatLaf in the installed theme's colours: classic IntelliJ Light or
-Jasper Dark. Form text, button labels included, uses the 12-point form font and follows UI font
-changes. Plugin side panels paint the theme's tool window colour (`ToolWindow.background`) behind
+added later, are drawn by FlatLaf in the shown theme's colours. Form text, button labels
+included, uses the 12-point form font and follows UI font
+changes. Plugin side panels paint the tool-window body colour (`surface.panel`) behind
 plain containers; a background a plugin sets itself is kept. Toolbar button geometry stays
 independent (30-pixel height, 12-pixel arc).
 Small app-owned toolbar/rail/status controls keep their existing geometry. The SDK's ordinary-Swing
@@ -132,7 +136,8 @@ parents `FileDialog` to the actual frame or dialog and always disposes it. The t
 selections through `FakePluginHost.queueFileSelection`; an empty queue models cancellation.
 
 `persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order and visibility,
-the dock's per-side sizes and ratios, stripe visibility and auxiliary window bounds. It is
+the dock's per-side sizes and ratios, stripe visibility, auxiliary window bounds and the dragged
+command palette's place. It is
 application state, not configuration: a bad panel or window entry or dock key falls back alone,
 an unreadable file falls back to defaults, writes are atomic, and a version 1 file migrates on read.
 The process stays alive while a plugin window is open.
@@ -188,9 +193,9 @@ and calls `Palette.open`. `plugins.HostedPalette` adapts an SDK scope: contained
 `PaletteQuery` built from the target's window and pane ids through the plugin's own handles, and
 the plugin's row kept as the app row's token so it comes back unchanged. Every scope gets a tab;
 `ScopeSpec.inAll` (SDK 0.8.0, `withInAll(false)` to opt out) decides whether the All tab searches it
-too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `platform().openInEditor` runs the application's
-`ConfigEditor` on the plugin's executor and posts a failure in the plugin's notification group, and
-`platform().browse` does the same with `platform.Browser` after refusing anything but an http or https address. `PaneInfo.shell` is
+too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `platform().openInEditor` asks the provided file
+editor (SDK 0.17.1, below) and then the application's `ConfigEditor`, from the plugin's executor, and posts a failure
+in the plugin's notification group, and `platform().browse` does the same with `platform.Browser` after refusing anything but an http or https address. `PaneInfo.shell` is
 `PaneSnapshot.shell`, the pane's launcher label. The bundled History and Snippets plugins are the first
 contributors; `stagePlugins` copies each plugin's jar and runtime classpath into `lib/plugins/<id>/`.
 
@@ -249,8 +254,9 @@ every discovered plugin's folder, data directory and settings file (seeded from 
 `[plugins."<id>"]` table, else the jar's `settings.toml`, else a header) before loading, and a
 one-second poller re-reads changed files, and each plugin's `DeclaredSettings` updates its handles and runs their listeners;
 a broken file keeps its last good values and is reported under `plugins.<id>`. `PluginRuntime.Row`
-carries the folder, settings file and data directory, which the manager's context menu opens
-through `ConfigEditor`.
+carries the folder, settings file and data directory, which the manager's context menu opens:
+the settings file in the default editor, with `ConfigEditor` as the fallback, the folder and data directory through
+`ConfigEditor`.
 
 `PluginCatalog` is pure: it resolves the disk as it would be after maintenance and compares the
 result with what this process selected at launch. The difference is the "Restart to apply"
@@ -275,6 +281,37 @@ executor stops admitting tasks; accepted work drains for 1.5 s and is then inter
 the existing 2 s bounded wait. A `stop()` that blocks the EDT cannot be abandoned: the 4 s
 deadline ends the process and logs which callback was running.
 
+## Command-line subcommands (SDK 0.17.0)
+
+`PluginContext.commandLine()` is `plugins.HostedCommandLine`, one per context, over the host's `PluginCommands`. When
+plugins start, `PluginRuntime` builds `Subcommands` from the `[[subcommands]]` of the plugins that load (a bundled plugin
+keeps a contested name, otherwise the first by id, and the other plugin gets a problem notice) and writes the active ones
+to `daemon/subcommands` for `jasper --help`. `PluginCommands` is the application's `commandline.CommandDispatcher` for
+subcommand calls: it hops to the UI thread, runs the handler inside containment, maps the call's pane to its
+`WindowHandle`, and adapts the application's `Invocation` to `CommandCall`. `HostedUi` tracks each handler, so it ends
+with the plugin, and `PluginCommands` then ends the plugin's calls still running with exit code 1. The testkit's
+`FakeCommandLine` and `FakeCommandCall` do the same in memory, and `PluginContractTest` holds both hosts to one contract.
+
+## Shell variables, the file editor and program tabs (SDK 0.17.1)
+
+`Terminals.environment` (needs `terminal.environment`) registers a contributor in `plugins.ShellContributions`. For each
+local launch the application asks every contributor on the UI thread, with Jasper's own environment, and merges the
+answers: the first plugin by id keeps a name two set; reserved, malformed and NUL-holding entries are dropped and logged
+once per plugin and name; a contributor that throws adds nothing and counts as a plugin failure. `LaunchSettings` puts
+them after Jasper's own variables and before `[terminal.env]`; WSL profiles and provided sessions get none.
+`Platform.editor` (needs `editor.provide`) registers a `FileEditor` in `plugins.FileEditors`, one at a time, a bundled
+plugin's replacing a non-bundled plugin's. Every editor open in the application (`ConfigEditor`'s callers, the Plugin
+Manager's settings files, the VM options file and `Platform.openInEditor`) runs on a worker, which asks the file editor
+on the UI thread through `FileEditors.editFromWorker`, waits up to 30 s, and otherwise runs the desktop fallback itself.
+A Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local terminal pane (`JasperApplication.openFileAt`)
+asks the same way, with the line and the clicked window, and so does File › Open File…, at no line; a clicked path is
+program output, and an OSC 8 link's target can differ from the text shown, so the fallback is the desktop's edit or reveal action, never its open action, and a
+plugin's editor should edit the file and never run it.
+`LocalSpec.command` becomes `terminals.OpenSpec.Local.program`; the workspace launches it through `ShellLauncher` with
+the default profile's environment and pins close-on-success over `terminal.on_exit`. `CommandLine.client()` comes from
+`commandline.CommandInstall.client`: the client inside the installed image, or the build's in a development run. The
+testkit's `FakePluginHost` models all four, and `PluginContractTest` holds both hosts to them.
+
 ## Contract suite
 
 `PluginContractTest` states the semantics once. `FakeContractTest` runs it against the
@@ -283,40 +320,15 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
-per-session token from Jasper's own shell integration.
+A stronger locality signal than the host name, such as a per-session token from Jasper's own shell integration.
 
-## Semantic and plugin icons (SDK 0.7.4)
+## Semantic presentation icons (SDK 0.15)
 
-SDK 0.8.0 removed `OldGnomeIcon` and `Appearance.icon(String, OldGnomeIcon)`; plugins use
-`icon(IconName)` or `icon(String)`.
-
-HostedUi and FakePluginContext implement `Appearance.icon(IconName)`; no contribution
-record changes. HostedUi converts enum names into validated app-native catalog keys at the
-plugin boundary. SDK types never enter platform/workspace/contribution production packages.
-
-Shared action, menu and palette icons stay 16px. WindowContributions also populates Swing's
-SMALL_ICON property so menu items receive the compact artwork. SVG foreground recoloring
-stays live. See [the icon catalog and compatibility contract](sdk-icons.md).
-
-### Host-owned semantic catalog (SDK 0.7.4)
-
-`Appearance.icon(IconName)` is now preferred. The SDK carries meanings only. HostedUi
-translates the enum at the boundary; AppIcons/NamedIcons select the app-owned SVG, never
-the plugin loader. The old custom overload remains supported. Vault uses semantic LOCK/UNLOCK
-in its status/menu and manager controls. The fake returns inspectable `FakeNamedIcon(name)`;
-older custom Appearance implementations inherit an explicit UnsupportedOperationException for
-this method until they implement it.
-
-### Chrome icons and session tab icons (SDK 0.7.6)
-
-- `IconName` gains `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Artwork is now IntelliJ New UI SVG (0.8.2),
-  vendored under `jasper-app/.../icons/intellij/` (Apache-2.0, hash-pinned in `assets.tsv`).
-- Behaviour change: `Appearance.icon(String)` no longer recolours to the chrome foreground. It
-  draws the SVG as authored; FlatLaf's global colour filter maps IntelliJ light-palette colours
-  to the running theme. Grey `#6E6E6E` artwork looks as before.
-- `SessionSpec.icon` is no longer reserved: it is the tab icon. Empty shows `IconName.TERMINAL`.
-  Inside the app the icon travels opaquely on `SessionRequest`.
+All standard presentation icon boundaries carry semantic strings. HostedKit validates the
+plugin's scoped registry and produces paint-time theme-resolved icons only inside app.plugins.
+Host-native contribution values may still carry Swing Icon; no arbitrary Icon enters through SDK.
+The fake validates the same built-ins and owned registrations. Manifest identity previews remain
+an app-managed image path, separate from ordinary presentation. See [icons](sdk-icons.md).
 
 SDK 0.7.2 adds `Panels.toggle(panelId, window)` for a plugin's own registered panel.
 It dispatches the same per-window lazy toggle as the rail; the app and testkit both
@@ -348,16 +360,6 @@ loops start while the plugin context is live; stop signals them synchronously, a
 quiesce endpoints and close the queue/lock without submitting new shutdown tasks. The app
 knows only the SDK contributions, not transfer state or SFTP classes.
 
-### Full New UI icon catalog (SDK 0.8.2)
-
-`Appearance.icon(BundledIcon)` exposes 885 generated choices from the complete platform and
-Terminal New UI collections. HostedUi translates the enum to an app-native ID; AppIcons
-validates it against the generated index and caches the host-owned SVG. No SDK type enters
-app.platform. Icons select dark siblings live and preserve aspect ratio in a 16px square.
-The fake returns `FakeBundledIcon`; older hosts inherit an explicit unsupported default.
-Vault manager controls and Remote page chevrons now use semantic icons, removing their
-private painters. See [the catalog contract](sdk-icons.md).
-
 ### Provider remote-directory hints (SDK 0.8.3)
 
 `PendingSession.reportRemoteDirectory(RemoteDirectory)` is a binary-compatible default
@@ -375,8 +377,9 @@ ends probing and takes precedence. The fake host models the same fallback and li
 ### Close command, quit guards and the save chooser (SDK 0.8.4)
 
 `PluginWindow.onCloseCommand` lets a plugin window's content handle File → Close Window and
-Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item calls
-`AuxiliarySurface.closeCommand()`, which asks the handlers newest first and otherwise closes like
+Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item (or, in a classic look's
+frame, which has no menu row, its shortcut) calls `AuxiliarySurface.closeCommand()`, which asks the
+handlers newest first and otherwise closes like
 the close button, through the guards. The close button itself (`windowClosing`) still calls
 `requestClose()`. With the macOS screen menu bar, the menu accelerator fires before the content's
 key bindings see Cmd+W, so a key binding could not do this.
@@ -429,6 +432,12 @@ and gutter colors from the workspace. SDK 0.12.0 adds `WorkspacePalette`, `Synta
 `onWorkspaceChanged` compares the complete workspace generated value, skips initial replay, contains handler failures,
 and removes registrations on disposal or stop. Chrome `variant` and `onChanged` retain their existing meaning.
 
+SDK 0.18.2 adds `Appearance.presentation()`: `HostedPresentation` builds one `Presentation` per run from the
+`PluginLook` projection, the installed kit and the look's `DefaultSource`, and
+`PluginRuntime.presentation(Kit, PluginLook, DefaultSource)` hands all three to the host before plugins start. It is an
+immutable value read from any thread; `FakePluginHost.setPresentation` mirrors it, and the contract case
+`presentationIsTheHostsForEveryPluginOnAnyThreadAndThroughThemeChanges` runs on both.
+
 SDK 0.14.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0, UI thread, null rejected); `onWorkspaceChanged` also
 reports its changes. The method takes a component because opacity is per window and content moves between windows (the
 design's no-argument form was changed for that reason). `dev.jasper.app.plugins.GlassSource` is the per-component lookup
@@ -441,34 +450,32 @@ announces on `flush()` and reports one value for every component; the contract c
 `workspaceOpacityStartsOpaqueAndChangesAreWorkspaceChanges` runs on the fake and on the app.
 
 `PluginRuntime.appearance` accepts app-native `ResolvedTheme` suppliers and subscriptions. The `plugins` package
-alone adapts native tokens and syntax to SDK values (its allowed dependencies include `appearance`). The appearance
-controller publishes native Color/Boolean `Jasper.workspace.*` defaults after successful theme application, including
-chrome-derived syntax in match mode; no SDK values enter UIManager. `WorkspacePalette.current(component)` walks
-JDK client properties to distinguish workspace controls from chrome renderers. The SDK/testkit remain JDK-only.
+alone adapts the semantic roles, the editor scheme and syntax to SDK values (its allowed dependencies include `appearance`). The appearance
+controller publishes module ThemePair snapshots. SDK palettes are explicit host projections; no SDK
+values or workspace fallback palettes enter UIManager. The SDK/testkit remain JDK-only.
 `FakePluginHost.setWorkspace` and the actual hosted adapter share the same contract tests for values, notifications,
 same-variant changes, disposal and safe variant reads. The fake accepts its creating test thread or the real Swing EDT for appearance work, while rejecting background workers.
 Fake workspace changes publish their snapshot and notify current subscribers together during `flush()`. Until then,
 workspace getters expose the last flushed value. Consecutive queued changes each expose their own complete snapshot
 inside the callback; duplicate pending values are quiet. Subscriptions added before publication receive that change,
 and registrations closed before delivery remain silent. Chrome's existing fake variant/event behavior is unchanged.
-Retained host-owned named icons select light or dark artwork at paint time from the component's current zone, including
-after reparenting. Workspace markers are app-native JDK properties; popup, tooltip and root-pane boundaries return to
-chrome. Custom plugin SVG artwork remains authored. Hosted center panes now use an app-native WorkspaceStyler;
-no SDK change beyond the existing 0.12.0 palettes is needed. Ordinary controls follow workspace recipes, with plugin
-inline styles above class styles above generated values. Exempt document subtrees retain plugin ownership; dynamic
-children and removal are lifetime-managed. A workspace combo's explicitly owned dropdown list is the sole popup
-exception. Custom renderers pass their mounted list/table/tree to `WorkspacePalette.current`, and borders pass their
-paint component; rail renderers therefore stay chrome. See [plugin authoring](plugin-authoring.md#hosted-pane-control-styling)
-for direct-color ownership, replacement, cleanup and the bundled audit.
+Retained app-native icons use module glyphs and the receiving component's live theme. Shallow workspace
+markers belong to WindowContent/WorkspaceTheme and are cleared on removal; popup, tooltip and root-pane
+boundaries return to chrome. Kit views own standard controls and scoped custom content. The former
+recursive WorkspaceStyler/recipe/popup adapters are removed. App-native JComponent transports are private
+mount plumbing, never an SDK raw-control path. Manifest identity previews retain their PNG/SVG decoder.
 
 ### Declared settings (plan C1; SDK 0.9 completes them)
 
 `PluginContext.settings()` returns `PluginSettings`. A plugin declares each setting during `start` with a
-`SettingSpec` (dotted key, `SettingKind`, default, label, description, keywords, section, applies-when, editor hint)
+`SettingSpec` (dotted key, `SettingKind`, default, label, description, keywords, section, applies-when, editor hint, unit)
 and gets a typed `Setting` handle: `get()` is the file's value when its kind allows it, else the default; `set(value)`
 saves through the same comment-preserving, atomic write as `config.toml`; `onChanged` runs on the UI thread. The
 application translates declarations into its own settings schema inside `dev.jasper.app.plugins`, reads the plugin's
 file with `dev.jasper.app.settings.SchemaReader`, and reports rejected values and undeclared keys against the file.
+A look's `[defaults."<plugin id>"]` values become each declared setting's default, read with the setting's kind when it
+is declared; a rejected value and an undeclared key are logged (`PluginHost.lookDefaultProblem`) and ignored, and
+`FakePluginHost.setKitDefault` and `lookDefaultProblems` mirror it.
 The testkit's `FakePluginHost` offers `setSetting`, `savedSettings`, `settingsReports` and `declared`, and the contract
 suite holds the fake and the application to the same behaviour. SDK 0.9.0 removed `PluginConfig`; every bundled plugin declares its settings.
 Settings shows the declarations as a page per plugin, described next.
@@ -499,8 +506,8 @@ does not list logs a warning and makes `openTab` and `split` return empty, rathe
 default shell. An empty profile means what Jasper's own New Tab or Split would start. The catalog
 reaches `dev.jasper.app.plugins` as `PluginRuntime.ShellProfiles`, a supplier and a listener
 registration, so the plugin runtime depends only on the `launch.ShellProfile` value; listener
-registrations close with the plugin. Plugins open only shells the application detected: explicit
-commands in `LocalSpec` remain a separate decision. Remote uses this for its WSL group.
+registrations close with the plugin. A `LocalSpec` names a profile or, since SDK 0.17.1, a
+command, not both. Remote uses profiles for its WSL group.
 
 ### Per-window panel header metadata (SDK 0.14.2)
 
@@ -510,4 +517,94 @@ commands in `LocalSpec` remain a separate decision. Remote uses this for its WSL
 `ToolWindowArea`, which retains metadata while hidden and updates live headers without rebuilding
 plugin content. Header actions use the normal plugin containment boundary. Closing a site clears
 its metadata and invalidates retained callbacks. The testkit exposes `panelHeader(id, windowId)`
-for inspecting and invoking the same per-window contract.
+for inspecting and invoking the same per-window contract (and `closePanel(id, windowId)` to discard an instance).
+A panel whose content is a kit `Panel` view (`register`) shows the same metadata in its own header row, which the
+window borrows: `ToolWindowArea` passes it to the module's host-only `KitView.setPanelHostHeader`, so there is never
+a second header. The shared `PluginContractTest` covers the contract on the host and the fake.
+
+### SDK 0.15 admission and public factory boundary
+
+PanelFactory.create and SettingsPanel.create return UiView, Panels.register accepts the final factory,
+and SettingsPanelHost.row returns Nodes.Node. WindowSurface and Windows.openTab accept only owned views.
+PanelSpec has a single semantic String icon component. Appearance palettes are explicit host contracts;
+SDK palette current()/UIManager fallback readers and raw artwork loaders are gone.
+
+PluginResolver remains pure version/dependency selection. PluginLoader checks exact removed JVM
+owner/name/descriptors, removed types and directly implemented old factory declarations before class
+initialization. It examines effective JarFile multi-release entries for JBR 25 and ignores inactive
+future/non-multi variants. Generic erasure and reflection remain limits; linkage errors are still
+contained during entry creation and callbacks. Task 11b removes private app legacy style/catalog adapters.
+
+### Compiled presentation ownership (SDK 0.15)
+
+The build gate `gradle/architecture/PluginPresentationCheck.java` runs with the selected JBR25 toolchain,
+independently of the Gradle JVM. It parses compiled authored main classes (not vendor jars), inspects
+constructor/style/graphics member references and declared paint methods, and resolves class hierarchies
+without initialization. Ordinary visible receivers cannot receive presentation setters for size/bounds,
+margin, alignment/layout, icon assignment/variants or paint flags, in addition to colors/fonts/borders.
+The receiver hierarchy determines this policy: constructing or resizing a domain Dimension stays legal.
+Domain Color/Point/Dimension, timers and undo/string APIs remain legitimate.
+Its negative fixtures invoke the same production checker, including same-package and exact-owner
+ordinary-control attempts. This is a build-time ownership check, not a reflective-code security sandbox.
+
+Exact custom sources are `plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java` and
+`plugins/editor/src/main/java/dev/jasper/editor/vim/VimTextArea.java` (including nested classes whose
+SourceFile agrees). DocumentArea may construct its JComponent canvas, VimTextArea, RTextScrollPane and
+vendor-popup JMenuItem; VimTextArea may construct RSyntaxTextArea and its exact RSyntaxTextAreaUI
+subclass. EditorTab may construct DocumentArea to register it. Even these owners cannot construct
+ordinary JButton/JPanel controls. No package exemption exists.
+
+The specialized helper `plugins/editor/src/main/java/dev/jasper/editor/ui/EditorTheme.java` is allowed
+only document/gutter/scroll/viewports background and opacity, RSyntaxTextArea foreground/caret/selection,
+and JComponent opacity for gutter children. Its Gutter client property marks the single opacity follower.
+It cannot paint, construct controls, read global presentation defaults, or style arbitrary ordinary controls.
+The exact member-owner allowlist is in the checker; FlatLaf style writers remain forbidden.
+
+The SDK gate inspects public/protected JVM descriptors, generic signatures and classfile superclass/interface
+edges, following SDK-owned parents to detect indirect inherited exposure. Raw Swing/AWT inheritance is
+forbidden; value/custom-root descriptor exceptions never authorize extending those types. The only Swing signature
+values are CustomContent.JComponent and ContentCommand.KeyStroke; Color/Dimension and Appearance's
+Component opacity lookup are the supported AWT values. App SDK imports remain confined to app.plugins.
+
+## Consumer migration completion
+
+Plan 2 uses the kit as the only standard-control presentation authority. SDK 0.15 is incompatible with
+pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifests cut over together.
+The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
+rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
+content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.
+
+### Anchored producer UI
+
+`UiView.anchor(id)` mints a host-authenticated `UiAnchor` only for an eligible, mounted
+button or PICKER control. Its captured host, view, control and mount ancestry remain authoritative;
+hide, disable, busy, removal, retyping, reparenting, closure and plugin stop invalidate it permanently.
+A same-control descriptor/theme refresh and an owned child covering it preserve the capability.
+`Windows.popover(anchor)` is a nonblocking attachment whose content must belong to the producer's kit.
+The anchor also admits an owned `DialogSpec` child above the source's actual native surface.
+Neither path delegates view ownership or data/grant authority. The fake and host share
+`AnchorContractTest`; ordinary foreign-content admission stays unchanged.
+
+The mirrored `PickerFace` density and `PickerMenu` descriptors carry metadata and user intent only.
+The menu separates checked id from active id, retains search/caret/scroll on appearance refresh, and
+emits explicit row/footer/cancel actions. Vault owns consent, creation and one-time grants; Remote's
+Import controller owns the per-candidate selection and its separate durable import operation.
+
+### Shared Settings presentation additions (Task9a)
+
+The mirrored SDK/module vocabulary adds `SETTINGS_PAGE`, `SETTINGS_CONTROLS`, `SETTINGS_TRAILING`,
+`SETTINGS_GROUP_HEADER`, `SETTINGS_FOOTER`, `SETTINGS_NAVIGATION` and `JOINED_ACTIONS` layout roles.
+These select engine-owned geometry; plugins never supply pixels, fonts or renderer code.
+`SETTINGS_TRAILING` composes one content child and one reserved trailing action; `SETTINGS_NAVIGATION`
+wraps one tree. The group header takes a leading semantic icon/title and trailing count. Other layouts
+retain their existing behavior. The host propagates embedded row-label context only within Settings.
+
+`FieldPresentation.STEPPER` and `SLIDER` require NUMBER and its bounded numeric shape. A stepper retains
+its editable document and emits ordinary Edited events; a slider uses pointer/keyboard numeric edits
+and has no text selection/composition surface. `selectAll`, `fieldSelection` and composition operations
+reject sliders in both host and testkit. `ChoiceKind.PREVIEWS` keeps stable selection IDs and uses optional
+authored `Option.Preview` palettes; it never invents theme identity. The compatible three-argument Option
+constructor remains. Optional icon/description/preview fields are copied through KitValues; icon names
+are checked for producer ownership before mount/update, including options in unopened menus.
+`ButtonPresentation.HELP` marks a button that opens help; the default look draws it as an engine-owned round outlined face. Fake/real KitContract coverage
+checks these additions and keeps SDK0.15's existing boundary; no Swing/native objects cross the SDK.

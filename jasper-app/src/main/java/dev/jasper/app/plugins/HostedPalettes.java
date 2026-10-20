@@ -1,7 +1,7 @@
 package dev.jasper.app.plugins;
 
-import dev.jasper.app.appearance.GeneratedTheme;
-import dev.jasper.app.appearance.Token;
+import dev.jasper.ui.theme.GeneratedTheme;
+import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.sdk.ui.EditorPalette;
 import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.sdk.ui.SyntaxPalette;
@@ -13,17 +13,16 @@ import java.util.EnumMap;
 final class HostedPalettes {
     private HostedPalettes() {}
     static WorkspacePalette workspace(GeneratedTheme theme) {
-        var t = theme.tokens();
-        return new WorkspacePalette(t.get(Token.SURFACE), t.get(Token.SURFACE_RAISED), t.get(Token.SURFACE_SUNKEN),
-            t.get(Token.TEXT), t.get(Token.TEXT_MUTED), t.get(Token.BORDER), t.get(Token.SELECTION),
-            t.get(Token.SELECTION_TEXT), t.get(Token.HOVER), t.get(Token.ACCENT), t.get(Token.SUCCESS),
-            t.get(Token.WARNING), t.get(Token.ERROR));
+        var p = theme.semantic();
+        return new WorkspacePalette(p.color(SemanticColor.SURFACE_PANEL), p.color(SemanticColor.SURFACE_PANEL_RAISED),
+            p.color(SemanticColor.SURFACE_CARD), p.color(SemanticColor.TEXT_PRIMARY), p.color(SemanticColor.TEXT_SECONDARY),
+            p.color(SemanticColor.BORDER_WINDOW), p.color(SemanticColor.SELECTION_BG), p.color(SemanticColor.TEXT_ONSELECTION),
+            p.color(SemanticColor.SURFACE_CONTROL_HOVER), p.color(SemanticColor.ACCENT), p.color(SemanticColor.STATUS_SUCCESS),
+            p.color(SemanticColor.STATUS_WARNING), p.color(SemanticColor.STATUS_DANGER));
     }
     static EditorPalette editor(GeneratedTheme theme) {
-        var t = theme.tokens();
-        return new EditorPalette(t.get(Token.EDITOR_BACKGROUND), t.get(Token.EDITOR_FOREGROUND), t.get(Token.EDITOR_CARET),
-            t.get(Token.EDITOR_SELECTION), t.get(Token.EDITOR_CURRENT_LINE), t.get(Token.EDITOR_GUTTER),
-            t.get(Token.EDITOR_LINE_NUMBERS));
+        var e = theme.editor();
+        return new EditorPalette(e.background(), e.foreground(), e.caret(), e.selection(), e.currentLine(), e.gutter(), e.lineNumbers());
     }
     static SyntaxPalette syntax(GeneratedTheme theme) {
         var styles = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);

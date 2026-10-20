@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
@@ -39,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WindowPanelsTest {
     @TempDir Path dir;
 
-    @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); edt(() -> new dev.jasper.app.appearance.ThemeController()); }
+    @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); edt(() -> ThemeTestSupport.controller(true)); }
 
     private static WindowContent window() { return DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>())); }
 
@@ -47,7 +48,7 @@ class WindowPanelsTest {
         model.requestPanel(new Contributions.PanelRequest(owner.id(), id, Contributions.PanelRequest.Op.TOGGLE));
     }
 
-    private static List<String> tips(ToolStripe stripe) { return stripe.buttons().stream().map(AbstractButton::getToolTipText).toList(); }
+    private static List<String> tips(DockStripe stripe) { return stripe.buttons().stream().map(AbstractButton::getToolTipText).toList(); }
 
     private static Rectangle in(JComponent root, Component component) {
         return SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), root);
@@ -87,7 +88,7 @@ class WindowPanelsTest {
             });
             PanelEntry files = model.addPanel("dev.x.files", "Files", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("files"));
             assertThat(owner.leftStripe().isVisible()).isTrue();
-            assertThat(owner.rightStripe().isVisible()).as("an empty right stripe still shows").isTrue();
+            assertThat(owner.rightStripe().isVisible()).as("an empty right stripe hides").isFalse();
             assertThat(tips(owner.leftStripe())).containsExactly("Hosts", "Files");
             assertThat(owner.rightStripe().buttons()).isEmpty();
             assertThat(sites).as("no instance until first shown").isEmpty();
@@ -116,6 +117,154 @@ class WindowPanelsTest {
 
             files.close();
             assertThat(owner.leftStripe().buttons()).hasSize(1);
+        });
+    }
+
+    /** Plan 12 Rulings 18: under flush frames the View toggle action activates the panel it opens; a plugin's toggle does not. */
+    @Test void underFlushFramesTheViewToggleActivatesThePanelAndAPluginsToggleDoesNot() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            model.action("dev.x.hosts.toggle").orElseThrow().invoke(new Contributions.Invocation(owner.id(), Optional.empty()));
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("the View toggle is a user gesture").hasValue(Slot.LEFT_TOP);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            owner.area().focusMoved(null);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("a plugin's programmatic toggle").isEmpty();
+        });
+    }
+
+    private static void request(Contributions model, WindowContent owner, String id, Contributions.PanelRequest.Op op) {
+        model.requestPanel(new Contributions.PanelRequest(owner.id(), id, op));
+    }
+
+    /** A connected window with one panel, under flush frames (Enterprise's classic dock) or the default look's standard ones. */
+    private static WindowContent framed(Contributions model, boolean flush) {
+        var owner = flush
+            ? DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true), DockChromeTest.classicDock())
+            : window();
+        owner.connectContributions(model, UiState.inMemory());
+        model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+        return owner;
+    }
+
+    /** Plan 15b Rulings 1: a plugin's own toggle action arrives as an activating toggle, which activates what it shows. */
+    @Test void aPanelsActivatingToggleUnderFlushFramesActivatesIt() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    /** An activating toggle of the active tool window hides it and hands focus back, as a plain toggle does. */
+    @Test void anActivatingToggleThatHidesThePanelActivatesNothing() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            List<String> events = new ArrayList<>();
+            // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
+            model.content().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            assertThat(events).as("focus is handed back").contains("focus");
+            assertThat(owner.area().focusedSlot()).isEmpty();
+        });
+    }
+
+    /** As IntelliJ's ActivateToolWindowAction: an activating toggle of a visible tool window that is not active activates it. */
+    @Test void anActivatingToggleOfAVisibleInactivePanelActivatesIt() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("it stays open").isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("the active one hides").isNull();
+        });
+    }
+
+    @Test void underStandardFramesAnActivatingToggleIsAPlainToggle() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, false);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+        });
+    }
+
+    /** Plan 15b Rulings 1: a show by the panel's own toggle action (Transfers' after its first open) activates it, and never hides. */
+    @Test void anActivatingShowUnderFlushFramesActivatesThePanel() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            owner.area().focusMoved(null);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("a show never hides").isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    @Test void underStandardFramesAnActivatingShowIsAPlainShow() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, false);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+        });
+    }
+
+    /**
+     * Final review: a window toggled in by a user gesture in place of the active one keeps the activation. Handing focus
+     * back to the terminal first would post focus events that land after the activation and undo it.
+     */
+    @Test void underFlushFramesAnActivatingToggleThatReplacesAWindowDoesNotHandFocusBack() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            List<String> events = new ArrayList<>();
+            // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
+            model.content().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+            for (String name : List.of("log", "transfers"))
+                model.addPanel("dev.x." + name, name, new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    site.onVisibility(visible -> events.add(name + ":" + visible));
+                    return new JLabel(name);
+                });
+            model.action("dev.x.log.toggle").orElseThrow().invoke(new Contributions.Invocation(owner.id(), Optional.empty()));
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            owner.leftStripe().buttons().get(1).doClick();
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isInstanceOfSatisfying(JLabel.class, label -> assertThat(label.getText()).isEqualTo("transfers"));
+            assertThat(events).as("no hand-back to the terminal").containsExactly("log:false", "transfers:true");
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            toggle(model, owner, "dev.x.log");
+            assertThat(events).as("a plugin's toggle still hands focus back").containsExactly("transfers:false", "focus", "log:true");
         });
     }
 
@@ -190,6 +339,85 @@ class WindowPanelsTest {
             assertThat(owner.leftStripe().buttons().getFirst().isSelected()).isFalse();
             assertThat(view.getParent()).as("hidden content leaves the tree").isNull();
         });
+    }
+
+    /** PanelHost.setHeader (SDK 0.14.2) on a kit panel: the window's borrowed kit header shows it and releases it once. */
+    @Test void aKitPanelsHeaderMetadataReachesItsBorrowedHeaderAndIsReleasedWithTheInstance() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            var theme = dev.jasper.app.appearance.ThemeTestSupport.generated(true);
+            try (var bindings = new dev.jasper.app.appearance.AppearanceBindings(new dev.jasper.ui.theme.ThemePair(theme, theme),
+                    failure -> { throw new AssertionError(failure); }, () -> false)) {
+                var calls = new ArrayList<String>();
+                var sites = new ArrayList<PanelSite>();
+                var views = new ArrayList<dev.jasper.ui.swing.KitView>();
+                var icon = new ImageIcon();
+                PanelEntry entry = model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    sites.add(site);
+                    site.setHeader(new dev.jasper.app.contributions.PanelHeaderState("3", false, List.of(
+                        new dev.jasper.app.contributions.PanelHeaderState.Action("New session", icon, () -> calls.add("new")))));
+                    var view = new dev.jasper.ui.swing.KitView(bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+                        new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Panel("hosts", dev.jasper.ui.model.ControlState.READY,
+                            new dev.jasper.ui.model.Nodes.Header("hosts-header", dev.jasper.ui.model.ControlState.READY, "Hosts",
+                                java.util.OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+                            Optional.empty(), new dev.jasper.ui.model.Nodes.Text("body", dev.jasper.ui.model.ControlState.READY, "Body",
+                                dev.jasper.ui.model.Nodes.TextRole.BODY), Optional.empty())), event -> {});
+                    site.onClosed(view::close);
+                    views.add(view);
+                    return view;
+                });
+                toggle(model, owner, "dev.x.hosts");
+                var header = views.getFirst().panelHeader("hosts");
+                assertThat(owner.area().headerOf(Slot.LEFT_TOP)).isNull();
+                assertThat(names(header)).containsExactly("New session", "Options", "Hide");
+                assertThat(labels(header)).contains("Hosts", "3");
+                sites.getFirst().setHeader(new dev.jasper.app.contributions.PanelHeaderState("4", true, List.of(
+                    new dev.jasper.app.contributions.PanelHeaderState.Action("New session", icon, () -> calls.add("newer")))));
+                assertThat(labels(header)).contains("4").doesNotContain("3");
+                var created = button(header, "New session");
+                created.doClick();
+                assertThat(calls).containsExactly("newer");
+                toggle(model, owner, "dev.x.hosts");
+                assertThat(names(header)).as("hidden: released").isEmpty();
+                toggle(model, owner, "dev.x.hosts");
+                assertThat(names(header)).as("shown again with the retained metadata").containsExactly("New session", "Options", "Hide");
+                assertThat(labels(header)).contains("4");
+                var shown = button(header, "New session");
+                entry.close();
+                assertThat(sites).hasSize(1);
+                assertThat(shown.getActionListeners()).as("closing the instance releases the header actions").isEmpty();
+                shown.doClick();
+                assertThat(calls).containsExactly("newer");
+            }
+        });
+    }
+
+    private static List<AbstractButton> headerButtons(java.awt.Container root) {
+        var result = new ArrayList<AbstractButton>();
+        for (var child : root.getComponents()) {
+            if (child instanceof AbstractButton button) result.add(button);
+            else if (child instanceof java.awt.Container nested) result.addAll(headerButtons(nested));
+        }
+        return result;
+    }
+
+    private static List<String> names(java.awt.Container root) {
+        return headerButtons(root).stream().map(b -> b.getAccessibleContext().getAccessibleName()).toList();
+    }
+
+    private static AbstractButton button(java.awt.Container root, String name) {
+        return headerButtons(root).stream().filter(b -> name.equals(b.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
+    }
+
+    private static List<String> labels(java.awt.Container root) {
+        var result = new ArrayList<String>();
+        for (var child : root.getComponents()) {
+            if (child instanceof JLabel label && label.isVisible() && label.getText() != null && !label.getText().isEmpty()) result.add(label.getText());
+            if (child instanceof java.awt.Container nested && child.isVisible()) result.addAll(labels(nested));
+        }
+        return result;
     }
 
     @Test void aFailedFactoryShowsAPlaceholderAndRemovalOrCloseNotifiesTheInstance() throws Exception {
@@ -335,7 +563,7 @@ class WindowPanelsTest {
             model.addRailAction("dev.x.open");
             model.addRailAction("dev.x.never-registered");
             assertThat(owner.leftStripe().isVisible()).isTrue();
-            assertThat(owner.rightStripe().isVisible()).isTrue();
+            assertThat(owner.rightStripe().isVisible()).as("rail actions are on the left; the empty right stripe hides").isFalse();
             assertThat(owner.leftStripe().buttons()).singleElement().satisfies(button -> {
                 assertThat(button.getToolTipText()).isEqualTo("Open Manager");
                 button.doClick();
@@ -349,7 +577,44 @@ class WindowPanelsTest {
             assertThat(state.railVisible()).isFalse();
             owner.setRailVisible(true);
             assertThat(owner.leftStripe().isVisible()).isTrue();
+            assertThat(owner.rightStripe().isVisible()).isFalse();
+        });
+    }
+
+    /** The frame around the terminal column: the area's child that holds the tab strip. */
+    private static Component centerFrame(WindowContent owner) {
+        Component frame = owner.tabStrip();
+        while (frame.getParent() != owner.area()) frame = frame.getParent();
+        return frame;
+    }
+
+    @Test void eachStripeShowsOnlyWhileItHasAWindowAndTheTerminalIsBorderlessOnAHiddenOnesSide() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.logs", "Logs", new ImageIcon(), Slot.BOTTOM_LEFT, site -> new JLabel("logs"));
+            toggle(model, owner, "dev.x.logs");
+            var root = new javax.swing.JRootPane(); root.setContentPane(owner); root.setSize(1200, 800);
+            LayoutTestSupport.layoutTree(root);
+            assertThat(owner.leftStripe().isVisible()).isTrue();
+            assertThat(owner.rightStripe().isVisible()).isFalse();
+            var logs = owner.area().content(Slot.BOTTOM_LEFT).getParent();
+            assertThat(((JComponent) logs).getInsets().left).as("the left stripe supplies the left edge's spacing").isZero();
+            assertThat(((JComponent) logs).getInsets().right).as("no right stripe: a tool window keeps its edge gutter, as in Zen").isPositive();
+            var center = (JComponent) centerFrame(owner);
+            assertThat(center.getInsets().left).isZero();
+            assertThat(center.getInsets().right).as("the terminal is borderless on the hidden stripe's side").isZero();
+
+            owner.dock().move("dev.x.logs", Slot.BOTTOM_RIGHT, 0);
+            LayoutTestSupport.layoutTree(root);
+            assertThat(owner.leftStripe().isVisible()).as("the left stripe emptied").isFalse();
             assertThat(owner.rightStripe().isVisible()).isTrue();
+            logs = owner.area().content(Slot.BOTTOM_RIGHT).getParent();
+            assertThat(((JComponent) logs).getInsets().left).isPositive();
+            assertThat(((JComponent) logs).getInsets().right).isZero();
+            assertThat(center.getInsets().left).isZero();
+            assertThat(center.getInsets().right).isZero();
         });
     }
 
@@ -397,7 +662,7 @@ class WindowPanelsTest {
 
     @Test void hiddenPanelKeepsItsComponentAndHandlersAcrossADelegateThemeUpdate() throws Exception {
         edt(() -> {
-            var themes = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.DARK);
+            var themes = ThemeTestSupport.controller(true);
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
             var model = new Contributions(); owner.connectContributions(model, UiState.inMemory());
             var clicks = new java.util.concurrent.atomic.AtomicInteger();
@@ -421,6 +686,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
+            owner.newTab(DesktopTestSupport.HOME);
             owner.connectContributions(model, UiState.inMemory());
             var left = new JLabel("left"); var right = new JLabel("right"); var bottom = new JLabel("bottom");
             model.addPanel("dev.x.left", "Left", new ImageIcon(), Slot.LEFT_TOP, site -> left);
@@ -868,7 +1134,8 @@ class WindowPanelsTest {
             assertThat(stripes).as("the stripes appearing tell the window").isNotEmpty();
             assertThat(stripes.getLast()).as("and it last heard with them showing").isTrue();
             var withStripes = minimums.getLast();
-            assertThat(withStripes.width).as("both stripes").isGreaterThanOrEqualTo(bare.width + 2 * UIScale.scale(owner.railWidth()));
+            assertThat(owner.rightStripe().isVisible()).as("nothing on the right").isFalse();
+            assertThat(withStripes.width).as("the left stripe").isGreaterThanOrEqualTo(bare.width + UIScale.scale(owner.railWidth()));
             assertThat(withStripes.height).as("the lower inset").isGreaterThanOrEqualTo(bare.height + UIScale.scale(8));
             assertThat(withStripes).as("what the window heard is what it has").isEqualTo(owner.getMinimumSize());
 

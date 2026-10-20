@@ -5,6 +5,7 @@ import java.awt.Dimension;
 import java.awt.Rectangle;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
+import javax.swing.JViewport;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
 
@@ -24,6 +25,15 @@ public final class FillingPage extends JPanel implements Scrollable {
     @Override public int getScrollableBlockIncrement(Rectangle visible, int orientation, int direction) {
         return orientation == SwingConstants.VERTICAL ? visible.height : visible.width;
     }
-    @Override public boolean getScrollableTracksViewportWidth() { return true; }
+    /** A filled page still respects the receiving controls' minimum; the existing outer viewport owns overflow. */
+    @Override public boolean getScrollableTracksViewportWidth() {
+        return !(getParent() instanceof JViewport viewport) || viewport.getWidth() >= getMinimumSize().width;
+    }
+    @Override public Dimension getPreferredSize() {
+        var size=super.getPreferredSize();
+        if(getParent() instanceof JViewport viewport && viewport.getWidth()<getMinimumSize().width)
+            size.width=getMinimumSize().width;
+        return size;
+    }
     @Override public boolean getScrollableTracksViewportHeight() { return true; }
 }

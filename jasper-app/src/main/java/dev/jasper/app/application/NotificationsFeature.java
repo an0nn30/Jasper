@@ -40,26 +40,35 @@ final class NotificationsFeature implements AutoCloseable {
     private final PanelEntry panel;
     private final Map<UUID, Attached> windows = new LinkedHashMap<>();
     private final Subscription listening;
+    private final java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit;
     private UUID lastActive;
     private boolean closed;
 
-    NotificationsFeature(NotificationCenter center, Contributions contributions) {
+    /** {@code kit} supplies the chrome kit context the cards and the Notifications panel are built with: the default look's panel. */
+    NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {
+        this(center, contributions, kit, new dev.jasper.app.presentation.AppPanels("Notifications", Slot.RIGHT_TOP));
+    }
+
+    /** As the three-argument form, with the panel's title and default slot under the look: Event Log at Bottom Left under labelled stripes. */
+    NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit,
+                         dev.jasper.app.presentation.AppPanels panels) {
         this.center = center;
         this.contributions = contributions;
+        this.kit = java.util.Objects.requireNonNull(kit, "kit");
         center.register(GENERAL);
         center.register(CONFIG);
-        var icon = AppIcons.bundled("toolwindows/notifications");
+        var icon = AppIcons.semantic("bell");
         contributions.addAction(SHOW_HISTORY, "Notifications: Show History", icon,
             List.of("notifications", "history", "messages", "errors", "panel"), Optional.empty(),
             invocation -> contributions.requestPanel(new Contributions.PanelRequest(invocation.windowId(), PANEL_ID,
-                Contributions.PanelRequest.Op.TOGGLE)));
+                Contributions.PanelRequest.Op.ACTIVATING_TOGGLE)));
         contributions.addAction(DISMISS_CARDS, "Notifications: Dismiss Cards", null,
             List.of("notifications", "close", "clear", "balloons", "cards"), Optional.empty(), invocation -> {
                 Attached attached = windows.get(invocation.windowId());
                 if (attached != null) attached.layer().dismissAll();
             });
-        panel = contributions.addPanel(PANEL_ID, "Notifications", icon, Slot.RIGHT_TOP, Optional.of(SHOW_HISTORY),
-            site -> new HistoryPanel(center, site, focused(site.windowId())));
+        panel = contributions.addPanel(PANEL_ID, panels.notificationsTitle(), icon, panels.notificationsSlot(), Optional.of(SHOW_HISTORY),
+            site -> new HistoryPanel(kit.get(), center, site, focused(site.windowId()), panels.notificationsTitle()));
         listening = center.onChange(this::changed);
         updateBadge();
     }
@@ -68,7 +77,7 @@ final class NotificationsFeature implements AutoCloseable {
     void attach(WindowContent content) {
         if (closed || windows.containsKey(content.id())) return;
         UUID id = content.id();
-        var layer = new CardLayer(center, content.isActiveAndOpen(), () -> contributions.requestPanel(
+        var layer = new CardLayer(kit.get(), center, content.isActiveAndOpen(), () -> contributions.requestPanel(
             new Contributions.PanelRequest(id, PANEL_ID, Contributions.PanelRequest.Op.SHOW)));
         content.mountCornerLayer(layer);
         windows.put(id, new Attached(content, layer));

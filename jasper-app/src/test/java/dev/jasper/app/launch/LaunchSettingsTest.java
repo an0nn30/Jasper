@@ -20,8 +20,7 @@ class LaunchSettingsTest {
         var t = d.terminal();
         var terminal = new TerminalConfig(new TerminalConfig.Shell(program, args), t.env(), t.scrollback(), t.optionAsMeta(),
             t.cursorShape(), t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), mode);
-        return new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), Map.of(), d.columns(),
-            d.lines(), terminal, d.buddyEnabled(), d.visibleRows());
+        return ConfigSnapshot.builder().keybindings(Map.of()).terminal(terminal).build();
     }
 
     private static ShellProfile wsl() {
@@ -41,14 +40,14 @@ class LaunchSettingsTest {
             .doesNotContainKey("WSLENV").containsEntry("JASPER_SHELL_INTEGRATION", dir.toString());
         assertThat(settings.label()).isEqualTo("Ubuntu");
         assertThat(settings.profile()).isEqualTo(wsl());
-        assertThat(settings.localPaths().apply("/mnt/c/Users")).map(Path::toString).contains("C:\\Users");
-        assertThat(settings.localPaths().apply("/home/me")).map(Path::toString).contains("\\\\wsl.localhost\\Ubuntu\\home\\me");
+        assertThat(settings.localPaths(true).apply("/mnt/c/Users")).map(Path::toString).contains("C:\\Users");
+        assertThat(settings.localPaths(true).apply("/home/me")).map(Path::toString).contains("\\\\wsl.localhost\\Ubuntu\\home\\me");
         var off = LaunchSettings.resolve(withShell("", List.of(), ShellIntegrationMode.OFF), wsl(), "Windows 11", Map.of(), 80, 24, dir);
         assertThat(off.environment()).containsEntry("WSLENV", "TERM:COLORTERM:TERM_PROGRAM:JASPER_TERMINAL");
         var local = LaunchSettings.resolve(ConfigSnapshot.defaults(), powershell(), "Windows 11", Map.of(), 80, 24, dir);
         assertThat(local.environment()).doesNotContainKey("WSLENV");
         assertThat(local.label()).isEqualTo("PowerShell");
-        assertThat(local.localPaths()).isSameAs(SessionLaunchOptions.DEFAULT_LOCAL_PATHS);
+        assertThat(local.localPaths(false)).isSameAs(SessionLaunchOptions.DEFAULT_LOCAL_PATHS);
     }
 
     @Test void wslenvSpelledTwoWaysBecomesOneMergedEntry() {
@@ -108,6 +107,55 @@ class LaunchSettingsTest {
         var localHome = local.at(Optional.empty(), home, path -> path.equals(home));
         assertThat(localHome.directory()).isEqualTo(home);
         assertThat(localHome.settings()).isSameAs(local);
+    }
+
+    /**
+     * On Windows a requested directory on another host counts as no request, so the launch starts where the profile's new
+     * shell starts and nothing touches the share: any program can report such a directory (OSC 7) for a split or new tab to
+     * inherit, and starting there, or only checking that it exists, makes Windows authenticate to that host over SMB. A WSL
+     * profile keeps its WSL shares; any other launch has none. Textual, so it holds on every OS.
+     */
+    @Test void onWindowsADirectoryOnAnotherHostIsNoRequest() {
+        Path home = Path.of("home-directory");
+        var wsl = new LaunchSettings(List.of("wsl.exe", "-d", "Ubuntu"), Map.of(), 80, 24, 0, wsl());
+        var local = new LaunchSettings(List.of("powershell.exe", "-NoLogo"), Map.of(), 80, 24, 0, powershell());
+        java.util.function.Predicate<Path> untouchable = path -> { throw new AssertionError("the share is never touched: " + path); };
+        for (String share : List.of("\\\\attacker\\share\\project", "\\/attacker/share", "\\\\wsl.localhost.attacker\\x\\y",
+            "\\\\w\u017fl$\\Ubuntu\\x", "\\\\wsl.localhost\\..\\attacker")) {
+            Optional<Path> requested = Optional.of(Path.of(share));
+            assertThat(local.startable(requested, true)).as(share).isEmpty();
+            assertThat(wsl.startable(requested, true)).as(share + " for a WSL profile").isEmpty();
+            assertThat(wsl.at(wsl.startable(requested, true), home, untouchable).settings().command()).as("the WSL profile's own start")
+                .endsWith("--cd", "~");
+            assertThat(local.at(local.startable(requested, true), home, path -> path.equals(home)).directory()).isEqualTo(home);
+        }
+        Optional<Path> wslShare = Optional.of(Path.of("\\\\wsl.localhost\\Ubuntu\\home\\me"));
+        assertThat(wsl.startable(wslShare, true)).as("a WSL profile's share").isEqualTo(wslShare);
+        assertThat(local.startable(wslShare, true)).as("no WSL share outside a WSL profile").isEmpty();
+        Optional<Path> folder = Optional.of(Path.of("C:\\Users\\me"));
+        assertThat(local.startable(folder, true)).isEqualTo(folder);
+        assertThat(local.startable(Optional.empty(), true)).isEmpty();
+        Optional<Path> named = Optional.of(Path.of("\\\\attacker\\share"));
+        assertThat(local.startable(named, false)).as("elsewhere the text is only a name").isEqualTo(named);
+    }
+
+    /**
+     * On Windows the session ignores a reported directory on another host, so it never becomes the pane's directory, which
+     * plugins check on the file system with no click: the Indexer looks for a project in every directory a shell reports.
+     * Any program can report one (OSC 7). A WSL profile's reports stay on its own share. The mapped path's text decides,
+     * and the path of {@code file://localhost/%5C%5Cattacker%5Cshare} is a UNC path on Windows and a file name elsewhere,
+     * so this holds on every OS.
+     */
+    @Test void onWindowsTheSessionIgnoresAReportedDirectoryOnAnotherHost() {
+        var wsl = new LaunchSettings(List.of("wsl.exe", "-d", "Ubuntu"), Map.of(), 80, 24, 0, wsl());
+        var local = new LaunchSettings(List.of("powershell.exe", "-NoLogo"), Map.of(), 80, 24, 0, powershell());
+        String share = "/\\\\attacker\\share";
+        assertThat(local.localPaths(true).apply(share)).isEmpty();
+        assertThat(local.localPaths(false).apply(share)).as("elsewhere the text is only a name").isPresent();
+        assertThat(local.localPaths(true).apply("/C:/Users/me")).isPresent()
+            .isEqualTo(SessionLaunchOptions.DEFAULT_LOCAL_PATHS.apply("/C:/Users/me"));
+        assertThat(wsl.localPaths(true).apply("//attacker/share")).as("on the distribution's share")
+            .map(Path::toString).hasValueSatisfying(path -> assertThat(path).startsWith("\\\\wsl.localhost\\Ubuntu\\"));
     }
 
     @Test void termProgramIsAlwaysJasperAndOnlyAutoInjects() {
@@ -232,8 +280,7 @@ class LaunchSettingsTest {
         var terminal = new TerminalConfig(new TerminalConfig.Shell("/bin/zsh", List.of()),
             Map.of("JASPER_SHELL_INTEGRATION", "/my/own"), t.scrollback(), t.optionAsMeta(), t.cursorShape(),
             t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), ShellIntegrationMode.AUTO);
-        var snapshot = new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), Map.of(),
-            d.columns(), d.lines(), terminal, d.buddyEnabled(), d.visibleRows());
+        var snapshot = ConfigSnapshot.builder().keybindings(Map.of()).terminal(terminal).build();
         var settings = LaunchSettings.resolve(snapshot, "Mac OS X", Map.of(), 150, 45, Path.of("/opt/jasper/si"));
         assertThat(settings.environment()).containsEntry("JASPER_SHELL_INTEGRATION", "/my/own")
             .containsEntry("ZDOTDIR", Path.of("/my/own").resolve("zsh").toString());
@@ -243,8 +290,7 @@ class LaunchSettingsTest {
         var d = ConfigSnapshot.defaults(); var t = d.terminal();
         var terminal = new TerminalConfig(t.shell(), Map.of("TERM_PROGRAM", "Other"), t.scrollback(), t.optionAsMeta(), t.cursorShape(),
             t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), ShellIntegrationMode.AUTO);
-        var snapshot = new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), Map.of(), d.columns(),
-            d.lines(), terminal, d.buddyEnabled(), d.visibleRows());
+        var snapshot = ConfigSnapshot.builder().keybindings(Map.of()).terminal(terminal).build();
         assertThat(LaunchSettings.resolve(snapshot, "Linux", Map.of(), 150, 45, Path.of("/tmp/si")).environment())
             .containsEntry("TERM_PROGRAM", "Other");
     }
@@ -365,5 +411,60 @@ class LaunchSettingsTest {
         var unknownEnv = new HashMap<String, String>();
         LaunchSettings.inject(unknown, unknownEnv, dir);
         assertThat(unknownEnv).isEmpty();
+    }
+
+    @Test void variablesAddedLastWinOverEverythingTheSettingsResolved() {
+        var settings = LaunchSettings.resolve(withShell("/bin/zsh", List.of(), ShellIntegrationMode.OFF), "Mac OS X",
+            Map.of("KEEP", "yes"), 150, 45, null);
+        var added = settings.withVariables(Map.of("JASPER_PANE", "p", "KEEP", "replaced"));
+        assertThat(added.environment()).containsEntry("JASPER_PANE", "p").containsEntry("KEEP", "replaced");
+        assertThat(added.command()).isEqualTo(settings.command());
+        assertThat(added.profile()).isEqualTo(settings.profile());
+        assertThat(settings.environment()).doesNotContainKey("JASPER_PANE");
+        assertThat(settings.withVariables(Map.of())).isSameAs(settings);
+    }
+
+    private static ShellProfile login() {
+        return new ShellProfile("login", "zsh", ShellProfile.Kind.LOGIN_SHELL, Optional.of("zsh"), List.of("/bin/zsh", "-l"));
+    }
+
+    @Test void pluginVariablesComeAfterJaspersOwnAndBeforeTheConfiguredOnes() {
+        var config = snapshot("", List.of(), Map.of("EDITOR", "configured"), 100, 80, 24);
+        Map<String, String> inherited = Map.of("EDITOR", "inherited", "PAGER", "less", "TERM_PROGRAM", "iTerm.app");
+        var given = new ArrayList<Map<String, String>>();
+        var settings = LaunchSettings.resolve(config, login(), "Mac OS X", inherited, 80, 24, null, environment -> {
+            given.add(environment);
+            return Map.of("EDITOR", "plugin", "VISUAL", "plugin", "PAGER", "more", "TERM", "dumb", "COLORTERM", "no");
+        });
+        assertThat(given).singleElement().as("the untouched inherited map").isSameAs(inherited);
+        assertThat(settings.environment()).containsEntry("EDITOR", "configured").containsEntry("VISUAL", "plugin")
+            .containsEntry("PAGER", "more").containsEntry("TERM", "xterm-256color").containsEntry("COLORTERM", "truecolor")
+            .containsEntry("TERM_PROGRAM", "Jasper");
+    }
+
+    @Test void aWslProfileGetsNoPluginVariablesAndTheOtherOverloadsAddNone() {
+        var asked = new java.util.concurrent.atomic.AtomicInteger();
+        var settings = LaunchSettings.resolve(ConfigSnapshot.defaults(), wsl(), "Windows 11", Map.of(), 80, 24, null, environment -> {
+            asked.incrementAndGet();
+            return Map.of("EDITOR", "plugin");
+        });
+        assertThat(settings.environment()).doesNotContainKey("EDITOR");
+        assertThat(asked).as("only WSLENV's variables reach Linux").hasValue(0);
+        assertThat(LaunchSettings.resolve(ConfigSnapshot.defaults(), login(), "Linux", Map.of(), 80, 24, null).environment())
+            .doesNotContainKey("EDITOR");
+    }
+
+    @Test void aProgramKeepsTheShellsEnvironmentAndProfileAndIsNamedAfterItsFile() {
+        var settings = LaunchSettings.resolve(withShell("/bin/zsh", List.of("-l"), ShellIntegrationMode.AUTO), "Mac OS X",
+            Map.of("PATH", "/bin"), 150, 45, Path.of("/opt/jasper/si"));
+        var program = settings.withCommand(List.of("/opt/homebrew/bin/nvim", "+42", "config.toml"));
+        assertThat(program.command()).containsExactly("/opt/homebrew/bin/nvim", "+42", "config.toml");
+        assertThat(program.environment()).isEqualTo(settings.environment());
+        assertThat(program.profile()).isEqualTo(settings.profile());
+        assertThat(program.columns()).isEqualTo(150);
+        assertThat(program.label()).isEqualTo("nvim");
+        assertThat(LaunchSettings.programName("/usr/bin/vim")).isEqualTo("vim");
+        assertThat(LaunchSettings.programName("")).isEqualTo("shell");
+        assertThatIllegalArgumentException().isThrownBy(() -> settings.withCommand(List.of()));
     }
 }

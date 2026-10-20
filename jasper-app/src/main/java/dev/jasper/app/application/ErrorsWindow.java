@@ -27,15 +27,18 @@ final class ErrorsWindow {
     private final Incidents incidents;
     private final ErrorsView.Hooks hooks;
     private final ZoneId zone;
+    private final java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit;
     private AuxiliarySurface surface;
     private ErrorsView view;
 
-    ErrorsWindow(Contributions contributions, AuxiliaryWindows windows, Incidents incidents, ErrorsView.Hooks hooks, ZoneId zone) {
+    ErrorsWindow(Contributions contributions, AuxiliaryWindows windows, Incidents incidents, ErrorsView.Hooks hooks, ZoneId zone,
+                 java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {
+        this.kit = java.util.Objects.requireNonNull(kit, "kit");
         this.windows = windows;
         this.incidents = incidents;
         this.hooks = hooks;
         this.zone = zone;
-        contributions.addAction(SHOW_ERRORS, "Notifications: Show Errors", AppIcons.bundled("status/error"),
+        contributions.addAction(SHOW_ERRORS, "Notifications: Show Errors", AppIcons.semantic("error"),
             List.of("notifications", "errors", "exceptions", "stack trace", "incidents", "problems"), Optional.empty(),
             invocation -> show(Optional.empty()));
     }
@@ -46,10 +49,14 @@ final class ErrorsWindow {
      */
     void show(Optional<UUID> incident) {
         if (surface == null || surface.closed()) {
-            surface = windows.window(ID, "Errors", SIZE, true);
-            ErrorsView opened = new ErrorsView(incidents, hooks, zone);
-            surface.setContent(opened);
-            surface.onClosed(opened::close);
+            AuxiliarySurface window = windows.window(ID, "Errors", SIZE, true);
+            ErrorsView opened;
+            // A view that fails to build takes its window with it, so the next Show more… starts afresh.
+            try { opened = new ErrorsView(kit.get(), incidents, hooks, zone, window::close); }
+            catch (RuntimeException | Error failure) { window.close(); throw failure; }
+            window.setContent(opened);
+            window.onClosed(opened::close);
+            surface = window;
             view = opened;
         }
         incident.ifPresent(view::select);

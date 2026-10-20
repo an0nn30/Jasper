@@ -1,5 +1,6 @@
 package dev.jasper.app.shortcuthelp;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.config.UiFontConfig;
@@ -19,29 +20,29 @@ public final class ShortcutHelpPreview {
     public static void main(String[] args) throws Exception {
         Path output = Path.of(args[0]); Files.createDirectories(output);
         SwingUtilities.invokeAndWait(() -> {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             var c = new Contributions();
             c.addAction("dev.jasper.remote.palette", "SSH Hosts", null, List.of("connect"), Optional.of("cmd+shift+h"), ignored -> {});
             c.addAction("dev.jasper.remote.panel", "Toggle SSH Hosts", null, List.of(), Optional.of("cmd+shift+s"), ignored -> {});
             c.addAction("dev.jasper.vault.open", "Credential Vault", null, List.of(), Optional.empty(), ignored -> {});
-            for (dev.jasper.app.appearance.Theme appearance : dev.jasper.app.appearance.ThemeManager.builtIns()) for (int size : new int[]{0, 18}) {
-                themes.configure(appearance, new UiFontConfig("system", size));
-                var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
+            for (boolean dark : new boolean[]{true, false}) for (int size : new int[]{0, 18}) {
+                themes.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system", size));
+                var panel = new ShortcutPanel(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), true,
+                    changes -> { throw new AssertionError("Unexpected save"); });
                 panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), c.actions(),
                     Map.of("dev.jasper.remote", "Remote", "dev.jasper.vault", "Credential Vault"), true));
-                render(panel, output.resolve("sections-" + appearance.id() + "-" + size + ".png"));
-                panel.tree.expandRow(0);
-                panel.tree.expandRow(1);
-                panel.tree.setSelectionRow(0);
-                render(panel, output.resolve("expanded-" + appearance.id() + "-" + size + ".png"));
-                if (size != 0) panel.search.setText("remote");
-                else panel.search.setText("copy");
+                render(panel, output.resolve("sections-" + (dark ? "dark" : "light") + "-" + size + ".png"));
+                for (String group : panel.tree.visibleIds().subList(0, 2)) panel.tree.expanded(group, true);
+                ShortcutKit.search(panel).setText("");
+                ShortcutKit.selectRow(panel, 0);
+                render(panel, output.resolve("expanded-" + (dark ? "dark" : "light") + "-" + size + ".png"));
+                ShortcutKit.search(panel).setText(size != 0 ? "remote" : "copy");
                 int editedRow = 1;
                 if (size != 0) while (panel.tree.entryAt(editedRow) == null || !panel.tree.entryAt(editedRow).name().equals("SSH Hosts")) editedRow++;
-                panel.tree.setSelectionRow(editedRow);
-                panel.tree.getActionMap().get("editShortcut").actionPerformed(null);
+                ShortcutKit.selectRow(panel, editedRow);
+                ShortcutKit.key(panel, "ENTER");
                 panel.capture(javax.swing.KeyStroke.getKeyStroke(size == 0 ? "meta V" : "ctrl shift H"));
-                render(panel, output.resolve("shortcuts-" + appearance.id() + "-" + size + ".png"));
+                render(panel, output.resolve("shortcuts-" + (dark ? "dark" : "light") + "-" + size + ".png"));
                 panel.close();
             }
         });

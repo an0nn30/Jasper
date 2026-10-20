@@ -5,9 +5,13 @@ import java.io.IOException;
 import java.net.BindException;
 import java.net.ConnectException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
@@ -25,6 +29,32 @@ class ListenerTest {
         listener.close();
         listener.close();
         assertThatThrownBy(() -> new Socket(InetAddress.ofLiteral("127.0.0.1"), port).close()).isInstanceOf(ConnectException.class);
+    }
+
+    @Test void onceClosedThePortRefusesConnectionsAndCanBeBoundAgainEvenOnABusyMachine() throws Exception {
+        var accepted = new CountDownLatch(1);
+        Listener listener = Listener.open("127.0.0.1", 0, socket -> {
+            try (socket) { accepted.countDown(); } catch (IOException ignored) { }
+        });
+        int port = listener.port();
+        new Socket(InetAddress.ofLiteral("127.0.0.1"), port).close();
+        assertThat(accepted.await(5, TimeUnit.SECONDS)).as("the accepting thread runs").isTrue();
+        // Every carrier busy for a moment, so the virtual thread accepting on the socket cannot run: the JDK closes a
+        // socket that such a thread is accepting on only when that thread runs again.
+        int carriers = Integer.getInteger("jdk.virtualThreadScheduler.parallelism", Runtime.getRuntime().availableProcessors());
+        var busy = new CountDownLatch(carriers);
+        long until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(300);
+        var hogs = new ArrayList<Thread>();
+        for (int i = 0; i < carriers; i++)
+            hogs.add(Thread.ofVirtual().start(() -> { busy.countDown(); while (System.nanoTime() < until) Thread.onSpinWait(); }));
+        try {
+            busy.await();
+            listener.close();
+            assertThatThrownBy(() -> new Socket(InetAddress.ofLiteral("127.0.0.1"), port).close()).isInstanceOf(ConnectException.class);
+            try (var again = new ServerSocket()) { again.bind(new InetSocketAddress(InetAddress.ofLiteral("127.0.0.1"), port)); }
+        } finally {
+            for (Thread hog : hogs) hog.join();
+        }
     }
 
     @Test void aBusyPortIsReportedInTheUsersWords() throws Exception {

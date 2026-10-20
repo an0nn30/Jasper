@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Dimension;
@@ -16,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class WindowHeaderTest {
     @BeforeAll static void theme() throws Exception {
-        SwingUtilities.invokeAndWait(() -> ThemeTestSupport.install(Theme.DARK));
+        SwingUtilities.invokeAndWait(() -> ThemeTestSupport.install(true));
     }
 
     /** Four 60 px controls: full width 16 + 4 * 64 - 4 = 268, minimum 16 + 24 = 40 at a 30 px bar. */

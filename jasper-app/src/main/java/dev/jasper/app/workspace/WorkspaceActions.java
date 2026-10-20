@@ -25,6 +25,7 @@ final class WorkspaceActions {
         String unavailable = "Configuration is not connected";
         action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, unavailable);
         action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, unavailable);
+        action(ActionId.OPEN_FILE).putValue(Action.SHORT_DESCRIPTION, "Open a file with the default editor");
     }
     Action action(ActionId id) { return actions.get(id); }
     boolean updating() { return updatingActions; }
@@ -32,7 +33,7 @@ final class WorkspaceActions {
 
     void invoke(ActionId id) {
         if (dev.jasper.app.platform.WindowInput.blocked(owner) && id != ActionId.QUIT) return;
-        if (owner.commandPalette() != null && owner.commandPalette().isOpen()
+        if (owner.commandPalette() != null && owner.commandPalette().blocksActions()
             && id != ActionId.COMMAND_PALETTE) return;
         update();
         if (!action(id).isEnabled()) return;
@@ -49,6 +50,7 @@ final class WorkspaceActions {
             case COMMAND_PALETTE -> owner.commandPalette().open(PaletteScope.ALL_ID);
             case NEW_TAB -> owner.newTab(owner.directory());
             case NEW_WINDOW -> owner.requestNewWindow();
+            case OPEN_FILE -> owner.openFile();
             case QUIT -> owner.requestQuit();
             case CLOSE_TAB -> owner.closeTab(tab);
             case CLOSE_PANE -> tab.closePane(pane);
@@ -68,7 +70,7 @@ final class WorkspaceActions {
                 if (index < owner.tabStrip().getTabCount()) owner.tabStrip().setSelectedIndex(index);
             }
             case RENAME_TAB -> {
-                String name = JOptionPane.showInputDialog(owner, "Tab name (leave blank for automatic):", tab.title());
+                String name = owner.askTabName(tab.title());
                 if (name != null) tab.rename(name);
             }
             case FIND -> pane.findBar().open();
@@ -79,6 +81,7 @@ final class WorkspaceActions {
             case COPY -> view.execute(TerminalAction.COPY_SELECTION);
             case PASTE -> view.execute(TerminalAction.PASTE_CLIPBOARD);
             case CLEAR_SCROLLBACK -> view.execute(TerminalAction.CLEAR_SCROLLBACK);
+            case CLEAR_TERMINAL -> view.execute(TerminalAction.CLEAR_TERMINAL);
             case FONT_BIGGER -> view.setFontSize(view.fontSize() + 1);
             case FONT_SMALLER -> view.setFontSize(view.fontSize() - 1);
             case FONT_RESET -> view.setFontSize(owner.configuredFontSize());
@@ -115,9 +118,10 @@ final class WorkspaceActions {
                 boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
-                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT, TOGGLE_ZEN_MODE -> true;
+                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, OPEN_FILE, QUIT, TOGGLE_ZEN_MODE -> true;
                     case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
+                    case CLEAR_TERMINAL -> ready && !pane.session().usingAlternateBuffer();
                     case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
                          CLEAR_SCROLLBACK, FONT_BIGGER, FONT_SMALLER, FONT_RESET -> ready;
                     case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,

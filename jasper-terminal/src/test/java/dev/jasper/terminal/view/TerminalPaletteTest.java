@@ -166,16 +166,16 @@ class TerminalPaletteTest {
         colors.set(7, null);
 
         assertThatThrownBy(() -> new Palette(null, Color.BLACK, Color.WHITE, Color.GRAY,
-            Collections.nCopies(16, Color.BLACK))).isInstanceOf(NullPointerException.class);
+            Collections.nCopies(16, Color.BLACK), Color.WHITE)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new Palette(Color.WHITE, null, Color.WHITE, Color.GRAY,
-            Collections.nCopies(16, Color.BLACK))).isInstanceOf(NullPointerException.class);
+            Collections.nCopies(16, Color.BLACK), Color.WHITE)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, null, Color.GRAY,
-            Collections.nCopies(16, Color.BLACK))).isInstanceOf(NullPointerException.class);
+            Collections.nCopies(16, Color.BLACK), Color.WHITE)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, null,
-            Collections.nCopies(16, Color.BLACK))).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, Color.GRAY, null))
+            Collections.nCopies(16, Color.BLACK), Color.WHITE)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, Color.GRAY, null, Color.WHITE))
             .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, Color.GRAY, colors))
+        assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, Color.GRAY, colors, Color.WHITE))
             .isInstanceOf(NullPointerException.class);
     }
 

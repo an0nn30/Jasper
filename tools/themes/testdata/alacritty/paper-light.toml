@@ -1,0 +1,22 @@
+# 0x colours, Cell* references, no bright colours, an import.
+import = ["~/.config/alacritty/base.toml"]
+
+[colors.primary]
+background = '0xF8F8F4'
+foreground = '0x1C1C1C'
+
+[colors.cursor]
+cursor = 'CellForeground'
+
+[colors.selection]
+background = 'CellForeground'
+
+[colors.normal]
+black = '0x1C1C1C'
+red = '0xB3261E'
+green = '0x2E7D32'
+yellow = '0x8A6100'
+blue = '0x1F5FBF'
+magenta = '0x8E3FA8'
+cyan = '0x0F7A8A'
+white = '0x5D6470'

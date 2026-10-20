@@ -15,7 +15,7 @@ class ThemeButtonsTest {
     @Test void formControlsAreDrawnByFlatLafInTheThemesColours() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            var themes = new ThemeController();
+            var themes = ThemeTestSupport.controller(true);
             var button = new JButton("Generate Key...");
             var parent = new JPanel(); parent.add(button);
             var field = new JTextField("Existing text", 20);
@@ -26,18 +26,23 @@ class ThemeButtonsTest {
             parent.add(field); parent.add(password); parent.add(formatted); parent.add(choices); parent.add(note);
             var dialog = new JRootPane(); var confirm = new JButton("OK"); dialog.getContentPane().add(confirm); dialog.setDefaultButton(confirm);
             int[] clicks = {0}; button.addActionListener(event -> clicks[0]++);
-            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                themes.configure(theme);
+            for (boolean themeDark : new boolean[]{true, false}) {
+                themes.configure(themeDark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                 SwingUtilities.updateComponentTreeUI(parent);
                 SwingUtilities.updateComponentTreeUI(dialog);
                 assertThat(button.getUI()).isInstanceOf(FlatButtonUI.class);
-                assertThat(button.getFont().getSize2D()).as("form font").isEqualTo(12f);
-                assertThat(button.getPreferredSize().height).isBetween(20, 28);
-                assertThat(fill(button)).as(theme.name()).isEqualTo(UIManager.getColor("Button.background"));
+                assertThat(button.getFont().getSize2D()).as("form font").isEqualTo(UIManager.getFont("defaultFont").getSize2D());
+                // FlatLaf sizes the text button to its line inside margin and border (20 to 28 with the macOS faces).
+                var insets = button.getInsets();
+                assertThat(button.getPreferredSize().height).isEqualTo(button.getFontMetrics(button.getFont()).getHeight() + insets.top + insets.bottom);
+                if (com.formdev.flatlaf.util.SystemInfo.isMacOS) assertThat(button.getPreferredSize().height).isBetween(20, 28);
+                assertThat(fill(button)).as((themeDark ? "dark" : "light")).isEqualTo(UIManager.getColor("Button.background"));
                 // IntelliJ Light's default button is a slight gradient; sample within a small tolerance.
-                assertThat(distance(fill(confirm), UIManager.getColor("Button.default.background"))).as(theme.name()).isLessThanOrEqualTo(8);
+                assertThat(distance(fill(confirm), UIManager.getColor("Button.default.background"))).as((themeDark ? "dark" : "light")).isLessThanOrEqualTo(8);
                 for (var input : List.of(field, password, formatted)) {
-                    assertThat(input.getPreferredSize().height).isBetween(26, 34);
+                    var inputInsets = input.getInsets();
+                    assertThat(input.getPreferredSize().height).as("native input fits its font and border")
+                        .isEqualTo(input.getFontMetrics(input.getFont()).getHeight() + inputInsets.top + inputInsets.bottom);
                     assertThat(input.isEditable()).isTrue();
                 }
                 assertThat(field.getBackground()).isEqualTo(UIManager.getColor("TextField.background"));
@@ -47,7 +52,7 @@ class ThemeButtonsTest {
                 assertThat(note.getBackground()).isEqualTo(UIManager.getColor("TextArea.background"));
                 assertThat(field.getText()).isEqualTo("Existing text");
                 assertThat(note.getText()).isEqualTo("First line\nSecond line");
-                saveInputsPreview(List.of(field, password, formatted), theme);
+                saveInputsPreview(List.of(field, password, formatted), themeDark);
                 button.setEnabled(false); button.doClick(); assertThat(clicks[0]).isZero();
                 button.setEnabled(true);
             }
@@ -57,7 +62,7 @@ class ThemeButtonsTest {
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    private static void saveInputsPreview(List<JTextField> fields, Theme theme) throws java.io.IOException {
+    private static void saveInputsPreview(List<JTextField> fields, boolean dark) throws java.io.IOException {
         var image = new BufferedImage(720, 320, BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics();
         try {
@@ -76,7 +81,7 @@ class ThemeButtonsTest {
         } finally { g.dispose(); }
         var output = java.nio.file.Path.of("build/render-preview");
         java.nio.file.Files.createDirectories(output);
-        javax.imageio.ImageIO.write(image, "png", output.resolve("inputs-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+        javax.imageio.ImageIO.write(image, "png", output.resolve("inputs-" + (dark ? "dark" : "light") + ".png").toFile());
     }
 
     private static Color fill(JButton button) {

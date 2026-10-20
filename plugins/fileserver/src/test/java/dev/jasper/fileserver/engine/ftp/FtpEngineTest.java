@@ -3,7 +3,6 @@ package dev.jasper.fileserver.engine.ftp;
 import dev.jasper.fileserver.Ports;
 import dev.jasper.fileserver.TestClock;
 import dev.jasper.fileserver.auth.ResolvedLogin;
-import dev.jasper.fileserver.definition.PortRange;
 import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.engine.EngineFailure;
@@ -60,20 +59,18 @@ class FtpEngineTest {
 
     @AfterEach void stop() { if (engine != null) engine.stop(); }
 
-    FtpEngine engine(ResolvedLogin login, boolean writable, boolean tls, boolean requireTls) throws IOException {
-        port = Ports.free();
-        int first = Math.min(Ports.free(), 65000);
+    FtpEngine engine(int port, ResolvedLogin login, boolean writable, boolean tls, boolean requireTls) throws IOException {
+        this.port = port;
         var base = ServerDefinition.create("ftp", Protocol.FTP, shared);
         var definition = new ServerDefinition(base.id(), "ftp", Protocol.FTP, shared, base.bind(), port, Optional.empty(), writable,
             base.login(), List.of(), tls, requireTls, false);
         engine = new FtpEngine(definition, new ShareRoot(shared, !writable), login, new ServerEvents(Clock.systemUTC(), events::add), throttle,
-            List::of, new PortRange(first, first + 20), new TlsMaterial(temp.resolve("tls"), Clock.systemUTC(), () -> ""));
+            List::of, Ports.freeRange(21), new TlsMaterial(temp.resolve("tls"), Clock.systemUTC(), () -> ""));
         return engine;
     }
 
     FtpEngine start(ResolvedLogin login, boolean writable, boolean tls, boolean requireTls) throws Exception {
-        engine(login, writable, tls, requireTls).start();
-        return engine;
+        return Ports.start(free -> engine(free, login, writable, tls, requireTls));
     }
 
     FTPClient client() throws IOException {
@@ -107,6 +104,15 @@ class FtpEngineTest {
         long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
         while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(condition.getAsBoolean()).as(what).isTrue();
+    }
+
+    // Observe completion before opening the target: a concurrent reader can prevent replacement on Windows.
+    void awaitUpload(String path, long bytes) throws InterruptedException {
+        await(() -> events.stream().anyMatch(event -> event instanceof ServerEvent.Transferred done
+            && done.direction() == ServerEvent.Direction.UPLOAD && done.path().equals(path) && done.bytes() == bytes),
+            "upload completed: " + path);
+        assertThat(events).anyMatch(event -> event instanceof ServerEvent.Transferred done
+            && done.direction() == ServerEvent.Direction.UPLOAD && done.path().equals(path) && done.bytes() == bytes && done.complete());
     }
 
     static String content(Path file) {
@@ -159,11 +165,14 @@ class FtpEngineTest {
         assertThat(client.login("dustin", "pw")).isTrue();
         client.setFileType(FTP.BINARY_FILE_TYPE);
         assertThat(store(client, "/docs/new.txt", "abc")).isTrue();
-        await(() -> "abc".equals(content(shared.resolve("docs/new.txt"))), "the upload is committed");
+        awaitUpload("/docs/new.txt", 3);
+        assertThat(shared.resolve("docs/new.txt")).hasContent("abc");
         assertThat(store(client, "/docs/a.txt", "replaced")).isTrue();
-        await(() -> "replaced".equals(content(shared.resolve("docs/a.txt"))), "the file is replaced");
+        awaitUpload("/docs/a.txt", 8);
+        assertThat(shared.resolve("docs/a.txt")).hasContent("replaced");
         assertThat(client.appendFile("/docs/a.txt", new ByteArrayInputStream("!".getBytes(StandardCharsets.UTF_8)))).isTrue();
-        await(() -> "replaced!".equals(content(shared.resolve("docs/a.txt"))), "the append lands");
+        awaitUpload("/docs/a.txt", 1);
+        assertThat(shared.resolve("docs/a.txt")).hasContent("replaced!");
         client.setRestartOffset(2);
         assertThat(store(client, "/docs/a.txt", "zz")).as("resuming part-way through is refused").isFalse();
         assertThat(content(shared.resolve("docs/a.txt"))).isEqualTo("replaced!");
@@ -282,14 +291,14 @@ class FtpEngineTest {
     }
 
     @Test void aBusyPortFailsWithAClearMessageAndStopFreesThePort() throws Exception {
-        engine(ResolvedLogin.anonymous(), false, false, false);
+        engine(Ports.free(), ResolvedLogin.anonymous(), false, false, false);
         try (var taken = new ServerSocket()) {
             taken.setReuseAddress(false);
             taken.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
             assertThatThrownBy(engine::start).isInstanceOf(EngineFailure.class).hasMessage("Port " + port + " is already in use on 127.0.0.1");
         }
         assertThat(engine.addresses()).isEmpty();
-        engine(ResolvedLogin.anonymous(), false, false, false).start();
+        start(ResolvedLogin.anonymous(), false, false, false);
         assertThat(engine.port()).isEqualTo(port);
         engine.stop();
         engine.stop();

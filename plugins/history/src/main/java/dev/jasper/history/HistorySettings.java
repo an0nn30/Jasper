@@ -11,6 +11,8 @@ import java.util.Set;
 
 /** Shell History's declared settings. They apply at once and are safe to read from any thread. */
 final class HistorySettings {
+    /** The section label above the settings card on the generated Settings page. */
+    static final String SECTION = "Ranking";
     private final Setting<List<String>> trivialCommands;
     private final Setting<Boolean> deprioritizeTrivial;
 
@@ -19,11 +21,11 @@ final class HistorySettings {
                 SettingKind.stringList(word -> word.matches("\\S+")), HistoryPlugin.DEFAULT_TRIVIAL)
             .label("Trivial commands")
             .description("Single words compared with a command's first word; a command of at most two words that starts with one ranks below other commands on an empty History query.")
-            .keywords("history", "rank"));
+            .section(SECTION).keywords("history", "rank"));
         deprioritizeTrivial = settings.declare(SettingSpec.of("deprioritize_trivial", SettingKind.bool(), true)
             .label("Rank trivial commands last")
             .description("Off: an empty History query lists commands by recency alone.")
-            .keywords("history", "rank"));
+            .section(SECTION).keywords("history", "rank"));
     }
 
     /** The lower-cased trivial commands; none when ranking them last is off or the list is empty. */

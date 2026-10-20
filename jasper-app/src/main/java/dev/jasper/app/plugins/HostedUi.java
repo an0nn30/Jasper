@@ -12,7 +12,6 @@ import dev.jasper.app.dock.Slot;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.contributions.StatusEntry;
 import dev.jasper.app.contributions.ToolbarEntry;
-import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.sdk.Subscription;
@@ -71,15 +70,20 @@ final class HostedUi {
     private record Context(WindowHandle window, Optional<PaneHandle> pane) implements ActionContext { }
 
     private volatile dev.jasper.app.appearance.ResolvedTheme appearanceSnapshot;
+    private final List<Consumer<Variant>> themeHandlers = new ArrayList<>();
     private final List<Consumer<Variant>> workspaceHandlers = new ArrayList<>();
 
+    private HostedKit kit;
+    void kit(HostedKit value) { kit = java.util.Objects.requireNonNull(value); kit.anchorHost=windows; }
+    /** Where this plugin's appearance reads the presentation, on each call and from any thread. */
+    private volatile Supplier<dev.jasper.sdk.ui.Presentation> presentation = HostedPresentation::standard;
+    void presentation(Supplier<dev.jasper.sdk.ui.Presentation> source) { presentation = java.util.Objects.requireNonNull(source, "source"); }
     private final String pluginId;
     private final Contributions model;
     private final Containment containment;
     private final Consumer<Runnable> ui;
     private final BooleanSupplier onUi;
     private final BooleanSupplier open;
-    private final ClassLoader loader;
     private final Supplier<Variant> variant;
     private final Function<Consumer<Variant>, Subscription> themeSubscriber;
     private final AuxiliaryWindows windows;
@@ -87,6 +91,11 @@ final class HostedUi {
     private final GlassSource glass;
     private final Set<String> ownActions = new HashSet<>();
     private final List<Runnable> closers = new ArrayList<>();
+    /**
+     * The id of this plugin's action whose handler is running on the UI thread, or null: a toggle or show its panel's
+     * own toggle action makes as it runs activates the panel (plan 15b Rulings 1).
+     */
+    private String running;
 
     HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
              BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
@@ -110,7 +119,7 @@ final class HostedUi {
              Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe,
              GlassSource glass) {
         this.pluginId = pluginId; this.model = model; this.containment = containment; this.ui = ui; this.onUi = onUi;
-        this.open = open; this.loader = loader; this.variant = variant; this.themeSubscriber = themeSubscriber;
+        this.open = open; this.variant = variant; this.themeSubscriber = themeSubscriber;
         this.windows = windows;
         this.terminals = terminals;
         this.glass = glass == null ? GlassSource.NONE : glass;
@@ -119,6 +128,7 @@ final class HostedUi {
             var registration = subscribe.apply(next -> {
                 var previous = appearanceSnapshot;
                 appearanceSnapshot = next;
+                if (!previous.equals(next)) for(var handler:List.copyOf(themeHandlers)) if(themeHandlers.contains(handler) && open.getAsBoolean()) containment.run(pluginId,"appearance",() -> handler.accept(next.chrome().dark()?Variant.DARK:Variant.LIGHT));
                 if (!previous.workspace().equals(next.workspace())) announceWorkspace();
             });
             closers.add(registration::close);
@@ -195,10 +205,14 @@ final class HostedUi {
             requireNamespace(spec.id(), "An action");
             spec.context().id().ifPresent(owned -> requireNamespace(owned,
                 spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
-            ActionEntry entry = model.addAction(spec.id(), spec.title(), spec.icon().orElse(null), spec.keywords(),
+            ActionEntry entry = model.addAction(spec.id(), spec.title(), spec.icon().map(HostedUi.this::icon).orElse(null), spec.keywords(),
                 spec.defaultBinding(), spec.otherDefaultBinding(), keyContext(spec.context()),
-                invocation -> containment.run(pluginId, "action " + spec.id(), () ->
-                    handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle)))));
+                invocation -> containment.run(pluginId, "action " + spec.id(), () -> {
+                    String previous = running;
+                    running = spec.id();
+                    try { handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle))); }
+                    finally { running = previous; }
+                }));
             ownActions.add(spec.id());
             Subscription removal = tracked(() -> { ownActions.remove(spec.id()); entry.close(); });
             return new PluginAction() {
@@ -223,16 +237,61 @@ final class HostedUi {
     Toolbar toolbar() {
         return item -> {
             guard("add");
-            ToolbarEntry entry = switch (item) {
-                case ToolbarItem.Button button -> { requireOwn(button.actionId()); yield new ToolbarEntry.Button(button.actionId()); }
+            return switch (item) {
+                case ToolbarItem.Button button -> { requireOwn(button.actionId()); yield placed(new ToolbarEntry.Button(button.actionId())); }
                 case ToolbarItem.Dropdown dropdown -> {
                     dropdown.actionIds().forEach(this::requireOwn);
-                    yield new ToolbarEntry.Dropdown(dropdown.icon(), dropdown.title(), dropdown.actionIds());
+                    yield placed(new ToolbarEntry.Dropdown(icon(dropdown.icon()), dropdown.title(), dropdown.actionIds()));
                 }
+                case ToolbarItem.View view -> toolbarView(view.factory());
             };
-            var registration = model.addToolbar(entry);
-            return tracked(registration::close);
         };
+    }
+
+    private Subscription placed(ToolbarEntry entry) {
+        var registration = model.addToolbar(entry);
+        return tracked(registration::close);
+    }
+
+    /** A toolbar view's mount: the main toolbar of one terminal window. */
+    private record ToolbarMount(java.util.UUID windowId) { }
+
+    /**
+     * A toolbar view: each window builds its own once, when it opens, and closing the registration closes every window's.
+     * A view is admitted ({@link ToolbarViewAdmission}) when it is built and on every update after that.
+     */
+    private Subscription toolbarView(dev.jasper.sdk.ui.ToolbarViewFactory factory) {
+        var built = new java.util.LinkedHashMap<java.util.UUID, HostedKitView>();
+        var registration = model.addToolbar(new ToolbarEntry.View(windowId -> buildToolbarView(factory, windowId, built)));
+        return tracked(() -> {
+            registration.close();
+            for (var view : List.copyOf(built.values())) view.close();
+            built.clear();
+        });
+    }
+
+    /**
+     * One window's view, contained: empty when the factory threw or the toolbar does not admit its tree, and empty for
+     * a window that already holds this registration's view (one built while the factory ran is kept, the newer closed).
+     */
+    private Optional<ToolbarEntry.Mounted> buildToolbarView(dev.jasper.sdk.ui.ToolbarViewFactory factory, java.util.UUID windowId,
+                                                            java.util.Map<java.util.UUID, HostedKitView> built) {
+        if (built.containsKey(windowId)) return Optional.empty();
+        var mounted = new java.util.concurrent.atomic.AtomicReference<HostedKitView>();
+        containment.run(pluginId, "toolbar view", () -> {
+            var view = kit.requireOwned(java.util.Objects.requireNonNull(factory.create(terminals.windowHandle(windowId)), "view"));
+            if (built.containsKey(windowId)) { view.close(); return; }
+            view.mount(new ToolbarMount(windowId));
+            try {
+                ToolbarViewAdmission.require(view.spec());
+                view.hostSpec = spec -> { ToolbarViewAdmission.require(spec); return spec; };
+            } catch (RuntimeException refused) { view.close(); throw refused; }
+            mounted.set(view);
+        });
+        var hosted = mounted.get();
+        if (hosted == null) return Optional.empty();
+        built.put(windowId, hosted);
+        return Optional.of(new ToolbarEntry.Mounted(hosted.component(), () -> { built.remove(windowId, hosted); hosted.close(); }));
     }
 
     Menus menus() {
@@ -263,10 +322,11 @@ final class HostedUi {
             guard("add");
             requireNamespace(spec.id(), "A status item");
             StatusEntry entry = model.addStatus(spec.id(), spec.side() == Side.LEFT, spec.priority());
-            Subscription removal = tracked(entry::close);
+            var closed = new AtomicBoolean();
+            Subscription removal = tracked(() -> {closed.set(true);entry.close();});
             return new StatusItem() {
                 @Override public void setText(String text) { requireUi("setText"); entry.setText(text); }
-                @Override public void setIcon(Icon icon) { requireUi("setIcon"); entry.setIcon(icon); }
+                @Override public void setIcon(String icon) { requireUi("setIcon"); if(!closed.get())entry.setIcon(icon(icon)); }
                 @Override public void setTooltip(String text) { requireUi("setTooltip"); entry.setTooltip(text); }
                 @Override public void setAction(String actionId) {
                     requireUi("setAction");
@@ -301,8 +361,19 @@ final class HostedUi {
         };
     }
 
+    dev.jasper.ui.theme.ThemePair kitThemes() {
+        var source = appearanceSnapshot;
+        if (source != null) return source.pair();
+        var theme = dev.jasper.ui.theme.JasperTheme.bundled().generated(variant.get() == Variant.DARK);
+        return new dev.jasper.ui.theme.ThemePair(theme, theme);
+    }
+
+    Icon icon(String name) { return name == null ? null : kit.icon(name); }
+    void validateIcon(String name) { if(name != null) kit.validateIcon(name); }
+
     Appearance appearance() {
         return new Appearance() {
+            @Override public java.awt.Color color(dev.jasper.sdk.ui.SemanticColor role) { requireUi("color"); return kitThemes().chrome().semantic().color(dev.jasper.ui.theme.SemanticColor.valueOf(java.util.Objects.requireNonNull(role).name())); }
             @Override public Variant variant() {
                 var snapshot = appearanceSnapshot;
                 return snapshot == null ? variant.get() : snapshot.chrome().dark() ? Variant.DARK : Variant.LIGHT;
@@ -310,18 +381,15 @@ final class HostedUi {
             @Override public Variant workspaceVariant() { return HostedUi.this.workspaceVariant(); }
             @Override public dev.jasper.sdk.ui.WorkspacePalette workspacePalette() {
                 requireUi("workspacePalette");
-                return appearanceSnapshot == null ? dev.jasper.sdk.ui.WorkspacePalette.current()
-                    : HostedPalettes.workspace(appearanceSnapshot.workspace());
+                return HostedPalettes.workspace(kitThemes().workspace());
             }
             @Override public dev.jasper.sdk.ui.EditorPalette editorPalette() {
                 requireUi("editorPalette");
-                return appearanceSnapshot == null ? dev.jasper.sdk.ui.EditorPalette.current()
-                    : HostedPalettes.editor(appearanceSnapshot.workspace());
+                return HostedPalettes.editor(kitThemes().workspace());
             }
             @Override public dev.jasper.sdk.ui.SyntaxPalette syntaxPalette() {
                 requireUi("syntaxPalette");
-                return appearanceSnapshot == null ? dev.jasper.sdk.ui.SyntaxPalette.current()
-                    : HostedPalettes.syntax(appearanceSnapshot.workspace());
+                return HostedPalettes.syntax(kitThemes().workspace());
             }
             @Override public double workspaceOpacity(java.awt.Component component) {
                 requireUi("workspaceOpacity");
@@ -339,15 +407,12 @@ final class HostedUi {
             }
             @Override public Subscription onChanged(Consumer<Variant> handler) {
                 guard("onChanged");
-                return themeSubscriber.apply(java.util.Objects.requireNonNull(handler, "handler"));
+                java.util.Objects.requireNonNull(handler,"handler");
+                if(appearanceSnapshot==null)return themeSubscriber.apply(handler);
+                var closed=new AtomicBoolean();Consumer<Variant> guarded=v -> {if(!closed.get())handler.accept(v);};themeHandlers.add(guarded);
+                var removal=tracked(() -> {closed.set(true);themeHandlers.remove(guarded);});return () -> {closed.set(true);removal.close();};
             }
-            @Override public Icon icon(dev.jasper.sdk.ui.IconName name) {
-                return AppIcons.named(java.util.Objects.requireNonNull(name, "name").name());
-            }
-            @Override public Icon icon(dev.jasper.sdk.ui.BundledIcon name) {
-                return AppIcons.bundled(java.util.Objects.requireNonNull(name, "name").id());
-            }
-            @Override public Icon icon(String svgResourcePath) { return AppIcons.plugin(loader, svgResourcePath); }
+            @Override public dev.jasper.sdk.ui.Presentation presentation() { return presentation.get(); }
         };
     }
 
@@ -362,11 +427,11 @@ final class HostedUi {
             requireNamespace(spec.id(), "A panel");
             spec.toggleActionId().ifPresent(HostedUi.this::requireOwn);
             // Anchor plus split is IntelliJ's anchor plus split: one of the six slots. The SDK's own Side is imported here.
-            var entry = model.addPanel(spec.id(), spec.title(), spec.icon(),
+            var entry = model.addPanel(spec.id(), spec.title(), icon(spec.icon()),
                 Slot.of(dev.jasper.app.dock.Side.valueOf(spec.defaultAnchor().name()), spec.split()),
                 spec.toggleActionId(), site -> {
                 JComponent[] built = {null};
-                containment.run(pluginId, "panel " + spec.id(), () -> built[0] = factory.create(host(site)));
+                containment.run(pluginId, "panel " + spec.id(), () -> { var host=host(site, spec);var view=kit.requireOwned(factory.create(host));view.mount(host);host.onClosed(view::close);built[0]=view.component(); });
                 return built[0];
             });
             return tracked(entry::close);
@@ -374,23 +439,35 @@ final class HostedUi {
           @Override public void toggle(String panelId, WindowHandle window) {
             guard("toggle");
             requireNamespace(panelId, "A panel");
-            if (model.panels().stream().noneMatch(panel -> panel.id().equals(panelId)))
-                throw new IllegalArgumentException("Panel not registered: " + panelId);
-            model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, Contributions.PanelRequest.Op.TOGGLE));
+            var entry = model.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Panel not registered: " + panelId));
+            // The panel's own declared toggle action, as its handler runs, is the user's gesture: IntelliJ's Cmd+1.
+            var op = entry.namedToggle() && entry.toggleActionId().equals(running)
+                ? Contributions.PanelRequest.Op.ACTIVATING_TOGGLE : Contributions.PanelRequest.Op.TOGGLE;
+            model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, op));
           }
         };
     }
 
-    private PanelHost host(PanelSite site) {
+    private PanelHost host(PanelSite site, dev.jasper.sdk.ui.PanelSpec spec) {
         return new PanelHost() {
+            private boolean closed;
+            { site.onClosed(() -> closed=true); }
             @Override public WindowHandle window() { return terminals.windowHandle(site.windowId()); }
             @Override public void setHeader(dev.jasper.sdk.ui.PanelHeader header) {
                 requireUi("setHeader");
+                java.util.Objects.requireNonNull(header);if(closed)return;
                 site.setHeader(new dev.jasper.app.contributions.PanelHeaderState(header.detail(), header.active(),
                     header.actions().stream().map(action -> new dev.jasper.app.contributions.PanelHeaderState.Action(
-                        action.label(), action.icon(), () -> containment.run(pluginId, "panel header action", action.invoke()))).toList()));
+                        action.label(), icon(action.icon()), () -> containment.run(pluginId, "panel header action", action.invoke()))).toList()));
             }
-            @Override public void show() { requireUi("show"); site.show(); }
+            @Override public void show() {
+                requireUi("show");
+                // Inside the panel's own toggle action the show activates, as that action's toggle does.
+                if (!closed && spec.toggleActionId().filter(id -> id.equals(running)).isPresent())
+                    model.requestPanel(new Contributions.PanelRequest(site.windowId(), spec.id(), Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+                else site.show();
+            }
             @Override public void hide() { requireUi("hide"); site.hide(); }
             @Override public boolean visible() { return site.visible(); }
             @Override public Subscription onVisibility(Consumer<Boolean> handler) {
@@ -416,8 +493,23 @@ final class HostedUi {
     /** One SDK view of an application surface; windows and dialogs differ only in their SDK type. */
     private class Surface implements WindowSurface {
         final AuxiliarySurface surface;
-        Surface(AuxiliarySurface surface) { this.surface = surface; }
-        @Override public void setContent(JComponent content) { requireUi("setContent"); surface.setContent(content); }
+        HostedKitView mounted;
+        final SurfaceMount bodyMount;
+        Surface(AuxiliarySurface surface) { this.surface = surface; bodyMount = new SurfaceMount(surface, false); surface.onClosed(() -> { if(mounted!=null){mounted.close();mounted=null;} }); }
+        @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
+            guard("setContent");
+            var next = kit.requireOwned(content);
+            if(surface.closed())throw new IllegalStateException("Surface is closed");
+            next.mount(bodyMount);
+            if(mounted==next)return;
+            var previous=mounted;
+            // A host-packed dialog follows its kit view's size (DialogFit), as plugin dialogs did with pack().
+            var component = next.component();
+            // Removing an old anchor may synchronously close this surface through an owned child.
+            mounted = next; next.updated = surface::contentChanged;
+            surface.setContent(component); surface.fitContent(true);
+            if(previous!=null)previous.close();
+        }
         @Override public void show() { requireUi("show"); surface.show(); }
         @Override public Optional<Path> chooseFile(String title, Optional<Path> initialPath) {
             guard("chooseFile");
@@ -440,8 +532,36 @@ final class HostedUi {
         @Override public void close() { subscription(surface::close).close(); }
     }
 
+    private static dev.jasper.sdk.ui.ViewSpec titleSpec(dev.jasper.sdk.ui.ViewSpec value) {
+        if (!(value.root() instanceof dev.jasper.sdk.ui.Nodes.Stack stack)
+                || stack.role() != dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE
+                || stack.children().stream().anyMatch(node -> !(node instanceof dev.jasper.sdk.ui.Nodes.Button)
+                    && !(node instanceof dev.jasper.sdk.ui.Nodes.MenuButton)))
+            throw new IllegalArgumentException("Title actions require an INLINE Stack of Buttons and MenuButtons");
+        return value;
+    }
+
     private final class OwnedWindow extends Surface implements PluginWindow {
-        OwnedWindow(AuxiliarySurface surface) { super(surface); }
+        private final SurfaceMount titleMount;
+        private HostedKitView titleActions;
+        OwnedWindow(AuxiliarySurface surface) {
+            super(surface); titleMount = new SurfaceMount(surface, true);
+            surface.onClosed(() -> { if (titleActions != null) { titleActions.close(); titleActions = null; } });
+        }
+        @Override public void setTitleActions(Optional<dev.jasper.sdk.ui.UiView> actions) {
+            guard("setTitleActions"); java.util.Objects.requireNonNull(actions, "actions");
+            if (surface.closed()) throw new IllegalStateException("Surface is closed");
+            var next = actions.map(kit::requireOwned).orElse(null);
+            if (next == titleActions) return;
+            if (next != null) { titleSpec(next.spec()); next.mount(titleMount); }
+            var previous = titleActions;
+            var component = next == null ? null : next.component();
+            titleActions = next;
+            if (next != null) { next.hostSpec = HostedUi::titleSpec; next.updated = surface::titleActionsChanged; }
+            // Removing the previous anchor can synchronously close an owned child and this window.
+            surface.setTitleActions(component);
+            if (previous != null) previous.close();
+        }
         @Override public Subscription onCloseCommand(BooleanSupplier handler) {
             requireUi("onCloseCommand");
             return wrap(surface.onCloseCommand(() -> {
@@ -459,7 +579,7 @@ final class HostedUi {
     private final class OwnedContent implements dev.jasper.sdk.ui.ContentTab {
         final dev.jasper.app.contributions.ContentEntry entry;
         OwnedContent(dev.jasper.app.contributions.ContentEntry entry) { this.entry = entry; }
-        public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) { requireUi("content presentation"); entry.presentation(v.title(), v.detail(), v.icon(), v.dirty(), v.location(), v.host()); }
+        public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) { requireUi("content presentation"); if(entry.closed())return; entry.presentation(v.title(), v.detail(), icon(v.icon()), v.dirty(), v.location(), v.host()); }
         public void setCommands(List<dev.jasper.sdk.ui.ContentCommand> values) { requireUi("content commands"); entry.commands(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentCommand(v.id(), v.title(), v.shortcut(), v.enabled(), () -> containment.run(pluginId, "content command", v.run()))).toList()); }
         public void setStatus(List<dev.jasper.sdk.ui.ContentStatus> values) { requireUi("content status"); entry.status(values.stream().map(v ->
@@ -552,7 +672,26 @@ final class HostedUi {
 
     Windows windows() {
         return new Windows() {
-            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
+            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
+                guard("openTab");
+                var view = kit.requireOwned(content);
+                var existing = ownedContent.values().stream().filter(c -> c.entry.key().equals(spec.key())).findFirst();
+                if(existing.isPresent()) return openComponent(spec, owner, existing.get().entry.component());
+                // Reserve before publishing: a view cannot be owned by two surface lifetimes.
+                view.mount(spec);
+                // Workspace content takes the workspace theme slot, as terminals and editors do, on an opaque workspace
+                // surface; its specialized content paints its own background or glass above that. Moves keep both.
+                view.route(dev.jasper.ui.theme.ThemeRoute.WORKSPACE, true);
+                try {
+                    var tab = openComponent(spec, owner, view.component());
+                    tab.onClosed(view::close);
+                    return tab;
+                } catch(RuntimeException | Error failure) {
+                    view.route(dev.jasper.ui.theme.ThemeRoute.CHROME, false);
+                    view.unmount(spec);throw failure;
+                }
+            }
+            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
                 guard("openTab");
                 java.util.UUID window = null;
                 if (owner != null) {
@@ -624,6 +763,7 @@ final class HostedUi {
                 AuxiliarySurface surface = windows.window(spec.id(), spec.title(), spec.preferredSize(), spec.singleton());
                 OwnedWindow existing = ownedWindows.get(surface);
                 if (existing != null) return existing;
+                surface.contentSize(spec.sizeBasis() == WindowSpec.SizeBasis.CONTENT);
                 var window = new OwnedWindow(surface);
                 ownedWindows.put(surface, window);
                 surface.onClosed(() -> ownedWindows.remove(surface));
@@ -640,14 +780,34 @@ final class HostedUi {
                 closers.add(surface::close);
                 return new OwnedDialog(surface);
             }
+            @Override public dev.jasper.sdk.ui.PluginPopover popover(dev.jasper.sdk.ui.UiAnchor value) {
+                guard("popover");var anchor=HostedAnchor.require(value,windows);
+                var popup=new HostedPopover(kit,anchor);var stop=tracked(popup::close);popup.onClosed(stop::close);return popup;
+            }
             @Override public PluginDialog dialog(DialogSpec spec) {
                 guard("dialog");
                 WindowOwner owner = resolveContentOwner(spec.owner());
+                // An overlay is the kit's modal overlay inside the owner's window; the others are native dialogs.
+                boolean overlay = spec.presentation() == DialogSpec.Presentation.OVERLAY;
                 AuxiliarySurface surface;
-                if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window)
-                    surface = windows.dialog(spec.title(), spec.modal(), window.surface);
-                else if (owner instanceof WindowHandle terminalWindow && terminals.ownsOpenWindow(terminalWindow)) surface = windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
+                if (owner instanceof dev.jasper.sdk.ui.UiAnchor value) {
+                    var anchor=HostedAnchor.require(value,windows);
+                    surface=anchor.ownerSurface()!=null
+                        ? overlay ? windows.modalOverlay(spec.title(),anchor.ownerSurface()) : windows.dialog(spec.title(),spec.modal(),anchor.ownerSurface())
+                        : overlay ? windows.modalOverlay(spec.title(),anchor.target) : windows.dialog(spec.title(),spec.modal(),anchor.target);
+                    var registration=anchor.onClosed(surface::close);surface.onClosed(registration::close);
+                } else if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window)
+                    surface = overlay ? windows.modalOverlay(spec.title(), window.surface) : windows.dialog(spec.title(), spec.modal(), window.surface);
+                else if (owner instanceof WindowHandle terminalWindow && terminals.ownsOpenWindow(terminalWindow)) {
+                    surface = overlay ? windows.modalOverlay(spec.title(), terminalWindow.id()) : windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
+                    if (overlay) {
+                        var ownerClosed = terminals.onWindowClosed(terminalWindow.id(), surface::close);
+                        surface.onClosed(ownerClosed::close);
+                    }
+                }
                 else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
+                surface.attachedSheet(spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET);
+                surface.swatch(dev.jasper.ui.model.Nodes.Hue.valueOf(spec.swatch().name()));
                 if (spec.owner() instanceof OwnedContent content) {
                     var pin = spec.modal() ? content.entry.pin() : null;
                     var registration = content.entry.onClosed(surface::close);

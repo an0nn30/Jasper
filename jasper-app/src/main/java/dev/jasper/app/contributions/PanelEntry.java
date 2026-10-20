@@ -33,7 +33,7 @@ public final class PanelEntry {
     public Icon icon() { return icon; }
     /** Where the panel docks until the user moves it. */
     public Slot defaultSlot() { return defaultSlot; }
-    /** The action View > Tools lists: the one the contributor named, or the application's {@code <id>.toggle}. */
+    /** The action View > Tool Windows lists: the one the contributor named, or the application's {@code <id>.toggle}. */
     public String toggleActionId() { return toggleActionId; }
     /** Whether the contributor named its own toggle, so the application registered none. */
     public boolean namedToggle() { return namedToggle; }

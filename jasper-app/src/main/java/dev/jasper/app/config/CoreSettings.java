@@ -50,6 +50,9 @@ public final class CoreSettings {
             SettingKind.integer(ConfigSnapshot.MIN_STATUS_BAR_HEIGHT, ConfigSnapshot.MAX_STATUS_BAR_HEIGHT, CLAMP), ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT)
         .label("Status bar height").keywords("status bar", "footer", "height")
         .description("Status bar height in logical pixels, 20-48; never shorter than its text. Updates live.").build();
+    public static final Setting<Boolean> WINDOW_MEMORY_INDICATOR = Setting.of("window.memory_indicator", SettingKind.bool(), false)
+        .label("Show memory indicator").keywords("memory", "heap", "indicator", "status bar", "garbage collection")
+        .description("Show the heap in use and its limit in the status bar, while the status bar is shown; click it to run garbage collection. Updates live.").build();
     public static final Setting<Integer> WINDOW_COLUMNS = Setting.of("window.columns", SettingKind.integer(5, 500, DEFAULT), 100)
         .label("Initial columns").keywords("grid", "width", "size", "columns").applies(Applies.NEW_WINDOWS)
         .description("Initial terminal grid for new windows only; existing windows keep their size.\n"
@@ -84,6 +87,24 @@ public final class CoreSettings {
         .description("Live. While Jasper is in the background, or idle as a resident Jasper with every window closed, also\n"
             + "show its notifications as the operating system's own: banners from the packaged macOS app, Windows tray\n"
             + "balloons, or notify-send on Linux.").build();
+    /** The modes notifications.groups accepts. */
+    static final Set<String> NOTIFICATION_MODES = Set.of("card", "sticky", "history", "off");
+    private static final java.util.regex.Pattern NOTIFICATION_GROUP = java.util.regex.Pattern.compile("[a-z][a-z0-9_.-]{0,159}");
+
+    /** Whether {@code id} is shaped like a notification group id: lowercase, a plugin's id or one under it. */
+    static boolean notificationGroupId(String id) {
+        return NOTIFICATION_GROUP.matcher(id).matches();
+    }
+
+    public static final Setting<Map<String, String>> NOTIFICATIONS_GROUPS = Setting.of("notifications.groups",
+            SettingKind.stringMap(new SettingKind.MapRules(CoreSettings::notificationGroupId,
+                "Use a notification group id such as \"jasper.commands\"; entry ignored.", Set.of(), "",
+                NOTIFICATION_MODES::contains, "Use \"card\", \"sticky\", \"history\" or \"off\"; the group's default applies.",
+                "a display mode", dev.jasper.app.settings.Reading.Severity.WARNING)), Map.<String, String>of())
+        .label("Notification groups").keywords("notification", "group", "card", "sticky", "history", "off", "mute", "quiet")
+        .description("Live. How each group's notifications appear: \"card\" (a card that hides itself), \"sticky\" (a card\n"
+            + "that stays until you close it), \"history\" (only the Notifications panel) or \"off\". Settings > Notifications\n"
+            + "lists every group; a group not listed here keeps its default.").build();
     /**
      * Residency is on by default where a windowless Jasper stays reachable: macOS (its menu bar item and Dock) and
      * Windows (its notification-area icon). Linux has no tray, so it stays off there.
@@ -135,19 +156,10 @@ public final class CoreSettings {
         .label("Shell integration").keywords("integration", "prompt marks", "osc 133", "zsh", "bash", "fish").applies(Applies.NEW_PANES)
         .description("Shell integration: \"auto\" loads Jasper's zsh/bash/fish script after your own startup files (new panes only),\n"
             + "\"manual\" only exports JASPER_SHELL_INTEGRATION so you can source it yourself, \"off\" does neither.").build();
-    public static final Setting<String> UI_THEME_WORKSPACE = Setting.of("ui.theme.workspace",
-            SettingKind.string(text -> !text.isBlank(), "Use a workspace scheme name or match; using match.",
-                text -> WorkspaceThemeChoice.parse(text.isBlank() ? "match" : text).name()), "match")
-        .alias("terminal.colors").alias("ui.theme.terminal").label("Workspace scheme")
-        .keywords("palette", "colours", "color scheme", "scheme", "theme", "alacritty", "workspace")
-        .description("Colour scheme for terminal panes and their workspace controls. \"match\" follows the UI theme;\n"
-            + "otherwise name a native theme. Choose it in Settings > Appearance, whose theme gear imports theme files. Changes update the workspace live.").build();
-    /** Source compatibility for transitional pages; the schema registers this setting only once. */
-    @Deprecated public static final Setting<String> TERMINAL_COLORS = UI_THEME_WORKSPACE;
     public static final Setting<String> TERMINAL_FONT_FAMILY = Setting.of("terminal.font.family",
             SettingKind.string(CoreSettings::fontName, FONT_NAME), FontConfig.defaults().family())
         .alias("font.family").label("Font").keywords("font", "typeface", "family")
-        .description("Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.").build();
+        .description("Font family and ordered fallbacks update live. Cousine Nerd Font Mono is bundled. Missing fonts use JBR/system fallback.").build();
     public static final Setting<Float> TERMINAL_FONT_SIZE = Setting.of("terminal.font.size", SettingKind.number(6, 72), FontConfig.defaults().size())
         .alias("font.size").label("Font size").keywords("font", "size", "points", "zoom")
         .description("Font size in points, 6-72; changes update all panes live.\n"
@@ -195,7 +207,8 @@ public final class CoreSettings {
     public static final Setting<Map<String, String>> TERMINAL_ENV = Setting.of("terminal.env", SettingKind.stringMap(new SettingKind.MapRules(
             TerminalConfig::validEnvName, "Use a portable environment name; entry omitted.",
             Set.of("TERM", "COLORTERM"), "Jasper sets this environment variable; entry omitted.",
-            CoreSettings::noNul, "Environment values must contain no NUL; entry omitted.", "a string environment value")), Map.<String, String>of())
+            CoreSettings::noNul, "Environment values must contain no NUL; entry omitted.", "a string environment value",
+            dev.jasper.app.settings.Reading.Severity.ERROR)), Map.<String, String>of())
         .label("Environment variables").keywords("environment", "env", "variables", "PATH").applies(Applies.NEW_PANES)
         .description("New panes only: add string values to the inherited environment.\n"
             + "Names use letters, digits and underscore, starting with a letter or underscore.\n"
@@ -215,11 +228,31 @@ public final class CoreSettings {
     public static final Setting<Float> UI_FONT_SIZE = Setting.of("ui.font.size", SettingKind.number(8, 32), UiFontConfig.defaults().size())
         .example(14f).label("UI font size").keywords("font", "interface", "size", "points")
         .description("Omit size to retain platform sizing. Use 8-32 points, including fractions, when set.").build();
-    public static final Setting<String> UI_THEME_NAME = Setting.of("ui.theme.name",
-            SettingKind.string(text -> true, "", String::strip), ConfigSnapshot.DEFAULT_THEME)
-        .alias("ui.theme.variant").label("Theme").keywords("theme", "dark", "light", "appearance", "look")
-        .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"Nord\",\n"
-            + "\"Clear Dark\", \"Clear Light\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
+    public static final Setting<AppearanceMode> UI_APPEARANCE = Setting.of("ui.appearance", SettingKind.choice(List.of(
+            Map.entry("system", AppearanceMode.SYSTEM), Map.entry("dark", AppearanceMode.DARK), Map.entry("light", AppearanceMode.LIGHT))),
+            AppearanceMode.SYSTEM)
+        .label("Appearance").keywords("appearance", "theme", "dark", "light", "system", "slate cobalt", "look")
+        .description("The UI appearance: \"system\" (the default) follows the operating system's light or dark setting;\n"
+            + "\"dark\" or \"light\" chooses one. [ui.theme] names the theme each shows. Switches live across windows.").build();
+    static final String THEME_ID = "Use a theme id such as \"slate-cobalt\"; using the default.";
+    public static final Setting<String> UI_THEME_DARK = Setting.of("ui.theme.dark",
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
+        .label("Dark theme").keywords("theme", "dark", "appearance", "slate cobalt", "imported")
+        .description("The theme the Dark appearance shows: \"slate-cobalt\" (the default), a built-in Catppuccin flavour such as\n"
+            + "\"catppuccin-mocha\", or an imported theme's id, its file name in the themes folder without .json. A theme without a\n"
+            + "Dark variant is reported and Slate Cobalt is used. Switches live.").build();
+    public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID)
+        .label("Light theme").keywords("theme", "light", "appearance", "jasper meadow", "slate cobalt", "imported")
+        .description("The theme the Light appearance shows: \"jasper-meadow\" (the default), the built-in \"catppuccin-latte\", or an\n"
+            + "imported theme's id, its file name in the themes folder without .json. A theme without a Light variant is reported\n"
+            + "and Jasper Meadow Light is used. Switches live.").build();
+    static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.";
+    public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",
+            SettingKind.string(text -> TerminalSchemeChoice.parse(text).isPresent(), SCHEME_ID), TerminalSchemeChoice.MATCH.key())
+        .label("Terminal scheme").keywords("terminal", "scheme", "colors", "colours", "palette", "high contrast", "slate cobalt")
+        .description("Colors for terminal panes: \"match\" (the default) uses the shown theme's own scheme; a scheme id,\n"
+            + "<theme id>/<scheme key> such as \"slate-cobalt/high-contrast\", chooses one. Only the terminal text area changes; updates live.").build();
     public static final Setting<Boolean> UI_ANIMATIONS_ENABLED = Setting.of("ui.animations.enabled", SettingKind.bool(), true)
         .label("Enable animations").keywords("animations", "motion", "transitions", "reduce motion")
         .description("Enable animations throughout the app. Disabling finishes running transitions immediately. Updates live in every window.").build();
@@ -227,19 +260,19 @@ public final class CoreSettings {
             GlassSettings.UNSET_OPACITY)
         .example(95f).label("Opacity").keywords("opacity", "transparency", "translucent", "glass", "workspace", "background")
         .description("macOS only (ignored on other platforms), live: the terminal and editor background opacity, 10-100 percent.\n"
-            + "Omit to use the workspace theme's value (opaque unless the theme sets one).").build();
+            + "Omit to keep the terminal area opaque.").build();
     public static final Setting<WorkspaceBlur> UI_WORKSPACE_BLUR = Setting.of("ui.workspace.blur", SettingKind.choice(List.of(
             Map.entry("theme", WorkspaceBlur.THEME), Map.entry("on", WorkspaceBlur.ON), Map.entry("off", WorkspaceBlur.OFF))),
             WorkspaceBlur.THEME)
         .label("Blur").keywords("blur", "frosted", "glass", "workspace", "background")
-        .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows the workspace theme.").build();
+        .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows Slate Cobalt, which does not blur.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
-            WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
-            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, SYSTEM_RUN_IN_BACKGROUND,
+            WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT, WINDOW_MEMORY_INDICATOR,
+            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
-            TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
+            TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
-            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_WORKSPACE,
+            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_THEME_DARK, UI_THEME_LIGHT, UI_FONT_FAMILY, UI_FONT_SIZE,
             UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR, UI_ANIMATIONS_ENABLED),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(
@@ -252,8 +285,9 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "font"), "The terminal font; the interface font is [ui.font]."),
             Map.entry(List.of("terminal", "shell"), "The shell new panes start."),
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
+            Map.entry(List.of("ui"), "The interface: its appearance, fonts, workspace glass and animations."),
+            Map.entry(List.of("ui", "theme"), "The theme each appearance shows: a built-in theme's id or an imported theme's id."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
-            Map.entry(List.of("ui", "theme"), "The UI theme and workspace scheme."),
-            Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values follow the workspace theme."),
+            Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values keep the terminal area opaque."),
             Map.entry(List.of("ui", "animations"), "App-wide animation policy. Changes apply live.")));
 }

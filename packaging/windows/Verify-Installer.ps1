@@ -34,7 +34,9 @@ try {
     if ($allUsers) { throw "Installer must be per-user, but ALLUSERS=$allUsers" }
     $summary = $database.SummaryInformation(0)
     try {
-        if ($summary.Property(7) -notmatch '^x64;') { throw 'Installer must target Windows x64' }
+        # jpackage's WiX template always declares x64, for an ARM64 payload too (Windows on Arm installs it);
+        # verifyPackage checks the binaries' own architecture.
+        if ($summary.Property(7) -notmatch '^x64;') { throw 'Installer must use the x64 Windows Installer platform' }
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($summary) }
 
     $dialogs = @(Read-Column 'SELECT `Dialog` FROM `Dialog`')
@@ -49,7 +51,7 @@ try {
     }
     $actions = @(Read-Column 'SELECT `Action` FROM `InstallExecuteSequence`')
     if ($actions -notcontains 'RemoveExistingProducts') { throw 'Missing upgrade removal action' }
-    Write-Output "Verified Jasper $Version x64 per-user setup wizard and upgrade identity $UpgradeUuid"
+    Write-Output "Verified Jasper $Version per-user setup wizard and upgrade identity $UpgradeUuid"
 } finally {
     if ($null -ne $database) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database) }
     [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)

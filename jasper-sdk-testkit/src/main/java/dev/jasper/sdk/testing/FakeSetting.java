@@ -19,12 +19,35 @@ final class FakeSetting<T> implements Setting<T> {
 
     private final FakePluginSettings owner;
     private final SettingSpec<T> spec;
+    /** The look's default when its kind accepts it, else the declared one. */
+    private final T defaultValue;
     private final CopyOnWriteArrayList<Consumer<T>> listeners = new CopyOnWriteArrayList<>();
     private volatile T value;
 
-    FakeSetting(FakePluginSettings owner, SettingSpec<T> spec) {
-        this.owner = owner; this.spec = spec; this.value = spec.defaultValue();
+    /** {@code lookDefault}: the look's raw default for this key, reported to {@code owner} when the kind rejects it. */
+    FakeSetting(FakePluginSettings owner, SettingSpec<T> spec, Optional<Object> lookDefault) {
+        this.owner = owner; this.spec = spec;
+        this.defaultValue = lookDefault.map(this::lookDefault).orElse(spec.defaultValue());
+        this.value = defaultValue;
     }
+
+    private T lookDefault(Object raw) {
+        Object converted = convert(raw);
+        String problem;
+        if (converted == WRONG_TYPE) problem = "Expected " + expected() + ".";
+        else if (converted == null) problem = unknownToken();
+        else {
+            @SuppressWarnings("unchecked") T candidate = (T) converted;
+            Optional<String> rejected = spec.kind().check(candidate);
+            if (rejected.isEmpty()) return candidate;
+            problem = rejected.get();
+        }
+        owner.lookDefaultRejected(key(), problem);
+        return spec.defaultValue();
+    }
+
+    /** The effective default: the look's when it gives an accepted one, else the declared one. */
+    T defaultValue() { return defaultValue; }
 
     @Override public String key() { return spec.key(); }
 
@@ -51,7 +74,7 @@ final class FakeSetting<T> implements Setting<T> {
     /** Reads a raw value (absent: the default); returns whether the value changed. Listeners run when {@code notify}. */
     boolean load(Object raw, boolean notify, List<String> reports) {
         T next;
-        if (raw == null) next = spec.defaultValue();
+        if (raw == null) next = defaultValue;
         else {
             Object converted = convert(raw);
             if (converted == WRONG_TYPE) {
@@ -60,7 +83,7 @@ final class FakeSetting<T> implements Setting<T> {
             }
             @SuppressWarnings("unchecked") T candidate = (T) converted;
             Optional<String> problem = candidate == null ? Optional.of(unknownToken()) : spec.kind().check(candidate);
-            if (problem.isPresent()) { reports.add(key() + ": " + problem.get()); next = spec.defaultValue(); }
+            if (problem.isPresent()) { reports.add(key() + ": " + problem.get()); next = defaultValue; }
             else next = candidate;
         }
         boolean changed = !next.equals(value);
@@ -84,6 +107,39 @@ final class FakeSetting<T> implements Setting<T> {
             case SettingKind.StringList list -> raw instanceof List<?> items && items.stream().allMatch(String.class::isInstance)
                 ? List.copyOf(items) : WRONG_TYPE;
         };
+    }
+
+    @SuppressWarnings("unchecked")
+    T checked(Object candidate) {
+        T next = (T) Objects.requireNonNull(candidate);
+        spec.kind().check(next).ifPresent(problem -> { throw new IllegalArgumentException(problem); });
+        return next;
+    }
+
+    /** Convert typed UI intent using the fake's existing TOML value conversion and validation. */
+    Object edited(dev.jasper.sdk.ui.UiEvent event) {
+        Object raw = switch (event) {
+            case dev.jasper.sdk.ui.UiEvent.Toggled toggled -> toggled.checked();
+            case dev.jasper.sdk.ui.UiEvent.Selected selected -> selected.ids().stream().findFirst().orElse("");
+            case dev.jasper.sdk.ui.UiEvent.Edited edited -> {
+                String text = edited.text();
+                if (value instanceof Integer) yield Long.valueOf(text);
+                if (value instanceof Double) yield Double.valueOf(text);
+                yield text;
+            }
+            default -> throw new IllegalArgumentException("Unsupported setting edit");
+        };
+        // Editor integers reject overflow instead of the file loader's bounded conversion.
+        if (value instanceof Integer && raw instanceof Long number && (number < Integer.MIN_VALUE || number > Integer.MAX_VALUE))
+            throw new IllegalArgumentException("Enter an integer in range.");
+        Object converted = convert(raw);
+        if (converted == WRONG_TYPE || converted == null) throw new IllegalArgumentException("Enter " + expected() + ".");
+        return checked(converted);
+    }
+
+    void writeDraft(Optional<?> edit) {
+        if (edit.isEmpty()) owner.raw().remove(key());
+        else owner.raw().put(key(), toRaw(checked(edit.get())));
     }
 
     private Object toRaw(T next) {

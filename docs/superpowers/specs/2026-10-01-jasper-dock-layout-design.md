@@ -3,6 +3,8 @@
 **Status:** Design approved in chat by the user on 2026-10-01, section by section. Plan 1 (six-slot layout) and
 plan 2 (drag and drop) were both implemented on branch `claude/dock-layout` on 2026-10-02.
 
+Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): stripe, frame and bottom-strip presentation and saved layouts are per look; the model and the six slots are unchanged; everything else in this document stands.
+
 Replaces: the single left rail (`WindowRail`), the three-region nested-split docking (`WorkspaceRegions`), the
 "one panel per region" rule from the [plugin SDK design](2026-09-21-jasper-plugin-sdk-design.md) ("Rail and
 panels") and plan 3a's decision that regions have no header or close button.

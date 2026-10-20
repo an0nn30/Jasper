@@ -1,6 +1,5 @@
 package dev.jasper.app.application;
 
-import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.*;
 import dev.jasper.app.workspace.WindowContent;
@@ -10,12 +9,16 @@ import java.util.function.Consumer;
 /** Package-local test access, excluded from production artifacts. */
 public final class ConfigurationTestSupport {
     private final ConfigurationController controller;
-    public ConfigurationTestSupport(ThemeController themes, ConfigService service) { this(themes, service, ThemeCatalog.builtIn()); }
-    public ConfigurationTestSupport(ThemeController themes, ConfigService service, ThemeCatalog catalog) {
-        controller = new ConfigurationController(themes, service, catalog);
+    public ConfigurationTestSupport(ThemeController themes, ConfigService service) {
+        controller = new ConfigurationController(themes, service);
     }
     public ConfigurationTestSupport(ThemeController themes, ConfigService service, Consumer<Path> editor) {
-        controller = new ConfigurationController(themes, service, ThemeCatalog.builtIn(), editor);
+        controller = new ConfigurationController(themes, service, editor);
+    }
+    /** With imported themes in {@code themesFolder}. */
+    public ConfigurationTestSupport(ThemeController themes, ConfigService service, Path themesFolder) {
+        controller = new ConfigurationController(themes, service, path -> { },
+            dev.jasper.app.platform.SystemAppearance.Observation.unavailable("No system appearance in tests."), themesFolder);
     }
     public ConfigService.State shown() { return controller.shown(); }
     public void register(WindowContent owner) { controller.register(owner); }

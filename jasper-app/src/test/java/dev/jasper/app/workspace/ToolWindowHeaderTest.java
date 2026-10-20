@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
@@ -20,31 +21,41 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class ToolWindowHeaderTest {
-    @Test void connectedHeaderDotMatchesTheDarkReferenceAndLightSuccessPalette() {
-        Object oldBackground = javax.swing.UIManager.get("Panel.background");
-        Object oldSuccess = javax.swing.UIManager.get("Jasper.configSuccessForeground");
-        try {
-            for (boolean dark : List.of(true, false)) {
-                javax.swing.UIManager.put("Panel.background", new java.awt.Color(dark ? 0x20252b : 0xffffff));
-                javax.swing.UIManager.put("Jasper.configSuccessForeground", new java.awt.Color(0x248943));
-                var header = new ToolWindowHeader("SFTP", JPopupMenu::new, () -> {});
-                header.presentation(new dev.jasper.app.contributions.PanelHeaderState("prod", true, List.of()));
-                var detail = descendants(header).stream().filter(c -> c instanceof javax.swing.JLabel label && "prod".equals(label.getText()))
-                    .map(c -> (javax.swing.JLabel) c).findFirst().orElseThrow();
-                var image = new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                var graphics = image.createGraphics();
-                try { detail.getIcon().paintIcon(detail, graphics, 0, 0); } finally { graphics.dispose(); }
-                assertThat(new java.awt.Color(image.getRGB(3, 3), true)).isEqualTo(new java.awt.Color(dark ? 0x38ba54 : 0x248943));
-            }
-        } finally {
-            javax.swing.UIManager.put("Panel.background", oldBackground);
-            javax.swing.UIManager.put("Jasper.configSuccessForeground", oldSuccess);
+    @org.junit.jupiter.api.BeforeEach void installModuleTheme() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeTestSupport.install(true));
+    }
+
+    /**
+     * Main's connected-status dot, on the branch's module roles: the success status, held to the indicator floor on
+     * the tool window surface, in a dark and a light theme (it replaces main's fixed 0x38ba54/0x248943 reference).
+     */
+    @Test void connectedHeaderDotIsTheReadableSuccessStatusInDarkAndLight() {
+        for (boolean themeDark : new boolean[]{true, false}) {
+            assertThat(dev.jasper.app.appearance.ThemeTestSupport.install(themeDark)).isTrue();
+            var header = new ToolWindowHeader("SFTP", JPopupMenu::new, () -> {});
+            header.presentation(new dev.jasper.app.contributions.PanelHeaderState("prod", true, List.of()));
+            var detail = descendants(header).stream().filter(c -> c instanceof javax.swing.JLabel label && "prod".equals(label.getText()))
+                .map(c -> (javax.swing.JLabel) c).findFirst().orElseThrow();
+            var image = new java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            try { detail.getIcon().paintIcon(detail, graphics, 0, 0); } finally { graphics.dispose(); }
+            int middle = detail.getIcon().getIconWidth() / 2;
+            var dot = new java.awt.Color(image.getRGB(middle, middle), true);
+            var palette = dev.jasper.app.platform.ThemeZone.theme(header).semantic();
+            var surface = palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR);
+            assertThat(dot).as((themeDark ? "dark" : "light")).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(palette,
+                dev.jasper.ui.theme.SemanticColor.STATUS_SUCCESS, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR,
+                dev.jasper.ui.theme.SurfaceContrast.INDICATOR));
+            assertThat(dev.jasper.ui.theme.ColorMath.contrast(dot, surface)).as((themeDark ? "dark" : "light")).isGreaterThanOrEqualTo(3);
+            assertThat(dot.getGreen()).as("%s: a green status", (themeDark ? "dark" : "light")).isGreaterThan(Math.max(dot.getRed(), dot.getBlue()));
+            assertThat(detail.getForeground()).as("detail uses the kit header's count colour")
+                .isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
         }
     }
 
     @Test void contributedActionsLiveInTheHeaderAndSurviveMetadataRefresh() {
         var header = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { });
-        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        var icon = dev.jasper.app.platform.AppIcons.named("ADD");
         header.presentation(new dev.jasper.app.contributions.PanelHeaderState("5", false, List.of(
             new dev.jasper.app.contributions.PanelHeaderState.Action("Import sessions", icon, () -> events.add("import")))));
         var actions = descendants(header).stream().filter(c -> c instanceof javax.swing.JButton button
@@ -88,6 +99,7 @@ class ToolWindowHeaderTest {
 
     @Test void theMenuMovesToAnyOfTheSixSlotsAndHides() {
         JPopupMenu menu = menu(Slot.LEFT_BOTTOM, true);
+        assertThat(item(menu, "Hide").getFont()).as("the kit menu's type").isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY));
         var moveTo = (JMenu) menu.getComponent(0);
         assertThat(moveTo.getText()).isEqualTo("Move to");
         assertThat(Arrays.stream(moveTo.getMenuComponents()).map(item -> ((JMenuItem) item).getText()))
@@ -106,16 +118,16 @@ class ToolWindowHeaderTest {
         var header = new ToolWindowHeader("<html><b>Sessions</b>", () -> menu(Slot.LEFT_TOP, true), () -> events.add("hidden"));
         assertThat(header.titleLabel().getText()).isEqualTo("<html><b>Sessions</b>");
         assertThat(header.titleLabel().getClientProperty("html.disable")).as("a plugin title is never HTML").isEqualTo(Boolean.TRUE);
-        assertThat(header.titleLabel().getFont().getStyle() & Font.BOLD).isEqualTo(Font.BOLD);
+        assertThat(header.titleLabel().getFont()).isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE));
         header.updateUI();
         SwingUtilities.updateComponentTreeUI(header);
         assertThat(header.getInsets()).as("padding survives a look-and-feel update").isEqualTo(new Insets(0, UIScale.scale(10), 0, UIScale.scale(6)));
-        assertThat(header.titleLabel().getFont().isBold()).as("bold after a look-and-feel change").isTrue();
+        assertThat(header.titleLabel().getFont()).as("module title role survives a look-and-feel change").isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE));
         assertThat(header.optionsButton().getAccessibleContext().getAccessibleName()).isEqualTo("Options");
         assertThat(header.optionsButton().getToolTipText()).isEqualTo("Options");
         assertThat(header.hideButton().getAccessibleContext().getAccessibleName()).isEqualTo("Hide");
         assertThat(header.optionsButton().isFocusable()).isFalse();
-        assertThat(header.getPreferredSize().height).isEqualTo(UIScale.scale(ToolWindowHeader.HEIGHT));
+        assertThat(header.getPreferredSize().height).isEqualTo(UIScale.scale(header.logicalHeight()));
 
         header.hideButton().doClick();
         header.optionsButton().doClick();
@@ -134,5 +146,93 @@ class ToolWindowHeaderTest {
         assertThat(Math.abs(hide.y - (header.getHeight() - hide.y - hide.height))).isLessThanOrEqualTo(1);
         var title = SwingUtilities.convertRectangle(header.titleLabel().getParent(), header.titleLabel().getBounds(), header);
         assertThat(title.x).isEqualTo(UIScale.scale(10));
+    }
+
+    /** The class runs on the EDT (EdtTestExtension) with the module theme installed. */
+    @Test void toolWindowsSitOnThePanelSurface() {
+        var header = new ToolWindowHeader("Sessions", javax.swing.JPopupMenu::new, () -> { });
+        assertThat(header.getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(header, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+        var root = new javax.swing.JPanel();
+        ToolWindowSurface.apply(root);
+        assertThat(root.getBackground()).isEqualTo(dev.jasper.app.platform.ThemeZone.color(root, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+        assertThat(dev.jasper.app.platform.ThemeZone.color(root, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL))
+            .as("the module theme tells panel from sidebar").isNotEqualTo(dev.jasper.app.platform.ThemeZone.color(root, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
+    }
+
+    /** A six-argument header strip over the Enterprise kit with one action, laid out at a fixed size. */
+    private static ToolWindowHeader enterprise(dev.jasper.ui.icons.ChromeArtwork artwork, javax.swing.Icon icon) {
+        var header = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { }, dev.jasper.app.testsupport.EnterpriseLook.kit(), true, artwork);
+        header.presentation(new dev.jasper.app.contributions.PanelHeaderState("", false, List.of(
+            new dev.jasper.app.contributions.PanelHeaderState.Action("Action", icon, () -> { }))));
+        header.setSize(260, 28);
+        LayoutTestSupport.layoutTree(header);
+        return header;
+    }
+
+    private static javax.swing.JButton action(ToolWindowHeader header) {
+        return descendants(header).stream().filter(c -> c instanceof javax.swing.JButton button
+            && "Action".equals(button.getAccessibleContext().getAccessibleName())).map(c -> (javax.swing.JButton) c).findFirst().orElseThrow();
+    }
+
+    private static int[] pixels(java.awt.image.BufferedImage image) {
+        return image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+    }
+
+    private static java.awt.image.BufferedImage painted(javax.swing.JComponent component) {
+        var image = new java.awt.image.BufferedImage(component.getWidth(), component.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { component.paint(g); } finally { g.dispose(); }
+        return image;
+    }
+
+    /** Runs {@code body} under the Enterprise look, restoring the default look after. */
+    private static void underEnterprise(Runnable body) {
+        var themes = dev.jasper.app.testsupport.EnterpriseLook.controller(false);
+        try { body.run(); } finally { themes.close(); dev.jasper.app.testsupport.EnterpriseLook.restoreDefault(); }
+    }
+
+    /** Plan 15b: under the classic chrome icons a header's contributed add action draws IntelliJ's classic add icon. */
+    @Test void underClassicIconsAContributedAddActionDrawsIntelliJsClassicArt() {
+        underEnterprise(() -> {
+            var button = action(enterprise(dev.jasper.ui.icons.ChromeArtwork.CLASSIC, dev.jasper.app.platform.AppIcons.named("ADD")));
+            var icon = button.getIcon();
+            int size = icon.getIconWidth();
+            var expected = new dev.jasper.ui.icons.IconRegistry().classicChromeIcon("add", size).orElseThrow()
+                .icon(dev.jasper.app.platform.ThemeZone.theme(button), dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY);
+            var want = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var g = want.createGraphics();
+            try { com.formdev.flatlaf.ui.FlatUIUtils.setRenderingHints(g); expected.paintIcon(button, g, 0, 0); } finally { g.dispose(); }
+            assertThat(Arrays.stream(pixels(want)).filter(argb -> argb >>> 24 != 0).count()).as("the classic add icon has ink").isPositive();
+            var image = painted(button);
+            int x = (button.getWidth() - size) / 2, y = (button.getHeight() - size) / 2;
+            assertThat(pixels(image.getSubimage(x, y, size, size))).as("the action paints the classic add icon").isEqualTo(pixels(want));
+        });
+    }
+
+    /** Plan 15b: a name outside the classic set, and a plugin's path, keep their header glyph under the classic icons. */
+    @Test void otherNamesKeepTheirGlyphUnderClassicIcons() {
+        underEnterprise(() -> {
+            for (javax.swing.Icon icon : List.of(dev.jasper.app.platform.AppIcons.semantic("folder"),
+                    new dev.jasper.app.platform.PresentationIcon("owner:glyph", "M 2 2 L 14 14"))) {
+                var classic = painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.CLASSIC, icon));
+                var newUi = painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.NEW_UI, icon));
+                assertThat(pixels(classic)).as(icon.toString()).isEqualTo(pixels(newUi));
+            }
+            assertThat(pixels(painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.CLASSIC, dev.jasper.app.platform.AppIcons.named("ADD")))))
+                .as("the add action does change").isNotEqualTo(pixels(painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.NEW_UI, dev.jasper.app.platform.AppIcons.named("ADD")))));
+        });
+    }
+
+    /** Plan 15b: the five-argument header is the New UI one. */
+    @Test void underNewUiNothingChanges() {
+        underEnterprise(() -> {
+            var icon = dev.jasper.app.platform.AppIcons.named("ADD");
+            var five = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { }, dev.jasper.app.testsupport.EnterpriseLook.kit(), true);
+            five.presentation(new dev.jasper.app.contributions.PanelHeaderState("", false, List.of(
+                new dev.jasper.app.contributions.PanelHeaderState.Action("Action", icon, () -> { }))));
+            five.setSize(260, 28);
+            LayoutTestSupport.layoutTree(five);
+            assertThat(pixels(painted(enterprise(dev.jasper.ui.icons.ChromeArtwork.NEW_UI, icon)))).isEqualTo(pixels(painted(five)));
+        });
     }
 }

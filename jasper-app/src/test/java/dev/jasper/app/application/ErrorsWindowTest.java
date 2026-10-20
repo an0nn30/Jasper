@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import javax.swing.JList;
 import javax.swing.JViewport;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
@@ -44,7 +43,8 @@ class ErrorsWindowTest {
 
     private ErrorsWindow window(AuxiliaryWindows in) {
         return new ErrorsWindow(contributions, in, incidents, new ErrorsView.Hooks(id -> id, id -> "",
-            new IncidentReport.Environment("1", "os", "java"), text -> { }, id -> { }, () -> { }), ZoneOffset.UTC);
+            new IncidentReport.Environment("1", "os", "java"), text -> { }, id -> { }, () -> { }), ZoneOffset.UTC,
+            dev.jasper.app.testsupport.KitTestSupport::context);
     }
 
     /** The first component of {@code type} in {@code root}, depth first. */
@@ -87,6 +87,26 @@ class ErrorsWindowTest {
         assertThat(shell).containsExactly("show", "front", "show", "front");
     }
 
+    /**
+     * A window whose view failed to build is closed again, so the next Show more… opens a working one; it used to stay
+     * open without a view, and every later Show more… failed.
+     */
+    @Test void aViewThatFailsToBuildLeavesNoWindowBehindAndTheNextShowWorks() {
+        boolean[] fail = {true};
+        var errors = new ErrorsWindow(contributions, windows, incidents, new ErrorsView.Hooks(id -> id, id -> "",
+            new IncidentReport.Environment("1", "os", "java"), text -> { }, id -> { }, () -> { }), ZoneOffset.UTC,
+            () -> {
+                if (fail[0]) { fail[0] = false; throw new NoClassDefFoundError("dev/jasper/ui/swing/Stacks$PromptLayout"); }
+                return dev.jasper.app.testsupport.KitTestSupport.context();
+            });
+        Incident incident = incidents.record("jasper", "a", "t", Capture.of(new IllegalStateException("boom")));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> errors.show(Optional.of(incident.id()))).isInstanceOf(NoClassDefFoundError.class);
+        assertThat(windows.open()).as("the half-built window is gone").isEmpty();
+        errors.show(Optional.of(incident.id()));
+        assertThat(windows.open()).singleElement().satisfies(surface -> assertThat(surface.shown()).isTrue());
+        assertThat(ErrorsViewTestSupport.selected(errors.view().orElseThrow())).contains(incident.id());
+    }
+
     @Test void showMoreSelectsItsIncidentInTheSameWindow() {
         var errors = window();
         Incident first = incidents.record("jasper", "a", "t", Capture.of(new IllegalStateException("first")));
@@ -103,7 +123,7 @@ class ErrorsWindowTest {
         var laidOut = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> {
             surface.holder().setSize(900, 560);
             layOut(surface.holder());
-            ((JViewport) find(surface.holder(), JList.class).getParent()).setViewPosition(new Point(0, 0));
+            find((Container) ErrorsViewTestSupport.list((ErrorsView) surface.holder().getComponent(0)), JViewport.class).setViewPosition(new Point(0, 0));
         }, () -> { }, () -> { }, title -> { }, () -> new Rectangle(0, 0, 900, 560), (title, initial) -> Optional.empty()));
         var errors = window(laidOut);
         for (int i = 0; i < 40; i++) incidents.record("jasper", "a", "t", new Capture("x.Older" + i, "", "x.Older" + i, ""));
@@ -111,11 +131,15 @@ class ErrorsWindowTest {
         for (int i = 0; i < 40; i++) incidents.record("jasper", "a", "t", new Capture("x.Newer" + i, "", "x.Newer" + i, ""));
         errors.show(Optional.of(wanted.id()));
         nextEdtTurn();
-        JList<?> list = find(errors.view().orElseThrow(), JList.class);
-        assertThat(ErrorsViewTestSupport.selected(errors.view().orElseThrow())).contains(wanted.id());
-        int index = list.getSelectedIndex();
-        assertThat(index).isEqualTo(40);
-        assertThat(list.getVisibleRect().contains(list.getCellBounds(index, index))).as("the selected row is in view").isTrue();
+        var view = errors.view().orElseThrow();
+        assertThat(ErrorsViewTestSupport.selected(view)).contains(wanted.id());
+        assertThat(ErrorsViewTestSupport.listed(view).indexOf(incidents.list().stream().filter(i -> i.id().equals(wanted.id())).findFirst().orElseThrow())).isEqualTo(40);
+        var viewport = find((Container) ErrorsViewTestSupport.list(view), JViewport.class);
+        var summary = ErrorsViewTestSupport.summary(view, wanted.id());
+        assertThat(summary).as("the selected row is mounted").isNotNull();
+        var bounds = javax.swing.SwingUtilities.convertRectangle(summary.getParent(), summary.getBounds(), viewport.getView());
+        assertThat(viewport.getViewPosition().y).as("scrolled away from the top").isPositive();
+        assertThat(viewport.getViewRect().intersects(bounds)).as("the selected row is in view").isTrue();
     }
 
     @Test void closingTheWindowStopsItsViewAndTheNextShowOpensAFreshOne() {

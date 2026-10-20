@@ -52,28 +52,37 @@ public final class FakePluginContext implements PluginContext {
     volatile State state = State.STARTING;
     final Map<Class<?>, Object> services = new ConcurrentHashMap<>();
     private final List<Subscription> owned = new ArrayList<>();
+    private final FakeKit kit;
+    @Override public FakeKit kit() { return kit; }
     final FakeTerminals terminals;
     final FakeUi ui;
     final FakePalette palette;
     final FakeFileSources fileSources;
+    final FakeCommandLine commandLine;
     final FakePluginSettings settings;
     final dev.jasper.sdk.notifications.Notifications notifications;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
+        this.kit = new FakeKit(info.id()); this.kit.anchorHost=host;
         this.host = host; this.info = info; this.requires = requires; this.plugin = plugin;
         this.terminals = new FakeTerminals(this, host.workspace);
         this.ui = new FakeUi(host, this);
         this.palette = new FakePalette(host, this);
         this.fileSources = new FakeFileSources(host, this);
+        this.commandLine = new FakeCommandLine(host, this);
         this.settings = new FakePluginSettings(host, info.id(), host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
-        this.notifications = host.notifications.of(info.id(), () -> state != State.CLOSED);
+        this.notifications = host.notifications.of(info.id(), () -> state != State.CLOSED, name -> kit().validateIcon(name));
     }
+
+    /** The host this context belongs to, for the fakes that keep host-wide registries. */
+    FakePluginHost host() { return host; }
 
     void requireOpen() {
         if (state == State.CLOSED) throw new IllegalStateException("Plugin context is closed: " + info.id());
     }
 
     void closeOwned() {
+        kit.close();
         List<Subscription> copy;
         synchronized (owned) { copy = new ArrayList<>(owned); owned.clear(); }
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
@@ -107,11 +116,44 @@ public final class FakePluginContext implements PluginContext {
         @Override public dev.jasper.sdk.palette.Palette palette() { return palette; }
     @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
     @Override public dev.jasper.sdk.notifications.Notifications notifications() { return notifications; }
+    @Override public dev.jasper.sdk.cli.CommandLine commandLine() { return commandLine; }
         @Override public dev.jasper.sdk.ui.Platform platform() {
             return new dev.jasper.sdk.ui.Platform() {
-                @Override public void openInEditor(Path file) { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }
+                @Override public void openInEditor(Path file) {
+                    requireOpen();
+                    Objects.requireNonNull(file, "file");
+                    // As the application: the editor a plugin provides first, here on the caller's thread and with no window.
+                    if (!host.editProvided(file, java.util.OptionalInt.empty(), Optional.empty())) host.openedInEditor.add(file);
+                }
+                @Override public Subscription editor(dev.jasper.sdk.ui.FileEditor editor) {
+                    requireOpen();
+                    if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.EDITOR_PROVIDE))
+                        throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.EDITOR_PROVIDE);
+                    Objects.requireNonNull(editor, "editor");
+                    return host.provideEditor(FakePluginContext.this, editor);
+                }
                 @Override public void browse(java.net.URI uri) { requireOpen(); host.browsed.add(webAddress(uri)); }
+                @Override public boolean copy(String text) { requireOpen(); return copied(text, false); }
+                @Override public boolean copySecret(String text) { requireOpen(); return copied(text, true); }
+                @Override public Optional<String> clipboardText() {
+                    requireOpen();
+                    if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.CLIPBOARD_READ))
+                        throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.CLIPBOARD_READ);
+                    return host.clipboard.text();
+                }
             };
+        }
+
+        /** As the application: a busy clipboard is posted in the plugin's group, never thrown. */
+        private boolean copied(String text, boolean secret) {
+            Objects.requireNonNull(text, "text");
+            try {
+                host.clipboard.copy(info.id(), text, secret);
+                return true;
+            } catch (IllegalStateException busy) {
+                notifications.group().error("Could not copy", busy);
+                return false;
+            }
         }
 
         /** Only an absolute http or https address opens in a browser. */
@@ -193,9 +235,10 @@ public final class FakePluginContext implements PluginContext {
     /** Plugin windows and dialogs. */
     @Override public Windows windows() { return ui.windows(); }
 
-    /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */
+    /** The host's variant, presentation, change notifications, and icons checked against the plugin's own class loader. */
     @Override public Appearance appearance() {
         return new Appearance() {
+            @Override public java.awt.Color color(dev.jasper.sdk.ui.SemanticColor role) { host.requireAppearanceThread(); return host.semanticColor(role); }
             @Override public Variant variant() { return ui.variant(); }
             @Override public Variant workspaceVariant() { return host.workspaceAppearance().variant(); }
             @Override public dev.jasper.sdk.ui.WorkspacePalette workspacePalette() {
@@ -217,19 +260,9 @@ public final class FakePluginContext implements PluginContext {
                 var subscription = host.subscribeWorkspace(info.id(), handler); own(subscription); return subscription;
             }
             @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {
-                return events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant()));
+                requireOpen();var subscription=host.subscribeAppearance(info.id(),handler);own(subscription);return subscription;
             }
-            @Override public javax.swing.Icon icon(dev.jasper.sdk.ui.IconName name) {
-                return new FakeNamedIcon(java.util.Objects.requireNonNull(name, "name"));
-            }
-            @Override public javax.swing.Icon icon(dev.jasper.sdk.ui.BundledIcon name) {
-                return new FakeBundledIcon(java.util.Objects.requireNonNull(name, "name"));
-            }
-            @Override public javax.swing.Icon icon(String svgResourcePath) {
-                if (svgResourcePath == null || plugin.getClass().getClassLoader().getResource(svgResourcePath) == null)
-                    throw new IllegalArgumentException("No such icon resource: " + svgResourcePath);
-                return FakeUi.blankIcon();
-            }
+            @Override public dev.jasper.sdk.ui.Presentation presentation() { return host.presentation(); }
         };
     }
 }

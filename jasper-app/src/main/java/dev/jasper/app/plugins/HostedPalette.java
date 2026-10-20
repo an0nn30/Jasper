@@ -33,10 +33,14 @@ final class HostedPalette implements Palette {
     private final Containment containment;
     private final HostedUi ui;
     private final HostedTerminals terminals;
+    /** The plugin's manifest {@code icon_hue}, which a scope that names no hue takes; never NONE. */
+    private final dev.jasper.ui.model.Nodes.Hue ownerHue;
     private boolean audited;
 
-    HostedPalette(String pluginId, CapabilityGate gate, Contributions model, Containment containment, HostedUi ui, HostedTerminals terminals) {
+    HostedPalette(String pluginId, CapabilityGate gate, Contributions model, Containment containment, HostedUi ui, HostedTerminals terminals,
+                  dev.jasper.ui.model.Nodes.Hue ownerHue) {
         this.pluginId = pluginId; this.gate = gate; this.model = model; this.containment = containment; this.ui = ui; this.terminals = terminals;
+        this.ownerHue = Objects.requireNonNull(ownerHue, "ownerHue");
     }
 
     private void requireContribute() {
@@ -52,6 +56,7 @@ final class HostedPalette implements Palette {
         if (!spec.id().startsWith(pluginId + "."))
             throw new IllegalArgumentException("A scope id must start with " + pluginId + ".: " + spec.id());
         spec.shortcutActionId().ifPresent(ui::requireOwn);
+        spec.icon().ifPresent(ui::validateIcon);
         dev.jasper.app.lifecycle.Subscription added = model.addScope(new Adapted(scope, spec));
         return ui.tracked(added::close);
     }
@@ -70,9 +75,9 @@ final class HostedPalette implements Palette {
             context.maxResults(), context.macOs());
     }
 
-    private static dev.jasper.app.palette.PaletteRow appRow(PaletteRow row) {
+    private dev.jasper.app.palette.PaletteRow appRow(PaletteRow row) {
         return new dev.jasper.app.palette.PaletteRow(row.id(), row.title(), row.detail().orElse(null), row.tag().orElse(null),
-            row.icon().orElse(null), row.enabled(), row);
+            row.icon().map(ui::icon).orElse(null), row.enabled(), row);
     }
 
     private static dev.jasper.app.palette.PaletteStep.Result appResult(PaletteStep.Result result) {
@@ -90,16 +95,21 @@ final class HostedPalette implements Palette {
 
         Adapted(PaletteScope scope, ScopeSpec spec) {
             this.scope = scope; this.spec = spec;
-            this.verbs = spec.verbs().stream().map(verb -> new dev.jasper.app.palette.PaletteVerb(verb.id(), verb.label())).toList();
+            this.verbs = spec.verbs().stream().map(verb -> new dev.jasper.app.palette.PaletteVerb(verb.id(), verb.label(),
+                dev.jasper.app.palette.PaletteVerb.Role.valueOf(verb.role().name()))).toList();
         }
 
         @Override public String id() { return spec.id(); }
         @Override public String label() { return spec.label(); }
-        @Override public Icon icon() { return spec.icon().orElse(null); }
+        @Override public Icon icon() { return spec.icon().map(ui::icon).orElse(null); }
         @Override public String description() { return spec.description(); }
         @Override public String placeholder() { return spec.placeholder(); }
         @Override public List<dev.jasper.app.palette.PaletteVerb> verbs() { return verbs; }
         @Override public boolean monospaceRows() { return spec.monospaceRows(); }
+        @Override public dev.jasper.ui.model.Nodes.Hue hue() {
+            return spec.hue() == dev.jasper.sdk.ui.Nodes.Hue.NONE ? ownerHue : dev.jasper.ui.model.Nodes.Hue.valueOf(spec.hue().name());
+        }
+        @Override public String itemNoun() { return spec.itemNoun().isEmpty() ? spec.label() : spec.itemNoun(); }
         @Override public boolean inAll() { return spec.inAll(); }
         @Override public boolean inRecents() { return spec.inAll() && spec.inRecents(); }
         @Override public Optional<String> shortcutActionId() { return spec.shortcutActionId(); }

@@ -10,8 +10,9 @@ from an unidentified developer. By default Jasper keeps running in the
 background after Cmd+Q, which only closes its windows: choose Quit Jasper
 Completely in its menu bar item before replacing Jasper.app with a newer version.
 
-Windows setup: run Jasper-<version>-windows-x64-setup.exe to install for your user,
-choose the folder and shortcuts, then launch Jasper from the Start menu. Quit Jasper
+Windows setup: run Jasper-<version>-windows-<x64|aarch64>-setup.exe (aarch64 for
+Windows on Arm) to install for your user, choose the folder and shortcuts, then
+launch Jasper from the Start menu. Quit Jasper
 before installing an upgrade. Uninstall through Windows Installed apps; your settings
 and plugin data are preserved. Development installers are unsigned.
 

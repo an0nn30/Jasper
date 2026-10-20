@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
+import dev.jasper.ui.swing.KitView;
 
 /**
  * The page Settings generates for a running plugin's declared settings: rows in declaration order under their
@@ -27,14 +27,16 @@ final class PluginSettingsPage implements SettingsPage {
     private final SchemaPage inner;
     private final Runnable stopListening;
     private final dev.jasper.app.lifecycle.Subscription draftListening;
-    private final JLabel message = PluginPageBody.message();
+    private KitView message;
+    private final PageContext context;
     private JComponent body;
 
     PluginSettingsPage(String pluginId, String title, DeclaredSettings declared, PageContext context) {
         this.title = title;
+        this.context = context;
         this.declared = declared;
         draft = new SettingsDraft(declared.values());
-        var own = new PageContext(draft, context.navigate(), context.closeThen(), context.chooseFile(), context.changed(), context.surface());
+        var own = context.withDraft(draft);
         inner = spec(PluginRuntime.settingsPageId(pluginId), title, declared.handles()).build(own);
         stopListening = declared.onReloaded(() -> {
             draft.rebase(declared.values());
@@ -46,7 +48,7 @@ final class PluginSettingsPage implements SettingsPage {
 
     SettingsDraft draft() { return draft; }
     DeclaredSettings declared() { return declared; }
-    JLabel message() { return message; }
+    KitView message() { return message; }
 
     /** The rows of a plugin's page: declaration order, a heading wherever the section changes. */
     static SchemaPage.Spec spec(String id, String title, List<DeclaredSetting<?>> handles) {
@@ -74,12 +76,15 @@ final class PluginSettingsPage implements SettingsPage {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Editors.Factory editor(DeclaredSetting<?> handle) {
         var spec = handle.spec();
-        EditorHint hint = spec.editor().orElse(null);
-        if (hint instanceof EditorHint.Font font) return Editors.font(font.monospaced());
-        if (hint instanceof EditorHint.File) return Editors.path("Choose a file");
+        Hint hint = Hint.of(spec);
+        if (hint.font()) return Editors.font(hint == Hint.MONOSPACED_FONT);
+        if (hint == Hint.FILE) return Editors.path(Hint.FILE_CHOOSER_TITLE);
+        if (hint == Hint.TECHNICAL && spec.kind() instanceof dev.jasper.sdk.settings.SettingKind.Text) return Editors.technical();
         return switch (spec.kind()) {
             case dev.jasper.sdk.settings.SettingKind.OneOf<?> oneOf -> Editors.choice(names(oneOf));
-            case dev.jasper.sdk.settings.SettingKind.NumberRange range -> Editors.number(0.1, "");
+            // A bounded integer is the Settings stepper, as on the core pages, with its declared unit.
+            case dev.jasper.sdk.settings.SettingKind.IntegerRange range -> Editors.stepper(spec.unit());
+            case dev.jasper.sdk.settings.SettingKind.NumberRange range -> Editors.number(0.1, spec.unit());
             default -> Editors.byKind((Setting) handle.appSetting());
         };
     }
@@ -90,6 +95,38 @@ final class PluginSettingsPage implements SettingsPage {
         return names;
     }
 
+    /**
+     * The control a declared setting's editor hint asks for. The generated page ({@link #editor}) and plugin pages'
+     * standard rows ({@code KitSettingRows}) both follow it, so a hinted setting gets the same control on either.
+     * {@code EditorHint.Directory} has none yet: its setting's kind decides.
+     */
+    enum Hint {
+        /** A font family over every installed family. */
+        FONT,
+        /** A font family over the installed monospaced families. */
+        MONOSPACED_FONT,
+        /** A path with Browse, which asks for an existing file. */
+        FILE,
+        /** A text setting's field in the data face. */
+        TECHNICAL,
+        /** No hint either page honours: the kind decides. */
+        NONE;
+
+        /** The title of the file chooser a {@link #FILE} setting's Browse opens. */
+        static final String FILE_CHOOSER_TITLE = "Choose a file";
+
+        static Hint of(dev.jasper.sdk.settings.SettingSpec<?> spec) {
+            return switch (spec.editor().orElse(null)) {
+                case EditorHint.Font font -> font.monospaced() ? MONOSPACED_FONT : FONT;
+                case EditorHint.File _ -> FILE;
+                case EditorHint.Technical _ -> TECHNICAL;
+                case null, default -> NONE;
+            };
+        }
+
+        boolean font() { return this == FONT || this == MONOSPACED_FONT; }
+    }
+
     @Override public String id() { return inner.id(); }
     @Override public String title() { return title; }
     @Override public Optional<String> parent() { return Optional.of(PluginRuntime.TOOLS); }
@@ -98,6 +135,7 @@ final class PluginSettingsPage implements SettingsPage {
 
     @Override public JComponent component() {
         if (body == null) {
+            message = PluginPageBody.message(context.kit().get());
             body = new PluginPageBody(message, inner.component());
             showMessage();
         }
@@ -126,6 +164,7 @@ final class PluginSettingsPage implements SettingsPage {
         stopListening.run();
         draftListening.close();
         inner.dispose();
+        if (message != null) message.close();
     }
 
     private void showMessage() { PluginPageBody.showMessage(message, declared); }

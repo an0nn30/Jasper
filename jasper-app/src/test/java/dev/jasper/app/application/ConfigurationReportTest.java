@@ -1,6 +1,5 @@
 package dev.jasper.app.application;
 
-import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
@@ -23,7 +22,7 @@ class ConfigurationReportTest {
         // The service reads its initial state here, off the EDT, as production does; the controller is EDT-owned.
         try (var service = new ConfigService(file, true, worker, SwingUtilities::invokeLater)) {
             edt(() -> {
-                var controller = new ConfigurationController(new ThemeController(theme -> true), service, ThemeCatalog.builtIn(), path -> { });
+                var controller = new ConfigurationController(dev.jasper.app.appearance.ThemeTestSupport.controller(true, theme -> true), service, path -> { });
                 assertThat(controller.shown().diagnostics()).isEmpty();
                 controller.report("plugins.\"a.b\".port", "out of range");
                 assertThat(controller.shown().diagnostics()).singleElement().satisfies(diagnostic -> {
@@ -37,20 +36,5 @@ class ConfigurationReportTest {
                 controller.close();
             });
         } finally { worker.shutdownNow(); }
-    }
-    @Test void migrationWarningsSurviveReloadWithoutDuplicationAndRefreshSeparately() throws Exception {
-        Path file = dir.resolve("config.toml"); Files.writeString(file, "");
-        var warning = new ThemeCatalog.Problem(dir.resolve("themes/bad.jar"), "Failed conversion");
-        var warnings = new java.util.concurrent.atomic.AtomicReference<java.util.List<ThemeCatalog.Problem>>(java.util.List.of(warning, warning));
-        try (var service = new ConfigService(file, true)) {
-            edt(() -> {
-                var controller = new ConfigurationController(new ThemeController(theme -> true), service, ThemeCatalog.builtIn(),
-                    path -> {}, warnings::get);
-                controller.accept(service.initialState()); controller.accept(service.initialState());
-                assertThat(controller.shown().diagnostics()).singleElement().satisfies(p -> assertThat(p.message()).isEqualTo("Failed conversion"));
-                warnings.set(java.util.List.of()); controller.accept(service.initialState());
-                assertThat(controller.shown().diagnostics()).isEmpty(); controller.close();
-            });
-        }
     }
 }

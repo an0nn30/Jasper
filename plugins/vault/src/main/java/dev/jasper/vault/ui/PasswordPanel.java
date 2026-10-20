@@ -1,108 +1,264 @@
 package dev.jasper.vault.ui;
 
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
 import dev.jasper.vault.service.UnlockPrompt;
-import java.awt.BorderLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import dev.jasper.vault.workstation.Layout;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiConsumer;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JPasswordField;
 
-/** The master-password form: unlock (one field) or create (two fields and the bind checkbox). */
-public final class PasswordPanel extends JPanel {
+/**
+ * The master-password form: unlock (one field) or create (two paired fields and the bind switch). It owns a kit view
+ * in its own dialog, or renders inside the manager's view under an id prefix. The typed password lives only in the
+ * view's wipeable storage until a submit hands a copy to its owner. UI thread only.
+ */
+public final class PasswordPanel implements AutoCloseable {
     static final int MIN_LENGTH = 8;
-    final JPasswordField password = new JPasswordField(24);
-    final JPasswordField confirm = new JPasswordField(24);
-    final JCheckBox bind = new JCheckBox("Bind to this device (recommended)");
-    final JLabel message = new JLabel(" ");
-    final JButton primary;
-    final JButton cancel = new JButton("Cancel");
+    static final String REVEAL_GROUP = "master";
 
-    private PasswordPanel(String primaryTitle, boolean creating, boolean bindDefault, String intro) {
-        super(new BorderLayout(0, 8));
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
-        password.setDocument(new SecretDocument());
-        confirm.setDocument(new SecretDocument());
-        primary = new JButton(primaryTitle);
-        var form = new JPanel(new GridBagLayout());
-        var at = new GridBagConstraints();
-        at.insets = new Insets(2, 2, 2, 2); at.anchor = GridBagConstraints.WEST; at.gridy = 0; at.gridwidth = 2;
-        form.add(new JLabel(intro), at);
-        at.gridwidth = 1; at.gridy++;
-        form.add(new JLabel("Master password:"), at); at.gridx = 1; form.add(password, at);
-        if (creating) {
-            at.gridx = 0; at.gridy++;
-            form.add(new JLabel("Confirm:"), at); at.gridx = 1; form.add(confirm, at);
-            at.gridx = 0; at.gridy++; at.gridwidth = 2;
-            bind.setSelected(bindDefault);
-            form.add(bind, at);
-        }
-        add(form, BorderLayout.CENTER);
-        var south = new JPanel();
-        south.setLayout(new BoxLayout(south, BoxLayout.Y_AXIS));
-        message.setBorder(BorderFactory.createEmptyBorder(4, 2, 4, 2));
-        south.add(message);
-        var buttons = new JPanel();
-        buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.add(Box.createHorizontalGlue()); buttons.add(cancel); buttons.add(Box.createHorizontalStrut(8)); buttons.add(primary);
-        south.add(buttons);
-        add(south, BorderLayout.SOUTH);
-        password.addActionListener(event -> primary.doClick());
-        confirm.addActionListener(event -> primary.doClick());
+    /** Where the form renders: its own view, or a section of a larger one. */
+    interface Host {
+        UiView view();
+        void render();
+        /** False once the view is disposed (its storage is then already erased). */
+        boolean open();
     }
 
-    /** The unlock form bound to {@code prompt}: Enter submits, errors show, the prompt's dismissal is the dialog's. */
-    public static PasswordPanel unlock(UnlockPrompt prompt) {
-        var panel = new PasswordPanel("Unlock", false, false, "Enter the master password to unlock the vault.");
-        prompt.onError(text -> { panel.message.setText(text); panel.primary.setEnabled(true); panel.password.selectAll(); panel.password.requestFocusInWindow(); });
-        panel.primary.addActionListener(event -> {
-            char[] typed = panel.password.getPassword();
-            if (typed.length == 0) { Arrays.fill(typed, (char) 0); return; }
-            panel.primary.setEnabled(false);
-            panel.message.setText("Unlocking...");
-            panel.password.setText("");
-            prompt.submit(typed);
+    final String form, intro, password, confirm, bind, message, submit, cancel;
+    private final boolean creating;
+    private final String primaryTitle, introText;
+    private final Map<String, String> errors = new LinkedHashMap<>();
+    private boolean bound, busy, closed, ready;
+    private int strength;
+    private String status = "";
+    private Runnable onSubmit = () -> { }, onCancel = () -> { };
+    private Host host;
+    /** The standalone unlock form's composition and its footer line (plan 10b Rulings 11). */
+    private Layout layout = Layout.ROWS;
+    private String footnote = "";
+    private UiView own;
+
+    private PasswordPanel(String prefix, String primaryTitle, boolean creating, boolean bindDefault, String introText) {
+        form = prefix + "form"; intro = prefix + "intro"; password = prefix + "password"; confirm = prefix + "confirm";
+        bind = prefix + "bind"; message = prefix + "message"; submit = prefix + "submit"; cancel = prefix + "cancel";
+        this.primaryTitle = primaryTitle; this.creating = creating; this.bound = bindDefault; this.introText = introText;
+    }
+
+    /** The unlock form in its own view, bound to {@code prompt}: Enter submits, errors show, the prompt's dismissal is the dialog's. */
+    public static PasswordPanel unlock(UiKit kit, UnlockPrompt prompt) {
+        var panel = unlockPanel("", prompt);
+        panel.own(kit);
+        return panel;
+    }
+
+    /**
+     * The unlock form in its own view in {@code layout}'s composition (plan 10b Rulings 11); under CLASSIC
+     * {@code footnote} is the footer's one line ("Auto-locks after 15 min idle"), blank for none.
+     */
+    public static PasswordPanel unlock(UiKit kit, UnlockPrompt prompt, Layout layout, String footnote) {
+        var panel = unlockPanel("", prompt);
+        panel.layout = Objects.requireNonNull(layout);
+        panel.footnote = Objects.requireNonNull(footnote);
+        panel.own(kit);
+        return panel;
+    }
+
+    /** The unlock form rendered inside {@code host} under {@code prefix}. */
+    static PasswordPanel unlockIn(Host host, String prefix, UnlockPrompt prompt) {
+        var panel = unlockPanel(prefix, prompt);
+        panel.host = Objects.requireNonNull(host);
+        return panel;
+    }
+
+    private static PasswordPanel unlockPanel(String prefix, UnlockPrompt prompt) {
+        var panel = new PasswordPanel(prefix, "Unlock", false, false, "Enter your master password to use saved credentials.");
+        panel.busy=prompt.busy();panel.status=panel.busy?"Unlocking...":prompt.error().orElse("");
+        prompt.onError(text -> {
+            if (panel.closed || !panel.host.open()) return;
+            panel.status = text; panel.busy = false; panel.render();
+            panel.host.view().focus(panel.password);
         });
-        panel.cancel.addActionListener(event -> prompt.cancel());
+        panel.onSubmit = () -> {
+            char[] typed = panel.copy(panel.password);
+            if (typed.length == 0) { Arrays.fill(typed, (char) 0); return; }
+            panel.busy = true; panel.status = "Unlocking...";
+            panel.host.view().clearSecret(panel.password);
+            panel.updateReadiness(); panel.render();
+            prompt.submit(typed);
+        };
+        panel.onCancel = prompt::cancel;
         return panel;
     }
 
     /** The create form: two matching passwords of at least {@value #MIN_LENGTH} characters and the bind choice. */
-    public static PasswordPanel create(boolean bindDefault, BiConsumer<char[], Boolean> onCreate, Runnable onCancel) {
-        var panel = new PasswordPanel("Create Vault", true, bindDefault, "Choose a master password. It cannot be recovered if forgotten.");
-        panel.primary.addActionListener(event -> {
-            char[] typed = panel.password.getPassword(), again = panel.confirm.getPassword();
+    public static PasswordPanel create(UiKit kit, boolean bindDefault, BiConsumer<char[], Boolean> onCreate, Runnable onCancel) {
+        var panel = new PasswordPanel("", "Create Vault", true, bindDefault, "Choose a master password to protect your saved credentials.");
+        panel.onSubmit = () -> {
+            char[] typed = panel.copy(panel.password), again = panel.copy(panel.confirm);
             try {
-                if (typed.length < MIN_LENGTH) { panel.message.setText("Use at least " + MIN_LENGTH + " characters"); return; }
-                if (!Arrays.equals(typed, again)) { panel.message.setText("The passwords do not match"); return; }
-                panel.password.setText(""); panel.confirm.setText("");
-                onCreate.accept(typed.clone(), panel.bind.isSelected());
+                if (typed.length < MIN_LENGTH) { panel.errors.put(panel.password, "Use at least " + MIN_LENGTH + " characters"); panel.render(); return; }
+                if (!Arrays.equals(typed, again)) { panel.errors.put(panel.confirm, "The passwords do not match"); panel.render(); return; }
+                panel.host.view().clearSecret(panel.password); panel.host.view().clearSecret(panel.confirm);
+                panel.updateReadiness(); panel.render();
+                onCreate.accept(typed.clone(), panel.bound);
             } finally { Arrays.fill(typed, (char) 0); Arrays.fill(again, (char) 0); }
-        });
-        panel.cancel.addActionListener(event -> onCancel.run());
+        };
+        panel.onCancel = onCancel;
+        panel.own(kit);
         return panel;
     }
-    /** Erases editable copies when the containing surface closes or locks. */
-    public void clear() { password.setText(""); confirm.setText(""); }
+
+    private void own(UiKit kit) {
+        own = kit.create(new ViewSpec(node()), this::handle);
+        host = new Host() {
+            @Override public UiView view() { return own; }
+            @Override public void render() { own.update(new ViewSpec(node())); }
+            @Override public boolean open() { return !closed; }
+        };
+    }
+
+    /** The view this panel owns; only for a panel made by {@link #unlock} or {@link #create}. */
+    public UiView view() { return Objects.requireNonNull(own, "An embedded form has no view of its own"); }
+
+    private char[] copy(String id) {
+        char[][] result = {new char[0]};
+        host.view().withSecret(id, chars -> result[0] = chars.clone());
+        return result[0];
+    }
+
+    private void render() { if (!closed && host.open()) host.render(); }
+
+    /** Routes one event; true when it belonged to this form. */
+    boolean handle(UiEvent event) {
+        if (closed) return false;
+        switch (event) {
+            case UiEvent.Action action when action.id().equals(submit) -> { if (!busy) { errors.clear(); onSubmit.run(); } return true; }
+            case UiEvent.Action action when action.id().equals(cancel) -> { onCancel.run(); return true; }
+            case UiEvent.Toggled toggled when toggled.id().equals(bind) -> { bound = toggled.checked(); render(); return true; }
+            case UiEvent.SecretChanged changed when changed.id().equals(password) || changed.id().equals(confirm) -> {
+                errors.clear(); updateReadiness(); render();
+                return true;
+            }
+            default -> { return false; }
+        }
+    }
+
+    private ControlState state(String id) { return new ControlState(true, !busy, false, errors.getOrDefault(id, "")); }
+
+    /** Derives only non-secret presentation state while borrowed arrays remain wipeable. */
+    private void updateReadiness() {
+        host.view().withSecret(password, typed -> {
+            strength = typed.length == 0 ? 0 : Math.min(4, 1 + typed.length / MIN_LENGTH);
+            if (creating) host.view().withSecret(confirm, again -> ready = typed.length >= MIN_LENGTH && Arrays.equals(typed, again));
+            else ready = typed.length > 0;
+        });
+    }
+
+    /** The standalone prompt; domain policy remains in the submit handler. */
+    Nodes.Form node() {
+        if (layout == Layout.CLASSIC && !creating) return classicNode();
+        var hero = new Nodes.Stack(form + ".hero", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
+            new Nodes.Icon(form + ".icon", ControlState.READY, creating ? "shield" : "lock.keyhole", Nodes.Hue.BLUE, Nodes.IconSize.PROMPT, creating ? "Protect credentials" : "Locked vault"),
+            new Nodes.Text(form + ".heading", ControlState.READY, creating ? "Create Vault" : "Unlock Vault", Nodes.TextRole.PROMPT_TITLE),
+            new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.DESCRIPTION)));
+        var fields = new ArrayList<Nodes.Node>();
+        fields.add(secret(password, "Master password"));
+        if (creating) {
+            fields.add(new Nodes.Strength("strength", ControlState.READY, strength, ""));
+            fields.add(secret(confirm, "Confirm password"));
+        }
+        var sections = new ArrayList<Nodes.Node>();
+        sections.add(new Nodes.Stack(form + ".fields", ControlState.READY, Nodes.LayoutRole.VERTICAL, fields));
+        if (creating) {
+            sections.add(new Nodes.Card(bind + ".card", ControlState.READY, Nodes.CardKind.SETTINGS, List.of(
+                new Nodes.SettingRow(bind + ".row", ControlState.READY, "Bind to this device", "The vault can only be opened on this computer",
+                    new Nodes.Toggle(bind, new ControlState(true, !busy, false, ""), "Bind to this device (recommended)", bound, bind, false), false, false, "Recommended"))));
+            sections.add(new Nodes.Stack(form + ".warning", ControlState.READY, Nodes.LayoutRole.SUPPORTING, List.of(
+                new Nodes.Icon(form + ".warning.icon", ControlState.READY, "warning", Nodes.Hue.NONE, Nodes.IconSize.CAPTION, "Warning", Optional.of(Nodes.Severity.WARNING)),
+                new Nodes.Text(form + ".warning.text", ControlState.READY, "Your master password cannot be recovered if forgotten.", Nodes.TextRole.CAPTION))));
+        }
+        sections.add(statusLine());
+        return new Nodes.Form(form, ControlState.READY, creating ? Nodes.FormKind.PROMPT : Nodes.FormKind.PROMPT_COMPACT, primaryTitle, Optional.of(hero), sections, Optional.empty(),
+            List.of(cancelButton(), submitButton()), cancel);
+    }
+
+    /**
+     * The classic Unlock Vault (spec 14.8): the lock tile beside the intro (the classic prompt face draws a PROMPT_HEADER
+     * that way; the dialog's header strip carries the title), the password in the label column with no hint, the footnote.
+     */
+    private Nodes.Form classicNode() {
+        var top = new Nodes.Stack(form + ".hero", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
+            new Nodes.Icon(form + ".icon", ControlState.READY, "lock.keyhole", Nodes.Hue.BLUE, Nodes.IconSize.PROMPT, "Locked vault"),
+            new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.BODY)));
+        var sections = List.<Nodes.Node>of(
+            new Nodes.FormRow(form + ".row", ControlState.READY, "Master password", "",
+                new Nodes.Secret(password, state(password), "", "Master password", REVEAL_GROUP, Nodes.SecretKind.INPUT, "", submit), Optional.empty(), false),
+            statusLine());
+        return new Nodes.Form(form, ControlState.READY, Nodes.FormKind.PROMPT_COMPACT, primaryTitle, Optional.of(top), sections, Optional.empty(),
+            List.of(cancelButton(), submitButton()), cancel, Nodes.FormSubmission.PRIMARY, footnote);
+    }
+
+    /**
+     * The unlock form inside a larger view: its fields and Cancel. The host puts {@link #submitButton()} among its own
+     * actions as the one primary, as the former form was its window's default button.
+     */
+    Nodes.Node embedded() {
+        return new Nodes.Stack(form, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.BODY),
+            new Nodes.Card(form+".card",ControlState.READY,Nodes.CardKind.FORM,List.of(new Nodes.FormRow(form+".row",ControlState.READY,"Password","",secret(password,"Master password"),Optional.empty()))), statusLine(),
+            new Nodes.Stack(form + ".actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(cancelButton()))));
+    }
+
+    /** Enter in a password field submits, as the former fields' action listeners did. */
+    private Nodes.Secret secret(String id, String label) {
+        return new Nodes.Secret(id, state(id), label, label, REVEAL_GROUP, creating && id.equals(confirm) ? Nodes.SecretKind.CONFIRMATION : Nodes.SecretKind.INPUT, "", submit);
+    }
+
+    private Nodes.Text statusLine() { return new Nodes.Text(message, new ControlState(!status.isEmpty(), true, false, ""), status, Nodes.TextRole.BODY); }
+
+    private Nodes.Button cancelButton() { return new Nodes.Button(cancel, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, cancel, ""); }
+
+    /** The primary submit button (Unlock or Create Vault). */
+    Nodes.Button submitButton() {
+        return new Nodes.Button(submit, new ControlState(true, ready && !busy, busy, ""), primaryTitle, "", Nodes.ButtonKind.PRIMARY, submit, "");
+    }
+
+    boolean busy() { return busy; }
+    boolean bound() { return bound; }
+    String status() { return status; }
+    Map<String, String> errors() { return Map.copyOf(errors); }
+
+    /** Erases the typed passwords while the form stays open (for example when its prompt is dismissed). */
+    public void clear() {
+        if (closed || !host.open()) return;
+        host.view().clearSecret(password);
+        if (creating) host.view().clearSecret(confirm);
+        updateReadiness(); render();
+    }
 
     /** Prevents duplicate submits while a background create is running. */
-    public void setBusy(boolean busy) { primary.setEnabled(!busy); password.setEnabled(!busy); confirm.setEnabled(!busy); bind.setEnabled(!busy); }
-    @Override public void removeNotify() {
-        if (getRootPane() != null && getRootPane().getDefaultButton() == primary)
-            getRootPane().setDefaultButton(null);
-        super.removeNotify();
-    }
-    @Override public void addNotify() {
-        super.addNotify();
-        if (getRootPane() != null) getRootPane().setDefaultButton(primary);
-    }
+    public void setBusy(boolean value) { busy = value; render(); }
 
+    /**
+     * Ends the form; a view it owns is disposed with its secret storage. Late prompt results are ignored. A surface
+     * that closed the owned view calls this before anything else can reach the form.
+     */
+    @Override public void close() {
+        if (closed) return;
+        // An embedded form erases its fields in the shared view; an owned view erases everything as it closes,
+        // which its surface may already have done, so the owned view is never touched before closing.
+        if (own == null) clear();
+        closed = true;
+        if (own != null) own.close();
+    }
 }

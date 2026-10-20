@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Slot;
@@ -61,35 +60,35 @@ class SidePanelRenderTest {
     @Test void aSidePanelShowsTheThemesToolWindowFieldButtonAndListColours() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            ThemeTestSupport.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeTestSupport.install(false);
             var panel = new HostsLike();
             var area = new ToolWindowArea(new JPanel(), new DockState());
-            DockTestSupport.show(area, Slot.LEFT_TOP, panel.root, 280);
-            assertThemeColours(area, panel, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            DockTestSupport.show(area, Slot.LEFT_TOP, panel.root, Math.max(280, panel.header.getPreferredSize().width + 32));
+            assertThemeColours(area, panel, false);
 
-            ThemeTestSupport.install(Theme.DARK);
+            ThemeTestSupport.install(true);
             SwingUtilities.updateComponentTreeUI(area);
             area.refreshTheme();
-            assertThemeColours(area, panel, Theme.DARK);
+            assertThemeColours(area, panel, true);
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    private static void assertThemeColours(ToolWindowArea area, HostsLike panel, Theme theme) {
+    private static void assertThemeColours(ToolWindowArea area, HostsLike panel, boolean dark) {
         area.setSize(900, 400);
         LayoutTestSupport.layoutTree(area);
         var image = new BufferedImage(area.getWidth(), area.getHeight(), BufferedImage.TYPE_INT_ARGB);
         var graphics = image.createGraphics();
         try { area.paint(graphics); } finally { graphics.dispose(); }
-        String name = theme.name() + " ";
+        String name = (dark ? "dark" : "light") + " ";
         int gutter = com.formdev.flatlaf.util.UIScale.scale(6);
         var header = area.headerOf(Slot.LEFT_TOP);
         assertThat(panel.root.getX()).as(name + "retains its gutter after theme changes").isEqualTo(gutter);
         assertThat(header.getY()).isEqualTo(gutter);
         assertThat(panel.root.getY()).as(name + "content sits under the header").isEqualTo(gutter + header.getHeight());
         assertThat(pixel(image, area, header, header.getWidth() / 2, header.getHeight() / 2)).as(name + "header has no bar colour")
-            .isEqualTo(UIManager.getColor("ToolWindow.background"));
+            .isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
 
-        assertThat(pixel(image, area, panel.header, 12, 2)).as(name + "panel").isEqualTo(UIManager.getColor("ToolWindow.background"));
+        assertThat(pixel(image, area, panel.header, 12, 2)).as(name + "raw fixture owns its panel surface").isEqualTo(UIManager.getColor("Panel.background"));
         var field = panel.search;
         assertThat(pixel(image, area, field, field.getWidth() - 10, field.getHeight() / 2)).as(name + "search field")
             .isEqualTo(UIManager.getColor("TextField.background"));
@@ -98,9 +97,6 @@ class SidePanelRenderTest {
                 .isEqualTo(UIManager.getColor("Button.background"));
         assertThat(pixel(image, area, panel.list, row(panel.list, 1))).as(name + "selected row")
             .isEqualTo(UIManager.getColor("List.selectionBackground"));
-        var selected = panel.list.getCellBounds(1, 1);
-        assertThat(pixel(image, area, panel.list, selected.width - 5, selected.y))
-            .as(name + "rounded composite renderer corner").isEqualTo(panel.list.getBackground());
         assertThat(pixel(image, area, panel.list, row(panel.list, 0))).as(name + "unselected row")
             .isEqualTo(UIManager.getColor("List.background"));
     }

@@ -18,12 +18,13 @@ class StartupTraceTest {
         final List<String> log = new ArrayList<>();
         final List<Long> delays = new ArrayList<>();
         final List<Runnable> timers = new ArrayList<>();
+        StartupTrace.JvmStatus status = StartupTrace.JvmStatus.of("/Jasper.app/Contents/app/jasper.aot", true, null);
 
         StartupTrace trace() { return trace(null); }
 
         StartupTrace trace(Path file) {
             return new StartupTrace(new StartupTrace.Environment(now::get, 0, 100.0, Instant.parse("2026-10-02T16:35:09.123Z"),
-                42, file, log::add, Runnable::run, () -> StartupTrace.JvmStatus.of("/Jasper.app/Contents/app/jasper.aot", true),
+                42, file, log::add, Runnable::run, () -> status,
                 (delay, task) -> { delays.add(delay); timers.add(task); }));
         }
 
@@ -71,7 +72,7 @@ class StartupTraceTest {
         trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
         trace.settle();
         assertThat(fixture.log).containsExactly(
-            "Startup (cold, AOT cache used, CDS on): main entered 101 ms, output painted 600 ms, plugins bound 400 ms"
+            "Startup (cold, AOT cache used, CDS on, look=default): main entered 101 ms, output painted 600 ms, plugins bound 400 ms"
                 + " | plugins 3 ms");
     }
 
@@ -83,7 +84,7 @@ class StartupTraceTest {
         fixture.at(250);
         trace.mark(StartupTrace.Milestone.WARMED_UP);
         assertThat(fixture.log).containsExactly(
-            "Startup (background, AOT cache used, CDS on): plugins bound 300 ms, warmed up 350 ms");
+            "Startup (background, AOT cache used, CDS on, look=default): plugins bound 300 ms, warmed up 350 ms");
     }
 
     @Test void theCapSettlesTenSecondsAfterTheProcessStartWithWhateverWasMarked() {
@@ -93,7 +94,7 @@ class StartupTraceTest {
         fixture.at(20);
         trace.mark(StartupTrace.Milestone.MAIN_ENTERED);
         fixture.timers.getFirst().run();
-        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache used, CDS on): main entered 120 ms");
+        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache used, CDS on, look=default): main entered 120 ms");
     }
 
     @Test void aWindowReportsItsMilestonesFromTheRequestAndCompletesOnce() {
@@ -117,6 +118,48 @@ class StartupTraceTest {
             .containsEntry("SHOWN", 1_140.0).containsEntry("OUTPUT_PAINTED", 1_195.0);
     }
 
+    @Test void aWindowAfterAnIdleSpellReportsTheSpellAndItsMemoryUntilShown() {
+        var fixture = new Fixture();
+        StartupTrace trace = fixture.trace();
+        var readings = new java.util.ArrayDeque<>(List.of(new MemoryReading(1_000, 120L << 20), new MemoryReading(41_000, 300L << 20)));
+        trace.readMemoryWith(readings::poll);
+        fixture.at(1_000);
+        trace.windowsClosed();
+        fixture.at(1_000 + TimeUnit.MINUTES.toMillis(170));
+        WindowTrace window = trace.window("handoff");
+        fixture.at(1_000 + TimeUnit.MINUTES.toMillis(170) + 900);
+        window.mark(WindowTrace.Milestone.SHOWN);
+        window.mark(WindowTrace.Milestone.SHOWN);
+        window.mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(fixture.log).containsExactly("Window (handoff): shown 900 ms, output painted 900 ms after the request;"
+            + " no window for 2 h 50 min before, 40000 page faults until shown, working set 120 to 300 MB");
+        assertThat(readings).as("read once when requested and once when shown").isEmpty();
+        // The idle spell belongs to that window only.
+        trace.window("menu").mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(fixture.log.getLast()).isEqualTo("Window (menu): output painted 0 ms after the request");
+    }
+
+    @Test void aWindowWithoutAnIdleSpellBeforeItNeverReadsMemory() {
+        var fixture = new Fixture();
+        StartupTrace trace = fixture.trace();
+        trace.readMemoryWith(() -> { throw new AssertionError("a first or further window pays nothing for the reading"); });
+        WindowTrace first = trace.window("cold");
+        first.mark(WindowTrace.Milestone.SHOWN);
+        first.mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(fixture.log).containsExactly("Window (cold): shown 0 ms, output painted 0 ms after the request");
+    }
+
+    @Test void anUnreadableMemoryReadingLeavesTheLineAsItWas() {
+        var fixture = new Fixture();
+        StartupTrace trace = fixture.trace();
+        trace.readMemoryWith(() -> { throw new IllegalStateException("no counters"); });
+        trace.windowsClosed();
+        fixture.at(45_000);
+        trace.window("reopen").mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(fixture.log).containsExactly("Window (reopen): output painted 0 ms after the request; no window for 45 s before");
+        assertThat(WindowTrace.duration(TimeUnit.MINUTES.toNanos(90))).isEqualTo("90 min");
+    }
+
     @Test void aWindowThatNeverPrintsGivesUpAtTheCap() {
         var fixture = new Fixture();
         StartupTrace trace = fixture.trace();
@@ -137,10 +180,42 @@ class StartupTraceTest {
     }
 
     @Test void theJvmStatusNamesAStaleCache() {
-        assertThat(StartupTrace.JvmStatus.of("", true)).isEqualTo(new StartupTrace.JvmStatus("none", "on"));
-        assertThat(StartupTrace.JvmStatus.of("/a.aot", true)).isEqualTo(new StartupTrace.JvmStatus("used", "on"));
-        assertThat(StartupTrace.JvmStatus.of("/a.aot", false)).isEqualTo(new StartupTrace.JvmStatus("stale", "off"));
-        assertThat(StartupTrace.JvmStatus.of(null, false)).isEqualTo(new StartupTrace.JvmStatus("none", "off"));
+        assertThat(StartupTrace.JvmStatus.of("", true, null)).isEqualTo(new StartupTrace.JvmStatus("none", "on"));
+        assertThat(StartupTrace.JvmStatus.of("/a.aot", true, null)).isEqualTo(new StartupTrace.JvmStatus("used", "on"));
+        assertThat(StartupTrace.JvmStatus.of("/a.aot", false, null)).isEqualTo(new StartupTrace.JvmStatus("stale", "off"));
+        assertThat(StartupTrace.JvmStatus.of(null, false, null)).isEqualTo(new StartupTrace.JvmStatus("none", "off"));
+    }
+
+    @Test void theJvmStatusNamesASkippedCacheByItsReason() {
+        assertThat(StartupTrace.JvmStatus.of("", true, "launch-failed")).isEqualTo(new StartupTrace.JvmStatus("skipped: launch-failed", "on"));
+        assertThat(StartupTrace.JvmStatus.of("", true, "remembered")).isEqualTo(new StartupTrace.JvmStatus("skipped: remembered", "on"));
+        assertThat(StartupTrace.JvmStatus.of("", false, "environment")).isEqualTo(new StartupTrace.JvmStatus("skipped: environment", "off"));
+        assertThat(StartupTrace.JvmStatus.of("", true, "/Users/me/notes")).as("a hand-set value stays out of the log")
+            .isEqualTo(new StartupTrace.JvmStatus("skipped: environment", "on"));
+        assertThat(StartupTrace.JvmStatus.of("/a.aot", true, " ")).as("a blank value is no skip")
+            .isEqualTo(new StartupTrace.JvmStatus("used", "on"));
+    }
+
+    @Test void theLaunchersSkipReachesTheObservedStatus() {
+        String previous = System.getProperty("jasper.aotCacheSkipped");
+        System.setProperty("jasper.aotCacheSkipped", "remembered");
+        try {
+            assertThat(StartupTrace.JvmStatus.observe().aotCache()).isEqualTo("skipped: remembered");
+        } finally {
+            if (previous == null) System.clearProperty("jasper.aotCacheSkipped");
+            else System.setProperty("jasper.aotCacheSkipped", previous);
+        }
+    }
+
+    @Test void aStartWithoutTheCacheSaysWhyInTheLineAndTheFile() {
+        var fixture = new Fixture();
+        fixture.status = StartupTrace.JvmStatus.of("", true, "launch-failed");
+        StartupTrace trace = fixture.trace();
+        fixture.at(20);
+        trace.mark(StartupTrace.Milestone.MAIN_ENTERED);
+        trace.settle();
+        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache skipped: launch-failed, CDS on, look=default): main entered 120 ms");
+        assertThat(trace.document(trace.status()).get("jvm")).isEqualTo(java.util.Map.of("aotCache", "skipped: launch-failed", "cds", "on"));
     }
 
     @Test void aDetachedTraceNeverLogsOrSchedules() {
@@ -171,5 +246,15 @@ class StartupTraceTest {
         assertThat(StartupTrace.traceFile("  ")).isNull();
         assertThat(StartupTrace.traceFile(null)).isNull();
         assertThat(StartupTrace.traceFile("/tmp/trace.json")).isEqualTo(Path.of("/tmp/trace.json"));
+    }
+
+    @Test void theLineNamesTheLook() {
+        var fixture = new Fixture();
+        StartupTrace trace = fixture.trace();
+        trace.look("dev.jasper.enterprise");
+        fixture.at(20);
+        trace.mark(StartupTrace.Milestone.MAIN_ENTERED);
+        trace.settle();
+        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache used, CDS on, look=dev.jasper.enterprise): main entered 120 ms");
     }
 }

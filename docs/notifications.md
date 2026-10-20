@@ -32,7 +32,7 @@ that window is focused.
 ## The Notifications panel
 
 The Notifications button on the right stripe opens the panel, which starts in the upper half of the window's right
-side; drag the button or the panel's header to move it, or use **Move to** on the button's right-click menu or the
+side (under the Enterprise look the panel is titled Event Log and starts in the bottom strip, on its left); drag the button or the panel's header to move it, or use **Move to** on the button's right-click menu or the
 header's ⋮ menu. **Notifications: Show History** in the command palette also opens and closes it. The button shows a
 dot while anything is unread: red when an error is unread. Its tooltip gives the count.
 
@@ -43,19 +43,26 @@ longer applies). `✕` removes one row; **Clear All** removes them all.
 
 ## Groups
 
-| Group | What it covers | Shows as |
-|---|---|---|
-| Jasper | errors and results of Jasper's own commands: a shell that could not start, a theme that could not be applied, Migrate Config | card |
-| Configuration | problems in `config.toml`, themes and plugin settings files | sticky card |
-| Long-running commands | a command that ran at least `notifications.long_command_seconds` and finished anywhere but the pane you were typing in | card |
-| Plugin problems | a plugin that failed while Jasper asked it to do something, or that could not be loaded, started or read at launch | card |
-| Internal errors | unexpected errors in Jasper itself | card |
-| *Plugin name*, one per plugin | the plugin's own messages, such as a host that could not be saved | card |
-| *Plugin name* activities | a plugin's background work that finished or failed, such as a sync or an upload | card |
-| Tunnels | Remote's tunnel failures | card |
+| Group | Id | What it covers | Shows as |
+|---|---|---|---|
+| Jasper | `jasper.general` | errors and results of Jasper's own commands: a shell that could not start, a theme that could not be applied, Migrate Config | card |
+| Configuration | `jasper.config` | problems in `config.toml` and plugin settings files | sticky card |
+| Long-running commands | `jasper.commands` | a command that ran at least `notifications.long_command_seconds` and finished anywhere but the pane you were typing in | card |
+| Plugin problems | `jasper.plugins` | a plugin that failed while Jasper asked it to do something, or that could not be loaded, started or read at launch | card |
+| Internal errors | `jasper.errors` | unexpected errors in Jasper itself | card |
+| Memory & VM options | `jasper.vmoptions` | a start without your custom VM options or without the start-up cache, an options file Jasper had to ignore, a restart that would apply new options, a restart Jasper could not perform, an options file that could not be opened, saved or revealed, and a warning when Jasper runs low on memory | card |
+| *Plugin name*, one per plugin | *plugin id* | the plugin's own messages, such as a host that could not be saved | card |
+| *Plugin name* activities | *plugin id*`.activities` | a plugin's background work that finished or failed, such as a sync or an upload | card |
+| Tunnels | `dev.jasper.remote.tunnels` | Remote's tunnel failures | card |
 
 A configuration notification offers **Show Problems** (the same list as the status bar's configuration indicator)
 and **Open config.toml**. It goes away by itself once every problem is fixed.
+
+To change how a group appears, use **Settings › Notifications › Groups**. It lists every group known now: Jasper's,
+and each plugin's once the plugin has run. Each group gets a choice of **Card**, **Sticky card**, **History only**
+(the Notifications panel, unread, no card) or **Off**, with the default marked, and **Reset**. The change applies to
+the next notification; what is already in the panel or on screen stays. The same choices live in `config.toml` under
+[`[notifications.groups]`](configuration.md#notification-groups).
 
 ## Long-running commands
 

@@ -44,10 +44,13 @@ public final class ConfigService implements AutoCloseable {
      * @param deadTables old tables Migrate Config may remove
      * @param values each core setting's loaded value and where it came from (the last good values when rejected)
      * @param rejected whether the file could not be applied (syntax or type errors, or an unreadable file)
+     * @param defaults the look's defaults the snapshot was read with
      */
     public record State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present,
-                        List<LegacyKey> legacyKeys, List<List<String>> deadTables, SettingValues values, boolean rejected) {
+                        List<LegacyKey> legacyKeys, List<List<String>> deadTables, SettingValues values, boolean rejected,
+                        DefaultSource defaults) {
         public State {
+            Objects.requireNonNull(defaults, "defaults");
             Objects.requireNonNull(snapshot, "snapshot");
             Objects.requireNonNull(file, "file");
             Objects.requireNonNull(values, "values");
@@ -65,6 +68,12 @@ public final class ConfigService implements AutoCloseable {
         public State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present,
                      List<LegacyKey> legacyKeys, List<List<String>> deadTables) {
             this(snapshot, diagnostics, file, present, legacyKeys, deadTables, SettingValues.defaults(CoreSettings.SCHEMA), false);
+        }
+
+        /** A state read under the core look's defaults. */
+        public State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present,
+                     List<LegacyKey> legacyKeys, List<List<String>> deadTables, SettingValues values, boolean rejected) {
+            this(snapshot, diagnostics, file, present, legacyKeys, deadTables, values, rejected, DefaultSource.CORE);
         }
 
         /** Whether Migrate Config has old keys or dead tables to rewrite. */
@@ -88,6 +97,7 @@ public final class ConfigService implements AutoCloseable {
 
     private final Path file;
     private final boolean macOs;
+    private final DefaultSource defaults;
     private final ScheduledExecutorService worker;
     private final Consumer<Runnable> publisher;
     private final State initialState;
@@ -105,22 +115,41 @@ public final class ConfigService implements AutoCloseable {
     private java.util.function.BooleanSupplier changes; // confined to the worker
 
     public ConfigService(Path file, boolean macOs) {
-        this(file, macOs, newWorker(), SwingUtilities::invokeLater);
+        this(file, macOs, DefaultSource.CORE);
+    }
+
+    /** A service whose snapshots read the allowlisted keys the file does not set from {@code defaults} (spec 5.8). */
+    public ConfigService(Path file, boolean macOs, DefaultSource defaults) {
+        this(file, macOs, newWorker(), SwingUtilities::invokeLater, defaults);
     }
 
     /** The supplied single-thread scheduled worker is owned by this service, including shutdown. */
     public ConfigService(Path file, boolean macOs, ScheduledExecutorService worker, Consumer<Runnable> publisher) {
+        this(file, macOs, worker, publisher, DefaultSource.CORE);
+    }
+
+    /** As the four-argument form, under {@code defaults}. */
+    public ConfigService(Path file, boolean macOs, ScheduledExecutorService worker, Consumer<Runnable> publisher, DefaultSource defaults) {
         requireOffEdt();
+        this.defaults = Objects.requireNonNull(defaults, "defaults");
         this.file = Objects.requireNonNull(file, "file");
         this.macOs = macOs;
         this.worker = Objects.requireNonNull(worker, "worker");
         this.publisher = Objects.requireNonNull(publisher, "publisher");
-        lastConfig = readState(new State(ConfigSnapshot.defaults(), List.of(), file, false), true);
+        lastConfig = readState(empty(), true);
         initialState = lastConfig;
         state = initialState;
     }
 
     public State initialState() { return initialState; }
+    /** The look's defaults every snapshot of this service reads with. */
+    public DefaultSource defaults() { return defaults; }
+
+    /** The state of a missing file: the defaults under this service's source. */
+    private State empty() {
+        return new State(ConfigSnapshot.defaults(defaults), List.of(), file, false, List.of(), List.of(),
+            SettingValues.defaults(CoreSettings.SCHEMA), false, defaults);
+    }
     public boolean macOs() { return macOs; }
 
     /**
@@ -199,7 +228,7 @@ public final class ConfigService implements AutoCloseable {
                     if (parsed.rejected()) throw new IllegalArgumentException("Fix config.toml's errors before saving settings.");
                     for (var change : edit.changes().entrySet()) {
                         Setting<?> setting = change.getKey();
-                        if (!parsed.values().saved(setting).equals(edit.expected().get(setting)))
+                        if (!setting.sameSaved(parsed.values().saved(setting), edit.expected().get(setting)))
                             throw new StaleSetting(setting.name() + " changed on disk. Review the new value and try again.");
                         change.getValue().ifPresent(value -> check(setting, value));
                     }
@@ -210,9 +239,9 @@ public final class ConfigService implements AutoCloseable {
                         document = write(document, change.getKey(), change.getValue());
                     }
                     String updated = document.text();
-                    var checked = ConfigLoader.parse(file, updated, macOs);
+                    var checked = ConfigLoader.parse(file, updated, macOs, defaults);
                     if (checked.rejected() || edit.changes().entrySet().stream()
-                            .anyMatch(change -> !checked.values().saved(change.getKey()).equals(change.getValue())))
+                            .anyMatch(change -> !change.getKey().sameSaved(checked.values().saved(change.getKey()), change.getValue())))
                         throw new IllegalArgumentException("Cannot safely save these settings; review config.toml.");
                     return updated;
                 });
@@ -303,7 +332,7 @@ public final class ConfigService implements AutoCloseable {
                             throw new IllegalArgumentException("The default shortcut for " + edit.getKey() + " is unavailable. Assign a shortcut explicitly instead.");
                     }
                     String updated = KeybindingText.update(source.text(), edits);
-                    var checked = ConfigLoader.parse(file, updated, macOs);
+                    var checked = ConfigLoader.parse(file, updated, macOs, defaults);
                     if (checked.rejected() || !checked.snapshot().keybindings().equals(next))
                         throw new IllegalArgumentException("Cannot safely save these shortcuts; review the settings file.");
                     return updated;
@@ -331,7 +360,7 @@ public final class ConfigService implements AutoCloseable {
         String source = original.orElseGet(() -> ConfigTemplate.text(macOs));
         String updated;
         try {
-            updated = edit.apply(new Source(source, ConfigLoader.parse(file, source, macOs)));
+            updated = edit.apply(new Source(source, ConfigLoader.parse(file, source, macOs, defaults)));
         } catch (UncheckedIOException failure) {
             throw failure.getCause();
         }
@@ -393,10 +422,10 @@ public final class ConfigService implements AutoCloseable {
                 return readError(lastGood, "Configuration exceeds 1 MiB; reduce the file size and reload.");
             }
             String text = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
-            var parsed = ConfigLoader.parse(file, text, macOs);
+            var parsed = ConfigLoader.parse(file, text, macOs, defaults);
             return parsed.rejected()
-                ? new State(lastGood.snapshot(), parsed.diagnostics(), file, true, List.of(), List.of(), lastGood.values(), true)
-                : new State(parsed.snapshot(), parsed.diagnostics(), file, true, parsed.legacyKeys(), parsed.deadTables(), parsed.values(), false);
+                ? new State(lastGood.snapshot(), parsed.diagnostics(), file, true, List.of(), List.of(), lastGood.values(), true, defaults)
+                : new State(parsed.snapshot(), parsed.diagnostics(), file, true, parsed.legacyKeys(), parsed.deadTables(), parsed.values(), false, defaults);
         } catch (NoSuchFileException ignored) {
             return missingState(lastGood);
         } catch (CharacterCodingException ignored) {
@@ -426,12 +455,12 @@ public final class ConfigService implements AutoCloseable {
             }
         }
         fingerprint = MISSING;
-        return new State(ConfigSnapshot.defaults(), List.of(), file, false);
+        return empty();
     }
 
     private State readError(State lastGood, String message) {
         return new State(lastGood.snapshot(), List.of(new ConfigDiagnostic(
-            ConfigDiagnostic.Severity.ERROR, file, 0, 0, "", message)), file, true, List.of(), List.of(), lastGood.values(), true);
+            ConfigDiagnostic.Severity.ERROR, file, 0, 0, "", message)), file, true, List.of(), List.of(), lastGood.values(), true, defaults);
     }
 
     /** Called under lifecycle: the publication must still be current when it reaches the EDT. */

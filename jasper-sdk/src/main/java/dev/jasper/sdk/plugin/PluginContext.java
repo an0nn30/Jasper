@@ -2,6 +2,7 @@ package dev.jasper.sdk.plugin;
 
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.Activities;
+import dev.jasper.sdk.cli.CommandLine;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.services.Services;
 import dev.jasper.sdk.settings.PluginSettings;
@@ -28,6 +29,8 @@ import dev.jasper.sdk.ui.Platform;
  * handles already issued do nothing. {@link #log()} keeps working.
  */
 public interface PluginContext {
+    /** Plugin-owned declarative view factory. @return the kit */
+    dev.jasper.sdk.ui.UiKit kit();
     /**
      * This plugin's verified identity.
      *
@@ -114,7 +117,7 @@ public interface PluginContext {
     StatusBar statusBar();
 
     /**
-     * The application's look, change notifications and theme-aware icons.
+     * The application's colours, variant, presentation and their change notifications.
      *
      * @return the appearance service
      */
@@ -166,6 +169,15 @@ public interface PluginContext {
      * @since 0.14.0
      */
     Notifications notifications();
+
+    /**
+     * This plugin's {@code jasper} subcommands, declared under {@code [[subcommands]]} in {@code plugin.toml}. No
+     * capability is needed.
+     *
+     * @return the command line
+     * @since 0.17.0
+     */
+    CommandLine commandLine();
 
         /** @return desktop integration such as opening a file in the editor */
         Platform platform();

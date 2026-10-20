@@ -71,4 +71,12 @@ class DirectoryProvenanceTest {
         assertThat(DirectoryProvenance.fileUriPath("relative")).isEmpty();
         assertThat(new DirectoryProvenance(true, Set.of()).classify("file:///tmp")).isEqualTo(local(Path.of(new URI("file:///tmp"))));
     }
+
+    @Test void aFileLinkIsLocalByTheSameRuleAndGivesItsPath() {
+        assertThat(local.localPath("file:///tmp/My%20Notes.txt")).contains(Path.of("/tmp/My Notes.txt"));
+        assertThat(local.localPath("file://workstation/tmp/a.txt")).contains(Path.of("/tmp/a.txt"));
+        assertThat(local.localPath("file://build-host/tmp/a.txt")).as("another host").isEmpty();
+        assertThat(new DirectoryProvenance(false, Set.of()).localPath("file:///tmp/a.txt")).as("an attached session").isEmpty();
+        assertThat(local.localPath("https://example.com/a.txt")).isEmpty();
+    }
 }

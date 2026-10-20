@@ -1,9 +1,6 @@
-# Key fallback
+# Historical key artwork provenance
 
-KEY.svg is byte-identical Tabler outline artwork from commit
+The former KEY.svg was byte-identical Tabler outline artwork from commit
 0239805680a36bab4e1070529b6744924402d804 of https://github.com/tabler/tabler-icons.
-It remains because the vendored IntelliJ platform New UI collection has no key symbol.
-The central icon manager tints it to the running theme's chrome foreground.
-
-Tabler is MIT licensed; its pinned upstream license is included as LICENSE.txt.
-assets.tsv records the original source URL and SHA-256. No runtime download occurs.
+Task11b removed that unused asset and its manifest: the module owns an original named key glyph.
+The pinned MIT LICENSE.txt is retained as historical legal provenance.

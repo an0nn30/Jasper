@@ -73,12 +73,20 @@ public final class DirectoryProvenance {
         }
     }
 
+    /**
+     * The path a {@code file} URI names when it is on this machine by the same rule, through the local path mapper;
+     * empty for a remote one and for anything that is not a {@code file} URI with a path.
+     */
+    public Optional<Path> localPath(String uri) {
+        return classify(uri).flatMap(report -> report instanceof Report.Local local ? Optional.of(local.directory()) : Optional.empty());
+    }
+
     private Optional<Report> local(String path) {
         Optional<Path> mapped;
         try {
             mapped = localPaths.apply(path);
         } catch (RuntimeException failure) {
-            // The mapper runs on the reader thread; a broken one must not end the session.
+            // The mapper runs on the reader thread for a report and on the EDT for a clicked link; a broken one must end neither.
             return Optional.empty();
         }
         return mapped == null ? Optional.empty() : mapped.map(Report.Local::new);

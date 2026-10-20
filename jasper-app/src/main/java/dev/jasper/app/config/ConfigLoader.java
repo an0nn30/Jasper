@@ -63,45 +63,31 @@ public final class ConfigLoader {
     private Map<String, String> keybindings = Map.of();
     private Map<String, Map<String, Object>> plugins = Map.of();
 
-    private ConfigLoader(Path file, String text, boolean macOs) {
+    private final DefaultSource defaults;
+
+    private ConfigLoader(Path file, String text, boolean macOs, DefaultSource defaults) {
         this.file = Objects.requireNonNull(file, "file");
-        this.reader = new SchemaReader(CoreSettings.SCHEMA, text, this::aliasValue);
+        this.defaults = Objects.requireNonNull(defaults, "defaults");
+        // An invalid value of an allowlisted key falls back to the look's default, not the core one (spec 5.8).
+        this.reader = new SchemaReader(CoreSettings.SCHEMA, text, (path, value) -> value, defaults::value);
         this.macOs = macOs;
     }
 
-    public static Result parse(Path file, String text, boolean macOs) {
-        return new ConfigLoader(file, text, macOs).parse();
+    /** The core look's reading of {@code text}. */
+    public static Result parse(Path file, String text, boolean macOs) { return parse(file, text, macOs, DefaultSource.CORE); }
+
+    /** {@code text} read with {@code defaults} for the allowlisted keys it does not set. */
+    public static Result parse(Path file, String text, boolean macOs, DefaultSource defaults) {
+        return new ConfigLoader(file, text, macOs, defaults).parse();
     }
 
     private Result parse() {
         SchemaReader.Result read = reader.read(this::special);
         List<ConfigDiagnostic> diagnostics = read.problems().stream().map(this::diagnostic).toList();
         if (read.syntaxError())
-            return new Result(ConfigSnapshot.defaults(), diagnostics, true, read.values(), List.of(), List.of());
-        return new Result(ConfigSnapshot.from(read.values(), keybindings, plugins), diagnostics, read.rejected(), read.values(),
+            return new Result(ConfigSnapshot.defaults(defaults), diagnostics, true, read.values(), List.of(), List.of());
+        return new Result(ConfigSnapshot.from(read.values(), defaults, keybindings, plugins), diagnostics, read.rejected(), read.values(),
             read.legacyKeys(), deadTables);
-    }
-
-    private Object aliasValue(List<String> path, Object value) {
-        if (!(value instanceof String name)) return value;
-        if (path.equals(List.of("ui", "theme", "variant"))) {
-            return switch (name.strip().toLowerCase(java.util.Locale.ROOT)) {
-                case "light" -> "Jasper Light";
-                case "dark" -> "Jasper Dark";
-                default -> {
-                    reader.warning(path, "Use light or dark for the old theme variant; using the default.");
-                    yield ConfigSnapshot.DEFAULT_THEME;
-                }
-            };
-        }
-        if (path.equals(List.of("terminal", "colors")) || path.equals(List.of("ui", "theme", "terminal"))) {
-            return switch (name.strip().toLowerCase(java.util.Locale.ROOT)) {
-                case "light" -> "Jasper Light";
-                case "dark" -> "Jasper Dark";
-                default -> name;
-            };
-        }
-        return value;
     }
 
     /** Retired tab tuning keys, the version key and the tables other readers own. */

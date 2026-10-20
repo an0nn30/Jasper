@@ -1,14 +1,11 @@
 package dev.jasper.app.workspace;
 
-import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.app.platform.ThemeZone;
+
 import dev.jasper.app.contributions.PanelBadge;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import javax.swing.Icon;
-import javax.swing.UIManager;
 
 /**
  * A stripe icon with an unread dot at its top-right corner, ringed in the stripe's colour so it reads on any artwork.
@@ -32,19 +29,7 @@ final class BadgedIcon implements Icon {
 
     @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
         base.paintIcon(component, graphics, x, y);
-        var g = (Graphics2D) graphics.create();
-        try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int dot = UIScale.scale(6), ring = UIScale.scale(1);
-            int left = x + getIconWidth() - dot;
-            Color rail = UIManager.getColor("Jasper.titleBackground");
-            if (rail != null) {
-                g.setColor(rail);
-                g.fillOval(left - ring, y - ring, dot + 2 * ring, dot + 2 * ring);
-            }
-            Color color = UIManager.getColor(tone == PanelBadge.Tone.ERROR ? "Jasper.railBadgeError" : "Jasper.railBadgeAccent");
-            g.setColor(color != null ? color : Color.RED);
-            g.fillOval(left, y, dot, dot);
-        } finally { g.dispose(); }
+        // Badges sit on the rail (surface.app); the kit holds them to the indicator floor there.
+        dev.jasper.ui.swing.ChromePainter.installed().badge(graphics, x, y, getIconWidth(), ThemeZone.theme(null), tone == PanelBadge.Tone.ERROR);
     }
 }

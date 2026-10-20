@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -26,8 +27,8 @@ class ApplicationActionsTest {
         edt(() -> {
             WindowContent ui = owner[0];
             ui.invoke(ActionId.FONT_BIGGER);
-            assertThat(ui.currentPane().view().fontSize()).isEqualTo(17);
-            assertThat(first[0].view().fontSize()).isEqualTo(16);
+            assertThat(ui.currentPane().view().fontSize()).isEqualTo(13);
+            assertThat(first[0].view().fontSize()).isEqualTo(12);
             ui.invoke(ActionId.FOCUS_PANE_LEFT); ui.invoke(ActionId.FIND);
             assertThat(first[0].findBar().isVisible()).isTrue();
             assertThat(ui.action(ActionId.OPEN_SETTINGS).isEnabled()).isFalse();
@@ -39,6 +40,43 @@ class ApplicationActionsTest {
             ui.close();
         });
     }
+    /** Spec 13: File › Open File… asks the window's chooser from the pane's folder and opens the file as a Cmd-click does. */
+    @Test void openFileAsksTheChooserAndOpensTheChosenFileAsACmdClickDoes() throws Exception {
+        Queue<Runnable> pending = new ArrayDeque<>();
+        WindowContent[] owner = new WindowContent[1];
+        edt(() -> owner[0] = content(launcher(pending)));
+        pending.remove().run();
+        var file = java.nio.file.Path.of("notes.txt").toAbsolutePath();
+        var answers = new ArrayDeque<Optional<java.nio.file.Path>>(List.of(Optional.of(file), Optional.empty()));
+        var asked = new ArrayList<Optional<java.nio.file.Path>>();
+        var opened = new ArrayList<String>();
+        edt(() -> {
+            WindowContent ui = owner[0];
+            ui.fileChooser = folder -> { asked.add(folder); return answers.remove(); };
+            ui.onOpenFile = (chosen, line) -> opened.add(chosen + ":" + line);
+            assertThat(ui.action(ActionId.OPEN_FILE).isEnabled()).isTrue();
+            assertThat(ui.action(ActionId.OPEN_FILE).getValue(Action.NAME)).isEqualTo("Open File…");
+            assertThat(ui.action(ActionId.OPEN_FILE).getValue(Action.SHORT_DESCRIPTION)).isEqualTo("Open a file with the default editor");
+            assertThat(ui.action(ActionId.OPEN_FILE).getValue(Action.ACCELERATOR_KEY)).as("no default binding").isNull();
+            JMenu fileMenu = null;
+            for (int i = 0; i < ui.menuBar().getMenuCount(); i++) if ("File".equals(ui.menuBar().getMenu(i).getText())) fileMenu = ui.menuBar().getMenu(i);
+            var labels = new ArrayList<String>();
+            for (var child : fileMenu.getMenuComponents()) if (child instanceof JMenuItem item) labels.add(item.getText());
+            assertThat(labels).containsSubsequence("New Window", "Open File…");
+            var command = ui.commands().find("open_file").orElseThrow();
+            assertThat(command.title()).as("spec 14.7: also a palette command").isEqualTo("Open File…");
+            assertThat(command.keywords()).contains("open file", "open", "editor", "browse");
+            assertThat(dev.jasper.app.commands.CommandSearch.find(ui.commands().entries(), "open file", List.of(), 5).stream()
+                .map(dev.jasper.app.commands.Command::id)).as("the palette finds it").contains("open_file");
+            ui.invoke(ActionId.OPEN_FILE);
+            assertThat(asked).singleElement().as("the chooser starts in the pane's folder").isEqualTo(Optional.ofNullable(ui.directory()));
+            assertThat(opened).containsExactly(file + ":0");
+            ui.invoke(ActionId.OPEN_FILE);
+            assertThat(opened).as("cancelling opens nothing").containsExactly(file + ":0");
+            ui.close();
+        });
+    }
+
     @Test void focusingFindFieldRetargetsGlobalPaneActions() throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];
@@ -54,7 +92,7 @@ class ApplicationActionsTest {
             java.awt.event.FocusEvent event = new java.awt.event.FocusEvent(field, java.awt.event.FocusEvent.FOCUS_GAINED);
             for (var listener : field.getFocusListeners()) listener.focusGained(event);
             owner[0].invoke(ActionId.FONT_BIGGER);
-            assertThat(first[0].view().fontSize()).isEqualTo(17);
+            assertThat(first[0].view().fontSize()).isEqualTo(13);
             owner[0].close();
         });
     }
@@ -62,7 +100,7 @@ class ApplicationActionsTest {
         Queue<Runnable> pending = new ArrayDeque<>();
         edt(() -> {
             var original = UIManager.getLookAndFeel();
-            dev.jasper.app.appearance.ThemeTestSupport.install(dev.jasper.app.appearance.Theme.DARK);
+            dev.jasper.app.appearance.ThemeTestSupport.install(true);
             try {
                 WindowContent owner = content(launcher(pending));
                 BindingRoot root = new BindingRoot(); root.setContentPane(owner);

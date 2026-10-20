@@ -7,7 +7,6 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.event.ContainerAdapter;
 import java.awt.event.ContainerEvent;
-import java.util.Map;
 import javax.swing.JComponent;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.Style;
@@ -28,7 +27,7 @@ public final class EditorTheme {
 
     /**
      * Applies the current workspace palettes to an editor and its gutter. Below 1, {@code opacity} makes the editor and
-     * gutter backgrounds clear and their components non-opaque, so the enclosing {@link GlassSurface} paints the only
+     * gutter backgrounds clear and their components non-opaque, so the enclosing {@link DocumentArea} paints the only
      * glass; the current-line highlight takes that alpha.
      *
      * @param opacity the workspace opacity behind the editor, from 0.1 to 1
@@ -62,7 +61,6 @@ public final class EditorTheme {
         area.setCurrentLineHighlightColor(glass ? translucent(editor.currentLine(), opacity) : fixed(editor.currentLine()));
         scroll.setOpaque(!glass);
         scroll.setBackground(background);
-        scroll.putClientProperty("FlatLaf.style", Map.of("background", background));
         scroll.getViewport().setOpaque(!glass);
         scroll.getViewport().setBackground(background);
         if (scroll.getRowHeader() != null) {

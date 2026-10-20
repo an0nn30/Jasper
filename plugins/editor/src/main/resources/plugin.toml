@@ -1,10 +1,16 @@
 id = "dev.jasper.editor"
 name = "Editor"
-version = "0.7.0"
+version = "0.10.0"
 entry = "dev.jasper.editor.EditorPlugin"
-sdk = ">=0.14.1, <0.15"
+sdk = ">=0.18.0, <0.19"
 description = "Edit local and remote text files in tabs, with syntax highlighting."
 vendor = "Jasper"
+icon_hue = "neutral"
+icon_selected_ink = "foreground"
 icon = "icons/editor.svg"
-capabilities = ["palette.contribute"]
+capabilities = ["palette.contribute", "terminal.environment", "editor.provide", "terminal.open"]
 exports = ["dev.jasper.editor.api"]
+
+[[subcommands]]
+name = "editor"
+summary = "Open files in Jasper's Editor"

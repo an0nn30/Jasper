@@ -3,15 +3,22 @@
 The API Jasper plugins compile against. It depends only on the JDK; `verifySdkArchitecture`
 enforces that from bytecode, and `check` runs Javadoc with doclint.
 
+Each Jasper GitHub release carries `jasper-sdk-<v>.jar` and `jasper-sdk-testkit-<v>.jar` (with sources and Javadoc) for
+plugins built outside this repository; `./gradlew sdkRelease` builds them into `build/sdk-release/`, and
+`verifySdkRelease` (part of `check`) pins their names and contents. Start from the
+[example external plugin](../docs/examples/external-plugin/build.gradle.kts) and the
+[authoring guide](../docs/plugin-authoring.md#building-a-plugin-outside-the-jasper-repository).
+
 | Package | Contents |
 | --- | --- |
 | `dev.jasper.sdk` | `JasperSdk.VERSION`, `PluginInfo`, `Variant`, `Subscription`, `WindowOwner`, `Capabilities`, `MissingCapabilityException` |
 | `dev.jasper.sdk.plugin` | `Plugin` (the entry point), `PluginContext` |
+| `dev.jasper.sdk.cli` | `CommandLine`, `CommandHandler`, `CommandCall`: answering `jasper` subcommands |
 | `dev.jasper.sdk.settings` | `PluginSettings`, `Setting`, `SettingSpec`, `SettingKind`, `Choice`, `EditorHint`, `Applies`, `SettingsPanel`, `SettingsPanelHost` |
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `ToolbarViewFactory`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `Presentation`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform`, `FileEditor` |
 | `dev.jasper.sdk.notifications` | `Notifications`, `NotificationGroup`, `GroupSpec`, `NotificationSpec`, `NotificationAction`, `NotificationHandle`, `Severity`, `DisplayMode` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
@@ -21,26 +28,54 @@ The SDK is **0.x: no compatibility promise** until the Vault and SSH plugins shi
 implement only `Plugin` and functional callbacks; the application and `jasper-sdk-testkit`
 implement everything else, so methods can be added without breaking plugins.
 
-Start with the [authoring guide](../docs/plugin-authoring.md); the
+Start with the [authoring guide](../docs/plugin-authoring.md) and [building plugin UI](../docs/plugin-ui.md); the
 [architecture](../docs/sdk-architecture.md) explains loading, threading and lifetimes.
 Unit-test a plugin with `dev.jasper.sdk.testing.FakePluginHost` from `jasper-sdk-testkit`.
 
 Packaged Jasper ships a trimmed Java runtime: [The Java runtime](../docs/plugin-authoring.md#the-java-runtime) lists
 the JDK modules a plugin may rely on.
 
-## Icons (SDK 0.8)
+## Icons and mounting (SDK 0.15)
 
-```java
-var lock = context.appearance().icon(IconName.LOCK);
-var unlock = context.appearance().icon(IconName.UNLOCK);
-```
+Presentation icons are semantic strings such as `"lock"` and `"unlock"`. Register scoped
+monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
+Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
+Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
+Specialized content retains explicit Appearance palettes and workspace opacity.
+Bundled manifests require `sdk = ">=0.18.0, <0.19"`; 0.18.2 adds `Appearance.presentation()` (Remote, Vault, File Server and Sample require it) and is the first host to read a kit's `[defaults."<plugin id>"]` tables (Enterprise requires it); 0.18.1 adds icon-only GHOST buttons in toolbar views and the `run` and `application` icons (Remote requires it); 0.18.0 is a breaking boundary: `ChoiceKind.SEGMENTED` is `EXCLUSIVE`, `ButtonPresentation.CIRCULAR` is `HELP`, and `FormKind.HERO`, `HERO_COMPACT`, `LayoutRole.HERO`, `TextRole.HERO_TITLE` and `IconSize.HERO` are `PROMPT`, `PROMPT_COMPACT`, `PROMPT_HEADER`, `PROMPT_TITLE` and `PROMPT`, and it adds the `presentation.provide` capability, `StandardMenu.SESSION` and `TRANSFER`, `ToolbarItem.View` with `ToolbarViewFactory`, `ScopeSpec.hue` and `itemNoun`, `PaletteVerb.role`, `DialogSpec.swatch`, the `Notice`, `Properties` and `Separator` nodes, `ChoiceKind.TABS`, `Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, `IconSize.SWATCH`, `Form.footnote`, `Tree.columns`, `TableRow.cellNodes` and `TableRow.heading`, `Table.empty` and `emptyText`, and `ItemList.emptyText`, and an EXCLUSIVE choice with fewer than two or more than four options, a selected heading row, a table's empty state together with its empty text, an empty state with more than one action and more tree values than columns are refused; 0.17.1 adds `Terminals.environment`, `Platform.editor` with `FileEditor`, `LocalSpec.command`, `CommandLine.client()`, the `hidden` icon and the `TAB_INDICATOR` and `TITLEBAR` colours; 0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
+`DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
+Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed.
 
-Import `dev.jasper.sdk.ui.IconName`. Plugins request only the meaning, without image paths.
-Icons use IntelliJ New UI artwork, selected centrally and fitted into a 16px square.
-SDK 0.8.2 also exposes all 885 catalog choices through `Appearance.icon(BundledIcon)`.
-Bundled plugins require `sdk = ">=0.9.0, <0.10"` (SDK 0.9.0 removed `PluginConfig`); Remote requires `sdk = ">=0.9.1, <0.10"` for shell profiles. Before 0.9, Vault required `>=0.8.2` and Editor `>=0.8.5` for app-hosted document tabs and theme palettes.
-Older custom hosts inherit UnsupportedOperationException until they implement each catalog.
-See the [catalog, size rules and testkit example](../docs/sdk-icons.md).
+## The look Jasper runs with (SDK 0.18.2)
+
+`Appearance.presentation()` returns a `Presentation`: whether the look is classic, its icon set, how tool windows are reached, the title bar and where the menus are on this platform, how the toolbar offers Search Everywhere, the look's UI and data faces, its body size and its default toolbar height. It is chosen at start and is the same for every plugin until Jasper restarts; read it from any thread. A plugin that composes differently under a classic look branches on it once in `start`. The testkit's `FakePluginHost.setPresentation` sets it, and `FakePresentations.STANDARD` and `CLASSIC` are ready values; `setKitDefault` and `lookDefaultProblems` model a look's defaults for a plugin's settings. Plugins that read it declare `sdk = ">=0.18.2, <0.19"`.
+
+## Shell variables, the file editor and program tabs (SDK 0.17.1)
+
+`Terminals.environment(contributor)` adds variables to new local shells (capability `terminal.environment`,
+`Capabilities.TERMINAL_ENVIRONMENT`); `Platform.editor(FileEditor)` makes a plugin the editor Jasper opens files with
+(`editor.provide`, `Capabilities.EDITOR_PROVIDE`); `LocalSpec.running(command, workingDirectory)` opens a tab that runs
+a program instead of the shell; `CommandLine.client()` is the `jasper` command's path. Each is a default method or a
+record component behind the old constructors. The testkit adds `FakePluginHost.shellEnvironment`, `edit`,
+`editorPlugin`, `declareBundled` and `setCommandClient`. Plugins that use them declare `sdk = ">=0.18.0, <0.19"`.
+
+## Command-line subcommands (SDK 0.17.0)
+
+`PluginContext.commandLine().handle(name, handler)` answers `jasper <name> ...` for a name the plugin declares under
+`[[subcommands]]` in `plugin.toml`. The handler runs on the UI thread with a `CommandCall` (its arguments, working
+directory, the window of the pane it ran in, `out`, `err` and `onCancelled`) and completes with the exit code. The
+testkit's `FakePluginHost.declareSubcommand` and `call` return a `FakeCommandCall` with the output and the exit code.
+Plugins that use it declare `sdk = ">=0.18.0, <0.19"`.
+
+## Clipboard and the Tools menu (SDK 0.16.1)
+
+`Platform.copy(text)`, `copySecret(text)` and `clipboardText()` give plugins the clipboard on the UI thread. A write that
+fails is posted as "Could not copy" in the plugin's group and returns `false`; a secret is cleared 30 seconds later
+(retrying briefly while another program holds the clipboard), and Jasper tries once when its plugin stops and once when
+Jasper quits, in each case only if the clipboard still holds it. Reading needs the new `clipboard.read` capability (`Capabilities.CLIPBOARD_READ`).
+`StandardMenu.TOOLS` is a Tools menu for utility commands, shown after Tab only while a plugin has entries in it; the
+View submenu that lists tool windows is now View › Tool Windows. The testkit models the clipboard with
+`FakePluginHost.clipboard()`. Plugins that use any of these declare `sdk = ">=0.18.0, <0.19"`.
 
 ## File workflows and progress (0.7.5)
 
@@ -72,7 +107,7 @@ registers a `FileSource` whose roots (for example saved hosts) appear in Jasper'
 when the user opens one and browses it through the plugin's `FileBrowser` on a host worker. `Windows.choose` opens
 the chooser for local places plus the sources the caller names and returns `FileLocation`s. The testkit scripts it
 with `FakePluginHost.queueFileChoice` and drives sources with `fileSources`, `fileRoots`, `locateFile` and
-`connectFileSource`. Plugins declare `sdk = ">=0.10.0, <0.11"`.
+`connectFileSource`. Plugins declare `sdk = ">=0.18.0, <0.19"`.
 
 SDK 0.10.1 lets `FileLocation.Sourced` carry `Sourced.HOME` (`~`), a root's home folder, so a source can locate a pane
 whose folder it does not know yet; `FakePluginHost.connectFileSource` runs scripted background work while it waits.
@@ -89,7 +124,7 @@ programs or computers, such as a file server; the user consents to it like any o
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper that only goes to
 the background on Cmd+Q does not ask them. `FakePluginHost.requestQuit` asks these guards too. Plugins declare
-`sdk = ">=0.14.0, <0.15"`.
+`sdk = ">=0.18.0, <0.19"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
@@ -116,7 +151,7 @@ with `FakePluginHost.setShellProfiles`.
 `Appearance.variant()` and `onChanged` describe application chrome. Document and workspace widgets use
 `workspaceVariant()`, `workspacePalette()`, `editorPalette()` and `syntaxPalette()`. Both variant getters are safe
 from any thread; read palettes and register listeners on the UI thread. `onWorkspaceChanged` runs after new values
-are available, including a dark theme changing to a different dark theme. Close the subscription when the widget
+are available, including a change between Slate Cobalt Dark and Light. Close the subscription when the widget
 is disposed; the host also removes registrations when the plugin stops.
 
 Syntax palettes contain all 16 `SyntaxRole` values with color, bold and italic emphasis; plugins classify their
@@ -144,7 +179,7 @@ action, an icon or a window. Jasper posts a succeeded or failed activity in `<pl
 `FakePluginHost.notifications()` records posts as `group|SEVERITY|title|content[|Cause]`, lists declared groups and
 runs an action (`runAction`) or the body (`click`); `new FakeNotifications().group(id)` records for a component under
 test. A plugin built for 0.13 that called `notices()` moves to `notifications()` and declares
-`sdk = ">=0.14.0, <0.15"`.
+`sdk = ">=0.18.0, <0.19"`.
 
 ## Workspace opacity (SDK 0.14.1)
 
@@ -161,7 +196,7 @@ unantialiased rectangles (antialiased translucent fills fall back to software re
 lag). Everything above it (viewports, gutters, text areas) must be non-opaque, or it covers the glass. Keep selection,
 carets, find bars and banners solid. `FakePluginHost.setWorkspaceOpacity(double)` scripts the value in tests; it is
 announced on `flush()` and the fake reports it for every component, while the real host reports 1.0 for components
-outside a translucent window. Plugins that use it declare `sdk = ">=0.14.1, <0.15"`.
+outside a translucent window. Plugins that use it declare `sdk = ">=0.18.0, <0.19"`.
 
 ## Panel headers (SDK 0.14.2)
 
@@ -170,4 +205,7 @@ its title and icon-only actions before the host's options/hide controls. Use a c
 name for `detail`; `active` adds a connected status dot. Each `PanelHeader.Action` carries an
 accessible label, icon and UI-thread callback. Header updates work while the panel is hidden;
 callbacks are contained like other plugin actions and become inert when the instance closes.
-Use `PanelHeader.EMPTY` to clear the contribution. Plugins using this API require SDK 0.14.2.
+Use `PanelHeader.EMPTY` to clear the contribution. The final semantic-action signature requires SDK 0.15.0.
+
+The [Plan 2 completion audit](../docs/design/theme-engine/completion.md) records SDK 0.15 migration,
+headless validation and distribution visibility. Final screen composition is owned by Plan 3.

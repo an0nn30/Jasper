@@ -8,21 +8,25 @@ import dev.jasper.remote.transfer.*;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.*;
 import dev.jasper.sdk.ui.*;
-import java.awt.*;
-import java.awt.datatransfer.StringSelection;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.*;
-import javax.swing.*;
 
-/** Per-window explorers and captured picker flows; the coordinator owns all queued jobs. */
+/**
+ * Per-window explorers and captured picker flows; the coordinator owns all queued jobs. Each window's explorer is an
+ * owned kit view ({@code register}); its dialogs (host chooser, new folder, delete, existing items, Copy to host) are
+ * kit forms from {@code context.kit()}, each closed with its dialog. Back, Forward and the parent folder are panel
+ * shortcuts (Alt+Left, Alt+Right, Alt+Up by default) anywhere in the SFTP panel, listed in the Keymap.
+ */
 public final class SftpUi implements AutoCloseable {
     public static final String PANEL="dev.jasper.remote.sftp.panel";
-    /** The action that toggles the panel; registered by the plugin before this UI, so View &gt; Tools lists it once. */
+    /** The action that toggles the panel; registered by the plugin before this UI, so View &gt; Tool Windows lists it once. */
     public static final String TOGGLE="dev.jasper.remote.sftp.toggle";
+    /** The panel's history and parent folder shortcuts, in the panel's own shortcut context. */
+    public static final String BACK="dev.jasper.remote.sftp.back",FORWARD="dev.jasper.remote.sftp.forward",PARENT="dev.jasper.remote.sftp.parent";
     public record PaneTarget(UUID pane,ConnectionIdentity identity,String directory) {}
     private record View(PanelHost host,SftpPanel panel,SftpController controller,FileOperationController operations) {}
     private final PluginContext context;
@@ -32,39 +36,75 @@ public final class SftpUi implements AutoCloseable {
     private final Supplier<TransferCoordinator> transfers;
     private final Supplier<List<RemoteHost>> hosts;
     private final Function<WindowHandle,Optional<PaneTarget>> activePane;
-    private final Function<WindowHandle,JComponent> transferStrip;
+    private final Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip;
     private final Consumer<WindowHandle> releaseStrip;
     private final Consumer<String> clipboard;
     private final Map<UUID,View> views=new HashMap<>();
     private final Set<PluginDialog> dialogs=new HashSet<>();
     private final Map<UUID,CompletableFuture<ConnectionIdentity>> browsing=new HashMap<>();
     private Consumer<UUID> followRequested=pane->{};
+    private volatile boolean showHidden;
+    private Consumer<Boolean> rememberHidden=shown->{};
     private RemoteEditing editing;
     private volatile boolean closed;
+    /** Which composition the sidebars take (spec 14.4). */
+    private final dev.jasper.remote.workstation.Layout layout;
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
-                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,JComponent> transferStrip,Consumer<WindowHandle> releaseStrip) {
-        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,text->Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text),null));
+                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip) {
+        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,text->context.platform().copy(text));
+    }
+    /** The sidebars in {@code layout}'s composition; under CLASSIC the window's transfers are the Transfers panel's. */
+    public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
+                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip,
+                  dev.jasper.remote.workstation.Layout layout) {
+        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,text->context.platform().copy(text),layout);
     }
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
-                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,JComponent> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard) {
+                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard) {
+        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,clipboard,dev.jasper.remote.workstation.Layout.ROWS);
+    }
+    public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
+                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard,
+                  dev.jasper.remote.workstation.Layout layout) {
+        this.layout=layout;
         this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.transferStrip=transferStrip;this.releaseStrip=releaseStrip;this.clipboard=clipboard;
-        context.panels().register(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT).withToggleActionId(TOGGLE).withSplit(),this::create);
+        // Enterprise's default slots (spec 14.4): SFTP leads the left side, File Servers under it.
+        context.panels().register(layout==dev.jasper.remote.workstation.Layout.CLASSIC ? new PanelSpec(PANEL,"SFTP","folder",Anchor.LEFT).withToggleActionId(TOGGLE)
+            : new PanelSpec(PANEL,"SFTP","folder",Anchor.LEFT).withToggleActionId(TOGGLE).withSplit(),this::create);
+        // Ruling G6: the old panel-wide Alt+Left/Alt+Right and the table's Alt+Up, now rebindable panel shortcuts.
+        shortcut(BACK,"SFTP: Back","alt+left",SftpPanel::back);
+        shortcut(FORWARD,"SFTP: Forward","alt+right",SftpPanel::forward);
+        shortcut(PARENT,"SFTP: Parent Folder","alt+up",SftpPanel::parent);
     }
-    private JComponent create(PanelHost host) {
-        var panel=new SftpPanel(context.appearance()::icon);var window=host.window();
+    private void shortcut(String id,String title,String binding,Consumer<SftpPanel> command) {
+        context.actions().register(ActionSpec.of(id,title).withKeywords(List.of("sftp","files","folder","history")).withDefaultBinding(binding)
+            .withContext(ShortcutContext.panel(PANEL)),invoked-> { var view=closed?null:views.get(invoked.window().id());if(view!=null) command.accept(view.panel()); });
+    }
+    /**
+     * Whether the SFTP browsers show hidden items, and where a change is remembered; each browser takes the choice as it
+     * opens, and a toggle in any of them changes it.
+     */
+    public void hiddenItems(boolean shown,Consumer<Boolean> remember) { showHidden=shown;rememberHidden=remember; }
+    private void hiddenChanged(boolean shown) { showHidden=shown;rememberHidden.accept(shown); }
+    /** The window's explorer while its panel is open. */
+    SftpPanel panel(UUID window) { var view=views.get(window);return view==null?null:view.panel(); }
+    private UiView create(PanelHost host) {
+        var panel=new SftpPanel(context.kit(),layout);var window=host.window();
         panel.onHeaderChanged(host::setHeader);
-        panel.onChooseSession(()-> { if(!closed && window.isOpen()) chooseHost(window); });
-        panel.transfers(transferStrip.apply(window));
+        panel.onChooseSession(chosen-> { if(!closed && window.isOpen()) browse(window,chosen); });
+        panel.sessions(hosts.get());
+        if(layout==dev.jasper.remote.workstation.Layout.ROWS) panel.transfers(transferStrip.apply(window));
         Function<ConnectionIdentity,CompletableFuture<FileEndpoint>> open=identity->endpoints.open(Optional.of(identity),window,status->{});
         var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),background,ui,open,panel);
         controller.onFollowRequested(pane->followRequested.accept(pane));
+        controller.showHidden(showHidden);controller.onShowHiddenChanged(this::hiddenChanged);
         var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,open,transfers.get().reservations(),panel::operationStatus,controller::refresh);
         var view=new View(host,panel,controller,operations);views.put(window.id(),view);
         controller.operations(new SftpController.Operations(()->upload(view,false),()->upload(view,true),()->download(view),()->newFolder(view),()->delete(view),()->copyPaths(view),()->copyHost(view),operations::cancel));
         if(editing!=null) panel.editing(new SftpPanel.Editing(entry->activate(view,entry),()->openSelected(view)));
         controller.visible(host.visible());
         host.onVisibility(visible->{controller.visible(visible);if(visible) activePane.apply(window).ifPresent(pane->controller.open(pane.pane(),pane.identity(),pane.directory(),false));});
-        host.onClosed(()-> { releaseStrip.accept(window);cancelBrowse(window.id());views.remove(window.id());controller.close();operations.close(); });return panel;
+        host.onClosed(()-> { if(layout==dev.jasper.remote.workstation.Layout.ROWS) releaseStrip.accept(window);cancelBrowse(window.id());views.remove(window.id());controller.close();operations.close();panel.close(); });return panel.view();
     }
     private View showView(WindowHandle window) {
         var view=views.get(window.id());if(view==null) { context.panels().toggle(PANEL,window);view=views.get(window.id()); }else view.host().show();return view;
@@ -79,6 +119,8 @@ public final class SftpUi implements AutoCloseable {
         if(closed)return;var view=showView(window);if(view!=null)view.controller().open(pane.pane(),pane.identity(),pane.directory(),true);
     }
     public void toggle(WindowHandle window) { if(!closed) context.panels().toggle(PANEL,window); }
+    /** Saved hosts changed: every disconnected sidebar's Choose Session menu follows. */
+    public void hostsChanged() { if(closed) return;for(var view:views.values()) view.panel().sessions(hosts.get()); }
     /** Shows the window's SFTP sidebar without choosing a host. */
     public void reveal(WindowHandle window) { if(!closed) showView(window); }
     public void browse(WindowHandle window,RemoteHost host) {
@@ -99,12 +141,15 @@ public final class SftpUi implements AutoCloseable {
     public boolean following(UUID pane) { return views.values().stream().anyMatch(view->view.controller().following(pane)); }
     public void notice(UUID pane,String text) { for(var view:views.values()) view.controller().notice(pane,text); }
     private PluginDialog dialog(WindowHandle owner,String title) { var dialog=context.windows().dialog(new DialogSpec(title,owner,false));dialogs.add(dialog);dialog.onClosed(()->dialogs.remove(dialog));return dialog; }
-    private void chooseHost(WindowHandle window) {
-        var chooser=dialog(window,"Browse files on SSH host");var selection=new JComboBox<>(hosts.get().toArray(RemoteHost[]::new));selection.setRenderer(hostRenderer());
-        var panel=new JPanel(new BorderLayout(8,8));panel.setBorder(BorderFactory.createEmptyBorder(12,12,12,12));panel.add(selection,BorderLayout.CENTER);var open=new JButton("Browse files");open.setEnabled(selection.getItemCount()>0);panel.add(open,BorderLayout.SOUTH);
-        open.addActionListener(event->{var host=(RemoteHost)selection.getSelectedItem();if(host!=null) { chooser.close();browse(window,host); }});chooser.setContent(panel);chooser.show();
+    /** Mounts an owned kit view on {@code dialog}, closes it with the dialog and shows the dialog. */
+    private static void show(PluginDialog dialog,UiView view,AutoCloseable owner) {
+        dialog.setContent(view);dialog.onClosed(()-> { try { owner.close(); } catch(Exception ignored) { } });dialog.show();
     }
-    private static ListCellRenderer<Object> hostRenderer() { return new DefaultListCellRenderer() { @Override public Component getListCellRendererComponent(JList<?> list,Object value,int index,boolean selected,boolean focus) { super.getListCellRendererComponent(list,value,index,selected,focus);putClientProperty("html.disable",true);setText(value instanceof RemoteHost host?host.name()+" — "+host.hostname():"");return this; } }; }
+    private void chooseHost(WindowHandle window) {
+        var chooser=dialog(window,"Browse files on SSH host");
+        var panel=new HostChooser(context.kit(),hosts.get(),host-> { chooser.close();browse(window,host); },chooser::close);
+        show(chooser,panel.view(),panel);
+    }
     private void upload(View view,boolean folder) {
         var captured=view.controller().capture();if(captured.isEmpty() || closed) return;var target=captured.orElseThrow();WindowHandle owner=view.host().window();
         List<Path> paths=folder?context.windows().chooseDirectory(owner,"Upload folder",Optional.empty()).map(List::of).orElse(List.of()):context.windows().chooseFiles(owner,"Upload files",Optional.empty());
@@ -140,8 +185,9 @@ public final class SftpUi implements AutoCloseable {
         if(existing.isEmpty()) { enqueue(queued.request(),owner);return; }
         String where=identity.map(value->value.host().name()+":").orElse("")+queued.request().directory();
         var dialog=dialog(owner,"Items already exist");
-        dialog.setContent(new dev.jasper.remote.ui.transfers.ExistingItemsPanel(dev.jasper.remote.ui.transfers.ExistingItemsPanel.message(existing,queued.names().size(),where),
-            choice-> { dialog.close();if(!closed && owner.isOpen()) enqueue(queued.request().withExisting(choice),owner); },dialog::close));dialog.show();
+        var panel=new dev.jasper.remote.ui.transfers.ExistingItemsPanel(context.kit(),dev.jasper.remote.ui.transfers.ExistingItemsPanel.message(existing,queued.names().size(),where),
+            choice-> { dialog.close();if(!closed && owner.isOpen()) enqueue(queued.request().withExisting(choice),owner); },dialog::close);
+        show(dialog,panel.view(),panel);
     }
     private void enqueue(TransferRequest request,WindowHandle owner) {
         transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(!closed && error!=null) context.notifications().group().error("Could not queue the transfer",message(error),error); }));
@@ -152,23 +198,26 @@ public final class SftpUi implements AutoCloseable {
     }
     private void newFolder(View view) { view.controller().capture().ifPresent(captured->nameDialog(view.host().window(),captured,view.operations()::mkdir)); }
     private void nameDialog(WindowHandle owner,SftpController.Capture captured,BiConsumer<SftpController.Capture,String> create) {
-        var dialog=dialog(owner,"New folder");var panel=new JPanel(new BorderLayout(6,6));panel.setBorder(BorderFactory.createEmptyBorder(12,12,12,12));var name=new JTextField(24);name.getAccessibleContext().setAccessibleName("Folder name");var error=new JLabel();error.putClientProperty("html.disable",true);var button=new JButton("Create");
-        var center=new JPanel(new BorderLayout(6,6));center.add(name,BorderLayout.NORTH);center.add(error,BorderLayout.SOUTH);panel.add(center,BorderLayout.CENTER);panel.add(button,BorderLayout.SOUTH);
-        Runnable submit=()-> { try { FilePaths.child(captured.directory(),name.getText());if(name.getText().indexOf('\\')>=0) throw new IOException("Enter one folder name");create.accept(captured,name.getText());dialog.close(); }catch(IOException invalid) { error.setText(invalid.getMessage()); } };
-        button.addActionListener(event->submit.run());name.addActionListener(event->submit.run());dialog.setContent(panel);dialog.show();
+        var dialog=dialog(owner,"New folder");
+        var panel=new FolderNamePanel(context.kit(),name-> {
+            try { FilePaths.child(captured.directory(),name);if(name.indexOf('\\')>=0) throw new IOException("Enter one folder name");create.accept(captured,name);dialog.close();return Optional.empty(); }
+            catch(IOException invalid) { return Optional.of(String.valueOf(invalid.getMessage())); }
+        },dialog::close);
+        show(dialog,panel.view(),panel);
     }
     private void delete(View view) {
         var selected=view.controller().capture();if(selected.isEmpty() || selected.orElseThrow().selection().isEmpty() || view.operations().busy()) return;var captured=selected.orElseThrow();
-        var dialog=dialog(view.host().window(),"Delete selected files");var panel=new dev.jasper.remote.ui.ConfirmPanel("Delete "+captured.selection().size()+" selected items from "+captured.identity().host().name()+":"+captured.directory()+"?", "Delete",()-> { dialog.close();if(!closed) view.operations().delete(captured); },dialog::close);dialog.setContent(panel);dialog.show();
+        var dialog=dialog(view.host().window(),"Delete selected files");var panel=new dev.jasper.remote.ui.ConfirmPanel(context.kit(),"Delete "+captured.selection().size()+" selected items from "+captured.identity().host().name()+":"+captured.directory()+"?", "Delete",()-> { dialog.close();if(!closed) view.operations().delete(captured); },dialog::close);dialog.setContent(panel.view());dialog.onClosed(panel::close);dialog.show();
     }
     private void copyHost(View view) {
         var selected=view.controller().capture();if(selected.isEmpty() || selected.orElseThrow().selection().isEmpty()) return;var source=selected.orElseThrow();var owner=view.host().window();var dialog=dialog(owner,"Copy to host");
         var pickerReference=new java.util.concurrent.atomic.AtomicReference<DestinationPanel>();
         var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,identity->endpoints.open(Optional.of(identity),owner,status->{}),transfers.get().reservations(),(busy,text)-> { var current=pickerReference.get();if(current!=null) current.status(busy,text); },()-> { var current=pickerReference.get();if(current!=null) current.refresh(); });
-        var picker=new DestinationPanel(source.selection().size()+" items from "+source.identity().host().name()+":"+source.directory(),hosts.get(),context.dataDirectory().resolve("browser-cache"),background,ui,context.appearance()::icon,
+        var picker=new DestinationPanel(context.kit(),source.selection().size()+" items from "+source.identity().host().name()+":"+source.directory(),hosts.get(),context.dataDirectory().resolve("browser-cache"),background,ui,
             id->connections.resolveIdentity(id,owner),identity->endpoints.open(Optional.of(identity),owner,status->{}),destination->{dialog.close();background(()->new Queued(new TransferRequest(EndpointRef.remote(source.identity()),paths(source),EndpointRef.remote(destination.identity()),destination.directory()),source.selection().stream().map(FileEntry::name).toList()),owner);},
             destination->nameDialog(owner,destination,operations::mkdir),operations::cancel,dialog::close);
-        pickerReference.set(picker);dialog.onClosed(()-> { picker.close();operations.close(); });dialog.setContent(picker);dialog.show();
+        picker.hiddenItems(showHidden,this::hiddenChanged);
+        pickerReference.set(picker);dialog.onClosed(()-> { picker.close();operations.close(); });dialog.setContent(picker.view());dialog.show();
     }
     /** Whether {@code view} is still {@code owner}'s open view, showing the same identity and directory {@code capture} was taken from: a late result from the per-identity {@link RemoteEditing} queue must not act on a view that moved on in the meantime. */
     private boolean stillShowing(View view,WindowHandle owner,SftpController.Capture capture) {
@@ -188,5 +237,5 @@ public final class SftpUi implements AutoCloseable {
         EditorOpening.openSelected(editing,browser(view,owner),captured.orElseThrow(),owner);
     }
     private static String message(Throwable failure) { while((failure instanceof CompletionException || failure instanceof ExecutionException) && failure.getCause()!=null) failure=failure.getCause();return failure.getMessage()==null?"SFTP operation failed":failure.getMessage(); }
-    @Override public void close() { if(closed) return;closed=true;for(var request:List.copyOf(browsing.values())) request.cancel(true);browsing.clear();for(var dialog:List.copyOf(dialogs)) dialog.close();for(var view:List.copyOf(views.values())) { view.controller().close();view.operations().close(); }views.clear(); }
+    @Override public void close() { if(closed) return;closed=true;for(var request:List.copyOf(browsing.values())) request.cancel(true);browsing.clear();for(var dialog:List.copyOf(dialogs)) dialog.close();for(var view:List.copyOf(views.values())) { view.controller().close();view.operations().close();view.panel().close(); }views.clear(); }
 }

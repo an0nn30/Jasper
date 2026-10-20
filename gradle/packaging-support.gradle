@@ -2,12 +2,20 @@ import groovy.json.JsonException
 import groovy.json.JsonSlurper
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
+import java.util.jar.Attributes
+import java.util.jar.JarFile
+import java.util.jar.Manifest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
-// What packaging decides, as pure helpers: the runtime's modules, the native libraries copied into the app, the
-// launcher configuration, the AOT training launch and the DMG detach. gradle/packaging.gradle applies this file;
-// gradle/packaging-support-test.gradle checks it with fixtures (verifyPackagingSupport, part of check). The imports
-// serve helpers further down: Groovy accepts imports only before the first statement.
+// What packaging decides, as pure helpers: the runtime's modules, the native libraries copied into the app, class-path
+// unsealing, the launcher configuration, the AOT training launch in a throwaway copy and the DMG detach.
+// gradle/packaging.gradle applies this file; gradle/packaging-support-test.gradle checks it with fixtures
+// (verifyPackagingSupport, part of check). The imports serve helpers further down: Groovy accepts imports only before
+// the first statement.
 
 // The Java runtime packaged Jasper ships; docs/plugin-authoring.md ("The Java runtime") lists it for plugin authors.
 // jpackage's default for a class-path application is every module, and --bind-services then also bound javac,
@@ -62,21 +70,27 @@ ext.bundledNatives = { String os, String architecture ->
         ]
     }
     if (os == 'windows') {
+        // pty4j names its folder after JNA's architecture, and ships cyglaunch.exe for x64 only.
+        boolean arm = architecture == 'aarch64'
+        String flatLafArchitecture = arm ? 'arm64' : 'x86_64'
+        String jnaArchitecture = arm ? 'aarch64' : 'x86-64'
+        List<String> ptyFiles = ['conpty.dll', 'OpenConsole.exe'] + (arm ? [] : ['cyglaunch.exe']) +
+            ['win-helper.dll', 'winpty-agent.exe', 'winpty.dll']
         return [
-            [jar: flatLaf, entry: 'com/formdev/flatlaf/natives/flatlaf-windows-x86_64.dll',
-             path: 'native/flatlaf-windows-x86_64.dll', executable: false, loaded: true],
-            [jar: jna, entry: 'com/sun/jna/win32-x86-64/jnidispatch.dll', path: 'native/jnidispatch.dll',
+            [jar: flatLaf, entry: "com/formdev/flatlaf/natives/flatlaf-windows-${flatLafArchitecture}.dll".toString(),
+             path: "native/flatlaf-windows-${flatLafArchitecture}.dll".toString(), executable: false, loaded: true],
+            [jar: jna, entry: "com/sun/jna/win32-${jnaArchitecture}/jnidispatch.dll".toString(), path: 'native/jnidispatch.dll',
              executable: false, loaded: true],
-        ] + ['conpty.dll', 'OpenConsole.exe', 'cyglaunch.exe', 'win-helper.dll', 'winpty-agent.exe', 'winpty.dll'].collect { String name ->
-            [jar: pty4j, entry: "resources/com/pty4j/native/win/x86-64/${name}".toString(),
-             path: "native/win/x86-64/${name}".toString(), executable: false, loaded: false]
+        ] + ptyFiles.collect { String name ->
+            [jar: pty4j, entry: "resources/com/pty4j/native/win/${jnaArchitecture}/${name}".toString(),
+             path: "native/win/${jnaArchitecture}/${name}".toString(), executable: false, loaded: false]
         }
     }
     []
 }
 
 // The launcher options that point FlatLaf, JNA and pty4j at those files ($APPDIR is the launcher's app directory).
-// pty4j looks in native/darwin or native/win/x86-64 below its folder. jna.nosys keeps JNA off java.library.path.
+// pty4j looks in native/darwin or native/win/<x86-64|aarch64> below its folder. jna.nosys keeps JNA off java.library.path.
 // No jna.noclasspath or jna.nounpack: JNA's properties are process-wide, and a plugin that bundles its own JNA must
 // still be able to extract its own copy (docs/plugin-authoring.md, "The Java runtime").
 ext.bundledNativeJvmOptions = { String os ->
@@ -156,17 +170,22 @@ ext.trainingTraceProblem = { Map trace, long pid ->
 }
 
 // The training launch's environment: inherited with JASPER_HOME removed (it would point training at the user's real
-// configuration and data), JDK_JAVA_OPTIONS, _JAVA_OPTIONS and CLASSPATH removed (they would change the JVM options
-// and class path a real launch has) and JAVA_TOOL_OPTIONS replaced by javaToolOptions. Returns a new map.
-ext.aotTrainingEnvironment = { Map<String, String> inherited, String javaToolOptions ->
+// configuration and data), JDK_JAVA_OPTIONS, _JAVA_OPTIONS, CLASSPATH and JASPER_VM_OPTIONS_SKIP removed (they would
+// change the JVM options and class path a real launch has), JASPER_AOT_CACHE_SKIP, JASPER_LAUNCH_DIAGNOSE and
+// JASPER_WATCH_REPORT removed (the launcher and jasper-watch read them), JAVA_TOOL_OPTIONS replaced by javaToolOptions
+// and JASPER_VM_OPTIONS pointing at vmOptions, an empty file, so the developer's own jasper.vmoptions never shapes the
+// cache. Returns a new map.
+ext.aotTrainingEnvironment = { Map<String, String> inherited, String javaToolOptions, File vmOptions ->
     Map<String, String> environment = new LinkedHashMap<String, String>(inherited)
-    ['JASPER_HOME', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH'].each { environment.remove(it) }
+    ['JASPER_HOME', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH', 'JASPER_VM_OPTIONS_SKIP', 'JASPER_AOT_CACHE_SKIP',
+        'JASPER_LAUNCH_DIAGNOSE', 'JASPER_WATCH_REPORT'].each { environment.remove(it) }
     environment.put('JAVA_TOOL_OPTIONS', javaToolOptions)
+    environment.put('JASPER_VM_OPTIONS', vmOptions.absolutePath)
     environment
 }
 
-// One training launch of launcher (the image's Contents/MacOS/Jasper, so jpackage's launcher sets everything a real
-// launch has) in work, isolated like startupBench: user.home is work/home with the training configuration, and
+// One training launch of launcher (Contents/MacOS/Jasper of the copy trainInCopy makes, so jpackage's launcher sets
+// everything a real launch has) in work, isolated like startupBench: user.home is work/home with the training configuration, and
 // JAVA_TOOL_OPTIONS asks for the cache, the start-up trace and no Dock icon. Once the trace has settled, SIGTERM; the
 // JVM assembles the cache while it exits, running the runtime's bin/java (whose output lands in the same log, and
 // whose JAVA_TOOL_OPTIONS the JVM replaces). Returns the cache; throws with the log's tail on any failure. The
@@ -186,8 +205,11 @@ ext.runAotTraining = { File launcher, File work, Long settleSeconds, Long exitSe
     def builder = new ProcessBuilder(launcher.absolutePath).directory(work).redirectErrorStream(true)
         .redirectOutput(ProcessBuilder.Redirect.to(log))
     Map<String, String> environment = builder.environment()
+    File emptyVmOptions = new File(work, 'empty.vmoptions')
+    emptyVmOptions.text = ''
     Map<String, String> trainingEnvironment = aotTrainingEnvironment(environment, javaToolOptions(["-XX:AOTCacheOutput=${cache.absolutePath}",
-        "-Duser.home=${home.absolutePath}", "-Djasper.startupTrace=${trace.absolutePath}", '-Dapple.awt.UIElement=true']*.toString()))
+        "-Duser.home=${home.absolutePath}", "-Djasper.startupTrace=${trace.absolutePath}", '-Dapple.awt.UIElement=true']*.toString()),
+        emptyVmOptions)
     environment.clear()
     environment.putAll(trainingEnvironment)
     def tail = { log.isFile() ? log.readLines('UTF-8').takeRight(40).join('\n') : '(no output)' }
@@ -265,4 +287,85 @@ ext.modificationTimeMismatches = { File expectedRoot, File actualRoot ->
         }
     }
     mismatches.sort()
+}
+
+// The manifest sections of jar that declare Sealed (any value): 'main' for the main attributes, then the per-entry
+// section names, sorted. Classes the JBR 25 AOT cache loads get no code source once the cache's training paths are gone
+// (JDK-8376576, spec 2026-10-14 section 2), and a package sealed by the manifest then refuses its second class, which
+// stops the JVM; so stagePackage unseals the class path and verifyPackage rejects a sealed jar in the image.
+ext.sealingSections = { File jar ->
+    Manifest manifest = new JarFile(jar, false).withCloseable { it.manifest }
+    if (manifest == null) return []
+    List<String> sections = manifest.entries.findAll { String name, Attributes attributes ->
+        attributes.getValue(Attributes.Name.SEALED) != null
+    }.keySet().sort()
+    manifest.mainAttributes.getValue(Attributes.Name.SEALED) != null ? ['main'] + sections : sections
+}
+
+// Rewrites jar without its manifest's Sealed attributes (main and per-entry; a section left empty is dropped) and adds
+// the main attribute "Jasper-Modified: package sealing removed", the notice Apache-2.0 section 4(b) asks of modified
+// files. Every other entry is copied in order with its bytes, time, comment and extra field. Returns whether it changed
+// the jar. Rewriting the manifest of a signed jar would break its signature, so a signed jar that declares Sealed fails.
+ext.unsealJar = { File jar ->
+    if (sealingSections(jar).isEmpty()) return false
+    Manifest manifest = new JarFile(jar, false).withCloseable { it.manifest }
+    manifest.mainAttributes.remove(Attributes.Name.SEALED)
+    manifest.mainAttributes.put(new Attributes.Name('Jasper-Modified'), 'package sealing removed')
+    manifest.entries.values().each { it.remove(Attributes.Name.SEALED) }
+    manifest.entries.values().removeIf { it.isEmpty() }
+    File rewritten = new File(jar.parentFile, jar.name + '.unsealing')
+    new ZipFile(jar).withCloseable { zip ->
+        List<ZipEntry> entries = zip.entries().toList()
+        if (entries.any { it.name ==~ /(?i)META-INF\/[^\/]+\.(SF|RSA|DSA|EC)/ }) {
+            throw new GradleException("Packaging: ${jar.name} seals packages and is signed; unsealing it would break its signature")
+        }
+        rewritten.withOutputStream { raw ->
+            new ZipOutputStream(raw).withCloseable { out ->
+                entries.each { ZipEntry entry ->
+                    ZipEntry copy = new ZipEntry(entry.name)
+                    copy.time = entry.time
+                    if (entry.comment != null) copy.comment = entry.comment
+                    if (entry.extra != null) copy.extra = entry.extra
+                    out.putNextEntry(copy)
+                    if (entry.name.equalsIgnoreCase(JarFile.MANIFEST_NAME)) {
+                        manifest.write(out)
+                    } else if (!entry.directory) {
+                        zip.getInputStream(entry).withCloseable { out << it }
+                    }
+                    out.closeEntry()
+                }
+            }
+        }
+    }
+    Files.move(rewritten.toPath(), jar.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    true
+}
+
+// Runs train on a copy of image at copy, made by copier (which must keep modification times, as ditto does: the JVM
+// checks them for the class-path jars), and deletes the copy afterwards, also when copier or train throws. The AOT
+// cache then records class-path locations that exist on no machine, so the build machine runs the trained image in
+// the condition every user's machine is in (spec 2026-10-14 section 3.3). A copy left by an earlier, killed training is
+// replaced. A copy that cannot be deleted fails the build, after the deletion attempt and so never in place of an
+// exception from copier or train, because verifyAotCache would then see the training paths. Returns what train
+// returns; train receives the copy.
+ext.trainInCopy = { File image, File copy, Closure copier, Closure train ->
+    copy.deleteDir()
+    copy.parentFile.mkdirs()
+    def trained
+    try {
+        copier(image, copy)
+        List<String> changed = modificationTimeMismatches(image, copy)
+        if (changed) {
+            throw new GradleException("AOT training: the copy of ${image.name} has other modification times for " +
+                "${changed.take(10)}; the JVM would refuse the cache")
+        }
+        trained = train(copy)
+    } finally {
+        copy.deleteDir()
+    }
+    if (copy.exists()) {
+        throw new GradleException("AOT training: could not delete the training copy ${copy}; " +
+            'verifyAotCache would see the training paths')
+    }
+    return trained
 }

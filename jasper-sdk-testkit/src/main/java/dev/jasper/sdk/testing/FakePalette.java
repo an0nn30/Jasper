@@ -32,6 +32,7 @@ final class FakePalette implements Palette {
         ScopeSpec spec = Objects.requireNonNull(scope.spec(), "spec");
         if (!spec.id().startsWith(context.plugin().id() + "."))
             throw new IllegalArgumentException("A scope id must start with " + context.plugin().id() + ".: " + spec.id());
+        spec.icon().ifPresent(context.kit()::validateIcon);
         spec.shortcutActionId().ifPresent(context.ui::requireOwn);
         if (host.scopes.containsKey(spec.id())) throw new IllegalArgumentException("Scope already contributed: " + spec.id());
         var registered = new Registered(context, scope, spec);

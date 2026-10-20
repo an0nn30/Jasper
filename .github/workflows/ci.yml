@@ -1,17 +1,37 @@
 name: ci
 
+# Test PRs and main only; documentation-only changes remain excluded.
+# The example external plugin under docs/examples is code and still runs.
 on:
   push:
+    branches: [main]
+    paths:
+      - '**'
+      - '!docs/**'
+      - 'docs/examples/**'
+      - '!**/*.md'
   pull_request:
+    paths:
+      - '**'
+      - '!docs/**'
+      - 'docs/examples/**'
+      - '!**/*.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
-    # A full run takes about five minutes; a hang should not hold the runner for GitHub's six hours.
+    # Full Windows checks take about 20 minutes; bound hangs while retaining time for diagnostics.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -19,7 +39,36 @@ jobs:
         with:
           distribution: jetbrains
           java-version: '25'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v6
+      - name: Install Linux font coverage
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-dejavu-core fonts-noto-cjk
       - name: Check
         shell: bash
-        run: ./gradlew check --continue --stacktrace
+        # Windows subprocess/cleanup tests hit deadlines with concurrent test JVMs.
+        # Keep its worker count at one; Unix runners parallelize independent projects.
+        # Each project keeps its default single test JVM and sequential JUnit execution.
+        env:
+          GRADLE_WORKERS: ${{ runner.os == 'Windows' && '1' || '2' }}
+        run: ./gradlew check --parallel --max-workers="$GRADLE_WORKERS" --continue --stacktrace
+      # check built the release jars; the example plugin must keep building from them.
+      - name: Example external plugin
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ./gradlew -p docs/examples/external-plugin -PjasperSdkDir="$PWD/build/sdk-release" check pluginZip --stacktrace
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-diagnostics-${{ matrix.os }}
+          path: |
+            **/build/test-results/**
+            **/build/reports/tests/**
+            jasper-app/build/enterprise-settings/**
+            jasper-app/build/chrome-renders/**
+          retention-days: 7

@@ -33,6 +33,7 @@ class RemoteShortcutConfigTest {
     private Contributions contributions;
 
     private void start() throws Exception {
+        UnboundVault.settings(root.resolve("plugins")); // the runtime starts the staged Vault, whose keychain stays unused
         onEdt(() -> {
             contributions = new Contributions();
             var buddy = new BuddyTestSupport();
@@ -56,8 +57,10 @@ class RemoteShortcutConfigTest {
 
     @AfterEach void stop() throws Exception {
         if (runtime != null) {
+            var workers = PluginShutdownTestSupport.capture(runtime);
             var stopped = onEdtValue(runtime::stop);
             CompletableFuture.allOf(stopped.toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            workers.await();
         }
     }
 
@@ -73,10 +76,10 @@ class RemoteShortcutConfigTest {
             assertThat(bindings.strokeFor(CONNECT)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
             assertThat(bindings.idFor(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).isEmpty();
             assertThat(contributions.menus()).filteredOn(menu -> menu.target().equals(MenuTarget.standard(MenuTarget.Slot.VIEW)))
-                .as("View > Tools toggles the panel; Remote adds no View item of its own")
+                .as("View > Tool Windows toggles the panel; Remote adds no View item of its own")
                 .allSatisfy(menu -> assertThat(menu.entries()).doesNotContain(new MenuEntry.Item(HOSTS)));
             assertThat(contributions.menus()).anySatisfy(menu -> {
-                assertThat(menu.target().key()).isEqualTo("dev.jasper.remote.menu");
+                assertThat(menu.target()).as("spec 13: the Session menu").isEqualTo(MenuTarget.standard(MenuTarget.Slot.SESSION));
                 assertThat(menu.entries()).contains(new MenuEntry.Item(HOSTS), new MenuEntry.Item(CONNECT));
             });
         });
@@ -121,11 +124,11 @@ class RemoteShortcutConfigTest {
         });
     }
 
-    /** The entries of View > Tools. */
+    /** The entries of View > Tool Windows. */
     private java.util.List<MenuEntry> tools() {
         return contributions.menus().stream().filter(menu -> menu.target().equals(MenuTarget.standard(MenuTarget.Slot.VIEW)))
             .flatMap(menu -> menu.entries().stream())
-            .filter(entry -> entry instanceof MenuEntry.Submenu submenu && submenu.title().equals("Tools"))
+            .filter(entry -> entry instanceof MenuEntry.Submenu submenu && submenu.title().equals("Tool Windows"))
             .flatMap(entry -> ((MenuEntry.Submenu) entry).entries().stream()).toList();
     }
 

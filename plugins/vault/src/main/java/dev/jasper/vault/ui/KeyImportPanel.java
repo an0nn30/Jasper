@@ -1,42 +1,97 @@
 package dev.jasper.vault.ui;
 
-import dev.jasper.vault.service.KeyImportPrompt;
 import dev.jasper.sdk.Subscription;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import javax.swing.*;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.ListItem;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import dev.jasper.vault.service.KeyImportPrompt;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
-/** Passive import review and passphrase controls; metadata is never interpreted as HTML. */
-public final class KeyImportPanel extends JPanel implements AutoCloseable {
-    private final SecretDocument secret = new SecretDocument();
-    private final JPasswordField password = new JPasswordField(24);
-    private final JTextArea status = new JTextArea(3, 42), keys = new JTextArea(7, 42);
-    private final JPanel phrase = new JPanel(new FlowLayout(FlowLayout.LEFT));
-    private final JButton submit = new JButton("Unlock key"), commit = new JButton("Import and use"), cancel = new JButton("Cancel");
+/**
+ * Passive import review and passphrase controls; metadata is literal text, never markup. Enter keeps the former
+ * dialog's meaning exactly: the form has no primary (the dialog had no default button), Enter in the passphrase field
+ * unlocks the key (its action listener did) and Enter anywhere else does nothing, so it never commits. Escape cancels.
+ */
+public final class KeyImportPanel implements AutoCloseable {
+    static final String FORM = "import", STATUS = "status", KEYS = "keys", PASSPHRASE = "passphrase", UNLOCK = "unlock-key",
+        COMMIT = "commit", CANCEL = "cancel";
+    private final KeyImportPrompt prompt;
+    private final UiView view;
     private final Subscription subscription;
-    public KeyImportPanel(KeyImportPrompt prompt) {
-        super(new BorderLayout(0, 12));
-        setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 18));
-        status.setEditable(false); status.setLineWrap(true); status.setWrapStyleWord(true); status.setOpaque(false);
-        keys.setEditable(false); keys.setLineWrap(true); keys.setWrapStyleWord(true);
-        password.setDocument(secret); password.getAccessibleContext().setAccessibleName("Key passphrase");
-        phrase.add(new JLabel("Key passphrase")); phrase.add(password); phrase.add(submit);
-        var body = new JPanel(new BorderLayout(0, 10)); body.add(new JScrollPane(keys)); body.add(phrase, BorderLayout.SOUTH);
-        add(status, BorderLayout.NORTH); add(body);
-        var actions = new JPanel(new FlowLayout(FlowLayout.RIGHT)); actions.add(cancel); actions.add(commit); add(actions, BorderLayout.SOUTH);
-        Runnable unlock = () -> { char[] value = secret.snapshot(); secret.clear(); prompt.submitPassphrase(value); };
-        submit.addActionListener(e -> unlock.run()); password.addActionListener(e -> unlock.run());
-        commit.addActionListener(e -> prompt.commit()); cancel.addActionListener(e -> prompt.cancel());
-        Runnable refresh = () -> {
-            status.setText(prompt.status());
-            keys.setText(String.join("\n", prompt.rows().stream().map(row -> row.name() + "  " + row.fingerprint() + (row.reused() ? " (reuse)" : " (new)")).toList()));
-            boolean waiting = prompt.phase() == KeyImportPrompt.Phase.PASSPHRASE;
-            phrase.setVisible(waiting); if (!waiting) secret.clear();
-            commit.setEnabled(prompt.phase() == KeyImportPrompt.Phase.REVIEW);
-            cancel.setEnabled(prompt.phase() != KeyImportPrompt.Phase.COMMITTING);
-            revalidate(); repaint(); if (waiting) password.requestFocusInWindow();
-        };
-        subscription = prompt.onChanged(refresh); refresh.run();
+    private boolean closed, waiting;
+
+    public KeyImportPanel(UiKit kit, KeyImportPrompt prompt) {
+        this.prompt = prompt;
+        view = kit.create(new ViewSpec(node()), this::handle);
+        subscription = prompt.onChanged(this::refresh);
+        refresh();
     }
-    @Override public void close() { subscription.close(); secret.clear(); }
+
+    public UiView view() { return view; }
+
+    private void handle(UiEvent event) {
+        if (closed || !(event instanceof UiEvent.Action action)) return;
+        switch (action.id()) {
+            case UNLOCK -> {
+                if (prompt.phase() != KeyImportPrompt.Phase.PASSPHRASE) return;
+                char[][] typed = {new char[0]};
+                view.withSecret(PASSPHRASE, chars -> typed[0] = chars.clone());
+                view.clearSecret(PASSPHRASE);
+                prompt.submitPassphrase(typed[0]); // the prompt owns and erases its copy
+            }
+            case COMMIT -> prompt.commit();
+            case CANCEL -> { if (prompt.phase() != KeyImportPrompt.Phase.COMMITTING) prompt.cancel(); }
+            default -> { }
+        }
+    }
+
+    private void refresh() {
+        if (closed) return;
+        boolean wanted = prompt.phase() == KeyImportPrompt.Phase.PASSPHRASE;
+        if (!wanted) view.clearSecret(PASSPHRASE);
+        view.update(new ViewSpec(node()));
+        if (wanted && !waiting) view.focus(PASSPHRASE);
+        waiting = wanted;
+    }
+
+    private Nodes.Form node() {
+        var phase = prompt.phase();
+        boolean wanted = phase == KeyImportPrompt.Phase.PASSPHRASE;
+        var items = new ArrayList<ListItem>();
+        int index = 0;
+        for (var row : prompt.rows()) {
+            String id = "key-" + index++;
+            items.add(new ListItem(id, Optional.of(new Nodes.Icon(id+".icon",ControlState.READY,"key",Nodes.Hue.GREEN,Nodes.IconSize.RAIL,"SSH key")),
+                List.<Nodes.Node>of(new Nodes.Text(id + ".name", ControlState.READY, row.name(), Nodes.TextRole.BODY)),
+                List.<Nodes.Node>of(new Nodes.Text(id + ".fingerprint", ControlState.READY, row.fingerprint(), Nodes.TextRole.MONO_SMALL)),
+                List.<Nodes.Node>of(new Nodes.Chip(id + ".use", ControlState.READY, row.reused() ? "reuse" : "new", row.reused() ? Nodes.Hue.NEUTRAL : Nodes.Hue.GREEN))));
+        }
+        var sections = List.<Nodes.Node>of(
+            new Nodes.Text(STATUS, ControlState.READY, prompt.status(), Nodes.TextRole.BODY),
+            new Nodes.ItemList(KEYS, ControlState.READY, Nodes.ListKind.DOUBLE, items, Set.of(), "", List.of()),
+            new Nodes.Card("passphrase.card",new ControlState(wanted,true,false,""),Nodes.CardKind.FORM,List.of(
+                new Nodes.FormRow("passphrase.row",ControlState.READY,"Passphrase","",new Nodes.Secret(PASSPHRASE, new ControlState(wanted, true, false, ""), "", "Key passphrase", "", Nodes.SecretKind.INPUT, "", UNLOCK),Optional.empty()))));
+        var actions = new ArrayList<Nodes.Button>();
+        actions.add(new Nodes.Button(CANCEL, new ControlState(true, phase != KeyImportPrompt.Phase.COMMITTING, false, ""), "Cancel", "",
+            Nodes.ButtonKind.SECONDARY, CANCEL, ""));
+        actions.add(new Nodes.Button(COMMIT, new ControlState(true, phase == KeyImportPrompt.Phase.REVIEW, phase == KeyImportPrompt.Phase.COMMITTING, ""),
+            "Import and use", "", Nodes.ButtonKind.SECONDARY, COMMIT, ""));
+        if (wanted) actions.add(new Nodes.Button(UNLOCK, ControlState.READY, "Unlock key", "", Nodes.ButtonKind.SECONDARY, UNLOCK, ""));
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, "Import SSH keys", Optional.empty(), sections, Optional.empty(), actions,
+            phase == KeyImportPrompt.Phase.COMMITTING ? "" : CANCEL, Nodes.FormSubmission.NONE);
+    }
+
+    @Override public void close() {
+        if (closed) return;
+        closed = true;
+        subscription.close();
+        view.close();
+    }
 }

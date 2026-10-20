@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.ToolbarMode;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
@@ -65,7 +66,7 @@ class WindowChromeContributionsTest {
         edt(() -> {
             var model = new Contributions();
             List<Contributions.Invocation> seen = new ArrayList<>();
-            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.DARK));
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true));
             List<String> before = buttons(owner);
             owner.connectContributions(model);
             ActionEntry run = model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), seen::add);
@@ -147,6 +148,89 @@ class WindowChromeContributionsTest {
         });
     }
 
+    @Test void toolsAppearsAfterTabOnlyWhileAPluginHasEntriesInIt() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.connectContributions(model);
+            model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), invocation -> { });
+            model.addMenuSection(MenuTarget.topLevel("dev.x.menu", "Own")).set(List.of(new MenuEntry.Item("dev.x.run")));
+            assertThat(titles(owner)).as("no entries, no menu").doesNotContain("Tools");
+            MenuSection first = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS));
+            first.set(List.of(new MenuEntry.Item("dev.x.run")));
+            assertThat(titles(owner)).containsSubsequence("Tab", "Tools", "Own");
+            assertThat(items(tools(owner))).as("no separator before the first section").containsExactly("Run Tool");
+            MenuSection second = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS));
+            second.set(List.of(new MenuEntry.Item("dev.x.run")));
+            assertThat(items(tools(owner))).containsExactly("Run Tool", "---", "Run Tool");
+            first.close();
+            second.close();
+            assertThat(titles(owner)).as("the last entry gone, the menu goes").doesNotContain("Tools");
+        });
+    }
+
+    @Test void toolsIsBuiltFreshOnEachRebuildAndNeverDuplicated() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            try {
+                owner.connectContributions(model);
+                model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), invocation -> { });
+                MenuSection section = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS));
+                section.set(List.of(new MenuEntry.Item("dev.x.run")));
+                JMenu before = tools(owner);
+
+                owner.chrome().renderContributedMenus();
+
+                JMenu after = tools(owner);
+                assertThat(after).as("each rebuild builds its own Tools menu").isNotSameAs(before);
+                assertThat(before.getParent()).as("the old one left the bar").isNull();
+                assertThat(titles(owner)).containsOnlyOnce("Tools");
+                assertThat(items(after)).containsExactly("Run Tool");
+
+                section.close();
+                assertThat(titles(owner)).doesNotContain("Tools");
+                section = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS));
+                section.set(List.of(new MenuEntry.Item("dev.x.run")));
+                assertThat(titles(owner)).containsOnlyOnce("Tools");
+                assertThat(items(tools(owner))).as("the closed section left nothing behind").containsExactly("Run Tool");
+            } finally { owner.close(); }
+        });
+    }
+
+    /** Plan 3d: Session and Transfer show after Tab and before Tools, each only while a plugin has entries in it. */
+    @Test void sessionAndTransferAppearAfterTabBeforeToolsOnlyWhileAPluginHasEntriesInThem() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.connectContributions(model);
+            model.addAction("dev.x.connect", "Connect", null, List.of(), Optional.empty(), invocation -> { });
+            model.addAction("dev.x.upload", "Upload", null, List.of(), Optional.empty(), invocation -> { });
+            model.addMenuSection(MenuTarget.topLevel("dev.x.menu", "Own")).set(List.of(new MenuEntry.Item("dev.x.connect")));
+            model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS)).set(List.of(new MenuEntry.Item("dev.x.upload")));
+            assertThat(titles(owner)).as("no entries, no menus").doesNotContain("Session", "Transfer");
+            MenuSection session = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.SESSION));
+            session.set(List.of(new MenuEntry.Item("dev.x.connect")));
+            MenuSection transfer = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TRANSFER));
+            transfer.set(List.of(new MenuEntry.Item("dev.x.upload")));
+            assertThat(titles(owner)).containsSubsequence("Tab", "Session", "Transfer", "Tools", "Own");
+            assertThat(items(menu(owner, "Session"))).as("no separator before the first section").containsExactly("Connect");
+            assertThat(items(menu(owner, "Transfer"))).containsExactly("Upload");
+            session.close();
+            assertThat(titles(owner)).doesNotContain("Session").containsSubsequence("Tab", "Transfer", "Tools");
+            transfer.close();
+            assertThat(titles(owner)).doesNotContain("Transfer");
+        });
+    }
+
+    private static List<String> titles(WindowContent owner) {
+        return owner.chrome().menuBar().menus().stream().map(JMenu::getText).toList();
+    }
+
+    private static JMenu tools(WindowContent owner) {
+        return owner.chrome().menuBar().menus().stream().filter(menu -> menu.getText().equals("Tools")).findFirst().orElseThrow();
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     void menuRefreshDuringNativeMenuMutationDoesNotDuplicateTopLevelMenus(boolean onRemoval) throws Exception {
@@ -159,6 +243,8 @@ class WindowChromeContributionsTest {
                 model.addAction("app.help", "Shortcuts", null, List.of(), Optional.empty(), event -> {});
                 var ssh = model.addMenuSection(MenuTarget.topLevel("dev.x.ssh", "SSH"));
                 ssh.set(List.of(new MenuEntry.Item("dev.x.connect")));
+                model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS))
+                    .set(List.of(new MenuEntry.Item("dev.x.connect")));
                 model.addMenuSection(MenuTarget.topLevel("app.help", "Help"))
                     .set(List.of(new MenuEntry.Item("app.help")));
                 // JBR can dispatch an EDT callback while creating a native menu peer.
@@ -181,18 +267,20 @@ class WindowChromeContributionsTest {
                 owner.chrome().renderContributedMenus();
 
                 assertThat(owner.chrome().menuBar().menus().stream().map(JMenu::getText).toList())
-                    .containsExactly("File", "Edit", "View", "Pane", "Tab", "SSH", "Help");
+                    .containsExactly("File", "Edit", "View", "Pane", "Tab", "Tools", "SSH", "Help");
                 assertThat(menu(owner, "SSH").getItem(0).isEnabled()).isFalse();
                 assertThat(items(menu(owner, "SSH"))).containsExactly("Connect", "Shortcuts");
+                assertThat(items(menu(owner, "Tools"))).containsExactly("Connect");
+                assertThat(menu(owner, "Tools").getItem(0).isEnabled()).isFalse();
             } finally { owner.close(); }
         });
     }
 
     @Test void sharedManagedIconsSizePerPlacementInMultipleWindows() throws Exception {
         edt(() -> {
-            var theme = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            var theme = ThemeTestSupport.controller(false);
             try {
-                var icon = dev.jasper.app.platform.AppIcons.plugin(getClass().getClassLoader(), "dev/jasper/app/icons/intellij/general/search.svg");
+                var icon = dev.jasper.app.platform.AppIcons.semantic("search");
                 var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(19,19,java.awt.image.BufferedImage.TYPE_INT_ARGB));
                 var model = new Contributions();
                 model.addAction("dev.x.lock", "Lock", icon, List.of(), Optional.empty(), event -> {});
@@ -225,7 +313,7 @@ class WindowChromeContributionsTest {
                 }
                 assertThat(model.action("dev.x.lock").orElseThrow().icon()).isSameAs(icon);
                 assertThat(icon.getIconWidth()).isEqualTo(16);
-            } finally { new dev.jasper.app.appearance.ThemeController(); }
+            } finally { ThemeTestSupport.controller(true); }
         });
     }
 }

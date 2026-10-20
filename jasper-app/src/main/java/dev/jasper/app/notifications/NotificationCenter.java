@@ -60,6 +60,8 @@ public final class NotificationCenter {
     private final ArrayDeque<Change> queue = new ArrayDeque<>();
     private boolean delivering;
     private Consumer<Throwable> actionFailures = failure -> { };
+    /** The user's modes by group id, from notifications.groups. */
+    private Map<String, DisplayMode> modes = Map.of();
 
     /**
      * @param ui runs {@link #submit}ted posts on the EDT ({@code SwingUtilities::invokeLater} in the application)
@@ -100,11 +102,21 @@ public final class NotificationCenter {
         return List.copyOf(groups.values());
     }
 
-    /** How the group's notifications appear: its declared default; {@code OFF} for an undeclared group. */
+    /**
+     * The user's modes by group id, from {@code notifications.groups}: a listed group's notifications appear that way
+     * from the next post on; a group not listed keeps its declared default. What is in history, showing or waiting
+     * stays as it is.
+     */
+    public void useModes(Map<String, DisplayMode> modes) {
+        requireEdt();
+        this.modes = Map.copyOf(modes);
+    }
+
+    /** How the group's notifications appear: the user's mode, else its declared default; {@code OFF} for an undeclared group. */
     public DisplayMode mode(String groupId) {
         requireEdt();
         NotificationGroup group = groups.get(groupId);
-        return group == null ? DisplayMode.OFF : group.defaultMode();
+        return group == null ? DisplayMode.OFF : modes.getOrDefault(groupId, group.defaultMode());
     }
 
     /** Posts, returning the entry it landed in (an earlier one for a repeat), or empty when its group drops it. */

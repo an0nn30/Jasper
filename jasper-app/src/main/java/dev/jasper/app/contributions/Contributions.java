@@ -53,7 +53,13 @@ public final class Contributions {
 
     /** A request to show, hide or toggle a panel in one window; each window answers only its own. */
     public record PanelRequest(UUID windowId, String panelId, Op op) {
-        public enum Op { SHOW, HIDE, TOGGLE }
+        public enum Op {
+            SHOW, HIDE, TOGGLE,
+            /** A toggle by the user's View action, or by the panel's own toggle action as it runs: a panel it shows, or a visible one that is not the active tool window, becomes the active tool window under flush frames (Enterprise plan 12 Rulings 18). */
+            ACTIVATING_TOGGLE,
+            /** A show by the panel's own toggle action: the panel becomes the active tool window under flush frames (plan 15b Rulings 1). */
+            ACTIVATING_SHOW
+        }
     }
 
     private final Map<String, PanelEntry> panels = new LinkedHashMap<>();
@@ -153,13 +159,20 @@ public final class Contributions {
         panels.put(id, entry);
         if (toggleActionId.isEmpty())
             panelToggles.put(id, addAction(toggle, "Toggle " + title, icon, List.of("panel", "show", "hide"), Optional.empty(),
-                invocation -> requestPanel(new PanelRequest(invocation.windowId(), id, PanelRequest.Op.TOGGLE))));
+                invocation -> requestPanel(new PanelRequest(invocation.windowId(), id, PanelRequest.Op.ACTIVATING_TOGGLE))));
         rebuildPanelsMenu();
         changed(Kind.PANELS);
         return entry;
     }
 
     public List<PanelEntry> panels() { return List.copyOf(panels.values()); }
+
+    /**
+     * The app's View section listing every panel's toggle ("Tool Windows"), while there are panels.
+     *
+     * @return the section, or empty while there are no panels
+     */
+    public Optional<MenuSection> toolWindowsSection() { return Optional.ofNullable(panelsMenu); }
 
     public Subscription addRailAction(String actionId) {
         requireEdt();
@@ -252,7 +265,7 @@ public final class Contributions {
         changed(Kind.PANELS);
     }
 
-    /** One app-owned View section, "Tools", listing every panel's toggle action; gone when there are no panels. */
+    /** One app-owned View section, "Tool Windows", listing every panel's toggle action; gone when there are no panels. */
     private void rebuildPanelsMenu() {
         if (panels.isEmpty()) {
             if (panelsMenu != null) { panelsMenu.close(); panelsMenu = null; }
@@ -261,7 +274,7 @@ public final class Contributions {
         if (panelsMenu == null) panelsMenu = addMenuSection(MenuTarget.standard(MenuTarget.Slot.VIEW));
         List<MenuEntry> toggles = new ArrayList<>();
         for (PanelEntry panel : panels.values()) toggles.add(new MenuEntry.Item(panel.toggleActionId()));
-        panelsMenu.set(List.of(new MenuEntry.Submenu("Tools", toggles)));
+        panelsMenu.set(List.of(new MenuEntry.Submenu("Tool Windows", toggles)));
     }
 
     void remove(ActionEntry entry) { if (actions.remove(entry.id(), entry)) changed(Kind.ACTIONS); }

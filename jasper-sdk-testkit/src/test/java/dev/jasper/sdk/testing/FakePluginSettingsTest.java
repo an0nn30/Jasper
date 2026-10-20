@@ -4,13 +4,16 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.settings.Choice;
+import dev.jasper.sdk.settings.EditorHint;
 import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.SettingSpec;
 import dev.jasper.sdk.settings.SettingsPanel;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,16 +95,15 @@ class FakePluginSettingsTest {
         assertThat(settings.get().file()).isEqualTo(host.dataRoot().resolve("test.fake").resolve("test.fake.toml"));
     }
 
-    @Test void aPluginsOwnPageGetsRowsAndStagesValues() {
+    @Test void aPluginsOwnPageGetsRowsAndStagesValues() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         var size = new AtomicReference<Setting<Integer>>();
         var settings = new AtomicReference<PluginSettings>();
         var seen = new ArrayList<String>();
         host.start(INFO, Set.of(), Set.of(), context -> {
             settings.set(context.settings());
-            size.set(context.settings().declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size")));
+            size.set(context.settings().declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size").unit("pt")));
             context.settings().page(rows -> {
-                var panel = new JPanel();
-                panel.add(rows.row(size.get()));
+                var panel = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(rows.row(size.get())), e -> {});
                 seen.add("pending " + rows.pending(size.get()));
                 rows.stage(size.get(), 20);
                 seen.add("pending " + rows.pending(size.get()));
@@ -109,14 +111,98 @@ class FakePluginSettingsTest {
                 rows.changed();
                 return panel;
             });
-            assertThatIllegalStateException().isThrownBy(() -> context.settings().page(rows -> new JPanel()));
+            assertThatIllegalStateException().isThrownBy(() -> context.settings().page(rows -> {throw new AssertionError("Lazy page");}));
         });
         var component = host.settingsPanel("test.fake").orElseThrow();
-        assertThat(((JLabel) component.getComponent(0)).getText()).isEqualTo("Font size");
+        var row = (dev.jasper.sdk.ui.Nodes.SettingRow) host.settingsPanelView("test.fake").orElseThrow().spec().root();
+        assertThat(row.title()).isEqualTo("Font size");
+        // As the host renders it: a bounded integer is the Settings stepper with its declared unit.
+        var input = (dev.jasper.sdk.ui.Nodes.Field) ((dev.jasper.sdk.ui.Nodes.Stack) row.control()).children().getFirst();
+        assertThat(input.presentation()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldPresentation.STEPPER);
+        assertThat(input.hint()).isEqualTo("pt");
         assertThat(seen).containsExactly("pending 13", "pending 20");
         assertThat(host.pendingSettings("test.fake")).containsEntry("font_size", 20);
         assertThat(host.settingsPanelChanges("test.fake")).isEqualTo(1);
         assertThat(size.get().get()).as("staging saves nothing").isEqualTo(13);
-        assertThatIllegalStateException().isThrownBy(() -> settings.get().page(rows -> new JPanel()));
+        assertThatIllegalStateException().isThrownBy(() -> settings.get().page(rows -> {throw new AssertionError("Lazy page");}));
+    }); }
+
+    /** As the host: a font hint's row is the font picker, a file hint's a path whose Browse takes the next queued file selection. */
+    @Test void hintedRowsAreTheFontPickerAndAPathWithBrowse() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        var font = new AtomicReference<Setting<String>>();
+        var log = new AtomicReference<Setting<String>>();
+        host.start(INFO, Set.of(), Set.of(), context -> {
+            font.set(context.settings().declare(SettingSpec.of("font", SettingKind.text(), "Menlo").label("Font").editor(EditorHint.font(true))));
+            log.set(context.settings().declare(SettingSpec.of("log", SettingKind.text(), "").label("Log file").editor(EditorHint.file())));
+            context.settings().page(rows -> context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("page",
+                dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL, List.of(rows.row(font.get()), rows.row(log.get())))), e -> {}));
+        });
+        host.settingsPanel("test.fake").orElseThrow();
+        var view = host.settingsPanelView("test.fake").orElseThrow();
+        var installed = List.of(java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames());
+        assertThat(control(view, 0)).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Choice.class, picker -> {
+            assertThat(picker.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.ChoiceKind.SEARCHABLE);
+            assertThat(picker.selectedId()).as("free entry owns the value").isEmpty();
+            assertThat(picker.search().orElseThrow().entry()).contains("Menlo");
+            assertThat(picker.search().orElseThrow().noMatches()).isEqualTo("No installed font matches");
+            assertThat(picker.options()).extracting(dev.jasper.sdk.ui.Option::label).allSatisfy(family -> assertThat(installed).contains(family));
+        });
+        view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("settings:font", "Courier New"));
+        assertThat(host.pendingSettings("test.fake")).containsEntry("font", "Courier New");
+        assertThat(control(view, 1)).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Field.class, path -> {
+            assertThat(path.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.PATH);
+            assertThat(path.trailingAction()).isEqualTo("settings:log:browse");
+        });
+        view.emit(new dev.jasper.sdk.ui.UiEvent.Action("settings:log:browse"));
+        assertThat(host.pendingSettings("test.fake")).as("nothing queued: Browse cancels").doesNotContainKey("log");
+        Path chosen = host.dataRoot().resolve("app.log").toAbsolutePath().normalize();
+        host.queueFileSelection(Optional.of(chosen));
+        view.emit(new dev.jasper.sdk.ui.UiEvent.Action("settings:log:browse"));
+        assertThat(host.pendingSettings("test.fake")).containsEntry("log", chosen.toString());
+        assertThat(((dev.jasper.sdk.ui.Nodes.Field) control(view, 1)).value()).isEqualTo(chosen.toString());
+        assertThat(host.failures()).isEmpty();
+    }); }
+
+    /** As the host: a technical hint's row is a text field in the data face. */
+    @Test void aTechnicalHintsRowIsATextFieldInTheDataFace() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        var ports = new AtomicReference<Setting<String>>();
+        host.start(INFO, Set.of(), Set.of(), context -> {
+            ports.set(context.settings().declare(SettingSpec.of("ports", SettingKind.text(), "50000-50100").label("Passive ports").editor(EditorHint.technical())));
+            context.settings().page(rows -> context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("page",
+                dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL, List.of(rows.row(ports.get())))), e -> {}));
+        });
+        host.settingsPanel("test.fake").orElseThrow();
+        var view = host.settingsPanelView("test.fake").orElseThrow();
+        assertThat(control(view, 0)).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Field.class, field -> {
+            assertThat(field.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.TEXT);
+            assertThat(field.presentation()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldPresentation.TECHNICAL);
+            assertThat(field.value()).isEqualTo("50000-50100");
+        });
+        view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("settings:ports", "50000-50010"));
+        assertThat(host.pendingSettings("test.fake")).containsEntry("ports", "50000-50010");
+        assertThat(host.failures()).isEmpty();
+    }); }
+
+    /** As the host: a panel's form keeps its footnote, and its submission, through the row projection. */
+    @Test void aPanelFormsFootnoteSurvivesTheRowProjection() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        var name = new AtomicReference<Setting<String>>();
+        host.start(INFO, Set.of(), Set.of(), context -> {
+            name.set(context.settings().declare(SettingSpec.of("name", SettingKind.text(), "files").label("Name")));
+            context.settings().page(rows -> context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Form("form",
+                dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.FormKind.FULL, "Panel", Optional.empty(), List.of(rows.row(name.get())),
+                Optional.empty(), List.of(), "", dev.jasper.sdk.ui.Nodes.FormSubmission.NONE, "Saved to the plugin's settings file")), e -> {}));
+        });
+        host.settingsPanel("test.fake").orElseThrow();
+        var view = host.settingsPanelView("test.fake").orElseThrow();
+        view.update(view.sourceSpec());
+        var form = (dev.jasper.sdk.ui.Nodes.Form) view.spec().root();
+        assertThat(form.footnote()).isEqualTo("Saved to the plugin's settings file");
+        assertThat(form.submission()).isEqualTo(dev.jasper.sdk.ui.Nodes.FormSubmission.NONE);
+    }); }
+
+    /** The control in the trailing slot of the {@code index}th host row of a page that stacks them. */
+    private static dev.jasper.sdk.ui.Nodes.Node control(FakeKitView view, int index) {
+        var row = (dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children().get(index);
+        return ((dev.jasper.sdk.ui.Nodes.Stack) row.control()).children().getFirst();
     }
 }

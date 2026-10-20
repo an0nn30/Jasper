@@ -1,201 +1,299 @@
 package dev.jasper.fileserver.ui;
 
-import dev.jasper.fileserver.definition.Bind;
-import dev.jasper.fileserver.definition.Login;
-import dev.jasper.fileserver.definition.PortRange;
-import dev.jasper.fileserver.definition.Protocol;
-import dev.jasper.fileserver.definition.ServerDefinition;
+import dev.jasper.fileserver.definition.*;
 import dev.jasper.fileserver.engine.ServerAddresses;
-import java.net.InetAddress;
+import dev.jasper.sdk.testing.FakeKit;
+import dev.jasper.sdk.testing.FakeKitView;
+import dev.jasper.sdk.ui.*;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.net.InetAddress;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ServerEditorTest {
-    static final UUID ACCOUNT = UUID.randomUUID();
     @TempDir Path folder;
-    final List<ServerDefinition> saved = new ArrayList<>();
-    boolean cancelled;
+    private final FakeKit kit = new FakeKit("dev.jasper.fileserver");
+    private final List<ServerDefinition> saved = new ArrayList<>();
+    private final AtomicReference<CompletableFuture<Optional<ServerEditor.Account>>> pending = new AtomicReference<>();
+    private int folderRequests, keyRequests;
+    /** What the next Choose… answers; the temporary folder when null. */
+    private Path nextFolder;
+    private static final String ED25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAEgwWITbeAjMHfs63n4fe6AxR8buxH3Wx+IdWdotPF0 alice@laptop";
+    private static final String ECDSA = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCKLV4ChGhVzArLw7brgwvIOQAjpwGqDaTifUtUTLxNQCWVdgGVtTjhhZSbIMKVdDUtRyBDkfjMCE3d4mznEAa8=";
 
-    ServerEditor editor(Optional<ServerDefinition> initial, boolean existing, boolean vaultPresent, boolean linux, List<ServerDefinition> others) throws Exception {
-        var en0 = new ServerAddresses.Nic("en0", true, false, false, List.of(InetAddress.getByName("192.168.1.20")));
-        return new ServerEditor(others, initial, existing, Set.of(Protocol.HTTP), List.of(en0), vaultPresent,
-            id -> id.equals(ACCOUNT) ? Optional.of("Share login") : Optional.empty(),
-            () -> CompletableFuture.completedFuture(Optional.of(new ServerEditor.Account(ACCOUNT, "Share login"))),
-            () -> Optional.of(folder), linux, saved::add, () -> cancelled = true);
+    private static void onEdt(Runnable task) { UiTestAccess.edt(task); }
+    private ServerEditor editor(Set<Protocol> protocols, Optional<ServerDefinition> initial, boolean vault, ServerEditor.KeySources keys) {
+        return editor(protocols, initial, vault, keys, List.of(), false, List.of());
     }
+    private ServerEditor editor(Set<Protocol> protocols, Optional<ServerDefinition> initial, boolean vault, ServerEditor.KeySources keys,
+                                List<ServerDefinition> others, boolean linux, List<ServerAddresses.Nic> interfaces) {
+        var result = new AtomicReference<ServerEditor>();
+        onEdt(() -> result.set(new ServerEditor(kit, others, initial, initial.isPresent(), protocols, interfaces, vault,
+            id -> Optional.of("Share login"), () -> { var future = new CompletableFuture<Optional<ServerEditor.Account>>(); pending.set(future); return future; },
+            () -> { folderRequests++; return Optional.of(nextFolder == null ? folder : nextFolder); }, keys, linux, saved::add, () -> { })));
+        return result.get();
+    }
+    private ServerEditor editor(Set<Protocol> protocols) { return editor(protocols, Optional.empty(), false, ServerEditor.KeySources.NONE); }
+    private static FakeKitView view(ServerEditor editor) { return (FakeKitView) editor.view(); }
+    private static void emit(ServerEditor editor, UiEvent event) { onEdt(() -> view(editor).emit(event)); }
+    private static void edit(ServerEditor editor, String id, String value) { emit(editor, new UiEvent.Edited(id, value)); }
+    private static void action(ServerEditor editor, String id) {
+        var node = node(editor, id);
+        emit(editor, new UiEvent.Action(node instanceof Nodes.Button button ? button.action() : id));
+    }
+    private static void choose(ServerEditor editor, String id, String value) { emit(editor, new UiEvent.Selected(id, Set.of(value))); }
+    private static void toggle(ServerEditor editor, String id, boolean value) { emit(editor, new UiEvent.Toggled(id, value)); }
+    private static Nodes.Node node(ServerEditor editor, String id) { return UiTestAccess.node(view(editor), id); }
+    private static String field(ServerEditor editor, String id) { return ((Nodes.Field) node(editor, id)).value(); }
+    private static String message(ServerEditor editor) { return ((Nodes.Text) node(editor, ServerEditor.MESSAGE)).text(); }
+    private static String text(ServerEditor editor, String id) { return ((Nodes.Text) node(editor, id)).text(); }
+    private static String notice(ServerEditor editor) { return ((Nodes.Notice) node(editor, ServerEditor.WARNING)).text(); }
+    private void basic(ServerEditor editor) { edit(editor, ServerEditor.NAME, "docs"); action(editor, ServerEditor.CHOOSE_FOLDER); }
 
-    @Test void createsAnHttpServerWithSafeDefaults() throws Exception {
-        var editor = editor(Optional.empty(), false, true, false, List.of());
-        assertThat(editor.save.getText()).isEqualTo("Add Server");
-        assertThat(editor.protocol.getItemCount()).isEqualTo(1);
-        assertThat(editor.port.getText()).isEqualTo("8080");
-        assertThat(editor.anonymous.isSelected()).isTrue();
-        assertThat(editor.reachable.getSelectedItem()).hasToString("This computer only");
-        assertThat(editor.reachable.getItemCount()).as("loopback, all, en0").isEqualTo(3);
-        assertThat(editor.reachable.getItemAt(2)).hasToString("en0 (192.168.1.20)");
-        assertThat(editor.writable.isSelected()).isFalse();
-        editor.save.doClick();
-        assertThat(editor.message.getText()).contains("needs a name");
-        editor.name.setText("docs");
-        editor.save.doClick();
-        assertThat(editor.message.getText()).isEqualTo("Choose a folder to share");
-        editor.folder.setText(folder.resolve("missing").toString());
-        editor.save.doClick();
-        assertThat(editor.message.getText()).endsWith("does not exist");
-        editor.chooseFolder.doClick();
-        assertThat(editor.folder.getText()).isEqualTo(folder.toString());
-        editor.port.setText("http");
-        editor.save.doClick();
-        assertThat(editor.message.getText()).contains("1 to 65535");
-        editor.port.setText("8081");
-        editor.save.doClick();
-        assertThat(saved).singleElement().satisfies(d -> {
-            assertThat(d.name()).isEqualTo("docs");
-            assertThat(d.protocol()).isEqualTo(Protocol.HTTP);
-            assertThat(d.folder()).isEqualTo(folder.toAbsolutePath().normalize());
-            assertThat(d.bind()).isEqualTo(Bind.LOOPBACK);
-            assertThat(d.port()).isEqualTo(8081);
-            assertThat(d.writable()).isFalse();
-            assertThat(d.login()).isEqualTo(Login.ANONYMOUS);
-            assertThat(d.autostart()).isFalse();
+    /** Spec 13: the folder is a read-only fact that only Choose…, beside it, changes. */
+    @Test void theFolderIsAReadOnlyFieldThatOnlyChooseChanges() {
+        var editor = editor(Set.of(Protocol.HTTP));
+        var folderField = (Nodes.Field) node(editor, ServerEditor.FOLDER);
+        assertThat(folderField.readOnly()).isTrue();
+        assertThat(folderField.value()).isEmpty();
+        assertThat(folderField.hint()).isEqualTo("No folder selected");
+        assertThat(((Nodes.FormRow) node(editor, "server.folder.row")).trailing()).get().isInstanceOfSatisfying(Nodes.Button.class, choose -> {
+            assertThat(choose.id()).isEqualTo(ServerEditor.CHOOSE_FOLDER);
+            assertThat(choose.label()).isEqualTo("Choose…");
         });
-        editor.cancel.doClick();
-        assertThat(cancelled).isTrue();
+        edit(editor, ServerEditor.FOLDER, "/typed/elsewhere");
+        assertThat(field(editor, ServerEditor.FOLDER)).as("typing never reaches a read-only field").isEmpty();
+        action(editor, ServerEditor.CHOOSE_FOLDER);
+        assertThat(field(editor, ServerEditor.FOLDER)).isEqualTo(folder.toString());
     }
 
-    @Test void aVaultLoginNeedsAnAccountAndRiskyChoicesWarn() throws Exception {
-        var editor = editor(Optional.empty(), false, true, false, List.of());
-        editor.name.setText("vaulted");
-        editor.folder.setText(folder.toString());
-        editor.vault.doClick();
-        assertThat(editor.warnings.getText()).contains("Plain HTTP sends the password unencrypted");
-        editor.save.doClick();
-        assertThat(editor.message.getText()).contains("Choose a Vault account");
-        editor.chooseAccount.doClick();
-        assertThat(editor.accountLabel.getText()).isEqualTo("Share login");
-        editor.writable.doClick();
-        editor.reachable.setSelectedIndex(1);
-        assertThat(editor.warnings.getText()).contains("Writable and reachable from other computers");
-        editor.save.doClick();
-        assertThat(saved).singleElement().satisfies(d -> {
-            assertThat(d.login()).isEqualTo(new Login.Vault(ACCOUNT));
-            assertThat(d.writable()).isTrue();
-            assertThat(d.bind()).isEqualTo(Bind.ALL);
+    /** Spec 13: the warnings are one WARNING Notice, present only while there is a warning. */
+    @Test void theWarningsAreAWarningNoticeOnlyWhileThereIsOne() {
+        var editor = editor(Set.of(Protocol.HTTP, Protocol.FTP));
+        assertThat(node(editor, ServerEditor.WARNING)).as("anonymous read-only HTTP warns of nothing").isNull();
+        choose(editor, ServerEditor.PROTOCOL, "FTP");
+        assertThat(node(editor, ServerEditor.WARNING)).isInstanceOfSatisfying(Nodes.Notice.class, notice -> {
+            assertThat(notice.severity()).isEqualTo(Nodes.Severity.WARNING);
+            assertThat(notice.text()).as("the presentation adds the word Warning").isEqualTo("Plain FTP sends the password unencrypted");
+            assertThat(notice.actions()).isEmpty();
+        });
+        choose(editor, ServerEditor.PROTOCOL, "HTTP");
+        assertThat(node(editor, ServerEditor.WARNING)).isNull();
+    }
+
+    /** Spec 13: plugin form labels are sentence case. */
+    @Test void theReachableRowIsSentenceCase() {
+        var editor = editor(Set.of(Protocol.HTTP));
+        assertThat(((Nodes.FormRow) node(editor, "server.reachable.row")).label()).isEqualTo("Reachable from");
+        assertThat(((Nodes.Choice) node(editor, ServerEditor.REACHABLE)).label()).isEqualTo("Reachable from");
+    }
+
+    @Test void protocolChangesPreserveExplicitPortAndHiddenValues() {
+        var editor = editor(Set.of(Protocol.HTTP, Protocol.FTP, Protocol.SFTP, Protocol.TFTP));
+        assertThat(field(editor, ServerEditor.PORT)).isEqualTo("8080");
+        choose(editor, ServerEditor.PROTOCOL, "FTP");
+        assertThat(field(editor, ServerEditor.PORT)).isEqualTo("2121");
+        edit(editor, ServerEditor.PASSIVE, "50000-50020");
+        edit(editor, ServerEditor.PORT, "2317");
+        toggle(editor, ServerEditor.TLS, true);
+        toggle(editor, ServerEditor.REQUIRE_TLS, true);
+        choose(editor, ServerEditor.PROTOCOL, "HTTP");
+        assertThat(field(editor, ServerEditor.PORT)).isEqualTo("2317");
+        basic(editor); action(editor, ServerEditor.SAVE);
+        assertThat(saved).singleElement().satisfies(value -> {
+            assertThat(value.protocol()).isEqualTo(Protocol.HTTP);
+            assertThat(value.port()).isEqualTo(2317);
+            assertThat(value.passiveRange()).isEmpty();
+            assertThat(value.requireTls()).isFalse();
         });
     }
 
-    @Test void withoutTheVaultASessionPasswordIsOffered() throws Exception {
-        var editor = editor(Optional.empty(), false, false, false, List.of());
-        assertThat(editor.vault.isEnabled()).isFalse();
-        assertThat(editor.vault.getText()).contains("install or enable the Credential Vault");
-        assertThat(editor.chooseAccount.isEnabled()).isFalse();
-        editor.name.setText("guarded");
-        editor.folder.setText(folder.toString());
-        editor.session.doClick();
-        editor.save.doClick();
-        assertThat(saved).singleElement().satisfies(d -> assertThat(d.login()).isEqualTo(Login.SESSION));
+    @Test void validatesNameFolderAndPortOnlyOnSaveWithoutReadingUserFolders() {
+        var editor = editor(Set.of(Protocol.HTTP));
+        assertThat(folderRequests).isZero();
+        action(editor, ServerEditor.SAVE); assertThat(message(editor)).contains("needs a name");
+        edit(editor, ServerEditor.NAME, "docs"); action(editor, ServerEditor.SAVE);
+        assertThat(message(editor)).contains("Choose a folder");
+        nextFolder = folder.resolve("missing"); action(editor, ServerEditor.CHOOSE_FOLDER); action(editor, ServerEditor.SAVE);
+        assertThat(message(editor)).contains("does not exist");
+        nextFolder = folder; action(editor, ServerEditor.CHOOSE_FOLDER);
+        assertThat(folderRequests).isEqualTo(2);
+        edit(editor, ServerEditor.PORT, "word"); action(editor, ServerEditor.SAVE);
+        assertThat(message(editor)).contains("port");
+        edit(editor, ServerEditor.PORT, "8080"); action(editor, ServerEditor.SAVE);
+        assertThat(saved).singleElement().satisfies(value -> {
+            assertThat(value.folder()).isEqualTo(folder);
+            assertThat(value.bind()).isEqualTo(Bind.LOOPBACK);
+            assertThat(value.login()).isEqualTo(Login.ANONYMOUS);
+            assertThat(value.writable()).isFalse();
+        });
     }
 
-    @Test void editingKeepsTheIdAndHiddenSettingsAndRefusesTakenNames() throws Exception {
+    @Test void vaultChooserResolvesOnEdtAndStaleCompletionAfterCloseIsIgnored() throws Exception {
+        var editor = editor(Set.of(Protocol.FTP), Optional.empty(), true, ServerEditor.KeySources.NONE);
+        basic(editor); choose(editor, ServerEditor.LOGIN, "vault"); action(editor, ServerEditor.SAVE);
+        assertThat(message(editor)).contains("Choose a Vault account");
+        action(editor, ServerEditor.CHOOSE_ACCOUNT);
+        var chooser = pending.get();
+        assertThat(chooser).isNotNull();
+        var account = UUID.randomUUID();
+        chooser.complete(Optional.of(new ServerEditor.Account(account, "Share login")));
+        onEdt(() -> { });
+        action(editor, ServerEditor.SAVE);
+        assertThat(saved).singleElement().extracting(ServerDefinition::login).isEqualTo(new Login.Vault(account));
+        var stale = editor(Set.of(Protocol.FTP), Optional.empty(), true, ServerEditor.KeySources.NONE);
+        action(stale, ServerEditor.CHOOSE_ACCOUNT);
+        onEdt(stale::close);
+        pending.get().completeExceptionally(new IllegalStateException("unavailable"));
+        SwingUtilities.invokeAndWait(() -> { });
+        onEdt(() -> assertThat(kit.failures()).isEmpty());
+    }
+
+    @Test void unavailableVaultCannotBeChosenAndNoPickerRuns() {
+        var editor = editor(Set.of(Protocol.FTP));
+        choose(editor, ServerEditor.PROTOCOL, "FTP");
+        var login = (Nodes.Choice) node(editor, ServerEditor.LOGIN);
+        assertThat(login.options()).noneMatch(option -> option.id().equals("vault"));
+        action(editor, ServerEditor.CHOOSE_ACCOUNT);
+        assertThat(pending.get()).isNull();
+        basic(editor); action(editor, ServerEditor.SAVE);
+        assertThat(saved).singleElement().extracting(ServerDefinition::login).isEqualTo(Login.SESSION);
+    }
+
+    @Test void tlsAndKeySourcesAreProtocolBoundAndExplicit() {
+        var editor = editor(Set.of(Protocol.HTTP, Protocol.FTP, Protocol.SFTP, Protocol.TFTP), Optional.empty(), false,
+            new ServerEditor.KeySources(() -> { keyRequests++; return Optional.of("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA alice"); }, Optional::empty));
+        assertThat(keyRequests).isZero();
+        choose(editor, ServerEditor.PROTOCOL, "SFTP");
+        action(editor, ServerEditor.ADD_KEY);
+        assertThat(keyRequests).isEqualTo(1);
+        assertThat(((Nodes.ItemList) node(editor, ServerEditor.KEYS)).items()).hasSize(1);
+        basic(editor); action(editor, ServerEditor.SAVE);
+        assertThat(saved.getLast().authorizedKeys()).hasSize(1);
+        choose(editor, ServerEditor.PROTOCOL, "TFTP");
+        toggle(editor, ServerEditor.WRITABLE, true);
+        action(editor, ServerEditor.SAVE);
+        assertThat(saved.getLast()).satisfies(value -> {
+            assertThat(value.protocol()).isEqualTo(Protocol.TFTP);
+            assertThat(value.login()).isEqualTo(Login.ANONYMOUS);
+            assertThat(value.authorizedKeys()).isEmpty();
+            assertThat(value.tls()).isFalse();
+            assertThat(value.writable()).isTrue();
+        });
+    }
+
+    @Test void editingLocksProtocolKeepsUnavailableInterfaceAndRejectsDuplicateNames() throws Exception {
         var other = ServerDefinition.create("taken", Protocol.HTTP, folder);
         var original = new ServerDefinition(UUID.randomUUID(), "docs", Protocol.HTTP, folder, new Bind.Interface("en9"), 8443,
-            Optional.empty(), true, new Login.Vault(ACCOUNT), List.of(), true, false, true);
-        var editor = editor(Optional.of(original), true, true, false, List.of(other, original));
-        assertThat(editor.save.getText()).isEqualTo("Save");
-        assertThat(editor.protocol.isEnabled()).isFalse();
-        assertThat(editor.reachable.getSelectedItem()).hasToString("en9 (not available)");
-        assertThat(editor.accountLabel.getText()).isEqualTo("Share login");
-        assertThat(editor.autostart.isSelected()).isTrue();
-        editor.name.setText("TAKEN");
-        editor.save.doClick();
-        assertThat(editor.message.getText()).isEqualTo("A server named taken exists");
-        editor.name.setText("docs");
-        editor.save.doClick();
-        assertThat(saved).singleElement().isEqualTo(original);
+            Optional.empty(), true, new Login.Vault(UUID.randomUUID()), List.of(), true, false, true);
+        var editor = editor(Set.of(Protocol.HTTP, Protocol.FTP), Optional.of(original), true, ServerEditor.KeySources.NONE,
+            List.of(other, original), false, List.of(new ServerAddresses.Nic("en0", true, false, false,
+                List.of(InetAddress.getByName("192.168.1.20")))));
+        assertThat(((Nodes.Choice) node(editor, ServerEditor.PROTOCOL)).state().enabled()).isFalse();
+        assertThat(((Nodes.Choice) node(editor, ServerEditor.REACHABLE)).options())
+            .anyMatch(option -> option.label().equals("en9 (not available)"));
+        assertThat(((Nodes.Choice) node(editor, ServerEditor.REACHABLE)).options())
+            .anyMatch(option -> option.label().equals("en0 (192.168.1.20)"));
+        assertThat(((Nodes.Toggle) node(editor, ServerEditor.AUTOSTART)).checked()).isTrue();
+        choose(editor, ServerEditor.PROTOCOL, "FTP");
+        assertThat(((Nodes.Choice) node(editor, ServerEditor.PROTOCOL)).selectedId()).isEqualTo("HTTP");
+        edit(editor, ServerEditor.NAME, "TAKEN"); action(editor, ServerEditor.SAVE);
+        assertThat(message(editor)).isEqualTo("A server named taken exists");
+        edit(editor, ServerEditor.NAME, "docs"); action(editor, ServerEditor.SAVE);
+        assertThat(saved).containsExactly(original);
     }
 
-    @Test void onLinuxAPrivilegedPortGetsAHint() throws Exception {
-        var linux = editor(Optional.empty(), false, true, true, List.of());
-        linux.port.setText("80");
-        assertThat(linux.portHint.getText()).isEqualTo("Ports below 1024 need root or CAP_NET_BIND_SERVICE on Linux — try 8080");
-        linux.port.setText("8080");
-        assertThat(linux.portHint.getText().isBlank()).isTrue();
-        var mac = editor(Optional.empty(), false, true, false, List.of());
-        mac.port.setText("80");
-        assertThat(mac.portHint.getText().isBlank()).isTrue();
-    }
-
-    ServerEditor ftpEditor(Optional<ServerDefinition> initial, boolean existing) {
-        return new ServerEditor(List.of(), initial, existing, Set.of(Protocol.HTTP, Protocol.FTP), List.of(), false,
-            id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), () -> Optional.of(folder), false,
-            saved::add, () -> cancelled = true);
-    }
-
-    @Test void ftpOffersTlsAndAPassiveRange() {
-        var editor = ftpEditor(Optional.empty(), false);
-        assertThat(editor.protocol.getSelectedItem()).isEqualTo(Protocol.HTTP);
-        assertThat(editor.useTls.isEnabled()).as("HTTP can use TLS").isTrue();
-        assertThat(editor.requireTls.isEnabled()).as("only FTP requires TLS").isFalse();
-        assertThat(editor.passive.isEnabled()).as("only FTP has passive ports").isFalse();
-        editor.protocol.setSelectedItem(Protocol.FTP);
-        assertThat(editor.port.getText()).isEqualTo("2121");
-        assertThat(editor.session.isSelected()).as("no Vault: a session password").isTrue();
-        assertThat(editor.passive.isEnabled()).isTrue();
-        assertThat(editor.warnings.getText()).isEqualTo("\u26a0 Plain FTP sends the password unencrypted");
-        assertThat(editor.requireTls.isEnabled()).as("needs Use TLS").isFalse();
-        editor.useTls.doClick();
-        assertThat(editor.requireTls.isEnabled()).isTrue();
-        assertThat(editor.warnings.getText()).isEqualTo(" ");
-        editor.requireTls.doClick();
-        editor.name.setText("drop");
-        editor.folder.setText(folder.toString());
-        editor.passive.setText("60000-50000");
-        editor.save.doClick();
-        assertThat(editor.message.getText()).isEqualTo("A port range runs from a lower to a higher port, 1 to 65535");
+    @Test void ftpRangeValidationTlsDependencyAndEditRoundTrip() {
+        var editor = editor(Set.of(Protocol.HTTP, Protocol.FTP));
+        choose(editor, ServerEditor.PROTOCOL, "FTP");
+        assertThat(((Nodes.Field) node(editor, ServerEditor.PASSIVE)).state().enabled()).isTrue();
+        assertThat(((Nodes.Toggle) node(editor, ServerEditor.REQUIRE_TLS)).state().enabled()).isFalse();
+        assertThat(notice(editor)).contains("Plain FTP sends the password unencrypted");
+        toggle(editor, ServerEditor.TLS, true);
+        assertThat(((Nodes.Toggle) node(editor, ServerEditor.REQUIRE_TLS)).state().enabled()).isTrue();
+        toggle(editor, ServerEditor.REQUIRE_TLS, true);
+        basic(editor); edit(editor, ServerEditor.PASSIVE, "60000-50000"); action(editor, ServerEditor.SAVE);
+        assertThat(message(editor)).contains("lower to a higher port");
         assertThat(saved).isEmpty();
-        editor.passive.setText(" 51000-51010 ");
-        editor.save.doClick();
-        assertThat(saved).singleElement().satisfies(definition -> {
-            assertThat(definition.protocol()).isEqualTo(Protocol.FTP);
-            assertThat(definition.tls()).isTrue();
-            assertThat(definition.requireTls()).isTrue();
-            assertThat(definition.passiveRange()).contains(new PortRange(51000, 51010));
-            assertThat(definition.login()).isEqualTo(Login.SESSION);
-        });
-        editor.useTls.doClick();
-        assertThat(editor.requireTls.isSelected()).as("Require TLS goes with Use TLS").isFalse();
-        assertThat(editor.requireTls.isEnabled()).isFalse();
+        edit(editor, ServerEditor.PASSIVE, " 51000-51010 "); action(editor, ServerEditor.SAVE);
+        var definition = saved.getLast();
+        assertThat(definition.passiveRange()).contains(new PortRange(51000, 51010));
+        assertThat(definition.tls()).isTrue();
+        assertThat(definition.requireTls()).isTrue();
+        var edited = editor(Set.of(Protocol.HTTP, Protocol.FTP), Optional.of(definition), false, ServerEditor.KeySources.NONE);
+        assertThat(field(edited, ServerEditor.PASSIVE)).isEqualTo("51000-51010");
+        assertThat(((Nodes.Toggle) node(edited, ServerEditor.TLS)).checked()).isTrue();
+        assertThat(((Nodes.Toggle) node(edited, ServerEditor.REQUIRE_TLS)).checked()).isTrue();
+        action(edited, ServerEditor.SAVE);
+        assertThat(saved.getLast()).isEqualTo(definition);
+        toggle(editor, ServerEditor.TLS, false);
+        assertThat(((Nodes.Toggle) node(editor, ServerEditor.REQUIRE_TLS)).checked()).isTrue();
+        assertThat(((Nodes.Toggle) node(editor, ServerEditor.REQUIRE_TLS)).state().enabled()).isFalse();
     }
 
-    @Test void anEmptyPassiveRangeUsesTheSetting() {
-        var editor = ftpEditor(Optional.empty(), false);
-        editor.protocol.setSelectedItem(Protocol.FTP);
-        editor.name.setText("plain");
-        editor.folder.setText(folder.toString());
-        editor.save.doClick();
-        assertThat(saved).singleElement().satisfies(definition -> {
-            assertThat(definition.passiveRange()).isEmpty();
-            assertThat(definition.tls()).isFalse();
-        });
+    @Test void sftpKeyDedupRemovalMalformedFeedbackAndKeysOnlyValidation() {
+        var editor = editor(Set.of(Protocol.SFTP), Optional.empty(), false,
+            new ServerEditor.KeySources(() -> Optional.of("# keys\n" + ED25519 + "\n" + ED25519), () -> Optional.of(ECDSA)));
+        action(editor, ServerEditor.ADD_KEY); action(editor, ServerEditor.PASTE_KEY);
+        assertThat(((Nodes.ItemList) node(editor, ServerEditor.KEYS)).items()).hasSize(2);
+        emit(editor, new UiEvent.Selected(ServerEditor.KEYS, Set.of("key.0")));
+        action(editor, ServerEditor.REMOVE_KEY);
+        assertThat(((Nodes.ItemList) node(editor, ServerEditor.KEYS)).items()).hasSize(1);
+        basic(editor); choose(editor, ServerEditor.LOGIN, "anon"); action(editor, ServerEditor.SAVE);
+        assertThat(saved.getLast().authorizedKeys()).containsExactly(ECDSA);
+        var edited = editor(Set.of(Protocol.SFTP), Optional.of(saved.getLast()), false, ServerEditor.KeySources.NONE);
+        action(edited, ServerEditor.SAVE);
+        assertThat(saved.getLast()).isEqualTo(saved.get(saved.size() - 2));
+        var bad = editor(Set.of(Protocol.SFTP), Optional.empty(), false,
+            new ServerEditor.KeySources(() -> Optional.of("not a key"), Optional::empty));
+        action(bad, ServerEditor.ADD_KEY);
+        assertThat(message(bad)).contains("Not an OpenSSH public key");
+        action(bad, ServerEditor.PASTE_KEY);
+        basic(bad); choose(bad, ServerEditor.LOGIN, "anon"); action(bad, ServerEditor.SAVE);
+        assertThat(message(bad)).isEqualTo("SFTP needs a password or authorized keys");
     }
 
-    @Test void editingAnFtpServerKeepsItsTlsAndRange() {
-        var original = new ServerDefinition(UUID.randomUUID(), "drop", Protocol.FTP, folder, Bind.LOOPBACK, 2121,
-            Optional.of(new PortRange(52000, 52005)), true, Login.SESSION, List.of(), true, true, false);
-        var editor = ftpEditor(Optional.of(original), true);
-        assertThat(editor.passive.getText()).isEqualTo("52000-52005");
-        assertThat(editor.useTls.isSelected()).isTrue();
-        assertThat(editor.requireTls.isSelected()).isTrue();
-        assertThat(editor.requireTls.isEnabled()).isTrue();
-        editor.save.doClick();
-        assertThat(saved).singleElement().isEqualTo(original);
+    @Test void underClassicTheAuthorizedKeysAreATable() {
+        var events = new java.util.ArrayList<String>();
+        var holder = new java.util.concurrent.atomic.AtomicReference<ServerEditor>();
+        UiTestAccess.edt(() -> holder.set(new ServerEditor(new dev.jasper.sdk.testing.FakeKit("dev.jasper.fileserver"), java.util.List.of(),
+            java.util.Optional.empty(), false, java.util.Set.of(dev.jasper.fileserver.definition.Protocol.SFTP), java.util.List.of(), false,
+            id -> java.util.Optional.empty(), () -> java.util.concurrent.CompletableFuture.completedFuture(java.util.Optional.empty()),
+            java.util.Optional::empty, new ServerEditor.KeySources(() -> java.util.Optional.of(ED25519), java.util.Optional::empty), false,
+            definition -> events.add("save"), () -> events.add("cancel")).layout(dev.jasper.fileserver.workstation.Layout.CLASSIC)));
+        var editor = holder.get();
+        var view = (dev.jasper.sdk.testing.FakeKitView) editor.view();
+        var keys = (dev.jasper.sdk.ui.Nodes.Table) UiTestAccess.node(view, ServerEditor.KEYS);
+        assertThat(keys.columns()).extracting(column -> column.title()).containsExactly("Type", "Fingerprint", "Comment");
+        assertThat(keys.emptyText()).isEqualTo("No keys added");
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Action(ServerEditor.ADD_KEY)));
+        keys = (dev.jasper.sdk.ui.Nodes.Table) UiTestAccess.node(view, ServerEditor.KEYS);
+        assertThat(keys.rows()).singleElement().satisfies(row -> {
+            assertThat(row.id()).isEqualTo("key.0");
+            assertThat(row.cells()).containsEntry("type", "ssh-ed25519").containsEntry("comment", "alice@laptop");
+            assertThat(row.cells().get("fingerprint")).startsWith("SHA256:");
+        });
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Selected(ServerEditor.KEYS, java.util.Set.of("key.0"))));
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Action(ServerEditor.REMOVE_KEY)));
+        assertThat(((dev.jasper.sdk.ui.Nodes.Table) UiTestAccess.node(view, ServerEditor.KEYS)).rows()).isEmpty();
+    }
+
+    @Test void linuxPortHintAndRiskySharingWarningsTrackChoices() {
+        var editor = editor(Set.of(Protocol.HTTP), Optional.empty(), true, ServerEditor.KeySources.NONE,
+            List.of(), true, List.of());
+        edit(editor, ServerEditor.PORT, "80");
+        assertThat(text(editor, "server.port.hint")).contains("root or CAP_NET_BIND_SERVICE");
+        edit(editor, ServerEditor.PORT, "8080");
+        assertThat(node(editor, "server.port.hint").state().visible()).isFalse();
+        choose(editor, ServerEditor.LOGIN, "vault");
+        assertThat(notice(editor)).contains("Plain HTTP sends the password unencrypted");
+        toggle(editor, ServerEditor.WRITABLE, true);
+        choose(editor, ServerEditor.REACHABLE, "bind.1");
+        assertThat(notice(editor)).contains("Writable and reachable from other computers");
     }
 }

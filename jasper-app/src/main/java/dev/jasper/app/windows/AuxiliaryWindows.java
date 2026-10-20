@@ -14,12 +14,30 @@ public final class AuxiliaryWindows implements AutoCloseable {
     private final UiState state;
     private final Function<AuxiliarySurface, AuxiliarySurface.Shell> shells;
     private final List<AuxiliarySurface> open = new ArrayList<>();
+    /** The look's mapping: classic overlays and sheets, and dialogs a native title bar titles. */
+    private final boolean classic, windowTitled;
+    private final dev.jasper.app.presentation.DialogMapping dialogs;
+
+    /** The look's dialog mapping these windows were made with (spec 4.9; {@code PresentationReachTest}). */
+    public dev.jasper.app.presentation.DialogMapping dialogs() { return dialogs; }
 
     public AuxiliaryWindows(UiState state, Function<AuxiliarySurface, AuxiliarySurface.Shell> shells) {
         this(state, shells, (choice, cancellation) -> List.of());
     }
 
     public AuxiliaryWindows(UiState state, Function<AuxiliarySurface, AuxiliarySurface.Shell> shells, PathChooser chooser) {
+        this(state, shells, chooser, new dev.jasper.app.presentation.DialogMapping(dev.jasper.app.presentation.DialogMapping.Kind.AS_REQUESTED, false));
+    }
+
+    /**
+     * As above, under the look's dialog mapping (Enterprise presentation spec 10.8): the one reader of
+     * {@code DialogMapping}, it marks every surface it makes, so plugin and app dialogs share the classic path.
+     */
+    public AuxiliaryWindows(UiState state, Function<AuxiliarySurface, AuxiliarySurface.Shell> shells, PathChooser chooser,
+                            dev.jasper.app.presentation.DialogMapping dialogs) {
+        this.dialogs = Objects.requireNonNull(dialogs);
+        this.classic = dialogs.kind() == dev.jasper.app.presentation.DialogMapping.Kind.CLASSIC;
+        this.windowTitled = dialogs.windowTitled();
         this.chooser = Objects.requireNonNull(chooser);
         this.state = Objects.requireNonNull(state);
         this.shells = Objects.requireNonNull(shells);
@@ -30,6 +48,17 @@ public final class AuxiliaryWindows implements AutoCloseable {
         if (choice.auxiliaryOwner() != null && (!open.contains(choice.auxiliaryOwner()) || !choice.auxiliaryOwner().shown()))
             throw new IllegalArgumentException("Picker requires a shown, open owner");
         return List.copyOf(chooser.choose(choice, cancellation));
+    }
+
+    /**
+     * File › Open File…'s chooser: one existing local file, chosen over terminal window {@code window} and starting in
+     * {@code folder} when its pane has one; empty when cancelled. EDT.
+     */
+    public java.util.Optional<java.nio.file.Path> openFile(UUID window, java.util.Optional<java.nio.file.Path> folder) {
+        var choice = new PathChoice(window, null, "Open File", java.util.Optional.empty(), PathChoice.Mode.OPEN, false,
+            folder.map(dev.jasper.app.files.Location::local), java.util.Optional.empty(), List.of());
+        return choose(choice, cancel -> { }).stream().filter(dev.jasper.app.files.Location::isLocal)
+            .map(dev.jasper.app.files.Location::localPath).findFirst();
     }
 
     public AuxiliarySurface window(String id, String title, Dimension preferred, boolean singleton) {
@@ -49,6 +78,15 @@ public final class AuxiliaryWindows implements AutoCloseable {
         return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.DIALOG, modal, new Dimension(1, 1), null, owner, shells));
     }
 
+    /** A checked control attachment resolves to its actual containing native surface, including a modal dialog. */
+    public AuxiliarySurface dialog(String title, boolean modal, javax.swing.JComponent anchor) {
+        for(var surface:open) if(surface.shown() && javax.swing.SwingUtilities.isDescendingFrom(anchor,surface.holder()))
+            return dialog(title,modal,surface);
+        if(!anchor.isShowing())throw new IllegalArgumentException("Anchor has no shown owner");
+        var result=new AuxiliarySurface("",title,AuxiliarySurface.Kind.DIALOG,modal,new Dimension(1,1),null,null,shells);
+        result.anchorOwner(anchor);return track(result);
+    }
+
     /**
      * A modal dialog that remembers its bounds under {@code id}: over the terminal window {@code ownerWindowOrNull}, or
      * application-modal with no owner when it is null. Showing it blocks until it closes.
@@ -58,14 +96,38 @@ public final class AuxiliaryWindows implements AutoCloseable {
         return track(new AuxiliarySurface(id, title, AuxiliarySurface.Kind.DIALOG, true, preferred, ownerWindowOrNull, null, shells));
     }
 
-    /** Reserves one overlay per terminal owner, including surfaces not shown yet. */
+    /** Reserves one progress overlay per terminal owner, including surfaces not shown yet; modal overlays may stack over it. */
     public AuxiliarySurface overlay(String title, UUID ownerWindow) {
         Objects.requireNonNull(ownerWindow);
-        if (open.stream().anyMatch(surface -> surface.kind() == AuxiliarySurface.Kind.OVERLAY
+        if (open.stream().anyMatch(surface -> surface.kind() == AuxiliarySurface.Kind.OVERLAY && !surface.modal()
                 && surface.ownerWindow().filter(ownerWindow::equals).isPresent()))
             throw new IllegalStateException("This window already has an overlay");
         return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, false,
             new Dimension(1, 1), ownerWindow, null, shells));
+    }
+
+    /**
+     * A modal overlay over the terminal window {@code ownerWindow}: a dialog presented inside the window, over a
+     * dimmed scrim. It may stack over the window's progress overlay. Showing it blocks until it closes.
+     */
+    public AuxiliarySurface modalOverlay(String title, UUID ownerWindow) {
+        return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, true, new Dimension(1, 1),
+            Objects.requireNonNull(ownerWindow), null, shells));
+    }
+
+    /** A modal overlay inside the open auxiliary window or dialog {@code owner}; it closes with it. */
+    public AuxiliarySurface modalOverlay(String title, AuxiliarySurface owner) {
+        if (owner.closed() || !open.contains(owner)) throw new IllegalArgumentException("An overlay needs an open owner window");
+        return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, true, new Dimension(1, 1), null, owner, shells));
+    }
+
+    /** A modal overlay inside the window that holds the checked control {@code anchor}. */
+    public AuxiliarySurface modalOverlay(String title, javax.swing.JComponent anchor) {
+        for (var surface : open) if (surface.shown() && javax.swing.SwingUtilities.isDescendingFrom(anchor, surface.holder()))
+            return modalOverlay(title, surface);
+        if (!anchor.isShowing()) throw new IllegalArgumentException("Anchor has no shown owner");
+        var result = new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, true, new Dimension(1, 1), null, null, shells);
+        result.anchorOwner(anchor); return track(result);
     }
 
     /** Removes terminal-owned surfaces even if they have never been shown. */
@@ -81,6 +143,9 @@ public final class AuxiliaryWindows implements AutoCloseable {
     private boolean emptyReported = true;
 
     private AuxiliarySurface track(AuxiliarySurface surface) {
+        surface.classic(classic);
+        // A dialog under a title bar the system draws, and an overlay should it open as one (spec 10.8).
+        if (surface.kind() != AuxiliarySurface.Kind.WINDOW) surface.hostTitled(windowTitled);
         boolean first = open.isEmpty();
         open.add(surface);
         emptyReported = false;

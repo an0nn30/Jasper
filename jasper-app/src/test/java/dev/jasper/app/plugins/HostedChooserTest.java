@@ -23,7 +23,7 @@ class HostedChooserTest {
     private final TerminalFixture fixture = new TerminalFixture();
     private final HostedTerminals terminals = new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", Set.of()),
         fixture.registry, Runnable::run, () -> true, () -> true,
-        new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null));
+        new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null, name -> new javax.swing.ImageIcon()));
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final AtomicReference<Runnable> during = new AtomicReference<>(() -> {});
     private final AtomicBoolean disposed = new AtomicBoolean();
@@ -38,6 +38,24 @@ class HostedChooserTest {
             return chosenLocations != null ? chosenLocations : selected.stream().map(Location::local).toList(); });
     private final HostedUi ui = new HostedUi("dev.x.tool", contributions, new Containment(() -> true),
         Runnable::run, () -> true, open::get, getClass().getClassLoader(), () -> Variant.DARK, h -> () -> {}, windows, terminals);
+
+    @Test void ownedDocumentPinsAcrossChooserAndOwnerClosureDiscardsResult() {
+        var containment=new Containment(() -> true);
+        var kit=new HostedKit("dev.x.tool",open::get,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
+        contributions.content().setFactory(separate -> {
+            UUID id=fixture.addWindow();contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(id,separate,e -> {},e -> {},e -> {},() -> {}));return id;
+        });
+        var disposed=new java.util.concurrent.atomic.AtomicInteger();
+        var view=kit.create(HostedKitTest.custom(dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"doc"),e -> {});
+        view.registerContent(new dev.jasper.sdk.ui.CustomContent("doc",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),disposed::incrementAndGet));
+        var tab=ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("doc","Document"),null,view);
+        during.set(() -> {tab.move(true);assertThat(tab.isSeparate()).isFalse();assertThat(tab.requestClose().join()).isFalse();});
+        assertThat(ui.windows().chooseFiles(tab,"Choose",Optional.empty())).hasSize(2);
+        tab.move(true);assertThat(tab.isSeparate()).isTrue();
+        during.set(tab::close);
+        assertThat(ui.windows().chooseFiles(tab,"Choose",Optional.empty())).isEmpty();
+        assertThat(disposed.get()).isEqualTo(1);kit.close();ui.closeAll();
+    }
 
     @Test void terminalOwnerSelectsMultipleFilesOrOneDirectory() {
         var owner = terminals.windowHandle(fixture.addWindow());
@@ -78,7 +96,7 @@ class HostedChooserTest {
     @Test void foreignAndDeadOwnersAreRejectedBeforeOpening() {
         var foreign = new TerminalFixture();
         var other = new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", Set.of()), foreign.registry,
-            Runnable::run, () -> true, () -> true, new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null));
+            Runnable::run, () -> true, () -> true, new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null, name -> new javax.swing.ImageIcon()));
         assertThatIllegalArgumentException().isThrownBy(() -> ui.windows().chooseFiles(other.windowHandle(foreign.addWindow()), "Upload", Optional.empty()));
         assertThatIllegalArgumentException().isThrownBy(() -> ui.windows().chooseFiles(terminals.windowHandle(UUID.randomUUID()), "Upload", Optional.empty()));
         assertThat(requests).isEmpty();

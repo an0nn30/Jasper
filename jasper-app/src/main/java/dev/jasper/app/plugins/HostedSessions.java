@@ -24,12 +24,14 @@ import java.util.function.Function;
  */
 final class HostedSessions {
     private final String pluginId;
+    private final Function<String,javax.swing.Icon> icons;
     private final Containment containment;
     private final Executor cleanup;
     private final Function<UUID, PaneHandle> panes;
     private final List<SessionAttempt> pending = new ArrayList<>();
 
-    HostedSessions(String pluginId, Containment containment, Executor cleanup, Function<UUID, PaneHandle> panes) {
+    HostedSessions(String pluginId, Containment containment, Executor cleanup, Function<UUID, PaneHandle> panes, Function<String,javax.swing.Icon> icons) {
+        this.icons=icons;
         this.pluginId = pluginId; this.containment = containment; this.cleanup = cleanup; this.panes = panes;
     }
 
@@ -40,7 +42,7 @@ final class HostedSessions {
             track(attempt);
             Throwable failure = containment.attempt(pluginId, "session connector", () -> { spec.connector().accept(new Pending(attempt)); return null; });
             if (failure != null) attempt.fail(failure.getMessage() == null ? failure.toString() : failure.getMessage());
-        }, contained, spec.icon().orElse(null));
+        }, contained, spec.icon().map(icons).orElse(null));
     }
 
     private void track(SessionAttempt attempt) {

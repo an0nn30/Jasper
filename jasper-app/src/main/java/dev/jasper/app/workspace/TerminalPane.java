@@ -1,7 +1,16 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeStyles;
+
 import dev.jasper.app.config.ShellExitBehavior;
+import dev.jasper.app.config.FontConfig;
+import dev.jasper.app.platform.BundledFonts;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.launch.ShellProfiles;
+import dev.jasper.app.launch.UncHosts;
 import dev.jasper.terminal.config.Palette;
 import dev.jasper.terminal.config.TerminalOptions;
 import dev.jasper.terminal.session.TerminalSession;
@@ -29,8 +38,9 @@ import javax.swing.*;
 /** Exactly one asynchronously launched shell and its retained output. Owned on the EDT. */
 public final class TerminalPane extends JPanel implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(TerminalPane.class.getName());
-    static final float DEFAULT_FONT_SIZE = 16f;
+    static final float DEFAULT_FONT_SIZE = FontConfig.defaults().size();
     static final int PADDING = 4;
+    private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
     private final UUID id = UUID.randomUUID();
     private final Path launchDirectory;
     /**
@@ -41,6 +51,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     /** The profile this local pane asked for (empty: the user's default), and the one its launch resolved to. */
     private final Optional<String> requestedProfile;
     private Optional<String> launchedProfile = Optional.empty();
+    /** The program this local pane runs instead of the shell; such a pane closes when it exits with status 0. */
+    private final Optional<java.util.List<String>> program;
     private final ShellLauncher launcher;
     private final AtomicBoolean updateQueued = new AtomicBoolean();
     private volatile String shellLabel;
@@ -180,23 +192,39 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
      * {@code directory} means nobody asked for one: the pane starts where a new shell starts.
      */
     TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull, Optional<String> profile) {
+        this(directory, launcher, requestOrNull, profile, Optional.empty());
+    }
+
+    /**
+     * As above; {@code program} runs instead of a local pane's shell. Such a pane closes when its program exits with
+     * status 0 and stays open otherwise, whatever {@code terminal.on_exit} says.
+     */
+    TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull, Optional<String> profile,
+                 Optional<java.util.List<String>> program) {
         super(new BorderLayout());
         this.defaultDirectory = directory == null || requestOrNull != null;
         this.launchDirectory = directory == null ? Path.of(System.getProperty("user.home")) : directory;
         this.launcher = launcher;
         this.requestedProfile = java.util.Objects.requireNonNull(profile, "profile");
+        this.program = java.util.Objects.requireNonNull(program, "program");
+        if (program.isPresent()) onExit = ShellExitBehavior.CLOSE_ON_SUCCESS;
         this.request = requestOrNull;
         this.shellLabel = requestOrNull == null ? launcher.label() : requestOrNull.title();
         if (requestOrNull != null) reportedTitle = requestOrNull.title();
         setPreferredSize(new Dimension(958, 821));
         setFocusable(true);
-        add(new JLabel("Starting terminal…", SwingConstants.CENTER));
-        setBackground(UIManager.getColor("Panel.background"));
+        var starting = new JLabel("Starting terminal…", SwingConstants.CENTER);
+        NativeStyles.installed().label(starting, dev.jasper.ui.metrics.Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY, () -> ThemeZone.theme(this));
+        add(starting);
+        setBackground(ThemeZone.color(null, SemanticColor.SURFACE_PANEL));
         noticeLabel.putClientProperty("html.disable", Boolean.TRUE);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
+        NativeStyles.installed().label(noticeLabel, dev.jasper.ui.metrics.Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY, () -> ThemeZone.theme(this));
+        var buttons = new JPanel(new FlowLayout(FlowLayout.TRAILING, NativeStyles.installed().metric(DesignMetrics.Role.NOTICE_BUTTON_GAP), 0));
         buttons.setOpaque(false);
         buttons.add(noticeSecondary); buttons.add(noticePrimary);
-        notice.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        notice.setBorder(NativeStyles.installed().padding(DesignMetrics.Role.NOTICE_VERTICAL_PADDING, DesignMetrics.Role.NOTICE_HORIZONTAL_PADDING));
+        NativeStyles.installed().framedButton(noticePrimary, () -> ThemeZone.theme(this));
+        NativeStyles.installed().framedButton(noticeSecondary, () -> ThemeZone.theme(this));
         notice.add(noticeLabel, BorderLayout.CENTER);
         notice.add(buttons, BorderLayout.EAST);
         noticePrimary.addActionListener(event -> primaryAction.run());
@@ -219,7 +247,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     void start() {
         if (request != null) { connect(); return; }
         ShellLauncher.Launch launched = launcher.launch(defaultDirectory ? Optional.empty() : Optional.of(launchDirectory),
-                requestedProfile, replaced -> {
+                requestedProfile, program, Optional.of(id), replaced -> {
             // Detection showed the profile resolved before it completed is missing: the default starts instead.
             if (closed) return;
             shellLabel = replaced.label();
@@ -233,6 +261,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
                 while (cause.getCause() != null) cause = cause.getCause();
                 removeAll();
                 var message = new JLabel("Could not start terminal: " + cause.getMessage());
+                NativeStyles.installed().label(message, dev.jasper.ui.metrics.Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY, () -> ThemeZone.theme(this));
                 message.setForeground(getForeground()); add(message);
                 revalidate(); repaint();
                 onFailure.accept("Could not start terminal in " + launchDirectory + ":\n" + cause.getMessage(), failure);
@@ -378,7 +407,10 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     }
 
     private static TerminalOptions applicationOptions() {
-        return TerminalOptions.defaults().toBuilder().fontSize(DEFAULT_FONT_SIZE).build();
+        BundledFonts.register();
+        FontConfig font = FontConfig.defaults();
+        return TerminalOptions.defaults().toBuilder().fontFamily(font.family()).fontSize(font.size())
+            .fallbackFonts(font.fallback()).ligatures(font.ligatures()).lineHeight(font.lineHeight()).build();
     }
 
     private void trackFocus(Component component) {
@@ -461,14 +493,31 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     public Path directory() { return session == null ? launchDirectory : session.workingDirectory().orElse(launchDirectory); }
 
     /**
+     * The local directory a relative path printed in this pane is relative to: the one the shell last reported, else the
+     * one the pane started in. Empty for a provided session, and while the shell reports a directory on another host,
+     * since nothing printed there is a path on this machine.
+     */
+    Optional<Path> localDirectory() {
+        PaneSnapshot now = snapshot();
+        if (now.providerId().isPresent() || now.remoteDirectory().isPresent()) return Optional.empty();
+        return Optional.of(directory());
+    }
+
+    /**
      * Where a split of this pane, or a tab or window opened from it, starts: the directory the shell reported, else
      * the one it was asked to start in; null when it started where a new shell starts and has reported nothing, so
-     * the new pane does too (a WSL profile then opens its Linux home, not {@code /mnt/c/Users/NAME}).
+     * the new pane does too (a WSL profile then opens its Linux home, not {@code /mnt/c/Users/NAME}). Null too on
+     * Windows for a directory on a UNC host other than a WSL pane's WSL share ({@link UncHosts}): any program can report
+     * one, and a shell started there would make Windows authenticate to that host.
      */
     Path inheritableDirectory() {
         Optional<Path> reported = session == null ? Optional.empty() : session.workingDirectory();
-        return reported.orElse(defaultDirectory ? null : launchDirectory);
+        Path directory = reported.orElse(defaultDirectory ? null : launchDirectory);
+        return directory != null && WINDOWS && UncHosts.namesForeignHost(directory.toString(), wsl()) ? null : directory;
     }
+
+    /** Whether this pane's launch started a WSL profile, so that this machine's WSL shares are real here. */
+    boolean wsl() { return launchedProfile.filter(id -> id.startsWith(ShellProfiles.WSL_PREFIX)).isPresent(); }
     String title() {
         return TerminalTitle.singleLine(!reportedTitle.isBlank() ? reportedTitle : runningCommand.strip());
     }
@@ -493,9 +542,13 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         if (view != null) view.setInactiveDim(selected ? 0 : configuredDim);
     }
 
-    /** Only future exit deliveries use this policy; retained output is never closed retroactively. */
+    /**
+     * Only future exit deliveries use this policy; retained output is never closed retroactively. A program pane keeps
+     * its close-on-success policy.
+     */
     void setShellExitBehavior(ShellExitBehavior behavior) {
-        onExit = java.util.Objects.requireNonNull(behavior);
+        java.util.Objects.requireNonNull(behavior);
+        if (program.isEmpty()) onExit = behavior;
     }
 
     void setConfiguredDim(float amount) {
@@ -545,7 +598,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         closedHook.run();
         if (findBar != null) findBar.dispose();
         if (view != null) {
-            view.setShortcutHandler(null); view.setContextMenuHandler(null); view.setOnCloseRequest(() -> {});
+            view.setShortcutHandler(null); view.setContextMenuHandler(null); view.setFileLinkHandler(null); view.setOnCloseRequest(() -> {});
         }
         if (attempt != null) attempt.cancel();
         droppedTimer.stop();

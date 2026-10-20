@@ -44,18 +44,20 @@ class HttpEngineReadTest {
         shared = Files.createDirectories(temp.resolve("shared"));
         Files.createDirectories(shared.resolve("docs"));
         Files.writeString(shared.resolve("docs/a.txt"), "hello");
-        Files.writeString(shared.resolve("x & <y>.txt"), "odd");
+        // Every platform can store this name; Windows forbids < and > (HttpPathsTest escapes those).
+        Files.writeString(shared.resolve("x & 'y'.txt"), "odd");
         Files.writeString(temp.resolve("outside.txt"), "secret");
     }
 
     @AfterEach void stop() { if (engine != null) engine.stop(); }
 
     HttpEngine start(ResolvedLogin login) throws Exception {
-        var definition = ServerDefinition.create("docs", Protocol.HTTP, shared);
-        definition = new ServerDefinition(definition.id(), definition.name(), definition.protocol(), definition.folder(), definition.bind(),
-            Ports.free(), definition.passiveRange(), false, definition.login(), List.of(), false, false, false);
-        engine = new HttpEngine(definition, new ShareRoot(shared, true), login, new ServerEvents(Clock.systemUTC(), events::add), throttle, List::of);
-        engine.start();
+        engine = Ports.start(port -> {
+            var definition = ServerDefinition.create("docs", Protocol.HTTP, shared);
+            definition = new ServerDefinition(definition.id(), definition.name(), definition.protocol(), definition.folder(), definition.bind(),
+                port, definition.passiveRange(), false, definition.login(), List.of(), false, false, false);
+            return new HttpEngine(definition, new ShareRoot(shared, true), login, new ServerEvents(Clock.systemUTC(), events::add), throttle, List::of);
+        });
         return engine;
     }
 
@@ -77,8 +79,8 @@ class HttpEngineReadTest {
         start(ResolvedLogin.anonymous());
         var response = get("/");
         assertThat(response.statusCode()).isEqualTo(200);
-        assertThat(response.body()).contains("x &amp; &lt;y&gt;.txt", "href=\"/x%20%26%20%3Cy%3E.txt\"", "href=\"/docs/\"")
-            .doesNotContain("<y>").doesNotContain("enctype");
+        assertThat(response.body()).contains("x &amp; &#39;y&#39;.txt", "href=\"/x%20%26%20%27y%27.txt\"", "href=\"/docs/\"")
+            .doesNotContain("'y'").doesNotContain("enctype");
         assertThat(response.body().indexOf("docs/")).as("folders first").isLessThan(response.body().indexOf("x &amp;"));
         assertThat(response.headers().firstValue("Content-Security-Policy")).get().asString().contains("default-src 'none'");
         assertThat(response.headers().firstValue("X-Content-Type-Options")).contains("nosniff");

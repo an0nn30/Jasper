@@ -181,4 +181,42 @@ class ApplicationIconTest {
         }
         return -1;
     }
+
+    /** Spec 10.11: a branded look's icons stand in for Jasper's; one that does not decode is left out (Review Focus 2). */
+    @Test void aBrandedLooksIconsStandInForJaspersAndAFileThatDoesNotDecodeIsLeftOut() throws Exception {
+        byte[] truncated = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R', 0, 0, 0, 48, 0, 0, 0, 48};
+        try {
+            ApplicationIcon.useLook(java.util.List.of(png(16), truncated, png(32)));
+            assertThat(ApplicationIcon.branded()).isTrue();
+            assertThat(ApplicationIcon.images()).extracting(image -> image.getWidth(null)).containsExactly(16, 32);
+            var first = ApplicationIcon.images();
+            ApplicationIcon.useLook(java.util.List.of(png(16), truncated, png(32)));
+            assertThat(ApplicationIcon.images()).as("the same files change nothing").isSameAs(first);
+            ApplicationIcon.useLook(java.util.List.of(truncated));
+            assertThat(ApplicationIcon.branded()).as("nothing decoded: Jasper's icons stay").isFalse();
+            assertThat(ApplicationIcon.images()).extracting(image -> image.getWidth(null)).contains(16, 32, 256);
+            ApplicationIcon.useLook(java.util.List.of(png(16)));
+            ApplicationIcon.useLook(java.util.List.of());
+            assertThat(ApplicationIcon.branded()).as("an empty list is Jasper's icons again").isFalse();
+            ApplicationIcon.installTaskbarIcon(); // No native calls in headless test mode.
+        } finally {
+            ApplicationIcon.useLook(java.util.List.of());
+        }
+    }
+
+    /** Spec 10.11: a look's icon reaches the Dock in a packaged macOS launch too, and Jasper's goes back over it. */
+    @Test void aLooksIconIsSetOnTheTaskbarEvenInAPackagedMacLaunch() {
+        String packaged = "/Applications/Jasper.app/Contents/MacOS/Jasper";
+        assertThat(ApplicationIcon.setsTaskbarIcon(true, packaged, true)).isTrue();
+        assertThat(ApplicationIcon.setsTaskbarIcon(true, packaged, false)).isFalse();
+        assertThat(ApplicationIcon.setsTaskbarIcon(true, null, false)).isTrue();
+        assertThat(ApplicationIcon.setsTaskbarIcon(false, "/opt/jasper/bin/Jasper", false)).isTrue();
+    }
+
+    private static byte[] png(int size) throws java.io.IOException {
+        var image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        var bytes = new java.io.ByteArrayOutputStream();
+        ImageIO.write(image, "png", bytes);
+        return bytes.toByteArray();
+    }
 }

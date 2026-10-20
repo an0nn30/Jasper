@@ -49,6 +49,7 @@ public final class PluginManager {
     private final AuxiliaryWindows windows;
     private final Hooks hooks;
     private Supplier<AuxiliarySurface> host;
+    private Supplier<dev.jasper.ui.swing.KitContext> kit;
     private java.util.function.Consumer<String> navigate = id -> { };
     private PluginManagerPanel panel;
     private PluginRuntime.Snapshot snapshot = new PluginRuntime.Snapshot(List.of(), false, false);
@@ -77,12 +78,17 @@ public final class PluginManager {
     /** The Plugins page for one opening of Settings; it lists the plugins afresh. */
     public SettingsPage page(PageContext context) { return new PluginsPage(this, context); }
 
-    /** Builds the list for a page whose dialogs open over {@code host} and which moves Settings with {@code navigate}. */
-    PluginManagerPanel attach(Supplier<AuxiliarySurface> host, java.util.function.Consumer<String> navigate) {
+    /**
+     * Builds the list for a page whose dialogs open over {@code host}, which moves Settings with {@code navigate} and
+     * builds its kit views (and its sheets') with {@code kit}, the Settings dialog's chrome context.
+     */
+    PluginManagerPanel attach(Supplier<AuxiliarySurface> host, java.util.function.Consumer<String> navigate,
+                              Supplier<dev.jasper.ui.swing.KitContext> kit, PluginShape shape) {
         this.host = Objects.requireNonNull(host);
         this.navigate = Objects.requireNonNull(navigate);
-        panel = new PluginManagerPanel(new PluginManagerPanel.Handlers(this::toggle, this::review, this::remove, this::discardInstall,
-            this::install, this::openSettings, this::openFolder, this::openData, hooks.browse()));
+        this.kit = Objects.requireNonNull(kit);
+        panel = new PluginManagerPanel(kit.get(), new PluginManagerPanel.Handlers(this::toggle, this::review, this::remove, this::discardInstall,
+            this::install, this::openSettings, this::openFolder, this::openData, hooks.browse()), shape);
         panel.show(snapshot);
         renderBanner();
         return panel;
@@ -91,8 +97,10 @@ public final class PluginManager {
     /** The page is gone: forget its list and end any restart conversation. */
     void detach(PluginManagerPanel detached) {
         if (panel != detached) return;
+        detached.close();
         panel = null;
         host = null;
+        kit = null;
         navigate = id -> { };
         hooks.restarts().cancel();
     }
@@ -142,11 +150,17 @@ public final class PluginManager {
             case IDLE -> {
                 if (snapshot.safeMode()) panel.banner("Safe mode: installed plugins are not loaded.",
                     List.of(new PluginManagerPanel.BannerAction("Restart Normally", flow::restartNormally)));
-                else if (snapshot.restartNeeded()) panel.banner("Restart Jasper to apply your changes.",
+                else if (snapshot.restartNeeded()) panel.banner(restartText(snapshot),
                     List.of(new PluginManagerPanel.BannerAction("Restart Now", flow::restartNow)));
                 else panel.banner("", List.of());
             }
         }
+    }
+
+    /** The restart banner's text, naming the looks an enable turned off (spec 4.4). */
+    static String restartText(PluginRuntime.Snapshot snapshot) {
+        return "Restart Jasper to apply your changes." + snapshot.turnedOff()
+            .map(names -> " " + names + (names.contains(" and ") ? " were" : " was") + " turned off: one look can be active at a time.").orElse("");
     }
 
     private void toggle(PluginRuntime.Row row) {
@@ -157,11 +171,19 @@ public final class PluginManager {
     private void remove(PluginRuntime.Row row) {
         if (row.pendingRemoval()) { panel.busy(true); runtime.remove(row.id(), false, this::accept); return; }
         AuxiliarySurface dialog = windows.dialog("Remove " + row.name(), true, host.get());
-        var view = new ConfirmView("Remove " + row.name() + " " + row.version() + "?\n\nIts jars, settings and data in " + row.directory()
+        boolean[] answered = {false};
+        var view = new ConfirmView(kit.get(), "Remove " + row.name() + " " + row.version() + "?", "Its jars, settings and data in " + row.directory()
             + " are deleted the next time Jasper starts. Keep undoes this until then.", "Remove",
-            () -> { dialog.close(); panel.busy(true); runtime.remove(row.id(), true, this::accept); }, dialog::close);
-        dialog.onClosed(() -> { if (confirmDialog == dialog) { confirmDialog = null; confirm = null; } });
-        dialog.setContent(view);
+            () -> {
+                if (answered[0]) return;
+                answered[0] = true;
+                dialog.close();
+                if (panel == null) return;
+                panel.busy(true);
+                runtime.remove(row.id(), true, this::accept);
+            }, dialog::close);
+        dialog.onClosed(() -> { view.close(); if (confirmDialog == dialog) { confirmDialog = null; confirm = null; } });
+        dialog.setContent(view.view());
         confirmDialog = dialog;
         confirm = view;
         dialog.show();
@@ -228,13 +250,21 @@ public final class PluginManager {
                      String allowLabel, Runnable allowed, Runnable refused) {
         AuxiliarySurface dialog = windows.dialog(title, true, host.get());
         boolean[] decided = {false};
-        var view = new ConsentView(name, version, vendor, capabilities, update, allowLabel,
-            () -> { decided[0] = true; dialog.close(); allowed.run(); }, dialog::close);
+        var view = new ConsentView(kit.get(), name, version, vendor, capabilities, update, allowLabel,
+            () -> {
+                if (decided[0] || dialog.closed()) return;
+                // With the page gone nothing can carry the allowed operation on: the answer becomes a refusal, so a
+                // staged install is discarded rather than left behind.
+                decided[0] = panel != null;
+                dialog.close();
+                if (decided[0]) allowed.run();
+            }, dialog::close);
         dialog.onClosed(() -> {
+            view.close();
             if (consentDialog == dialog) { consentDialog = null; consent = null; }
             if (!decided[0]) refused.run();
         });
-        dialog.setContent(view);
+        dialog.setContent(view.view());
         consentDialog = dialog;
         consent = view;
         dialog.show();

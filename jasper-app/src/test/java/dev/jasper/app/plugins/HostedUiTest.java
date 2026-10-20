@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
@@ -45,41 +46,51 @@ class HostedUiTest {
     private final TerminalFixture terminalFixture = new TerminalFixture();
     private final HostedTerminals terminals = new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", java.util.Set.of()),
         terminalFixture.registry, Runnable::run, () -> true, () -> true,
-        new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null));
+        new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null, name -> new javax.swing.ImageIcon()));
     private final HostedUi ui = new HostedUi("dev.x.tool", model, containment, Runnable::run, () -> true, open::get,
         HostedUiTest.class.getClassLoader(), () -> variant,
         handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals);
 
+    private final HostedKit kit = new HostedKit("dev.x.tool",open::get,ui::kitThemes,ui.appearance(),containment);
+    { ui.kit(kit); }
+    private dev.jasper.sdk.ui.UiView view(){return kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",dev.jasper.sdk.ui.ControlState.READY,"Content",dev.jasper.sdk.ui.Nodes.TextRole.BODY)),e -> {});}
+
+    /** Slate Cobalt Dark with a plum accent and panel: another workspace of the same darkness, for hosting code that takes any pair (Decision 5). */
+    private static dev.jasper.ui.theme.GeneratedTheme recolouredDark() {
+        var plum = new java.awt.Color(0x7a3fa0);
+        return ThemeTestSupport.recolored(ThemeTestSupport.generated(true), java.util.Map.of(
+            dev.jasper.ui.theme.SemanticColor.ACCENT, plum, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL, dev.jasper.ui.theme.ColorMath.mix(plum,
+                ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL), .2)));
+    }
+
     @Test void workspaceChangesPublishRichValuesWithoutChangingChromeAndDisposeListeners() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+        // HostedUi takes any pair: a recoloured Dark workspace under the Dark chrome is a workspace-only change.
+        var themes = new WorkspaceAppearanceFixture();
         var hosted = new HostedUi("dev.x.tool", model, containment, Runnable::run,
             javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
             handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals,
-            themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
+            themes::current, themes::subscribe);
         var appearance = hosted.appearance();
         var seen = new ArrayList<dev.jasper.sdk.ui.WorkspacePalette>();
         appearance.onWorkspaceChanged(value -> { seen.add(appearance.workspacePalette());
-            assertThat(appearance.syntaxPalette()).isEqualTo(dev.jasper.sdk.ui.SyntaxPalette.current()); });
+            assertThat(appearance.syntaxPalette()).isEqualTo(HostedPalettes.syntax(themes.current().workspace())); });
         assertThat(seen).isEmpty();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,
-            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
-            dev.jasper.app.config.UiFontConfig.defaults());
+        themes.setPair(ThemeTestSupport.mixed(ThemeTestSupport.generated(true), recolouredDark()));
         assertThat(seen).hasSize(1);
         assertThat(appearance.variant()).isEqualTo(Variant.DARK);
         assertThat(appearance.workspaceVariant()).isEqualTo(Variant.DARK);
-        assertThat(appearance.workspacePalette()).isEqualTo(dev.jasper.sdk.ui.WorkspacePalette.current());
-        assertThat(appearance.editorPalette()).isEqualTo(dev.jasper.sdk.ui.EditorPalette.current());
+        assertThat(appearance.workspacePalette()).isEqualTo(HostedPalettes.workspace(themes.current().workspace()));
+        assertThat(appearance.editorPalette()).isEqualTo(HostedPalettes.editor(themes.current().workspace()));
         assertThat(java.util.concurrent.CompletableFuture.supplyAsync(appearance::workspaceVariant).join()).isEqualTo(Variant.DARK);
         assertThatThrownBy(() -> java.util.concurrent.CompletableFuture.supplyAsync(appearance::workspacePalette).join())
             .hasCauseInstanceOf(IllegalStateException.class);
         hosted.closeAll();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.config.WorkspaceThemeChoice.MATCH, null,
-            dev.jasper.app.config.UiFontConfig.defaults());
+        themes.setPair(ThemeTestSupport.resolved(true));
         assertThat(seen).hasSize(1);
     }
 
     @Test void workspaceOpacityFollowsTheGlassSourceAndItsChangesAreWorkspaceChanges() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+        var themes = ThemeTestSupport.controller(true);
         double[] value = {0.6};
         var listeners = new ArrayList<Runnable>();
         var glass = new GlassSource(component -> value[0], listener -> {
@@ -116,14 +127,14 @@ class HostedUiTest {
     }
 
     @Test void bothVariantsReadThePublishedNativeSnapshotInsideWorkspaceCallbacks() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+        var themes = ThemeTestSupport.controller(true);
         var hosted = new HostedUi("dev.x.tool", model, containment, Runnable::run,
             javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
             handler -> () -> {}, auxiliary, terminals, themes::current,
             handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         var seen = new ArrayList<Variant>();
         hosted.appearance().onWorkspaceChanged(value -> seen.add(hosted.appearance().variant()));
-        themes.configure(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+        themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
         assertThat(seen).containsExactly(Variant.LIGHT);
         assertThat(java.util.concurrent.CompletableFuture.supplyAsync(() -> hosted.appearance().variant()).join())
             .isEqualTo(Variant.LIGHT);
@@ -132,41 +143,31 @@ class HostedUiTest {
         hosted.closeAll();
     }
 
-    @Test void semanticDefaultsSurviveChromeRebuildAndMatchKeepsRichSyntax() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+    @Test void matchKeepsRichSyntaxAndARejectedInstallLeavesThePalettes() {
+        var themes = ThemeTestSupport.controller(true);
         var match = themes.current().chrome();
-        assertThat(dev.jasper.sdk.ui.SyntaxPalette.current()).isEqualTo(HostedPalettes.syntax(match));
-        assertThat(dev.jasper.sdk.ui.SyntaxPalette.current().style(dev.jasper.sdk.ui.SyntaxRole.KEYWORD).color())
-            .isNotEqualTo(dev.jasper.sdk.ui.EditorPalette.current().foreground());
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,
-            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
-            dev.jasper.app.config.UiFontConfig.defaults());
-        var workspace = dev.jasper.sdk.ui.WorkspacePalette.current();
-        var editor = dev.jasper.sdk.ui.EditorPalette.current();
-        var syntax = dev.jasper.sdk.ui.SyntaxPalette.current();
-        themes.configure(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
-        assertThat(dev.jasper.sdk.ui.WorkspacePalette.current()).isEqualTo(workspace);
-        assertThat(dev.jasper.sdk.ui.EditorPalette.current()).isEqualTo(editor);
-        assertThat(dev.jasper.sdk.ui.SyntaxPalette.current()).isEqualTo(syntax);
-        var rejected = new dev.jasper.app.appearance.ThemeController(value -> value == dev.jasper.app.appearance.Theme.DARK);
-        var before = dev.jasper.sdk.ui.WorkspacePalette.current();
-        assertThatThrownBy(() -> rejected.configure(dev.jasper.app.appearance.Theme.JASPER_LIGHT))
+        assertThat(HostedPalettes.syntax(themes.current().workspace())).isEqualTo(HostedPalettes.syntax(match));
+        assertThat(HostedPalettes.syntax(themes.current().workspace()).style(dev.jasper.sdk.ui.SyntaxRole.KEYWORD).color())
+            .isNotEqualTo(HostedPalettes.editor(themes.current().workspace()).foreground());
+        var rejected = ThemeTestSupport.controller(true, value -> value.dark() && ThemeTestSupport.install(value));
+        // The controller that failed keeps publishing the palettes it had.
+        var before = HostedPalettes.workspace(rejected.current().workspace());
+        assertThatThrownBy(() -> rejected.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH))
             .isInstanceOf(dev.jasper.app.appearance.ThemeController.InstallationFailure.class);
-        assertThat(dev.jasper.sdk.ui.WorkspacePalette.current()).isEqualTo(before);
+        assertThat(HostedPalettes.workspace(rejected.current().workspace())).isEqualTo(before)
+            .isEqualTo(HostedPalettes.workspace(ThemeTestSupport.generated(true)));
     }
 
     @Test void closingWorkspaceSubscriptionOffThreadSuppressesDeliveryBeforeQueuedRemoval() {
-        var themes = new dev.jasper.app.appearance.ThemeController();
+        var themes = new WorkspaceAppearanceFixture();
         var hosted = new HostedUi("dev.x.tool", model, containment, javax.swing.SwingUtilities::invokeLater,
             javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
             handler -> () -> {}, auxiliary, terminals, themes::current,
-            handler -> themes.subscribe((value, changed) -> handler.accept(value)));
+            themes::subscribe);
         var calls = new java.util.concurrent.atomic.AtomicInteger();
         var subscription = hosted.appearance().onWorkspaceChanged(value -> calls.incrementAndGet());
         java.util.concurrent.CompletableFuture.runAsync(subscription::close).join();
-        themes.configure(dev.jasper.app.appearance.Theme.DARK,
-            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
-            dev.jasper.app.config.UiFontConfig.defaults());
+        themes.setPair(ThemeTestSupport.mixed(ThemeTestSupport.generated(true), recolouredDark()));
         assertThat(calls).hasValue(0);
         hosted.closeAll();
     }
@@ -235,10 +236,10 @@ class HostedUiTest {
     @Test void placementsAcceptOnlyThisPluginsActions() {
         ui.actions().register(ActionSpec.of("dev.x.tool.run", "Run"), context -> { });
         Subscription button = ui.toolbar().add(ToolbarItem.action("dev.x.tool.run"));
-        ui.toolbar().add(ToolbarItem.menu(new javax.swing.ImageIcon(), "Tool", List.of("dev.x.tool.run")));
+        ui.toolbar().add(ToolbarItem.menu("file", "Tool", List.of("dev.x.tool.run")));
         assertThatIllegalArgumentException().isThrownBy(() -> ui.toolbar().add(ToolbarItem.action("dev.x.tool.absent")));
         assertThatIllegalArgumentException().isThrownBy(() ->
-            ui.toolbar().add(ToolbarItem.menu(new javax.swing.ImageIcon(), "Tool", List.of("dev.x.tool.run", "new_tab"))));
+            ui.toolbar().add(ToolbarItem.menu("file", "Tool", List.of("dev.x.tool.run", "new_tab"))));
         assertThat(model.toolbar()).hasSize(2);
         button.close();
         button.close();
@@ -314,8 +315,8 @@ class HostedUiTest {
         assertThat(changes).containsExactly(Variant.LIGHT);
         watching.close();
         assertThat(themeHandlers).isEmpty();
-        assertThat(ui.appearance().icon("dev/jasper/app/icons/intellij/general/search.svg").getIconWidth()).isPositive();
-        assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon("nope.svg"));
+        assertThat(ui.icon("search").getIconWidth()).isPositive();
+        assertThatIllegalArgumentException().isThrownBy(() -> ui.icon("missing"));
     }
 
     @Test void closeAllRemovesEverythingAndAClosedContextRejectsRegistration() {
@@ -362,15 +363,15 @@ class HostedUiTest {
     @Test void panelsAndRailReachTheModelWithContainedFactories() {
         ui.actions().register(ActionSpec.of("dev.x.tool.open", "Open"), context -> { });
         List<dev.jasper.sdk.ui.PanelHost> hosts = new ArrayList<>();
-        Subscription panel = ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.hosts", "Hosts", new javax.swing.ImageIcon(),
-            dev.jasper.sdk.ui.Anchor.RIGHT), host -> { hosts.add(host); return new javax.swing.JLabel("hosts"); });
-        ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.broken", "Broken", new javax.swing.ImageIcon(),
+        Subscription panel = ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.hosts", "Hosts", "file",
+            dev.jasper.sdk.ui.Anchor.RIGHT), host -> { hosts.add(host); return view(); });
+        ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.broken", "Broken", "file",
             dev.jasper.sdk.ui.Anchor.LEFT), host -> { throw new IllegalStateException("factory failure"); });
         assertThatIllegalArgumentException().isThrownBy(() -> ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.other.panel", "Foreign",
-            new javax.swing.ImageIcon(), dev.jasper.sdk.ui.Anchor.LEFT), host -> new javax.swing.JLabel()));
+            "file", dev.jasper.sdk.ui.Anchor.LEFT), host -> view()));
 
-        ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.files", "Files", new javax.swing.ImageIcon(),
-            dev.jasper.sdk.ui.Anchor.BOTTOM).withSplit(), host -> new javax.swing.JLabel("files"));
+        ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.files", "Files", "file",
+            dev.jasper.sdk.ui.Anchor.BOTTOM).withSplit(), host -> view());
 
         var entry = model.panels().get(0);
         assertThat(entry.defaultSlot()).isEqualTo(dev.jasper.app.dock.Slot.RIGHT_TOP);
@@ -380,7 +381,7 @@ class HostedUiTest {
         UUID window = UUID.randomUUID();
         boolean[] visible = {true};
         var site = new dev.jasper.app.contributions.PanelSite(window, () -> visible[0] = true, () -> visible[0] = false, () -> visible[0]);
-        assertThat(entry.factory().apply(site)).isInstanceOf(javax.swing.JLabel.class);
+        assertThat(entry.factory().apply(site)).isNotNull();
         assertThat(hosts).singleElement().satisfies(host -> {
             assertThat(host.window().id()).isEqualTo(window);
             host.hide();
@@ -403,18 +404,77 @@ class HostedUiTest {
         assertThat(model.railActions()).isEmpty();
     }
 
+    /** Plan 15b (Rulings 1): the panel's own toggle action activates it, as IntelliJ's ⌘1; anything else toggles. */
+    @Test void aPanelsOwnToggleActionActivatesAndAnythingElseToggles() {
+        var window = UUID.randomUUID();
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        dev.jasper.sdk.terminal.WindowHandle[] handle = {null};
+        ui.actions().register(ActionSpec.of("dev.x.tool.hosts.show", "Hosts"), context -> { handle[0] = context.window(); ui.panels().toggle("dev.x.tool.hosts", context.window()); });
+        ui.actions().register(ActionSpec.of("dev.x.tool.other", "Other"), context -> ui.panels().toggle("dev.x.tool.hosts", context.window()));
+        ui.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", "file", Anchor.RIGHT).withToggleActionId("dev.x.tool.hosts.show"), host -> view());
+        model.action("dev.x.tool.hosts.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        model.action("dev.x.tool.other").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        ui.panels().toggle("dev.x.tool.hosts", handle[0]);
+        assertThat(requests).extracting(Contributions.PanelRequest::op).containsExactly(
+            Contributions.PanelRequest.Op.ACTIVATING_TOGGLE, Contributions.PanelRequest.Op.TOGGLE, Contributions.PanelRequest.Op.TOGGLE);
+        assertThat(requests).extracting(Contributions.PanelRequest::windowId).containsOnly(window);
+    }
+
+    /** Inside the panel's own toggle action only that panel's toggle activates, into whichever window it names. */
+    @Test void insideAPanelsToggleActionAnotherPanelsToggleStaysPlainAndAnotherWindowIsKept() {
+        var window = UUID.randomUUID();
+        var other = UUID.randomUUID();
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        ui.actions().register(ActionSpec.of("dev.x.tool.hosts.show", "Hosts"), context -> {
+            ui.panels().toggle("dev.x.tool.files", context.window());
+            ui.panels().toggle("dev.x.tool.hosts", terminals.windowHandle(other));
+        });
+        ui.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", "file", Anchor.RIGHT).withToggleActionId("dev.x.tool.hosts.show"), host -> view());
+        ui.panels().register(new PanelSpec("dev.x.tool.files", "Files", "file", Anchor.LEFT), host -> view());
+        model.action("dev.x.tool.hosts.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        assertThat(requests).containsExactly(
+            new Contributions.PanelRequest(window, "dev.x.tool.files", Contributions.PanelRequest.Op.TOGGLE),
+            new Contributions.PanelRequest(other, "dev.x.tool.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
+    }
+
+    /** Plan 15b (Rulings 1): a show inside the panel's own toggle action activates it; any other show goes to the site. */
+    @Test void aShowInsideThePanelsOwnToggleActionActivates() {
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        dev.jasper.sdk.ui.PanelHost[] hosts = {null};
+        ui.actions().register(ActionSpec.of("dev.x.tool.queue.show", "Queue"), context -> hosts[0].show());
+        ui.actions().register(ActionSpec.of("dev.x.tool.queue.other", "Other"), context -> hosts[0].show());
+        ui.panels().register(new PanelSpec("dev.x.tool.queue", "Queue", "file", Anchor.BOTTOM).withToggleActionId("dev.x.tool.queue.show"),
+            host -> { hosts[0] = host; return view(); });
+        UUID window = UUID.randomUUID();
+        int[] shows = {0};
+        var site = new dev.jasper.app.contributions.PanelSite(window, () -> shows[0]++, () -> { }, () -> false);
+        assertThat(model.panels().getFirst().factory().apply(site)).isNotNull();
+
+        model.action("dev.x.tool.queue.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, "dev.x.tool.queue", Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+        assertThat(shows[0]).as("the activating show goes through the window").isZero();
+
+        model.action("dev.x.tool.queue.other").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        hosts[0].show();
+        assertThat(requests).as("another action's show and one outside any action").hasSize(1);
+        assertThat(shows[0]).isEqualTo(2);
+    }
+
     @Test void panelHeadersAreWindowOwnedContainFailuresAndBecomeInertWhenDiscarded() {
         var hosts = new ArrayList<dev.jasper.sdk.ui.PanelHost>();
         var calls = new ArrayList<String>();
-        ui.panels().register(new PanelSpec("dev.x.tool.header", "Header", new javax.swing.ImageIcon(), Anchor.LEFT),
-            host -> { hosts.add(host); return new javax.swing.JLabel(); });
+        ui.panels().register(new PanelSpec("dev.x.tool.header", "Header", "file", Anchor.LEFT),
+            host -> { hosts.add(host); return view(); });
         var first = new ArrayList<dev.jasper.app.contributions.PanelHeaderState>();
         var second = new ArrayList<dev.jasper.app.contributions.PanelHeaderState>();
         var firstSite = new dev.jasper.app.contributions.PanelSite(UUID.randomUUID(), () -> {}, () -> {}, () -> true, first::add);
         var secondSite = new dev.jasper.app.contributions.PanelSite(UUID.randomUUID(), () -> {}, () -> {}, () -> true, second::add);
         var factory = model.panels().getFirst().factory();
         factory.apply(firstSite); factory.apply(secondSite);
-        var icon = new javax.swing.ImageIcon();
+        var icon = "file";
         hosts.getFirst().setHeader(new dev.jasper.sdk.ui.PanelHeader("5", false, List.of(
             new dev.jasper.sdk.ui.PanelHeader.Action("Add", icon, () -> calls.add("first")),
             new dev.jasper.sdk.ui.PanelHeader.Action("Failure", icon, () -> { throw new IllegalStateException("header failed"); }),
@@ -447,8 +507,8 @@ class HostedUiTest {
             new Case("dev.x.tool.bottom", Anchor.BOTTOM, false, Slot.BOTTOM_LEFT),
             new Case("dev.x.tool.bottomsplit", Anchor.BOTTOM, true, Slot.BOTTOM_RIGHT));
         for (Case each : cases) {
-            var spec = new PanelSpec(each.id(), "Panel", new javax.swing.ImageIcon(), each.anchor());
-            ui.panels().register(each.split() ? spec.withSplit() : spec, host -> new javax.swing.JLabel());
+            var spec = new PanelSpec(each.id(), "Panel", "file", each.anchor());
+            ui.panels().register(each.split() ? spec.withSplit() : spec, host -> view());
         }
         assertThat(model.panels()).hasSize(6);
         for (Case each : cases)
@@ -463,7 +523,7 @@ class HostedUiTest {
             .as("an open singleton is the same window").isSameAs(manager);
         assertThatIllegalArgumentException().isThrownBy(() ->
             ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.other.window", "Foreign", new java.awt.Dimension(10, 10), false)));
-        manager.setContent(new javax.swing.JLabel("content"));
+        manager.setContent(view());
         manager.show();
         List<String> events = new ArrayList<>();
         manager.onClosing(() -> { throw new IllegalStateException("guard failure"); });
@@ -482,26 +542,5 @@ class HostedUiTest {
         assertThatCode(() -> { prompt.close(); trust.close(); manager.setTitle("after close"); }).doesNotThrowAnyException();
     }
 
-    @Test void namedIconsBelongToHostRatherThanPluginLoader() {
-        var isolated = new HostedUi("dev.x.tool", model, containment, Runnable::run, () -> true, open::get,
-            new ClassLoader(null) {}, () -> variant,
-            handler -> () -> {}, auxiliary, terminals);
-        try {
-            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            for (var name : dev.jasper.sdk.ui.IconName.values()) {
-                var icon = isolated.appearance().icon(name);
-                assertThat(icon.getIconWidth()).isEqualTo(16);
-                assertThat(icon.getIconHeight()).isEqualTo(16);
-            }
-            assertThat(java.util.Arrays.stream(dev.jasper.sdk.ui.BundledIcon.values()).map(dev.jasper.sdk.ui.BundledIcon::id))
-                .containsExactlyInAnyOrderElementsOf(dev.jasper.app.platform.AppIcons.bundledIds());
-            for (var name : dev.jasper.sdk.ui.BundledIcon.values()) {
-                assertThat(isolated.appearance().icon(name))
-                    .isSameAs(dev.jasper.app.platform.AppIcons.bundled(name.id()));
-            }
-            assertThatNullPointerException().isThrownBy(() -> isolated.appearance().icon((dev.jasper.sdk.ui.BundledIcon) null));
-            assertThatNullPointerException().isThrownBy(() -> isolated.appearance().icon((dev.jasper.sdk.ui.IconName) null));
-            assertThatIllegalArgumentException().isThrownBy(() -> isolated.appearance().icon("dev/jasper/app/icons/intellij/general/search.svg"));
-        } finally { isolated.closeAll(); new dev.jasper.app.appearance.ThemeController(); }
-    }
+
 }

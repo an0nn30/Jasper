@@ -1,5 +1,11 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.swing.NativeStyles;
+
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.terminals.PaneSnapshot;
@@ -74,25 +80,25 @@ final class PathBreadcrumbs extends JPanel {
             var label = label(crumb.label()); label.setToolTipText(crumb.path());
             label.getAccessibleContext().setAccessibleName(crumb.path());
             label.setIcon(crumb.icon() == null ? null : AppIcons.named(crumb.icon()));
-            label.setIconTextGap(UIScale.scale(5)); labels.add(label); add(label);
-            var separator = new JLabel(AppIcons.named("NEXT")); separators.add(separator); add(separator);
+            label.setIconTextGap(NativeStyles.installed().metric(DesignMetrics.Role.BREADCRUMB_ICON_GAP)); labels.add(label); add(label);
+            var separator = new JLabel(AppIcons.semantic("chevron.right")); separators.add(separator); add(separator);
         }
         add(ellipsis); ellipsis.setToolTipText(next.path()); setToolTipText(next.path());
         getAccessibleContext().setAccessibleDescription(next.path());
         refreshTheme(); revalidate(); repaint();
     }
     void refreshTheme() {
-        for (var label : labels) { label.setFont(UIManager.getFont("Label.font")); label.setForeground(UIManager.getColor("Jasper.mutedForeground")); }
-        ellipsis.setFont(UIManager.getFont("Label.font")); ellipsis.setForeground(UIManager.getColor("Jasper.mutedForeground"));
+        for (var label : labels) { label.setFont(ThemeZone.font(Typography.Role.STATUS_PATH)); label.setForeground(ThemeZone.color(null, SemanticColor.TEXT_SECONDARY)); }
+        ellipsis.setFont(ThemeZone.font(Typography.Role.STATUS_PATH)); ellipsis.setForeground(ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
     }
-    @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(16)); }
+    @Override public Dimension getMinimumSize() { return new Dimension(0, NativeStyles.installed().metric(DesignMetrics.Role.BREADCRUMB_COLLAPSED_HEIGHT)); }
     @Override public Dimension getPreferredSize() {
         int height = labels.stream().mapToInt(label -> label.getPreferredSize().height).max().orElse(0);
-        return new Dimension(width(labels), Math.max(UIScale.scale(20), height));
+        return new Dimension(width(labels), Math.max(NativeStyles.installed().metric(DesignMetrics.Role.BREADCRUMB_MIN_HEIGHT), height));
     }
     private int width(List<JLabel> visible) {
         return visible.stream().mapToInt(label -> label.getPreferredSize().width).sum()
-            + Math.max(0, visible.size() - 1) * UIScale.scale(22);
+            + Math.max(0, visible.size() - 1) * NativeStyles.installed().metric(DesignMetrics.Role.BREADCRUMB_SEPARATOR);
     }
     @Override public void doLayout() {
         for (Component child : getComponents()) { child.setVisible(false); child.setBounds(0, 0, 0, 0); }
@@ -115,7 +121,7 @@ final class PathBreadcrumbs extends JPanel {
         int x = 0, separator = 0;
         for (int i = 0; i < shown.size(); i++) {
             if (i > 0) {
-                var arrow = separators.get(separator++); int space = Math.min(UIScale.scale(22), getWidth() - x);
+                var arrow = separators.get(separator++); int space = Math.min(NativeStyles.installed().metric(DesignMetrics.Role.BREADCRUMB_SEPARATOR), getWidth() - x);
                 arrow.setBounds(x, 0, space, getHeight()); arrow.setVisible(true); x += space;
             }
             var label = shown.get(i); int space = Math.max(0, Math.min(label.getPreferredSize().width, getWidth() - x));

@@ -97,7 +97,7 @@ class SettingKindTest {
 
     @Test void stringMapsReportEachEntryAtItsOwnKey() {
         var rules = new SettingKind.MapRules(name -> name.matches("[A-Z_]+"), "Bad name.", Set.of("TERM"), "Reserved.",
-            value -> value.indexOf('\0') < 0, "Bad value.", "a string environment value");
+            value -> value.indexOf('\0') < 0, "Bad value.", "a string environment value", Reading.Severity.ERROR);
         var kind = SettingKind.stringMap(rules);
         var reading = kind.read(toml("{ OK = 'yes', bad = 'x', TERM = 'y' }"), Map.of());
         assertThat(reading.value()).containsExactly(Map.entry("OK", "yes"));
@@ -111,6 +111,19 @@ class SettingKindTest {
         assertThat(kind.literal(Map.of("B", "2", "A", "1"))).isEqualTo("{ A = \"1\", B = \"2\" }");
         assertThat(kind.literal(Map.of())).isEqualTo("{}");
         assertThat(kind.check(Map.of("TERM", "x"))).hasValue("Reserved.");
+    }
+
+    @Test void warningTablesIgnoreUnusableEntriesWithoutRejectingTheFile() {
+        var rules = new SettingKind.MapRules(name -> name.matches("[a-z.]+"), "Bad id.", Set.of(), "",
+            Set.of("card", "off")::contains, "Bad mode.", "a display mode", Reading.Severity.WARNING);
+        var kind = SettingKind.stringMap(rules);
+        var reading = kind.read(toml("{ 'a.b' = 'card', 'A B' = 'off', c = 'CARD', d = 3 }"), Map.of());
+        assertThat(reading.value()).containsExactly(Map.entry("a.b", "card"));
+        assertThat(reading.rejectsFile()).isFalse();
+        assertThat(reading.issues()).extracting(Reading.Issue::subPath, Reading.Issue::severity, Reading.Issue::message)
+            .containsExactlyInAnyOrder(tuple(List.of("A B"), Reading.Severity.WARNING, "Bad id."),
+                tuple(List.of("c"), Reading.Severity.WARNING, "Bad mode."),
+                tuple(List.of("d"), Reading.Severity.WARNING, "Expected a display mode; entry ignored."));
     }
 
     @Test void literalsQuoteKeysOnlyWhenNeededAndFormatParsedValues() {

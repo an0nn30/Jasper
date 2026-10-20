@@ -5,9 +5,11 @@ import dev.jasper.terminal.internal.shell.CommandLocation;
 import dev.jasper.terminal.internal.text.AbsoluteRowState;
 import dev.jasper.terminal.internal.text.CommandCapture;
 import dev.jasper.terminal.internal.text.CursorRequest;
+import dev.jasper.terminal.internal.text.FileTarget;
 import dev.jasper.terminal.internal.text.LinkDetector;
 import dev.jasper.terminal.internal.text.LogicalLine;
 import dev.jasper.terminal.internal.text.MouseGeometry;
+import dev.jasper.terminal.internal.text.PathDetector;
 import dev.jasper.terminal.internal.text.RowText;
 import dev.jasper.terminal.internal.text.SelectedCells;
 import dev.jasper.terminal.internal.text.Selection;
@@ -19,11 +21,13 @@ import dev.jasper.terminal.internal.text.WordBoundaries;
 import com.jediterm.terminal.model.JediTerminal;
 import com.jediterm.terminal.model.TerminalTextBuffer;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /** Buffer reads with explicit locking; regex and rendering consume detached rows afterward. */
@@ -274,6 +278,62 @@ public final class BufferQueries {
      * across a wrap boundary is still recognized as one link. Call with the buffer lock held.
      */
     private Optional<String> urlAcrossWrappedRows(long absoluteRow, int column) {
+        return wrappedRowLocked(absoluteRow, column).flatMap(wrapped -> LinkDetector.urlAt(wrapped.text(), wrapped.column()));
+    }
+
+    /**
+     * The file a click at an absolute row and column names. An OSC 8 link on the cell counts when {@code localFiles}
+     * maps it to this machine; a cell with any other OSC 8 target names nothing, whatever its text says. Otherwise the
+     * soft-wrapped rows around the row are joined under the lock, as for URLs, and read after it: a plain-text
+     * {@code file://} URL under the column counts the same way, with the line and column it ends in, and anything
+     * else is left to {@link PathDetector}.
+     *
+     * @param absoluteRow the clicked row
+     * @param column the clicked column
+     * @param windows whether {@code C:\} and backslash paths count
+     * @param localFiles the path a {@code file} URI names on this machine; empty for a remote one or any other URI
+     * @return the file, or empty when the click names none
+     */
+    public Optional<FileTarget> fileLinkAt(long absoluteRow, int column, boolean windows,
+                                           Function<String, Optional<Path>> localFiles) {
+        String link;
+        Optional<WrappedRow> wrapped;
+        buffer.lock();
+        try {
+            if (column < 0 || column >= buffer.getWidth()) return Optional.empty();
+            TerminalRow line = lineAtLocked(absoluteRow);
+            if (line == null) return Optional.empty();
+            link = column < line.length() ? line.attributesAt(column).link() : null;
+            wrapped = link == null ? wrappedRowLocked(absoluteRow, column) : Optional.empty();
+        } finally {
+            buffer.unlock();
+        }
+        // Match outside the lock, as search does, so a long logical line cannot stall the reader thread.
+        // An OSC 8 target is an exact URI: a colon and digits at its end are part of the path.
+        if (link != null) return localFile(link, 0, 0, localFiles);
+        if (wrapped.isEmpty()) return Optional.empty();
+        RowText text = wrapped.get().text();
+        int at = wrapped.get().column();
+        Optional<String> url = LinkDetector.fileUrlAt(text, at);
+        if (url.isPresent()) {
+            LinkDetector.UrlPosition split = LinkDetector.splitPosition(url.get());
+            return localFile(split.url(), split.line(), split.column(), localFiles);
+        }
+        return PathDetector.pathAt(text, at, windows).map(match -> new FileTarget(match.path(), match.line(), match.column()));
+    }
+
+    private static Optional<FileTarget> localFile(String uri, int line, int column, Function<String, Optional<Path>> localFiles) {
+        return localFiles.apply(uri).map(path -> new FileTarget(path.toString(), line, column));
+    }
+
+    /** Soft-wrapped rows joined into one, and the clicked column on it. */
+    private record WrappedRow(RowText text, int column) { }
+
+    /**
+     * The wrapped screen rows around {@code absoluteRow} joined into one row, within {@link LogicalLine}'s bounds, and
+     * {@code column} on it; empty when the line was truncated. Call with the buffer lock held.
+     */
+    private Optional<WrappedRow> wrappedRowLocked(long absoluteRow, int column) {
         int width = buffer.getWidth();
         LogicalLine range = LogicalLine.around(absoluteRow, width, this::lineAtLocked);
         if (range.truncated()) return Optional.empty();
@@ -294,8 +354,7 @@ public final class BufferQueries {
             }
         }
         int virtualColumn = (int) ((absoluteRow - range.firstRow()) * width) + column;
-        RowText combined = new RowText(text.toString(), columns, lastColumns);
-        return LinkDetector.urlAt(combined, virtualColumn);
+        return Optional.of(new WrappedRow(new RowText(text.toString(), columns, lastColumns), virtualColumn));
     }
 
     /** The word at an absolute row and column, as a stream selection. */

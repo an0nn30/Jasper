@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
@@ -24,10 +23,11 @@ class ToolWindowSurfaceTest {
         return area;
     }
 
-    @Test void toolWindowsPaintTheToolWindowColourWhileControlsKeepTheirOwn() throws Exception {
+    /** theme.md: a tool window's body is surface.panel; a vendor ToolWindow.background no longer reaches it. */
+    @Test void toolWindowsPaintThePanelSurfaceWhileControlsKeepTheirOwn() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            ThemeTestSupport.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeTestSupport.install(false);
             var content = new JPanel(new BorderLayout());
             var inner = new JPanel();
             var field = new JTextField("hosts");
@@ -37,27 +37,29 @@ class ToolWindowSurfaceTest {
             content.add(inner, BorderLayout.NORTH); content.add(scroll); content.add(fixed, BorderLayout.SOUTH);
             var area = showing(Slot.LEFT_TOP, content, 250);
 
-            Color surface = UIManager.getColor("ToolWindow.background");
-            assertThat(surface).isEqualTo(Color.WHITE);
-            assertThat(UIManager.getColor("Panel.background")).isNotEqualTo(surface);
+            assertThat(UIManager.getColor("ToolWindow.background")).as("the vendor key the tool window ignores")
+                .isEqualTo(ThemeTestSupport.color(false, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
+            Color surface = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL);
+            assertThat(surface).isNotEqualTo(UIManager.getColor("ToolWindow.background"));
             assertThat(content.getParent().getBackground()).as("tool window frame").isEqualTo(surface);
             assertThat(area.headerOf(Slot.LEFT_TOP).getBackground()).as("the header has no bar colour").isEqualTo(surface);
-            assertThat(content.getBackground()).isEqualTo(surface);
-            assertThat(inner.getBackground()).isEqualTo(surface);
-            assertThat(scroll.getViewport().getBackground()).isEqualTo(surface);
+            assertThat(content.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
+            assertThat(inner.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
+            assertThat(scroll.getViewport().getBackground()).isEqualTo(UIManager.getColor("Viewport.background"));
             assertThat(field.getBackground()).isEqualTo(UIManager.getColor("TextField.background"));
             assertThat(fixed.getBackground()).as("a plugin's own colour").isEqualTo(Color.MAGENTA);
             var later = new JPanel();
             inner.add(later);
-            assertThat(later.getBackground()).as("added after the panel opened").isEqualTo(surface);
+            assertThat(later.getBackground()).as("no recursive observer after the panel opened").isEqualTo(UIManager.getColor("Panel.background"));
 
-            ThemeTestSupport.install(Theme.DARK);
+            ThemeTestSupport.install(true);
             SwingUtilities.updateComponentTreeUI(area);
             area.refreshTheme();
-            Color dark = UIManager.getColor("ToolWindow.background");
-            assertThat(dark).isEqualTo(new Color(0x191c20));
-            for (var component : List.<JComponent>of(content, inner, later, area.headerOf(Slot.LEFT_TOP)))
-                assertThat(component.getBackground()).isEqualTo(dark);
+            Color dark = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL);
+            assertThat(dark).isEqualTo(ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+            assertThat(area.headerOf(Slot.LEFT_TOP).getBackground()).isEqualTo(dark);
+            for (var component : List.<JComponent>of(content, inner, later))
+                assertThat(component.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
             assertThat(fixed.getBackground()).isEqualTo(Color.MAGENTA);
         } finally { UIManager.setLookAndFeel(original); }
     }
@@ -65,8 +67,8 @@ class ToolWindowSurfaceTest {
     @Test void roundedFramesClipOpaquePluginContentInEverySlotAndTheme() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                ThemeTestSupport.install(theme);
+            for (boolean themeDark : new boolean[]{true, false}) {
+                ThemeTestSupport.install(themeDark);
                 for (var slot : Slot.values()) {
                     var plugin = new JPanel(); plugin.setBackground(Color.MAGENTA);
                     var area = showing(slot, plugin, 240);
@@ -76,25 +78,26 @@ class ToolWindowSurfaceTest {
                     var image = new java.awt.image.BufferedImage(host.getWidth(), host.getHeight(), 2);
                     var graphics = image.createGraphics();
                     try { host.paint(graphics); } finally { graphics.dispose(); }
-                    assertThat(new Color(image.getRGB(0, 0))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                    assertThat(new Color(image.getRGB(0, 0))).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                     var insets = host.getInsets();
                     assertThat(new Color(image.getRGB(insets.left, insets.top))).as("opaque plugin cannot square the rounded corner")
-                        .isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                        .isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                     assertThat(new Color(image.getRGB(host.getWidth() / 2, host.getHeight() / 2))).isEqualTo(Color.MAGENTA);
                     assertThat(host.contains(insets.left, insets.top)).isFalse();
                     assertThat(host.contains(host.getWidth() / 2, host.getHeight() / 2)).isTrue();
                 }
-                renderToolPanels(theme);
+                renderToolPanels(themeDark);
             }
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    private static void renderToolPanels(Theme theme) throws Exception {
+    private static void renderToolPanels(boolean dark) throws Exception {
         var terminal = new JTextArea("\n  ~ / projects / jasper\n\n  $ ");
-        terminal.setBackground(theme.palette().background()); terminal.setForeground(theme.palette().foreground());
+        var palette = ThemeTestSupport.terminal(dark);
+        terminal.setBackground(palette.background()); terminal.setForeground(palette.foreground());
         terminal.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 14));
         var area = new ToolWindowArea(terminal, new DockState());
-        area.setStripesVisible(true);
+        area.setStripesVisible(true, true);
         var plugin = new JPanel(new BorderLayout(0, 8));
         plugin.setBorder(BorderFactory.createEmptyBorder(0, 12, 12, 12));
         // The header carries the title now, so the panel starts with its search field.
@@ -121,17 +124,17 @@ class ToolWindowSurfaceTest {
         var bg = buttonImage.createGraphics(); selectedButton.paint(bg); bg.dispose();
         assertThat(new Color(buttonImage.getRGB(4, selectedButton.getHeight() / 2)))
             .as("the stripe uses the active theme's neutral toolbar selection")
-            .isEqualTo(UIManager.getColor("ToggleButton.toolbar.selectedBackground"));
+            .isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_SELECTED));
         var image = new java.awt.image.BufferedImage(1640, 960, 2); var g = image.createGraphics();
         try { g.scale(2, 2); root.printAll(g); } finally { g.dispose(); }
         var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
-        javax.imageio.ImageIO.write(image, "png", output.resolve("tool-panels-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+        javax.imageio.ImageIO.write(image, "png", output.resolve("tool-panels-" + (dark ? "dark" : "light") + ".png").toFile());
     }
 
     @Test void renderersAndEditorsOfListsTablesTreesAndCombosKeepTheColoursTheirOwnerGaveThem() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            ThemeTestSupport.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            ThemeTestSupport.install(false);
             var list = new JList<>(new String[]{"prod", "stage"});
             var table = new JTable(2, 2);
             var tree = new JTree();
@@ -139,7 +142,7 @@ class ToolWindowSurfaceTest {
             var content = new JPanel();
             content.add(new JScrollPane(list)); content.add(new JScrollPane(table)); content.add(new JScrollPane(tree)); content.add(combo);
             showing(Slot.LEFT_TOP, content, 250);
-            assertThat(content.getBackground()).isEqualTo(UIManager.getColor("ToolWindow.background"));
+            assertThat(content.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
 
             // A renderer painted with the owner's selection colour, as the Remote plugin's host rows are.
             var selection = new ColorUIResource(UIManager.getColor("List.selectionBackground"));

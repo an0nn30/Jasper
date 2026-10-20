@@ -37,15 +37,22 @@ final class PluginLoader {
             for (String exported : dependency.candidate().descriptor().exports()) imports.put(exported, dependency.loader());
         }
         for (var jar : candidate.jars()) {
-            try (var file = new JarFile(jar.toFile())) {
-                var entries = file.entries();
-                while (entries.hasMoreElements()) {
-                    String name = entries.nextElement().getName();
+            try (var file = new JarFile(jar.toFile(), true, JarFile.OPEN_READ, Runtime.version())) {
+                var entries = file.versionedStream().iterator();
+                while (entries.hasNext()) {
+                    var entry=entries.next();
+                    String name = entry.getName();
+                    if(name.startsWith("META-INF/"))continue;
                     int slash = name.lastIndexOf('/');
-                    if (!name.endsWith(".class") || slash < 0) continue;
-                    String packageName = name.substring(0, slash).replace('/', '.');
+                    if (!name.endsWith(".class")) continue;
+                    String packageName = slash < 0 ? "" : name.substring(0, slash).replace('/', '.');
                     if (DescriptorParser.forbidden(packageName))
                         throw new LoadFailure(jar.getFileName() + " defines a class in the reserved package " + packageName, null);
+                    try(var input=file.getInputStream(entry)) {
+                        byte[] bytes=input.readNBytes(16 * 1024 * 1024 + 1);
+                        if(bytes.length>16 * 1024 * 1024)throw new LoadFailure(jar.getFileName()+" class exceeds admission limit: "+name,null);
+                        KitCompatibility.check(bytes,jar.getFileName()+"!"+entry.getRealName());
+                    }
                     if (imports.containsKey(packageName))
                         throw new LoadFailure(jar.getFileName() + " defines a class in " + packageName + ", which a dependency exports", null);
                 }

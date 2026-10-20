@@ -14,7 +14,12 @@ import java.util.function.Consumer;
 
 /** The one master-password prompt; the dialog drives it and every requester waits on it. */
 public final class UnlockPrompt {
-    private final WindowHandle owner;
+    private WindowHandle owner;
+    private dev.jasper.sdk.WindowOwner presentationOwner;
+    private Consumer<UnlockPrompt> represent = prompt -> {};
+    private final List<Runnable> retire = new ArrayList<>();
+    private record Request(WindowHandle owner,dev.jasper.sdk.WindowOwner presentation){}
+    private final java.util.Map<CompletableFuture<Boolean>,Request> requests=new java.util.LinkedHashMap<>();
     private final LockManager lock;
     private final Runnable onSettled;
     private final List<CompletableFuture<Boolean>> waiters = new ArrayList<>();
@@ -23,7 +28,13 @@ public final class UnlockPrompt {
     private String error;
     private boolean busy, settled;
 
-    UnlockPrompt(WindowHandle owner, LockManager lock, Runnable onSettled) { this.owner = owner; this.lock = lock; this.onSettled = onSettled; }
+    UnlockPrompt(WindowHandle owner, LockManager lock, Runnable onSettled) { this(owner,owner,lock,onSettled); }
+    UnlockPrompt(WindowHandle owner,dev.jasper.sdk.WindowOwner presentationOwner,LockManager lock,Runnable onSettled){this.owner=owner;this.presentationOwner=presentationOwner;this.lock=lock;this.onSettled=onSettled;}
+    void representWith(Consumer<UnlockPrompt> show){represent=show;}
+    /** Retires only this presentation, before replacement; the shared request stays unsettled. */
+    public void onPresentationRetired(Runnable cleanup){retire.add(cleanup);}
+    public dev.jasper.sdk.WindowOwner presentationOwner(){return presentationOwner;}
+    public boolean anchored(){return presentationOwner instanceof dev.jasper.sdk.ui.UiAnchor;}
 
     public WindowHandle owner() { return owner; }
     public boolean busy() { return busy; }
@@ -34,17 +45,30 @@ public final class UnlockPrompt {
     /** The dialog closes itself here. */
     public void onDismiss(Runnable listener) { dismissListeners.add(listener); }
 
-    CompletableFuture<Boolean> attach() {
+    CompletableFuture<Boolean> attach() {return attach(owner,presentationOwner);}
+    CompletableFuture<Boolean> attach(WindowHandle requestOwner,dev.jasper.sdk.WindowOwner presentation) {
         var waiter = new CompletableFuture<Boolean>();
-        waiters.add(waiter);
+        waiters.add(waiter);requests.put(waiter,new Request(requestOwner,presentation));
         waiter.whenComplete((ignored, failure) -> { if (waiter.isCancelled()) detach(waiter); });
         return waiter;
     }
 
     private void detach(CompletableFuture<Boolean> waiter) {
-        waiters.remove(waiter);
-        if (waiters.isEmpty() && !settled) cancel();
+        waiters.remove(waiter);requests.remove(waiter);
+        if(settled)return;
+        if(waiters.isEmpty()){cancel();return;}
+        if(!live(owner,presentationOwner)){
+            var survivor=List.copyOf(requests.values()).stream().filter(r->live(r.owner(),r.presentation())).findFirst();
+            if(settled||live(owner,presentationOwner))return;
+            if(survivor.isEmpty()){cancel();return;}
+            owner=survivor.get().owner();presentationOwner=survivor.get().presentation();
+            errorListener=message->{};
+            var old=List.copyOf(retire);retire.clear();old.forEach(Runnable::run);
+            if(!settled)represent.accept(this);
+        }
     }
+
+    private static boolean live(WindowHandle owner,dev.jasper.sdk.WindowOwner presentation){return (owner==null||owner.isOpen())&&(!(presentation instanceof dev.jasper.sdk.ui.UiAnchor anchor)||anchor.isOpen());}
 
     /** Tries {@code password} (zeroed by the lock manager); on success every waiter gets {@code true}. */
     public void submit(char[] password) {
@@ -78,6 +102,6 @@ public final class UnlockPrompt {
         onSettled.run();
         dismissListeners.forEach(Runnable::run);
         for (CompletableFuture<Boolean> waiter : List.copyOf(waiters)) waiter.complete(unlocked);
-        waiters.clear();
+        waiters.clear();requests.clear();retire.clear();
     }
 }

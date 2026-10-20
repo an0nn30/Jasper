@@ -1,5 +1,6 @@
 package dev.jasper.app.settingsui;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeManager;
 import dev.jasper.app.config.ConfigLoader;
@@ -70,15 +71,16 @@ public final class SettingsDialogPreview {
             return new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { }, () -> new Rectangle(0, 0, 1000, 700),
                 (title, initial) -> Optional.empty());
         });
+        var contributions = new Contributions();
         var themes = new ThemeController[1];
         var runtime = new PluginRuntime[1];
         var manager = new PluginManager[1];
         var previewPlugins = new dev.jasper.app.plugins.PluginPreviewSupport[1];
         SwingUtilities.invokeAndWait(() -> {
-            themes[0] = new ThemeController();
+            themes[0] = ThemeTestSupport.controller(true);
             runtime[0] = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")), home.resolve("plugins"), null, false,
                 home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
-                PluginRuntime.SettingsReports.IGNORED, new Contributions(), windows, new TerminalRegistry());
+                PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
             runtime[0].start(Map.of(), true);
             var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run,
                 Duration.ofMillis(20), Duration.ofMillis(1));
@@ -88,16 +90,18 @@ public final class SettingsDialogPreview {
         });
         var keymapHooks = new KeymapPage.Hooks(new Contributions(), Map::of, Map::of, true, edits -> CompletableFuture.completedFuture(null));
         try {
-            for (var theme : ThemeManager.builtIns()) for (int size : new int[]{0, 18}) {
-                String suffix = theme.id() + "-" + size + ".png";
+            for (boolean dark : new boolean[]{true, false}) for (int size : new int[]{0, 18}) {
+                String suffix = (dark ? "dark" : "light") + "-" + size + ".png";
                 var keymap = new KeymapPage[1];
-                var dialog = new SettingsDialog(windows, CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark", "IntelliJ Light")),
-                    new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false),
-                    context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context), previewPlugins[0].pages()),
+                var dialog = new SettingsDialog(windows, CorePages.pages(AppearanceFixtures.CHOICES,
+                    new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()),
+                    context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context),
+                    context -> previewPlugins[0].pages().apply(context)),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state,
-                        listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true));
+                        listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true,
+                        () -> themes[0].appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
                 SwingUtilities.invokeAndWait(() -> {
-                    themes[0].configure(theme, new UiFontConfig("system", size));
+                    themes[0].configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system", size));
                     dialog.open(null, "appearance");
                     render(holder[0], output.resolve("appearance-" + suffix));
                     dialog.select("window");
@@ -109,9 +113,9 @@ public final class SettingsDialogPreview {
                     render(holder[0], output.resolve("shell-narrow-" + suffix), 760);
                     dialog.select("system");
                     render(holder[0], output.resolve("system-" + suffix));
-                    dialog.view().search.setText("font");
+                    searchField(dialog).setText("font");
                     render(holder[0], output.resolve("search-" + suffix));
-                    dialog.view().search.setText("");
+                    searchField(dialog).setText("");
                     dialog.draft().stage(dev.jasper.app.config.CoreSettings.TERMINAL_BELL, Optional.of(dev.jasper.terminal.config.BellMode.NONE));
                     dialog.select("terminal");
                     render(holder[0], output.resolve("modified-" + suffix));
@@ -120,9 +124,9 @@ public final class SettingsDialogPreview {
                 });
                 SwingUtilities.invokeAndWait(() -> {
                     render(holder[0], output.resolve("keymap-" + suffix));
-                    dialog.view().search.setText("paste");
+                    searchField(dialog).setText("paste");
                     render(holder[0], output.resolve("keymap-search-" + suffix));
-                    dialog.view().search.setText("");
+                    searchField(dialog).setText("");
                     dialog.select("plugins");
                 });
                 await(() -> dialog.pages().stream().filter(page -> page.id().equals("plugins")).findFirst().orElseThrow()
@@ -130,7 +134,8 @@ public final class SettingsDialogPreview {
                 SwingUtilities.invokeAndWait(() -> {
                     dialog.pages().stream().filter(page -> page.id().equals("plugins")).findFirst().orElseThrow().highlight("Tidy Tabs");
                     render(holder[0], output.resolve("plugins-" + suffix));
-                    tabbed(holder[0]).setSelectedIndex(1);
+                    // Details are now beside the list; show the contained-failure row through the page's real filter.
+                    dialog.pages().stream().filter(page -> page.id().equals("plugins")).findFirst().orElseThrow().highlight("Broken Example");
                     render(holder[0], output.resolve("plugins-details-" + suffix));
                     dialog.select("plugin.dev.example.editor");
                     render(holder[0], output.resolve("plugin-editor-" + suffix));
@@ -142,11 +147,15 @@ public final class SettingsDialogPreview {
         } finally {
             if (previewPlugins[0] != null) previewPlugins[0].close();
             var stopping = new CompletableFuture<List<CompletableFuture<?>>>();
+            var pluginWorkers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime[0]);
             SwingUtilities.invokeAndWait(() -> stopping.complete(runtime[0].stop()));
             CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+            pluginWorkers.await();
             SwingUtilities.invokeAndWait(windows::close);
         }
     }
+
+    private static javax.swing.JTextField searchField(SettingsDialog dialog) { return dialog.view().control("search.input", javax.swing.JTextField.class); }
 
     /** Polls a condition on the EDT, so runtime callbacks queued there can run in between. */
     private static void await(BooleanSupplier onEdt) throws Exception {
@@ -167,22 +176,6 @@ public final class SettingsDialogPreview {
     }
 
     private static void render(JComponent component, Path file) { render(component, file, 1000); }
-
-    private static javax.swing.JTabbedPane tabbed(java.awt.Component root) {
-        var found = findTabbed(root);
-        if (found == null) throw new IllegalStateException("No tabbed pane on the Plugins page");
-        return found;
-    }
-
-    private static javax.swing.JTabbedPane findTabbed(java.awt.Component component) {
-        if (component instanceof javax.swing.JTabbedPane tabs) return tabs;
-        if (component instanceof java.awt.Container container)
-            for (var child : container.getComponents()) {
-                var found = findTabbed(child);
-                if (found != null) return found;
-            }
-        return null;
-    }
 
     private static void render(JComponent component, Path file, int width) {
         component.setSize(width, 700);

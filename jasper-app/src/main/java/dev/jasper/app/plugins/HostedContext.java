@@ -58,14 +58,17 @@ final class HostedContext implements PluginContext {
     final DeclaredSettings declared;
     private final String id;
     private final List<Subscription> owned = new ArrayList<>();
+    void ownPage(PluginPanelPage page){Subscription cleanup=page::dispose;owned.add(cleanup);page.onDisposed=() -> owned.remove(cleanup);}
     private final ExecutorService executor;
     volatile State state = State.STARTING;
     private final HostedUi ui;
+    private final HostedKit kit;
     final CapabilityGate gate;
     final HostedTerminals terminals;
     final HostedPalette palette;
     final HostedFileSources fileSources;
     final HostedNotifications notifications;
+    final HostedCommandLine commandLine;
     private boolean observing;
     Plugin plugin;
 
@@ -75,9 +78,9 @@ final class HostedContext implements PluginContext {
         this.executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("jasper-plugin-" + id + "-", 0).factory());
         this.gate = new CapabilityGate(id, hosted.info().capabilities());
         HostedTerminals[] self = new HostedTerminals[1];
-        var sessions = new HostedSessions(id, host.containment, host.cleanup, paneId -> self[0].detachedPaneHandle(paneId));
+        var sessions = new HostedSessions(id, host.containment, host.cleanup, paneId -> self[0].detachedPaneHandle(paneId), name -> uiIcon(name));
         this.terminals = new HostedTerminals(id, gate, host.environment.terminals(), host.environment.ui(), host.environment.onUi(),
-            () -> state != State.CLOSED, sessions, host.environment.profiles(), host.containment);
+            () -> state != State.CLOSED, sessions, host.environment.profiles(), host.containment, host.shellContributions);
         self[0] = terminals;
         this.ui = new HostedUi(id, host.environment.contributions(), host.containment, host.environment.ui(),
             host.environment.onUi(), () -> state != State.CLOSED, hosted.loader(),
@@ -85,11 +88,17 @@ final class HostedContext implements PluginContext {
             handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())),
             host.environment.windows(), terminals, host.environment.appearance(), host.environment.appearanceSubscriber(),
             host.environment.glass());
-        this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals);
+        ui.presentation(() -> host.presentation);
+        this.kit = new HostedKit(id, () -> state != State.CLOSED, ui::kitThemes, ui.appearance(), host.containment, () -> host.animations.getAsBoolean(), action -> host.shortcuts.apply(action), () -> host.kit.get());
+        ui.kit(kit);
+        this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals, hosted.iconHue());
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,
-            host.environment.ui(), host.environment.onUi());
+            host.environment.ui(), host.environment.onUi(), ui::icon, ui::validateIcon);
+        this.commandLine = new HostedCommandLine(id, host.commands, ui, terminals, () -> host.commandClient);
     }
+
+    private javax.swing.Icon uiIcon(String name){return ui.icon(name);}
 
     private void requireOpen() {
         if (state == State.CLOSED) throw new IllegalStateException("Plugin context is closed: " + id);
@@ -103,9 +112,12 @@ final class HostedContext implements PluginContext {
     /** Closes everything the context handed out. Interrupting is for a failed start; shutdown drains first. */
     void teardown(boolean interrupt, String reason) {
         state = State.CLOSED;
+        kit.close();
         ui.closeAll();
         terminals.closeAll();
         notifications.close();
+        host.clipboard.ownerStopped(id);
+        host.commands.stopped(id);
         List<Subscription> copy;
         synchronized (owned) { copy = new ArrayList<>(owned); owned.clear(); }
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
@@ -116,7 +128,7 @@ final class HostedContext implements PluginContext {
         if (interrupt) executor.shutdownNow(); else executor.shutdown();
     }
 
-    /** Completes when accepted background work has finished, interrupting it once the grace elapses. */
+    /** Completes when accepted work finishes or the grace elapses and interruption is requested. */
     CompletableFuture<Void> drain(Duration grace) {
         var done = new CompletableFuture<Void>();
         Thread.ofPlatform().daemon().name("jasper-plugin-drain-" + id).start(() -> {
@@ -127,6 +139,24 @@ final class HostedContext implements PluginContext {
                 Thread.currentThread().interrupt();
             }
             done.complete(null);
+        });
+        return done;
+    }
+
+    /** Actual completion, including cleanup after the bounded drain has requested interruption. */
+    CompletableFuture<Void> terminated() { return terminated(executor, id); }
+
+    static CompletableFuture<Void> terminated(ExecutorService executor, String name) {
+        if (executor.isTerminated()) return CompletableFuture.completedFuture(null);
+        var done = new CompletableFuture<Void>();
+        Thread.ofVirtual().name("jasper-plugin-termination-" + name).start(() -> {
+            try {
+                while (!executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)) { }
+                done.complete(null);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                done.completeExceptionally(interrupted);
+            }
         });
         return done;
     }
@@ -147,6 +177,7 @@ final class HostedContext implements PluginContext {
     @Override public Toolbar toolbar() { return ui.toolbar(); }
     @Override public Menus menus() { return ui.menus(); }
     @Override public StatusBar statusBar() { return ui.statusBar(); }
+    @Override public dev.jasper.sdk.ui.UiKit kit() { return kit; }
     @Override public Appearance appearance() { return ui.appearance(); }
     @Override public Panels panels() { return ui.panels(); }
     @Override public Rail rail() { return ui.rail(); }
@@ -157,14 +188,18 @@ final class HostedContext implements PluginContext {
 
         @Override public Notifications notifications() { return notifications; }
 
+        @Override public dev.jasper.sdk.cli.CommandLine commandLine() { return commandLine; }
+
         @Override public Platform platform() {
             return new Platform() {
                 @Override public void openInEditor(Path file) {
                     requireOpen();
                     Objects.requireNonNull(file, "file");
                     background().execute(() -> {
-                        try { host.environment.editor().accept(file); }
-                        catch (RuntimeException failure) {
+                        try {
+                            host.fileEditors.openFromWorker(file,
+                                () -> host.environment.terminals().activeWindow().map(dev.jasper.app.terminals.WindowEntry::id), host.environment.editor());
+                        } catch (RuntimeException failure) {
                             log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
                             notifications.group().error("Could not open a file in an editor", String.valueOf(file.getFileName()), failure);
                         }
@@ -181,7 +216,51 @@ final class HostedContext implements PluginContext {
                         }
                     });
                 }
+                @Override public boolean copy(String text) {
+                    requireOpen();
+                    requireUi("Platform.copy");
+                    Objects.requireNonNull(text, "text");
+                    return copied(() -> host.clipboard.copy(text));
+                }
+                @Override public boolean copySecret(String text) {
+                    requireOpen();
+                    requireUi("Platform.copySecret");
+                    Objects.requireNonNull(text, "text");
+                    return copied(() -> host.clipboard.copySecret(text, id));
+                }
+                @Override public Optional<String> clipboardText() {
+                    requireOpen();
+                    requireUi("Platform.clipboardText");
+                    gate.require(Capabilities.CLIPBOARD_READ);
+                    Optional<String> text = host.clipboard.text();
+                    gate.audit(Capabilities.CLIPBOARD_READ, "read " + text.map(String::length).orElse(0) + " characters from the clipboard");
+                    return text;
+                }
+                @Override public Subscription editor(dev.jasper.sdk.ui.FileEditor editor) {
+                    requireOpen();
+                    requireUi("Platform.editor");
+                    gate.require(Capabilities.EDITOR_PROVIDE);
+                    Objects.requireNonNull(editor, "editor");
+                    dev.jasper.app.lifecycle.Subscription registration = host.fileEditors.register(id, editor,
+                        window -> host.environment.terminals().window(window)
+                            .<dev.jasper.sdk.WindowOwner>map(entry -> terminals.windowHandle(entry.id())));
+                    gate.audit(Capabilities.EDITOR_PROVIDE, "became the editor Jasper opens files with");
+                    // HostedUi.closeAll, which teardown runs, closes it when the plugin stops or fails to start.
+                    return ui.tracked(registration::close);
+                }
             };
+        }
+
+        /** Runs a clipboard write; a clipboard that cannot be written is posted in the plugin's group, never thrown. */
+        private boolean copied(Runnable write) {
+            try {
+                write.run();
+                return true;
+            } catch (IllegalStateException | java.awt.HeadlessException unavailable) {
+                log().log(System.Logger.Level.WARNING, "Could not copy to the clipboard", unavailable);
+                notifications.group().error("Could not copy", unavailable);
+                return false;
+            }
         }
 
         /** Only an absolute http or https address opens in a browser. */

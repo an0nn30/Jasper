@@ -1,9 +1,12 @@
 package dev.jasper.app.workspace;
+import dev.jasper.ui.theme.SemanticColor;
+
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeStyles;
 
 import com.formdev.flatlaf.FlatClientProperties;
-import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
-import dev.jasper.app.appearance.Token;
 import dev.jasper.terminal.search.FindResult;
 import dev.jasper.terminal.search.SearchQuery;
 import dev.jasper.terminal.view.TerminalView;
@@ -70,8 +73,8 @@ final class FindBar extends JPanel {
 
     /** IntelliJ's find row: history and toggles inside the field, then count, arrows and a far-right close. */
     private void build() {
-        setLayout(new BorderLayout(UIScale.scale(6), 0));
-        setBorder(BorderFactory.createEmptyBorder(UIScale.scale(2), UIScale.scale(6), UIScale.scale(3), UIScale.scale(6)));
+        setLayout(new BorderLayout(NativeStyles.installed().metric(DesignMetrics.Role.FIND_GAP), 0));
+        setBorder(BorderFactory.createEmptyBorder(NativeStyles.installed().metric(DesignMetrics.Role.FIND_TOP_PADDING), NativeStyles.installed().metric(DesignMetrics.Role.FIND_SIDE_PADDING), NativeStyles.installed().metric(DesignMetrics.Role.FIND_BOTTOM_PADDING), NativeStyles.installed().metric(DesignMetrics.Role.FIND_SIDE_PADDING)));
         JButton history = iconButton("findHistory", "Recent searches", "Recent searches", "SEARCH_HISTORY", null);
         history.addActionListener(event -> recentMenu().show(history, 0, history.getHeight()));
         configure(clear, "clearFind", "Clear search", "Clear search", "CLOSE");
@@ -84,14 +87,15 @@ final class FindBar extends JPanel {
         trailing.add(clear); trailing.addSeparator(); trailing.add(caseSensitive); trailing.add(regex);
         query.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_COMPONENT, history);
         query.putClientProperty(FlatClientProperties.TEXT_FIELD_TRAILING_COMPONENT, trailing);
-        query.putClientProperty(FlatClientProperties.STYLE, "borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
+        NativeStyles.installed().borderlessField(query, () -> ThemeZone.theme(this));
         count.setName("findCount");
-        var controls = new JPanel(new FlowLayout(FlowLayout.LEADING, UIScale.scale(4), 0));
+        NativeStyles.installed().label(count, dev.jasper.ui.metrics.Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY, () -> ThemeZone.theme(this));
+        var controls = new JPanel(new FlowLayout(FlowLayout.LEADING, NativeStyles.installed().metric(DesignMetrics.Role.FIND_CONTROL_GAP), 0));
         controls.setOpaque(false);
         controls.add(count);
         controls.add(iconButton("previousMatch", "Previous", "Previous match (Shift+Enter)", "PREVIOUS_MATCH", this::previous));
         controls.add(iconButton("nextMatch", "Next", "Next match (Enter)", "NEXT_MATCH", this::next));
-        controls.add(Box.createHorizontalStrut(UIScale.scale(16)));
+        controls.add(Box.createHorizontalStrut(NativeStyles.installed().metric(DesignMetrics.Role.FIND_CLOSE_SPACER)));
         controls.add(iconButton("closeFind", "Close", "Close (Escape)", "CLOSE", this::close));
         add(query, BorderLayout.CENTER);
         add(controls, BorderLayout.EAST);
@@ -112,7 +116,7 @@ final class FindBar extends JPanel {
         button.setToolTipText(tooltip);
         button.getAccessibleContext().setAccessibleName(accessible);
         button.setFocusable(false);
-        button.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+        NativeStyles.installed().button(button, () -> ThemeZone.theme(button));
     }
 
     private static void bind(JComponent component, KeyStroke stroke, String name, Runnable task) {
@@ -130,8 +134,7 @@ final class FindBar extends JPanel {
 
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(WorkspaceTheme.color(this, Token.SEPARATOR, "Jasper.titleSeparator"));
-        g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
+        dev.jasper.ui.swing.ChromePainter.installed().bottomHairline(this, g, ThemeZone.theme(this));
     }
 
     @Override public void removeNotify() {
@@ -229,37 +232,24 @@ final class FindBar extends JPanel {
         query.putClientProperty(FlatClientProperties.OUTLINE, value ? FlatClientProperties.OUTLINE_ERROR : null);
         // The tint is a plain Color so the field's own updateUI keeps it; the default stays a
         // UIResource so a theme switch restores the new theme's background.
-        Color background = WorkspaceTheme.color(this, value ? Token.ERROR_BACKGROUND : Token.INPUT_BACKGROUND,
-            value ? "Jasper.findErrorBackground" : "TextField.background");
+        Color background = value ? dev.jasper.ui.theme.UiColorKeys.errorTint(ThemeZone.theme(this).semantic()) : ThemeZone.color(this, SemanticColor.SURFACE_INPUT);
         query.setBackground(value ? new Color(background.getRGB(), true) : background);
     }
 
     /** Reapply host-owned controls after a zone or chrome change; retain query, actions and base field style. */
     void refreshTheme() {
-        setBackground(WorkspaceTheme.color(this, Token.SURFACE, "Panel.background"));
-        setForeground(WorkspaceTheme.color(this, Token.TEXT, "Label.foreground"));
-        count.setForeground(WorkspaceTheme.color(this, Token.TEXT_MUTED, "Label.disabledForeground"));
-        query.setForeground(WorkspaceTheme.color(this, Token.TEXT, "TextField.foreground"));
-        query.setCaretColor(WorkspaceTheme.color(this, Token.TEXT, "TextField.caretForeground"));
-        query.setSelectionColor(WorkspaceTheme.color(this, Token.TEXT_SELECTION, "TextField.selectionBackground"));
-        query.setSelectedTextColor(WorkspaceTheme.color(this, Token.TEXT_SELECTION_TEXT, "TextField.selectionForeground"));
-        styleButtons(this);
+        setBackground(ThemeZone.color(this, SemanticColor.SURFACE_PANEL));
+        setForeground(ThemeZone.color(this, SemanticColor.TEXT_PRIMARY));
+        count.setForeground(ThemeZone.color(this, SemanticColor.TEXT_SECONDARY));
+        NativeStyles.installed().refresh(query);
+        refreshControls(this);
         miss(missing);
     }
 
-    private void styleButtons(java.awt.Container root) {
+    private void refreshControls(java.awt.Container root) {
         for (var child : root.getComponents()) {
-            if (child instanceof AbstractButton button) {
-                boolean toggle = button instanceof JToggleButton;
-                String prefix = toggle ? "ToggleButton." : "Button.";
-                button.setBackground(WorkspaceTheme.color(this, Token.SURFACE, prefix + "background"));
-                button.setForeground(WorkspaceTheme.color(this, Token.TEXT, prefix + "foreground"));
-                button.putClientProperty(FlatClientProperties.STYLE, WorkspaceTheme.workspace(this) == null ? null :
-                    java.util.Map.of("toolbar.hoverBackground", WorkspaceTheme.color(this, Token.HOVER, prefix + "background"),
-                        "toolbar.pressedBackground", WorkspaceTheme.color(this, Token.PRESSED, prefix + "background"),
-                        "toolbar.selectedBackground", WorkspaceTheme.color(this, Token.SELECTION, prefix + "background")));
-            }
-            if (child instanceof java.awt.Container container) styleButtons(container);
+            if (child instanceof JComponent component) NativeStyles.installed().refresh(component);
+            if (child instanceof java.awt.Container container) refreshControls(container);
         }
     }
 
@@ -282,7 +272,7 @@ final class FindBar extends JPanel {
             item.addActionListener(event -> { query.setText(text); query.requestFocusInWindow(); });
             menu.add(item);
         }
-        return menu;
+        dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
     }
 
     void close() {

@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.AppIcons;
-import dev.jasper.app.appearance.Theme;
+
 import dev.jasper.app.contributions.*;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Font;
@@ -40,13 +40,13 @@ public final class HostedContentPreview {
                         new ContentStatus("UTF-8", "Encoding", null), new ContentStatus("LF", "Line ending", null), new ContentStatus("Spaces: 4", "Indentation", null)));
                     selected = entry;
                 }
-                for (Theme theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                    owner.selectTheme(theme);
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    owner.selectVariant(themeDark);
                     for (var entry : model.content().entries()) {
                         var scroll = (JScrollPane)entry.component();
                         var text = (JTextArea)scroll.getViewport().getView();
-                        text.setBackground(UIManager.getColor("Jasper.editorBackground"));
-                        text.setForeground(UIManager.getColor("Jasper.editorForeground"));
+                        text.setBackground(dev.jasper.ui.theme.JasperTheme.bundled().editor(dev.jasper.app.platform.ThemeZone.theme(text).dark()).background());
+                        text.setForeground(dev.jasper.ui.theme.JasperTheme.bundled().editor(dev.jasper.app.platform.ThemeZone.theme(text).dark()).foreground());
                         scroll.getViewport().setBackground(text.getBackground());
                     }
                     selected.select();
@@ -56,7 +56,7 @@ public final class HostedContentPreview {
                         var image = new BufferedImage(width * 2, 1240, BufferedImage.TYPE_INT_RGB);
                         var graphics = image.createGraphics();
                         try { graphics.scale(2, 2); root.printAll(graphics); } finally { graphics.dispose(); }
-                        Path path = output.resolve("hosted-" + theme.name().toLowerCase() + "-" + width + ".png");
+                        Path path = output.resolve("hosted-" + (themeDark ? "dark" : "light").toLowerCase() + "-" + width + ".png");
                         try { ImageIO.write(image, "png", path.toFile()); }
                         catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
                         System.out.println(path.toAbsolutePath());

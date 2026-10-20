@@ -16,6 +16,14 @@ public sealed interface EditorHint {
     record File() implements EditorHint { }
 
     /**
+     * A data value, such as a host, a port range, a path or a command: a text setting's field is drawn in the data face.
+     * Other kinds ignore it.
+     *
+     * @since 0.18.0
+     */
+    record Technical() implements EditorHint { }
+
+    /**
      * A font family picker.
      *
      * @param monospaced whether only monospaced families are offered
@@ -36,4 +44,12 @@ public sealed interface EditorHint {
      * @return the hint
      */
     static EditorHint file() { return new File(); }
+
+    /**
+     * A data value's text field.
+     *
+     * @return the hint
+     * @since 0.18.0
+     */
+    static EditorHint technical() { return new Technical(); }
 }

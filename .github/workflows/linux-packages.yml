@@ -5,12 +5,8 @@ name: linux-packages
 # and newer releases still provide. Each package is then installed into disposable containers of other
 # distributions to prove its dependencies resolve there.
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Package version (X.Y.Z)
-        default: 1.0.0
   push:
+    branches: [main]
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
@@ -22,6 +18,13 @@ on:
       - gradle/packaging-support.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   package:
@@ -36,20 +39,21 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
+      # The package version comes from the release tag, so the whole history and its tags are needed.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils
+          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils g++
       - uses: actions/setup-java@v6
         with:
           distribution: jetbrains
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v6
       - name: Package
-        env:
-          JASPER_VERSION: ${{ inputs.version || '1.0.0' }}
-        run: ./gradlew :jasper-app:packageDist "-PjasperVersion=$JASPER_VERSION" --continue --stacktrace
+        run: ./gradlew :jasper-app:packageDist --stacktrace
       - uses: actions/upload-artifact@v7
         with:
           name: jasper-linux-${{ matrix.arch }}

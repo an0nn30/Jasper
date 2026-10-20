@@ -4,6 +4,7 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.testing.contract.ContractCall;
 import dev.jasper.sdk.testing.contract.ContractHarness;
 import dev.jasper.sdk.testing.contract.PluginContractTest;
 import java.util.List;
@@ -19,8 +20,10 @@ class FakeContractTest extends PluginContractTest {
                 return java.util.Optional.ofNullable(host.savedSettings(pluginId).get(key));
             }
             @Override public List<String> settingsReports(String pluginId) { return host.settingsReports(pluginId); }
+            @Override public void setKitDefault(String pluginId, String key, Object rawValue) { host.setKitDefault(pluginId, key, rawValue); }
+            @Override public List<String> lookDefaultProblems(String pluginId) { return host.lookDefaultProblems(pluginId); }
             @Override public void start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
-                host.start(info, requires, optional, plugin);
+                ui(() -> host.start(info, requires, optional, plugin));
             }
             @Override public boolean active(String pluginId) { return host.active(pluginId); }
             @Override public void setWorkspace(dev.jasper.sdk.Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
@@ -28,7 +31,10 @@ class FakeContractTest extends PluginContractTest {
                 host.setWorkspace(variant, palette, editor, syntax);
             }
             @Override public void setWorkspaceOpacity(double opacity) { host.setWorkspaceOpacity(opacity); }
-            @Override public void ui(Runnable action) { action.run(); }
+            @Override public void ui(Runnable action) {
+                if(javax.swing.SwingUtilities.isEventDispatchThread()){action.run();return;}
+                try {javax.swing.SwingUtilities.invokeAndWait(action);}catch(Exception failure){throw new AssertionError(failure);}
+            }
             @Override public void flush() { host.flush(); }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.publishApp(topic, payload); }
             @Override public List<ActivityEvent> activityLog() { return host.activityLog(); }
@@ -36,18 +42,45 @@ class FakeContractTest extends PluginContractTest {
             @Override public List<String> actions() { return host.actions(); }
             @Override public boolean invoke(String actionId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.invoke(actionId, windowId, paneIdOrNull); }
             @Override public List<String> toolbar() { return host.toolbar(); }
+            @Override public List<String> openToolbarViews(java.util.UUID windowId) {
+                return host.toolbarViews(windowId).stream().map(view -> view.spec().root().id()).toList();
+            }
+            @Override public void closeToolbarViews(java.util.UUID windowId) { host.closeToolbarViews(windowId); }
+            @Override public void clickToolbarViewButton(java.util.UUID windowId, String buttonId) {
+                for (var view : host.toolbarViews(windowId))
+                    for (var child : ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children())
+                        if (child instanceof dev.jasper.sdk.ui.Nodes.Button button && button.id().equals(buttonId)) {
+                            view.emit(new dev.jasper.sdk.ui.UiEvent.Action(button.action()));
+                            return;
+                        }
+                throw new AssertionError("No toolbar view button " + buttonId + " in " + windowId);
+            }
             @Override public List<String> menu(String target) { return host.menu(target); }
             @Override public List<String> status() { return host.status(); }
             @Override public List<String> panels() { return host.panels(); }
             @Override public javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId) { return host.openPanel(panelId, windowId); }
+            @Override public String panelHeader(String panelId, java.util.UUID windowId) {
+                var header = host.panelHeader(panelId, windowId);
+                var labels = header.actions().stream().map(dev.jasper.sdk.ui.PanelHeader.Action::label).toList();
+                return header.detail() + "|" + header.active() + "|" + (labels.isEmpty() ? "-" : String.join(";", labels));
+            }
+            @Override public boolean runPanelHeaderAction(String panelId, java.util.UUID windowId, String label) {
+                var action = host.panelHeader(panelId, windowId).actions().stream().filter(a -> a.label().equals(label)).findFirst();
+                action.ifPresent(a -> a.invoke().run());
+                return action.isPresent();
+            }
+            @Override public void closePanel(String panelId, java.util.UUID windowId) { host.closePanel(panelId, windowId); }
+            @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((FakeKitView) view).route; }
             @Override public List<String> rail() { return host.rail(); }
             @Override public List<String> windows() { return host.windows(); }
+            @Override public String dialogSwatch(String pluginId, String title) { return host.dialogSwatch(pluginId, title).map(Enum::name).orElse("-"); }
             @Override public boolean requestClose(String windowId) { return host.requestClose(windowId); }
             @Override public boolean closeCommand(String windowId) { return host.closeCommand(windowId); }
             @Override public boolean requestQuit() { return host.requestQuit(); }
             @Override public java.util.UUID addTerminalWindow() { return host.addTerminalWindow(); }
             @Override public java.util.UUID addTerminalTab(java.util.UUID windowId, String title) { return host.addTerminalTab(windowId, title); }
             @Override public List<String> scopes() { return host.scopes(); }
+            @Override public String scopePresentation(String scopeId) { return host.scopePresentation(scopeId); }
             @Override public List<String> fileSources() { return host.fileSources(); }
             @Override public List<String> searchScope(String scopeId, String query, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.searchScope(scopeId, query, windowId, paneIdOrNull); }
             @Override public boolean availableInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.availableInScope(scopeId, rowId, verbId, windowId, paneIdOrNull); }
@@ -84,7 +117,34 @@ class FakeContractTest extends PluginContractTest {
                 host.commandFinished(paneId, command, java.util.OptionalInt.of(exitStatus), java.time.Duration.ofMillis(1500));
             }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) { host.setVariant(variant); }
+            @Override public void setPresentation(dev.jasper.sdk.ui.Presentation presentation) { host.setPresentation(presentation); }
+            @Override public java.util.Optional<String> clipboard() { return host.clipboard().text(); }
+            @Override public void userCopies(String text) { host.clipboard().setText(text); }
+            @Override public void clipboardBusy(boolean busy) { host.clipboard().failWrites(busy); }
+            @Override public void expireClipboardSecret() { host.clipboard().expireSecrets(); }
             @Override public void stopAll() { host.stopAll(); }
+            @Override public void declareSubcommand(String pluginId, String name, String summary) { host.declareSubcommand(pluginId, name, summary); }
+            @Override public ContractCall call(String name, List<String> arguments, java.nio.file.Path workingDirectory, java.util.UUID paneOrNull) {
+                FakeCommandCall call = host.call(name, arguments, workingDirectory, paneOrNull);
+                return new ContractCall() {
+                    @Override public int exitCode() {
+                        try { return call.exit().get(5, java.util.concurrent.TimeUnit.SECONDS); }
+                        catch (Exception failure) { throw new AssertionError(failure); }
+                    }
+                    @Override public boolean finished() { return call.exit().isDone(); }
+                    @Override public String out() { return call.out(); }
+                    @Override public String err() { return call.err(); }
+                    @Override public void cancel() { call.cancel(); }
+                };
+            }
+            @Override public java.util.Map<String, String> shellVariables(java.util.Map<String, String> jasperEnvironment) {
+                return host.shellEnvironment(jasperEnvironment);
+            }
+            @Override public void declareBundled(String pluginId) { host.declareBundled(pluginId); }
+            @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId) {
+                return host.edit(file, line, windowId);
+            }
+            @Override public void commandClient(java.nio.file.Path client) { host.setCommandClient(client); }
             @Override public void close() { host.close(); }
         };
     }

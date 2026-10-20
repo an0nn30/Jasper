@@ -27,7 +27,7 @@ To carry settings over, close the app and copy `config.toml` and
 `command-history.toml` from the old directory into the new one. If Jasper already
 has settings, merge them instead of overwriting them. Logs do not need to be copied.
 Replace any old `[colors]` block (`appearance`, `theme`, custom palette files) with
-`ui.theme.name = "Jasper Dark"` or `"IntelliJ Light"`; the old keys are reported as unknown settings
+`ui.appearance = "dark"` or `"light"`; the old keys are reported as unknown settings
 and ignored. Update any custom shortcuts, scripts,
 or integrations referencing the old executable, package, property, or module name.
 Historical benchmark manifests preserve the original artifact names and hashes.

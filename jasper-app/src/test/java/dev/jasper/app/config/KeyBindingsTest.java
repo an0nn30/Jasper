@@ -17,7 +17,7 @@ class KeyBindingsTest {
     @Test
     void actionCatalogCoversEveryPhaseOneActionAndUsesStableIds() {
         assertThat(EnumSet.allOf(ActionId.class)).containsExactly(
-            ActionId.NEW_TAB, ActionId.CLOSE_TAB, ActionId.NEW_WINDOW,
+            ActionId.NEW_TAB, ActionId.CLOSE_TAB, ActionId.NEW_WINDOW, ActionId.OPEN_FILE,
             ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.CLOSE_PANE, ActionId.ZOOM_PANE,
             ActionId.TOGGLE_ZEN_MODE,
             ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT,
@@ -28,12 +28,14 @@ class KeyBindingsTest {
             ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9,
             ActionId.RENAME_TAB, ActionId.FIND, ActionId.FIND_NEXT, ActionId.FIND_PREVIOUS,
             ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT, ActionId.COPY, ActionId.PASTE,
-            ActionId.COMMAND_PALETTE, ActionId.CLEAR_SCROLLBACK, ActionId.FONT_BIGGER, ActionId.FONT_SMALLER,
+            ActionId.COMMAND_PALETTE, ActionId.CLEAR_SCROLLBACK, ActionId.CLEAR_TERMINAL, ActionId.FONT_BIGGER, ActionId.FONT_SMALLER,
             ActionId.FONT_RESET, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         assertThat(ActionId.SPLIT_RIGHT.id()).isEqualTo("split_right");
         assertThat(ActionId.SPLIT_RIGHT.label()).isEqualTo("Split Right");
         assertThat(ActionId.SPLIT_RIGHT.defaultBinding(true)).isEqualTo("cmd+d");
         assertThat(ActionId.SPLIT_RIGHT.defaultBinding(false)).isEqualTo("ctrl+shift+d");
+        assertThat(KeyBindings.defaults(true).strokeFor(ActionId.CLEAR_TERMINAL)).isEmpty();
+        assertThat(KeyBindings.defaults(false).strokeFor(ActionId.CLEAR_TERMINAL)).isEmpty();
     }
 
     @Test
@@ -181,5 +183,12 @@ class KeyBindingsTest {
         KeyBindings bindings = KeyBindings.withOverrides(true, Map.of("new_tab", "F13", "new_window", "F24"));
         assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_F13, 0))).contains(ActionId.NEW_TAB);
         assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_F24, 0))).contains(ActionId.NEW_WINDOW);
+    }
+
+    @Test void displayWritesTheMacGlyphsInOrderAndNamesElsewhere() {
+        var stroke = KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
+        assertThat(KeyBindings.display(stroke, true)).isEqualTo("\u21e7\u2318H");
+        assertThat(KeyBindings.display(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK), false)).isEqualTo("Ctrl+Shift+H");
+        assertThat(KeyBindings.display(null, true)).isEmpty();
     }
 }

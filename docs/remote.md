@@ -4,7 +4,7 @@ Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
 split beside the current pane, Shift+Enter edits the host. The **Sessions** panel shows searchable
 compact tree-style rows grouped by folder, favorites first, with slightly larger text.
-Choose **View > SSH Hosts** or press **Cmd+Shift+S** (Ctrl+Shift+S elsewhere) to show or hide
+Choose **Session › Toggle SSH hosts** or press **Cmd+Alt+1** (Alt+1 elsewhere) to show or hide
 the panel in the current window. Opening the sidebar highlights the first visible host and focuses
 the list, ready for arrow keys and Enter. Both navigation shortcuts are configurable below.
 A small dot marks an active session; multiple sessions show a count. Selecting a host shows its
@@ -19,6 +19,13 @@ The toolbar’s **Sessions** dropdown lists saved hosts alphabetically with thei
 Choose a host to focus its most recently used running session, or connect in a new tab if none
 is open. **Manage Sessions...** opens the hosts panel, including when no hosts are saved.
 The list updates when hosts are added, edited, imported or removed.
+
+Under the Enterprise look the toolbar shows the session combo (saved hosts, then WSL distributions, then
+**Manage Sessions…**) and the Run button, tooltip **Connect**, which focuses a running pane for the chosen host or opens one. The Sessions panel
+is a Name/Host/Port tree over the selected host's Properties, Tunnels is a Type/Local/Remote/Via table whose rows start
+or stop on Enter or a double click, SFTP's tools read **Hidden files** and **Upload** over a Modified column, and
+Transfers (**Cmd+Alt+3**, Alt+3 elsewhere) is a bottom panel. The panels start with Sessions and Tunnels on the right,
+SFTP on the left.
 
 On Windows with WSL installed, the Sessions panel starts with a read-only **WSL** group: the
 distributions Jasper detected for its shell profiles, each with its WSL version (WSL 1 or WSL 2) as a
@@ -39,14 +46,17 @@ button. It stays centered on resize and blocks underlying input; Escape and outs
 dismiss it. The tab or split appears once the SSH shell is ready. Failures offer **Retry** and
 **Close**. Reconnect uses the overlay while preserving the existing pane. Host-key and Vault prompts
 remain native dialogs above it. A second connection request in that window focuses the current attempt.
-The **SSH** menu carries the connection commands plus **Import from ~/.ssh/config...**.
+The **Session** menu carries the connection commands, **New Host...** (`dev.jasper.remote.hosts.new`, the Sessions
+panel's **+** without opening the panel; unbound by default), **Import from ~/.ssh/config...** and the tunnel commands; the **Transfer**
+menu carries **Open SFTP here** and **Transfers**.
 
 A host is a name, hostname, port, username, group, an optional jump host and how it authenticates:
 a **Vault credential** (a login with a password, a key or both, or a standalone key with the host's
 username) or the **SSH agent** (`SSH_AUTH_SOCK`, or the OpenSSH agent pipe on Windows). Hosts live in
 `plugins/dev.jasper.remote/data/hosts.toml`, which you may edit; Jasper notices the change within a
 second. The file never holds a secret. A jump host makes the connection go through that host first,
-with its own authentication and host-key check.
+with its own authentication and host-key check. In the Add Host form, **Add and Connect** saves the host and then
+connects to it in a new tab, as the palette's Connect does; if the save fails, nothing connects.
 
 **Import** reads `~/.ssh/config` (`Host`, `HostName`, `Port`, `User`, `ProxyJump`, ordered
 `IdentityFile` directives and one level of `Include`). Wildcard hosts and `Match` blocks are
@@ -109,12 +119,12 @@ use_ssh_agent = true
 ```
 
 Connection settings apply to the next connection. A value out of range is reported and its default used.
-Toggle SSH Hosts (Cmd+Shift+S), Connect to SSH Host… (Cmd+Shift+H) and Toggle SFTP (no default) are bound in
+Toggle SSH Hosts (Cmd+Alt+1), Connect to SSH Host… (Cmd+Shift+H) and Toggle SFTP (Cmd+Alt+2) are bound in
 Settings › Keymap like any other action; `cmd` means Command on macOS and Ctrl+Shift elsewhere. A `[shortcuts]`
 table from an older Remote is reported as unknown; delete it and rebind in Keymap.
 
-The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split` and
-`dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
+The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split`,
+`dev.jasper.remote.hosts.new` and `dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
 contributed actions. Tunnels have their own section at the end of this guide.
 
 ## Native acceptance
@@ -166,11 +176,12 @@ menus, palette and subsequent connection overlay follow the new family/size.
 
 ## SFTP browsing and transfers
 
-Remote 0.4 includes SFTP in the same plugin as SSH. Choose **SSH > SFTP**, **View > SFTP**,
+Remote 0.4 includes SFTP in the same plugin as SSH. Choose **Transfer > Open SFTP here**, **View > SFTP**,
 **Open SFTP here** in a terminal's context menu, or **Browse files** on a saved host.
 Connecting a shell does not automatically open the browser. There is one remote browser in
 each window, with an editable path, compact file list, Up, Upload, Download, Refresh,
-New folder, Delete and Copy path controls. Select multiple rows for file operations.
+New folder, Delete and Copy path controls. Select multiple rows for file operations. Hidden items (names starting with
+a dot) stay out of the list until the **Show hidden items** toggle beside Refresh is pressed; the choice is remembered.
 The context menu also offers **Upload folder** and **Copy to host**.
 Opening a directory link deliberately resolves its path; recursive copy/delete still treat it as a link.
 
@@ -222,13 +233,13 @@ first and closed when none are left. When the connection has closed, the next op
 appear in the terminal window the file was opened from, or else in the active one. With no terminal window open it
 fails with "Reconnecting to prod-web needs an open terminal window for the sign-in prompt."
 
-Transfers appear at the bottom of the SFTP sidebar, in every window: what is copying and where,
+Transfers appear at the bottom of the SFTP sidebar (the Transfers panel under the Enterprise look), in every window: what is copying and where,
 a progress bar, speed and time left, and **×** to cancel. A transfer that needs you shows one
 button — **Resume** (paused or interrupted), **Resolve…**, **Retry failed** or **Retry cleanup**.
 A finished transfer shows "Done" for a few seconds and leaves; failed or cancelled ones stay until
 dismissed with ×. The strip hides when nothing is queued. Before copying onto items that already
 exist, Remote asks once: **Replace** (files replaced, folders merged), **Skip existing** or
-**Cancel**. **SSH > Transfers** shows the sidebar. The status bar displays aggregate progress,
+**Cancel**. **Transfer > Transfers** shows the sidebar. The status bar displays aggregate progress,
 confirmed-data speed and bytes remaining; scanning has an unknown total. Click it to show the
 sidebar. Its cancel control cancels the sole active job, or shows the sidebar when several jobs
 are active.
@@ -282,7 +293,7 @@ verified build commands are in [SFTP verification](remote-7c-verification.md).
 
 ## Tunnels
 
-Remote 0.10 adds SSH tunnels. Open the **Tunnels** panel from its rail button or **SSH > Toggle Tunnels**
+Remote 0.10 adds SSH tunnels. Open the **Tunnels** panel from its rail button or **Session > Toggle Tunnels**
 (the palette's **Show Tunnels** command opens it too). A tunnel goes through a saved host: its credential, host-key
 trust and jump host apply. It has its own life: starting one never opens a terminal, closing terminals never stops it,
 and it shares the host's SSH connection with any terminals that are open.
@@ -293,15 +304,15 @@ and it shares the host's SSH connection with any terminals that are open.
   connect needs the server's `GatewayPorts` to permit it.
 - **Dynamic** (`-D`): a SOCKS5 proxy on this computer (no authentication, CONNECT only); names resolve on the server.
 
-Click **+** (or **SSH > New Tunnel...**) to add one: a name, the host to go through, the type, where to listen (port 0
+Click **+** (or **Session > New Tunnel...**) to add one: a name, the host to go through, the type, where to listen (port 0
 means any free port) and where to forward to. Start and stop a tunnel with the button at the end of its row, Enter or
-Space. The palette's Tunnels scope (`tunnels >`) lists the same tunnels: Enter starts or stops, Cmd/Ctrl+Enter opens a
+Space. The palette's Tunnels scope (`tunnels >`, or **Session > Start or Stop a Tunnel...**) lists the same tunnels: Enter starts or stops, Cmd/Ctrl+Enter opens a
 running local tunnel in the browser, Shift+Enter edits a saved tunnel. Double-clicking a saved tunnel edits it. A
 running row shows its open connections, the bytes moved each way and its uptime; right-click for Start or Stop, Open
 in Browser, Copy Address, Edit, Duplicate and Delete. The status bar counts running tunnels and failures. A tunnel
 whose host was deleted stays in the list, marked "Host missing"; edit it to choose another host.
 
-**Forward a Port...** (a terminal's context menu, the SSH menu or the palette) forwards a remote port to the same port
+**Forward a Port...** (a terminal's context menu, the Session menu or the palette) forwards a remote port to the same port
 on this computer's loopback (the next free one if it is taken) through the SSH pane's host, or through a host you choose
 when the command does not start from an SSH pane. **More** reveals a *Forward to host* field for a target other than the
 server itself, named as the server sees it. It starts a quick forward, listed under *Quick forwards* until you stop it
@@ -336,7 +347,7 @@ Edits to the file apply within a second: a running tunnel whose forwarding chang
 A file that does not parse keeps the last good tunnels and shows one error row ("tunnels.toml has errors: …"). While
 the file has entries Remote cannot read (they are reported in the log), saves from Jasper are refused until you fix or
 remove them. The actions are `dev.jasper.remote.tunnels` (Toggle Tunnels), `.tunnels.show` (Show Tunnels),
-`.tunnels.new` (New Tunnel...), `.tunnels.forward` (Forward a Port...) and `.tunnels.stop-all` (Stop All Tunnels),
+`.tunnels.pick` (Start or Stop a Tunnel...), `.tunnels.new` (New Tunnel...), `.tunnels.forward` (Forward a Port...) and `.tunnels.stop-all` (Stop All Tunnels),
 none bound by default.
 
 Native acceptance for tunnels (user-run):
@@ -347,3 +358,15 @@ Native acceptance for tunnels (user-run):
 4. Forward a Port from an SSH pane, then Save as Tunnel; restart Jasper and find it saved.
 5. Stop the network or `sshd`: the tunnel shows "Connection lost" and its port closes.
 6. "Allow other computers to connect" on a local tunnel: macOS asks once to accept incoming connections.
+
+## For plugins: projects on saved hosts
+
+Remote 0.12 exports `dev.jasper.remote.api`. Its `RemoteProjects` service (published with `Services.publish`; require
+`dev.jasper.remote` `>=0.12`, optionally) lets a plugin find where an SSH pane is (`locate`), check markers in a list of
+folders with one command (`exists`), list a project's files (`list`: Git, then `find`, then an SFTP walk), and open a
+file in the Editor or an SSH tab in a folder. Calls without a window use only an already authenticated connection and
+fail with `NotConnectedException` otherwise; `list` with a window may connect and ask the user to sign in. Remote runs
+fixed scripts as `sh -s` with every path single-quoted and never types into the user's shell. `exists` needs a POSIX
+`sh` on the host, so marker detection does not work on Windows OpenSSH hosts; `list` falls back to an SFTP walk where
+`sh`, Git or `find` is missing. `locate` attributes a pane's folder to the pane's saved host: after a nested `ssh`
+inside an SSH pane, the folder reported is still read as one on the saved host. Project Index is the bundled consumer.

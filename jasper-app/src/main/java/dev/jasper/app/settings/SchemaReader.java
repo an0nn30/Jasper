@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import org.tomlj.Toml;
 import org.tomlj.TomlParseResult;
 import org.tomlj.TomlPosition;
@@ -50,6 +51,7 @@ public final class SchemaReader {
 
     private final SettingsSchema schema;
     private final BiFunction<List<String>, Object, Object> aliasValue;
+    private final Function<Setting<?>, Object> fallback;
     private final TomlParseResult toml;
     private final SettingValues.Builder values;
     private final List<Problem> problems = new ArrayList<>();
@@ -61,8 +63,18 @@ public final class SchemaReader {
     }
 
     public SchemaReader(SettingsSchema schema, String text, BiFunction<List<String>, Object, Object> aliasValue) {
+        this(schema, text, aliasValue, Setting::defaultValue);
+    }
+
+    /**
+     * As {@link #SchemaReader(SettingsSchema, String, BiFunction)}; an invalid value reads as {@code fallback} gives its
+     * setting, which must be a value of that setting's type (a look's defaults, spec 5.8).
+     */
+    public SchemaReader(SettingsSchema schema, String text, BiFunction<List<String>, Object, Object> aliasValue,
+                        Function<Setting<?>, Object> fallback) {
         this.schema = Objects.requireNonNull(schema, "schema");
         this.aliasValue = Objects.requireNonNull(aliasValue, "aliasValue");
+        this.fallback = Objects.requireNonNull(fallback, "fallback");
         this.toml = Toml.parse(Objects.requireNonNull(text, "text"));
         this.values = SettingValues.builder(schema);
     }
@@ -100,8 +112,9 @@ public final class SchemaReader {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private <T> void read(Setting<T> setting, List<String> path, Object value) {
-        Reading<T> reading = setting.kind().read(value, setting.defaultValue());
+        Reading<T> reading = setting.kind().read(value, (T) fallback.apply(setting));
         for (Reading.Issue issue : reading.issues()) {
             if (issue.rejectsFile()) rejected = true;
             var at = new ArrayList<>(path);

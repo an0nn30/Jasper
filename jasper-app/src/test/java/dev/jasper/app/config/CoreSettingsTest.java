@@ -28,7 +28,7 @@ class CoreSettingsTest {
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(40);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(44);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();
@@ -49,7 +49,8 @@ class CoreSettingsTest {
         assertThat(CoreSettings.SCHEMA.aliasOf(List.of("font", "fallback"))).containsSame(CoreSettings.TERMINAL_FONT_FALLBACK);
         assertThat(CoreSettings.SCHEMA.aliasOf(List.of("font", "ligatures"))).containsSame(CoreSettings.TERMINAL_FONT_LIGATURES);
         assertThat(CoreSettings.SCHEMA.aliasOf(List.of("font", "line_height"))).containsSame(CoreSettings.TERMINAL_FONT_LINE_HEIGHT);
-        assertThat(CoreSettings.SCHEMA.aliasOf(List.of("ui", "theme", "terminal"))).containsSame(CoreSettings.TERMINAL_COLORS);
+        assertThat(CoreSettings.SCHEMA.aliasOf(List.of("ui", "theme", "terminal"))).as("removed with the theme names").isEmpty();
+        assertThat(CoreSettings.SCHEMA.aliasOf(List.of("terminal", "colors"))).isEmpty();
         assertThat(CoreSettings.SCHEMA.aliasOf(List.of("background", "enabled"))).containsSame(CoreSettings.SYSTEM_RUN_IN_BACKGROUND);
         assertThat(CoreSettings.SCHEMA.reserved(List.of("keybindings"))).isTrue();
         assertThat(CoreSettings.SCHEMA.reserved(List.of("plugins"))).isTrue();
@@ -64,13 +65,18 @@ class CoreSettingsTest {
         var values = SettingValues.builder(CoreSettings.SCHEMA)
             .put(CoreSettings.TERMINAL_FONT_SIZE, 20f, CoreSettings.TERMINAL_FONT_SIZE.key())
             .put(CoreSettings.SYSTEM_RUN_IN_BACKGROUND, true, CoreSettings.SYSTEM_RUN_IN_BACKGROUND.key())
-            .put(CoreSettings.TERMINAL_COLORS, "dark", CoreSettings.TERMINAL_COLORS.key())
+            .put(CoreSettings.UI_APPEARANCE, AppearanceMode.LIGHT, CoreSettings.UI_APPEARANCE.key())
+            .put(CoreSettings.TERMINAL_SCHEME, "slate-cobalt/high-contrast", CoreSettings.TERMINAL_SCHEME.key())
+            .put(CoreSettings.UI_THEME_DARK, "ocean", CoreSettings.UI_THEME_DARK.key())
             .put(CoreSettings.TERMINAL_ENV, Map.of("A", "1"), CoreSettings.TERMINAL_ENV.key())
             .put(CoreSettings.WINDOW_STATUS_BAR_HEIGHT, 30, CoreSettings.WINDOW_STATUS_BAR_HEIGHT.key()).build();
         var snapshot = ConfigSnapshot.from(values, Map.of("copy", "none"), Map.of());
         assertThat(snapshot.fontSize()).isEqualTo(20f);
         assertThat(snapshot.backgroundEnabled()).isTrue();
-        assertThat(snapshot.terminalColors()).isEqualTo(TerminalColors.DARK);
+        assertThat(snapshot.appearance()).isEqualTo(AppearanceMode.LIGHT);
+        assertThat(snapshot.terminalScheme()).isEqualTo(TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow());
+        assertThat(snapshot.darkTheme()).isEqualTo("ocean");
+        assertThat(snapshot.lightTheme()).isEqualTo("jasper-meadow");
         assertThat(snapshot.terminal().env()).containsExactly(Map.entry("A", "1"));
         assertThat(snapshot.statusBarHeight()).isEqualTo(30);
         assertThat(snapshot.keybindings()).containsExactly(Map.entry("copy", "none"));
@@ -94,5 +100,11 @@ class CoreSettingsTest {
         assertThat(setting.applies()).isEqualTo(dev.jasper.app.settings.Applies.RESTART);
         assertThat(dev.jasper.app.config.ConfigSnapshot.defaults().nativeDecorations()).isFalse();
         assertThat(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder().nativeDecorations(true).build().nativeDecorations()).isTrue();
+    }
+
+    @Test void theMemoryIndicatorIsOffByDefault() {
+        assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.name()).isEqualTo("window.memory_indicator");
+        assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.defaultValue()).isFalse();
+        assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.label()).isEqualTo("Show memory indicator");
     }
 }

@@ -1,0 +1,331 @@
+package dev.jasper.ui.swing;
+
+import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.theme.*;
+import java.awt.*;
+import java.awt.geom.Area;
+import java.awt.geom.Path2D;
+import java.awt.geom.Rectangle2D;
+import java.awt.geom.RoundRectangle2D;
+import java.util.List;
+import javax.swing.JComponent;
+import javax.swing.SwingUtilities;
+
+/**
+ * The classic buttons (spec 6.4, DESIGN_LANGUAGE §6): a top-to-bottom gradient from {@code button.secondary.bg} to
+ * {@code button.end} inside a {@code button.secondary.border} edge that darkens to {@code border.hover} on hover; the
+ * primary filled with the accent inside {@code accent.edge}, its label medium, with no inset line or drop; a disabled
+ * face flat; ghosts flat until hovered where a toolbar holds them. Dropdowns and picker faces follow, ending with a ▼;
+ * a rich dropdown in a toolbar strip is IntelliJ's run-configuration combo (plan 12 Rulings 10).
+ */
+final class ClassicButtonFace implements ButtonFace {
+    private static final float DISABLED = .42f;
+    /** A document bar's disabled verb: {@code text.secondary} at half (the 07 toolbar mock's #A2A7AF on its bar). */
+    private static final float BAR_DISABLED = .5f;
+    private final PaintPair primaryLabel, label, edge, primaryEdge, hoverEdge, arrow, primaryHoverLabel, comboEdge, comboArrow, comboText;
+
+    /** A face whose buttons stand on {@code surface}, the kit's dialog surface. */
+    ClassicButtonFace(SemanticColor surface) {
+        primaryLabel = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT, SurfaceContrast.Guard.TEXT);
+        label = new PaintPair(SemanticColor.TEXT_PRIMARY, SemanticColor.BUTTON_SECONDARY_BG, SurfaceContrast.Guard.TEXT);
+        edge = new PaintPair(SemanticColor.BUTTON_SECONDARY_BORDER, surface, SurfaceContrast.Guard.CONTROL);
+        primaryEdge = new PaintPair(DerivedColor.ACCENT_EDGE, surface, SurfaceContrast.Guard.CONTROL);
+        hoverEdge = new PaintPair(DerivedColor.BORDER_HOVER, surface, SurfaceContrast.Guard.CONTROL);
+        arrow = new PaintPair(SemanticColor.TEXT_SECONDARY, SemanticColor.BUTTON_SECONDARY_BG, SurfaceContrast.Guard.INDICATOR);
+        primaryHoverLabel = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT_HOVER, SurfaceContrast.Guard.TEXT);
+        comboEdge = new PaintPair(SemanticColor.BORDER_CONTROL, surface, SurfaceContrast.Guard.CONTROL);
+        comboArrow = new PaintPair(SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_INPUT, SurfaceContrast.Guard.INDICATOR);
+        comboText = new PaintPair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_INPUT, SurfaceContrast.Guard.TEXT);
+    }
+
+    @Override public List<PaintPair> pairs() {
+        return List.of(primaryLabel, label, edge, primaryEdge, hoverEdge, arrow, primaryHoverLabel, comboEdge, comboArrow, comboText);
+    }
+
+    /**
+     * Plan 4b Rulings 7: flat until hovered in toolbars, rows, panel headers and contextual slots, and as a composite control's
+     * inner part; a standard button elsewhere. A menu button's parts and face stand where its surface does.
+     */
+    static boolean flat(Buttons.KitButton b) {
+        var placed = b.placement();
+        return b.inner || b.panel || b.panelRow || b.contextual || b.orderedCommand
+            || SwingUtilities.getAncestorOfClass(InteractiveRows.Row.class, placed) != null
+            || placed.getParent() instanceof Stacks.StackSurface stack && (stack.role == Nodes.LayoutRole.INLINE || stack.role == Nodes.LayoutRole.NAVIGATION);
+    }
+
+    private static boolean ghost(Buttons.KitButton b) { return b.kind == Nodes.ButtonKind.GHOST || b.kind == Nodes.ButtonKind.DESTRUCTIVE_GHOST; }
+
+    /** The standard fill in {@code face}: {@code button.secondary.bg} at the top to {@code button.end} at the bottom, reversed while pressed. */
+    private static void gradient(Graphics2D g, KitContext c, Shape face, boolean pressed) {
+        Color top = ThemePainting.color(c, SemanticColor.BUTTON_SECONDARY_BG), bottom = ThemePainting.role(c, DerivedColor.BUTTON_END);
+        var bounds = face.getBounds2D();
+        g.setPaint(new GradientPaint(0, (float) bounds.getMinY(), pressed ? bottom : top, 0, (float) bounds.getMaxY(), pressed ? top : bottom));
+        g.fill(face);
+    }
+
+    @Override public void paintFace(Buttons.KitButton b, Graphics2D g, boolean hover, boolean focused) {
+        if (b.recorder()) { recorder(b, g, focused); return; }
+        if (b.embedded || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) { b.paintRaised(g, hover, focused); return; }
+        var c = b.context();
+        boolean flat = ghost(b) && flat(b), selected = b.toggle && b.isSelected(), pressed = b.isEnabled() && b.getModel().isPressed();
+        if (flat && !hover && !selected) { ThemePainting.rounded(g, b, c, null, null, focused, false); return; }
+        ThemePainting.antialias(g);
+        int inset = b.panelDetail ? ThemePainting.metric(c, DesignMetrics.Role.FOCUS_RING) : 0;
+        double trim = b.panelDetail ? UIScale.scale((float) c.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM)) : 0;
+        // A circular button (the Settings footer's ?) is a standard face drawn as a circle, as the mocks draw it.
+        double radius = b.circular ? Math.min(b.getWidth(), b.getHeight()) / 2.0 : ThemePainting.metric(c, DesignMetrics.Role.CONTROL_RADIUS);
+        var pair = b.placement().getParent() instanceof Stacks.StackSurface stack && stack.joined ? stack : null;
+        Shape face = pair == null ? new RoundRectangle2D.Double(inset, inset, b.getWidth() - 2.0 * inset, b.getHeight() - trim - 2.0 * inset, 2 * radius, 2 * radius)
+            : joined(pair, b.placement(), 0, b.getWidth(), b.getHeight(), radius);
+        boolean primary = b.kind == Nodes.ButtonKind.PRIMARY;
+        Color border;
+        if (!b.isEnabled()) {
+            g.setColor(ThemePainting.role(c, primary ? DerivedColor.SURFACE_HEADER : DerivedColor.SURFACE_TABLE_HEADER)); g.fill(face);
+            // A joined pair keeps one outline: its disabled half takes the standard edge (the mocks' history pair).
+            border = pair != null ? ThemePainting.painted(c, edge) : ThemePainting.role(c, DerivedColor.BORDER_DIVIDER);
+        } else if (selected || flat) {
+            g.setColor(ThemePainting.color(c, selected ? SemanticColor.SURFACE_CONTROL_SELECTED : SemanticColor.SURFACE_CONTROL_HOVER)); g.fill(face);
+            border = ThemePainting.painted(c, hoverEdge);
+        } else if (primary) {
+            g.setColor(ThemePainting.color(c, hover || pressed ? SemanticColor.ACCENT_HOVER : SemanticColor.ACCENT)); g.fill(face);
+            border = ThemePainting.painted(c, primaryEdge);
+        } else {
+            gradient(g, c, face, pressed);
+            border = ThemePainting.painted(c, hover ? hoverEdge : edge);
+        }
+        // A borderless face (a strip's icon-only menu) keeps its fill without the outline, as by default.
+        if (pair == null) { ThemePainting.rounded(g, b, c, null, b.borderless ? null : border, focused, false, radius, inset, trim); return; }
+        ThemePainting.rounded(g, b, c, null, null, focused, false, radius, 0, 0);
+        if (b.borderless) return;
+        var line = (Graphics2D) g.create();
+        try {
+            line.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+            line.setColor(border); line.setStroke(new BasicStroke(UIScale.scale(1f)));
+            line.draw(joined(pair, b.placement(), .5, b.getWidth() - 1, b.getHeight() - 1, radius));
+        } finally { line.dispose(); }
+    }
+
+    /**
+     * A joined pair's half at {@code offset}, {@code width} by {@code height}: rounded on the pair's outer side only, so the
+     * halves meet square at the border they share.
+     */
+    private static Shape joined(Stacks.StackSurface pair, Component half, double offset, double width, double height, double radius) {
+        var shape = new Area(new RoundRectangle2D.Double(offset, offset, width, height, 2 * radius, 2 * radius));
+        double square = Math.min(radius, width / 2);
+        if (pair.getComponentCount() > 1 && pair.getComponent(0) != half) shape.add(new Area(new Rectangle2D.Double(offset, offset, square, height)));
+        if (pair.getComponentCount() > 1 && pair.getComponent(pair.getComponentCount() - 1) != half)
+            shape.add(new Area(new Rectangle2D.Double(offset + width - square, offset, square, height)));
+        return shape;
+    }
+
+    @Override public Color text(Buttons.KitButton b, boolean hover) {
+        var c = b.context();
+        if (b.embedded || b.recorder() || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) return ThemePainting.color(c, b.textRole(hover));
+        if (b.sideColumn && b.isEnabled() && b.kind != Nodes.ButtonKind.PRIMARY) return ThemePainting.painted(c, label);
+        // A document bar's flat verbs read as the 07 toolbar mock's: text.primary, disabled text.secondary at half (plan 10b).
+        if (b.documentBar && ghost(b) && flat(b))
+            return b.isEnabled() ? ThemePainting.painted(c, label) : ColorMath.opacity(ThemePainting.color(c, SemanticColor.TEXT_SECONDARY), BAR_DISABLED);
+        if (!b.isEnabled()) return ColorMath.opacity(ThemePainting.color(c, SemanticColor.TEXT_PRIMARY), DISABLED);
+        if (ghost(b) && flat(b)) return ThemePainting.color(c, b.textRole(hover));
+        // A hovered or pressed primary fills accent.hover (paintFace), so its label is guarded there.
+        if (b.kind == Nodes.ButtonKind.PRIMARY) return ThemePainting.painted(c, hover || b.getModel().isPressed() ? primaryHoverLabel : primaryLabel);
+        var role = b.textRole(hover);
+        return role == SemanticColor.TEXT_STRONG_SECONDARY || ghost(b) ? ThemePainting.painted(c, label) : ThemePainting.color(c, role);
+    }
+
+    /**
+     * The buttons this face leaves to the default treatment fade as one layer: those {@code paintFace} hands to the
+     * raised face, and those on a selected row, whose labels {@code text} keeps in their role. The condition is
+     * {@code text}'s, which is {@code paintFace}'s with the selected row added, so the three change together. Every
+     * other button draws its own flat disabled face (plan 4b Rulings 6); a disabled SECONDARY or PRIMARY button on a selected
+     * row draws that flat face and is faded with it as well.
+     */
+    @Override public boolean fades(Buttons.KitButton b) {
+        return b.embedded || b.recorder() || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn;
+    }
+
+    /**
+     * The mocks' glyph inks on a standard face: a joined pair's halves in {@code text.primary}, the disabled half's at the
+     * disabled alpha in {@code text.strong.secondary} (the mocks' #A3A8B0 over its flat fill), and the circular ? in
+     * {@code text.strong.secondary}, an enabled document bar verb's in {@code text.primary} as its label; every other glyph
+     * takes its text role, as by default.
+     */
+    @Override public SemanticColor iconRole(Buttons.KitButton b, boolean hover) {
+        if (joinedHalf(b)) return b.isEnabled() ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_STRONG_SECONDARY;
+        if (b.documentBar && ghost(b) && b.isEnabled() && !b.onSelection) return SemanticColor.TEXT_PRIMARY;
+        if (b.circular) return SemanticColor.TEXT_STRONG_SECONDARY;
+        return b.textRole(hover);
+    }
+
+    /** A joined pair's halves take their ink whatever the artwork: the authored chevron.right keeps its own otherwise. */
+    @Override public boolean recolours(Buttons.KitButton b) { return joinedHalf(b); }
+
+    private static boolean joinedHalf(Buttons.KitButton b) {
+        return !b.onSelection && b.placement().getParent() instanceof Stacks.StackSurface stack && stack.joined;
+    }
+
+    @Override public Typography.Role label(Nodes.ButtonKind kind, Typography.Role role) {
+        return kind == Nodes.ButtonKind.PRIMARY && role == Typography.Role.LABEL ? Typography.Role.BODY_STRONG : role;
+    }
+
+    @Override public void paintCombo(Choices.ChoiceCombo combo, Graphics2D g, boolean hover, boolean focused) {
+        var c = combo.context;
+        ThemePainting.antialias(g);
+        double radius = ThemePainting.metric(c, DesignMetrics.Role.CONTROL_RADIUS);
+        var face = new RoundRectangle2D.Double(0, 0, combo.getWidth(), combo.getHeight(), 2 * radius, 2 * radius);
+        if (combo.isEnabled()) gradient(g, c, face, false);
+        else { g.setColor(ThemePainting.role(c, DerivedColor.SURFACE_TABLE_HEADER)); g.fill(face); }
+        ThemePainting.rounded(g, combo, c, null, focused ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS)
+            : !combo.isEnabled() ? ThemePainting.role(c, DerivedColor.BORDER_DIVIDER) : ThemePainting.painted(c, hover ? hoverEdge : edge), focused, false);
+    }
+
+    /**
+     * The guarded ▼ in text.secondary; a bare cell dropdown's in text.placeholder (the Notifications mock's #7A808A, plan
+     * 9b Task 2), or on a selected row in the row's supporting ink, as by default.
+     */
+    @Override public void paintArrow(Choices.ChoiceCombo combo, JComponent owner, Graphics2D g, int beyond, boolean settings) {
+        var c = combo.context;
+        down(owner, g, c, beyond, !combo.bare() ? ThemePainting.painted(c, arrow)
+            : ThemePainting.color(c, combo.cellInk != null ? combo.cellInk.supporting : SemanticColor.TEXT_PLACEHOLDER));
+    }
+
+    /** The drawn ▼ in {@code colour}, ending {@code DROPDOWN_GLYPH_INSET} in from a trailing edge {@code beyond} past {@code owner}'s. */
+    static void down(JComponent owner, Graphics2D g, KitContext c, int beyond, Color colour) {
+        int glyph = ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH);
+        double right = owner.getWidth() + beyond - ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH_INSET);
+        ClassicGlyphs.down(g, right - glyph / 2.0, (owner.getHeight() - glyph * .8) / 2, glyph, colour);
+    }
+
+    @Override public void paintPickerArrow(Choices.PickerButton picker, Graphics2D g) {
+        down(picker, g, picker.context, 0, ThemePainting.painted(picker.context, arrow));
+    }
+
+    @Override public void paintPicker(JComponent owner, Graphics graphics, KitContext c, Nodes.PickerFace face, boolean empty, boolean focus,
+                                      boolean hover, boolean expanded) {
+        if (owner instanceof Choices.ChoiceCombo combo && combo.toolbar) { toolbarCombo(combo, graphics, c, face, empty, focus || expanded); return; }
+        var g = (Graphics2D) graphics.create();
+        try {
+            ThemePainting.antialias(g);
+            double radius = ThemePainting.metric(c, DesignMetrics.Role.CONTROL_RADIUS);
+            var shape = new RoundRectangle2D.Double(0, 0, owner.getWidth(), owner.getHeight(), 2 * radius, 2 * radius);
+            boolean enabled = owner.isEnabled();
+            // Disabled, like a disabled dropdown and button (plan 4b Rulings 6): a flat fill, the lighter edge, then the line and arrow faded.
+            if (enabled) gradient(g, c, shape, false);
+            else { g.setColor(ThemePainting.role(c, DerivedColor.SURFACE_TABLE_HEADER)); g.fill(shape); }
+            ThemePainting.rounded(g, owner, c, null, focus || expanded ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS)
+                : !enabled ? ThemePainting.role(c, DerivedColor.BORDER_DIVIDER) : ThemePainting.painted(c, hover ? hoverEdge : edge), focus || expanded, false);
+            if (!enabled) g.setComposite(AlphaComposite.SrcOver.derive(DISABLED));
+            int pad = ThemePainting.metric(c, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING), glyph = ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH);
+            int right = owner.getWidth() - ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH_INSET) - glyph;
+            ClassicGlyphs.down(g, right + glyph / 2.0, (owner.getHeight() - glyph * .8) / 2, glyph, ThemePainting.painted(c, arrow));
+            PickerMenus.line(g, c, empty ? "Choose…" : face.primary(), empty ? "" : face.caption(), pad, 0, Math.max(0, right - 2 * pad),
+                owner.getHeight(), false, empty, face.density() == Nodes.PickerDensity.COMPACT, false, face.technicalCaption());
+        } finally { g.dispose(); }
+    }
+
+    /**
+     * Plan 12 Rulings 10, IntelliJ's {@code ComboBoxButton}: the input surface inset one pixel in its control edge, the
+     * focus edge while focused or open, the divider edge while disabled; then the face's icon, its name (or "Choose…")
+     * capped at {@code TOOLBAR_COMBO_TEXT_MAX}, and IntelliJ's 9 by 5 triangle in its arrow box, all faded while disabled.
+     * Hover changes nothing, as in IntelliJ.
+     */
+    private void toolbarCombo(Choices.ChoiceCombo combo, Graphics graphics, KitContext c, Nodes.PickerFace face, boolean empty, boolean ring) {
+        var g = (Graphics2D) graphics.create();
+        try {
+            ThemePainting.antialias(g);
+            boolean enabled = combo.isEnabled();
+            Color border = ring ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS)
+                : !enabled ? ThemePainting.role(c, DerivedColor.BORDER_DIVIDER) : ThemePainting.painted(c, comboEdge);
+            ThemePainting.rounded(g, combo, c, ThemePainting.color(c, SemanticColor.SURFACE_INPUT), border, ring, false,
+                ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_RADIUS), UIScale.scale(1), 0);
+            if (!enabled) g.setComposite(AlphaComposite.SrcOver.derive(DISABLED));
+            int width = combo.getWidth(), height = combo.getHeight(), x = ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_LEADING);
+            int gap = ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_ICON_GAP), box = ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_ARROW);
+            int arrowX = width - ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_TRAILING) - box;
+            if (!face.icon().isBlank()) {
+                int rail = ThemePainting.metric(c, DesignMetrics.Role.ICON_RAIL);
+                var icon = c.icons().icon(face.icon(), c.theme(), SemanticColor.TEXT_SECONDARY, rail);
+                icon.paintIcon(combo, g, x, (height - icon.getIconHeight()) / 2);
+                x += rail + gap;
+            }
+            g.setFont(ThemePainting.font(c, Typography.Role.BODY));
+            var metrics = g.getFontMetrics();
+            int room = Math.min(ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_TEXT_MAX), arrowX - gap - x);
+            g.setColor(ThemePainting.painted(c, comboText));
+            g.drawString(PickerMenus.clipped(metrics, empty ? "Choose…" : face.primary(), Math.max(0, room)), x,
+                (height - metrics.getHeight()) / 2 + metrics.getAscent());
+            double unit = UIScale.scale(1f), top = (height - box) / 2.0;
+            var triangle = new Path2D.Double();
+            triangle.moveTo(arrowX + 3.5 * unit, top + 6 * unit);
+            triangle.lineTo(arrowX + 12.5 * unit, top + 6 * unit);
+            triangle.lineTo(arrowX + 8 * unit, top + 11 * unit);
+            triangle.closePath();
+            g.setColor(ThemePainting.painted(c, comboArrow));
+            g.fill(triangle);
+        } finally { g.dispose(); }
+    }
+
+    /**
+     * Plan 12 Rulings 10: the leading inset, the icon and its gap, the name up to {@code TOOLBAR_COMBO_TEXT_MAX}, the gap,
+     * the arrow box and the trailing inset, {@code TOOLBAR_COMBO_HEIGHT} tall.
+     */
+    @Override public Dimension toolbarCombo(Choices.ChoiceCombo combo) {
+        var c = combo.context;
+        var face = combo.face;
+        int gap = ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_ICON_GAP);
+        int icon = face.icon().isBlank() ? 0 : ThemePainting.metric(c, DesignMetrics.Role.ICON_RAIL) + gap;
+        int text = Math.min(ThemePainting.measureText(ThemePainting.font(c, Typography.Role.BODY), face.primary().isEmpty() ? "Choose…" : face.primary()),
+            ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_TEXT_MAX));
+        return new Dimension(ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_LEADING) + icon + text + gap
+            + ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_ARROW) + ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_TRAILING),
+            ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_HEIGHT));
+    }
+
+    @Override public boolean tiles() { return false; }
+    /** The classic pair's halves share one border, as the Settings mocks' history pair does (51 wide for two 26 px halves). */
+    @Override public int joinedOverlap() { return UIScale.scale(1); }
+    @Override public Color menuDivider(KitContext context) { return ThemePainting.role(context, DerivedColor.BORDER_ROW); }
+    /**
+     * The drawn ▼ follows a cell dropdown's value: as far after the text as it ends before the trailing edge (the
+     * Notifications mock's "Card ▼", plan 9b Task 2).
+     */
+    @Override public int cellChevronLane(KitContext context) {
+        return 2 * ThemePainting.metric(context, DesignMetrics.Role.DROPDOWN_GLYPH_INSET) + ThemePainting.metric(context, DesignMetrics.Role.DROPDOWN_GLYPH);
+    }
+
+    /**
+     * A recorder value drawn as a classic field (plan 9b Rulings 10): the input surface, its edge (the error edge while it
+     * reports one), and the focus ring while focused or armed.
+     */
+    private static void recorder(Buttons.KitButton b, Graphics2D g, boolean focused) {
+        var c = b.context();
+        boolean ring = focused || b.armed();
+        ThemePainting.rounded(g, b, c, b.fill(false), ring ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS) : b.border(),
+            ring, false, DesignMetrics.Role.FIELD_RADIUS);
+    }
+    /** Plan 9b Task 5: the Plugins mock's Disable stands on the plugin name's line, above its metadata. */
+    @Override public boolean titleLine() { return true; }
+    /** Plan 10b: the 07 toolbar mock's verbs stand {@code DOCUMENT_BAR_BUTTON_PADDING} inside their faces. */
+    @Override public int barPadding(KitContext context) { return ThemePainting.metric(context, DesignMetrics.Role.DOCUMENT_BAR_BUTTON_PADDING); }
+    /** Plan 10b: the 07 toolbar mock's "New ▼": the drawn ▼ one icon gap after the label. */
+    @Override public int barMenuLane(KitContext context) {
+        return ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP) + ThemePainting.metric(context, DesignMetrics.Role.DROPDOWN_GLYPH);
+    }
+    /** The guarded ▼ in {@code text.secondary}, ending the menu item padding inside the button, faded while disabled. */
+    @Override public void paintBarMenuArrow(Buttons.KitButton main, Graphics2D graphics) {
+        var c = main.context();
+        var g = (Graphics2D) graphics.create();
+        try {
+            ThemePainting.antialias(g);
+            int glyph = ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH);
+            double right = main.getWidth() - ThemePainting.metric(c, DesignMetrics.Role.MENU_ITEM_PADDING);
+            Color ink = ThemePainting.painted(c, arrow);
+            ClassicGlyphs.down(g, right - glyph / 2.0, (main.getHeight() - glyph * .8) / 2, glyph, main.isEnabled() ? ink : ColorMath.opacity(ink, DISABLED));
+        } finally { g.dispose(); }
+    }
+    /** Plan 10b: the 07 toolbar mock's "⇧⌘L" after Lock Vault, in the placeholder grey. */
+    @Override public SemanticColor barShortcut() { return SemanticColor.TEXT_PLACEHOLDER; }
+}

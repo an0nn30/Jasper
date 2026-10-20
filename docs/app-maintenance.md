@@ -220,7 +220,7 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ### Workspace glass
 
-A translucent, blurred terminal workspace on macOS. The workspace theme's `[workspace]` table and
+A translucent, blurred terminal workspace on macOS. Slate Cobalt's glass (opaque, no blur) and
 `ui.workspace.opacity`/`ui.workspace.blur` combine in `GlassLevels.resolve`; `WindowContent.requestGlass` sends the
 result to the window's `WindowGlass` after every theme or configuration change. `WindowGlass` decides, and reports the
 opacity actually in effect to `WindowContent.applyBackgroundOpacity`; painting never reads the raw settings, so any
@@ -240,7 +240,7 @@ failure leaves an opaque window.
   watched through `WindowGlass.Platform.watch`: `WindowGlass` reports opaque at once and re-applies on the next turn,
   and `MacGlass` restores that newer background later.
 - **Blur** is on or off (`WindowGlass.Blur`: `NONE`, `DARK` or `LIGHT`, from the request's blur and whether the
-  workspace theme is dark) and lives in `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by
+  appearance is dark) and lives in `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by
   `gradle/mac-glass.gradle`). It finds the `NSWindow` whose content-view layer is JAWT's layer or any ancestor of it
   and, on the main thread without waiting, places a public `NSVisualEffectView` behind the content view: material
   `hudWindow` (13) in the dark appearance, or `underWindowBackground` (21) in the light one (`MacGlass.DARK_MATERIAL`
@@ -262,7 +262,7 @@ failure leaves an opaque window.
   its text and gutter backgrounds once each from this value; see the SDK README for the painting rule.
 
 ```sh
-./gradlew :jasper-app:test --tests "*WorkspaceGlassTest" --tests "*WindowGlassTest" --tests "*MacGlassTest" --tests "*ClearThemesTest"
+./gradlew :jasper-app:test --tests "*WorkspaceGlassTest" --tests "*WindowGlassTest" --tests "*MacGlassTest"
 ./gradlew :jasper-app:testMacGlass :jasper-terminal:test --tests "*TerminalPainterTest"
 ```
 
@@ -289,8 +289,25 @@ checks a built image ([start-up performance](packaging.md#start-up-performance))
   re-signs it in `packageApp` (so the staged bytes and their ad-hoc signature survive), and listed in `verifyPackage`'s
   bridge check with the JNI symbols it must export. A new bridge needs all three.
 - **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
-  trained image, rebuild it. Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or
-  `-Pjasper.aot=true`.
+  trained image, rebuild it. `trainAotCache` trains in a `ditto` copy of the image that it deletes before
+  `verifyAotCache`, because JBR 25 gives cached classes the code source of the path they were trained at
+  (JDK-8376576): the build machine then runs the trained image as every user's Mac does. For the same reason
+  `stagePackage` removes package sealing from class-path jars (`verifyPackage` rejects a sealed one) and Jasper finds
+  its own files with `CodeLocation`, never a code source. Training opens a window: agents ask the user before
+  `packageDist`, `trainAotCache` or `-Pjasper.aot=true`.
+- **Jasper's launcher.** `packageApp` builds the image with Jasper's own build of jpackage's launcher
+  (`gradle/launcher.gradle`, [packaging/launcher](../packaging/launcher/README.md)), which merges the user's
+  `jasper.vmoptions` over these options. A JBR update means re-vendoring its launcher sources and re-applying the
+  hook lines; `verifyLauncherSources`, `testLauncherCore`, `testWatcher`, `testLauncherWatch` and `verifyLauncherImage`
+  (all in `check`) show what changed.
+- **Bundled JVM defaults.** `-Xmx2048m` and `-XX:+IgnoreUnrecognizedVMOptions` are in `applicationDefaultJvmArgs`; a
+  user's `jasper.vmoptions` overrides them. AOT training and the start-up benchmark's isolated home give the launcher
+  an empty options file, so a developer's own flags never shape the cache or the numbers.
+  `dev.jasper.app.vmoptions.VmOptionsSyntax` mirrors `packaging/launcher/jasper/JasperVmOptionsCore.cpp`: change both
+  together and add a vector to `packaging/launcher/test/digest-vectors.txt`, which both test suites read.
+  `AotCacheRecord` reads the record of a failed start-up cache (`jasper-aot.failed`) with the launcher's rules: change
+  both together and add a vector to `packaging/launcher/test/aot-record-vectors.txt`.
+  `LauncherImage.DEFAULT_MAX_HEAP_MIB` follows the bundled `-Xmx` in `jasper-app/build.gradle.kts`.
 
 ## Session lifecycle change
 
@@ -312,6 +329,24 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*SessionLaunchCoordinatorTest" --tests "*ApplicationShutdownTest" --tests "*JasperApplicationShutdownTest" --tests "*ShellLauncherTest"
 ```
 
+## Cutting a release
+
+Tag the release commit `vX.Y.Z` (no leading zeroes, major 1–255) on a clean tree and package from it: `packageDist`
+takes the version from the tag, and About shows "Jasper" and "X.Y.Z" on separate lines without the Development build
+chip (only Copy and error reports say "Jasper X.Y.Z"). Any other commit, or a tree with changes or untracked files, is a
+development build named after the latest release tag at or behind it.
+`gradle/build-info.gradle` records the git facts in the jar and `BuildInfo` derives the labels.
+
+## Adding or bumping a dependency
+
+Every external jar Jasper or a bundled plugin ships needs its exact `group:artifact:version` in a component of
+`jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`, with its license text (and its NOTICE, when
+the project publishes one) beside it; `verifyThirdPartyNotices` (part of `check`) names any jar without one and any
+entry that no longer ships. A font file a bundled plugin ships is listed in its component's `files` as
+`<plugin id>/<path in its jar>`, and the check names any that is not. Read the new version's license before updating the entry, and look inside the jar for bundled
+native binaries (DLLs, executables, shared libraries): their own licenses need components too. When `stagePackage`
+logs that it unsealed a jar, record the change in that component's notice, as `jbr-api.NOTICE.txt` does.
+
 ## Review checklist
 
 Preserve established behavior and owner lifetimes. Run the focused regression, full
@@ -322,39 +357,41 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-Edit the hand-written Jasper Light/Dark and Clear Dark/Light TOMLs under
-`jasper-app/src/main/resources/dev/jasper/app/themes/` (`ConvertThemes` copies these four unchanged);
-change shared mappings in `UiTemplate` and derivations in `ThemeGenerator`. The 256 KiB native cap remains.
+Jasper's built-in themes are Slate Cobalt, in Dark and Light, and Catppuccin's four flavours; installed themes are theme
+files in `<home>/themes/` ([themes](themes.md)). `JasperTheme.builtIns()` lists the built-in files. The Catppuccin
+files are the theme converter's output for the plugin jar vendored in `tools/themes/catppuccin/`, with the
+hand-picked roles in its `roles.json` (its `SOURCE.md` says how to regenerate them); a converter test fails when they
+differ. Slate Cobalt's colours live only in jasper-ui's
+`slate-cobalt.json`, the machine-readable block of [the Slate Cobalt record](design/theme-engine/slate-cobalt.md) (a test
+keeps the two identical). `JasperTheme` reads the file once: the semantic palettes, the terminal schemes (`TerminalScheme`),
+the derived editor schemes and syntax styles, and one `GeneratedTheme` per variant; when one is installed,
+`UiColorKeys.flatLaf` derives its FlatLaf UI keys from the roles (text selection from the terminal selection, a search miss from
+`UiColorKeys.errorTint`). To change a colour, edit the record's block and the JSON together; to give a component a
+colour, give it a role, never a value.
 
-`tools/themes/sources.json` locks every source commit/artifact, variant decision and input hash. Maintainers may
-refresh exact upstream bytes with `tools/themes/fetch-themes.py`; retain each source's full license, SOURCE.md and
-assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates the five shipped native files (Jasper Light/Dark, Clear Dark/Light and Nord), index, legacy
-aliases and third-party notices entirely offline. The wider source lock remains for import/converter coverage; it does not expand the shipped catalog.
-Normal build/test never fetches. Do not normalize upstream bytes.
-Run `BundledThemeConversionTest` for drift/provenance and `BundledWorkspaceParityTest` for effective LAF/workspace
-colors; preserve golden converter tests for UI ordering, OS tables, syntax styles and icon palettes.
+`ColourLiteralScanTest` fails on any colour literal in production code or resources (jasper-ui, the app and the
+plugins) outside the built-in theme files; `UiColorKeysTest`, `SlateCobaltGeneratedTest` and `HostedPalettesTest` pin the
+keys, the variants and the plugins' palettes. `RemovedThemeLayerTest` pins that the former theme layer is gone.
 
-Converters/security fixtures live in `themeimport`; native catalog/installation tests live in `appearance`.
-`ThemeMigrationTest`, `MigrationJournalTest`, `ThemeSelectionMigrationTest`, `ThemeUpgradeTest` and
-`NativeThemeUpgradeTest` cover recovery/ownership and startup ordering. Never fix recovery by overwriting a changed
-file or deleting an equal-byte foreign backup. Keep original data and report the conflict. Config migration must
-stay ahead of ConfigService construction and use its actual override directory.
+```sh
+./gradlew :jasper-ui:test --tests "*SlateCobalt*" --tests "*JasperTheme*" --tests "*UiColorKeysTest"
+./gradlew :jasper-app:test --tests "*ColourLiteralScanTest" --tests "*HostedPalettesTest" --tests "*RemovedThemeLayerTest"
+```
 
-Import theme… (`themesui.ThemeImport`) consumes `ThemeImporter`, which writes through `ThemeFiles` and `ThemeTomlWriter`.
 Run `./gradlew check` and all architecture guards; hand native visual acceptance to the user ([themes](themes.md)).
 
 ## Maintaining SDK icons
 
-`NamedIcons` is the sole semantic-to-artwork mapping; `AppIcons` owns rendering and caching.
-All ordinary controls use vendored New UI artwork; KEY retains the centrally tinted Tabler
-key because the upstream set has no equivalent. No plugin needs to draw its own common icons.
+SDK0.15 standard presentation uses semantic names and constrained monochrome IconAsset registration.
+The module IconRegistry owns glyph paths; NamedIcons maps only app-native names to module meanings.
+AppIcons has no raw plugin loader or authored catalog. PresentationIcon/PresentationIcons carry immutable
+snapshots into native models and receiver-owned registries; preserve their failure/lifetime tests.
 
-`tools/icons/fetch-intellij-icons.py` vendors the full platform and Terminal `expui` trees at
-pinned commit/tree IDs, verifies staged downloads, and generates `BundledIcon` plus the host
-index. Preserve Apache LICENSE.txt, upstream NOTICE.txt and assets.tsv hashes. Add semantic
-meanings to both `IconName` and `NamedIcons`; callers never choose physical SVG paths.
-See [SDK icons](sdk-icons.md). Run `./gradlew check` for complete-catalog light/dark rendering,
-provenance, SDK and plugin isolation checks. Native application launch remains user-run.
+Only three IntelliJ SVGs remain: ResidentTray's terminal template and PluginIcons' light/dark manifest-identity
+fallback. Keep their assets.tsv hashes, SOURCE.md, Apache LICENSE and NOTICE. PluginIcons.decode still
+handles manifest PNG/SVG previews. Application branding is separate and unchanged. The old catalog fetcher
+is removed so it cannot regenerate obsolete SDK types. Run platform icon, manifest-preview and architecture
+checks after changes. Native GUI acceptance remains user-run. See [SDK icons](sdk-icons.md).
 
 ## Remote lives in a plugin
 
@@ -484,7 +521,10 @@ toolbar is hidden. `MacTitleBar` updates the JBR custom-title height with the sa
 geometry; standalone dialog titles remain 28px tall.
 
 `WindowToolbar` allocates whole buttons by stable priority and constructs overflow menus
-from the same Actions as their original placements. Do not retain a second plugin registry
+from the same Actions as their original placements. A contributed toolbar view (`ToolbarEntry.View`) is built once per
+window, when `WindowContent.connectTerminals` reports the window open (never for the warm-up rehearsal), and closed
+with its window or its entry; it lays out at its preferred size and hides, never overflows, when the row is too
+narrow. Do not retain a second plugin registry
 for overflow. Theme changes must retain selected-tab contrast when terminal colors differ
 from chrome. Host icons choose their authored light/dark variants for that surface; custom
 plugin icons remain plugin-owned.
@@ -504,9 +544,11 @@ these defaults; upstream theme assets should not be edited to duplicate them.
 
 
 Workspace rounding belongs to `ToolWindowArea.Host`: 8px-radius tool window frames and,
-while the stripes are visible, matching rounded corners for the terminal/tab column. With
-the stripes hidden or empty, the terminal/tab column has square corners, no exterior
-gutters and no lower corner spacer: it fills the available workspace edge to edge.
+while a stripe is visible, matching rounded corners for the terminal/tab column, square on
+the side of a hidden stripe, where the column meets the window edge borderless. Each stripe
+shows only while it is not empty (`WindowContent.syncRailVisibility`). With both stripes
+hidden, the terminal/tab column has square corners, no exterior gutters and no lower corner
+spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
 tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree, with one exception
 on purpose: the guide for a second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, as if its
@@ -517,18 +559,24 @@ bottom edges (each distance a share of the workspace's own width or height, so t
 at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height
 (`DockDrag.sideSplit`: above the bottom area while it shows, else the workspace's half) and the bottom at half
 its width; a side wins a tie. `DockDrag` previews no area for a stripe drop of a hidden window, which stays
-hidden. Change the zones in the resolver and its tests first; the window tests aim with
+hidden. While the rails are enabled, an empty hidden stripe still takes drops: `DockDrag.standAtEdge` gives it
+bounds over the workspace's edge for the drag without showing it, and `DockDrag.areaAfter` lays the guide out for
+the stripes that show or hide after the drop, so it follows `syncRailVisibility`'s rule. Change the zones in the resolver and its tests first; the window tests aim with
 `DockTestSupport.zone(workspace, slot)`.
 Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
-components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
-headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged
+components `DockDrag.install` was given: stripe window buttons and labels (`DockStripe.dragSource`, on
+`ToolStripe`, `LabelledStripe` and `BottomStrip`) and headers with their titles (`ToolWindowArea.dragSource`); rail
+actions are not sources. The dragged
 button is lifted out by giving it empty bounds, not by hiding it, so the mouse events Swing sends
 to the pressed component keep arriving. Any dock change or stripe render, View › Rail and the window
 being deactivated (`WindowContent.setActive(false)`) cancel a running drag, and its Esc dispatcher
 claims only an Esc from its own window. A panel badge change is not a render: it fires
 `Contributions.Kind.BADGES`, and `WindowContributions` applies it to the existing stripe buttons with
-`ToolStripe.updateBadge` (the icon's size is the base icon's, so nothing is laid out), so a notification
-arriving mid-drag leaves the drag alone. An action's enable or title change is not a render either:
+`DockStripe.updateBadge` (on a rail the icon's size is the base icon's, so nothing is laid out; on a labelled stripe
+or the bottom strip the pill changes the label's length, so the stripe lays out again and a lifted label stays
+lifted), so a notification arriving mid-drag leaves the drag alone. A Keymap change that renumbers a labelled
+stripe's label ("N: ") renders the stripes again, so it cancels a running drag; under the icon rails it renders
+nothing. An action's enable or title change is not a render either:
 `WindowContributions` calls `ToolStripe.refreshActions`, which renames the existing rail action buttons
 (a button follows the action's enabled state itself) and repaints them. Only adding or removing an
 action or a rail placement, or a dock or panel change, renders the stripes again. Keep the layout-only terminal
@@ -536,11 +584,11 @@ column non-opaque: otherwise Swing considers partial tab repaints fully obscured
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
 Exterior gutters are 6px, except
-beside the visible stripes: each stripe supplies its own balanced spacing, so the adjacent
-frames and the terminal column have no additional side gutter. Hiding or emptying the
-stripes restores that gutter on tool window frames without reparenting their content.
-The following gutter and lower-inset rules apply to the terminal column only while
-the stripes are visible. A visible status bar
+beside a visible stripe: each stripe supplies its own balanced spacing, so the adjacent
+frames and the terminal column have no additional side gutter. On a side whose stripe is
+hidden, tool window frames get that gutter back without reparenting their content, and the
+terminal column has none. The following gutter and lower-inset rules apply to the terminal
+column only while a stripe is visible. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
 status bar restores the 6px bottom gutter. A visible toolbar or unified native header
@@ -563,29 +611,38 @@ row. `ToolWindowArea.sync` and `WindowContent.syncRailVisibility` tell the windo
 (`onMinimumSizeChanged`) so the frame's minimum follows a split, or the stripes, appearing or going
 away. Keep clipping and hit testing in the
 host, and route descendant repaints
-through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
-owns theme-background propagation and preserves plugin-selected colors. The active theme's
-`ToolWindow.background` supplies the inner surface. `UiTemplate` maps it to the `sidebar` token and list/tree/table backgrounds to `surface_sunken`; edit the
-`[tokens]` in `jasper-dark.toml` or `jasper-light.toml` to tune the contrast.
-Stripe selection uses the theme's toolbar-button background and the original theme-aware icon;
-do not substitute the tab accent or a different selected icon variant.
+through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` paints only the
+app-owned root using `surface.sidebar`; it does not observe or recursively restyle plugin descendants.
+The native header paints its own canonical surface. Shared kit views consume their routed palette
+and own their control/selection geometry. App-native stripe selection retains its semantic icon.
 
-
-Selection geometry is shared through `ThemeManager.APP_DEFAULTS`: lists, trees, tables,
-combo-box popups and menus use a 4px radius with a 4px horizontal inset. FlatLaf joins
-adjacent selected rows and maintains focus/selection repainting. `AppListUI` extends
-that painting to composite plugin renderers by intercepting full-row fills of the list's
-selection color; it leaves their component hierarchy, layout and custom colors alone.
-The palette uses the same geometry for selections, hover and scope highlights.
-`SelectionRenderingTest` saves light/dark headless previews in `build/render-preview`.
+Selection geometry for standard controls belongs to the shared kit. Native FlatLaf controls keep
+their delegate behavior and receive canonical module colors; there is no app list delegate or global
+selection-default recipe. `SelectionRenderingTest` retains light/dark selected-fill and readable-text
+coverage, while kit control tests cover their owned rounded selections.
 
 
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
-workspace title bar, tab strip and status bar have no edge strokes. The selected tab
-uses an inset rounded selection instead of an underline. Dock dividers paint nothing, so no UI
-update can give them a border or grip; terminal-internal splits keep their existing visible indicators. The standalone
-dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
-previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
+workspace title bar and status bar have no edge strokes. The equal-width tab strip uses
+vertical separators and a subtle bottom rule. Dock dividers paint nothing, so no UI
+update can give them a border or grip; terminal-internal splits keep their existing visible indicators. Auxiliary title rows follow the
+2026-10-10 references through `MacTitleBar.Style` and the kit's title metrics: a window (`WINDOW`, the Vault
+manager, the file chooser) has a 45-logical row above a hairline with the title and controls on its middle; a dialog
+(`DIALOG`) has a 30-logical band in the dialog surface with no rule, its title and controls centred 21 down (the
+native title region reaches over the content's top padding); a prompt dialog keeps a 20-logical band with the controls
+centred 18 down; and content that draws its own title row (`INTEGRATED`, Settings, through
+`AuxiliarySurface.integratedTitle`) gets no strip, with the controls centred on its row. Attached sheets have none.
+
+In-window overlays are `AuxiliarySurface.Kind.OVERLAY`: a terminal window's progress overlay
+(`AuxiliaryWindows.overlay`, one per window) and modal overlays (`modalOverlay`, a plugin dialog presented as
+`DialogSpec.Presentation.OVERLAY`) over a terminal window, an auxiliary window or a dialog. `WindowOverlay` hosts the
+kit's `ModalOverlay` in the window's layered pane and routes input: overlays stack, the newest above the rest takes
+keys and focus, and closing it hands them to the one below (Vault unlock over Remote's Connecting overlay). A modal
+overlay's `show` blocks in a secondary loop until it closes and lets Escape reach its form; a progress overlay returns
+at once and keeps Escape from the window. Under the classic dialog mapping (the Enterprise presentation) a modal overlay
+or attached sheet whose owner window is showing is a `ClassicDialog` hosted by the same `WindowOverlay`, centred on the
+window or joined under its title bar; without a showing window it opens as a native dialog. `GraphiteChromeTest` writes
+headless full-window previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
 
 
 Status-bar breadcrumbs are rendered by `PathBreadcrumbs` from the focused pane's
@@ -606,20 +663,14 @@ dedicated connections, OS support and failure limits still apply. `PathBreadcrum
 saves light/dark local/remote/narrow previews under `build/render-preview`.
 
 
-Selected workspace tabs read `Jasper.tabSelectedBackground` and
-`Jasper.tabSelectedForeground` from the active UI theme; host icons choose their variant
-against that fill. `Jasper.tabSelectedBorder` and `Jasper.tabSelectedBorderInactive`
-derive from the theme's active/inactive underline colors unless explicitly supplied.
-Jasper Dark defines its fill and outline in the scheme JSON. `WindowTabs` paints a 4px
-radius and 1px outline, with 2px horizontal and up to 4px vertical insets; short tabs
-reduce the vertical inset to preserve space for labels/icons. Hover uses the same
-rounded shape. Geometry scales with UI scale. Overflow uses a clipped viewport with
-full-width tabs and a fixed tab-list button; precise wheel/trackpad input over any tab
-control scrolls by distance without changing selection. Selection, resize and growing
-visible titles reveal the active tab. The viewport paints a 16px fade from the active
-`ToolWindow.background` at each overflowing edge and owns child repaint origins so
-hover/close repaints preserve that overlay. `WindowTabsTest` saves dark/light selection
-and overflow previews under `build/render-preview`.
+Workspace tabs use centered text and equal-width cells, hiding the rail when only one tab
+remains. `WindowTabs` derives selected/inactive surfaces from the workspace palette while
+preserving glass alpha. Child repaints start at the strip to reconstruct translucent pixels
+once. Width animations interpolate the sampled Alacritty reference; resize/reorder/animation
+disable settle, and closed content is released before its empty gap contracts. See the
+[approved layout and motion](design/alacritty-tabs.md), including reproducible headless previews.
+The toolbar and shortcuts own new-tab actions; close is hover-only and titles retain literal,
+bounded tooltips. The fixed list/add controls and scrolling/underline motion are retired.
 
 
 Startup keyboard focus belongs to the active terminal. `WindowContent` provides the
@@ -642,35 +693,35 @@ and icons use the active theme and bundled catalog. `shortcutHelpPreview` render
 expanded and editing states in both themes and larger UI type without opening a window.
 
 
-### Maintaining the theme dropdowns and Import theme…
+### Maintaining the Appearance section
 
-The Appearance page's Theme and Workspace scheme rows are ordinary schema rows (`Editors.theme` and
-`Editors.workspaceScheme`, one `Editors.ThemePick` each). `settingsui.ThemeChoices` carries the catalog's names and a
-per-page import factory from application wiring, so settingsui has no dependency on themesui. A pick re-reads the
-names on each page refresh (`ValueEditor.refresh`); a saved name the catalog lacks stays listed as "(not found)" and
-keeps its spelling. Only the Theme row has the gear; its page disposes the row, which closes the import.
+The Appearance page's Theme section is `Editors.appearance(AppearanceChoices)`: `settingsui.AppearanceSelection` edits
+`ui.appearance` with the Dark / Light / Match System tiles, each previewing its pick, and stages `ui.theme.dark` and
+`ui.theme.light` from the Dark theme and Light theme dropdowns as companions (their rows are hidden); one Reset returns
+all three to their defaults. `terminal.scheme` is `Editors.schemeChoice`'s `SchemePick`, "Same as UI theme" then every
+installed scheme, noted "Colors for terminal panes". A saved pick that is not installed shows as "<id> (not
+installed)". `AppearanceChoices` carries `InstalledThemes` (the theme options with previews and the schemes, read again
+on every refresh), the workspace glass defaults and the system-appearance observation from application wiring
+(`application.SettingsAppearance`, over the controller's live library), so settingsui reads jasper-ui only through
+`ui.model` and `ui.swing`. When the application supplies `ThemeImports`, each of the three dropdowns has a gear
+(`settingsui.ThemeMenu`, a `MenuButton`): Import Theme… and Remove run `appearance.ThemeFolder`'s file work on a worker,
+come back on the EDT and reload the configuration; an import is then staged in the gear's dropdown, and Remove returns
+the removed theme's saved and staged picks to their defaults. The application asks its questions and shows failures
+with `pluginmanager.ConfirmView` sheets. The gears' item actions are never row edits (the editors return false for
+them). The Light row holds a hidden copy of Reset, so the three rows' dropdowns line up. The Match System tile names
+the observed appearance, or says it is unavailable and Dark is used. Terminal › Font & Colors links to the section.
 
-Both picks use `settingsui.SearchCombo`, a `JComboBox` whose look-and-feel UI (a `FlatComboBoxUI` subclass, or Basic
-without FlatLaf) creates its own `ComboPopup`: a non-focusable `JPopupMenu` with a search bar over a filtered list.
-Focus stays on the combo; the popup's key listener, which the UI installs on the combo, routes typed characters into
-the search and handles Up/Down (keypad too), Page Up/Down, Home/End, Enter, Escape and Backspace while the list is
-open or a search runs; every key the combo's own bindings would answer with a pick behind the list must stay handled
-there. `selectWithKeyChar` always returns false, because each look and feel installs a fresh key selection manager.
-The popup's size is fixed when it opens; only the bar's first appearance repacks. Its rows have their own renderer,
-padded as FlatLaf pads its own combo popup (`ComboBox.padding` plus the combo's focus width at each side, read at paint
-time), with the combo's `selectionInsets`/`selectionArc` and `popupInsets`; `SearchComboTest` compares the padding
-with a stock FlatLaf combo.
-FlatLaf touches its own popup type only behind an `instanceof` check; recheck that when upgrading FlatLaf.
+The command palette's `view.terminal_scheme.match` and `view.terminal_scheme.<theme>.<key>` commands save `terminal.scheme` for every window
+(`WindowContent.selectTerminalScheme`); "Themes…" opens Appearance.
 
-`themesui.ThemeImport` runs every conversion and write on its serial worker. Dialogs and reload requests run on EDT;
-completion waits for the catalog refresh before reporting. A closed import suppresses UI callbacks while a running
-confirmed write still refreshes application state. Copying, editing and removing themes are file edits in the
-`themes` folder; there is no UI for them.
+Headless checks: AppearancePageTest, AppearanceSelectionTest, ThemeMenuTest, SettingsAppearanceTest,
+SettingsDialogTest, TerminalSchemeCommandsTest, TerminalSchemeSurfaceTest, ThemeFolderTest, ThemeLibraryTest,
+ThemeSelectionTest and JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.
 
-The configuration worker's companion scan hashes native content every second and publishes catalog-only changes.
-`WindowContent` receives the latest snapshot supplier from `ConfigurationController`; menu models rebuild on opening
-only when names or requested choices change. Menu listeners and catalogs are released with the window. Keep the three
-legacy terminal-color command IDs mapped to explicit Jasper names; canonical Light/Dark user names are literal.
+## Consumer migration completion
 
-Headless checks: AppearancePageTest, ThemeImportTest, ThemeImportViewTest, WindowThemeMenuTest and
-JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.
+Plan 2 uses the kit as the only standard-control presentation authority. SDK 0.15 is incompatible with
+pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifests cut over together.
+The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
+rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
+content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.

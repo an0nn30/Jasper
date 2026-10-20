@@ -39,6 +39,19 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
             new ShellProfile(ShellProfiles.CUSTOM, "Custom", ShellProfile.Kind.CUSTOM, Optional.empty(), command));
     }
 
+    /** These settings with {@code variables} added last, over everything they resolved. */
+    public LaunchSettings withVariables(Map<String, String> variables) {
+        if (variables.isEmpty()) return this;
+        var merged = new HashMap<>(environment);
+        merged.putAll(variables);
+        return new LaunchSettings(command, merged, columns, lines, scrollback, profile);
+    }
+
+    /** These settings running {@code program} instead of the shell: the same environment, profile and grid. */
+    public LaunchSettings withCommand(List<String> program) {
+        return new LaunchSettings(program, environment, columns, lines, scrollback, profile);
+    }
+
     /** Where a launch runs: the PTY's directory, and the settings with a WSL profile's {@code --cd} argument added. */
     public record Start(Path directory, LaunchSettings settings) { }
 
@@ -62,6 +75,17 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
     /** {@code integrationDir} is the extracted script directory, or null when extraction failed or tests want none. */
     public static LaunchSettings resolve(ConfigSnapshot snapshot, ShellProfile profile, String osName, Map<String, String> inherited,
                                   int windowColumns, int windowLines, Path integrationDir) {
+        return resolve(snapshot, profile, osName, inherited, windowColumns, windowLines, integrationDir, environment -> Map.of());
+    }
+
+    /**
+     * As above, with what plugins add ({@code contributions}, given the untouched {@code inherited} map): after Jasper's
+     * own variables and before {@code [terminal.env]}, so a configured entry, {@code TERM} and {@code COLORTERM} still
+     * win. A WSL profile gets none: only the variables {@code WSLENV} names reach Linux.
+     */
+    public static LaunchSettings resolve(ConfigSnapshot snapshot, ShellProfile profile, String osName, Map<String, String> inherited,
+                                  int windowColumns, int windowLines, Path integrationDir,
+                                  Function<Map<String, String>, Map<String, String>> contributions) {
         TerminalConfig terminal = snapshot.terminal();
         var command = new ArrayList<>(profile.command());
         var environment = new HashMap<>(inherited);
@@ -78,6 +102,7 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
         if (integrationDir != null && terminal.shellIntegration() != ShellIntegrationMode.OFF) {
             environment.put("JASPER_SHELL_INTEGRATION", integrationDir.toString());
         }
+        if (profile.kind() != ShellProfile.Kind.WSL) environment.putAll(contributions.apply(inherited));
         environment.putAll(terminal.env());
         if (osName.toLowerCase(Locale.ROOT).startsWith("mac")
                 && environment.getOrDefault("LANG", "").isBlank()) {
@@ -155,10 +180,31 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
         return new Start(directory, this);
     }
 
-    /** How the session reads a local working-directory report: a WSL profile's Linux paths become Windows paths. */
-    public Function<String, Optional<Path>> localPaths() {
-        return profile.distro().<Function<String, Optional<Path>>>map(distro -> path -> WslPaths.toWindows(distro, path))
+    /**
+     * The directory a launch asked for {@code requested} may start in: {@code requested}, or empty, so that it starts where
+     * this profile's new shell starts, when on Windows ({@code windows}) its text names a UNC host other than, for a WSL
+     * profile, this machine's WSL shares ({@link UncHosts}). Any program can report such a directory (OSC 7) for a split
+     * or new tab to inherit, and starting there, or only checking that it exists, would make Windows authenticate to that
+     * host over SMB. Pure text: nothing is touched.
+     */
+    public Optional<Path> startable(Optional<Path> requested, boolean windows) {
+        return requested.filter(directory -> !windows || !UncHosts.namesForeignHost(directory.toString(), profile.distro().isPresent()));
+    }
+
+    /**
+     * How the session reads a local working-directory report: a WSL profile's Linux paths become Windows paths, and on
+     * Windows ({@code windows}) a directory whose text names a UNC host other than, for a WSL profile, this machine's WSL
+     * shares ({@link UncHosts}) is ignored. Any program can report such a directory (OSC 7), and the pane's directory
+     * reaches plugins, which check it on the file system with no click (the Indexer looks for a project in every one), so
+     * Windows would authenticate to that host over SMB. Pure text: nothing is touched.
+     */
+    public Function<String, Optional<Path>> localPaths(boolean windows) {
+        Function<String, Optional<Path>> paths = profile.distro()
+            .<Function<String, Optional<Path>>>map(distro -> path -> WslPaths.toWindows(distro, path))
             .orElse(SessionLaunchOptions.DEFAULT_LOCAL_PATHS);
+        if (!windows) return paths;
+        boolean wsl = profile.distro().isPresent();
+        return path -> paths.apply(path).filter(directory -> !UncHosts.namesForeignHost(directory.toString(), wsl));
     }
 
     /**
@@ -253,8 +299,13 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
     /** The tab's name: a Windows shell's or WSL distribution's profile name; a login or Custom shell's program name. */
     String label() {
         if (profile.kind() == ShellProfile.Kind.WSL || profile.kind() == ShellProfile.Kind.LOCAL_SHELL) return profile.name();
+        return programName(command.getFirst());
+    }
+
+    /** A program's name for its tab: the file name of {@code program}, or {@code shell} when it has none. */
+    static String programName(String program) {
         try {
-            Path name = Path.of(command.getFirst()).getFileName();
+            Path name = Path.of(program).getFileName();
             return name == null || name.toString().isBlank() ? "shell" : name.toString();
         } catch (InvalidPathException failure) {
             return "shell";

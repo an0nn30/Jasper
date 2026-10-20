@@ -42,11 +42,25 @@ public interface ContractHarness extends AutoCloseable {
     /** Invokes an action as a window would; true when an enabled action ran. */
     boolean invoke(String actionId, UUID windowId, UUID paneIdOrNull);
 
-    /** The toolbar's plugin section: {@code button:id} or {@code menu:title:id,id}; closed actions omitted. */
+    /** The toolbar's plugin section: {@code button:id}, {@code menu:title:id,id} or {@code view}; closed actions omitted. */
     List<String> toolbar();
 
     /**
-     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code context},
+     * UI thread: builds a window's toolbar views as the window does when it opens, once per window (a second call reports
+     * the same views), and reports each built view as its root's id, in toolbar order; a view whose factory threw or whose
+     * tree the toolbar does not admit is left out.
+     */
+    List<String> openToolbarViews(java.util.UUID windowId);
+
+    /** UI thread: closes a window's toolbar views, as the window does when it closes. */
+    void closeToolbarViews(java.util.UUID windowId);
+
+    /** UI thread: clicks the button with this node id in one of a window's open toolbar views, as the user would. */
+    void clickToolbarViewButton(java.util.UUID windowId, String buttonId);
+
+    /**
+     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code TOOLS},
+     * {@code SESSION}, {@code TRANSFER}, {@code context},
      * {@code top:<menuId>}): {@code item:id}, {@code ---}, {@code submenu:title}, children indented two
      * spaces, sections separated by {@code ===}; items of closed actions omitted.
      */
@@ -65,11 +79,33 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: invokes the panel's factory as a window showing it would; null when there is no such panel or the factory failed. */
     javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId);
 
+    /**
+     * UI thread: the header metadata an open panel instance published through {@code PanelHost.setHeader}, as
+     * {@code detail|active|label;label} with {@code -} for no actions; {@code |false|-} when it published none or no
+     * instance is open.
+     */
+    String panelHeader(String panelId, java.util.UUID windowId);
+
+    /** UI thread: activates the labelled header action of an open panel instance as its header would; false when there is none. */
+    boolean runPanelHeaderAction(String panelId, java.util.UUID windowId, String label);
+
+    /** UI thread: discards an open panel instance as its window would when the window or registration goes away. */
+    void closePanel(String panelId, java.util.UUID windowId);
+    /**
+     * UI thread: the theme slot the host paints a kit view of this runtime from, {@code CHROME} or {@code WORKSPACE}. A view
+     * mounted as a workspace content tab ({@code Windows.openTab}) takes {@code WORKSPACE}, as terminals and editors do;
+     * windows, dialogs and panels keep {@code CHROME}. Plan 2 Task 9-kit (host-only; no SDK member).
+     */
+    String viewRoute(dev.jasper.sdk.ui.UiView view);
+
     /** Rail buttons as action ids in placement order; buttons of closed actions omitted. */
     List<String> rail();
 
     /** Open plugin windows and dialogs as {@code id|title|shown} in creation order; a dialog's id is {@code dialog}. */
     List<String> windows();
+
+    /** UI thread: the hue name of the square an open plugin dialog with this title draws before its title, or {@code -} when there is none. */
+    String dialogSwatch(String pluginId, String title);
 
     /** UI thread: closes the first open window with this id as the user would; false when vetoed or absent. */
     boolean requestClose(String windowId);
@@ -109,7 +145,8 @@ public interface ContractHarness extends AutoCloseable {
 
     /**
      * What plugins asked to open: {@code tab|<window id>|<directory or ->} or {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->},
-     * each followed by {@code |<profile id>} when the request named a shell profile.
+     * each followed by {@code |<profile id>} when the request named a shell profile, then by
+     * {@code |run:<the command's words joined by spaces>} when it runs a program.
      */
     List<String> openRequests();
 
@@ -140,6 +177,11 @@ public interface ContractHarness extends AutoCloseable {
     /** Changes the look and announces it. */
     void setVariant(Variant variant);
 
+    /** Sets the presentation every plugin reads; called before any plugin starts.
+     * @param presentation the look the runtime runs with
+     */
+    void setPresentation(dev.jasper.sdk.ui.Presentation presentation);
+
     /** Sets independently chosen workspace values.
      * @param variant workspace variant
      * @param palette workspace controls
@@ -169,10 +211,27 @@ public interface ContractHarness extends AutoCloseable {
     /** The problems reported for a plugin's settings file and not yet cleared, as {@code key: message}. */
     List<String> settingsReports(String pluginId);
 
+    /**
+     * Gives a plugin's setting a look default, as a kit's {@code [defaults."<plugin id>"]} table would; called before
+     * any plugin starts. Raw values are what TOML reads: String, Long, Double, Boolean or List of String.
+     */
+    void setKitDefault(String pluginId, String key, Object rawValue);
+
+    /**
+     * The look defaults a plugin could not use, in the order reported: a value its declared kind rejects, or a key it
+     * never declares. Each line starts with the plugin's id and a colon.
+     */
+    List<String> lookDefaultProblems(String pluginId);
+
     @Override void close();
 
         /** Contributed scopes as {@code id|label|verbIds}, in registration order. */
         List<String> scopes();
+        /**
+         * A registered scope's row presentation as {@code HUE|itemNoun|ROLE,ROLE}: its hue (NONE taken as the plugin's
+         * icon hue, NEUTRAL without one), its item noun (its label when it names none) and each verb's role, in order.
+         */
+        String scopePresentation(String scopeId);
         /** Registered file sources as {@code id|heading}, in registration order. */
         List<String> fileSources();
         /** Searches a scope from a window and optional pane, as {@code rowId|title|enabled}; later row lookups use this answer. */
@@ -200,4 +259,34 @@ public interface ContractHarness extends AutoCloseable {
         List<java.nio.file.Path> openedInEditor();
         /** Every web address a plugin asked to open in the browser, in request order. */
         List<java.net.URI> browsed();
+        /** What the clipboard holds now; empty when it holds no text. */
+        java.util.Optional<String> clipboard();
+        /** As if the user copied this text in another program. */
+        void userCopies(String text);
+        /** Whether clipboard writes fail, as while another program holds the clipboard. */
+        void clipboardBusy(boolean busy);
+        /** Runs the pending secret's clear now, as its 30 seconds would. */
+        void expireClipboardSecret();
+
+        /** Declares a subcommand as the plugin's {@code [[subcommands]]} would; before that plugin starts. */
+        void declareSubcommand(String pluginId, String name, String summary);
+        /**
+         * Calls {@code jasper name arguments...} as if run in the pane {@code paneOrNull} (null: outside Jasper); returns
+         * once the handler has run.
+         */
+        ContractCall call(String name, List<String> arguments, java.nio.file.Path workingDirectory, java.util.UUID paneOrNull);
+        /**
+         * What plugins' {@code Terminals.environment} contributors add to a new local shell, given Jasper's own environment;
+         * asked on the UI thread.
+         */
+        java.util.Map<String, String> shellVariables(java.util.Map<String, String> jasperEnvironment);
+        /** Marks a plugin as one that ships with Jasper, whose editor replaces a non-bundled plugin's; before that plugin starts. */
+        void declareBundled(String pluginId);
+        /**
+         * Opens a file as Jasper's own opens do, with the editor a plugin provides; false when none does, or it declined or
+         * threw. Asked on the UI thread.
+         */
+        boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId);
+        /** Sets the {@code jasper} command {@code CommandLine.client()} names, as the application names its installed or built one. */
+        void commandClient(java.nio.file.Path client);
 }

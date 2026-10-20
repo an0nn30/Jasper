@@ -16,11 +16,17 @@ public final class WindowTrace {
     private final long requestedNanos;
     private final AtomicLongArray marks = new AtomicLongArray(Milestone.values().length);
     private final AtomicBoolean completed = new AtomicBoolean();
+    /** How long the process had no window before this request; UNSET when it had one, or for the first. */
+    private final long idleNanos;
+    private final MemoryReading requestedMemory;
+    private volatile MemoryReading shownMemory;
 
-    WindowTrace(StartupTrace owner, String trigger, long requestedNanos) {
+    WindowTrace(StartupTrace owner, String trigger, long requestedNanos, long idleNanos, MemoryReading requestedMemory) {
         this.owner = owner;
         this.trigger = Objects.requireNonNull(trigger, "trigger");
         this.requestedNanos = requestedNanos;
+        this.idleNanos = idleNanos;
+        this.requestedMemory = requestedMemory;
         for (int i = 0; i < marks.length(); i++) marks.set(i, StartupTrace.UNSET);
     }
 
@@ -28,6 +34,7 @@ public final class WindowTrace {
     public void mark(Milestone milestone) {
         Objects.requireNonNull(milestone, "milestone");
         if (!marks.compareAndSet(milestone.ordinal(), StartupTrace.UNSET, owner.nanos())) return;
+        if (milestone == Milestone.SHOWN && requestedMemory != null) shownMemory = owner.memory();
         if (milestone == Milestone.OUTPUT_PAINTED) complete();
     }
 
@@ -58,7 +65,28 @@ public final class WindowTrace {
             separator = ", ";
         }
         if (separator.equals(" ")) out.append(" nothing shown");
-        return out.append(" after the request").toString();
+        out.append(" after the request");
+        // What a slow window after a long idle needs to tell apart: memory paged back in, or just slow code.
+        String context = "; ";
+        if (idleNanos != StartupTrace.UNSET) {
+            out.append(context).append("no window for ").append(duration(idleNanos)).append(" before");
+            context = ", ";
+        }
+        MemoryReading shown = shownMemory;
+        if (requestedMemory != null && shown != null) {
+            out.append(context).append(Math.max(0, shown.pageFaults() - requestedMemory.pageFaults()))
+                .append(" page faults until shown, working set ").append(requestedMemory.workingSetBytes() >> 20)
+                .append(" to ").append(shown.workingSetBytes() >> 20).append(" MB");
+        }
+        return out.toString();
+    }
+
+    /** Seconds under two minutes, minutes under two hours, hours beyond. */
+    static String duration(long nanos) {
+        long seconds = Math.max(0, nanos) / 1_000_000_000L;
+        if (seconds < 120) return seconds + " s";
+        if (seconds < 7_200) return seconds / 60 + " min";
+        return seconds / 3_600 + " h " + seconds % 3_600 / 60 + " min";
     }
 
     /** This window's JSON entry: the request and each milestone in milliseconds since the process start. */

@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import com.formdev.flatlaf.util.UIScale;
+
 import java.awt.Component;
 import java.awt.Graphics;
 import javax.swing.JSplitPane;
@@ -13,14 +13,7 @@ public final class SplitDividerBorder extends AbstractBorder implements UIResour
     @Override public void paintBorder(Component component, Graphics graphics, int x, int y, int width, int height) {
         if (!(component instanceof BasicSplitPaneDivider divider)) return;
         boolean vertical = divider.getBasicSplitPaneUI().getSplitPane().getOrientation() == JSplitPane.HORIZONTAL_SPLIT;
-        int thickness = UIScale.scale(2);
-        Graphics g = graphics.create();
-        try {
-            g.setColor(WorkspaceTheme.color(component, dev.jasper.app.appearance.Token.DIVIDER, "Jasper.splitDivider"));
-            if (vertical) g.fillRect(x + (width - thickness) / 2, y, thickness, height);
-            else g.fillRect(x, y + (height - thickness) / 2, width, thickness);
-        } finally {
-            g.dispose();
-        }
+        dev.jasper.ui.swing.ChromePainter.installed().splitDivider(graphics, x, y, width, height, vertical,
+            dev.jasper.app.platform.ThemeZone.theme(component));
     }
 }

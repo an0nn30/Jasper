@@ -1,6 +1,6 @@
 # Configuration
 
-Jasper reads UTF-8 TOML at startup and watches it for changes once per second. Reading configuration does not create the config file. Normal desktop startup can create application data: logs, extracted shell-integration scripts, and (when enabled) residency files. Click **Settings** to create a commented template if the file is absent, then open it in your operating system's editor. Jasper tries Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Jasper shows the error. Existing files are never overwritten by Settings.
+Jasper reads UTF-8 TOML at startup and watches it for changes once per second. Reading configuration does not create the config file. Normal desktop startup can create application data: logs, extracted shell-integration scripts, and (when enabled) residency files. Click **Settings** to create a commented template if the file is absent, then open it in the [default editor](editor.md#default-editor), the Jasper Editor unless you choose another. When that editor does not open it, Jasper tries your operating system's Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Jasper shows the error. Existing files are never overwritten by Settings.
 
 For a copyable starting point, use the root [config.example.toml](../config.example.toml). It lists app settings with their built-in defaults, an empty environment table and optional platform-specific shortcut examples. UI font size stays commented because its default depends on the platform. Plugin settings belong in their separate [plugin files](#plugins).
 
@@ -25,6 +25,52 @@ Use `--config <path>` to select a different file. Relative paths resolve from th
 
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
 
+### The jasper command
+
+`jasper` hands a call to the Jasper that is running, starting it first when none is, and never starts a Java process of
+its own, so it returns quickly. To use it in any terminal or program, choose Settings › System Settings › Command line ›
+Install, or **Install 'jasper' Command in PATH** in the command palette; in Jasper's own shells it then reaches their own
+Jasper through `JASPER_COMMAND_SOCKET`. On macOS that makes `/usr/local/bin/jasper`, asking for an administrator's
+password when that folder needs it; on Linux `~/.local/bin/jasper`; on Windows it adds Jasper's `bin` folder to your
+user `Path`. A development run cannot install it.
+
+- `jasper` opens a window, or brings one forward.
+- `jasper --safe-mode`, `--config <path>`, `--plugin-dir <path>` and `--standalone` start Jasper with those options.
+- `jasper editor [--wait] FILE[:LINE[:COLUMN]]...` opens files in the [Editor](editor.md#opening-files);
+  `git config --global core.editor "jasper editor --wait"` edits commit messages there.
+- `jasper --help` lists the commands plugins add, as Jasper last recorded them.
+
+The command looks for Jasper's socket in `JASPER_COMMAND_SOCKET`, else in `daemon/commands` under `JASPER_HOME`, else
+under the default home. A launch with `--config`, `--safe-mode`, `--plugin-dir` or `--standalone` serves a socket of its
+own, which only its own shells reach, and so does a Jasper started while another serves its home.
+
+### Custom VM options
+
+The installed app reads JVM options from `jasper.vmoptions` in Jasper's home (next to `config.toml`), the way IntelliJ
+reads its `.vmoptions` file. Each line is one option, passed unchanged after the bundled options (`-Xmx2048m` and
+`-XX:+IgnoreUnrecognizedVMOptions`), so `-Xmx4g` raises the heap limit. Blank lines and lines starting with `#` are
+skipped; a line that does not start with `-`, or that names one of the `java` launcher's own options (such as
+`-version` or `-cp`), is ignored. `JASPER_VM_OPTIONS=<file>` reads another file instead. Changes take effect at the next
+launch.
+
+If the JVM cannot start with the options (a malformed value such as `-Xmx3q`, conflicting garbage collectors, `-Xms`
+above `-Xmx`), Jasper starts once more without them, and when it cannot start at all, a dialog (standard error on
+Linux) shows what Java reported. Setting `JASPER_VM_OPTIONS_SKIP=1` in the environment starts Jasper without the file
+so you can fix it, and `JASPER_AOT_CACHE_SKIP=1` without its
+[start-up cache](diagnostics.md#start-up-cache-packaged-macos-app). `./gradlew :jasper-app:run` does not read the file.
+
+In the installed app, System Settings → Java Virtual Machine sets the maximum heap size (it edits the file's `-Xmx` line;
+the bundled 2048 MiB removes it) and opens the file with **Edit Custom VM Options…**; Help → **Change Memory
+Settings…** and **Edit Custom VM Options…** lead to the same places. The section checks the options with the bundled
+`java` and says which lines it ignores, which options the JVM does not know, whether Jasper would start with them, and
+when a restart is needed (**Restart Now**). When Jasper had to start without your options or its start-up cache, or
+ignored the file, it says so in a notification in the **Memory & VM options** group. Settings › Window ›
+**Show memory indicator** (`window.memory_indicator`) adds the heap in use and its limit, such as `312 of 2048M`, to the
+status bar while the
+status bar is shown; click it to run garbage collection. When the heap stays nearly full, or Jasper runs out of memory, a notification in the same group
+offers **Adjust Memory Settings…**, which opens the heap limit with 512 MiB more filled in (left as saved when a larger
+limit is already saved).
+
 ## Settings dialog
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
@@ -36,18 +82,25 @@ Terminal › Shell's Profile lists the shells Jasper detected, including each WS
 ("Ubuntu (WSL 1)"); ↻ detects them again. Program and Arguments apply only to Custom.
 
 Changes wait until **Apply** or **OK**; **Cancel** (or Escape) discards them, asking first. A page with unsaved
-changes shows its name in blue, and a setting that differs from its default has a Reset button, which removes
-the key from the file. Settings writes `config.toml` in place and keeps your comments; a value the file would
-reject is refused with the same message the file would produce. If `config.toml` has errors, Settings shows a
+changes shows its name in blue, and a setting that differs from its default has a Reset button (under the
+Enterprise look, Reset to Default in the row's context menu), which removes the key from the file. Settings writes
+`config.toml` in place and keeps your comments; a value the file would reject is refused with the same message the
+file would produce. If `config.toml` has errors, Settings shows a
 banner and saves nothing until the file is fixed; if it uses old setting names, the banner offers Migrate Config.
-System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config.
+System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config, and a
+Java Virtual Machine section for the [custom VM options](#custom-vm-options).
 Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from their defaults, and the
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
-Appearance holds View mode (Normal or Compact, applied after restart), the Theme and Workspace scheme dropdowns,
-and the theme gear's Import theme…; Terminal › Font & Colors links there. The old stores are retired; see [Themes](themes.md) for the offline collection and automatic
-legacy upgrade.
+Under the Enterprise look the Keymap shows Action, Scope and Shortcut columns, with Find by Shortcut, Expand All
+and Collapse All; Plugins lists checkbox rows, with each plugin's actions in its ⋯; Terminal › Shell lists
+environment variables in a table with Add Variable…, and Edit… and Remove in a variable's context menu;
+Notifications › Groups is one table with Display and Source columns, Reset to Default in a group's context menu;
+and the Appearance dropdowns' menu that imports and removes themes is a ⋯ in place of the gear.
+Appearance holds View mode (Normal or Compact, applied after restart), the Dark, Light and Match System tiles,
+the Dark theme and Light theme dropdowns and the Terminal scheme dropdown, each with a gear that imports and removes themes; Terminal › Font & Colors links there. See
+[Themes](themes.md).
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
 itself; Apply writes the plugin's own file, keeping its comments. A plugin that is installed but not running (it
@@ -85,6 +138,9 @@ enabled = false
 long_command_seconds = 10
 system = true
 
+[notifications.groups]
+# "jasper.commands" = "history"
+
 [system]
 run_in_background = true  # false on Linux
 
@@ -99,10 +155,11 @@ copy_on_select = false
 bell = "visual"
 on_exit = "keep_open"
 shell_integration = "auto"
+scheme = "match"
 
 [terminal.font]
-family = "JetBrains Mono"
-size = 16.0
+family = "Cousine Nerd Font Mono"
+size = 12.0
 fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
 ligatures = true
 line_height = 1.0
@@ -119,15 +176,13 @@ blink = true
 [terminal.env]
 # MY_VARIABLE = "value"
 
+[ui]
+appearance = "system"
+
 [ui.font]
 family = "system"
 # Optional: 8-32 points. Omit to keep the platform default.
 # size = 14.0
-
-[ui.theme]
-# A built-in or installed theme's name; see Themes.
-name = "Jasper Dark"
-workspace = "match"
 
 [keybindings]
 # Optional action overrides; see examples below.
@@ -136,24 +191,26 @@ workspace = "match"
 | Key | Default | Accepted values | When applied |
 |---|---|---|---|
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
-| `window.rail_width` | `28` | Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
-| `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
-| `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
+| `window.rail_width` | `28` | Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it (not under the Enterprise look, whose labelled stripes fit their labels and whose Settings hides the row); out-of-range values use the nearest limit with a warning | Live |
+| `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"`; the default depends on the active look | Live |
+| `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning; the default depends on the active look | Live |
 | `window.status_bar` | `true` | Boolean | Live |
 | `window.status_bar_height` | `24` | Integer 20–48 logical pixels; the bar grows past it only when a large UI font needs the room; out-of-range values use the nearest limit with a warning | Live |
+| `window.memory_indicator` | `false` | Boolean | Live |
 | `window.columns` | `100` | Integer 5–500 | New windows |
 | `window.lines` | `35` | Integer 2–200 | New windows |
 | `window.view_mode` | `"normal"` | `"normal"` or `"compact"`; Compact uses the native title bar, hides the workspace header and floats the command palette | After restart |
-| `window.native_decorations` | `false` | Boolean; Windows and Linux only | Next start |
+| `window.native_decorations` | `false` | Boolean; Windows and Linux only; a look with the system title bar uses it whatever this says, and Settings hides it; the system title bar follows the operating system's light or dark setting | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `notifications.system` | `true` | Boolean | Live |
+| `notifications.groups` | `{}` | Table of notification group id to `"card"`, `"sticky"`, `"history"` or `"off"` | Live |
 | `system.run_in_background` | `true` on macOS and Windows, `false` on Linux | Boolean | Next start (residency); live (login item) |
-| `palette.visible_rows` | `5` | Integer 1–20; the old `palette.max_results` key is still read | Live |
+| `palette.visible_rows` | `5` | Integer 1–20; the old `palette.max_results` key is still read; the default depends on the active look | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |
 | `ui.font.size` | Platform default (omit key) | Finite number 8–32 points | Live, app and plugins |
-| `terminal.font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
-| `terminal.font.size` | `16.0` | Finite number 6–72 points | Live |
+| `terminal.font.family` | `"Cousine Nerd Font Mono"` | Nonblank string without NUL | Live |
+| `terminal.font.size` | `12.0` | Finite number 6–72 points | Live |
 | `terminal.font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
 | `terminal.font.ligatures` | `true` | Boolean | Live |
 | `terminal.font.line_height` | `1.0` | Finite multiplier 0.5–3.0 | Live |
@@ -168,13 +225,15 @@ workspace = "match"
 | `terminal.dim_inactive_panes` | `0.3` | Finite number 0–1; 0 disables dimming, 1 fully dims | Live |
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
+| `terminal.scheme` | `"match"` | `"match"` or a scheme id such as `"slate-cobalt/high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
-| `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
-| `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
-| `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
-| `ui.workspace.opacity` | Workspace theme's value (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
-| `ui.workspace.blur` | `"theme"` | `"theme"` (the workspace theme's value), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
+| `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately; a look without motion keeps everything still whatever this says, and Settings hides it | Live |
+| `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
+| `ui.theme.dark` | `"slate-cobalt"` | A theme id: the theme the Dark appearance shows ([Themes](themes.md)); the default depends on the active look | Live |
+| `ui.theme.light` | `"jasper-meadow"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)); the default depends on the active look | Live |
+| `ui.workspace.opacity` | Opaque (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
+| `ui.workspace.blur` | `"theme"` | `"theme"` (Slate Cobalt's: no blur), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
@@ -265,6 +324,16 @@ all of them, up to 200 rows in total; only when that total cuts a scope short do
 as `palette.visible_rows` with a warning; Migrate Config renames it. Changes apply live, including to
 an open palette.
 
+The palette can be dragged by its empty areas: the padding around the search box, the hint bar and an
+empty result list. Near the window's vertical centre line or one fifth down from its top, it snaps to that
+line; the lines are never drawn, only felt. Releasing saves the place, as fractions of the window, in `ui-state.toml`'s
+`[palette]` table (`center_x`, `top`), and every window opens the palette there; a dragged palette keeps the
+560-pixel activated width in both view modes. In Normal mode, dragging the palette back to the title-bar field
+(near its usual place across, at or above its usual height) snaps it home, and releasing there re-attaches it.
+Double-clicking a draggable area also forgets the place: Normal mode hangs the palette from the title-bar field
+again and Compact mode centres it. Under the Enterprise look the palette is the Run window, which keeps its own place in
+`[palette.run_window]` (`left`, `bottom`: its left and bottom edges as fractions of the window).
+
 ### Finished-command notifications
 
 `notifications.long_command_seconds` sets how long a command must run before it is worth telling you about.
@@ -305,6 +374,23 @@ on Linux, and clicking it focuses the pane. `notifications.system = false` turns
 off for everything (Settings › Notifications › Show system notifications). See
 [Notifications](notifications.md#system-notifications).
 
+### Notification groups
+
+`[notifications.groups]` sets how each group's notifications appear, by group id:
+
+```toml
+[notifications.groups]
+"jasper.commands" = "history"   # Long-running commands: the Notifications panel only
+"dev.jasper.remote" = "sticky"  # Remote's notifications stay until you close them
+```
+
+The modes are `"card"` (a card that hides itself), `"sticky"` (a card that stays until you close it), `"history"`
+(only the Notifications panel, unread) and `"off"`. A group you do not list keeps its default. Settings ›
+Notifications › Groups lists every group, shows a group's id when you point at its name, and saves changes here. An
+entry for a plugin that is not running is kept. An unknown mode, a value that is not a string, or a key that is not a
+group id is a warning, and that group keeps its default. [Notifications](notifications.md#groups) lists the groups
+with their ids.
+
 ### Automatic tab and notification titles
 
 On macOS, the title bar combines the native window controls, a compact working-context
@@ -315,9 +401,8 @@ Program titles and manual tab names do not replace this label. A remote OSC 7 re
 from a local shell can also supply remote context; Jasper does not infer SSH hosts by
 parsing command text.
 
-Tabs sit directly beneath the header. The selected tab has an inset rounded fill and
-thin outline from the active workspace scheme, with a muted blue selection in Jasper Dark.
-An independent workspace scheme also changes tab text and icon artwork. Narrow
+Tabs sit directly beneath the header. The selected tab's fill, outline, text and icons follow the
+UI appearance; the terminal scheme never changes them. Narrow
 windows scroll overflowing tabs, and keyboard selection reveals the selected tab. Tab height remains configurable (30 logical
 pixels by default, 20–72).
 
@@ -406,13 +491,14 @@ directory, `<Jasper home>/plugins/dev.jasper.snippets/data/`; a `snippets.toml` 
 from before the plugin is moved there on first launch. It is a separate file: it is not part of the
 configuration file and is never read or written by the configuration loader. An empty or missing
 file is an empty scope; disable the plugin in File → Manage Plugins… to remove the scope. Its
-shortcut is the action `"dev.jasper.snippets.open"`. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
+shortcut is the action `"dev.jasper.snippets.open"`. **Edit Snippets File** (`"dev.jasper.snippets.edit"`, unbound by
+default) opens the file in the editor, creating it if missing. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
 name steps.
 
 ### Editor
 
 The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see [Plugins](#plugins)):
-`font_family`, `font_size`, `tab_size`, `soft_wrap`, `max_file_mib` and `vim`, applied live; they are also on its page under Settings › Tools. See
+`font_family`, `font_size`, `tab_size`, `soft_wrap`, `max_file_mib`, `vim`, `recent_files_days` and the [default editor](editor.md#default-editor)'s `default_editor`, `custom_command`, `custom_in_terminal` and `keep_environment_editor`, applied live; they are also on its page under Settings › Tools. See
 [Editor](editor.md#settings) for defaults and ranges.
 
 ### Live settings and temporary choices
@@ -421,7 +507,7 @@ Live changes reach existing windows and terminals, including hidden tabs, zoomed
 
 View menu choices save: Toolbar and Status Bar write `window.toolbar` and `window.status_bar` to `config.toml`, and every window follows. Choose themes in Settings › Appearance and tab, rail, toolbar and status bar sizes in Settings › Window. The command palette’s Window Settings… command opens the Window page. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and the command palette’s Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
-Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
+Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses bundled Cousine Nerd Font Mono at 12 points by default. The app ships regular, bold, italic and bold-italic faces, including Nerd Font symbols, and registers them for its own process; no system font installation is needed. Explicitly saved font family and size settings take precedence.
 
 On macOS, `option_as_meta` controls which Option key sends Meta input; `"none"` leaves Option character entry available. Application shortcuts retain priority over terminal encoding. Cursor settings supply the fallback: a program's cursor shape/blink escape sequence takes precedence until the program resets that choice. Configured pane dimming persists through focus and theme changes. Copy-on-select copies a completed local selection to the clipboard.
 
@@ -461,7 +547,10 @@ script folder into its `/mnt/c/...` path. A working directory the WSL shell repo
 `/mnt/c/Users/me` is `C:\Users\me`, anything else `\\wsl.localhost\<name>\...`, so the status bar, breadcrumbs and
 "new tab here" all get a real path. A PowerShell or Command Prompt tab asked to start on a `\\wsl.localhost` share
 starts in your home folder instead, because those shells misbehave in UNC folders and touching the share can start
-the WSL 2 VM. Limits: a distribution whose hostname is not the Windows computer name reports its directory as
+the WSL 2 VM. A tab asked to start on any other network share (`\\server\share`) starts where a new shell starts,
+and a shell's report that it is in such a folder is ignored (the status bar and breadcrumbs keep the last folder),
+because any program can report such a folder and starting there, or only looking at it, would make Windows sign in
+to that server. Limits: a distribution whose hostname is not the Windows computer name reports its directory as
 remote, and an automount root other than `/mnt` is not recognised.
 
 For example, this starts zsh with exactly the two arguments `-l` and `-i`:
@@ -478,7 +567,7 @@ PROJECT_LABEL = "a value with spaces"
 
 Arguments containing spaces stay single arguments, and an empty string remains an empty argument. To ask a shell to interpret a command, explicitly name that shell and pass its command flag and command text as separate arguments. Nested tables above and inline tables such as `shell = { program = "/bin/zsh", args = ["-l"] }` under `[terminal]` are both supported; the same applies to `cursor` and `env`.
 
-Environment entries overlay the inherited child environment. Desktop launches remove the exact inherited terminal identity variables `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `TERM_SESSION_ID`, `TMUX`, and `TMUX_PANE`, plus variables matching `ITERM_*`, before applying this overlay, so configured values intentionally override them. On macOS, `LANG` defaults to `en_US.UTF-8` only when absent or blank; `LC_*` values are preserved. This table does not change which default login shell is selected: setting `SHELL` here only changes the child's environment. `TERM` and `COLORTERM` are reserved; configured entries warn and are ignored. Jasper always passes `TERM=xterm-256color` and `COLORTERM=truecolor`. Invalid environment entries are omitted individually. Diagnostics do not echo environment values or shell arguments. Setting scrollback to zero disables retained history for future sessions.
+Environment entries overlay the inherited child environment and the variables plugins add, such as the Editor's `EDITOR` for the [default editor](editor.md#default-editor), which reach local shells and the editors' terminal tabs, not WSL tabs or plugin sessions. Desktop launches remove the exact inherited terminal identity variables `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `TERM_SESSION_ID`, `TMUX`, and `TMUX_PANE`, plus variables matching `ITERM_*`, before applying this overlay, so configured values intentionally override them. On macOS, `LANG` defaults to `en_US.UTF-8` only when absent or blank; `LC_*` values are preserved. This table does not change which default login shell is selected: setting `SHELL` here only changes the child's environment. `TERM` and `COLORTERM` are reserved; configured entries warn and are ignored. Jasper always passes `TERM=xterm-256color` and `COLORTERM=truecolor`. Invalid environment entries are omitted individually. Diagnostics do not echo environment values or shell arguments. Setting scrollback to zero disables retained history for future sessions.
 
 ### Shell exit behavior
 
@@ -488,7 +577,7 @@ Environment entries overlay the inherited child environment. Desktop launches re
 - `"close_on_success"` closes the pane only after a normal exit with code 0. Nonzero or abnormal exits retain the output.
 - `"close"` closes the pane after any process exit, including nonzero or abnormal exits.
 
-Only the exited pane closes. Its tab closes when its final pane closes, and its window closes when its final tab closes. Sibling panes and tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and remove the failed pane.
+Only the exited pane closes. Its tab closes when its final pane closes, and its window closes when its final tab closes. Sibling panes and tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and remove the failed pane. A tab that runs a program, such as the [default editor](editor.md#default-editor) or one a plugin opens with `LocalSpec.command`, closes after a code 0 exit and keeps its output otherwise, whatever this setting says.
 
 To opt into closing successful exits, add or edit this setting in the existing `[terminal]` table:
 
@@ -574,7 +663,7 @@ settings file and data there too; their jars are in the application image). A zi
 unusable one is renamed `.rejected`. Enabled state and consented capabilities are in `plugins.toml`;
 pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
 launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
-dock's sizes and split ratios, which panels are open, stripe visibility, main-window size/position and maximized
+dock's sizes and split ratios (each look apart: the Enterprise look keeps its own), which panels are open, stripe visibility, main-window size/position and maximized
 state, and plugin window bounds. The last main window closed supplies the layout for the next launch, including
 the terminal area left between its panels; a resident Jasper (see [Background residency](#background-residency))
 uses it for its next window too, also after Quit sent it to the background, which closes every window as a real
@@ -587,20 +676,27 @@ are not recreated by this layout state.
 
 View › View Modes › Zen toggles a workspace-focused view in the current window. It hides the status bar,
 tool windows and their rails. The command palette field, toolbar icons, workspace tabs and native window/menu
-controls remain available; the toolbar keeps its selected style. Toggle Zen again to restore your layout; pane zoom works independently.
+controls remain available; the toolbar keeps its selected style. A tool window opened in Zen (by its shortcut,
+View › Tool Windows, the palette or a plugin command) shows in its usual place, without the rails. Toggle Zen again
+to restore your layout: the tool windows opened in Zen close and the ones that showed before return; pane zoom
+works independently.
 Zen is independent of Appearance's Normal/Compact setting: Compact keeps its native title bar, hidden header
 and floating command palette when Zen is toggled.
 
 Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before plugin panels are built on launch.
 New windows inherit the saved mode; existing windows retain their own mode. As with the dock layout, the last
 closed window saves its mode for the next launch. Missing or invalid values default to off. Normal status
-visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status and panel
-changes made while in Zen take effect when leaving it; toolbar changes apply immediately. Panel show/hide requests still update
-the normal dock layout, but panels remain hidden and newly requested panels are built only when Zen exits.
-Existing panel instances are retained and receive visibility notifications while hidden.
+visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status changes made
+while in Zen take effect when leaving it; toolbar changes apply immediately. The saved layout keeps the tool
+windows that showed before Zen, so a window opened in Zen is never saved as showing; moving or resizing one in Zen
+is saved. Panel instances are retained while hidden and receive visibility notifications.
 
 View groups Toolbar, Status Bar and Rail under **Show/Hide**, and font controls under **Font Size**.
 The contributed **Tools** submenu remains available. Status/rail controls are disabled during Zen; leave Zen to use them. Toolbar controls stay available.
+Each rail shows only while it holds a tool window (or, on the left, a plugin's rail button); on a side without one the
+terminal meets the window edge without a border, as in Zen. To put a tool window on
+an empty side's rail, drag it to that window edge: the drop guide marks where its button goes, and the rail appears
+once it lands.
 
 Zen has no default shortcut. Assign **Zen** in Settings › Keymap, or add a binding to `[keybindings]`:
 
@@ -614,7 +710,7 @@ or **Exit Zen Mode**, and the menu toggle remains usable even after removing its
 
 ## Shortcuts
 
-The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `open_settings` and `reload_config`.
+The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `clear_terminal`, `open_settings` and `reload_config`.
 
 Settings › Keymap edits these bindings without opening the file; it writes the same `[keybindings]` entries.
 
@@ -654,7 +750,9 @@ Plugin actions are bound by their quoted id, for example:
 A plugin may suggest a default shortcut; yours always wins, and Jasper's built-in shortcuts win
 over a plugin's suggestion. A binding for an action that no installed plugin provides is
 reported as a configuration warning. Every panel also has a `<panel id>.toggle` action you can
-bind the same way. `"plugins.manage"` opens Settings at Plugins and `"app.shortcuts"` at Keymap; neither has a default shortcut.
+bind the same way. `"plugins.manage"` opens Settings at Plugins, `"app.shortcuts"` at Keymap and `"app.about"` the About
+window; `"app.memory"` opens the heap limit in System Settings and `"app.vmoptions"` opens `jasper.vmoptions` in your
+editor and `"app.memory.gc"` runs garbage collection; none has a default shortcut.
 
 ## Command palette shortcuts
 
@@ -702,8 +800,6 @@ while leaving View → Command Palette available.
 | Earlier key | Current key |
 |---|---|
 | `[font]` `family`, `size`, `fallback`, `ligatures`, `line_height` | `[terminal.font]` with the same names |
-| `ui.theme.terminal` (version 1), `terminal.colors` (version 2) | `ui.theme.workspace` |
-| `ui.theme.variant` (`light` or `dark`) | `ui.theme.name` (`Jasper Light` or `Jasper Dark`) |
 | `background.enabled` (version 1) | `system.run_in_background` |
 
 Each old key is read as its new one, with a warning: *Moved to terminal.font.size. Use Migrate Config to
@@ -733,57 +829,21 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme
 
-`ui.theme.name` names the UI theme:
-- `"Jasper Dark"` (the default) or `"Jasper Light"`;
-- `"Nord"`, `"Clear Dark"` or `"Clear Light"`;
-- or a native Jasper TOML theme in the `themes` folder beside this file.
+Jasper's built-in themes include Jasper Meadow Light, Slate Cobalt in Dark and Light, Ubuntu Yaru, and Catppuccin Latte, Frappé, Macchiato and Mocha; imported
+themes live in the themes folder ([Themes](themes.md)).
 
-The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers writing and importing
-themes and how a theme colours the workspace. An unknown name is a warning that lists
-the available themes: at start-up Jasper uses Jasper Dark; on reload it uses the safe built-in
-for the last successfully applied chrome darkness. The requested name stays in the file for a later retry.
-A non-string value rejects the configuration.
+`ui.appearance` chooses the UI appearance: `"dark"`, `"light"`, or `"system"` (the default) to follow the operating
+system's light or dark setting live. When the operating system's appearance is unavailable, `"system"` uses Dark. An
+operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name the theme each
+appearance shows: `"slate-cobalt"` for Dark and `"jasper-meadow"` for Light by default.
 
-Terminal padding and the area behind panes match the workspace; toolbar, menus, sidebars,
-dialogs and the native title follow the UI theme. Find controls follow the workspace. Theme changes retain shells,
-scrollback, split
-ratios and font choices, and a failed installation keeps the previous theme and can be retried
-with Reload config.
+`terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses the shown theme's own scheme; a
+scheme id such as `"slate-cobalt/high-contrast"` chooses one. Only the terminal text area changes: tabs, the tab strip,
+the editor and panels stay on the UI appearance.
 
-The former `[colors]` table (`appearance`, `theme`) and custom palette files are no longer
-supported: a `[colors]` table is reported as an unknown setting and ignored. See the
-[dark](design/mock-ui-dark.png) and [light](design/mock-ui-light.png) renders.
-
-## Workspace scheme
-
-`ui.theme.workspace` chooses the workspace scheme: the theme that colours the terminal workspace, independently of
-`ui.theme.name`. `"match"` follows the UI theme. A separate choice names a native theme, including converted Alacritty palettes;
-`"Jasper Light"` and `"Jasper Dark"` name the bundled themes. A native theme named `"Light"` is
-selected literally. The older `terminal.colors` and `ui.theme.terminal` keys still load; their
-`light` and `dark` values become `Jasper Light` and `Jasper Dark` when migrated. A canonical
-`ui.theme.workspace = "Light"` is not changed by that compatibility conversion.
-Canonical values always win over either alias, regardless of file order. Saving or migrating
-the setting removes the older paths. Legacy `dark` now selects native Jasper Dark, whose terminal
-background is `#191c20`.
-
-The workspace setting changes terminal panes, tabs, find controls, dividers, zone-aware icons
-and Editor syntax in all windows without restarting Editor or discarding edits. Even two themes
-with the same light/dark variant produce a workspace update. A missing workspace scheme warns and
-temporarily matches the chrome; its requested name stays saved for repair and reload.
-General hosted plugin pane controls also follow the workspace scheme.
-
-Settings › Appearance's **Workspace scheme** dropdown starts with **Same as UI theme**. Apply/OK saves choices;
-Cancel discards them. A confirmed Import theme… writes immediately and survives Cancel. The command palette’s
-Themes… command opens Settings at Appearance.
-Native file edits, deletions and repairs reload automatically on the existing one-second poll, including inherited
-parent changes. Filesystem work runs off the EDT. A blank workspace value warns and uses `"match"`; a non-string
-value rejects the configuration. [Themes](themes.md#settings-and-importing) details importing and fallback.
-
-### Alacritty themes
-
-Alacritty palettes are converted into native themes. Existing `terminal-themes/` files migrate once at startup;
-the old store is removed. Select converted palettes as the workspace scheme in Settings › Appearance. See
-[Themes](themes.md#converted-terminal-palettes). `themes.marketplace.enabled` is ignored for compatibility.
+Appearance and scheme changes keep shells, scrollback, split ratios and font choices. A failed installation keeps the
+current appearance, is reported as a warning on `ui.appearance`, and can be retried with Reload config.
+`terminal.colors` and the `[colors]` table are no longer read: each is reported as an unknown setting and ignored.
 
 ### Interface typography
 
@@ -795,8 +855,10 @@ family = "system"
 size = 14
 ```
 
-`family = "system"` (the default) selects the current platform UI font. You can
-choose any installed family; an unavailable family falls back to the platform font. This
+`family = "system"` (the default) selects the look's UI font: the platform font under the default look, IBM Plex
+Sans under Enterprise; a named family overrides it. An unset `size` uses the look's size (the platform size, or 12 under
+Enterprise); a set size scales every role. You can
+choose any installed family; an unavailable family falls back to the look's UI font. This
 works on macOS, Linux and Windows without a downloaded font. An explicit family overrides
 that selection.
 
@@ -810,11 +872,17 @@ labels retain their relative emphasis. Native OS dialogs and system menu renderi
 
 ### Animations
 
-Settings → Appearance → Animations controls motion throughout the app. **Enable animations** is on by default;
+Settings → Appearance → Animations controls motion throughout the app, unless the active look has none. **Enable animations** is on by default;
 turning it off and clicking Apply finishes running transitions immediately in open windows. Future app animations
 use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
 
-Tab motion uses fixed timings: opening takes 80 ms, closing 100 ms, and selection 130 ms.
+Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): first reveal takes 490 ms,
+subsequent opening 475 ms and closing 425 ms. Selection and hiding the last remaining tab
+bar are immediate. A single workspace tab has no visible tab bar.
+
+The command palette drips open: over 300 ms its bottom edge eases down from the top of the card (quartic ease-out,
+fast then slow) while its rows stay in place, so the query field takes typing at once. Only a fresh open animates;
+switching scopes or changing results does not, and dismissing or disabling animations shows the card's final state.
 The temporary **Open tab duration**, **Close tab duration**, and **Switch tab duration** tuning fields have been removed.
 Existing `ui.animations.tab_open_ms`, `ui.animations.tab_close_ms`, and `ui.animations.tab_switch_ms` values are
 ignored silently and left in the configuration file; they no longer affect motion. Other unknown animation keys

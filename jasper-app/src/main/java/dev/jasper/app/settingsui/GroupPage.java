@@ -1,29 +1,28 @@
 package dev.jasper.app.settingsui;
 
-import com.formdev.flatlaf.FlatClientProperties;
-import java.awt.Font;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitView;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.UIManager;
 
 /** A category page, as IntelliJ shows one: its title and a link to each child page. */
 public final class GroupPage implements SettingsPage {
+    private static final String LINK = "link:";
     private final String id;
     private final String title;
     private final Optional<String> parent;
     private final boolean hiddenWhenChildless;
     private final Supplier<List<SettingsPage>> children;
     private final PageContext context;
-    private JPanel panel;
+    private KitView view;
+    private PageBody body;
 
     public GroupPage(String id, String title, Optional<String> parent, boolean hiddenWhenChildless,
                      Supplier<List<SettingsPage>> children, PageContext context) {
@@ -37,33 +36,30 @@ public final class GroupPage implements SettingsPage {
     @Override public List<String> searchTerms() { return List.of(title); }
     @Override public boolean hiddenWhenChildless() { return hiddenWhenChildless; }
 
+    /** The title over one link button per child page. */
+    ViewSpec viewSpec(List<SettingsPage> pages) {
+        var nodes = new ArrayList<Nodes.Node>();
+        nodes.add(new Nodes.Text("group-title", ControlState.READY, title, Nodes.TextRole.PANEL_TITLE));
+        for (SettingsPage child : pages)
+            nodes.add(new Nodes.Button(LINK + child.id(), ControlState.READY, child.title(), "", Nodes.ButtonKind.LINK, LINK + child.id(), ""));
+        return new ViewSpec(new Nodes.Stack("group:" + id, ControlState.READY, Nodes.LayoutRole.DETAIL, nodes));
+    }
+
+    /** The page's kit view once built; for tests. */
+    KitView view() { return view; }
+
     @Override public JComponent component() {
-        if (panel != null) return panel;
-        panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setOpaque(false);
-        panel.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
-        var heading = new JLabel(title);
-        heading.putClientProperty("html.disable", true);
-        heading.setFont(heading.getFont().deriveFont(Font.BOLD));
-        panel.add(heading);
-        for (SettingsPage child : children.get()) {
-            var link = new JButton(child.title());
-            link.putClientProperty("html.disable", true);
-            link.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_BORDERLESS);
-            var color = UIManager.getColor("Component.linkColor");
-            if (color != null) link.setForeground(color);
-            link.setAlignmentX(0);
-            link.addActionListener(event -> context.navigate().accept(child.id()));
-            panel.add(link);
-        }
-        panel.add(Box.createVerticalGlue());
-        return panel;
+        if (body != null) return body;
+        view = new KitView(context.kit().get(), viewSpec(children.get()), event -> {
+            if (event instanceof UiEvent.Action action && action.id().startsWith(LINK)) context.navigate().accept(action.id().substring(LINK.length()));
+        });
+        body = new PageBody(view);
+        return body;
     }
 
     @Override public boolean modified() { return false; }
     @Override public void reset() { }
     @Override public CompletableFuture<Void> apply() { return CompletableFuture.completedFuture(null); }
     @Override public void highlight(String query) { }
-    @Override public void dispose() { }
+    @Override public void dispose() { if (view != null) view.close(); }
 }

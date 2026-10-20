@@ -17,7 +17,6 @@ import dev.jasper.editor.vim.VimHost;
 import dev.jasper.editor.vim.Vimrc;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.DialogSpec;
-import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.ui.ContentTab;
@@ -25,7 +24,6 @@ import dev.jasper.sdk.ui.ContentSpec;
 import dev.jasper.sdk.ui.ContentPresentation;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.WindowHandle;
-import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
@@ -33,6 +31,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -41,9 +40,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import javax.swing.Action;
-import javax.swing.Icon;
 import javax.swing.JComponent;
-import javax.swing.JPopupMenu;
 import javax.swing.Timer;
 import javax.swing.text.BadLocationException;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
@@ -60,7 +57,6 @@ public final class EditorWindow {
     private final Predicate<OpenRequest> openers;
     private final Locations locations;
     private final EditorModel model = new EditorModel();
-    private final EditorTheme theme = new EditorTheme();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
     private EditorTab selectedTab;
     private WindowOwner origin;
@@ -75,7 +71,7 @@ public final class EditorWindow {
     private final LocalWatcher watcher;
     private final Timer ticker;
     private final Timer noticeTimer;
-    private final Icon fileIcon, serverIcon;
+    private final String fileIcon, serverIcon;
     private boolean showingEmpty = true;
     private boolean guarding;
     private final Vim vim;
@@ -142,11 +138,11 @@ public final class EditorWindow {
         this.onClosed = onClosed;
         this.opened = java.util.Objects.requireNonNull(opened);
         this.openers = java.util.Objects.requireNonNull(openers);
-        fileIcon = context.appearance().icon(IconName.FILE);
-        serverIcon = context.appearance().icon(IconName.SERVER);
+        fileIcon = "file";
+        serverIcon = "server";
         ask = question -> environment.askers().apply(owner()).apply(question);
         await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
-        findBar = new FindBar(() -> selected().map(EditorTab::area));
+        findBar = new FindBar(() -> selected().map(EditorTab::area), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }));
         status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim);
         commands = List.of(
             command("save", "Save", KeyEvent.VK_S, 0, this::save),
@@ -213,6 +209,101 @@ public final class EditorWindow {
     private WindowOwner owner(DocumentSession session) { return hosted.entrySet().stream().filter(e -> e.getKey().session() == session).map(e -> (WindowOwner)e.getValue()).findFirst().orElseGet(this::owner); }
     public void openLocal(Path file) { openLocal(file, null); }
     public void openLocal(Path file, WindowOwner owner) { open(new LocalDocument(file, context.background()), owner); }
+
+    /**
+     * Opens a local file for {@code jasper editor}, or selects the tab already showing it, and puts the caret on
+     * {@code line} and {@code column} (1-based; 0 leaves it where loading put it) once the text is there.
+     *
+     * @return completes with the tab's session once it is ready or has failed
+     */
+    public CompletableFuture<DocumentSession> openAt(Path file, int line, int column, WindowOwner owner) {
+        open(new LocalDocument(file, context.background()), owner);
+        DocumentSession session = model.find(LocalDocument.key(file)).orElseThrow();
+        var settled = new CompletableFuture<DocumentSession>();
+        // The session replaces the text before it reports READY, so the caret set here is not reset by the load.
+        Runnable check = () -> {
+            if (settled.isDone()) return;
+            if (session.state() == DocumentSession.State.READY) {
+                moveCaret(session, line, column);
+                settled.complete(session);
+            } else if (session.state() == DocumentSession.State.FAILED) {
+                settled.complete(session);
+            }
+        };
+        check.run();
+        if (!settled.isDone()) {
+            session.addListener(check);
+            // Closing the tab cancels the read, which leaves the session loading for good: its closing settles the call too.
+            closed(session).thenRun(() -> settled.complete(session));
+        }
+        return settled;
+    }
+
+    /**
+     * A tab for {@code file}, which does not exist yet: its first save creates it, as Vim's {@code :e newfile} does.
+     * Selects the tab already open for that path.
+     */
+    public DocumentSession openNew(Path file, WindowOwner owner) {
+        Path target = file.toAbsolutePath().normalize();
+        Optional<DocumentSession> open = model.find(LocalDocument.key(target));
+        if (open.isEmpty()) {
+            open = newFiles.entrySet().stream().filter(entry -> entry.getValue().equals(target))
+                .map(Map.Entry::getKey).findFirst();
+        }
+        if (open.isPresent()) {
+            select(open.get());
+            return open.get();
+        }
+        return newFile(target, owner);
+    }
+
+    /**
+     * Opens a local file for the default editor ({@code FileEditor.edit}): an existing file with the caret on
+     * {@code line}, a missing one whose folder exists as a tab its first save creates. The tab opens in {@code window}
+     * when that is a terminal window, else in the last main window.
+     *
+     * @return false for a folder or a file whose folder does not exist, which the desktop then opens or reports
+     */
+    public boolean edit(Path file, java.util.OptionalInt line, Optional<WindowOwner> window) {
+        Path target = file.toAbsolutePath().normalize();
+        WindowOwner owner = window.filter(WindowHandle.class::isInstance).orElse(null);
+        if (java.nio.file.Files.isRegularFile(target)) {
+            openAt(target, line.orElse(0), 0, owner);
+            return true;
+        }
+        Path folder = target.getParent();
+        if (java.nio.file.Files.exists(target) || folder == null || !java.nio.file.Files.isDirectory(folder)) return false;
+        openNew(target, owner);
+        return true;
+    }
+
+    /** Completes once the session's tab has closed: when the user closes it, its window closes or the Editor stops. */
+    public CompletableFuture<Void> closed(DocumentSession session) {
+        var done = new CompletableFuture<Void>();
+        var handle = hosted.entrySet().stream().filter(entry -> entry.getKey().session() == session)
+            .map(Map.Entry::getValue).findFirst();
+        if (handle.isEmpty() || handle.get().isClosed()) done.complete(null);
+        else handle.get().onClosed(() -> done.complete(null));
+        return done;
+    }
+
+    private void moveCaret(DocumentSession session, int line, int column) {
+        if (line <= 0) return;
+        hosted.keySet().stream().filter(tab -> tab.session() == session).findFirst().ifPresent(tab -> {
+            var area = tab.area();
+            int index = Math.min(line, area.getLineCount()) - 1;
+            try {
+                int start = area.getLineStartOffset(index);
+                // A line's end offset counts its newline (the last line's, the document's implicit one).
+                int length = Math.max(0, area.getLineEndOffset(index) - start - 1);
+                int offset = start + Math.min(Math.max(column, 1) - 1, length);
+                area.setCaretPosition(Math.min(offset, area.getDocument().getLength()));
+            } catch (BadLocationException impossible) {
+                // The line came from getLineCount, so it exists.
+            }
+        });
+    }
+
     public void openLocalFiles(List<Path> files) { openLocalFiles(files, owner()); }
     public void openLocalFiles(List<Path> files, WindowOwner owner) { for (Path file : files) openLocal(file, owner); }
     public void newUntitled() { newUntitled(owner()); }
@@ -226,16 +317,16 @@ public final class EditorWindow {
     public void dispose() {
         if (disposed) return; disposed = true;
         for (var handle : List.copyOf(hosted.values())) handle.close();
-        closeRegistration.close(); closed();
+        closeRegistration.close(); shutDown();
     }
 
     /** Settings or the theme changed: applies them to every tab. */
     public void apply() {
+        if (disposed) return;
         EditorSettings settings = environment.settings().get();
         if (vimToggled != null && vimToggled == settings.vim()) vimToggled = null;
         for (EditorTab tab : editorTabs()) {
-            tab.apply(settings, theme, context.appearance().editorPalette(), context.appearance().syntaxPalette(),
-                context.appearance().workspaceOpacity(tab));
+            tab.settings(settings);
             tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         }
         readVimrcOnce();
@@ -415,12 +506,14 @@ public final class EditorWindow {
         selected().filter(tab -> tab.session().state() == DocumentSession.State.READY).ifPresent(tab -> {
             RSyntaxTextArea area = tab.area();
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Go to Line", owner(), true));
-            dialog.setContent(new GoToLinePanel(area.getCaretLineNumber() + 1, area.getLineCount(), line -> {
+            var panel = new GoToLinePanel(context.kit(), area.getCaretLineNumber() + 1, area.getLineCount(), line -> {
                 dialog.close();
                 try { area.setCaretPosition(area.getLineStartOffset(line - 1)); }
                 catch (BadLocationException impossible) { return; }
                 area.requestFocusInWindow();
-            }, dialog::close));
+            }, dialog::close);
+            dialog.onClosed(panel::close);
+            dialog.setContent(panel.view());
             dialog.show();
         });
     }
@@ -428,7 +521,9 @@ public final class EditorWindow {
     public void chooseLanguage() {
         selected().ifPresent(tab -> {
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Language", owner(), true));
-            dialog.setContent(new LanguagePicker(tab.session().style(), style -> { dialog.close(); tab.session().setStyle(style); }));
+            var picker = new LanguagePicker(context.kit(), tab.session().style(), style -> { dialog.close(); tab.session().setStyle(style); }, dialog::close);
+            dialog.onClosed(picker::close);
+            dialog.setContent(picker.view());
             dialog.show();
         });
     }
@@ -453,12 +548,6 @@ public final class EditorWindow {
     String headerTitle(int index) { var session = editorTabs().get(index).session(); return (session.dirty() ? "\u25cf " : "") + session.name(); }
     String headerDetail(int index) { return model.detail(editorTabs().get(index).session()); }
     boolean showingEmpty() { return showingEmpty; }
-
-    JPopupMenu menu() {
-        var menu = new JPopupMenu();
-        for (Command command : commands) menu.add(EditorTab.menuItem(command));
-        return menu;
-    }
 
     /**
      * The closing guard (spec 2.3), asked when the window closes and when Jasper quits: waits for running saves,
@@ -503,7 +592,7 @@ public final class EditorWindow {
         }
     }
 
-    private void closed() {
+    private void shutDown() {
         ticker.stop();
         noticeTimer.stop();
         for (DocumentSession session : model.sessions()) session.cancelLoad();
@@ -560,13 +649,14 @@ public final class EditorWindow {
     }
 
     /** {@code :e newfile}: an empty tab named after the file, which its first save creates. */
-    private void newFile(Path file, WindowOwner owner) {
+    private DocumentSession newFile(Path file, WindowOwner owner) {
         origin = owner;
         var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
         var session = DocumentSession.untitled(String.valueOf(file.getFileName()), sessionEnvironment(ref));
         newFiles.put(session, file);
         add(session, ref);
         select(session);
+        return session;
     }
 
     /** {@code :r}: a local file's text, decoded as the Editor decodes it; empty when it cannot be read. */
@@ -652,9 +742,9 @@ public final class EditorWindow {
     private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef) {
         EditorSettings settings = environment.settings().get();
         session.setWrap(settings.softWrap());
-        var tab = new EditorTab(session, this::closeTab, environment.timers());
-        tab.apply(settings, theme, context.appearance().editorPalette(), context.appearance().syntaxPalette(),
-            context.appearance().workspaceOpacity(tab));
+        var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
+        tab.appearance(context.appearance());
+        tab.settings(settings);
         tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         var tabCommands = commands.stream().map(command -> new Command(command.id(), command.title(), command.stroke(), command.bound(),
             () -> { activate(tab); command.run().run(); })).toList();
@@ -663,14 +753,15 @@ public final class EditorWindow {
         tab.area().setTransferHandler(new FileDrop(tab.area().getTransferHandler(), this::openLocalFiles));
         tab.area().addCaretListener(event -> { if (selected().orElse(null) == tab) refreshStatus(); });
         session.addListener(() -> {
+            if (!hosted.containsKey(tab)) return;
             refreshHeaders();
             if (selected().orElse(null) == tab) refreshStatus();
         });
         model.add(session);
         numbers.put(session, nextNumber++);
-        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab);
+        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab.view());
         hosted.put(tab, handle); ownerRef.set(handle);
-        handle.setFocusTarget(tab.area()::requestFocusInWindow);
+        handle.setFocusTarget(tab::focusText);
         handle.onActive(active -> { if (active) activate(tab); });
         handle.onClosed(() -> remove(tab));
         var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
@@ -704,11 +795,12 @@ public final class EditorWindow {
     private void activate(EditorTab tab) {
         if (!hosted.containsKey(tab)) return;
         if (selectedTab != tab && selectedTab != null) {
-            selectedTab.remove(findBar);
+            selectedTab.find(null);
             previous = selectedTab;
         }
-        selectedTab = tab; tab.add(findBar, BorderLayout.SOUTH); tab.revalidate(); refreshStatus();
+        selectedTab = tab; tab.find(findBar); refreshStatus();
     }
+    private void refreshFind() { if (!disposed && selectedTab != null) selectedTab.render(); }
     private void step(int delta) {
         var all = editorTabs(); if (all.size() > 1) select(all.get(Math.floorMod(all.indexOf(selectedTab) + delta, all.size())).session());
     }

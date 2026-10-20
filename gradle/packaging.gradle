@@ -12,12 +12,15 @@ apply from: rootProject.file('gradle/mac-launcher-identity.gradle')
 apply from: rootProject.file('gradle/mac-launcher-identity-test.gradle')
 apply from: rootProject.file('gradle/packaging-support.gradle')
 apply from: rootProject.file('gradle/packaging-support-test.gradle')
+apply from: rootProject.file('gradle/launcher.gradle')
 
 def app = extensions.getByType(JavaApplication)
 def toolchains = extensions.getByType(JavaToolchainService)
 def java = extensions.getByType(JavaPluginExtension)
 def launcher = toolchains.launcherFor(java.toolchain)
-def version = providers.gradleProperty('jasperVersion').orElse('1.0.0')
+// -PjasperVersion, else the commit's release tag, else the latest release tag behind it, else 1.0.0 (gradle/build-info.gradle).
+def version = providers.provider { packageVersion(providers.gradleProperty('jasperVersion').orNull, buildFacts.get()) }
+ext.jasperPackageVersion = version
 def jarTask = tasks.named('jar')
 def packagingRoot = layout.buildDirectory.dir('packaging')
 def inputDirectory = packagingRoot.map { it.dir('input') }
@@ -61,11 +64,11 @@ def validatedVersion = {
     String value = version.get()
     def match = value =~ /^(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,4})$/
     if (!match.matches()) {
-        throw new GradleException("Invalid -PjasperVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
+        throw new GradleException("Invalid package version '${value}' (from -PjasperVersion or a vX.Y.Z release tag); expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
     }
     List<Integer> components = [match.group(1), match.group(2), match.group(3)].collect { Integer.parseInt(it) }
     if (components[0] < 1 || components[0] > 255 || components[1] > 255 || components[2] > 65535) {
-        throw new GradleException("Invalid -PjasperVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
+        throw new GradleException("Invalid package version '${value}' (from -PjasperVersion or a vX.Y.Z release tag); expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
     }
     value
 }
@@ -74,9 +77,9 @@ def nativeContext = {
     String packageVersion = validatedVersion()
     def host = normalizedHost()
     if (!(host.os == 'macos' && host.architecture in ['aarch64', 'x64']) &&
-            !(host.os == 'windows' && host.architecture == 'x64') &&
+            !(host.os == 'windows' && host.architecture in ['aarch64', 'x64']) &&
             !(host.os == 'linux' && host.architecture in ['aarch64', 'x64'])) {
-        throw new GradleException("Native packaging supports only macOS aarch64/x64, Windows x64 and Linux aarch64/x64; this host is ${System.getProperty('os.name')} ${System.getProperty('os.arch')}")
+        throw new GradleException("Native packaging supports only macOS, Windows and Linux on aarch64/x64; this host is ${System.getProperty('os.name')} ${System.getProperty('os.arch')}")
     }
     def selectedLauncher = launcher.get()
     File sdkHome = selectedLauncher.metadata.installationPath.asFile
@@ -112,10 +115,8 @@ def executeNative = { List<String> command, String purpose ->
 }
 
 // AppKit draws the macOS 26 window controls only for a main executable whose LC_BUILD_VERSION
-// records a macOS 26 or later SDK. jpackage's launcher stub records the SDK JetBrains built the
-// runtime with (13.3 for JBR 25), so every Swing window would get the pre-26 controls. Rewriting
-// that one load command with Apple's vtool and re-signing the bundle is enough; the stub's code is
-// untouched. Needs the Xcode command line tools; without them the image keeps the legacy controls.
+// records a macOS 26 or later SDK. Jasper's launcher (gradle/launcher.gradle) is linked against the
+// installed SDK, which verifyPackage checks. Null without the Xcode command line tools.
 def installedMacSdkVersion = {
     try {
         String reported = executeNative(['/usr/bin/xcrun', '--show-sdk-version'], 'xcrun --show-sdk-version').stdout.trim()
@@ -132,24 +133,6 @@ def launcherBuildVersion = { File stub ->
     [minos: minos.find() ? minos.group(1) : null, sdk: sdk.find() ? sdk.group(1) : null]
 }
 
-def refreshLauncherSdk = { File image ->
-    File stub = new File(image, 'Contents/MacOS/Jasper')
-    String sdk = installedMacSdkVersion()
-    if (sdk == null) {
-        logger.lifecycle('Launcher SDK version not updated: Xcode command line tools not found; the app keeps the pre-macOS-26 window controls')
-        return
-    }
-    def current = launcherBuildVersion(stub)
-    if (current.minos == null || current.sdk == null) throw new GradleException("Could not read the build version of ${stub}")
-    if (current.sdk == sdk) return
-    File patched = new File(stub.parentFile, 'Jasper.sdk-patched')
-    executeNative(['/usr/bin/xcrun', 'vtool', '-set-build-version', 'macos', current.minos, sdk, '-replace',
-        '-output', patched.absolutePath, stub.absolutePath], 'vtool -set-build-version')
-    Files.move(patched.toPath(), stub.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-    stub.setExecutable(true, false)
-    logger.lifecycle("Launcher build version: SDK ${current.sdk} -> ${sdk} (minos ${current.minos})")
-}
-
 // jpackage puts every jar under --input on the application classpath, including the bundled plugins
 // staged in plugins/. Those must load only through their own PluginClassLoader: MINA sshd resolves
 // classes through the thread context class loader (the application loader), and an application-loader
@@ -160,13 +143,9 @@ def removePluginClasspath = { File config ->
     if (kept.size() != lines.size()) config.setText(kept.join('\n') + '\n', 'UTF-8')
 }
 
-// Read the immutable launcher seed from the selected SDK, independent of the patched image.
-def macLauncherTemplate = { File sdkHome ->
-    new ZipFile(new File(sdkHome, 'jmods/jdk.jpackage.jmod')).withCloseable { archive ->
-        def entry = archive.getEntry('classes/jdk/jpackage/internal/resources/jpackageapplauncher')
-        if (entry == null) throw new GradleException('JBR SDK has no macOS jpackage launcher resource')
-        archive.getInputStream(entry).withCloseable { it.readAllBytes() }
-    }
+// The identity seed: Jasper's compiled launcher (gradle/launcher.gradle), independent of the patched image.
+def macLauncherTemplate = { ->
+    Files.readAllBytes(new File(launcherResources.get().asFile, 'jdk/jpackage/internal/resources/jpackageapplauncher').toPath())
 }
 
 // Re-signs after the bundle is edited: the same ad-hoc identity jpackage used; the nested runtime keeps its own signature.
@@ -225,21 +204,58 @@ def stage = tasks.register('stagePackage', Sync) {
     from(tasks.named('stagePlugins')) { into('plugins') }
     into(inputDirectory)
     duplicatesStrategy = DuplicatesStrategy.FAIL
+    // Spec 2026-10-14 section 3.1: the AOT cache's classes cannot satisfy package sealing (sealingSections). Nothing in
+    // Jasper relies on sealing; today this rewrites jbr-api only.
+    doLast {
+        inputDirectory.get().asFile.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }.each { File jar ->
+            if (unsealJar(jar)) logger.lifecycle("Unsealed ${jar.name}: classes from the AOT cache cannot satisfy package sealing")
+        }
+    }
 }
 
 apply from: rootProject.file('gradle/mac-native.gradle')
 apply from: rootProject.file('gradle/mac-glass.gradle')
+apply from: rootProject.file('gradle/mac-appearance.gradle')
+
+// The jasper command (packaging/cli/README.md) sits in a bin folder of its own: macOS and Windows file systems ignore
+// case, so it cannot share a folder with the Jasper launcher.
+def commandClientIn = { File image, String os ->
+    new File(image, [macos: 'Contents/Resources/bin/jasper', windows: 'bin/jasper.exe', linux: 'lib/bin/jasper'][os])
+}
+def installCommandClient = { File image, String os ->
+    File target = commandClientIn(image, os)
+    target.parentFile.mkdirs()
+    Files.copy(commandClientBinary.get().toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    target.setExecutable(true, false)
+    target
+}
+
+// jasper-watch (packaging/launcher/README.md) sits beside the launcher, where the launcher looks for it.
+def watcherIn = { File image, String os ->
+    new File(image, [macos: 'Contents/MacOS/jasper-watch', windows: 'jasper-watch.exe', linux: 'bin/jasper-watch'][os])
+}
+def installWatcher = { File image, String os ->
+    File target = watcherIn(image, os)
+    Files.copy(watcherBinary.get().toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    target.setExecutable(true, false)
+    target
+}
 
 def packageApp = tasks.register('packageApp') {
     group = 'distribution'
     description = 'Builds a native Jasper application image for the current host.'
     dependsOn(stage)
+    dependsOn(tasks.named('buildLauncher'))
+    dependsOn(tasks.named('buildCommandClient'))
+    dependsOn(tasks.named('buildWatcher'))
+    inputs.dir(launcherResources).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(nativeIcon).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(commandClientBinary).withPropertyName('commandClient').withPathSensitivity(PathSensitivity.NONE)
+    inputs.files(watcherBinary).withPropertyName('watcher').withPathSensitivity(PathSensitivity.NONE)
     if (normalizedHost().os == 'macos') {
         inputs.file(macIconCatalog).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.file(rootProject.file('gradle/mac-launcher-identity.gradle'))
-        inputs.file(launcher.map { it.metadata.installationPath.file('jmods/jdk.jpackage.jmod') })
         inputs.property('macIconName', macIconName)
     }
     inputs.property('mainClass', app.mainClass)
@@ -262,7 +278,7 @@ def packageApp = tasks.register('packageApp') {
         File marker = markerFile.get().asFile
         delete(imageDir, marker)
         imageDir.mkdirs()
-        List<String> args = [context.jpackage.absolutePath, '--type', 'app-image',
+        List<String> args = [context.jpackage.absolutePath, jpackageLauncherOption(), '--type', 'app-image',
             '--name', 'Jasper', '--app-version', context.version,
             '--description', 'Jasper terminal', '--vendor', 'Jasper',
             '--input', inputDirectory.get().asFile.absolutePath, '--dest', imageDir.absolutePath,
@@ -289,10 +305,9 @@ def packageApp = tasks.register('packageApp') {
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil icon catalog name')
                 executeNative(['/usr/bin/plutil', '-replace', 'NSLocalNetworkUsageDescription', '-string', localNetworkUsage,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil local network usage')
-                refreshLauncherSdk(image)
                 File executable = new File(image, 'Contents/MacOS/Jasper')
                 Files.write(executable.toPath(), macLauncherWithIdentity(Files.readAllBytes(executable.toPath()),
-                    'dev.jasper.app', macLauncherTemplate(context.sdkHome)))
+                    'dev.jasper.app', macLauncherTemplate()))
                 // jpackage re-signs native inputs. Restore our already-signed bridge so the
                 // same staged payload is verified byte-for-byte, then sign the outer bundle.
                 Files.copy(new File(inputDirectory.get().asFile, 'libjasper-macos.dylib').toPath(),
@@ -301,12 +316,24 @@ def packageApp = tasks.register('packageApp') {
                 Files.copy(new File(inputDirectory.get().asFile, 'libjasper-glass.dylib').toPath(),
                     new File(image, 'Contents/app/libjasper-glass.dylib').toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                Files.copy(new File(inputDirectory.get().asFile, 'libjasper-appearance.dylib').toPath(),
+                    new File(image, 'Contents/app/libjasper-appearance.dylib').toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                // Signed on its own, as the bridges are; resignImage then seals it into the bundle.
+                File command = installCommandClient(image, 'macos')
+                executeNative(['/usr/bin/codesign', '--force', '--sign', '-', command.absolutePath], 'codesign the jasper command')
+                File watcher = installWatcher(image, 'macos')
+                executeNative(['/usr/bin/codesign', '--force', '--sign', '-', watcher.absolutePath], 'codesign jasper-watch')
                 resignImage(image)
             } else if (context.host.os == 'linux') {
                 removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
+                installCommandClient(new File(imageDir, 'Jasper'), 'linux')
+                installWatcher(new File(imageDir, 'Jasper'), 'linux')
             } else {
                 removePluginClasspath(new File(imageDir, 'Jasper/app/Jasper.cfg'))
                 installBundledNatives(new File(imageDir, 'Jasper/app'), context.host)
+                installCommandClient(new File(imageDir, 'Jasper'), 'windows')
+                installWatcher(new File(imageDir, 'Jasper'), 'windows')
             }
             marker.text = "${context.version} ${context.host.os} ${context.host.architecture}\n"
         } catch (Exception failure) {
@@ -316,10 +343,90 @@ def packageApp = tasks.register('packageApp') {
     }
 }
 
+// A separate staging tree deliberately excludes the locally compiled launcher, CLI and platform bridges.
+def userInput = packagingRoot.map { it.dir('windows-user/input') }
+def userImage = packagingRoot.map { it.dir('windows-user/image') }
+def stageWindowsUser = tasks.register('stageWindowsUser', Sync) {
+    from(jarTask.flatMap { it.archiveFile })
+    from(configurations.runtimeClasspath)
+    from(tasks.named('stagePlugins')) { into('plugins') }
+    from(rootProject.file('config.example.toml'))
+    into(userInput)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+def packageWindowsUser = tasks.register('packageWindowsUser') {
+    group = 'distribution'
+    description = 'Builds a Windows app image with the standard JBR launcher; no native compiler or installer.'
+    dependsOn(stageWindowsUser)
+    // Always rebuild: this image is a local installation input, not a release artifact.
+    doLast {
+        if (normalizedHost().os != 'windows') throw new GradleException('Windows user installation requires Windows.')
+        def context = nativeContext()
+        File destination = userImage.get().asFile
+        delete(destination)
+        destination.mkdirs()
+        List<String> args = [context.jpackage.absolutePath, '--type', 'app-image',
+            '--name', 'Jasper', '--app-version', context.version, '--vendor', 'Jasper',
+            '--input', userInput.get().asFile.absolutePath, '--dest', destination.absolutePath,
+            '--main-jar', jarTask.get().archiveFile.get().asFile.name, '--main-class', app.mainClass.get(),
+            '--icon', nativeIcon.get().absolutePath,
+            '--add-modules', runtimeRootModules('windows').join(','), '--jlink-options', jlinkOptions]
+        app.applicationDefaultJvmArgs.each { args.addAll(['--java-options', it.toString()]) }
+        bundledNativeJvmOptions('windows').each { args.addAll(['--java-options', it]) }
+        executeNative(args, 'jpackage Windows user app-image')
+        File image = new File(destination, 'Jasper')
+        removePluginClasspath(new File(image, 'app/Jasper.cfg'))
+        installBundledNatives(new File(image, 'app'), context.host)
+    }
+}
+def userInstallerLibraries = configurations.create('windowsUserInstallerLibraries')
+dependencies.add(userInstallerLibraries.name, 'net.java.dev.jna:jna-platform:5.14.0')
+def userInstallerClasses = layout.buildDirectory.dir('windows-user-installer/classes')
+def compileUserInstaller = tasks.register('compileWindowsUserInstaller', JavaCompile) {
+    source(rootProject.fileTree('packaging/windows/user-install') { include('*.java') })
+    classpath = userInstallerLibraries
+    destinationDirectory = userInstallerClasses
+    javaCompiler = toolchains.compilerFor(java.toolchain)
+}
+def testUserInstaller = tasks.register('verifyWindowsUserInstall', JavaExec) {
+    group = 'verification'
+    description = 'Tests the Java user installer; also exercises Windows shell APIs on Windows.'
+    dependsOn(compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstallTest'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+}
+tasks.named('check') { dependsOn(testUserInstaller) }
+tasks.register('installWindowsUser', JavaExec) {
+    group = 'distribution'
+    description = 'Installs Jasper in APPDATA with a Start Menu shortcut, without MSVC or administrator rights.'
+    dependsOn(packageWindowsUser, compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstall'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+    args('install', new File(userImage.get().asFile, 'Jasper').absolutePath)
+}
+tasks.register('uninstallWindowsUser', JavaExec) {
+    group = 'distribution'
+    description = 'Removes the Windows user installation and its shortcut, preserving Jasper user data.'
+    dependsOn(compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstall'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+    args('uninstall')
+    doFirst {
+        if (normalizedHost().os != 'windows') throw new GradleException('Windows user uninstallation requires Windows.')
+    }
+}
+
 def verifyPackage = tasks.register('verifyPackage') {
     group = 'verification'
     description = 'Verifies the generated native image and bundled runtime without launching Jasper.'
     dependsOn(packageApp)
+    dependsOn(tasks.named('testLauncherCore'), tasks.named('testLauncherWatch'), tasks.named('testWatcher'))
     // BundledNativesProbe lives in the test sources: verification tooling, never in the application jar.
     if (normalizedHost().os in ['macos', 'windows']) dependsOn(tasks.named('testClasses'))
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
@@ -340,12 +447,56 @@ def verifyPackage = tasks.register('verifyPackage') {
         [image, appDir, runtimeHome, nativeLauncher, config].each { candidate ->
             if (!candidate.exists()) throw new GradleException("Package verification failed: missing ${candidate}")
         }
+        // Jasper's launcher (gradle/launcher.gradle), not jpackage's own: its watch module names the skip variable.
+        if (!new String(Files.readAllBytes(nativeLauncher.toPath()), StandardCharsets.ISO_8859_1).contains('JASPER_VM_OPTIONS_SKIP')) {
+            throw new GradleException("Package verification failed: ${nativeLauncher} is not Jasper's launcher")
+        }
+        if (context.host.os == 'linux') {
+            File launcherLibrary = new File(image, 'lib/libapplauncher.so')
+            if (!launcherLibrary.isFile() ||
+                    !new String(Files.readAllBytes(launcherLibrary.toPath()), StandardCharsets.ISO_8859_1).contains('-Djasper.vmOptionsFile=')) {
+                throw new GradleException("Package verification failed: ${launcherLibrary} is not Jasper's launcher library")
+            }
+        }
+        // The jasper command: present, executable, signed on macOS, and runnable here (--help contacts no Jasper).
+        File command = commandClientIn(image, context.host.os)
+        if (!command.isFile()) throw new GradleException("Package verification failed: missing ${command}")
+        if (context.host.os != 'windows' && !command.canExecute()) {
+            throw new GradleException("Package verification failed: ${command} is not executable")
+        }
+        if (context.host.os == 'macos') {
+            executeNative(['/usr/bin/codesign', '--verify', '--strict', command.absolutePath], 'verifying the jasper command')
+        }
+        String help = executeNative([command.absolutePath, '--help'], 'running jasper --help').stdout
+        if (!help.startsWith('Usage: jasper')) throw new GradleException("Package verification failed: jasper --help printed:\n${help}")
+        // jasper-watch: beside the launcher, executable, Jasper's (its dialog's title survives stripping), signed on macOS.
+        File watcher = watcherIn(image, context.host.os)
+        if (!watcher.isFile()) throw new GradleException("Package verification failed: missing ${watcher}")
+        if (context.host.os != 'windows' && !watcher.canExecute()) {
+            throw new GradleException("Package verification failed: ${watcher} is not executable")
+        }
+        if (!new String(Files.readAllBytes(watcher.toPath()), StandardCharsets.ISO_8859_1).contains('Jasper could not start')) {
+            throw new GradleException("Package verification failed: ${watcher} is not Jasper's watcher")
+        }
+        if (context.host.os == 'macos') {
+            executeNative(['/usr/bin/codesign', '--verify', '--strict', watcher.absolutePath], 'verifying jasper-watch')
+            String watcherArchitecture = executeNative(['/usr/bin/lipo', '-archs', watcher.absolutePath], 'jasper-watch architecture').stdout.trim()
+            if (watcherArchitecture != (context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64')) {
+                throw new GradleException("Package verification failed: ${watcher} is built for ${watcherArchitecture}")
+            }
+        }
         inputDirectory.get().asFile.eachFile { staged ->
             if (staged.isDirectory()) return
             File packaged = new File(appDir, staged.name)
             if (!packaged.isFile() || !Arrays.equals(Files.readAllBytes(staged.toPath()), Files.readAllBytes(packaged.toPath()))) {
                 throw new GradleException("Package verification failed: staged file differs or is missing: ${staged.name}")
             }
+        }
+        // stagePackage unseals the class path (spec 2026-10-14 section 3.1); a sealed jar here would stop the JVM once
+        // the AOT cache's training paths are gone.
+        appDir.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }.each { File jar ->
+            List<String> sealing = sealingSections(jar)
+            if (sealing) throw new GradleException("Package verification failed: ${jar.name} still seals packages (${sealing.join(', ')})")
         }
         File stagedPlugins = new File(inputDirectory.get().asFile, 'plugins')
         stagedPlugins.eachFileRecurse(groovy.io.FileType.FILES) { staged ->
@@ -364,9 +515,9 @@ def verifyPackage = tasks.register('verifyPackage') {
         boolean anyGlassOption = cfg.contains('--add-opens=java.desktop/java.awt=ALL-UNNAMED') || cfg.contains('--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED')
         if (context.host.os == 'macos' && !glassOptions) throw new GradleException('Package verification failed: the workspace glass JVM options are missing from Jasper.cfg')
         if (context.host.os != 'macos' && anyGlassOption) throw new GradleException('Package verification failed: Jasper.cfg opens JDK internals for workspace glass, which exists only on macOS')
-        // Part 2 adds no JVM tuning flags: only the application's own options (on macOS these include the workspace
-        // glass options above), the bundled-native options and jpackage's app version may appear (trainAotCache adds
-        // -XX:AOTCache on macOS).
+        // Only the application's own options (the heap default, -XX:+IgnoreUnrecognizedVMOptions and, on macOS, the
+        // workspace glass options above), the bundled-native options and jpackage's app version may appear
+        // (trainAotCache adds -XX:AOTCache on macOS). Users add theirs in jasper.vmoptions, not here.
         List<String> cfgOptions = cfg.readLines().findAll { it.startsWith('java-options=') }.collect { it.substring('java-options='.length()) }
         List<String> requiredOptions = app.applicationDefaultJvmArgs.collect { it.toString() } + bundledNativeJvmOptions(context.host.os)
         List<String> permittedOptions = requiredOptions + ["-Djpackage.app-version=${context.version}".toString()] +
@@ -429,7 +580,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         String nativeArchitecture = context.host.architecture == 'aarch64' ? 'aarch64' : 'x86-64'
         def nativePrefixes = [
             macos: [pty: 'resources/com/pty4j/native/darwin/', jna: "com/sun/jna/darwin-${nativeArchitecture}/"],
-            windows: [pty: 'resources/com/pty4j/native/win/x86-64/', jna: 'com/sun/jna/win32-x86-64/'],
+            windows: [pty: "resources/com/pty4j/native/win/${nativeArchitecture}/", jna: "com/sun/jna/win32-${nativeArchitecture}/"],
             linux: [pty: "resources/com/pty4j/native/linux/${nativeArchitecture}/", jna: "com/sun/jna/linux-${nativeArchitecture}/"],
         ][context.host.os]
         [[jar: ptyJar, prefix: nativePrefixes.pty], [jar: jnaJar, prefix: nativePrefixes.jna]].each { expected ->
@@ -455,7 +606,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         }
         if (context.host.os == 'macos') {
             // Jasper's own signed bridges, staged and restored byte for byte by packageApp: the macOS bridge
-            // (notifications and the Dock presence) and the workspace glass blur.
+            // (notifications and the Dock presence), workspace glass blur and system appearance observation.
             String expectedBridgeArchitecture = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
             [
                 [label: 'native', name: 'libjasper-macos.dylib', symbols: ['Java_dev_jasper_app_platform_MacNotifications_bind',
@@ -463,6 +614,8 @@ def verifyPackage = tasks.register('verifyPackage') {
                     'Java_dev_jasper_app_platform_MacNotifications_removeAll', 'Java_dev_jasper_app_platform_MacDock_setRegular',
                     'Java_dev_jasper_app_platform_MacDock_watchPowerOff', 'Java_dev_jasper_app_platform_MacDock_poweringOffNow']],
                 [label: 'glass', name: 'libjasper-glass.dylib', symbols: ['Java_dev_jasper_app_platform_MacGlass_setEffect']],
+                [label: 'appearance', name: 'libjasper-appearance.dylib', symbols: ['Java_dev_jasper_app_platform_MacAppearance_watch',
+                    'Java_dev_jasper_app_platform_MacAppearance_unwatch']],
             ].each { Map bridge ->
                 File library = new File(appDir, bridge.name as String)
                 if (!library.isFile()) throw new GradleException("Package verification failed: ${bridge.label} bridge missing")
@@ -498,7 +651,7 @@ def verifyPackage = tasks.register('verifyPackage') {
             String architectureNeedle = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
             if (!fileOutput.contains(architectureNeedle)) throw new GradleException("Package verification failed: native binaries are not ${architectureNeedle}\n${fileOutput}")
             byte[] executable = Files.readAllBytes(nativeLauncher.toPath())
-            if (!Arrays.equals(executable, macLauncherWithIdentity(executable, identifier, macLauncherTemplate(context.sdkHome)))) {
+            if (!Arrays.equals(executable, macLauncherWithIdentity(executable, identifier, macLauncherTemplate()))) {
                 throw new GradleException('Package verification failed: launcher lacks its app-specific Mach-O UUID; macOS may apply another app\'s Local Network permission')
             }
             executeNative(['/usr/bin/codesign', '--verify', '--deep', '--strict', image.absolutePath], 'codesign verification')
@@ -519,6 +672,22 @@ def verifyPackage = tasks.register('verifyPackage') {
             }
         }
         if (context.host.os == 'windows') {
+            // Read the PE header rather than trusting the toolchain: an x64 image on Windows on Arm runs under
+            // emulation, JIT-compiled code included. IMAGE_FILE_HEADER.Machine is 0x8664 for x64, 0xAA64 for ARM64.
+            int expectedMachine = context.host.architecture == 'aarch64' ? 0xAA64 : 0x8664
+            [nativeLauncher, watcher, new File(runtimeHome, 'bin/java.exe'), new File(runtimeHome, 'bin/server/jvm.dll')].each { binary ->
+                byte[] header = new byte[4096]
+                int read = binary.withInputStream { it.readNBytes(header, 0, header.length) }
+                ByteBuffer pe = ByteBuffer.wrap(header, 0, read).order(ByteOrder.LITTLE_ENDIAN)
+                int offset = read >= 0x40 ? pe.getInt(0x3C) : -1
+                boolean valid = read >= 2 && header[0] == ('M' as char) && header[1] == ('Z' as char) &&
+                    offset >= 0 && offset + 6 <= read && pe.getInt(offset) == 0x00004550
+                int machine = valid ? (pe.getShort(offset + 4) & 0xFFFF) : -1
+                if (machine != expectedMachine) {
+                    throw new GradleException(String.format(Locale.ROOT,
+                        'Package verification failed: %s is not a %s PE binary (machine 0x%04X)', binary, context.host.architecture, machine))
+                }
+            }
             // jpackage embeds the ICO's PNG frames in the executable's native resources.
             // Inspect bytes without running the launcher or depending on image-conversion tools.
             byte[] ico = Files.readAllBytes(nativeIcon.get().toPath())
@@ -540,7 +709,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (context.host.os == 'linux') {
             // Read the ELF header rather than trusting `file`: e_machine at offset 18 is 0x3E for x86-64, 0xB7 for AArch64.
             int expectedMachine = context.host.architecture == 'aarch64' ? 0xB7 : 0x3E
-            [nativeLauncher, new File(runtimeHome, 'bin/java')].each { binary ->
+            [nativeLauncher, watcher, new File(runtimeHome, 'bin/java')].each { binary ->
                 byte[] header = new byte[20]
                 binary.withInputStream { it.readNBytes(header, 0, header.length) }
                 boolean elf = header[0] == 0x7F && header[1] == ('E' as char) && header[2] == ('L' as char) && header[3] == ('F' as char)
@@ -625,19 +794,19 @@ if (normalizedHost().os == 'windows') {
         inputs.file(installerVerifier).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.property('version', version)
         inputs.property('upgradeUuid', upgradeUuid)
-        outputs.file(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-windows-x64-setup.exe") })
+        outputs.file(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-windows-${normalizedHost().architecture}-setup.exe") })
         doLast {
             def context = nativeContext()
             File distDir = distributionDirectory.get().asFile
             distDir.mkdirs()
-            File artifact = new File(distDir, "Jasper-${context.version}-windows-x64-setup.exe")
+            File artifact = new File(distDir, "Jasper-${context.version}-windows-${context.host.architecture}-setup.exe")
             File temporary = new File(packagingRoot.get().asFile, 'installer-work')
             delete(artifact, temporary)
             temporary.mkdirs()
             try {
                 File output = new File(temporary, 'output')
                 File work = new File(temporary, 'jpackage')
-                executeNative([context.jpackage.absolutePath, '--type', 'exe', '--name', 'Jasper',
+                executeNative([context.jpackage.absolutePath, jpackageLauncherOption(), '--type', 'exe', '--name', 'Jasper',
                     '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
                     '--icon', nativeIcon.get().absolutePath,
                     '--app-image', new File(imageDirectory.get().asFile, 'Jasper').absolutePath,
@@ -669,7 +838,7 @@ if (normalizedHost().os == 'windows') {
         group = 'distribution'
         description = 'Creates the portable Windows distribution after verifying its image.'
         dependsOn(verifyPackage)
-        archiveFileName = version.map { "Jasper-${it}-windows-x64.zip" }
+        archiveFileName = version.map { "Jasper-${it}-windows-${normalizedHost().architecture}.zip" }
         destinationDirectory = distributionDirectory
         from(imageDirectory)
         preserveFileTimestamps = false
@@ -793,7 +962,7 @@ if (normalizedHost().os == 'windows') {
                     resources.mkdirs()
                     Files.copy(nativeIcon.get().toPath(), new File(resources, 'Jasper.png').toPath())
                     writeInstallScripts(context.sdkHome, resources, type)
-                    List<String> args = [context.jpackage.absolutePath, '--type', type, '--name', 'Jasper',
+                    List<String> args = [context.jpackage.absolutePath, jpackageLauncherOption(), '--type', type, '--name', 'Jasper',
                         '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
                         '--about-url', 'https://github.com/an0nn30/Jasper',
                         '--icon', nativeIcon.get().absolutePath,
@@ -851,7 +1020,9 @@ if (normalizedHost().os == 'windows') {
     }
 } else {
     def aotTrainingDirectory = packagingRoot.map { it.dir('aot-training') }
-    // Launches the image once: a Jasper window for a few seconds, without a Dock icon. Agents ask the user first.
+    // Beside aotTrainingDirectory, which runAotTraining clears: the image copy that training launches (trainInCopy).
+    def aotTrainingImageDirectory = packagingRoot.map { it.dir('aot-training-image') }
+    // Launches a copy of the image once: a Jasper window for a few seconds, without a Dock icon. Agents ask the user first.
     // Training changes packageApp's output, so the next packageApp rebuilds the image from scratch, untrained.
     def trainAotCache = tasks.register('trainAotCache') {
         group = 'distribution'
@@ -864,7 +1035,9 @@ if (normalizedHost().os == 'windows') {
             if (config.readLines('UTF-8').contains('java-options=' + aotCacheOption)) {
                 throw new GradleException("${image} already has an AOT cache; packageApp rebuilds the image before training")
             }
-            File cache = runAotTraining(new File(image, 'Contents/MacOS/Jasper'), aotTrainingDirectory.get().asFile, 90, 300)
+            File cache = trainInCopy(image, new File(aotTrainingImageDirectory.get().asFile, 'Jasper.app'),
+                { File from, File to -> executeNative(['/usr/bin/ditto', from.absolutePath, to.absolutePath], 'copying the image for AOT training') },
+                { File copy -> runAotTraining(new File(copy, 'Contents/MacOS/Jasper'), aotTrainingDirectory.get().asFile, 90, 300) })
             Files.copy(cache.toPath(), new File(appDir, 'jasper.aot').toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
             config.setText(withJavaOption(config.getText('UTF-8'), aotCacheOption), 'UTF-8')
             resignImage(image)

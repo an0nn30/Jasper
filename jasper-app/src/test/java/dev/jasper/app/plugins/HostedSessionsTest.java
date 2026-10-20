@@ -38,7 +38,7 @@ class HostedSessionsTest {
 
     private HostedTerminals terminals(String... capabilities) {
         HostedTerminals[] holder = new HostedTerminals[1];
-        sessions = new HostedSessions("dev.x.ssh", containment, cleanup::add, id -> holder[0].detachedPaneHandle(id));
+        sessions = new HostedSessions("dev.x.ssh", containment, cleanup::add, id -> holder[0].detachedPaneHandle(id), name -> new javax.swing.ImageIcon());
         holder[0] = new HostedTerminals("dev.x.ssh", new CapabilityGate("dev.x.ssh", Set.of(capabilities)), fixture.registry, Runnable::run,
             () -> true, () -> true, sessions);
         return holder[0];
@@ -127,9 +127,9 @@ class HostedSessionsTest {
 
     @Test void theSpecIconBecomesTheRequestIconAndAnAbsentIconMeansTheHostDefault() {
         terminals(Capabilities.SESSION_PROVIDE);
-        var icon = new javax.swing.ImageIcon();
+        var icon = "file";
         assertThat(sessions.request(new SessionSpec("build-host", Optional.of(icon), ExitPolicy.KEEP_OPEN, pendings::add)).icon())
-            .isSameAs(icon);
+            .isInstanceOf(javax.swing.Icon.class);
         assertThat(sessions.request(SessionSpec.of("build-host", pendings::add)).icon()).isNull();
     }
 }

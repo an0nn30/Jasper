@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Color;
@@ -189,8 +188,7 @@ class DockDropOverlayTest {
     }
 
     @Test void thePlaceholdersBorderDoesNotStackOnItsFill() {
-        noThemeColours();
-        UIManager.put("Component.accentColor", new Color(0x2f, 0x80, 0xed));
+        installDragTheme(new Color(0x2f, 0x80, 0xed), Map.of());
         var overlay = new DockDropOverlay();
         overlay.show(null, new Rectangle(10, 160, 40, 40), null, null);
         BufferedImage image = paint(overlay);
@@ -204,8 +202,7 @@ class DockDropOverlayTest {
     }
 
     @Test void theHighlightAndThePlaceholderLandExactlyInTheirRectangles() {
-        noThemeColours();
-        UIManager.put("Component.accentColor", new Color(0x2f, 0x80, 0xed));
+        installDragTheme(new Color(0x2f, 0x80, 0xed), Map.of());
         var overlay = new DockDropOverlay();
         overlay.show(new Rectangle(50, 40, 200, 100), new Rectangle(10, 160, 22, 22), null, null);
         BufferedImage image = paint(overlay);
@@ -221,15 +218,27 @@ class DockDropOverlayTest {
         assertThat(overlay.contains(150, 90)).as("mouse events pass through").isFalse();
     }
 
-    @Test void theThemesOwnDragColoursWin() {
-        originalLookAndFeel = UIManager.getLookAndFeel();
-        ThemeTestSupport.install(Theme.DARK);
-        UIManager.put("DragAndDrop.areaBackground", new Color(10, 20, 30, 40));
-        UIManager.put("DragAndDrop.borderColor", new Color(200, 100, 50, 255));
-        assertThat(DockDropOverlay.fill()).isEqualTo(new Color(10, 20, 30, 40));
-        assertThat(DockDropOverlay.border()).isEqualTo(new Color(200, 100, 50, 255));
-        noThemeColours();
-        assertThat(DockDropOverlay.fill()).as("no accent either: IntelliJ's blue").isEqualTo(new Color(0x35, 0x74, 0xf0, 64));
+    /**
+     * Drag guides use the canonical accent with the kit's fill/border alphas. DragAndDrop.* has no canonical role,
+     * so an authored value no longer bypasses the canonical route (recorded as an unsupported native override);
+     * an explicit canonical accent reaches the guides.
+     */
+    @Test void dragGuidesFollowTheCanonicalAccentRoute() {
+        installDragTheme(new Color(0x3574f0), Map.of("DragAndDrop.areaBackground", new Color(0x0a, 0x14, 0x1e, 0x28),
+            "DragAndDrop.borderColor", new Color(0xc86432)));
+        assertThat(DockDropOverlay.fill()).isEqualTo(new Color(0x35, 0x74, 0xf0, 64));
+        assertThat(DockDropOverlay.border()).isEqualTo(new Color(0x35, 0x74, 0xf0, 153));
+        installDragTheme(new Color(0x2f80ed), Map.of());
+        assertThat(DockDropOverlay.fill()).isEqualTo(new Color(0x2f, 0x80, 0xed, 64));
+        assertThat(DockDropOverlay.border()).isEqualTo(new Color(0x2f, 0x80, 0xed, 153));
+    }
+
+    private void installDragTheme(Color accent, Map<String, Color> authored) {
+        if (originalLookAndFeel == null) originalLookAndFeel = UIManager.getLookAndFeel();
+        ThemeTestSupport.install(ThemeTestSupport.recolored(ThemeTestSupport.generated(true),
+            Map.of(dev.jasper.ui.theme.SemanticColor.ACCENT, accent)));
+        // Authored vendor DragAndDrop.* values in the installed defaults; the guides ignore them.
+        authored.forEach((key, color) -> UIManager.getLookAndFeelDefaults().put(key, new javax.swing.plaf.ColorUIResource(color)));
     }
 
     @Test void theGhostFollowsTheCursorAndClearRemovesEverything() {

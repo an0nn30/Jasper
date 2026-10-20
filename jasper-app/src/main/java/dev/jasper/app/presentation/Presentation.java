@@ -1,0 +1,93 @@
+package dev.jasper.app.presentation;
+
+import dev.jasper.app.config.DefaultSource;
+import dev.jasper.ui.kit.Kit;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * The one presentation a process runs with (spec 3.2 and 4.9), chosen on the bootstrap thread and replaced at most once,
+ * by {@link #fallback(Projections.Host)}, before plugins start. Consumers receive its kit or a projection, never this value.
+ *
+ * @param provider the providing plugin, empty for the default look
+ * @param kit the jasper-ui kit every context is made with
+ * @param chrome the parsed chrome points
+ * @param classicBase whether the kit's base is classic
+ * @param faces the face files the kit names
+ * @param defaults the kit's setting defaults
+ * @param projections every consumer's projection
+ * @param droppedDefaults the {@code [defaults]} keys left out because the theme they name did not load
+ * @param branding the look's branding (spec 10.11); {@link Branding#NONE} for the default look and the fallback
+ */
+public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chrome, boolean classicBase, KitParser.Faces faces,
+                           DefaultSource defaults, Projections projections, java.util.List<String> droppedDefaults, Branding branding) {
+    /**
+     * The plugin that provides a look.
+     *
+     * @param id its id
+     * @param name its name, as notices say it
+     * @param version its version
+     * @param digest the look's digest
+     */
+    public record Provider(String id, String name, String version, String digest) {
+        /** Every part is required. */
+        public Provider { Objects.requireNonNull(id); Objects.requireNonNull(name); Objects.requireNonNull(version); Objects.requireNonNull(digest); }
+    }
+
+    /** Every part is required. */
+    public Presentation {
+        Objects.requireNonNull(branding, "branding");
+        Objects.requireNonNull(provider); Objects.requireNonNull(kit); Objects.requireNonNull(chrome); Objects.requireNonNull(faces);
+        Objects.requireNonNull(defaults); Objects.requireNonNull(projections);
+        droppedDefaults = java.util.List.copyOf(droppedDefaults);
+    }
+
+    /**
+     * The default look.
+     *
+     * @param host the host's facts
+     * @return the default look's presentation
+     */
+    public static Presentation standard(Projections.Host host) {
+        return new Presentation(Optional.empty(), Kit.DEFAULT, ChromeSpec.DEFAULT, false, KitParser.Faces.NONE, DefaultSource.CORE,
+            Projections.of(ChromeSpec.DEFAULT, false, false, "", host), java.util.List.of(), Branding.NONE);
+    }
+
+    /**
+     * {@code provider}'s look from its parsed kit.
+     *
+     * @param provider the providing plugin
+     * @param parsed its parsed kit file
+     * @param host the host's facts
+     * @return the provider's presentation
+     */
+    public static Presentation of(Provider provider, KitParser.Parsed parsed, Projections.Host host) {
+        return new Presentation(Optional.of(provider), parsed.kit(), parsed.chrome(), parsed.classicBase(), parsed.faces(), parsed.defaults(),
+            Projections.of(parsed.chrome(), parsed.classicBase(), parsed.faces().ui().isPresent(), provider.id(), host), parsed.dropped(), parsed.branding());
+    }
+
+    /**
+     * Spec 4.7: the default kit and chrome under the flags already committed on {@code host}, keeping the defaults read at start.
+     *
+     * @param host the host's facts
+     * @return the fallback presentation
+     */
+    public Presentation fallback(Projections.Host host) {
+        return new Presentation(Optional.empty(), Kit.DEFAULT, ChromeSpec.DEFAULT, false, KitParser.Faces.NONE, defaults,
+            Projections.fallback(committedDesktop(), host), java.util.List.of(), Branding.NONE);
+    }
+
+    /**
+     * The desktop flags the bootstrap applied.
+     *
+     * @return the committed flags
+     */
+    public DesktopFlags committedDesktop() { return projections.desktop(); }
+
+    /**
+     * The provider's id, or {@code default}: how the start-up trace names the look.
+     *
+     * @return the look's name in the trace
+     */
+    public String look() { return provider.map(Provider::id).orElse("default"); }
+}

@@ -1,6 +1,6 @@
 package dev.jasper.sdk.settings;
 
-import javax.swing.JComponent;
+import dev.jasper.sdk.ui.Nodes;
 
 /**
  * What a {@link SettingsPanel} may use: standard rows for declared settings and the page's unsaved values. UI thread.
@@ -13,7 +13,8 @@ public interface SettingsPanelHost {
      * @param setting a setting this plugin declared
      * @return the row
      */
-    JComponent row(Setting<?> setting);
+    Nodes.Node row(Setting<?> setting);
+
 
     /**
      * The page's unsaved value of a declared setting, or its saved value when nothing is pending.

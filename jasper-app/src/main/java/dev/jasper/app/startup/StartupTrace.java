@@ -38,6 +38,8 @@ public final class StartupTrace {
 
     /** {@code -Djasper.startupTrace=<file>} also writes the trace as JSON, for the start-up benchmark. */
     public static final String TRACE_FILE_PROPERTY = "jasper.startupTrace";
+    /** Set by Jasper's launcher when it started this JVM without the AOT cache; the value is the reason. */
+    static final String AOT_CACHE_SKIPPED_PROPERTY = "jasper.aotCacheSkipped";
     static final long CAP_NANOS = TimeUnit.SECONDS.toNanos(10);
     static final int WINDOW_LIMIT = 50;
     static final long UNSET = Long.MIN_VALUE;
@@ -50,11 +52,23 @@ public final class StartupTrace {
                        Path traceFile, Consumer<String> log, Executor background, Supplier<JvmStatus> jvm,
                        BiConsumer<Long, Runnable> timer) { }
 
-    /** Whether this JVM mapped an AOT cache or the default CDS archive. */
+    /** Whether this JVM mapped an AOT cache or the default CDS archive, or why the launcher left the cache out. */
     record JvmStatus(String aotCache, String cds) {
-        static JvmStatus of(String aotCacheOption, boolean sharing) {
+        private static final List<String> SKIP_REASONS = List.of("launch-failed", "remembered", "environment");
+
+        /**
+         * {@code skipped} is {@code jasper.aotCacheSkipped}, which the launcher sets when it starts this JVM without
+         * the cache. {@code launch-failed}, {@code remembered} and {@code environment} are reported as they are; any other
+         * value is a hand-set {@code JASPER_AOT_CACHE_SKIP} and reads {@code environment}, because the log holds no
+         * environment values.
+         */
+        static JvmStatus of(String aotCacheOption, boolean sharing, String skipped) {
+            String cds = sharing ? "on" : "off";
+            if (skipped != null && !skipped.isBlank()) {
+                return new JvmStatus("skipped: " + (SKIP_REASONS.contains(skipped) ? skipped : "environment"), cds);
+            }
             boolean configured = aotCacheOption != null && !aotCacheOption.isEmpty();
-            return new JvmStatus(!configured ? "none" : sharing ? "used" : "stale", sharing ? "on" : "off");
+            return new JvmStatus(!configured ? "none" : sharing ? "used" : "stale", cds);
         }
 
         /** Off the EDT: loads the management classes on first use. */
@@ -67,7 +81,7 @@ public final class StartupTrace {
             } catch (RuntimeException | LinkageError unavailable) {
                 // No management module or no such option: report the cache as not configured.
             }
-            return of(configured, sharing);
+            return of(configured, sharing, System.getProperty(AOT_CACHE_SKIPPED_PROPERTY));
         }
     }
 
@@ -86,6 +100,8 @@ public final class StartupTrace {
     private final AtomicBoolean settling = new AtomicBoolean();
     private volatile boolean settled;
     private volatile JvmStatus jvm;
+    private volatile Supplier<MemoryReading> memory = () -> null;
+    private volatile long idleSince = UNSET;
 
     StartupTrace(Environment environment) {
         this.environment = Objects.requireNonNull(environment, "environment");
@@ -101,7 +117,7 @@ public final class StartupTrace {
     public static StartupTrace detached() {
         long now = System.nanoTime();
         return new StartupTrace(new Environment(System::nanoTime, now, 0, Instant.now(), ProcessHandle.current().pid(),
-            null, line -> { }, Runnable::run, () -> JvmStatus.of("", false), (delay, task) -> { }));
+            null, line -> { }, Runnable::run, () -> JvmStatus.of("", false, null), (delay, task) -> { }));
     }
 
     /** The trace file named by the property; null for a blank or malformed value, because tracing must never stop a launch. */
@@ -129,6 +145,14 @@ public final class StartupTrace {
                 task.run();
             }));
     }
+
+    private volatile String look = "default";
+
+    /** The look this process runs: its provider's id, or {@code default} (spec 4.10). */
+    public void look(String id) { look = Objects.requireNonNull(id, "id"); }
+
+    /** The look {@link #look(String)} last recorded. */
+    public String look() { return look; }
 
     /** Records {@code milestone} now unless it was already recorded; settles once both settling milestones exist. */
     public void mark(Milestone milestone) {
@@ -179,9 +203,36 @@ public final class StartupTrace {
         }
     }
 
+    /**
+     * Reads this process's memory for the line of a window opened after a spell with none (see {@link #windowsClosed}),
+     * on systems that have the figures; such a window reads it on the EDT when requested and again when shown, so it
+     * must be cheap by then. {@code reader} returns null when it cannot read them. A first window never reads it.
+     */
+    public void readMemoryWith(Supplier<MemoryReading> reader) {
+        memory = Objects.requireNonNull(reader, "reader");
+    }
+
+    /** The last window has closed: the next window's line reports how long the process sat with none. */
+    public void windowsClosed() {
+        idleSince = environment.nanos().getAsLong();
+    }
+
+    /** This process's memory now, or null. Never throws. */
+    MemoryReading memory() {
+        try {
+            return memory.get();
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+    }
+
     /** Starts timing a window requested now; it gives up 10 s later if it never paints output. */
     public WindowTrace window(String trigger) {
-        WindowTrace trace = new WindowTrace(this, trigger, environment.nanos().getAsLong());
+        long now = environment.nanos().getAsLong();
+        long idle = idleSince;
+        idleSince = UNSET;
+        WindowTrace trace = idle == UNSET ? new WindowTrace(this, trigger, now, UNSET, null)
+            : new WindowTrace(this, trigger, now, now - idle, memory());
         synchronized (windowsLock) {
             windows.addLast(trace);
             while (windows.size() > WINDOW_LIMIT) windows.removeFirst();
@@ -224,6 +275,7 @@ public final class StartupTrace {
         vm.put("cds", status.cds());
         root.put("jvm", vm);
         root.put("kind", kind());
+        root.put("look", look);
         root.put("settled", settled);
         Map<String, Object> milestones = new LinkedHashMap<>();
         for (Milestone milestone : Milestone.values()) millis(milestone).ifPresent(at -> milestones.put(milestone.name(), round(at)));
@@ -257,7 +309,7 @@ public final class StartupTrace {
 
     String line(JvmStatus status) {
         StringBuilder out = new StringBuilder("Startup (").append(kind()).append(", AOT cache ").append(status.aotCache())
-            .append(", CDS ").append(status.cds()).append("):");
+            .append(", CDS ").append(status.cds()).append(", look=").append(look).append("):");
         String separator = " ";
         for (Milestone milestone : Milestone.values()) {
             OptionalDouble at = millis(milestone);

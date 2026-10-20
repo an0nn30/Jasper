@@ -71,6 +71,8 @@ final class BuddyIntegration implements AutoCloseable {
     }
 
     BuddyCompanion companion() { return companion; }
+    /** The options last applied: appearance changes replace only the font and the dark flag. */
+    BuddyOptions options() { return options; }
     void configured(boolean enabled) { if (closed) return; visibility.configure(enabled); sync(); }
     void toggle() { if (closed) return; visibility.toggle(); sync(); }
     boolean enabled() { return !closed && visibility.enabled(); }

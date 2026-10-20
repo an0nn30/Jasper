@@ -1,24 +1,54 @@
 package dev.jasper.remote.ui;
 
-import java.awt.BorderLayout;
-import java.awt.Dimension;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
-import javax.swing.*;
 
-/** Edits the display name used for hosts with no explicit group. */
-public final class GroupNamePanel extends JPanel {
-    final JTextField name = new JTextField();
-    final JButton save = new JButton("Rename");
-    final JLabel error = new JLabel(" ");
-    public GroupNamePanel(String current, Consumer<String> rename, Runnable cancel) {
-        super(new BorderLayout(0, 10));
-        setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20)); setPreferredSize(new Dimension(360, 150));
-        var form = new JPanel(new BorderLayout(0, 6)); form.add(new JLabel("Default group name"), BorderLayout.NORTH);
-        name.setText(current); form.add(name, BorderLayout.CENTER); form.add(error, BorderLayout.SOUTH); add(form, BorderLayout.CENTER);
-        var buttons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
-        var close = new JButton("Cancel"); buttons.add(close); buttons.add(save); add(buttons, BorderLayout.SOUTH);
-        save.addActionListener(event -> rename.accept(name.getText())); name.addActionListener(event -> save.doClick());
-        close.addActionListener(event -> cancel.run()); error.putClientProperty("html.disable", true);
+/**
+ * Edits the display name used for hosts with no explicit group. Enter renames from the name field only (its trailing
+ * action, as its action listener did); no button is the form's primary, and Escape cancels. UI thread only.
+ */
+public final class GroupNamePanel implements AutoCloseable {
+    public static final String FORM = "group-name", NAME = "group-name.name", ERROR = "group-name.error", RENAME = "group-name.rename",
+        RENAME_BUTTON = "group-name.rename-button", CANCEL = "group-name.cancel";
+    private final UiView view;
+    private String name, error = "";
+    private boolean closed;
+
+    public GroupNamePanel(UiKit kit, String current, Consumer<String> rename, Runnable cancel) {
+        name = current;
+        view = kit.create(new ViewSpec(form()), event -> {
+            if (closed) return;
+            switch (event) {
+                case UiEvent.Edited edited when edited.id().equals(NAME) -> { name = edited.text(); render(); }
+                case UiEvent.Action action when action.id().equals(RENAME) -> rename.accept(name);
+                case UiEvent.Action action when action.id().equals(CANCEL) -> cancel.run();
+                default -> { }
+            }
+        });
     }
-    public void showError(String message) { error.setText(message); }
+
+    public UiView view() { return view; }
+
+    public void showError(String message) { if (closed) return; error = message; render(); }
+
+    private void render() { if (!closed) view.update(new ViewSpec(form())); }
+
+    private Nodes.Form form() {
+        var sections = List.<Nodes.Node>of(
+            new Nodes.Field(NAME, ControlState.READY, Nodes.FieldKind.TEXT, name, "", "Default group name", RENAME),
+            new Nodes.Text(ERROR, new ControlState(!error.isEmpty(), true, false, ""), error, Nodes.TextRole.BODY));
+        var actions = List.of(
+            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
+            new Nodes.Button(RENAME_BUTTON, ControlState.READY, "Rename", "", Nodes.ButtonKind.SECONDARY, RENAME, ""));
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Rename default group", Optional.empty(), sections, Optional.empty(), actions, CANCEL);
+    }
+
+    @Override public void close() { if (closed) return; closed = true; view.close(); }
 }

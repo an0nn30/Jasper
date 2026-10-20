@@ -41,7 +41,6 @@ import java.nio.file.Path;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import javax.swing.Icon;
 import javax.swing.JComponent;
 
 /** One fake plugin's recorded chrome contributions, with the same rules as the application. */
@@ -107,7 +106,7 @@ final class FakeUi {
             progress = value; text = value.text(); tooltip = value.detail(); actionId = value.actionId();
         }
         @Override public void setText(String value) { if (!closed) text = value == null ? "" : value.replace("\r", "").replace("\n", " "); }
-        @Override public void setIcon(Icon icon) { }
+        @Override public void setIcon(String icon) { if(!closed) ui.context.kit().validateIcon(icon); }
         @Override public void setTooltip(String value) { if (!closed) tooltip = value; }
         @Override public void setAction(String value) { if (value != null) ui.requireOwn(value); if (!closed) actionId = value; }
         @Override public void setVisible(boolean value) { if (!closed) visible = value; }
@@ -133,6 +132,10 @@ final class FakeUi {
     final FakePluginContext context;
     final Map<String, Action> actions = new LinkedHashMap<>();
     final List<ToolbarItem> toolbar = new ArrayList<>();
+    /** Each toolbar view's built views, per terminal window; empty where the factory threw or the tree was refused. */
+    final Map<ToolbarItem.View, Map<UUID, Optional<FakeKitView>>> toolbarBuilt = new java.util.IdentityHashMap<>();
+    /** A toolbar view's mount: the toolbar of one terminal window. */
+    record ToolbarMount(UUID windowId) { }
     final List<Menu> sections = new ArrayList<>();
     final List<String> topLevelIds = new ArrayList<>();
     final List<Status> status = new ArrayList<>();
@@ -155,9 +158,12 @@ final class FakeUi {
         quitGuards.clear();
         for (var content : List.copyOf(contents)) content.close();
         for (var item : status) item.closed = true;
+        for (var built : toolbarBuilt.values()) for (var view : built.values()) view.ifPresent(FakeKitView::close);
+        toolbarBuilt.clear();
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
         for (Panel panel : List.copyOf(panels)) panel.instances.values().forEach(PanelInstance::close);
         panels.clear(); railActions.clear();
+        for(var popup:List.copyOf(popovers))popup.close();
         for (FakeWindow window : List.copyOf(windows)) window.close();
     }
 
@@ -180,6 +186,7 @@ final class FakeUi {
             context.requireOpen();
             java.util.Objects.requireNonNull(handler, "handler");
             requireNamespace(spec.id(), "An action");
+            spec.icon().ifPresent(context.kit()::validateIcon);
             spec.context().id().ifPresent(owned -> requireNamespace(owned,
                 spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
             if (actions.containsKey(spec.id())) throw new IllegalArgumentException("Action already registered: " + spec.id());
@@ -201,11 +208,55 @@ final class FakeUi {
             context.requireOpen();
             switch (item) {
                 case ToolbarItem.Button button -> requireOwn(button.actionId());
-                case ToolbarItem.Dropdown dropdown -> dropdown.actionIds().forEach(this::requireOwn);
+                case ToolbarItem.Dropdown dropdown -> { context.kit().validateIcon(dropdown.icon());dropdown.actionIds().forEach(this::requireOwn); }
+                // A view's tree is admitted when a window builds it, and on every update after that.
+                case ToolbarItem.View view -> { }
             }
             toolbar.add(item);
-            return () -> { for (int i = 0; i < toolbar.size(); i++) if (toolbar.get(i) == item) { toolbar.remove(i); break; } };
+            return () -> {
+                for (int i = 0; i < toolbar.size(); i++) if (toolbar.get(i) == item) { toolbar.remove(i); break; }
+                if (item instanceof ToolbarItem.View view) {
+                    var built = toolbarBuilt.remove(view);
+                    if (built != null) for (var each : built.values()) each.ifPresent(FakeKitView::close);
+                }
+            };
         };
+    }
+
+    /** UI thread: the window's toolbar views in toolbar order, each built once for the window, as it builds them when it opens. */
+    List<FakeKitView> toolbarViews(UUID windowId) {
+        List<FakeKitView> views = new ArrayList<>();
+        for (ToolbarItem item : List.copyOf(toolbar)) {
+            if (!(item instanceof ToolbarItem.View view)) continue;
+            var built = toolbarBuilt.computeIfAbsent(view, key -> new LinkedHashMap<>());
+            if (!built.containsKey(windowId)) built.put(windowId, buildToolbarView(view, windowId));
+            built.get(windowId).ifPresent(views::add);
+        }
+        return views;
+    }
+
+    /** Closes the window's toolbar views, as the window does when it closes. */
+    void closeToolbarViews(UUID windowId) {
+        for (var built : toolbarBuilt.values()) {
+            var view = built.remove(windowId);
+            if (view != null) view.ifPresent(FakeKitView::close);
+        }
+    }
+
+    /** One window's view, admitted and mounted; empty, with the failure recorded, when the factory or the admission failed. */
+    private Optional<FakeKitView> buildToolbarView(ToolbarItem.View item, UUID windowId) {
+        try {
+            var view = context.kit().requireOwned(java.util.Objects.requireNonNull(item.factory().create(context.terminals.windowHandle(windowId)), "view"));
+            view.mount(new ToolbarMount(windowId));
+            try {
+                ToolbarViewAdmission.require(view.spec());
+                view.hostSpec = spec -> { ToolbarViewAdmission.require(spec); return spec; };
+            } catch (RuntimeException refused) { view.close(); throw refused; }
+            return Optional.of(view);
+        } catch (RuntimeException | LinkageError failure) {
+            host.recordFailure(pluginId() + " toolbar view: " + failure);
+            return Optional.empty();
+        }
     }
 
     Menus menus() {
@@ -254,18 +305,54 @@ final class FakeUi {
 
     static final class Panel { final PanelSpec spec; final PanelFactory factory; final Map<UUID, PanelInstance> instances = new LinkedHashMap<>(); Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
 
+    private static dev.jasper.sdk.ui.ViewSpec titleSpec(dev.jasper.sdk.ui.ViewSpec value) {
+        if (!(value.root() instanceof dev.jasper.sdk.ui.Nodes.Stack stack)
+                || stack.role() != dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE
+                || stack.children().stream().anyMatch(node -> !(node instanceof dev.jasper.sdk.ui.Nodes.Button)
+                    && !(node instanceof dev.jasper.sdk.ui.Nodes.MenuButton)))
+            throw new IllegalArgumentException("Title actions require an INLINE Stack of Buttons and MenuButtons");
+        return value;
+    }
+    record SurfaceMount(FakeWindow surface, boolean title) { }
+
     final class FakeWindow implements PluginWindow, PluginDialog {
         final String id; final FakeWindow owner; String title; boolean shown; boolean closed; JComponent content;
         final List<BooleanSupplier> guards = new ArrayList<>(); final List<Runnable> closedHandlers = new ArrayList<>();
         FakeWindow(String id, String title, FakeWindow owner) { this.id = id; this.title = title; this.owner = owner; }
-        @Override public void setContent(JComponent content) { if (!closed) this.content = java.util.Objects.requireNonNull(content); }
-        @Override public void show() { if (!closed) shown = true; }
+        final SurfaceMount bodyMount = new SurfaceMount(this, false), titleMount = new SurfaceMount(this, true);
+        FakeKitView mounted, titleActions;
+        boolean attachedSheet;
+        /** The presentation a dialog asked for; plain windows and overlays have none. */
+        DialogSpec.Presentation presentation;
+        /** The hue of the square a dialog asked for before its title; NONE for none. */
+        dev.jasper.sdk.ui.Nodes.Hue swatch = dev.jasper.sdk.ui.Nodes.Hue.NONE;
+        java.util.function.BooleanSupplier ownerLive = () -> true;
+        @Override public void setTitleActions(Optional<dev.jasper.sdk.ui.UiView> actions) {
+            context.requireOpen(); java.util.Objects.requireNonNull(actions, "actions");
+            if (closed) throw new IllegalStateException("Surface is closed");
+            var next = actions.map(context.kit()::requireOwned).orElse(null);
+            if (next == titleActions) return;
+            if (next != null) { titleSpec(next.spec()); next.mount(titleMount); }
+            var previous = titleActions; titleActions = next;
+            if (next != null) next.hostSpec = FakeUi::titleSpec;
+            if (previous != null) previous.close();
+        }
+        @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
+            context.requireOpen();var next=context.kit().requireOwned(content);
+            if(closed)throw new IllegalStateException("Surface is closed");next.mount(bodyMount);
+            if(mounted==next)return;var old=mounted;this.content=next.component;mounted=next;if(old!=null)old.close();
+        }
+        @Override public void show() {
+            if (closed) return;
+            if (attachedSheet && !ownerLive.getAsBoolean()) { close(); throw new IllegalArgumentException("Attached sheets need a shown owner"); }
+            shown = true;
+        }
         @Override public Optional<Path> chooseFile(String title, Optional<Path> initialPath) {
             context.requireOpen();
             if (title == null || title.isBlank()) throw new IllegalArgumentException("A file chooser needs a title");
             java.util.Objects.requireNonNull(initialPath, "initialPath");
             if (!shown || closed) throw new IllegalStateException("File selection needs a shown, open window");
-            return host.takeFileSelection();
+            var result=host.takeFileSelection();return closed || context.state == FakePluginContext.State.CLOSED ? Optional.empty() : result;
         }
         @Override public void toFront() { }
         @Override public void setTitle(String value) {
@@ -273,7 +360,7 @@ final class FakeUi {
             if (!closed) title = value;
         }
         @Override public Subscription onClosing(BooleanSupplier guard) { guards.add(guard); return () -> guards.remove(guard); }
-        @Override public Subscription onClosed(Runnable handler) { closedHandlers.add(handler); return () -> closedHandlers.remove(handler); }
+        @Override public Subscription onClosed(Runnable handler) { if (closed) { handler.run(); return () -> {}; } closedHandlers.add(handler); return () -> closedHandlers.remove(handler); }
         final List<BooleanSupplier> closeCommands = new ArrayList<>();
         @Override public Subscription onCloseCommand(BooleanSupplier handler) {
             closeCommands.add(java.util.Objects.requireNonNull(handler));
@@ -305,6 +392,8 @@ final class FakeUi {
         @Override public void close() {
             if (closed) return;
             closed = true;
+            if(mounted!=null){mounted.close();mounted=null;}
+            if(titleActions!=null){titleActions.close();titleActions=null;}
             windows.remove(this);
             for (FakeWindow other : List.copyOf(windows)) if (other.owner == this) other.close();
             for (Runnable handler : List.copyOf(closedHandlers)) {
@@ -331,6 +420,7 @@ final class FakeUi {
         @Override public void setHeader(dev.jasper.sdk.ui.PanelHeader value) {
             java.util.Objects.requireNonNull(value);
             if (done) return;
+            value.actions().forEach(action -> context.kit().validateIcon(action.icon()));
             header = new dev.jasper.sdk.ui.PanelHeader(value.detail(), value.active(), value.actions().stream()
                 .map(action -> new dev.jasper.sdk.ui.PanelHeader.Action(action.label(), action.icon(), () -> {
                     if (done) return;
@@ -367,6 +457,7 @@ final class FakeUi {
             context.requireOpen();
             java.util.Objects.requireNonNull(factory, "factory");
             requireNamespace(spec.id(), "A panel");
+            context.kit().validateIcon(spec.icon());
             spec.toggleActionId().ifPresent(FakeUi.this::requireOwn);
             for (Panel existing : panels) if (existing.spec.id().equals(spec.id())) throw new IllegalArgumentException("Panel already registered: " + spec.id());
             var panel = new Panel(spec, factory);
@@ -393,7 +484,7 @@ final class FakeUi {
             if (existing != null) { existing.show(); return existing.content; }
             try {
                 var instance = new PanelInstance(windowId);
-                instance.content = panel.factory.create(instance);
+                var view=context.kit().requireOwned(panel.factory.create(instance));view.mount(instance);instance.onClosed(view::close);instance.content = view.component;
                 if (instance.content != null) panel.instances.put(windowId, instance);
                 return instance.content;
             } catch (RuntimeException | LinkageError failure) {
@@ -430,9 +521,27 @@ final class FakeUi {
         } finally { if (document != null) document.pins--; }
     }
 
+    private FakeKitView.Attachment requireAnchor(dev.jasper.sdk.ui.UiAnchor value){
+        if(!(value instanceof FakeKitView.Attachment anchor)||anchor.host!=host||!anchor.isOpen())throw new IllegalArgumentException("Foreign or expired anchor");return anchor;
+    }
+    final class FakePopover implements dev.jasper.sdk.ui.PluginPopover {
+        final FakeKitView.Attachment anchor;final List<Runnable> listeners=new ArrayList<>();
+        FakeKitView content;boolean closed,shown;final Subscription lifetime;
+        FakePopover(FakeKitView.Attachment anchor){this.anchor=anchor;lifetime=anchor.onClosed(this::close);}
+        public void setContent(dev.jasper.sdk.ui.UiView view){context.requireOpen();if(closed)throw new IllegalStateException("Popover closed");var next=context.kit().requireOwned(view);next.mount(this);if(next==content)return;var previous=content;content=next;if(previous!=null)previous.close();}
+        public void show(){context.requireOpen();if(closed||!anchor.isOpen())throw new IllegalArgumentException("Expired anchor");if(content==null)throw new IllegalStateException("Missing popup content");shown=true;}
+        public Subscription onClosed(Runnable handler){java.util.Objects.requireNonNull(handler);if(closed){handler.run();return () -> {}; }listeners.add(handler);return () -> listeners.remove(handler);}
+        public void close(){if(closed)return;closed=true;if(lifetime!=null)lifetime.close();if(content!=null)content.close();popovers.remove(this);for(var listener:List.copyOf(listeners))listener.run();listeners.clear();}
+    }
+    final List<FakePopover> popovers=new ArrayList<>();
     Windows windows() {
         return new Windows() {
-            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
+            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
+                context.requireOpen();var view=context.kit().requireOwned(content);
+                for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
+                view.mount(spec);view.route="WORKSPACE";try{var tab=openComponent(spec,owner,view.component);tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.route="CHROME";view.unmount(spec);throw failure;}
+            }
+            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
                 context.requireOpen();
                 for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
                 if (owner instanceof FakeContent tab) {
@@ -493,16 +602,23 @@ final class FakeUi {
                 windows.add(overlay);
                 return overlay;
             }
+            @Override public dev.jasper.sdk.ui.PluginPopover popover(dev.jasper.sdk.ui.UiAnchor value){context.requireOpen();var popup=new FakePopover(requireAnchor(value));popovers.add(popup);return popup;}
             @Override public PluginDialog dialog(DialogSpec spec) {
                 context.requireOpen();
                 WindowOwner owner = spec.owner();
                 FakeWindow parent = null;
-                if (owner instanceof FakeWindow window) {
+                if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var anchor=requireAnchor(value);parent=anchor.ownerSurface();
+                } else if (owner instanceof FakeWindow window) {
                     if (window.closed || !windows.contains(window)) throw new IllegalArgumentException("A dialog needs an open owner window");
                     parent = window;
                 } else if (!(owner instanceof WindowHandle) && !(owner instanceof FakeContent content && contents.contains(content)))
                     throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
                 var dialog = new FakeWindow("dialog", spec.title(), parent);
+                dialog.attachedSheet = spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET;
+                dialog.presentation = spec.presentation();
+                dialog.swatch = spec.swatch();
+                dialog.ownerLive = () -> owner instanceof dev.jasper.sdk.ui.UiAnchor anchor ? anchor.isOpen() : liveChooserOwner(owner);
+                if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var registration=value.onClosed(dialog::close);dialog.onClosed(registration::close);}
                 if (owner instanceof FakeContent content) {
                     if (spec.modal()) content.pins++;
                     var registration = content.onClosed(dialog::close);
@@ -511,14 +627,6 @@ final class FakeUi {
                 windows.add(dialog);
                 return dialog;
             }
-        };
-    }
-
-    static Icon blankIcon() {
-        return new Icon() {
-            @Override public void paintIcon(java.awt.Component component, java.awt.Graphics graphics, int x, int y) { }
-            @Override public int getIconWidth() { return 16; }
-            @Override public int getIconHeight() { return 16; }
         };
     }
 

@@ -1,5 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeStyles;
+
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.Dimension;
 import java.awt.Insets;
@@ -18,15 +21,23 @@ import javax.swing.SwingUtilities;
  * Space the field and toolbar do not use drags the window.
  */
 final class WindowHeader extends JPanel {
-    private static final int GAP = 12;
+    /** The installed kit's gap between the field and each side, in logical pixels. */
+    private static int headerGap() { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.NATIVE_HEADER_GAP); }
     private final TitleSearchField field;
     private final WindowToolbar toolbar;
+    private final HeaderComposition composition;
 
-    WindowHeader(TitleSearchField field, WindowToolbar toolbar) {
+    WindowHeader(TitleSearchField field, WindowToolbar toolbar) { this(field, toolbar, new UnifiedHeader()); }
+
+    /** A header composed by {@code composition} (Enterprise presentation spec 10.3). */
+    WindowHeader(TitleSearchField field, WindowToolbar toolbar, HeaderComposition composition) {
         super(null);
         this.field = field;
         this.toolbar = toolbar;
+        this.composition = composition;
         setName("windowHeader");
+        // The title bar is a native chrome receiver: its toolbar and command centre show the original chrome artwork.
+        dev.jasper.app.platform.AppIcons.chromeReceiver(this);
         add(field);
         add(toolbar);
         toolbar.addPropertyChangeListener("barHeight", event -> {
@@ -58,23 +69,29 @@ final class WindowHeader extends JPanel {
     WindowToolbar toolbar() { return toolbar; }
 
     private int height() { return toolbar.getPreferredSize().height; }
-    private int fieldHeight(int height) { return Math.max(0, height - UIScale.scale(8)); }
+    private int fieldHeight(int height) { return Math.max(0, height - NativeStyles.installed().metric(DesignMetrics.Role.TITLE_SEARCH_VERTICAL_SPACE)); }
 
     /** The header adapts to the window's width, so it never asks for more than its minimum; the terminal sizes new windows. */
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 
-    @Override public Dimension getMinimumSize() {
+    @Override public Dimension getMinimumSize() { return composition.minimumSize(this); }
+
+    @Override public void doLayout() { composition.layout(this); }
+
+    /** Today's minimum: the toolbar's or the leading content's side twice around the field. */
+    Dimension unifiedMinimumSize() {
         Insets insets = getInsets();
         int side = Math.max(insets.left + leadingMinimum.getAsInt(), insets.right + (toolbar.isVisible() ? toolbar.minimumWidth() : 0));
-        return new Dimension(2 * (side + UIScale.scale(GAP)) + fieldHeight(height()), height());
+        return new Dimension(2 * (side + UIScale.scale(headerGap())) + fieldHeight(height()), height());
     }
 
-    @Override public void doLayout() {
+    /** Today's layout: the field centred on the window, the toolbar to its right, the leading content to its left. */
+    void unifiedLayout() {
         Insets insets = getInsets();
-        int width = getWidth(), height = getHeight(), gap = UIScale.scale(GAP);
+        int width = getWidth(), height = getHeight(), gap = UIScale.scale(headerGap());
         int left = Math.min(insets.left, width), right = Math.max(left, width - insets.right);
         int centre = centre();
-        int preferred = UIScale.scale(TitleSearchField.PREFERRED_WIDTH), minimum = UIScale.scale(TitleSearchField.MINIMUM_WIDTH);
+        int preferred = UIScale.scale(TitleSearchField.preferredWidth()), minimum = UIScale.scale(TitleSearchField.minimumWidth());
         int toolbarMinimum = toolbar.isVisible() ? toolbar.minimumWidth() : 0;
         // Each side gives way before the field does; the field keeps its centre.
         int half = Math.min(centre - left - leadingMinimum.getAsInt() - gap, right - centre - gap - toolbarMinimum);

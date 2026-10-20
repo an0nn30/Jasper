@@ -28,6 +28,7 @@ import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.PluginWindow;
+import dev.jasper.sdk.ui.Presentation;
 import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
@@ -35,6 +36,13 @@ import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
 import dev.jasper.sdk.ui.WindowSpec;
+import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.TableRow;
+import dev.jasper.sdk.ui.TreeItem;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.Option;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -87,6 +95,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CopyOnWriteArrayList;
+import dev.jasper.sdk.settings.Choice;
 import dev.jasper.sdk.settings.SettingSpec;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.Setting;
@@ -129,6 +138,163 @@ public abstract class PluginContractTest {
         h.start(info(id), requires, Set.of(), context::set);
         assertThat(h.active(id)).as("%s started", id).isTrue();
         return context.get();
+    }
+
+    /**
+     * Spec 16.1.9: a plugin's kit admits SDK 0.18's controls; the SDK refuses a misplaced Notice or Separator, a NONE
+     * swatch and a miscounted choice when the view is built, before any kit sees it.
+     */
+    @Test void aPluginsKitAdmitsZeroEighteenControlsAndTheSdkRefusesMisplacedOnes() {
+        var context = started("test.controls", Set.of());
+        h.ui(() -> {
+            var spec = dev.jasper.sdk.testing.KitContractTest.zeroEighteen("Plain FTP sends the password unencrypted");
+            var view = context.kit().create(spec, event -> { });
+            assertThat(view.spec()).isEqualTo(spec);
+            view.close();
+            var ready = ControlState.READY;
+            var text = new Nodes.Text("a", ready, "A", Nodes.TextRole.BODY);
+            var separator = new Nodes.Separator("separator", ready);
+            var one = List.of(new Option("one", "One", Optional.empty()));
+            var five = java.util.stream.IntStream.range(0, 5).mapToObj(i -> new Option("o" + i, "Option " + i, Optional.empty())).toList();
+            List<java.util.function.Supplier<ViewSpec>> refused = List.of(
+                () -> new ViewSpec(new Nodes.Stack("bar", ready, Nodes.LayoutRole.INLINE, List.of(separator, text))),
+                () -> new ViewSpec(new Nodes.Stack("bar", ready, Nodes.LayoutRole.VERTICAL, List.of(text, separator, new Nodes.Text("b", ready, "B", Nodes.TextRole.BODY)))),
+                () -> new ViewSpec(new Nodes.Stack("bar", ready, Nodes.LayoutRole.INLINE, List.of(new Nodes.Notice("notice", ready, Nodes.Severity.INFO, "Saved")))),
+                () -> new ViewSpec(new Nodes.Icon("swatch", ready, "file", Nodes.Hue.NONE, Nodes.IconSize.SWATCH, "None")),
+                () -> new ViewSpec(new Nodes.Choice("pick", ready, Nodes.ChoiceKind.EXCLUSIVE, one, "one", "Pick", "")),
+                () -> new ViewSpec(new Nodes.Choice("pick", ready, Nodes.ChoiceKind.EXCLUSIVE, five, "o0", "Pick", "")),
+                () -> new ViewSpec(new Nodes.Choice("tabs", ready, Nodes.ChoiceKind.TABS, one, "one", "Tabs", "")));
+            for (var bad : refused) assertThatIllegalArgumentException().isThrownBy(bad::get);
+        });
+    }
+
+    /** Spec 16.1.9 (plan 3c): a plugin's kit admits SDK 0.18's table vocabulary and refuses misplaced cell nodes, a rich-faced cell dropdown, selected headings, doubled empty states and extra tree values. */
+    @Test void aPluginsKitAdmitsZeroEighteenTablesAndRefusesMisplacedOnes() {
+        var context = started("test.tables", Set.of());
+        h.ui(() -> {
+            for (boolean rows : new boolean[] {false, true}) {
+                var spec = dev.jasper.sdk.testing.KitContractTest.tables("card", rows);
+                var view = context.kit().create(spec, event -> { });
+                assertThat(view.spec()).isEqualTo(spec);
+                view.close();
+            }
+            var ready = ControlState.READY;
+            var columns = List.of(new Column("c", "C", Nodes.TextRole.BODY, false), new Column("d", "D", Nodes.TextRole.BODY, false));
+            var go = new Nodes.Button("go", ready, "Go", "", Nodes.ButtonKind.SECONDARY, "go", "");
+            var more = new Nodes.Button("more", ready, "More", "", Nodes.ButtonKind.SECONDARY, "more", "");
+            var text = new Nodes.Text("t", ready, "T", Nodes.TextRole.BODY);
+            var heading = TableRow.heading("h", "Group", java.util.OptionalInt.of(1), "group");
+            var icon = new Nodes.Icon("e.icon", ready, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Servers");
+            var rich = new Nodes.Choice("rich", ready, Nodes.ChoiceKind.DROPDOWN, List.of(new dev.jasper.sdk.ui.Option("card", "Card", Optional.empty())), "card", "Display", "", "",
+                Optional.empty(), Optional.of(new Nodes.PickerFace("Card", "", "", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT)));
+            var three = new TreeItem("x", "X", Optional.empty(), true, List.of(), java.util.OptionalInt.empty(), false, "", Optional.empty(), List.of("1", "2", "3"), Optional.empty());
+            List<java.util.function.Supplier<ViewSpec>> refused = List.of(
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "",
+                    Map.of("c", go), Optional.empty())), Set.of(), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of("c", "x"), Optional.empty(), false, Optional.empty(), "",
+                    Map.of("c", text), Optional.empty())), Set.of(), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "",
+                    Map.of("c", rich), Optional.empty())), Set.of(), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(heading), Set.of("h"), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(), Set.of(), "", List.of(), Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD,
+                    Optional.of(new Nodes.Empty("e", ready, icon, "Nothing", "", List.of())), "Nothing here")),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(), Set.of(), "", List.of(), Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD,
+                    Optional.of(new Nodes.Empty("e", ready, icon, "Nothing", "", List.of(go, more))), "")),
+                () -> new ViewSpec(new Nodes.Tree("tree", ready, List.of(three), Set.of(), Set.of(), "", columns)));
+            for (var bad : refused)
+                assertThatIllegalArgumentException().isThrownBy(() -> context.kit().create(bad.get(), event -> { }));
+        });
+    }
+
+    @Test void semanticPresentationIconsValidateOwnershipAtEveryBoundary() {
+        var started=new AtomicReference<PluginContext>();
+        h.start(info("test.icons",Capabilities.PALETTE_CONTRIBUTE,Capabilities.SESSION_PROVIDE),Set.of(),Set.of(),started::set);
+        var context=started.get();
+        UUID window=h.addTerminalWindow();
+        h.ui(() -> {
+            var registration=context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("test.icons:own","M 2 2 L 14 14"));
+            context.actions().register(ActionSpec.of("test.icons.menuaction","Menu action"),e -> {});
+            var status=context.statusBar().add(new StatusItemSpec("test.icons.status",Side.RIGHT,0));
+            var tab=context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("content","Content"),null,kitView(context));
+            var panel=new AtomicReference<PanelHost>();
+            context.panels().register(new PanelSpec("test.icons.panel","Panel","file",Anchor.LEFT),host -> {panel.set(host);return kitView(context);});
+            h.openPanel("test.icons.panel",window);
+            for(String name:List.of("missing","foreign:own")) {
+                assertThatIllegalArgumentException().as("action "+name).isThrownBy(() -> context.actions().register(ActionSpec.of("test.icons.bad","Bad").withIcon(name),e -> {}));
+                assertThatIllegalArgumentException().as("panel "+name).isThrownBy(() -> context.panels().register(new PanelSpec("test.icons.badpanel","Bad",name,Anchor.LEFT),host -> kitView(context)));
+                assertThatIllegalArgumentException().as("toolbar "+name).isThrownBy(() -> context.toolbar().add(ToolbarItem.menu(name,"Menu",List.of("test.icons.menuaction"))));
+                assertThatIllegalArgumentException().as("status "+name).isThrownBy(() -> status.setIcon(name));
+                assertThatIllegalArgumentException().as("content "+name).isThrownBy(() -> tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Content","",name,false,"","")));
+                assertThatIllegalArgumentException().as("header "+name).isThrownBy(() -> panel.get().setHeader(new dev.jasper.sdk.ui.PanelHeader("",false,List.of(new dev.jasper.sdk.ui.PanelHeader.Action("Action",name,() -> {})))));
+                assertThatIllegalArgumentException().as("notification "+name).isThrownBy(() -> context.notifications().group().post(NotificationSpec.of(Severity.INFO,"Title").withContent("Body").withIcon(name)));
+                assertThatIllegalArgumentException().as("scope "+name).isThrownBy(() -> context.palette().register(iconScope(name)));
+                assertThatIllegalArgumentException().as("session "+name).isThrownBy(() -> context.terminals().openTab(context.terminals().window(window).orElseThrow(),OpenRequest.session(new SessionSpec("Bad",Optional.of(name),ExitPolicy.KEEP_OPEN,pending -> {}))));
+            }
+            assertThat(h.openRequests()).as("invalid icons must not create terminal panes").isEmpty();
+            for(String name:List.of("file","test.icons:own")) {
+                context.actions().register(ActionSpec.of("test.icons.action"+(name.equals("file")?"1":"2"),"Action").withIcon(name),e -> {});
+                status.setIcon(name);tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Content","",name,false,"",""));
+                context.toolbar().add(ToolbarItem.menu(name,"Menu",List.of("test.icons.menuaction")));
+                panel.get().setHeader(new dev.jasper.sdk.ui.PanelHeader("",false,List.of(new dev.jasper.sdk.ui.PanelHeader.Action("Action",name,() -> {}))));
+                context.notifications().group().post(NotificationSpec.of(Severity.INFO,"Title").withContent("Body").withIcon(name));
+            }
+            status.setIcon(null);tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Content","",null,false,"",""));
+            registration.close();
+            assertThatIllegalArgumentException().isThrownBy(() -> status.setIcon("test.icons:own"));
+            status.close();tab.close();h.closePanel("test.icons.panel",window);
+            assertThatCode(() -> {
+                status.setIcon("missing");
+                tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Content","","missing",false,"",""));
+                panel.get().setHeader(new dev.jasper.sdk.ui.PanelHeader("",false,List.of(new dev.jasper.sdk.ui.PanelHeader.Action("Action","missing",() -> {}))));
+            }).doesNotThrowAnyException();
+        });
+    }
+    private static PaletteScope iconScope(String icon) {
+        return new PaletteScope() {
+            public ScopeSpec spec(){return ScopeSpec.of("test.icons.scope","Scope","Search",List.of(PASTE)).withIcon(icon);}
+            public PaletteResults search(String query,PaletteQuery context){return PaletteResults.none();}
+            public void execute(PaletteRow row,PaletteVerb verb,PaletteQuery context){}
+            public Subscription onChanged(Runnable listener){return () -> {};}
+        };
+    }
+
+    private static dev.jasper.sdk.ui.UiView kitView(PluginContext context) {
+        return context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",dev.jasper.sdk.ui.ControlState.READY,"Content",dev.jasper.sdk.ui.Nodes.TextRole.BODY)), e -> {});
+    }
+
+    @Test void ownedViewsMountReplaceAndMoveWithExistingGuards() throws Exception {
+        var context = new AtomicReference<PluginContext>();
+        var other = new AtomicReference<PluginContext>();
+        h.start(info("test.owned"),Set.of(),Set.of(),context::set);
+        h.start(info("test.foreign"),Set.of(),Set.of(),other::set);
+        javax.swing.SwingUtilities.invokeAndWait(() -> h.ui(() -> {
+            var ctx=context.get();var disposed=new AtomicInteger();
+            var descriptor=new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Custom("node",dev.jasper.sdk.ui.ControlState.READY,"document",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"Document"));
+            var view=ctx.kit().create(descriptor,e -> {});
+            view.registerContent(new dev.jasper.sdk.ui.CustomContent("document",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea("retain"),disposed::incrementAndGet));
+            var alien=other.get().kit().create(descriptor,e -> {});
+            var window=ctx.windows().create(new WindowSpec("test.owned.window","Window",new Dimension(400,300),true));
+            assertThatThrownBy(() -> window.setContent(alien)).isInstanceOf(IllegalArgumentException.class);
+            window.setContent(view);window.setContent(view);
+            assertThat(h.viewRoute(view)).as("window content keeps the chrome slot").isEqualTo("CHROME");
+            assertThat(ctx.windows().create(new WindowSpec("test.owned.window","Window",new Dimension(400,300),true))).isSameAs(window);
+            var veto=window.onClosing(() -> false);
+            assertThat(h.requestClose("test.owned.window")).isFalse();assertThat(disposed.get()).isZero();
+            veto.close();window.close();window.close();assertThat(disposed.get()).isEqualTo(1);
+            var document=ctx.kit().create(descriptor,e -> {});
+            document.registerContent(new dev.jasper.sdk.ui.CustomContent("document",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea("retained"),disposed::incrementAndGet));
+            assertThatThrownBy(() -> ctx.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("foreign","Foreign"),null,alien)).isInstanceOf(IllegalArgumentException.class);
+            assertThat(h.viewRoute(document)).as("a view before it is mounted").isEqualTo("CHROME");
+            var tab=ctx.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("doc","Document"),null,document);
+            assertThat(h.viewRoute(document)).as("workspace content takes the workspace slot").isEqualTo("WORKSPACE");
+            tab.move(true);assertThat(tab.isSeparate()).isTrue();assertThat(h.viewRoute(document)).as("a move keeps it").isEqualTo("WORKSPACE");
+            tab.move(false);assertThat(tab.isSeparate()).isFalse();assertThat(h.viewRoute(document)).isEqualTo("WORKSPACE");
+            var guard=ctx.windows().onTabsClosing((tabs,batch) -> CompletableFuture.completedFuture(false));
+            assertThat(tab.requestClose().join()).isFalse();assertThat(disposed.get()).isEqualTo(1);
+            guard.close();assertThat(tab.requestClose().join()).isTrue();assertThat(disposed.get()).isEqualTo(2);
+            assertThatThrownBy(document::spec).isInstanceOf(IllegalStateException.class);
+            alien.close();
+        }));
     }
 
     @Test void pluginStopClosesOverlaysAndExplicitCloseReleasesTheirReservation() {
@@ -462,7 +628,7 @@ public abstract class PluginContractTest {
             run.set(context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { }));
             context.actions().register(ActionSpec.of("test.alpha.stop", "Stop"), invoked -> { });
             context.toolbar().add(ToolbarItem.action("test.alpha.run"));
-            context.toolbar().add(ToolbarItem.menu(new javax.swing.ImageIcon(), "Alpha", List.of("test.alpha.run", "test.alpha.stop")));
+            context.toolbar().add(ToolbarItem.menu("file", "Alpha", List.of("test.alpha.run", "test.alpha.stop")));
             assertThatIllegalArgumentException().isThrownBy(() -> context.toolbar().add(ToolbarItem.action("new_tab")));
             assertThatIllegalArgumentException().isThrownBy(() -> context.menus().standard(StandardMenu.FILE).add("test.alpha.absent"));
         });
@@ -502,6 +668,35 @@ public abstract class PluginContractTest {
         assertThat(h.menu("VIEW")).containsExactly("===", "item:test.alpha.run");
         h.ui(() -> view.get().close());
         assertThat(h.menu("VIEW")).containsExactly("item:test.alpha.run");
+    }
+
+    @Test void theToolsMenuTakesSectionsLikeTheOtherStandardMenus() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { });
+            context.menus().standard(StandardMenu.TOOLS).add("test.alpha.run");
+        });
+        h.start(info("test.beta"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.beta.run", "Run"), invoked -> { });
+            context.menus().standard(StandardMenu.TOOLS).add("test.beta.run");
+        });
+        assertThat(h.menu("TOOLS")).containsExactly("item:test.alpha.run", "===", "item:test.beta.run");
+    }
+
+    /** SDK 0.18: Session and Transfer are built-in menus with no items of their own, taking sections as Tools does. */
+    @Test void theSessionAndTransferMenusTakeSectionsLikeTools() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.connect", "Connect"), invoked -> { });
+            context.actions().register(ActionSpec.of("test.alpha.upload", "Upload"), invoked -> { });
+            context.menus().standard(StandardMenu.SESSION).add("test.alpha.connect");
+            context.menus().standard(StandardMenu.TRANSFER).add("test.alpha.upload");
+        });
+        h.start(info("test.beta"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.beta.connect", "Connect"), invoked -> { });
+            context.menus().standard(StandardMenu.SESSION).add("test.beta.connect");
+        });
+        assertThat(h.menu("SESSION")).containsExactly("item:test.alpha.connect", "===", "item:test.beta.connect");
+        assertThat(h.menu("TRANSFER")).containsExactly("item:test.alpha.upload");
+        assertThat(h.menu("TOOLS")).isEmpty();
     }
 
     @Test void statusItemsAreOrderedGlobalAndInertAfterClose() {
@@ -553,7 +748,7 @@ public abstract class PluginContractTest {
             var closed = a.onWorkspaceChanged(value -> disposed.incrementAndGet()); closed.close();
         });
         h.setWorkspace(Variant.DARK, next, editor, syntax); h.flush();
-        assertThat(seen).hasValue(1); assertThat(chrome).hasValue(0); assertThat(disposed).hasValue(0);
+        assertThat(seen).hasValue(1); assertThat(chrome).hasValue(1); assertThat(disposed).hasValue(0);
         h.setWorkspace(Variant.DARK, next, editor, syntax); h.flush();
         assertThat(seen).hasValue(1);
         assertThat(java.util.concurrent.CompletableFuture.supplyAsync(a::workspaceVariant).join()).isEqualTo(Variant.DARK);
@@ -613,7 +808,7 @@ public abstract class PluginContractTest {
             context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { });
             context.menus().standard(StandardMenu.TAB).add("test.alpha.run");
             context.appearance().onChanged(seen::add);
-            assertThatIllegalArgumentException().isThrownBy(() -> context.appearance().icon("no/such/icon.svg"));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("test.alpha.bad", "Bad").withIcon("missing"), e -> {}));
         });
         assertThat(alpha.get().appearance().variant()).isEqualTo(Variant.DARK);
         h.setVariant(Variant.LIGHT);
@@ -626,15 +821,31 @@ public abstract class PluginContractTest {
         assertThat(h.menu("TAB")).isEmpty();
     }
 
+    /** SDK 0.18.2: the presentation is the host's, the same for every plugin and on any thread, and a theme change keeps it. */
+    @Test void presentationIsTheHostsForEveryPluginOnAnyThreadAndThroughThemeChanges() throws Exception {
+        var classic = new Presentation(true, Presentation.Icons.CLASSIC, Presentation.ToolWindows.STRIPES, Presentation.TitleBar.NATIVE,
+            Presentation.Menus.WINDOW, Presentation.ToolbarSearch.FIELD, Optional.of("IBM Plex Sans"), Optional.of("IBM Plex Mono"), 12, 28);
+        h.setPresentation(classic);
+        var first = new AtomicReference<PluginContext>(); var second = new AtomicReference<PluginContext>();
+        h.start(new PluginInfo("test.lookone", "One", "1.0.0", Set.of()), Set.of(), Set.of(), first::set);
+        h.start(new PluginInfo("test.looktwo", "Two", "1.0.0", Set.of()), Set.of(), Set.of(), second::set);
+        assertThat(first.get().appearance().presentation()).isEqualTo(classic);
+        assertThat(second.get().appearance().presentation()).isEqualTo(classic);
+        var offThread = CompletableFuture.supplyAsync(() -> first.get().appearance().presentation()).get(5, TimeUnit.SECONDS);
+        assertThat(offThread).isEqualTo(classic);
+        h.setVariant(Variant.LIGHT); h.flush();
+        assertThat(first.get().appearance().presentation()).isEqualTo(classic);
+    }
+
     @Test void aPanelMayNameOneOfThePluginsOwnActionsAsItsToggle() {
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
             context.actions().register(ActionSpec.of("test.alpha.show", "Toggle Hosts"), invoked -> { });
-            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", new ImageIcon(), Anchor.LEFT)
-                .withToggleActionId("test.alpha.show"), host -> new JLabel());
-            context.panels().register(new PanelSpec("test.alpha.files", "Files", new ImageIcon(), Anchor.RIGHT), host -> new JLabel());
+            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", "file", Anchor.LEFT)
+                .withToggleActionId("test.alpha.show"), host -> kitView(context));
+            context.panels().register(new PanelSpec("test.alpha.files", "Files", "file", Anchor.RIGHT), host -> kitView(context));
             for (String toggle : List.of("test.alpha.absent", "test.beta.show", "new_tab"))
                 assertThatIllegalArgumentException().as(toggle).isThrownBy(() -> context.panels().register(
-                    new PanelSpec("test.alpha.other", "Other", new ImageIcon(), Anchor.LEFT).withToggleActionId(toggle), host -> new JLabel()));
+                    new PanelSpec("test.alpha.other", "Other", "file", Anchor.LEFT).withToggleActionId(toggle), host -> kitView(context)));
         });
         assertThat(h.panels()).as("a failed assertion above stops the plugin and removes its panels")
             .containsExactly("test.alpha.hosts|Hosts|LEFT|test.alpha.show", "test.alpha.files|Files|RIGHT");
@@ -643,11 +854,11 @@ public abstract class PluginContractTest {
     @Test void aSplitPanelKeepsItsSplitBesideItsToggleAndStartsInTheSecondaryHalf() {
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
             context.actions().register(ActionSpec.of("test.alpha.show", "Toggle Files"), invoked -> { });
-            context.panels().register(new PanelSpec("test.alpha.files", "Files", new ImageIcon(), Anchor.LEFT).withSplit()
-                .withToggleActionId("test.alpha.show"), host -> new JLabel());
-            context.panels().register(new PanelSpec("test.alpha.log", "Log", new ImageIcon(), Anchor.BOTTOM).withSplit(),
-                host -> new JLabel());
-            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", new ImageIcon(), Anchor.RIGHT), host -> new JLabel());
+            context.panels().register(new PanelSpec("test.alpha.files", "Files", "file", Anchor.LEFT).withSplit()
+                .withToggleActionId("test.alpha.show"), host -> kitView(context));
+            context.panels().register(new PanelSpec("test.alpha.log", "Log", "file", Anchor.BOTTOM).withSplit(),
+                host -> kitView(context));
+            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", "file", Anchor.RIGHT), host -> kitView(context));
         });
         assertThat(h.panels()).containsExactly("test.alpha.files|Files|LEFT+split|test.alpha.show",
             "test.alpha.log|Log|BOTTOM+split", "test.alpha.hosts|Hosts|RIGHT");
@@ -657,20 +868,20 @@ public abstract class PluginContractTest {
         List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
         var registration = new AtomicReference<Subscription>();
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
-            registration.set(context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", new ImageIcon(), Anchor.RIGHT),
-                host -> { hosts.add(host); return new JLabel("hosts"); }));
-            context.panels().register(new PanelSpec("test.alpha.broken", "Broken", new ImageIcon(), Anchor.BOTTOM),
+            registration.set(context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", "file", Anchor.RIGHT),
+                host -> { hosts.add(host); return kitView(context); }));
+            context.panels().register(new PanelSpec("test.alpha.broken", "Broken", "file", Anchor.BOTTOM),
                 host -> { throw new IllegalStateException("factory failure"); });
             assertThatIllegalArgumentException().isThrownBy(() -> context.panels().register(
-                new PanelSpec("test.alpha.hosts", "Twice", new ImageIcon(), Anchor.LEFT), host -> new JLabel()));
+                new PanelSpec("test.alpha.hosts", "Twice", "file", Anchor.LEFT), host -> kitView(context)));
             assertThatIllegalArgumentException().isThrownBy(() -> context.panels().register(
-                new PanelSpec("test.beta.panel", "Foreign", new ImageIcon(), Anchor.LEFT), host -> new JLabel()));
+                new PanelSpec("test.beta.panel", "Foreign", "file", Anchor.LEFT), host -> kitView(context)));
         });
         assertThat(h.panels()).containsExactly("test.alpha.hosts|Hosts|RIGHT", "test.alpha.broken|Broken|BOTTOM");
         assertThat(hosts).as("no instance until a window shows the panel").isEmpty();
         UUID window = UUID.randomUUID();
         h.ui(() -> {
-            assertThat(h.openPanel("test.alpha.hosts", window)).isInstanceOf(JLabel.class);
+            assertThat(h.openPanel("test.alpha.hosts", window)).isNotNull();
             assertThat(h.openPanel("test.alpha.broken", window)).as("a throwing factory is contained").isNull();
             assertThat(h.openPanel("test.alpha.absent", window)).isNull();
         });
@@ -679,6 +890,329 @@ public abstract class PluginContractTest {
         assertThat(h.panels()).containsExactly("test.alpha.broken|Broken|BOTTOM");
         h.stopAll();
         assertThat(h.panels()).isEmpty();
+    }
+
+    /**
+     * PanelHost.setHeader (0.14.2) on a kit (ViewSpec) panel: per-window metadata the host shows in the panel's one
+     * header row, replaced wholesale, cleared by EMPTY, contained when an action fails and ignored after the instance closes.
+     */
+    @Test void aKitPanelsHeaderIsPerWindowReplacedContainedAndIgnoredAfterClose() throws Exception {
+        List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
+        List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        var context = started("test.alpha", Set.of());
+        var icon = "file";
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        javax.swing.SwingUtilities.invokeAndWait(() -> h.ui(() -> {
+            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", "folder", Anchor.LEFT), host -> {
+                hosts.add(host);
+                host.setHeader(new dev.jasper.sdk.ui.PanelHeader(String.valueOf(hosts.size() + 2), true, List.of(
+                    new dev.jasper.sdk.ui.PanelHeader.Action("New session", icon, () -> calls.add("new")),
+                    new dev.jasper.sdk.ui.PanelHeader.Action("Broken", icon, () -> { throw new IllegalStateException("header failed"); }))));
+                var C = dev.jasper.sdk.ui.ControlState.READY;
+                return context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Panel("hosts", C,
+                    new dev.jasper.sdk.ui.Nodes.Header("hosts-header", C, "Hosts", java.util.OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+                    Optional.empty(), new dev.jasper.sdk.ui.Nodes.Text("body", C, "Body", dev.jasper.sdk.ui.Nodes.TextRole.BODY), Optional.empty())), e -> { });
+            });
+            assertThat(h.openPanel("test.alpha.hosts", first)).isNotNull();
+            assertThat(h.openPanel("test.alpha.hosts", second)).isNotNull();
+            assertThat(h.panelHeader("test.alpha.hosts", first)).isEqualTo("3|true|New session;Broken");
+            assertThat(h.panelHeader("test.alpha.hosts", second)).isEqualTo("4|true|New session;Broken");
+
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", first, "New session")).isTrue();
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", first, "Broken")).as("a failing action is contained").isTrue();
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", first, "Absent")).isFalse();
+            assertThat(calls).containsExactly("new");
+
+            hosts.get(1).setHeader(new dev.jasper.sdk.ui.PanelHeader("amp", false, List.of(
+                new dev.jasper.sdk.ui.PanelHeader.Action("Import", icon, () -> calls.add("import")))));
+            assertThat(h.panelHeader("test.alpha.hosts", second)).isEqualTo("amp|false|Import");
+            assertThat(h.panelHeader("test.alpha.hosts", first)).as("windows are independent").isEqualTo("3|true|New session;Broken");
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", second, "Import")).isTrue();
+            assertThat(calls).containsExactly("new", "import");
+
+            hosts.get(0).setHeader(dev.jasper.sdk.ui.PanelHeader.EMPTY);
+            assertThat(h.panelHeader("test.alpha.hosts", first)).isEqualTo("|false|-");
+            assertThatNullPointerException().isThrownBy(() -> hosts.get(0).setHeader(null));
+            assertThat(h.panelHeader("test.alpha.hosts", first)).isEqualTo("|false|-");
+
+            h.closePanel("test.alpha.hosts", second);
+            assertThat(h.panelHeader("test.alpha.hosts", second)).isEqualTo("|false|-");
+            hosts.get(1).setHeader(new dev.jasper.sdk.ui.PanelHeader("late", true, List.of(
+                new dev.jasper.sdk.ui.PanelHeader.Action("Import", icon, () -> calls.add("late")))));
+            assertThat(h.panelHeader("test.alpha.hosts", second)).as("a closed instance publishes nothing").isEqualTo("|false|-");
+            assertThat(h.runPanelHeaderAction("test.alpha.hosts", second, "Import")).isFalse();
+            assertThat(calls).containsExactly("new", "import");
+        }));
+    }
+
+    /** A toolbar view tree the toolbar admits: a label, a host choice, a separator and a PRIMARY Connect. */
+    private static dev.jasper.sdk.ui.ViewSpec sessionBar(String id) {
+        var ready = dev.jasper.sdk.ui.ControlState.READY;
+        return new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack(id, ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+            new dev.jasper.sdk.ui.Nodes.Text(id + ".label", ready, "Session", dev.jasper.sdk.ui.Nodes.TextRole.LABEL),
+            new dev.jasper.sdk.ui.Nodes.Choice(id + ".host", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.DROPDOWN,
+                List.of(new dev.jasper.sdk.ui.Option("mac", "Mac", Optional.empty())), "mac", "Session", "host"),
+            new dev.jasper.sdk.ui.Nodes.Separator(id + ".rule", ready),
+            new dev.jasper.sdk.ui.Nodes.Button(id + ".connect", ready, "Connect", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "connect", ""))));
+    }
+
+    /** SDK 0.18: a toolbar view is built once per open window and closes with its window and its registration. */
+    @Test void aToolbarViewIsBuiltOncePerWindowAndClosesWithItsWindowAndItsRegistration() {
+        List<UUID> asked = Collections.synchronizedList(new ArrayList<>());
+        List<dev.jasper.sdk.ui.UiView> made = Collections.synchronizedList(new ArrayList<>());
+        var registration = new AtomicReference<Subscription>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> registration.set(context.toolbar().add(ToolbarItem.view(window -> {
+            asked.add(window.id());
+            var view = context.kit().create(sessionBar("bar"), event -> { });
+            made.add(view);
+            return view;
+        }))));
+        assertThat(h.toolbar()).containsExactly("view");
+        var first = new AtomicReference<UUID>();
+        var second = new AtomicReference<UUID>();
+        h.ui(() -> { first.set(h.addTerminalWindow()); second.set(h.addTerminalWindow()); });
+        assertThat(asked).as("nothing is built before a window asks").isEmpty();
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(first.get())).containsExactly("bar");
+            assertThat(h.openToolbarViews(first.get())).as("once per window").containsExactly("bar");
+            assertThat(h.openToolbarViews(second.get())).containsExactly("bar");
+        });
+        assertThat(asked).containsExactly(first.get(), second.get());
+        h.ui(() -> {
+            h.closeToolbarViews(first.get());
+            assertThatIllegalStateException().as("the view closes with its window").isThrownBy(() -> made.get(0).spec());
+            assertThat(made.get(1).spec().root().id()).isEqualTo("bar");
+            assertThat(h.openToolbarViews(first.get())).as("a closed window builds nothing again").isEmpty();
+            assertThat(h.openToolbarViews(UUID.randomUUID())).as("nor does a window that never opened").isEmpty();
+        });
+        assertThat(asked).as("no factory runs for a dead window").containsExactly(first.get(), second.get());
+        h.ui(() -> registration.get().close());
+        assertThat(h.toolbar()).isEmpty();
+        h.ui(() -> assertThatIllegalStateException().as("and with its registration").isThrownBy(() -> made.get(1).spec()));
+    }
+
+    /** SDK 0.18: the toolbar admits an INLINE stack of labels, choices, one PRIMARY button, menu buttons and separators. */
+    @Test void aToolbarViewHoldsOnlyAnInlineStackOfAdmittedControls() {
+        var ready = dev.jasper.sdk.ui.ControlState.READY;
+        List<dev.jasper.sdk.ui.UiView> refused = Collections.synchronizedList(new ArrayList<>());
+        var admitted = new AtomicReference<dev.jasper.sdk.ui.UiView>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.toolbar().add(ToolbarItem.view(window -> {
+                var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("plain", ready, "Session",
+                    dev.jasper.sdk.ui.Nodes.TextRole.LABEL)), event -> { });
+                refused.add(view);
+                return view;
+            }));
+            context.toolbar().add(ToolbarItem.view(window -> {
+                var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("quiet", ready,
+                    dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(new dev.jasper.sdk.ui.Nodes.Button("quiet.edit", ready, "Edit", "",
+                        dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY, "edit", "")))), event -> { });
+                refused.add(view);
+                return view;
+            }));
+            context.toolbar().add(ToolbarItem.view(window -> { throw new IllegalStateException("factory failure"); }));
+            context.toolbar().add(ToolbarItem.view(window -> {
+                var view = context.kit().create(sessionBar("bar"), event -> { });
+                admitted.set(view);
+                return view;
+            }));
+        });
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(window.get())).as("refused trees and a throwing factory show nothing").containsExactly("bar");
+            assertThat(refused).hasSize(2);
+            for (var view : refused) assertThatIllegalStateException().as("a refused view is closed").isThrownBy(view::spec);
+            var twoPrimaries = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+                new dev.jasper.sdk.ui.Nodes.Button("bar.connect", ready, "Connect", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "connect", ""),
+                new dev.jasper.sdk.ui.Nodes.Button("bar.split", ready, "Split", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "split", ""))));
+            assertThatIllegalArgumentException().isThrownBy(() -> admitted.get().update(twoPrimaries)).withMessageContaining("bar.split");
+            assertThat(admitted.get().spec()).as("a refused update keeps the tree").isEqualTo(sessionBar("bar"));
+        });
+        assertThat(h.active("test.alpha")).as("refusals are contained").isTrue();
+    }
+
+    /** SDK 0.18: a toolbar view's controls report to the plugin that built it. */
+    @Test void aToolbarViewsControlsReportToThePluginThatBuiltIt() {
+        List<dev.jasper.sdk.ui.UiEvent> seen = new CopyOnWriteArrayList<>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context ->
+            context.toolbar().add(ToolbarItem.view(window -> context.kit().create(sessionBar("bar"), seen::add))));
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(window.get())).containsExactly("bar");
+            h.clickToolbarViewButton(window.get(), "bar.connect");
+        });
+        assertThat(seen).containsExactly(new dev.jasper.sdk.ui.UiEvent.Action("connect"));
+    }
+
+    /** Review fix (plan 3d): every branch of the admission rule, on update, so that the host and testkit copies agree. */
+    @Test void aToolbarViewRefusesEveryOtherTreeOnUpdateAndKeepsItsTree() {
+        var ready = dev.jasper.sdk.ui.ControlState.READY;
+        var admitted = new AtomicReference<dev.jasper.sdk.ui.UiView>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> context.toolbar().add(ToolbarItem.view(window -> {
+            var view = context.kit().create(sessionBar("bar"), event -> { });
+            admitted.set(view);
+            return view;
+        })));
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        var label = new dev.jasper.sdk.ui.Nodes.Text("bar.label", ready, "Session", dev.jasper.sdk.ui.Nodes.TextRole.LABEL);
+        var options = List.of(new dev.jasper.sdk.ui.Option("mac", "Mac", Optional.empty()));
+        java.util.function.Function<dev.jasper.sdk.ui.Nodes.Node, dev.jasper.sdk.ui.ViewSpec> inline = child -> new dev.jasper.sdk.ui.ViewSpec(
+            new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(label, child)));
+        var refused = new java.util.LinkedHashMap<String, dev.jasper.sdk.ui.ViewSpec>();
+        refused.put("column", new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("column", ready,
+            dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL, List.of(label))));
+        refused.put("plain", new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("plain", ready, "Session",
+            dev.jasper.sdk.ui.Nodes.TextRole.LABEL)));
+        refused.put("bar.body", inline.apply(new dev.jasper.sdk.ui.Nodes.Text("bar.body", ready, "Body", dev.jasper.sdk.ui.Nodes.TextRole.BODY)));
+        // An EXCLUSIVE or TABS choice needs two options before the SDK makes the view at all.
+        var pair = List.of(new dev.jasper.sdk.ui.Option("mac", "Mac", Optional.empty()), new dev.jasper.sdk.ui.Option("linux", "Linux", Optional.empty()));
+        refused.put("bar.mode", inline.apply(new dev.jasper.sdk.ui.Nodes.Choice("bar.mode", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.EXCLUSIVE,
+            pair, "mac", "Mode", "mode")));
+        refused.put("bar.tabs", inline.apply(new dev.jasper.sdk.ui.Nodes.Choice("bar.tabs", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.TABS,
+            pair, "mac", "Tabs", "tabs")));
+        refused.put("bar.facts", inline.apply(new dev.jasper.sdk.ui.Nodes.Properties("bar.facts", ready, "", List.of(
+            new dev.jasper.sdk.ui.Nodes.PropertyRow("Host", "mac", false, Optional.empty())))));
+        refused.put("bar.look", inline.apply(new dev.jasper.sdk.ui.Nodes.Choice("bar.look", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.PREVIEWS,
+            options, "mac", "Look", "look")));
+        for (var kind : List.of(dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY, dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST,
+                dev.jasper.sdk.ui.Nodes.ButtonKind.DESTRUCTIVE_GHOST, dev.jasper.sdk.ui.Nodes.ButtonKind.LINK)) {
+            String id = "bar." + kind.name().toLowerCase(java.util.Locale.ROOT);
+            refused.put(id, inline.apply(new dev.jasper.sdk.ui.Nodes.Button(id, ready, "Edit", "", kind, "edit", "")));
+        }
+        refused.put("bar.find", inline.apply(new dev.jasper.sdk.ui.Nodes.Field("bar.find", ready, dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,
+            "", "Find", "Find", "")));
+        refused.put("bar.inner", inline.apply(new dev.jasper.sdk.ui.Nodes.Stack("bar.inner", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE,
+            List.of(new dev.jasper.sdk.ui.Nodes.Text("bar.inner.label", ready, "Inner", dev.jasper.sdk.ui.Nodes.TextRole.LABEL)))));
+        refused.put("bar.split", new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+            new dev.jasper.sdk.ui.Nodes.Button("bar.connect", ready, "Connect", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "connect", ""),
+            new dev.jasper.sdk.ui.Nodes.Button("bar.split", ready, "Split", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "split", "")))));
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(window.get())).containsExactly("bar");
+            refused.forEach((node, tree) -> {
+                assertThatIllegalArgumentException().as(node).isThrownBy(() -> admitted.get().update(tree)).withMessageContaining(node);
+                assertThat(admitted.get().spec()).as("a refused update keeps the tree: " + node).isEqualTo(sessionBar("bar"));
+            });
+        });
+        assertThat(h.active("test.alpha")).isTrue();
+    }
+
+    /** SDK 0.18.1: a toolbar view also admits icon-only GHOST buttons; a labelled GHOST is still refused. */
+    @Test void aToolbarViewAdmitsIconOnlyGhostButtons() {
+        var ready = dev.jasper.sdk.ui.ControlState.READY;
+        List<dev.jasper.sdk.ui.UiEvent> seen = new CopyOnWriteArrayList<>();
+        var admitted = new AtomicReference<dev.jasper.sdk.ui.UiView>();
+        var run = new dev.jasper.sdk.ui.Nodes.Button("bar.run", ready, "", "run", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "run", "Connect");
+        var spec = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+            new dev.jasper.sdk.ui.Nodes.Choice("bar.host", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.DROPDOWN,
+                List.of(new dev.jasper.sdk.ui.Option("mac", "Mac", Optional.empty())), "mac", "Session", "host"),
+            run,
+            new dev.jasper.sdk.ui.Nodes.Button("bar.stop", ready, "", "close", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "stop", "Stop"))));
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> context.toolbar().add(ToolbarItem.view(window -> {
+            var view = context.kit().create(spec, seen::add);
+            admitted.set(view);
+            return view;
+        })));
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(window.get())).containsExactly("bar");
+            h.clickToolbarViewButton(window.get(), "bar.run");
+            var labelled = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+                new dev.jasper.sdk.ui.Nodes.Button("bar.edit", ready, "Edit", "", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "edit", ""))));
+            assertThatIllegalArgumentException().isThrownBy(() -> admitted.get().update(labelled)).withMessageContaining("bar.edit");
+            assertThat(admitted.get().spec()).isEqualTo(spec);
+        });
+        assertThat(seen).containsExactly(new dev.jasper.sdk.ui.UiEvent.Action("run"));
+    }
+
+    /** Review fix (plan 3d): SEARCHABLE and PICKER choices and a menu button are admitted beside a label and a DROPDOWN. */
+    @Test void aToolbarViewAdmitsSearchableAndPickerChoicesAndMenuButtons() {
+        var ready = dev.jasper.sdk.ui.ControlState.READY;
+        var options = List.of(new dev.jasper.sdk.ui.Option("mac", "Mac", Optional.empty()));
+        var rich = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("rich", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+            new dev.jasper.sdk.ui.Nodes.Text("rich.label", ready, "Session", dev.jasper.sdk.ui.Nodes.TextRole.LABEL),
+            new dev.jasper.sdk.ui.Nodes.Choice("rich.host", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.SEARCHABLE, options, "mac", "Host", "host", "",
+                Optional.of(new dev.jasper.sdk.ui.Nodes.ChoiceSearch(0, "No hosts", Optional.empty()))),
+            new dev.jasper.sdk.ui.Nodes.Choice("rich.login", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.PICKER, options, "mac", "Login", "login", ""),
+            new dev.jasper.sdk.ui.Nodes.MenuButton("rich.more", ready, "More", "", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "more",
+                List.of(new dev.jasper.sdk.ui.MenuItem("rich.more.edit", "Edit", "", "edit", true, false)), ""))));
+        h.start(info("test.alpha"), Set.of(), Set.of(), context ->
+            context.toolbar().add(ToolbarItem.view(window -> context.kit().create(rich, event -> { }))));
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        h.ui(() -> assertThat(h.openToolbarViews(window.get())).containsExactly("rich"));
+    }
+
+    /**
+     * Plans 3b and 3d merged (3d, R1): separators between admitted controls are admitted on update too, and a separator
+     * the SDK would place first, last or beside another never reaches a toolbar, since the SDK refuses the view itself.
+     */
+    @Test void aToolbarViewAdmitsSeparatorsBetweenItsControlsOnUpdate() {
+        var ready = dev.jasper.sdk.ui.ControlState.READY;
+        var admitted = new AtomicReference<dev.jasper.sdk.ui.UiView>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> context.toolbar().add(ToolbarItem.view(window -> {
+            var view = context.kit().create(sessionBar("bar"), event -> { });
+            admitted.set(view);
+            return view;
+        })));
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        var label = new dev.jasper.sdk.ui.Nodes.Text("bar.label", ready, "Session", dev.jasper.sdk.ui.Nodes.TextRole.LABEL);
+        var connect = new dev.jasper.sdk.ui.Nodes.Button("bar.connect", ready, "Connect", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "connect", "");
+        var more = new dev.jasper.sdk.ui.Nodes.MenuButton("bar.more", ready, "More", "", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "more",
+            List.of(new dev.jasper.sdk.ui.MenuItem("bar.more.edit", "Edit", "", "edit", true, false)), "");
+        java.util.function.Function<List<dev.jasper.sdk.ui.Nodes.Node>, dev.jasper.sdk.ui.ViewSpec> inline = children -> new dev.jasper.sdk.ui.ViewSpec(
+            new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, children));
+        var ruled = inline.apply(List.of(label, new dev.jasper.sdk.ui.Nodes.Separator("bar.first", ready), connect,
+            new dev.jasper.sdk.ui.Nodes.Separator("bar.second", ready), more));
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(window.get())).containsExactly("bar");
+            admitted.get().update(ruled);
+            assertThat(admitted.get().spec()).isEqualTo(ruled);
+        });
+        var rule = new dev.jasper.sdk.ui.Nodes.Separator("bar.rule", ready);
+        var twice = new dev.jasper.sdk.ui.Nodes.Separator("bar.again", ready);
+        List<List<dev.jasper.sdk.ui.Nodes.Node>> misplaced = List.of(List.of(rule, label, connect), List.of(label, connect, rule),
+            List.of(label, rule, twice, connect));
+        for (var children : misplaced)
+            assertThatIllegalArgumentException().as(children.toString()).isThrownBy(() -> inline.apply(children)).withMessageContaining("Separator");
+        assertThat(h.active("test.alpha")).isTrue();
+    }
+
+    /** Review fix (plan 3d): stopping the plugin closes the views its windows built and removes the entry. */
+    @Test void stoppingThePluginClosesItsBuiltToolbarViews() {
+        var made = new AtomicReference<dev.jasper.sdk.ui.UiView>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> context.toolbar().add(ToolbarItem.view(window -> {
+            var view = context.kit().create(sessionBar("bar"), event -> { });
+            made.set(view);
+            return view;
+        })));
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        h.ui(() -> assertThat(h.openToolbarViews(window.get())).containsExactly("bar"));
+        h.stopAll(); h.flush();
+        h.ui(() -> assertThatIllegalStateException().as("the built view closed").isThrownBy(() -> made.get().spec()));
+        assertThat(h.toolbar()).isEmpty();
+    }
+
+    /** Review fix (plan 3d): a plugin whose start fails after adding a toolbar view leaves no entry and builds nothing. */
+    @Test void aPluginThatFailsAfterAddingAToolbarViewLeavesNone() {
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        List<UUID> asked = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.doomed"), Set.of(), Set.of(), context -> {
+            context.toolbar().add(ToolbarItem.view(opened -> {
+                asked.add(opened.id());
+                return context.kit().create(sessionBar("bar"), event -> { });
+            }));
+            throw new IllegalStateException("start failure");
+        });
+        assertThat(h.toolbar()).isEmpty();
+        h.ui(() -> assertThat(h.openToolbarViews(window.get())).isEmpty());
+        assertThat(asked).as("the failed plugin's factory never runs afterwards").isEmpty();
     }
 
     @Test void railButtonsNameThePluginsOwnActions() {
@@ -728,6 +1262,21 @@ public abstract class PluginContractTest {
         assertThat(h.windows()).containsExactly("test.alpha.other|Other|true");
         h.stopAll();
         assertThat(h.windows()).isEmpty();
+    }
+
+    /** SDK 0.18: a dialog's swatch reaches the host with the dialog; NONE asks for no square. */
+    @Test void aDialogCarriesItsSwatchToTheHost() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            PluginWindow manager = context.windows().create(new WindowSpec("test.alpha.manager", "Manager", new Dimension(640, 480), true));
+            PluginWindow other = context.windows().create(new WindowSpec("test.alpha.other", "Other", new Dimension(640, 480), true));
+            context.windows().dialog(new DialogSpec("Add Login", manager, true, DialogSpec.Presentation.CENTERED, dev.jasper.sdk.ui.Nodes.Hue.BLUE));
+            context.windows().dialog(new DialogSpec("Details", other, true));
+        });
+        h.ui(() -> {
+            assertThat(h.dialogSwatch("test.alpha", "Add Login")).isEqualTo("BLUE");
+            assertThat(h.dialogSwatch("test.alpha", "Details")).isEqualTo("NONE");
+            assertThat(h.dialogSwatch("test.alpha", "Absent")).isEqualTo("-");
+        });
     }
 
     @Test void theCloseCommandAsksTheContentNewestFirstBeforeTheGuards() {
@@ -1262,6 +1811,29 @@ public abstract class PluginContractTest {
             assertThat(h.active("test.bare")).as("a contained registration failure does not fail the plugin").isTrue();
         }
 
+        /** SDK 0.18: a scope's hue, item noun and verb roles reach the host as the presentation will read them. */
+        @Test void aScopeCarriesItsHueItemNounAndSplitVerbToTheHost() {
+            var split = new PaletteVerb("split", "Open in a split pane", PaletteVerb.Role.SPLIT);
+            h.start(info("test.a", Capabilities.PALETTE_CONTRIBUTE), Set.of(), Set.of(), context -> {
+                context.palette().register(presented(ScopeSpec.of("test.a.hosts", "Hosts", "Search hosts", List.of(PASTE, split))
+                    .withHue(dev.jasper.sdk.ui.Nodes.Hue.GREEN).withItemNoun("session")));
+                context.palette().register(presented(ScopeSpec.of("test.a.plain", "Plain", "Search", List.of(PASTE))));
+            });
+            assertThat(h.scopes()).containsExactly("test.a.hosts|Hosts|paste,split", "test.a.plain|Plain|paste");
+            assertThat(h.scopePresentation("test.a.hosts")).isEqualTo("GREEN|session|STANDARD,SPLIT");
+            assertThat(h.scopePresentation("test.a.plain")).as("NONE takes the plugin's icon hue, NEUTRAL without one; no noun is the label")
+                .isEqualTo("NEUTRAL|Plain|STANDARD");
+        }
+
+        private static PaletteScope presented(ScopeSpec spec) {
+            return new PaletteScope() {
+                @Override public ScopeSpec spec() { return spec; }
+                @Override public PaletteResults search(String query, PaletteQuery context) { return PaletteResults.none(); }
+                @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context) { }
+                @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+            };
+        }
+
         @Test void aScopeGetsItsOwnRowsAndHandlesBackAndAStepCanReopenAnotherScope() {
             UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "t");
             UUID pane = h.addTerminalPane(tab, "zsh", Path.of("/src"));
@@ -1462,6 +2034,73 @@ public abstract class PluginContractTest {
         assertThat(h.browsed()).containsExactly(java.net.URI.create("http://localhost:5432/"));
     }
 
+    @Test void copyPutsTextOnTheClipboardAndReadingNeedsClipboardRead() {
+        var reader = new AtomicReference<PluginContext>();
+        h.start(info("test.reader", Capabilities.CLIPBOARD_READ), Set.of(), Set.of(), reader::set);
+        PluginContext writer = started("test.writer", Set.of());
+        h.ui(() -> {
+            assertThat(writer.platform().copy("line one\nline two")).isTrue();
+            assertThat(reader.get().platform().clipboardText()).contains("line one\nline two");
+            assertThatThrownBy(() -> writer.platform().clipboardText())
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("clipboard.read"));
+            assertThatThrownBy(() -> writer.platform().copy(null)).isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> writer.platform().copySecret(null)).isInstanceOf(NullPointerException.class);
+            assertThat(writer.platform().copy("")).isTrue();
+        });
+        assertThat(h.clipboard()).contains("");
+    }
+
+    @Test void aSecretIsClearedLaterOnlyIfTheClipboardStillHoldsIt() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> assertThat(a.platform().copySecret("hunter2")).isTrue());
+        assertThat(h.clipboard()).contains("hunter2");
+        h.expireClipboardSecret();
+        assertThat(h.clipboard()).as("cleared after its time").contains("");
+        h.ui(() -> a.platform().copySecret("hunter3"));
+        h.userCopies("something else");
+        h.expireClipboardSecret();
+        assertThat(h.clipboard()).as("a later copy by the user is left alone").contains("something else");
+        h.ui(() -> { a.platform().copySecret("hunter4"); a.platform().copy("not secret"); });
+        h.expireClipboardSecret();
+        assertThat(h.clipboard()).as("a later copy ends the secret").contains("not secret");
+    }
+
+    @Test void stoppingThePluginClearsTheSecretItCopied() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> a.platform().copySecret("hunter2"));
+        h.stopAll();
+        assertThat(h.clipboard()).contains("");
+    }
+
+    @Test void stoppingThePluginLeavesAPlainCopy() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> a.platform().copy("kept"));
+        h.stopAll();
+        assertThat(h.clipboard()).contains("kept");
+    }
+
+    @Test void aBusyClipboardIsReportedInsteadOfThrown() {
+        PluginContext a = started("test.a", Set.of());
+        h.clipboardBusy(true);
+        h.ui(() -> assertThat(a.platform().copy("lost")).isFalse());
+        h.flush();
+        h.clipboardBusy(false);
+        assertThat(h.notifications()).hasSize(1)
+            .allSatisfy(line -> assertThat(line).startsWith("test.a|ERROR|Could not copy|").contains("|cause|"));
+        assertThat(h.clipboard()).isEmpty();
+    }
+
+    @Test void aBusyClipboardIsReportedForASecretToo() {
+        PluginContext a = started("test.a", Set.of());
+        h.clipboardBusy(true);
+        h.ui(() -> assertThat(a.platform().copySecret("lost too")).isFalse());
+        h.flush();
+        h.clipboardBusy(false);
+        assertThat(h.notifications()).hasSize(1)
+            .allSatisfy(line -> assertThat(line).startsWith("test.a|ERROR|Could not copy|").contains("|cause|"));
+        assertThat(h.clipboard()).isEmpty();
+    }
+
     @Test void hostedTabsPreserveIdentityAndDeferMovesDuringPromptsAndCloseDecisions() {
         try (var harness = newHarness()) {
             var context = new AtomicReference<PluginContext>();
@@ -1469,8 +2108,10 @@ public abstract class PluginContractTest {
             harness.ui(() -> {
                 var windows = context.get().windows();
                 var component = new javax.swing.JTextArea("keep this text");
-                var tab = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "File"), null, component);
-                assertThat(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "Again"), null, new javax.swing.JPanel())).isSameAs(tab);
+                var content=context.get().kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Custom("editor",dev.jasper.sdk.ui.ControlState.READY,"editor",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"Editor")),e -> {});
+                content.registerContent(new dev.jasper.sdk.ui.CustomContent("editor",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,component,() -> {}));
+                var tab = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "File"), null, content);
+                assertThat(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "Again"), null, kitView(context.get()))).isSameAs(tab);
                 var disposed = new AtomicInteger(); tab.onClosed(disposed::incrementAndGet);
                 var dialog = windows.dialog(new DialogSpec("Question", tab, true));
                 dialog.show(); tab.move(true);
@@ -1513,6 +2154,43 @@ public abstract class PluginContractTest {
         assertThat(h.settingsReports("test.settings")).singleElement().asString().startsWith("font_size: ");
     }
 
+    /** Plan 15a (spec 5.8): saved, then the look's, then the plugin's own default. */
+    @Test void aKitDefaultReplacesTheDeclaredDefaultAndASavedValueWins() {
+        h.setKitDefault("test.kitdefault", "size", 15L);
+        var size = new AtomicReference<Setting<Integer>>();
+        h.start(new PluginInfo("test.kitdefault", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context ->
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size"))));
+        assertThat(size.get().get()).isEqualTo(15);
+        h.setSetting("test.kitdefault", "size", 13L);
+        assertThat(size.get().get()).as("a saved value equal to the plugin's own default still wins").isEqualTo(13);
+        assertThat(h.lookDefaultProblems("test.kitdefault")).isEmpty();
+    }
+
+    @Test void aKitDefaultTheKindRejectsLeavesThePluginsDefaultAndIsReported() {
+        h.setKitDefault("test.kitbad", "size", 99L);
+        h.setKitDefault("test.kitbad", "mode", "sideways");
+        var size = new AtomicReference<Setting<Integer>>(); var mode = new AtomicReference<Setting<String>>();
+        h.start(new PluginInfo("test.kitbad", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context -> {
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+            mode.set(context.settings().declare(SettingSpec.of("mode", SettingKind.choice(List.of(Choice.of("up", "Up", "up"), Choice.of("down", "Down", "down"))), "up").label("Mode")));
+        });
+        assertThat(h.active("test.kitbad")).isTrue();
+        assertThat(size.get().get()).isEqualTo(13);
+        assertThat(mode.get().get()).isEqualTo("up");
+        assertThat(h.lookDefaultProblems("test.kitbad")).hasSize(2).allSatisfy(line -> assertThat(line).startsWith("test.kitbad: the look's default for "))
+            .anySatisfy(line -> assertThat(line).startsWith("test.kitbad: the look's default for size is not used: "));
+    }
+
+    @Test void aKitDefaultForAnUndeclaredKeyIsReportedAndAnotherPluginsTableIsIgnored() {
+        h.setKitDefault("test.kitextra", "missing", true);
+        h.setKitDefault("test.notrunning", "size", 9L);
+        h.start(new PluginInfo("test.kitextra", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context ->
+            context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+        assertThat(h.lookDefaultProblems("test.kitextra"))
+            .containsExactly("test.kitextra: the look gives a default for missing, which the plugin does not declare");
+        assertThat(h.lookDefaultProblems("test.notrunning")).isEmpty();
+    }
+
     @Test void settingsAreDeclaredOnlyWhileStartingWithUniqueLabelledKeys() {
         var settings = new AtomicReference<PluginSettings>();
         h.start(info("test.declare"), Set.of(), Set.of(), context -> {
@@ -1529,7 +2207,7 @@ public abstract class PluginContractTest {
 
     @Test void aPluginGivesOneSettingsPageAndOnlyWhileStarting() {
         var settings = new AtomicReference<PluginSettings>();
-        SettingsPanel panel = panelHost -> new JLabel("Mine");
+        SettingsPanel panel = panelHost -> { throw new AssertionError("Page must remain lazy"); };
         h.start(info("test.page"), Set.of(), Set.of(), context -> {
             settings.set(context.settings());
             context.settings().page(panel);
@@ -1590,5 +2268,321 @@ public abstract class PluginContractTest {
         h.flush();
         assertThat(vim.get().get()).isTrue();
         assertThat(h.settingsReports("test.wrong")).anySatisfy(line -> assertThat(line).startsWith("vim: "));
+    }
+
+    private static final java.nio.file.Path HERE = java.nio.file.Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath();
+
+    @Test void aSubcommandNeedsItsDeclarationAndOneHandler() {
+        h.declareSubcommand("test.a", "greet", "Say hello");
+        h.declareSubcommand("test.b", "other", "Someone else's");
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> {
+            dev.jasper.sdk.cli.CommandHandler done = call -> java.util.concurrent.CompletableFuture.completedFuture(0);
+            assertThatIllegalArgumentException().as("undeclared").isThrownBy(() -> a.get().commandLine().handle("undeclared", done));
+            assertThatIllegalArgumentException().as("another plugin's").isThrownBy(() -> a.get().commandLine().handle("other", done));
+            a.get().commandLine().handle("greet", done);
+            assertThatIllegalArgumentException().as("a second handler").isThrownBy(() -> a.get().commandLine().handle("greet", done));
+        });
+    }
+
+    @Test void aCallGetsItsArgumentsAndRelaysOutputAndTheExitCode() {
+        h.declareSubcommand("test.a", "greet", "Say hello");
+        var a = new AtomicReference<PluginContext>();
+        var seen = new AtomicReference<dev.jasper.sdk.cli.CommandCall>();
+        var registration = new AtomicReference<Subscription>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> registration.set(a.get().commandLine().handle("greet", call -> {
+            seen.set(call);
+            call.out("hello " + call.arguments().getFirst() + "\n");
+            call.err("careful\n");
+            return java.util.concurrent.CompletableFuture.completedFuture(call.arguments().size() == 2 ? 300 : 3);
+        })));
+        assertThat(h.call("greet", List.of("world", "x"), HERE, null).exitCode()).as("outside 0 to 255").isEqualTo(1);
+        ContractCall call = h.call("greet", List.of("you"), HERE, null);
+        assertThat(call.exitCode()).isEqualTo(3);
+        assertThat(call.out()).isEqualTo("hello you\n");
+        assertThat(call.err()).isEqualTo("careful\n");
+        assertThat(seen.get().arguments()).containsExactly("you");
+        assertThat(seen.get().workingDirectory()).isEqualTo(HERE);
+        assertThat(seen.get().window()).isEmpty();
+        h.ui(() -> registration.get().close());
+        ContractCall closed = h.call("greet", List.of(), HERE, null);
+        assertThat(closed.exitCode()).isEqualTo(1);
+        assertThat(closed.err()).contains("greet is unavailable");
+    }
+
+    @Test void aCallFromAPaneGetsThatPanesWindow() {
+        h.declareSubcommand("test.a", "where", "Which window");
+        var a = new AtomicReference<PluginContext>();
+        var window = new AtomicReference<Optional<dev.jasper.sdk.WindowOwner>>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        java.util.UUID windowId = h.addTerminalWindow();
+        java.util.UUID pane = h.addTerminalPane(h.addTerminalTab(windowId, "shell"), "shell", HERE);
+        h.ui(() -> a.get().commandLine().handle("where", call -> {
+            window.set(call.window());
+            return java.util.concurrent.CompletableFuture.completedFuture(0);
+        }));
+        assertThat(h.call("where", List.of(), HERE, pane).exitCode()).isZero();
+        h.ui(() -> assertThat(window.get()).get().isInstanceOfSatisfying(dev.jasper.sdk.terminal.WindowHandle.class,
+            handle -> assertThat(handle.id()).isEqualTo(windowId)));
+        assertThat(h.call("where", List.of(), HERE, java.util.UUID.randomUUID()).exitCode()).isZero();
+        assertThat(window.get()).as("a pane that is not open").isEmpty();
+    }
+
+    @Test void unknownFailingAndStoppedSubcommandsAreReported() {
+        h.declareSubcommand("test.a", "boom", "Throws");
+        h.declareSubcommand("test.a", "sour", "Fails");
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> {
+            a.get().commandLine().handle("boom", call -> { throw new IllegalStateException("kaboom"); });
+            a.get().commandLine().handle("sour", call -> java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("curdled")));
+        });
+        ContractCall unknown = h.call("nothing", List.of(), HERE, null);
+        assertThat(unknown.exitCode()).isEqualTo(2);
+        assertThat(unknown.err()).contains("unknown command nothing");
+        ContractCall boom = h.call("boom", List.of(), HERE, null);
+        assertThat(boom.exitCode()).isEqualTo(1);
+        assertThat(boom.err()).contains("boom failed: kaboom");
+        ContractCall sour = h.call("sour", List.of(), HERE, null);
+        assertThat(sour.exitCode()).isEqualTo(1);
+        assertThat(sour.err()).contains("sour failed: curdled");
+        h.stopAll();
+        ContractCall stopped = h.call("boom", List.of(), HERE, null);
+        assertThat(stopped.exitCode()).isEqualTo(1);
+        assertThat(stopped.err()).contains("boom is unavailable");
+    }
+
+    @Test void cancellingACallTellsTheHandlerAndDropsLaterOutput() {
+        h.declareSubcommand("test.a", "wait", "Waits");
+        var a = new AtomicReference<PluginContext>();
+        var pending = new java.util.concurrent.CompletableFuture<Integer>();
+        var cancelled = new java.util.concurrent.atomic.AtomicInteger();
+        var seen = new AtomicReference<dev.jasper.sdk.cli.CommandCall>();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> a.get().commandLine().handle("wait", call -> {
+            call.onCancelled(cancelled::incrementAndGet);
+            seen.set(call);
+            return pending;
+        }));
+        ContractCall call = h.call("wait", List.of(), HERE, null);
+        assertThat(call.finished()).isFalse();
+        call.cancel();
+        assertThat(cancelled).hasValue(1);
+        h.ui(() -> seen.get().out("too late\n"));
+        assertThat(call.out()).isEmpty();
+        h.ui(() -> pending.complete(0));
+    }
+
+    @Test void aCallStillRunningWhenItsPluginStopsEndsWithOne() {
+        h.declareSubcommand("test.a", "wait", "Waits");
+        var a = new AtomicReference<PluginContext>();
+        var cancelled = new java.util.concurrent.atomic.AtomicInteger();
+        h.start(info("test.a"), Set.of(), Set.of(), a::set);
+        h.ui(() -> a.get().commandLine().handle("wait", call -> {
+            call.onCancelled(cancelled::incrementAndGet);
+            return new java.util.concurrent.CompletableFuture<Integer>();
+        }));
+        ContractCall call = h.call("wait", List.of(), HERE, null);
+        assertThat(call.finished()).isFalse();
+        h.stopAll();
+        assertThat(call.finished()).as("ended as its plugin stopped").isTrue();
+        assertThat(call.exitCode()).isEqualTo(1);
+        assertThat(call.err()).isEqualTo("jasper: wait stopped\n");
+        call.cancel();
+        assertThat(cancelled).as("a stopped plugin's cancellation listener never runs").hasValue(0);
+    }
+
+    @Test void shellVariablesNeedTheCapabilityAndTheFirstPluginByIdWins() {
+        var bare = new AtomicReference<PluginContext>();
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.start(info("test.beta", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), beta::set);
+        h.start(info("test.alpha", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), alpha::set);
+        var seen = new AtomicReference<Map<String, String>>();
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().terminals().environment(environment -> Map.of("A", "1")))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("terminal.environment"));
+            beta.get().terminals().environment(environment -> Map.of("EDITOR", "beta", "PAGER", "less"));
+            alpha.get().terminals().environment(environment -> {
+                seen.set(environment);
+                return Map.of("EDITOR", "alpha");
+            });
+        });
+        Map<String, String> jasper = new java.util.HashMap<>(Map.of("HOME", "/home/me", "EDITOR", "vim"));
+        assertThat(h.shellVariables(jasper)).as("by plugin id, not by start order").isEqualTo(Map.of("EDITOR", "alpha", "PAGER", "less"));
+        assertThat(seen.get()).as("Jasper's own environment").isEqualTo(Map.of("HOME", "/home/me", "EDITOR", "vim"));
+    }
+
+    @Test void invalidReservedAndNulEntriesAreDroppedAndAFailingContributorAddsNothing() {
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), a::set);
+        Map<String, String> offered = new java.util.HashMap<>();
+        for (String name : List.of("TERM", "COLORTERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "JASPER_PANE", "JASPER_ANYTHING",
+                "1ST", "WITH-DASH", "WITH SPACE", "", "\u00dcBER"))
+            offered.put(name, "x");
+        offered.put(null, "x");
+        offered.put("NO_VALUE", null);
+        offered.put("NUL_VALUE", "a\0b");
+        offered.put("KEPT", "yes");
+        offered.put("_kept_2", "yes");
+        h.ui(() -> {
+            var terminals = a.get().terminals();
+            terminals.environment(environment -> offered);
+            terminals.environment(environment -> { throw new IllegalStateException("broken contributor"); });
+            terminals.environment(environment -> {
+                environment.put("HOME", "/elsewhere");
+                return Map.of("NEVER", "1");
+            });
+            terminals.environment(environment -> null);
+        });
+        Map<String, String> jasper = new java.util.HashMap<>(Map.of("HOME", "/home/me"));
+        assertThat(h.shellVariables(jasper)).isEqualTo(Map.of("KEPT", "yes", "_kept_2", "yes"));
+        assertThat(jasper).as("contributors get a read-only copy").isEqualTo(Map.of("HOME", "/home/me"));
+    }
+
+    @Test void aContributorEndsWithItsRegistrationAndWithItsPlugin() {
+        var a = new AtomicReference<PluginContext>();
+        var b = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), a::set);
+        h.start(info("test.b", Capabilities.TERMINAL_ENVIRONMENT), Set.of(), Set.of(), b::set);
+        var registration = new AtomicReference<Subscription>();
+        h.ui(() -> {
+            registration.set(a.get().terminals().environment(environment -> Map.of("A", "1")));
+            b.get().terminals().environment(environment -> Map.of("B", "2"));
+        });
+        assertThat(h.shellVariables(Map.of())).isEqualTo(Map.of("A", "1", "B", "2"));
+        h.ui(() -> registration.get().close());
+        assertThat(h.shellVariables(Map.of())).isEqualTo(Map.of("B", "2"));
+        h.stopAll();
+        assertThat(h.shellVariables(Map.of())).as("the registration ends with its plugin").isEmpty();
+    }
+
+    @Test void aTabOrASplitMayRunAProgramAndThatNeedsTerminalOpen() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
+        var alpha = new AtomicReference<PluginContext>();
+        var bare = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        Path here = Path.of("/tmp").toAbsolutePath();
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            PaneHandle editor = terminals.openTab(terminals.window(window).orElseThrow(),
+                OpenRequest.local(dev.jasper.sdk.terminal.LocalSpec.running(List.of("nvim", "+3", "notes.txt"), Optional.of(here)))).orElseThrow();
+            assertThat(editor.isOpen()).isTrue();
+            terminals.split(terminals.pane(only).orElseThrow(), Direction.RIGHT,
+                OpenRequest.local(dev.jasper.sdk.terminal.LocalSpec.running(List.of("htop"), Optional.empty()))).orElseThrow();
+            var others = bare.get().terminals();
+            assertThatThrownBy(() -> others.openTab(others.window(window).orElseThrow(),
+                    OpenRequest.local(dev.jasper.sdk.terminal.LocalSpec.running(List.of("htop"), Optional.empty()))))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo(Capabilities.TERMINAL_OPEN));
+        });
+        assertThat(h.openRequests()).containsExactly("tab|" + window + "|" + here + "|run:nvim +3 notes.txt", "split|" + only + "|RIGHT|-|run:htop");
+    }
+
+    /** An editor that records {@code <file name>|<line or ->|<window id or ->} and answers {@code answer}. */
+    private static dev.jasper.sdk.ui.FileEditor recordingEditor(List<String> calls, boolean answer) {
+        return (file, line, window) -> {
+            calls.add(file.getFileName() + "|" + (line.isPresent() ? String.valueOf(line.getAsInt()) : "-") + "|"
+                + window.map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-"));
+            return answer;
+        };
+    }
+
+    @Test void providingTheEditorNeedsTheCapabilityAndOnePluginProvidesItAtATime() {
+        var bare = new AtomicReference<PluginContext>();
+        var a = new AtomicReference<PluginContext>();
+        var b = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.b", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), b::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        java.nio.file.Path notes = HERE.resolve("notes.txt");
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).as("no plugin provides one").isFalse();
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().platform().editor(recordingEditor(calls, true)))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("editor.provide"));
+            a.get().platform().editor(recordingEditor(calls, true));
+            assertThatIllegalStateException().isThrownBy(() -> b.get().platform().editor(recordingEditor(calls, true)))
+                .withMessage("The editor is already provided by test.a");
+            assertThatIllegalStateException().as("the same plugin twice").isThrownBy(() -> a.get().platform().editor(recordingEditor(calls, true)))
+                .withMessage("The editor is already provided by test.a");
+        });
+        assertThat(h.edit(notes, java.util.OptionalInt.of(3), Optional.empty())).isTrue();
+        assertThat(calls).containsExactly("notes.txt|3|-");
+    }
+
+    @Test void aBundledPluginsEditorReplacesAnotherPluginsAndEndsWithItsPlugin() {
+        h.declareBundled("test.z");
+        var a = new AtomicReference<PluginContext>();
+        var z = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.z", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), z::set);
+        List<String> byA = new CopyOnWriteArrayList<>(), byZ = new CopyOnWriteArrayList<>();
+        var replaced = new AtomicReference<Subscription>();
+        java.nio.file.Path notes = HERE.resolve("notes.txt");
+        h.ui(() -> {
+            replaced.set(a.get().platform().editor(recordingEditor(byA, true)));
+            z.get().platform().editor(recordingEditor(byZ, true));
+            assertThatIllegalStateException().isThrownBy(() -> a.get().platform().editor(recordingEditor(byA, true)))
+                .withMessage("The editor is already provided by test.z");
+        });
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).isTrue();
+        h.ui(() -> replaced.get().close());
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).as("closing the replaced registration leaves the bundled one").isTrue();
+        assertThat(byA).isEmpty();
+        assertThat(byZ).containsExactly("notes.txt|-|-", "notes.txt|-|-");
+        h.stopAll();
+        assertThat(h.edit(notes, java.util.OptionalInt.empty(), Optional.empty())).as("the registration ends with its plugin").isFalse();
+    }
+
+    @Test void anEditorThatThrowsGivesFalseAndOneGetsItsPluginsHandleForAnOpenWindow() {
+        UUID window = h.addTerminalWindow();
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.FileEditor recording = recordingEditor(calls, true);
+        h.ui(() -> a.get().platform().editor((file, line, owner) -> {
+            if (file.getFileName().toString().equals("broken.txt")) throw new IllegalStateException("the editor broke");
+            return recording.edit(file, line, owner);
+        }));
+        assertThat(h.edit(HERE.resolve("broken.txt"), java.util.OptionalInt.empty(), Optional.empty())).isFalse();
+        assertThat(h.edit(HERE.resolve("notes.txt"), java.util.OptionalInt.of(7), Optional.of(window))).isTrue();
+        assertThat(h.edit(HERE.resolve("notes.txt"), java.util.OptionalInt.empty(), Optional.of(UUID.randomUUID())))
+            .as("a window that is not open is no window").isTrue();
+        assertThat(calls).containsExactly("notes.txt|7|" + window, "notes.txt|-|-");
+    }
+
+    @Test void openInEditorGoesToTheProvidedEditorFirst() {
+        var a = new AtomicReference<PluginContext>();
+        var user = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.user"), Set.of(), Set.of(), user::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.get().platform().editor((file, line, window) -> {
+            calls.add(file.getFileName().toString());
+            return !file.getFileName().toString().equals("declined.txt");
+        }));
+        h.ui(() -> {
+            user.get().platform().openInEditor(HERE.resolve("notes.txt"));
+            user.get().platform().openInEditor(HERE.resolve("declined.txt"));
+        });
+        h.flush();
+        // Up to 10 s: the app host's worker hops to the UI thread, which a loaded CI can delay.
+        for (int i = 0; i < 1000 && (calls.size() < 2 || h.openedInEditor().isEmpty()); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        assertThat(calls).containsExactlyInAnyOrder("notes.txt", "declined.txt");
+        assertThat(h.openedInEditor()).as("only the declined file reaches the desktop").containsExactly(HERE.resolve("declined.txt"));
+    }
+
+    @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {
+        PluginContext a = started("test.a", Set.of());
+        assertThat(a.commandLine().client()).as("no client yet").isEmpty();
+        java.nio.file.Path client = HERE.resolve("bin").resolve("jasper");
+        h.commandClient(client);
+        assertThat(a.commandLine().client()).as("any thread").contains(client);
     }
 }

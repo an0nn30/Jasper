@@ -13,7 +13,8 @@ import org.tomlj.TomlParseResult;
 /**
  * Which groups the hosts panel shows collapsed, in {@code data/panel-state.toml}; a broken file means "all expanded".
  * {@code collapsed} lists host groups by name; the WSL group has its own {@code wsl_collapsed} flag, so no host group
- * (not even one named "wsl", nor the default group renamed so) can share its state.
+ * (not even one named "wsl", nor the default group renamed so) can share its state. {@code sftp_show_hidden} is whether
+ * the SFTP browsers show hidden items (off when absent or broken).
  */
 final class PanelState {
     private final Path file;
@@ -37,6 +38,16 @@ final class PanelState {
         } catch (IOException | RuntimeException unreadable) { return false; }
     }
 
+    boolean sftpShowHidden() {
+        try {
+            if (!Files.isRegularFile(file)) return false;
+            return Toml.parse(Files.readString(file, StandardCharsets.UTF_8)).get("sftp_show_hidden") instanceof Boolean value && value;
+        } catch (IOException | RuntimeException unreadable) { return false; }
+    }
+
+    /** Saves whether the SFTP browsers show hidden items, keeping the rest. */
+    void saveSftpShowHidden(boolean shown) throws IOException { save(collapsed(), wslCollapsed(), defaultGroup(), shown); }
+
     String defaultGroup() {
         try {
             if (!Files.isRegularFile(file)) return "Other";
@@ -50,17 +61,17 @@ final class PanelState {
         if (name.isBlank() || name.length() > 80) throw new IllegalArgumentException("Use a group name from 1 to 80 characters");
         var groups = new LinkedHashSet<>(collapsed());
         if (groups.remove(defaultGroup())) groups.add(name);
-        save(groups, wslCollapsed(), name);
+        save(groups, wslCollapsed(), name, sftpShowHidden());
     }
 
     /** Saves the collapsed host groups and keeps the WSL group's flag. */
-    void save(Set<String> groups) throws IOException { save(groups, wslCollapsed(), defaultGroup()); }
+    void save(Set<String> groups) throws IOException { save(groups, wslCollapsed(), defaultGroup(), sftpShowHidden()); }
 
-    void save(Set<String> groups, boolean wslCollapsed) throws IOException { save(groups, wslCollapsed, defaultGroup()); }
+    void save(Set<String> groups, boolean wslCollapsed) throws IOException { save(groups, wslCollapsed, defaultGroup(), sftpShowHidden()); }
 
-    private void save(Set<String> groups, boolean wslCollapsed, String defaultGroup) throws IOException {
+    private void save(Set<String> groups, boolean wslCollapsed, String defaultGroup, boolean sftpShowHidden) throws IOException {
         var out = new StringBuilder("# Jasper Remote panel state.\ndefault_group = ").append(dev.jasper.remote.hosts.HostFile.tomlString(defaultGroup))
-            .append("\nwsl_collapsed = ").append(wslCollapsed).append("\ncollapsed = [");
+            .append("\nwsl_collapsed = ").append(wslCollapsed).append("\nsftp_show_hidden = ").append(sftpShowHidden).append("\ncollapsed = [");
         boolean first = true;
         for (String group : groups) { if (!first) out.append(", "); first = false; out.append(dev.jasper.remote.hosts.HostFile.tomlString(group)); }
         Files.createDirectories(file.toAbsolutePath().getParent());

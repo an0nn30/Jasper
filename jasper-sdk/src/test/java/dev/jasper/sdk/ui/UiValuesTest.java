@@ -27,7 +27,7 @@ class UiValuesTest {
         assertThat(spec.otherDefaultBinding()).isEmpty();
         assertThat(spec.context()).isEqualTo(ShortcutContext.global());
         var paired = spec.withDefaultBindings("cmd+alt+1", "alt+1").withContext(ShortcutContext.panel("dev.x.tool.hosts"))
-            .withKeywords(List.of("hosts")).withIcon(new javax.swing.ImageIcon());
+            .withKeywords(List.of("hosts")).withIcon("file");
         assertThat(paired.defaultBinding()).hasValue("cmd+alt+1");
         assertThat(paired.otherDefaultBinding()).hasValue("alt+1");
         assertThat(paired.context()).isEqualTo(ShortcutContext.panel("dev.x.tool.hosts"));
@@ -39,19 +39,40 @@ class UiValuesTest {
         assertThatNullPointerException().isThrownBy(() -> spec.withContext(null));
     }
 
+    /** SDK 0.18: a toolbar view is a factory the host asks once per window. */
+    @Test void aToolbarViewNeedsAFactory() {
+        ToolbarViewFactory factory = window -> { throw new AssertionError("not called"); };
+        assertThat(ToolbarItem.view(factory)).isEqualTo(new ToolbarItem.View(factory));
+        assertThat(((ToolbarItem.View) ToolbarItem.view(factory)).factory()).isSameAs(factory);
+        assertThatNullPointerException().isThrownBy(() -> new ToolbarItem.View(null));
+    }
+
     @Test void toolbarItemsAndStatusSpecsValidate() {
         assertThat(ToolbarItem.action("dev.x.run")).isEqualTo(new ToolbarItem.Button("dev.x.run"));
         var ids = new ArrayList<>(List.of("dev.x.a", "dev.x.b"));
-        var dropdown = (ToolbarItem.Dropdown) ToolbarItem.menu(new javax.swing.ImageIcon(), "Hosts", ids);
+        var dropdown = (ToolbarItem.Dropdown) ToolbarItem.menu("file", "Hosts", ids);
         ids.clear();
         assertThat(dropdown.actionIds()).containsExactly("dev.x.a", "dev.x.b");
-        assertThatIllegalArgumentException().isThrownBy(() -> ToolbarItem.menu(new javax.swing.ImageIcon(), " ", List.of("dev.x.a")));
-        assertThatIllegalArgumentException().isThrownBy(() -> ToolbarItem.menu(new javax.swing.ImageIcon(), "Hosts", List.of()));
+        assertThatIllegalArgumentException().isThrownBy(() -> ToolbarItem.menu("file", " ", List.of("dev.x.a")));
+        assertThatIllegalArgumentException().isThrownBy(() -> ToolbarItem.menu("file", "Hosts", List.of()));
         assertThatNullPointerException().isThrownBy(() -> ToolbarItem.menu(null, "Hosts", List.of("dev.x.a")));
         assertThatNullPointerException().isThrownBy(() -> ToolbarItem.action(null));
 
         assertThat(new StatusItemSpec("dev.x.lock", Side.RIGHT, 10).side()).isEqualTo(Side.RIGHT);
         assertThatIllegalArgumentException().isThrownBy(() -> new StatusItemSpec("nodot", Side.LEFT, 0));
         assertThatNullPointerException().isThrownBy(() -> new StatusItemSpec("dev.x.lock", null, 0));
+    }
+
+    @Test void theEditorHookIsADefaultThatAnOlderHostIgnores() throws Exception {
+        assertThat(Platform.class.getMethod("editor", FileEditor.class).isDefault()).isTrue();
+        Platform older = (Platform) java.lang.reflect.Proxy.newProxyInstance(Platform.class.getClassLoader(), new Class<?>[]{Platform.class},
+            (proxy, method, args) -> method.isDefault() ? java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args) : null);
+        var asked = new java.util.concurrent.atomic.AtomicInteger();
+        older.editor((file, line, window) -> {
+            asked.incrementAndGet();
+            return true;
+        }).close();
+        assertThat(asked).as("an older host never asks").hasValue(0);
+        assertThatNullPointerException().isThrownBy(() -> older.editor(null));
     }
 }

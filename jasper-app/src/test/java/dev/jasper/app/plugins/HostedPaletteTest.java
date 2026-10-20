@@ -83,6 +83,38 @@ class HostedPaletteTest {
         @Override public dev.jasper.sdk.Subscription onChanged(Runnable listener) { return () -> { }; }
     }
 
+    static PaletteScope presented(ScopeSpec spec) {
+        return new PaletteScope() {
+            @Override public ScopeSpec spec() { return spec; }
+            @Override public PaletteResults search(String query, PaletteQuery context) { return PaletteResults.none(); }
+            @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context) { }
+            @Override public dev.jasper.sdk.Subscription onChanged(Runnable listener) { return () -> { }; }
+        };
+    }
+
+    /** Plan 3d: the app's scope has the plugin's hue or its manifest icon_hue, its noun or its label, and its verbs' roles. */
+    @Test void aScopeThatNamesNoHueTakesItsPluginsIconHueAndRolesAndNounsCarryOver() throws Exception {
+        PluginHost host = host();
+        var split = new PaletteVerb("split", "Open in a split pane", PaletteVerb.Role.SPLIT);
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo("test.a", "A", "1.0.0", Set.of(Capabilities.PALETTE_CONTRIBUTE)), Set.of(), Set.of(),
+            Set.of(getClass().getPackageName()), getClass().getClassLoader(), () -> c -> {
+                c.palette().register(presented(ScopeSpec.of("test.a.plain", "Plain", "Search", List.of(PASTE, split))));
+                c.palette().register(presented(ScopeSpec.of("test.a.hosts", "Hosts", "Search", List.of(PASTE))
+                    .withHue(dev.jasper.sdk.ui.Nodes.Hue.GREEN).withItemNoun("session")));
+            }, dev.jasper.ui.model.Nodes.Hue.AMBER)));
+        onEdt(() -> {
+            assertThat(contributions.scopes()).extracting(dev.jasper.app.palette.PaletteScope::id).containsExactly("test.a.plain", "test.a.hosts");
+            var plain = contributions.scopes().get(0);
+            var hosts = contributions.scopes().get(1);
+            assertThat(plain.hue()).as("no hue of its own: the manifest's icon_hue").isEqualTo(dev.jasper.ui.model.Nodes.Hue.AMBER);
+            assertThat(plain.itemNoun()).as("no noun: the label").isEqualTo("Plain");
+            assertThat(plain.verbs()).extracting(dev.jasper.app.palette.PaletteVerb::role)
+                .containsExactly(dev.jasper.app.palette.PaletteVerb.Role.STANDARD, dev.jasper.app.palette.PaletteVerb.Role.SPLIT);
+            assertThat(hosts.hue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.GREEN);
+            assertThat(hosts.itemNoun()).isEqualTo("session");
+        });
+    }
+
     @Test void aContributedScopeIsAdaptedContainedAndHandsThePluginItsOwnRowsBack() throws Exception {
         PluginHost host = host();
         var flaky = new Flaky();

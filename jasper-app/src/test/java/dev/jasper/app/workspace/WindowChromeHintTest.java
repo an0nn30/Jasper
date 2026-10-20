@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.config.ConfigService;
@@ -25,7 +26,7 @@ class WindowChromeHintTest {
         JButton[] button = new JButton[1];
         try {
             edt(() -> {
-                var themes = new ThemeController();
+                var themes = ThemeTestSupport.controller(true);
                 controller[0] = new ConfigurationTestSupport(themes, service);
                 owner[0] = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {}, themes);
                 controller[0].register(owner[0]);

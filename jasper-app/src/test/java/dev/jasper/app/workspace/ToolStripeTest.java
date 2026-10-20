@@ -128,6 +128,8 @@ class ToolStripeTest {
             assertThat(stripe.buttons().get(1).getY()).as("a button, then a separator").isEqualTo(s(4) + side + s(4) + s(8));
             assertThat(stripe.buttons().get(1).getWidth()).isEqualTo(side);
         }
+        for (var button : stripe.buttons())
+            assertThat(((java.util.Map<?, ?>) button.getClientProperty("FlatLaf.style")).get("arc")).as("the rail keeps its button arc").isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.RAIL_BUTTON_ARC));
     }
 
     @Test void aBadgeUpdateChangesOneButtonInPlaceAndLeavesTheStripeAndItsDragAlone() {

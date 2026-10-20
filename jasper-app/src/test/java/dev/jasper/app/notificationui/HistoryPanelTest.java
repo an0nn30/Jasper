@@ -1,7 +1,5 @@
 package dev.jasper.app.notificationui;
 
-import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.notifications.DisplayMode;
@@ -22,7 +20,6 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.UUID;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,10 +32,12 @@ class HistoryPanelTest {
     private final boolean[] visible = {false};
     private PanelSite site;
 
-    private HistoryPanel panel(boolean focused) {
+    private HistoryPanel panel(boolean focused) { return panel(dev.jasper.app.testsupport.KitTestSupport.context(), focused); }
+
+    private HistoryPanel panel(dev.jasper.ui.swing.KitContext kit, boolean focused) {
         center.register(GENERAL);
         site = new PanelSite(UUID.randomUUID(), () -> {}, () -> {}, () -> visible[0]);
-        return new HistoryPanel(center, site, focused);
+        return new HistoryPanel(kit, center, site, focused, "Notifications");
     }
 
     private void show() { visible[0] = true; site.notifyVisibility(true); }
@@ -49,11 +48,70 @@ class HistoryPanelTest {
         return center.post(NotificationRequest.of(GENERAL.id(), Severity.INFO, title)).orElseThrow();
     }
 
+    @Test void longActionsWrapWithoutClippingOrTakingKeyboardFocus() {
+        var panel=panel(false);show();
+        var id=center.post(NotificationRequest.of(GENERAL.id(),Severity.WARNING,"Review fixture")
+            .withAction(NotificationAction.of("Review the selected operation",()->{}))
+            .withAction(NotificationAction.of("Open the detailed explanation",()->{}))).orElseThrow();
+        try {
+            panel.setSize(300,400);for(int pass=0;pass<5;pass++)LayoutTestSupport.layoutTree(panel);
+            var row=panel.row(id);
+            for(String name:java.util.List.of("action:0","action:1")) {
+                var button=dev.jasper.app.testsupport.KitTestSupport.require(row,name,javax.swing.AbstractButton.class);
+                assertThat(button.getWidth()).as(name+" is fully reachable").isGreaterThanOrEqualTo(button.getPreferredSize().width);
+                assertThat(button.isFocusable()).isFalse();
+                var bounds=SwingUtilities.convertRectangle(button.getParent(),button.getBounds(),row);
+                assertThat(bounds.y+bounds.height).isLessThanOrEqualTo(row.getHeight());
+            }
+        } finally {site.notifyClosed();}
+    }
+
     @Test void anEmptyHistorySaysSo() {
         var panel = panel(true);
         show();
         assertThat(panel.showingEmpty()).isTrue();
         assertThat(panel.clearAllButton().isEnabled()).isFalse();
+    }
+
+    /** The empty history is the panels' standard empty state (tile, title, sentence), centred in the panel body. */
+    @Test void theEmptyStateIsThePanelEmptyStateCentred() {
+        var panel = panel(true);
+        show();
+        panel.setSize(400, 300);
+        for (int pass = 0; pass < 3; pass++) LayoutTestSupport.layoutTree(panel);
+        var empty = panel.emptyView();
+        assertThat(empty.isShowing() || empty.isVisible()).isTrue();
+        var root = (dev.jasper.ui.model.Nodes.Panel) empty.spec().root();
+        assertThat(root.body()).isInstanceOfSatisfying(dev.jasper.ui.model.Nodes.Empty.class, state -> {
+            assertThat(state.title()).isEqualTo("No Notifications");
+            assertThat(state.description()).isNotBlank();
+        });
+        var title = dev.jasper.app.testsupport.KitTestSupport.require(empty, "empty.title", java.awt.Component.class);
+        var bounds = SwingUtilities.convertRectangle(title.getParent(), title.getBounds(), panel);
+        assertThat(bounds.width).as("within the panel empty text width").isLessThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_EMPTY_TEXT_WIDTH)));
+        assertThat(Math.abs(bounds.x + bounds.width / 2 - panel.getWidth() / 2)).as("centred across").isLessThanOrEqualTo(1);
+        var clear = SwingUtilities.convertRectangle(panel.clearAllButton().getParent(), panel.clearAllButton().getBounds(), panel);
+        assertThat(bounds.y).as("in the body below Clear All").isGreaterThan(clear.y + clear.height);
+        assertThat(bounds.y + bounds.height / 2).as("centred down the body").isGreaterThan(panel.getHeight() / 3);
+    }
+
+    /** The title wraps to the row (as the former wrapping title did), strong while unread, with its count beside it. */
+    @Test void aLongTitleWrapsWithItsCountBesideIt() {
+        String title = "The background job that refreshes every remote listing finished with warnings on several hosts";
+        UUID id = post(title);
+        post(title);
+        var panel = panel(false);
+        show();
+        panel.setSize(300, 800);
+        for (int pass = 0; pass < 3; pass++) LayoutTestSupport.layoutTree(panel);
+        var row = panel.row(id);
+        assertThat(row.titleBold()).isTrue();
+        assertThat(row.titleLines()).as("wrapped").hasSizeGreaterThan(1);
+        assertThat(String.join(" ", row.titleLines())).isEqualTo(title);
+        assertThat(row.countText()).isEqualTo("×2");
+        var block = row.titleBlock();
+        assertThat(block.getWidth() + block.getX()).as("inside the row").isLessThanOrEqualTo(row.getWidth());
+        assertThat(block.getHeight()).isEqualTo(row.titleLines().size() * block.lineHeight());
     }
 
     @Test void showingInAFocusedWindowReadsEverythingAndKeepsItUnderNewUntilHidden() {
@@ -186,22 +244,44 @@ class HistoryPanelTest {
         assertThat(contentHeightAt(panel, id, 600)).as("wider rows need fewer lines").isLessThan(narrow);
     }
 
-    @Test void theRowsRestyleAndRebuildWhenTheThemeChanges() {
+    /** A theme switch restyles the rows from module roles and keeps them (and their state) rather than rebuilding them. */
+    @Test void theRowsRestyleAndStayWhenTheThemeChanges() {
+        var bindings = dev.jasper.app.testsupport.KitTestSupport.bindings(true);
         try {
-            new ThemeController(Theme.DARK);
+            var kit = bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME);
             UUID id = post("Theme");
-            var panel = panel(true);
+            var panel = panel(kit, false);
             show();
             HistoryRow before = panel.row(id);
             Color dark = before.titleColor();
-            new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
-            SwingUtilities.updateComponentTreeUI(panel);
+            assertThat(dark).isEqualTo(kit.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+            assertThat(before.titleBold()).isTrue();
+            bindings.binding().publish(dev.jasper.app.appearance.ThemeTestSupport.pair(false));
             HistoryRow after = panel.row(id);
-            assertThat(after).isNotNull().isNotSameAs(before);
-            Color light = UIManager.getColor("Label.foreground");
-            assertThat(after.titleColor().getRGB()).isEqualTo(light.getRGB());
+            assertThat(after).isSameAs(before);
+            assertThat(after.titleColor()).isEqualTo(kit.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
             assertThat(after.titleColor().getRGB()).isNotEqualTo(dark.getRGB());
-        } finally { new ThemeController(); }
+            assertThat(after.titleBold()).as("still unread").isTrue();
+            assertThat(panel.newSection()).containsExactly(id);
+        } finally {
+            // Close the panel's kit views before their bindings: a live view would refresh on a later font change.
+            if (site != null) site.notifyClosed();
+            bindings.close();
+        }
+    }
+
+    /** Ruling G5: the history's action links and remove stay pointer-only, as before; Clear All stays focusable. */
+    @Test void rowControlsArePointerOnlyAndClearAllTakesFocus() {
+        center.register(GENERAL);
+        UUID id = center.post(NotificationRequest.of(GENERAL.id(), Severity.WARNING, "act")
+            .withAction(NotificationAction.of("Fix", () -> {}))).orElseThrow();
+        var panel = panel(false);
+        show();
+        assertThat(panel.row(id).actionButtons().getFirst().isFocusable()).isFalse();
+        assertThat(panel.row(id).removeButton().isFocusable()).isFalse();
+        assertThat(panel.row(id).removeButton().getAccessibleContext().getAccessibleName()).isEqualTo("Remove notification");
+        assertThat(panel.clearAllButton().isFocusable()).isTrue();
+        assertThat(panel.row(id).getAccessibleContext().getAccessibleName()).isEqualTo("Warning: act");
     }
 
     /** Lays the panel out at a width until the wrapped text has settled (it revalidates once its width is known). */

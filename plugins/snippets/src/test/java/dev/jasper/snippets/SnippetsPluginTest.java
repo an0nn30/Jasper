@@ -45,6 +45,18 @@ class SnippetsPluginTest {
         }
     }
 
+    @Test void editSnippetsFileOpensTheFileEvenWithNoSnippets() throws Exception {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(SnippetsScopeTest.INFO, Set.of(), Set.of(), new SnippetsPlugin());
+            assertThat(host.actionSpec(SnippetsPlugin.EDIT).orElseThrow().defaultBinding()).as("unbound until the user binds it").isEmpty();
+            Path file = home.resolve("plugins/dev.jasper.snippets/data/snippets.toml");
+            assertThat(host.invoke(SnippetsPlugin.EDIT, host.addTerminalWindow(), null)).isTrue();
+            SnippetsScopeTest.await(() -> !host.openedInEditor().isEmpty());
+            assertThat(host.openedInEditor()).containsExactly(file);
+            assertThat(Files.readString(file)).isEqualTo(SnippetFile.HEADER);
+        }
+    }
+
     @Test void thePrePluginFileIsMovedOnceAndAConfigReloadRereadsTheFile() throws Exception {
         Path legacy = home.resolve("snippets.toml");
         Files.writeString(legacy, "[[snippet]]\nname = \"Old\"\ncommand = \"ls\"\n");

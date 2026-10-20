@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import dev.jasper.app.terminals.OpenSpec;
 import dev.jasper.sdk.terminal.RemoteDirectory;
 
@@ -53,6 +55,9 @@ final class HostedTerminals implements Terminals {
     private final Containment containment;
     /** Live {@link #onProfilesChanged} registrations, closed with the plugin. UI thread. */
     private final List<dev.jasper.app.lifecycle.Subscription> profileRegistrations = new ArrayList<>();
+    private final ShellContributions shellContributions;
+    /** Live {@link #environment} registrations, closed with the plugin. UI thread. */
+    private final List<dev.jasper.app.lifecycle.Subscription> environmentRegistrations = new ArrayList<>();
 
     /** A view that lists no shell profiles, for tests that do not need them. */
     HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
@@ -62,8 +67,16 @@ final class HostedTerminals implements Terminals {
 
     HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
                     BooleanSupplier open, HostedSessions sessions, PluginRuntime.ShellProfiles shellProfiles, Containment containment) {
+        this(pluginId, gate, registry, ui, onUi, open, sessions, shellProfiles, containment, new ShellContributions(containment));
+    }
+
+    /** As above; {@link #environment} registers into {@code shellContributions}, the host's. */
+    HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
+                    BooleanSupplier open, HostedSessions sessions, PluginRuntime.ShellProfiles shellProfiles, Containment containment,
+                    ShellContributions shellContributions) {
         this.pluginId = pluginId; this.gate = gate; this.registry = registry; this.ui = ui; this.onUi = onUi; this.open = open;
         this.sessions = sessions; this.shellProfiles = shellProfiles; this.containment = containment;
+        this.shellContributions = shellContributions;
     }
 
     private void requireUi(String what) {
@@ -213,6 +226,12 @@ final class HostedTerminals implements Terminals {
     /** A handle for an id an action was given; it finds its tab if the pane is open. */
     PaneHandle paneHandle(UUID id) { return registry.pane(id).<PaneHandle>map(Pane::new).orElseGet(() -> new Pane(id, NOWHERE)); }
 
+    /** The open window holding a pane, for a {@code jasper} call run in it; empty when the pane is not open. UI thread. */
+    Optional<WindowHandle> windowOfPane(UUID pane) {
+        return registry.pane(pane).flatMap(entry -> registry.tab(entry.tabId()))
+            .flatMap(tab -> registry.window(tab.windowId())).<WindowHandle>map(window -> new Window(window.id()));
+    }
+
     /** The focused pane in {@code windowId}'s selected tab, else the active pane. */
     Optional<UUID> focusedPane(UUID windowId) {
         Optional<PaneEntry> pane = windowId == null ? Optional.empty()
@@ -245,7 +264,7 @@ final class HostedTerminals implements Terminals {
         if (!knownProfile(spec)) return Optional.empty();
         Optional<WindowEntry> target = registry.window(window.id());
         if (target.isEmpty()) return Optional.empty();
-        gate.audit(capability(request), "opened a tab in window " + window.id());
+        gate.audit(capability(request), "opened a tab in window " + window.id() + running(spec));
         return target.get().openTab().apply(spec).map(Pane::new);
     }
 
@@ -257,7 +276,7 @@ final class HostedTerminals implements Terminals {
         if (!knownProfile(spec)) return Optional.empty();
         Optional<PaneEntry> entry = registry.pane(target.id());
         if (entry.isEmpty()) return Optional.empty();
-        gate.audit(capability(request), "split pane " + target.id());
+        gate.audit(capability(request), "split pane " + target.id() + running(spec));
         return entry.get().split().apply(direction == Direction.RIGHT ? SplitAxis.RIGHT : SplitAxis.DOWN, spec)
             .map(Pane::new);
     }
@@ -265,9 +284,16 @@ final class HostedTerminals implements Terminals {
     /** Every request kind names its capability here, before anything else happens. */
     private OpenSpec spec(OpenRequest request) {
         return switch (Objects.requireNonNull(request, "request")) {
-            case OpenRequest.Local local -> { gate.require(Capabilities.TERMINAL_OPEN); yield new OpenSpec.Local(local.spec().workingDirectory(), local.spec().profile()); }
+            case OpenRequest.Local local -> { gate.require(Capabilities.TERMINAL_OPEN); yield new OpenSpec.Local(local.spec().workingDirectory(), local.spec().profile(), local.spec().command()); }
             case OpenRequest.Session session -> { gate.require(Capabilities.SESSION_PROVIDE); yield new OpenSpec.Session(sessions.request(session.spec())); }
         };
+    }
+
+    /** What an audit line adds for a program tab or split: the program's file name, never its folder or arguments. */
+    private static String running(OpenSpec spec) {
+        if (!(spec instanceof OpenSpec.Local local) || local.program().map(List::isEmpty).orElse(true)) return "";
+        String program = local.program().get().getFirst();
+        return " running " + program.substring(Math.max(program.lastIndexOf('/'), program.lastIndexOf('\\')) + 1);
     }
 
     private static String capability(OpenRequest request) {
@@ -307,6 +333,21 @@ final class HostedTerminals implements Terminals {
         return new ShellProfileInfo(profile.id(), profile.name(), kind, profile.detail());
     }
 
+    @Override public Subscription environment(Function<Map<String, String>, Map<String, String>> contributor) {
+        Objects.requireNonNull(contributor, "contributor");
+        gate.require(Capabilities.TERMINAL_ENVIRONMENT);
+        requireUi("environment");
+        dev.jasper.app.lifecycle.Subscription registration = shellContributions.register(pluginId, contributor);
+        environmentRegistrations.add(registration);
+        gate.audit(Capabilities.TERMINAL_ENVIRONMENT, "added variables to new shells");
+        var closed = new AtomicBoolean();
+        Runnable removal = () -> { environmentRegistrations.remove(registration); registration.close(); };
+        return () -> {
+            if (!closed.compareAndSet(false, true)) return;
+            if (onUi.getAsBoolean()) removal.run(); else ui.accept(removal);
+        };
+    }
+
     /** A named profile must be one the catalog lists; otherwise nothing opens and the plugin's mistake is logged. */
     private boolean knownProfile(OpenSpec spec) {
         if (!(spec instanceof OpenSpec.Local local) || local.profile().isEmpty()) return true;
@@ -319,11 +360,13 @@ final class HostedTerminals implements Terminals {
     /** A handle that finds its tab lazily, for callers that are not on the UI thread. */
     PaneHandle detachedPaneHandle(UUID id) { return new Pane(id, NOWHERE); }
 
-    /** The plugin is stopping: cancel its sessions and drop its profile listeners. UI thread. */
+    /** The plugin is stopping: cancel its sessions and drop its profile listeners and environment contributors. UI thread. */
     void closeAll() {
         sessions.cancelAll();
-        var registrations = List.copyOf(profileRegistrations);
+        var registrations = new ArrayList<>(profileRegistrations);
+        registrations.addAll(environmentRegistrations);
         profileRegistrations.clear();
+        environmentRegistrations.clear();
         registrations.forEach(dev.jasper.app.lifecycle.Subscription::close);
     }
 }

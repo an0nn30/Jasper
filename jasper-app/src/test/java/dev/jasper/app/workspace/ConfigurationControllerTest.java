@@ -6,10 +6,15 @@ import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.application.JasperApplication;
-import dev.jasper.app.appearance.Theme;
+
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.config.AppearanceMode;
 import dev.jasper.app.config.ConfigService;
+import dev.jasper.app.config.TerminalSchemeChoice;
+import dev.jasper.ui.theme.GeneratedTheme;
+import dev.jasper.ui.theme.JasperTheme;
+import dev.jasper.ui.theme.TerminalScheme;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.config.TerminalConfig;
@@ -52,7 +57,19 @@ class ConfigurationControllerTest {
     void start(String text) throws Exception {
         Files.writeString(directory.resolve("config.toml"), text);
         service = new ConfigService(directory.resolve("config.toml"), false);
-        edt(() -> { themes = new ThemeController(ThemeTestSupport.named(service.initialState().snapshot().theme())); controller = new ConfigurationTestSupport(themes, service); });
+        edt(() -> { themes = new ThemeController(true, TerminalSchemeChoice.MATCH); controller = new ConfigurationTestSupport(themes, service); });
+    }
+    /** As {@link #start}, with imported themes read from {@code themes/} next to config.toml. */
+    void startWithThemes(String text) throws Exception {
+        Files.writeString(directory.resolve("config.toml"), text);
+        service = new ConfigService(directory.resolve("config.toml"), false);
+        var folder = directory.resolve("themes");
+        edt(() -> {
+            var library = dev.jasper.app.appearance.ThemeLibrary.read(folder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly());
+            themes = new ThemeController(true, dev.jasper.app.appearance.ThemeSelection.of(library, "slate-cobalt", "slate-cobalt",
+                TerminalSchemeChoice.MATCH, (key, message) -> { }));
+            controller = new ConfigurationTestSupport(themes, service, folder);
+        });
     }
     WindowContent owner() { return owner(launcher(pending)); }
     WindowContent owner(ShellLauncher launcher) {
@@ -67,7 +84,7 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void savedFieldsApplyAcrossOwnersAndPendingHiddenViewsWithoutReplacingSessions() throws Exception {
-        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=19\n[ui.theme]\nname='Jasper Light'\n");
+        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=19\n[ui]\nappearance='light'\n");
         edt(() -> { owner(); owner(); }); launchAll();
         var first = owners.getFirst(); var second = owners.get(1);
         var retained = first.currentPane(); var session = retained.session();
@@ -75,7 +92,7 @@ class ConfigurationControllerTest {
             assertThat(first.tabHeight()).isEqualTo(44);
             assertThat(((JButton) first.toolbar().getComponent(0)).getText()).isNull();
             assertThat(first.status().isVisible()).isFalse();
-            assertThat(first.theme().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.JASPER_LIGHT));
+            assertThat(first.theme().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
             assertThat(retained.view().fontSize()).isEqualTo(19);
             retained.findBar().open(); retained.findBar().queryField().setText("alpha");
             first.newTab(HOME); // pending and hides the retained terminal
@@ -108,18 +125,18 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(first.tabHeight()).as("the saved chrome is reapplied").isEqualTo(30);
             assertThat(first.toolbar().isVisible()).isTrue();
-            assertThat(first.status().isVisible()).isTrue(); assertThat(first.theme().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
+            assertThat(first.status().isVisible()).isTrue(); assertThat(first.theme().chrome()).isSameAs(JasperTheme.bundled().generated(true));
             assertThat(first.currentPane().view().fontSize()).as("a pane's own size stays").isEqualTo(28);
             var next = owner(); assertThat(next.tabHeight()).isEqualTo(30);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
-            assertThat(next.theme().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
+            assertThat(next.theme().chrome()).isSameAs(JasperTheme.bundled().generated(true));
         }); launchAll();
         edt(() -> assertThat(owners.get(1).currentPane().view().fontSize()).isEqualTo(19));
-        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=20\n[ui.theme]\nname='Jasper Light'\n");
+        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=20\n[ui]\nappearance='light'\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(45); assertThat(first.toolbar().isVisible()).isTrue();
             assertThat(first.currentPane().view().fontSize()).isEqualTo(20);
-            assertThat(first.theme().chrome()).as("the saved theme name applies").isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.JASPER_LIGHT));
+            assertThat(first.theme().chrome()).as("the saved appearance applies").isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
         });
     }
 
@@ -181,7 +198,7 @@ class ConfigurationControllerTest {
         service = new ConfigService(file, false);
         var opened = new java.util.concurrent.LinkedBlockingQueue<Path>();
         edt(() -> {
-            themes = new ThemeController();
+            themes = ThemeTestSupport.controller(true);
             controller = new ConfigurationTestSupport(themes, service, path -> {
                 assertThat(SwingUtilities.isEventDispatchThread()).isFalse(); opened.add(path);
             });
@@ -201,7 +218,9 @@ class ConfigurationControllerTest {
         edt(() -> {
             owner.close();
             assertThat(owner.action(ActionId.OPEN_SETTINGS).isEnabled()).isFalse();
-            var late = new ConfigService.State(new ConfigSnapshot(55, ToolbarMode.ICONS, false, FontConfig.defaults().withSize(22), Theme.DARK.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), file, true);
+            var late = new ConfigService.State(ConfigSnapshot.builder().tabHeight(55).toolbar(ToolbarMode.ICONS).statusBar(false)
+                .font(FontConfig.defaults().withSize(22)).keybindings(Map.of()).columns(150).lines(45)
+                .terminal(TerminalConfig.defaults()).build(), List.of(), file, true);
             controller.accept(late);
             assertThat(owner.tabHeight()).isEqualTo(48);
             assertThat(owner.status().configButton().isEnabled()).isFalse();
@@ -214,7 +233,7 @@ class ConfigurationControllerTest {
         service = new ConfigService(directory.resolve("config.toml"), false);
         var errors = new java.util.concurrent.LinkedBlockingQueue<String>();
         edt(() -> {
-            themes = new ThemeController();
+            themes = ThemeTestSupport.controller(true);
             controller = new ConfigurationTestSupport(themes, service, path -> { throw new IllegalStateException("Editor unavailable"); });
             var owner = owner();
             owner.onError = (title, message) -> { assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); errors.add(title + ": " + message); };
@@ -229,23 +248,35 @@ class ConfigurationControllerTest {
         service = new ConfigService(directory.resolve("config.toml"), false);
         var errors = new ArrayList<String>();
         edt(() -> {
-            themes = new ThemeController(theme -> theme != Theme.JASPER_LIGHT && ThemeTestSupport.install(theme));
+            themes = ThemeTestSupport.controller(true, theme -> theme.dark() && ThemeTestSupport.install(theme));
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = (title, message) -> errors.add(message);
-            var state = new ConfigService.State(new ConfigSnapshot(53, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(18), Theme.JASPER_LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
+            var snapshot = ConfigSnapshot.builder().tabHeight(53).toolbar(ToolbarMode.ICONS).font(FontConfig.defaults().withSize(18))
+                .appearance(AppearanceMode.LIGHT).build();
+            var state = new ConfigService.State(snapshot, List.of(), directory.resolve("config.toml"), true);
             controller.accept(state);
             assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
-            assertThat(owners.getFirst().theme().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
+            assertThat(owners.getFirst().theme().chrome()).isSameAs(JasperTheme.bundled().generated(true));
             // A theme that fails to install is also a configuration warning now, not just a toast: the
             // status bar reflects it and shown() carries the diagnostic (both still keep the other
             // settings that theme accompanied, per this test's name).
             assertThat(owners.getFirst().status().getText()).contains("Config warnings");
             assertThat(controller.shown().diagnostics()).anySatisfy(diagnostic -> {
-                assertThat(diagnostic.key()).isEqualTo("ui.theme.name");
-                assertThat(diagnostic.message()).contains("Could not apply theme").contains("keeping Jasper Dark");
+                assertThat(diagnostic.key()).isEqualTo("ui.appearance");
+                assertThat(diagnostic.message()).contains("Could not apply Jasper Meadow Light Light").contains("keeping the current appearance");
             });
-            assertThat(errors).singleElement().asString().contains("Could not apply theme");
+            assertThat(errors).singleElement().asString().contains("Jasper Meadow Light Light");
         });
+    }
+
+    @Test void configurationReloadUpdatesExistingNativeKitMotionPolicy() throws Exception {
+        start("[ui.animations]\nenabled=false\n");
+        var context=new AtomicReference<dev.jasper.ui.swing.KitContext>();
+        edt(() -> {context.set(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));assertThat(context.get().animationsEnabled().getAsBoolean()).isFalse();});
+        reload("[ui.animations]\nenabled=true\n");
+        edt(() -> assertThat(context.get().animationsEnabled().getAsBoolean()).isTrue());
+        reload("[ui.animations]\nenabled=false\n");
+        edt(() -> assertThat(context.get().animationsEnabled().getAsBoolean()).isFalse());
     }
 
     @Test void applicationCallbackFailuresAreNotReportedAsInstallationFailures() throws Exception {
@@ -253,9 +284,18 @@ class ConfigurationControllerTest {
         edt(() -> {
             var owner = owner();
             owner.onThemeChanged = ignored -> { throw new IllegalStateException("application callback"); };
-            var next = new ConfigService.State(new ConfigSnapshot(38, ToolbarMode.ICONS_AND_LABELS, true, FontConfig.defaults().withSize(16), Theme.JASPER_LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
-            assertThatThrownBy(() -> controller.accept(next)).isInstanceOf(IllegalStateException.class)
-                .hasMessage("application callback");
+            var snapshot = ConfigSnapshot.builder().tabHeight(38).toolbar(ToolbarMode.ICONS_AND_LABELS).font(FontConfig.defaults().withSize(16))
+                .appearance(AppearanceMode.LIGHT).build();
+            var next = new ConfigService.State(snapshot, List.of(), directory.resolve("config.toml"), true);
+            var published=new ArrayList<ResolvedTheme>();
+            var listening=themes.subscribe((value,changed) -> published.add(value));published.clear();
+            assertThatCode(() -> controller.accept(next)).doesNotThrowAnyException();
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
+            assertThat(published).containsExactly(themes.current());
+            assertThat(controller.shown().snapshot()).isEqualTo(next.snapshot());
+            assertThat(controller.shown().diagnostics()).noneMatch(diagnostic -> diagnostic.message().contains("Could not apply"));
+            assertThat(owner.tabHeight()).isEqualTo(38);
+            listening.close();
         });
     }
 
@@ -321,7 +361,7 @@ class ConfigurationControllerTest {
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(false);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(.65f);
-            first.selectTheme(Theme.JASPER_LIGHT);
+            first.selectVariant(false);
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(true);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(0f);
@@ -334,13 +374,13 @@ class ConfigurationControllerTest {
     void typographyAndBehaviorChangesPreserveManualSizeAndThemeUntilSavedSizeChanges() throws Exception {
         start("[terminal.font]\nsize=18\n"); edt(this::owner); launchAll();
         var owner = owners.getFirst(); var pane = owner.currentPane();
-        edt(() -> { pane.view().setFontSize(27); owner.selectTheme(Theme.JASPER_LIGHT); });
+        edt(() -> { pane.view().setFontSize(27); owner.selectVariant(false); });
         reload(liveSettings(18));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(27);
             assertThat(pane.view().options().fontFamily()).isEqualTo("Monospaced");
             assertThat(pane.view().options().lineHeight()).isEqualTo(1.5f);
-            assertThat(pane.view().palette()).as("a reload applies the configured theme").isEqualTo(Theme.DARK.palette());
+            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(slateCobaltDarkPalette());
             owner.newTab(HOME);
         }); launchAll();
         edt(() -> {
@@ -353,7 +393,7 @@ class ConfigurationControllerTest {
         reload(liveSettings(20));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(20);
-            assertThat(pane.view().palette()).as("a reload applies the configured theme").isEqualTo(Theme.DARK.palette());
+            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(slateCobaltDarkPalette());
         });
     }
 
@@ -418,7 +458,7 @@ class ConfigurationControllerTest {
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
             owner.setActive(true);
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(0f);
-            owner.setActive(false); owner.selectTheme(Theme.JASPER_LIGHT);
+            owner.setActive(false); owner.selectVariant(false);
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
         });
         reload("[terminal]\ndim_inactive_panes=0.2\n");
@@ -499,7 +539,7 @@ class ConfigurationControllerTest {
 
     @Test void reloadActionRetriesFailedSavedInstallationWithUnchangedFiles() throws Exception {
         Path file = directory.resolve("config.toml");
-        Files.writeString(file, "ui.theme.name='Jasper Dark'");
+        Files.writeString(file, "ui.appearance='dark'");
         var configWorker = new java.util.concurrent.ScheduledThreadPoolExecutor(1) {
             @Override public java.util.concurrent.ScheduledFuture<?> scheduleWithFixedDelay(
                     Runnable command, long initialDelay, long delay, java.util.concurrent.TimeUnit unit) {
@@ -507,24 +547,24 @@ class ConfigurationControllerTest {
             }
         };
         var broken = new java.util.concurrent.atomic.AtomicBoolean(false);
-        var attempts = new ArrayList<Theme>();
+        var attempts = new ArrayList<GeneratedTheme>();
+        var dark = JasperTheme.bundled().generated(true); var light = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false);
         var errors = new ArrayList<String>();
         service = new ConfigService(file, false, configWorker, SwingUtilities::invokeLater);
         edt(() -> {
-            themes = new ThemeController(theme -> { attempts.add(theme); return !broken.get() && ThemeTestSupport.install(theme); });
+            themes = ThemeTestSupport.controller(true, theme -> { attempts.add(theme); return !broken.get() && ThemeTestSupport.install(theme); });
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = (title, message) -> errors.add(message);
-            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
-            assertThat(attempts).containsExactly(Theme.DARK);
+            assertThat(themes.current().chrome()).isSameAs(dark);
+            assertThat(attempts).containsExactly(dark);
             broken.set(true);
         });
-        Files.writeString(file, "ui.theme.name='Jasper Light'");
+        Files.writeString(file, "ui.appearance='light'");
         edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         edt(() -> {
-            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
-            assertThat(themes.choice()).isEqualTo(Theme.DARK);
-            assertThat(attempts).containsExactly(Theme.DARK, Theme.JASPER_LIGHT);
+            assertThat(themes.current().chrome()).isSameAs(dark);
+            assertThat(attempts).containsExactly(dark, light);
             assertThat(errors).hasSize(1);
             broken.set(false);
         });
@@ -533,13 +573,12 @@ class ConfigurationControllerTest {
         edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         edt(() -> {
-            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.JASPER_LIGHT));
+            assertThat(themes.current().chrome()).isSameAs(light);
             assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
-            assertThat(themes.choice()).isEqualTo(Theme.JASPER_LIGHT);
-            assertThat(themes.current().palette()).isEqualTo(Theme.JASPER_LIGHT.palette());
-            assertThat(attempts).containsExactly(Theme.DARK, Theme.JASPER_LIGHT, Theme.JASPER_LIGHT);
+            assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(false)));
+            assertThat(attempts).containsExactly(dark, light, light);
             assertThat(errors).hasSize(1);
-            owners.getFirst().selectTheme(Theme.DARK);
+            owners.getFirst().selectVariant(true);
             owners.getFirst().invoke(ActionId.RELOAD_CONFIG);
         });
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
@@ -547,11 +586,18 @@ class ConfigurationControllerTest {
         assertThat(Files.getLastModifiedTime(file)).isEqualTo(acceptedTime);
         edt(() -> {
             // A reload re-applies the configured theme over a window's own choice.
-            assertThat(themes.choice()).isEqualTo(Theme.JASPER_LIGHT);
-            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.JASPER_LIGHT));
-            assertThat(attempts).containsExactly(Theme.DARK, Theme.JASPER_LIGHT,
-                Theme.JASPER_LIGHT, Theme.DARK, Theme.JASPER_LIGHT);
+            assertThat(themes.current().chrome()).isSameAs(light);
+            assertThat(attempts).containsExactly(dark, light, light, dev.jasper.app.appearance.ThemeTestSupport.generated(true), light);
         });
+    }
+
+    private static dev.jasper.app.appearance.ResolvedTheme meadowResolved(dev.jasper.ui.theme.TerminalScheme scheme) {
+        var light = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false);
+        return new dev.jasper.app.appearance.ResolvedTheme(light, light, dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(scheme));
+    }
+
+    private static Palette slateCobaltDarkPalette() {
+        return dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(JasperTheme.bundled().matching(true));
     }
 
     private static String liveSettings(int size) {
@@ -626,13 +672,43 @@ class ConfigurationControllerTest {
         });
     }
 
-    @Test void savedTerminalColorsApplyLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
-        start("[ui.theme]\nname='Jasper Light'\n[terminal]\ncolors='dark'\n");
-        edt(() -> assertThat(themes.current()).isEqualTo(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(Theme.JASPER_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK))));
-        reload("[ui.theme]\nname='Jasper Light'\n[terminal]\ncolors='match'\n");
+    @Test void savedTerminalSchemeAppliesLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
+        start("[ui]\nappearance='light'\n[terminal]\nscheme='slate-cobalt/dark'\n");
+        edt(() -> assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.bundled().matching(true))));
+        reload("[ui]\nappearance='light'\n[terminal]\nscheme='match'\n");
         edt(() -> {
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(Theme.JASPER_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(Theme.JASPER_LIGHT)));
+            assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(false)));
+            assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.") || d.key().startsWith("terminal."));
+        });
+    }
+
+    @Test void aSavedImportedThemeShowsAndAnUnknownOneIsReported() throws Exception {
+        var folder = Files.createDirectories(directory.resolve("themes"));
+        Files.writeString(folder.resolve("ocean.json"), ThemeTestSupport.uiThemeJson("Ocean"));
+        startWithThemes("[ui]\nappearance='dark'\n[ui.theme]\ndark='ocean'\n");
+        edt(() -> {
+            assertThat(themes.current().chrome().name()).isEqualTo("Ocean");
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.theme"));
+        });
+        reload("[ui]\nappearance='dark'\n[ui.theme]\ndark='nord'\n");
+        edt(() -> {
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.bundled().generated(true));
+            assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("ui.theme.dark")).singleElement()
+                .satisfies(d -> assertThat(d.message()).startsWith("\"nord\" is not an installed theme."));
+        });
+    }
+
+    @Test void reloadReadsTheThemesFolderAgainAndReportsAFileItSkips() throws Exception {
+        startWithThemes("[ui]\nappearance='dark'\n[ui.theme]\ndark='ocean'\n");
+        edt(() -> assertThat(themes.current().chrome()).isSameAs(JasperTheme.bundled().generated(true)));
+        var folder = Files.createDirectories(directory.resolve("themes"));
+        Files.writeString(folder.resolve("ocean.json"), ThemeTestSupport.uiThemeJson("Ocean"));
+        Files.writeString(folder.resolve("broken.json"), "{ \"jasper-theme\": 1 }");
+        service.reload().get(); edt(() -> {});
+        edt(() -> {
+            assertThat(themes.current().chrome().name()).isEqualTo("Ocean");
+            assertThat(controller.shown().diagnostics()).filteredOn(d -> d.file().getFileName().toString().equals("broken.json"))
+                .singleElement().satisfies(d -> assertThat(d.formatted()).endsWith("broken.json: warning: Missing entry \"name\""));
         });
     }
 
@@ -649,6 +725,10 @@ class ConfigurationControllerTest {
         });
         assertThat(shown).hasSize(1);
         var button = find(shown.getFirst(), "configuration.migrate");
+        edt(() -> {
+            assertThat(button.getClientProperty("JButton.buttonType")).as("Migrate Config stays a framed button").isNull();
+            assertThat(((javax.swing.AbstractButton) button).isContentAreaFilled()).isTrue();
+        });
         edt(button::doClick);
         until(() -> !infos.isEmpty());
         assertThat(infos).containsExactly("Migrate Config: Migrated 1 old setting to the new layout. Backup: config.toml.v1.bak.");
@@ -725,13 +805,13 @@ class ConfigurationControllerTest {
         until(() -> !seen.isEmpty() && seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TOOLBAR) == ToolbarMode.HIDDEN);
         edt(() -> first.windowCommands().view("view.status_bar").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
         until(() -> Boolean.FALSE.equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_STATUS_BAR)));
-        edt(() -> first.windowCommands().view("view.terminal_colors.dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
-        until(() -> "Jasper Dark".equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE)));
+        edt(() -> first.windowCommands().view("view.terminal_scheme.slate-cobalt.dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
+        until(() -> "slate-cobalt/dark".equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME)));
         edt(() -> {
             for (var owner : List.of(first, second)) {
                 assertThat(owner.toolbar().isVisible()).isFalse();
                 assertThat(owner.status().isVisible()).isFalse();
-                assertThat(owner.workspaceChoice().name()).isEqualTo("Jasper Dark");
+                assertThat(owner.terminalSchemeSelected(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-cobalt/dark").orElseThrow())).isTrue();
             }
         });
         assertThat(Files.readString(directory.resolve("config.toml"))).contains("tab_height = 44");

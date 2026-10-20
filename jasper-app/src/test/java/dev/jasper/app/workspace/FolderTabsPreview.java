@@ -1,7 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.terminal.config.GridSize;
@@ -57,14 +55,14 @@ public final class FolderTabsPreview {
                 var owner = owners[0]; var root = roots[0];
                 String[] titles = {"tmux", "amp", "pve-root", "dustin-vm"};
                 for (int i = 0; i < titles.length; i++) owner.terminalTabs().get(i).rename(titles[i]);
-                for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                    owner.selectTheme(theme);
-                    String name = theme.dark() ? "dark" : "light";
+                for (boolean themeDark : new boolean[]{true, false}) {
+                    owner.selectVariant(themeDark);
+                    String name = themeDark ? "dark" : "light";
                     owner.selectTab(owner.terminalTabs().get(0)); render(root, owner, output, name + "-first", 1040);
                     owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, name + "-middle", 1040);
                     owner.selectTab(owner.terminalTabs().get(3)); render(root, owner, output, name + "-overflow", 350);
                 }
-                owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); owner.selectTerminalColors(TerminalColors.DARK);
+                owner.selectVariant(false); owner.selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice.parse("slate-cobalt/dark").orElseThrow());
                 owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, "light-chrome-dark-workspace", 1040);
                 owner.applyBackgroundOpacity(.5); render(root, owner, output, "glass", 1040);
             });

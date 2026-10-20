@@ -29,10 +29,6 @@ class ConfigMigrationTest {
         [background]
         enabled = true
 
-        [ui.theme]
-        name = "IntelliJ Light"
-        terminal = "dark" # always dark
-
         [palette.scopes.history]
         enabled = false
 
@@ -57,11 +53,6 @@ class ConfigMigrationTest {
         [terminal]
         scrollback = 5000
 
-        [ui.theme]
-        name = "IntelliJ Light"
-        workspace = "Jasper Dark"
-        # always dark
-
         [plugins."dev.jasper.gone"]
         x = 1
 
@@ -72,12 +63,11 @@ class ConfigMigrationTest {
     @Test void aVersionOneFileBecomesTheGoldenVersionTwoFile() {
         var outcome = migrate(VERSION_ONE);
         assertThat(outcome.text()).isEqualTo(VERSION_TWO);
-        assertThat(outcome.changes()).isEqualTo(6);
+        assertThat(outcome.changes()).isEqualTo(5);
         var migrated = parse(outcome.text());
         assertThat(migrated.legacyKeys()).isEmpty();
         assertThat(migrated.snapshot().font().family()).isEqualTo("Iosevka");
         assertThat(migrated.snapshot().fontSize()).isEqualTo(15f);
-        assertThat(migrated.snapshot().terminalColors()).isEqualTo(TerminalColors.DARK);
         assertThat(migrated.snapshot().backgroundEnabled()).isTrue();
         assertThat(migrated.deadTables()).containsExactly(List.of("plugins", "dev.jasper.gone"));
         assertThat(ConfigMigration.plan(outcome.text(), migrated, id -> id.equals("dev.jasper.history"))).as("idempotent").isEmpty();
@@ -97,24 +87,5 @@ class ConfigMigrationTest {
         assertThat(ConfigMigration.plan(keptPlugin, parse(keptPlugin), id -> false)).isEmpty();
         assertThatIllegalArgumentException().isThrownBy(() -> ConfigMigration.plan("[font]\nsize = 'x'\n", parse("[font]\nsize = 'x'\n"), id -> true))
             .withMessage("Fix config.toml's errors before migrating.");
-    }
-
-    @Test void variantMigrationWritesNormalizedThemeAndKeepsComments() {
-        String original = "# keep this\nui.theme.variant = 'light' # theme\nwindow.tab_height = 42\n";
-        var migrated = migrate(original);
-        assertThat(migrated.text()).contains("# keep this", "window.tab_height = 42", "Jasper Light");
-        assertThat(migrated.text()).doesNotContain("variant");
-        assertThat(parse(migrated.text()).snapshot().theme()).isEqualTo("Jasper Light");
-        assertThat(parse("ui.theme.name = 'Light'\n").snapshot().theme()).isEqualTo("Light");
-    }
-
-    @Test void supersededWorkspaceAliasIsRemovedOnMigration() {
-        for (String text : List.of(
-                "terminal.colors = 'dark'\nui.theme.workspace = 'Light'\n",
-                "ui.theme.workspace = 'Light'\nterminal.colors = 'dark'\n")) {
-            var migrated = migrate(text);
-            assertThat(migrated.text()).doesNotContain("terminal.colors");
-            assertThat(parse(migrated.text()).snapshot().workspaceTheme().name()).isEqualTo("Light");
-        }
     }
 }

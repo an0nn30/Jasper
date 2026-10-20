@@ -19,9 +19,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-/** The Snippets scope: Enter pastes, Cmd/Ctrl+Enter pastes and runs, Shift+Enter edits the file. */
+/** The Snippets scope: Enter inserts (pastes), Cmd/Ctrl+Enter pastes and runs, Shift+Enter edits the file. */
 final class SnippetsScope implements PaletteScope {
-    static final PaletteVerb PASTE = new PaletteVerb("paste", "Paste");
+    /** Spec 13: the first verb reads Insert; its id stays {@code paste}, which palette history keys on. */
+    static final PaletteVerb PASTE = new PaletteVerb("paste", "Insert");
     static final PaletteVerb PASTE_RUN = new PaletteVerb("paste_run", "Paste and run");
     static final PaletteVerb EDIT = new PaletteVerb("edit", "Edit file");
     static final String ERROR_ROW = "snippets.file-error";
@@ -36,7 +37,8 @@ final class SnippetsScope implements PaletteScope {
 
     @Override public ScopeSpec spec() {
         return ScopeSpec.of(SnippetService.SCOPE_ID, "Snippets", "Search snippets", List.of(PASTE, PASTE_RUN, EDIT))
-            .withDescription("Paste or run a saved command").withShortcutActionId(openActionId);
+            .withDescription("Paste or run a saved command").withShortcutActionId(openActionId)
+            .withHue(dev.jasper.sdk.ui.Nodes.Hue.PURPLE).withItemNoun("snippet");
     }
 
     @Override public void activated(PaletteQuery context) { store.refresh(); }

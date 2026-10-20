@@ -34,8 +34,8 @@ class HandoffSocketTest {
         try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
             assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 7L)).isTrue();
             assertThat(seen).hasSize(1);
-            assertThat(seen.get(0).codeSource()).isEqualTo(Path.of("/app.jar"));
-            assertThat(seen.get(0).codeSourceModified()).isEqualTo(7L);
+            assertThat(seen.get(0).codeLocation()).isEqualTo(Path.of("/app.jar"));
+            assertThat(seen.get(0).codeLocationModified()).isEqualTo(7L);
             if (token().getFileSystem().supportedFileAttributeViews().contains("posix")) {
                 assertThat(java.nio.file.attribute.PosixFilePermissions
                     .toString(Files.getPosixFilePermissions(token()))).isEqualTo("rw-------");
@@ -43,6 +43,20 @@ class HandoffSocketTest {
         }
         assertThat(socket()).doesNotExist();
         assertThat(token()).doesNotExist();
+    }
+
+    @Test void theOwnerRecordsItsProcessIdBesideTheTokenUntilItCloses() throws Exception {
+        assertThat(HandoffSocket.ownerPid(token())).as("nothing bound yet").isEqualTo(-1);
+        try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
+            assertThat(HandoffSocket.ownerPid(token())).isEqualTo(ProcessHandle.current().pid());
+            // The token file itself is unchanged: a launcher from another build still reads it whole.
+            assertThat(Files.readString(token()).strip()).doesNotContain("\n").hasSizeGreaterThan(20);
+            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 7L)).isTrue();
+        }
+        assertThat(HandoffSocket.ownerPid(token())).as("released with the endpoint").isEqualTo(-1);
+        assertThat(dir.resolve("token.pid")).doesNotExist();
+        Files.writeString(dir.resolve("token.pid"), "not a number\n");
+        assertThat(HandoffSocket.ownerPid(token())).isEqualTo(-1);
     }
 
     @Test void aWrongTokenIsRefusedWithoutReachingTheHandler() throws Exception {
@@ -78,12 +92,12 @@ class HandoffSocketTest {
         assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
     }
 
-    @Test void anUnresolvableCodeSourceHandsOffInsteadOfCrashingTheLauncher() throws Exception {
+    @Test void anUnknownCodeLocationHandsOffInsteadOfCrashingTheLauncher() throws Exception {
         List<LaunchRequest> seen = new CopyOnWriteArrayList<>();
         try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
             assertThat(HandoffSocket.handOff(socket(), token(), null, 0L)).isTrue();
             assertThat(seen).singleElement()
-                .extracting(LaunchRequest::codeSource).isEqualTo(Path.of(""));
+                .extracting(LaunchRequest::codeLocation).isEqualTo(Path.of(""));
         }
     }
 
@@ -182,8 +196,8 @@ class HandoffSocketTest {
             request -> LaunchRequest.Response.OK)).isNull();
     }
 
-    @Test void theCodeSourceOfThisBuildIsResolvableAndItsTimestampIsReadable() {
-        Path source = HandoffSocket.codeSource();
+    @Test void theCodeLocationOfThisBuildIsResolvableAndItsTimestampIsReadable() {
+        Path source = HandoffSocket.codeLocation();
         assertThat(source).as("tests run from a jar or a classes directory").isNotNull();
         assertThat(source.isAbsolute()).isTrue();
         assertThat(HandoffSocket.lastModified(source)).isPositive();

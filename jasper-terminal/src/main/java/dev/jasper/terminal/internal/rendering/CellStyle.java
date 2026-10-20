@@ -15,7 +15,9 @@ import java.awt.Color;
 public record CellStyle(Color foreground, Color background, boolean bold, boolean italic, boolean underline) {
 
     public static CellStyle resolve(CellAttributes style, Palette palette) {
-        Color fg = resolve(style.foreground(), palette.foreground(), palette);
+        // Bold text in the default color takes the palette's bold color (xterm's colorBD), before inverse and dim apply.
+        Color fallback = style.has(CellAttributes.BOLD) ? palette.boldForeground() : palette.foreground();
+        Color fg = resolve(style.foreground(), fallback, palette);
         Color bg = resolve(style.background(), palette.background(), palette);
         if (style.has(CellAttributes.INVERSE)) {
             Color swap = fg;

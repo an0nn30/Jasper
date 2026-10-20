@@ -1,185 +1,243 @@
 package dev.jasper.app.pluginmanager;
 
-import com.formdev.flatlaf.FlatClientProperties;
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.plugins.PluginRuntime;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.MenuItem;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.Option;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.FlowLayout;
-import java.awt.Font;
+import java.awt.Dimension;
+import java.awt.Graphics;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Consumer;
 import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
+import javax.swing.Icon;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JMenuItem;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
-import javax.swing.JTextArea;
-import javax.swing.UIManager;
+import javax.swing.JTextPane;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.SimpleAttributeSet;
 
-/** The selected plugin: header, primary action and ▾ menu, then Overview and Details tabs. A passive view; EDT only. */
-final class PluginDetails extends JPanel {
-    final JButton primary = new JButton();
-    final JButton more = new JButton("▾");
-    final JButton homepage = new JButton("Plugin homepage ↗");
-    final JTabbedPane tabs = new JTabbedPane();
-    private final JLabel icon = new JLabel();
-    private final JLabel name = PluginManagerPanel.plain(new JLabel(" "));
-    private final JLabel vendor = PluginManagerPanel.plain(new JLabel());
-    private final JLabel version = PluginManagerPanel.plain(new JLabel());
-    private final JTextArea overview = area();
-    private final JTextArea details = area();
-    private final JPanel header = new JPanel(new BorderLayout(14, 0));
-    private final PluginManagerPanel.Handlers handlers;
+/**
+ * The selected plugin: its icon, name, vendor and homepage, the primary action, More actions and the version, then an
+ * Overview | Details choice over one read-only text area. A passive view built from kit views; EDT only.
+ */
+final class PluginDetails {
+    static final String PRIMARY = "primary", MORE = "more", HOMEPAGE = "homepage", SECTION = "section";
+    static final String OVERVIEW = "overview", DETAILS = "details";
+    private static final String ICON = "plugin.icon", TEXT = "plugin.text";
+    private final KitContext kit;
+    private final JPanel component = new JPanel(new BorderLayout());
+    private final KitView header, body;
+    private final dev.jasper.ui.icons.ReceivingArtwork artwork;
+    private String artName="plugin";
+    private final JTextPane text = new JTextPane();
+    private final AutoCloseable theme;
+    private final AutoCloseable typography;
     private PluginRuntime.Row row;
+    private boolean busy;
+    private String section = OVERVIEW;
+    private final PluginShape shape;
 
-    PluginDetails(PluginManagerPanel.Handlers handlers) {
-        super(new BorderLayout(0, 12));
-        this.handlers = handlers;
-        setBorder(BorderFactory.createEmptyBorder(4, 16, 4, 4));
-        homepage.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_BORDERLESS);
-        more.setToolTipText("More actions");
-        more.getAccessibleContext().setAccessibleName("More actions");
-        homepage.setMargin(new java.awt.Insets(0, 0, 0, 0));
-        homepage.setHorizontalAlignment(javax.swing.SwingConstants.LEADING);
-        var actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
-        actions.setOpaque(false);
-        actions.add(primary);
-        actions.add(more);
-        actions.add(Box.createHorizontalStrut(12));
-        actions.add(version);
-        var text = new JPanel();
-        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
-        text.setOpaque(false);
-        // The homepage has a line of its own: beside a long vendor name it would wrap out of sight.
-        for (JComponent part : List.of(name, vendor, homepage, actions)) {
-            part.setAlignmentX(0f);
-            text.add(part);
-            text.add(Box.createVerticalStrut(6));
-        }
-        header.setOpaque(false);
-        header.add(icon, BorderLayout.WEST);
-        header.add(text, BorderLayout.CENTER);
-        add(header, BorderLayout.NORTH);
-        tabs.addTab("Overview", scroll(overview));
-        tabs.addTab("Details", scroll(details));
-        add(tabs, BorderLayout.CENTER);
-        primary.addActionListener(event -> {
-            if (row != null) (row.needsConsent() ? handlers.review() : handlers.toggle()).accept(row);
+    PluginDetails(KitContext kit, Consumer<UiEvent> events) { this(kit, events, PluginShape.ROWS); }
+
+    PluginDetails(KitContext kit, Consumer<UiEvent> events, PluginShape shape) {
+        this.shape = shape;
+        this.kit = kit;
+        artwork=new dev.jasper.ui.icons.ReceivingArtwork(kit.icons());
+        header = new KitView(kit, headerSpec(), event -> {
+            if (event instanceof UiEvent.Selected chosen && chosen.id().equals(SECTION)) {
+                chosen.ids().stream().findFirst().ifPresent(this::section);
+                return;
+            }
+            events.accept(event);
         });
-        more.addActionListener(event -> { if (row != null) menu().show(more, 0, more.getHeight()); });
-        homepage.addActionListener(event -> { if (row != null) homepage(row).ifPresent(handlers.browse()); });
-        restyle();
-        show(null, false);
-    }
-
-    @Override public void updateUI() {
-        super.updateUI();
-        // Called by JPanel's constructor, before the labels exist.
-        if (version != null) restyle();
-    }
-
-    private void restyle() {
-        Font base = UIManager.getFont("Label.font");
-        if (base != null) name.setFont(base.deriveFont(Font.BOLD, base.getSize2D() + 5f));
-        Color secondary = UIManager.getColor("Label.disabledForeground");
-        vendor.setForeground(secondary);
-        version.setForeground(secondary);
-        Color link = UIManager.getColor("Component.linkColor");
-        if (link != null) homepage.setForeground(link);
-    }
-
-    private static JTextArea area() {
-        var area = new JTextArea();
-        area.setEditable(false);
-        area.setLineWrap(true);
-        area.setWrapStyleWord(true);
-        area.setOpaque(false);
-        area.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
-        return area;
-    }
-
-    private static JScrollPane scroll(JTextArea area) {
-        var scroll = new JScrollPane(area, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        body = new KitView(kit, new ViewSpec(new Nodes.Custom("plugin-text", ControlState.READY, TEXT, Nodes.CustomKind.EDITOR, "Overview")), events);
+        // Plain text in a styled pane, so its paragraphs can take the reading line spacing; it wraps at words, and
+        // an unbroken absolute path wraps at the edge instead of widening the text past the viewport.
+        text.setEditorKit(new WrappingKit());
+        text.setEditable(false);
+        text.setOpaque(false);
+        // Specialized read-only text: selectable and scrollable like the former tabs, painted from module roles.
+        var scroll = new JScrollPane(text, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.setOpaque(false);
         scroll.getViewport().setOpaque(false);
-        return scroll;
+        body.registerContent(TEXT, scroll, () -> { });
+        component.setOpaque(false);
+        component.add(header, BorderLayout.NORTH);
+        component.add(body, BorderLayout.CENTER);
+        theme = kit.binding().subscribe(pair -> restyle());
+        restyle();
+        show(null, false);
+        typography=dev.jasper.ui.swing.NativeStyles.installed().observeTypography(this::restyle);
+    }
+
+    JComponent component() { return component; }
+
+    /** Geometry and colours from the module: the former gaps and paddings as named metrics. */
+    private void restyle() {
+        // The manager page leaves vertical padding to its lanes, so the details add the page's own above and below.
+        int edge = metric(DesignMetrics.Role.PLUGIN_DETAILS_EDGE_PADDING)+metric(DesignMetrics.Role.PLUGIN_MANAGER_PADDING);
+        int leading=metric(DesignMetrics.Role.PLUGIN_DETAILS_LEADING_PADDING);
+        component.setBorder(BorderFactory.createEmptyBorder(edge, leading, edge, metric(DesignMetrics.Role.PLUGIN_DETAILS_TRAILING_PADDING)));
+        // The source-sized identity section is also the readable minimum for this split receiver.
+        // FillingPage lets Settings' existing horizontal viewport reveal it at constrained widths.
+        component.setMinimumSize(new Dimension(leading+metric(DesignMetrics.Role.IDENTITY_SECTION_WIDTH)+metric(DesignMetrics.Role.PLUGIN_DETAILS_TRAILING_PADDING),0));
+        ((BorderLayout) component.getLayout()).setVgap(metric(DesignMetrics.Role.PLUGIN_DETAILS_GAP));
+        int vertical = metric(DesignMetrics.Role.PLUGIN_TEXT_VERTICAL_PADDING), side = metric(DesignMetrics.Role.PLUGIN_TEXT_SIDE_PADDING);
+        text.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+        text.setFont(dev.jasper.ui.swing.NativeStyles.installed().font(kit,Typography.Role.BODY));
+        spacing();
+        var palette = kit.theme().semantic();
+        text.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
+        text.setCaretColor(text.getForeground());
+        text.setSelectionColor(palette.color(SemanticColor.SELECTION_BG));
+        text.setSelectedTextColor(palette.color(SemanticColor.TEXT_PRIMARY));
+        component.revalidate();
+        component.repaint();
+    }
+
+    private int metric(DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }
+
+    /** Text runs report no minimum width, so the flow breaks a word longer than the line instead of overflowing. */
+    private static final class WrappingKit extends javax.swing.text.StyledEditorKit {
+        @Override public javax.swing.text.ViewFactory getViewFactory() {
+            var base = super.getViewFactory();
+            return element -> javax.swing.text.AbstractDocument.ContentElementName.equals(element.getName())
+                ? new javax.swing.text.LabelView(element) {
+                    @Override public float getMinimumSpan(int axis) { return axis == javax.swing.text.View.X_AXIS ? 0 : super.getMinimumSpan(axis); }
+                }
+                : base.create(element);
+        }
+    }
+
+    /** Extra room below each line, as a share of the line, so the overview reads as a paragraph. */
+    private void spacing() {
+        var attributes = new SimpleAttributeSet();
+        StyleConstants.setLineSpacing(attributes, kit.metrics().value(DesignMetrics.Role.PLUGIN_TEXT_LINE_SPACING) / 100f);
+        // Paragraph attributes (not the shared default style) reach the views, which read them when they change.
+        text.getStyledDocument().setParagraphAttributes(0, text.getDocument().getLength(), attributes, false);
     }
 
     /** Shows {@code shown}, or nothing when it is null; {@code busy} disables the actions. */
     void show(PluginRuntime.Row shown, boolean busy) {
-        row = shown;
-        header.setVisible(row != null);
-        tabs.setVisible(row != null);
-        if (row == null) {
-            overview.setText("");
-            details.setText("");
-            return;
-        }
-        icon.setIcon(PluginIcons.of(row, 64, PluginCard.greyed(row)));
-        name.setText(row.name());
-        vendor.setText(row.vendor().isBlank() ? row.origin() : row.vendor());
-        homepage.setVisible(homepage(row).isPresent());
-        version.setText(row.version());
-        primary.setVisible(PluginCard.toggleable(row));
-        primary.setText(row.needsConsent() ? "Review…" : row.enabled() ? "Disable" : "Enable");
-        primary.setEnabled(!busy);
-        more.setEnabled(!busy);
-        overview.setText(row.description().isBlank() ? "No description." : row.description());
-        overview.setCaretPosition(0);
-        details.setText(describe(row));
-        details.setCaretPosition(0);
+        this.row = shown;
+        this.busy = busy;
+        component.setVisible(shown != null);
+        renderHeader();
+        fill();
     }
 
-    /** Everything the pane shows as text, for tests and search. */
+    private void renderHeader() {
+        if(header.isClosed())return;
+        artwork.reconcile(()->{
+            artName=row==null?"plugin":PluginIcons.name(artwork,row);
+            header.update(headerSpec());
+            if(!shape.checkboxRows())header.setArtworkPresentation("icon",dev.jasper.ui.swing.ArtworkPresentation.IDENTITY_HEADER);
+        });
+    }
+
+    /** Overview or Details: the chosen text replaces the other in the one text area. */
+    void section(String value) {
+        if (!value.equals(OVERVIEW) && !value.equals(DETAILS) || value.equals(section)) return;
+        section = value;
+        renderHeader();
+        fill();
+    }
+
+    String section() { return section; }
+
+    private void fill() {
+        String next = row == null ? "" : section.equals(OVERVIEW) ? overview(row) : describe(row);
+        if (!next.equals(text.getText())) {
+            text.setText(next);
+            spacing();
+            text.setCaretPosition(0);
+        }
+        text.getAccessibleContext().setAccessibleName(section.equals(OVERVIEW) ? "Overview" : "Details");
+    }
+
+    private static String overview(PluginRuntime.Row row) { return row.description().isBlank() ? "No description." : row.description(); }
+
+    private ViewSpec headerSpec() {
+        var shown = row;
+        boolean present = shown != null;
+        var hidden = new ControlState(false, true, false, "");
+        var actionsState = new ControlState(true, !busy, false, "");
+        List<MenuItem> items = present ? PluginCard.menu(shown, busy) : List.of(new MenuItem("none", "None", "", "none", false, false));
+        var primary = new Nodes.Button(PRIMARY, present && PluginCard.toggleable(shown) ? actionsState : hidden,
+            present && shown.needsConsent() ? "Review…" : present && shown.enabled() ? "Disable" : "Enable", "", Nodes.ButtonKind.SECONDARY, PRIMARY, "");
+        var more = shape.ellipsisActions() ? new Nodes.MenuButton(MORE, present ? actionsState : hidden, "", "more", Nodes.ButtonKind.GHOST, "", items, "Plugin actions")
+            : new Nodes.MenuButton(MORE, present ? actionsState : hidden, "", "chevron.down", Nodes.ButtonKind.SECONDARY, "", items, "More actions");
+        String status=!present?"":!PluginCard.badge(shown).isEmpty()?PluginCard.badge(shown):shown.state().equals("ACTIVE") && shown.enabled()?"Enabled":stateLabel(shown.state());
+        var metadata=new Nodes.Stack("metadata",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(
+            new Nodes.Text("vendor",ControlState.READY,present?(shown.vendor().isBlank()?shown.origin():shown.vendor()):" ",Nodes.TextRole.CAPTION),
+            new Nodes.Text("version",ControlState.READY,present?"·  Version "+shown.version()+"  ·":" ",Nodes.TextRole.CAPTION),
+            // The state's dot stays close to its label.
+            new Nodes.Stack("state-line",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(
+                new Nodes.StatusDot("state-dot",new ControlState(present,true,false,""),present && shown.enabled() && shown.state().equals("ACTIVE") ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.WARNING),
+                new Nodes.Text("state",ControlState.READY,status,Nodes.TextRole.CAPTION)))));
+        var name = new Nodes.Text("name", ControlState.READY, present ? shown.name() : " ", Nodes.TextRole.DETAIL_TITLE);
+        var homepage = new Nodes.Button(HOMEPAGE, present && homepage(shown).isPresent() ? ControlState.READY : hidden, "Plugin homepage ↗", "", Nodes.ButtonKind.LINK, HOMEPAGE, "");
+        var choice = new Nodes.Choice(SECTION, ControlState.READY, Nodes.ChoiceKind.TABS,
+            List.of(new Option(OVERVIEW, "Overview", Optional.empty()), new Option(DETAILS, "Details", Optional.empty())), section,
+            "Plugin information", "");
+        var identity = new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(name, metadata));
+        if (shape.checkboxRows()) {
+            // Spec 12.2 and mock 08: no identity icon, the plugin's ⋯ beside Disable, and the tabs without the section card.
+            var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.NAVIGATION,
+                shape.ellipsisActions() ? List.of(identity, more, primary) : List.of(identity, primary));
+            var ancillary = new Nodes.Stack("ancillary", new ControlState(section.equals(DETAILS), true, false, ""), Nodes.LayoutRole.NAVIGATION,
+                shape.ellipsisActions() ? List.of(homepage) : List.of(homepage, more));
+            var tabs = new Nodes.Stack("section-lane", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(choice));
+            return new ViewSpec(new Nodes.Stack("details-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(head, tabs, ancillary)));
+        }
+        var sections = new Nodes.Stack("section-lane",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(new Nodes.Card("section-card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(choice))));
+        var icon = new Nodes.Icon("icon",new ControlState(true,!present || !PluginCard.greyed(shown),false,""),artName,Nodes.Hue.NEUTRAL,Nodes.IconSize.PROMPT,present?shown.name():"Plugin");
+        var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(icon, identity, primary));
+        var ancillary=new Nodes.Stack("ancillary",new ControlState(section.equals(DETAILS),true,false,""),Nodes.LayoutRole.NAVIGATION,List.of(homepage,more));
+        return new ViewSpec(new Nodes.Stack("details-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(head, sections, ancillary)));
+    }
+
+    /** Everything the pane shows as text, for tests and search: the header, the overview and the details. */
     String text() {
         if (row == null) return "";
-        return name.getText() + " " + version.getText() + "\n" + vendor.getText() + "\n\n" + overview.getText() + "\n\n" + details.getText();
+        String vendor = row.vendor().isBlank() ? row.origin() : row.vendor();
+        return row.name() + " " + row.version() + "\n" + vendor + "\n\n" + overview(row) + "\n\n" + describe(row);
     }
 
-    /** The selected plugin's other actions: the three openers, then Remove…, Keep or Discard Install when it has one. */
-    JPopupMenu menu() {
-        var menu = new JPopupMenu();
-        if (row == null) return menu;
-        PluginRuntime.Row shown = row;
-        item(menu, "Open Settings", () -> handlers.openSettings().accept(shown));
-        item(menu, "Open Plugin Folder", () -> handlers.openFolder().accept(shown));
-        item(menu, "Open Data Folder", () -> handlers.openData().accept(shown));
-        String removal = removal(shown);
-        if (!removal.isEmpty()) {
-            menu.addSeparator();
-            item(menu, removal, () -> (shown.pendingInstall() ? handlers.discard() : handlers.remove()).accept(shown));
-        }
-        return menu;
-    }
+    /** The text the one text area shows now. */
+    String shownText() { return text.getText(); }
 
-    private static void item(JPopupMenu menu, String label, Runnable action) {
-        var item = new JMenuItem(label);
-        item.addActionListener(event -> action.run());
-        menu.add(item);
-    }
+    JTextPane textArea() { return text; }
 
+    KitView header() { return header; }
+
+    /** The More actions menu as labels, a separator as "-". */
     List<String> menuLabels() {
-        List<String> labels = new ArrayList<>();
-        for (Component component : menu().getComponents())
-            labels.add(component instanceof JMenuItem item ? item.getText() : "-");
-        return labels;
+        if (row == null) return List.of();
+        return PluginCard.menu(row, busy).stream().map(item -> item.separator() ? "-" : item.label()).toList();
     }
 
-    void clickMenu(String label) {
-        for (Component component : menu().getComponents())
-            if (component instanceof JMenuItem item && item.getText().equals(label)) { item.doClick(); return; }
-        throw new IllegalArgumentException("No menu item " + label);
+    boolean homepageShown() { return row != null && homepage(row).isPresent(); }
+
+    void close() {
+        try { typography.close(); } catch (Exception ignored) { /* idempotent module subscription */ }
+        try { theme.close(); } catch (Exception ignored) { /* the binding outlives nothing that needs this */ }
+        try { header.close(); } finally { try {body.close();} finally {artwork.close();} }
     }
 
     static String removal(PluginRuntime.Row row) {

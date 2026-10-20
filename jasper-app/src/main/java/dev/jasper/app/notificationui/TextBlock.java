@@ -1,8 +1,9 @@
 package dev.jasper.app.notificationui;
 
-import java.awt.Color;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -13,26 +14,34 @@ import java.util.function.ToIntFunction;
 import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
 import javax.swing.JComponent;
-import javax.swing.UIManager;
-import javax.swing.plaf.basic.BasicGraphicsUtils;
 
 /**
- * Plain text word-wrapped to a fixed width and, with a line limit, cut with an ellipsis. Painted with
+ * Plain text word-wrapped to a fixed width and, with a line limit, cut with an ellipsis: the notification card's clamp
+ * primitive (ruling G6), in a module typography role and semantic colour from the chrome KitContext. Painted with
  * {@code drawString}, so markup is never interpreted. EDT only.
  */
 final class TextBlock extends JComponent {
     static final String ELLIPSIS = "…";
-    private final String colorKey;
-    private final boolean bold;
+    private final KitContext kit;
+    private Typography.Role role;
+    private final SemanticColor color;
     private final int maxLines;
+    private final SemanticColor surface;
     private String text = "";
     private int wrapWidth = 1;
     private List<String> lines = List.of();
 
     /** {@code maxLines} 0 means no limit. */
-    TextBlock(String colorKey, boolean bold, int maxLines) {
-        this.colorKey = colorKey;
-        this.bold = bold;
+    TextBlock(KitContext kit, Typography.Role role, SemanticColor color, int maxLines) {
+        this(kit, role, color, maxLines, null);
+    }
+
+    /** Optional consuming surface applies the central text floor without changing the shared color role. */
+    TextBlock(KitContext kit, Typography.Role role, SemanticColor color, int maxLines, SemanticColor surface) {
+        this.kit = kit;
+        this.surface = surface;
+        this.role = role;
+        this.color = color;
         this.maxLines = maxLines;
         setOpaque(false);
         setFocusable(false);
@@ -59,20 +68,34 @@ final class TextBlock extends JComponent {
 
     int lastLineWidth() { return lines.isEmpty() ? 0 : measure(lines.getLast()); }
 
+    /** The whole text's width on one line. */
+    int textWidth() { return getFont() == null ? 0 : measure(text); }
+
     @Override public void updateUI() {
         super.updateUI();
-        if (colorKey != null) restyle();
+        // JComponent's constructor calls this before the fields exist; the constructor styles the text itself.
+        if (kit != null) restyle();
     }
 
-    private void restyle() {
-        Font base = UIManager.getFont("Label.font");
-        if (base != null) setFont(bold ? base.deriveFont(Font.BOLD) : base);
-        setForeground(NotificationStyle.color(colorKey, Color.BLACK));
+    /** Reads the role's font and colour again: the card calls this when the theme changes. */
+    void restyle() {
+        setFont(NotificationStyle.font(kit, role));
+        setForeground(surface == null ? NotificationStyle.color(kit, color)
+            : dev.jasper.ui.theme.SurfaceContrast.on(kit.theme().semantic(), color, surface, dev.jasper.ui.theme.SurfaceContrast.TEXT));
         relayout();
     }
 
+    Typography.Role role() { return role; }
+
+    /** Takes another role (a history title turns plain once read) and restyles. */
+    void setRole(Typography.Role value) {
+        if (value == role) return;
+        role = value;
+        restyle();
+    }
+
     private int measure(String value) {
-        return (int) Math.ceil(BasicGraphicsUtils.getStringWidth(this, getFontMetrics(getFont()), value));
+        return dev.jasper.ui.swing.ChromePainter.installed().measureText(getFont(), value);
     }
 
     private void relayout() {
@@ -87,12 +110,13 @@ final class TextBlock extends JComponent {
     @Override protected void paintComponent(Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {
+            dev.jasper.ui.swing.ChromePainter.installed().prepareText(g);
             g.setFont(getFont());
             g.setColor(getForeground());
             FontMetrics metrics = g.getFontMetrics();
             int y = metrics.getAscent();
             for (String line : lines) {
-                BasicGraphicsUtils.drawString(this, g, line, 0, y);
+                g.drawString(line, 0, y);
                 y += metrics.getHeight();
             }
         } finally { g.dispose(); }

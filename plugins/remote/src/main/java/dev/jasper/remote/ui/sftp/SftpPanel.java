@@ -1,350 +1,510 @@
 package dev.jasper.remote.ui.sftp;
 
+import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.sftp.FileEntry;
-import dev.jasper.remote.ui.PanelStyle;
-import dev.jasper.sdk.ui.WorkspacePalette;
-import dev.jasper.sdk.ui.IconName;
+import dev.jasper.remote.ui.transfers.TransferStrip;
+import dev.jasper.remote.workstation.Layout;
+import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Crumb;
+import dev.jasper.sdk.ui.MenuItem;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.Option;
 import dev.jasper.sdk.ui.PanelHeader;
-import java.awt.*;
-import java.awt.event.*;
-import java.time.*;
+import dev.jasper.sdk.ui.TableRow;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.function.*;
-import javax.swing.*;
-import javax.swing.table.*;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
+import java.util.function.Consumer;
 
-/** Compact file explorer. Controls use host artwork; directory rows use the reference's blue folder glyph. */
-public class SftpPanel extends JPanel {
+/**
+ * The compact SFTP file explorer on host-rendered kit descriptors (Plan 2 Task 8c). In the sidebar it owns one kit
+ * Panel: a row of icon buttons (Back, Forward, Refresh and Upload, whose menu holds the folder's other actions) over the
+ * path as breadcrumbs, the folder's entries as a two-column table (folders first, a folder, file or link glyph, the
+ * modified time in the row tooltip), and a footer with paging, the status line, the last operation's result, the Follow
+ * terminal folder switch and the window's transfers. While nothing is connected the body is a "Not Connected" empty
+ * state whose Choose Session menu lists the saved hosts; choosing one browses it. In a Copy to host dialog the same browser is embedded in another owner's form
+ * ({@link #destination}): folders only, single selection, no menus, no follow switch, a New folder button.
+ *
+ * <p>Under the Enterprise look ({@link Layout#CLASSIC}, Enterprise presentation spec 14.4) the sidebar reads back, forward
+ * and refresh, a separator, Hidden files, a separator and Upload over the breadcrumbs, and the table gains a Modified
+ * column; while nothing is connected a Choose Session… dropdown and the root as disabled breadcrumbs sit above the kept
+ * headers and a "Not Connected" empty state, and the window's transfers live in the Transfers panel instead of the footer.
+ *
+ * <p>Rows are keyed by entry name. A new listing or page selects its first row. Enter or a double click on one entry
+ * opens a folder (or a link, without the Editor) or hands a file or link to the Editor. Each row's own context menu acts
+ * on the selection when the row is selected and on that row alone otherwise; outside every row (an empty folder too) a
+ * context press opens the folder's menu on the selection. A context press never selects. Clicking a
+ * crumb opens that folder; clicking beside the crumbs edits the path (Enter goes, Escape or leaving cancels). UI thread
+ * only; after {@link #close()} nothing touches the view.
+ */
+public final class SftpPanel implements AutoCloseable {
     public record Actions(Consumer<String> navigate,Runnable up,Runnable refresh,Consumer<Boolean> follow,
                           Runnable upload,Runnable uploadFolder,Runnable download,Runnable newFolder,
-                          Runnable delete,Runnable copyPath,Runnable copyToHost,Runnable cancel,Consumer<Long> page) {}
+                          Runnable delete,Runnable copyPath,Runnable copyToHost,Runnable cancel,Consumer<Long> page,
+                          Consumer<Boolean> hidden) {}
     /** What double-click, Enter and Open in Editor do with files and links; set only when the Editor is installed. */
     public record Editing(Consumer<FileEntry> activate,Runnable open) {}
-    private final Function<IconName,Icon> icons;
-    private final Icon directoryIcon,documentIcon;
-    private final JLabel host=label("Select an SSH host to browse files"),message=label(""),pageLabel=label(""),operationResult=label("");
-    private final JTextField path=new PathField();
-    private final JCheckBox follow=new JCheckBox("",true);
-    private final JLabel followLabel=label("Follow terminal folder");
-    private final JButton chooseSession=new JButton("Choose Session");
-    private final CardLayout cards=new CardLayout();
-    private final JPanel content=new JPanel(cards),browser=new JPanel(new BorderLayout());
-    private final JPanel paging=new JPanel(new BorderLayout(4,0)),status=new JPanel(new BorderLayout(4,0));
-    private final JPanel followFooter=new JPanel(new BorderLayout());
-    private boolean destination;
-    private Runnable choose=()->{};
-    private final Rows model=new Rows();
-    private final FileTable table=new FileTable();
-    private final JButton previous, next, cancel;
-    private Runnable back=()->{},forward=()->{};
-    private boolean canBack,canForward,working,browsingEnabled=true;
-    private Consumer<PanelHeader> headerChanged=header->{};
-    private final Map<String,AbstractButton> buttons=new LinkedHashMap<>();
-    private final JPopupMenu popup=new JPopupMenu();
-    private final JToolBar toolbar=new dev.jasper.remote.ui.FlatToolBar();
-    private final JMenuItem openInEditor;
-    private final JPopupMenu.Separator editingSeparator=new JPopupMenu.Separator();
-    private Editing editing;
-    private List<FileEntry> entries=List.of();
+
+    public static final String ROOT="sftp", HEADER="sftp.header", NAVIGATION="sftp.navigation", TOOLS="sftp.tools", BACK="sftp.back",
+        FORWARD="sftp.forward", REFRESH="sftp.refresh", HIDDEN="sftp.hidden", UPLOAD="sftp.upload", NEW_FOLDER="sftp.new-folder", PATH="sftp.path",
+        FILES="sftp.files", EMPTY="sftp.empty", CHOOSE="sftp.choose", FOOTER="sftp.footer", PAGING="sftp.paging", PAGE="sftp.page",
+        PREVIOUS="sftp.previous", NEXT="sftp.next", STATUS="sftp.status", MESSAGE="sftp.message", CANCEL="sftp.cancel",
+        RESULT="sftp.result", FOLLOW="sftp.follow", FOLLOW_ROW="sftp.follow-row", BROWSER="sftp.browser";
+    /** The table's activate action (Enter, double click), the path's actions and the menu action prefixes. */
+    static final String OPEN="open", PATH_EDIT="path.edit", PATH_GO="path.go", PATH_DONE="path.done", MENU="menu:", ROW_MENU="row:", ROW="entry:", SESSION="session:";
+    static final String NO_HOST="Select an SSH host to browse files", FOLLOW_TEXT="Follow terminal folder",
+        FOLLOW_DESCRIPTION="Keep the SFTP browser in the active SSH terminal's folder";
+    private static final int PAGE_SIZE=200;
+
+    private final UiView view;
+    private final Runnable changed;
+    private final Consumer<String> focuser;
+    private final boolean destination;
+    /** Which composition the sidebar takes, fixed at construction (spec 3.6); an embedded browser keeps the rows. */
+    private final Layout layout;
     private Actions actions;
+    private Editing editing;
+    private Runnable back=()->{},forward=()->{},onLoaded=()->{};
+    private Consumer<RemoteHost> choose=host->{};
+    private List<RemoteHost> sessions=List.of();
+    private Consumer<PanelHeader> headerChanged=header->{};
+    private TransferStrip transfers;
+    private boolean canBack,canForward,working,browsingEnabled=true,loaded,following=true,showHidden,editingPath,closed;
+    private String host=NO_HOST,directory="",message="",result="",pathValue="";
+    private List<FileEntry> entries=List.of();
+    private Set<String> selected=Set.of();
+    /** While a row's own menu item runs on that row alone: what {@link #selection()} reports. */
+    private List<FileEntry> acting;
     private long offset,total;
-    private boolean loaded;
-    private Runnable onLoaded=()->{};
-    public void onLoaded(Runnable listener) { onLoaded=listener; }
-    private final JPanel transfersSlot=new JPanel(new BorderLayout());
-    /** The window's transfer strip, shown at the bottom of the sidebar. */
-    public void transfers(JComponent strip) { transfersSlot.removeAll();transfersSlot.add(strip,BorderLayout.CENTER);transfersSlot.revalidate(); }
-    private final TableColumn sizeColumn;
-    public SftpPanel(Function<IconName,Icon> icons) {
-        super(new BorderLayout());this.icons=icons;directoryIcon=new FolderIcon(icons.apply(IconName.FOLDER));documentIcon=new DocumentIcon(icons.apply(IconName.FILE));previous=new JButton(icons.apply(IconName.PREVIOUS));next=new JButton(icons.apply(IconName.NEXT));
-        browser.setBorder(BorderFactory.createEmptyBorder());
-        chooseSession.setIcon(icons.apply(IconName.DROPDOWN));chooseSession.setHorizontalTextPosition(SwingConstants.LEFT);
-        chooseSession.getAccessibleContext().setAccessibleName("Choose Session");chooseSession.addActionListener(event->choose.run());
-        content.add(PanelStyle.emptyState(icons.apply(IconName.FOLDER),"Not Connected","Connect to an SSH session to browse its files.",chooseSession),"disconnected");
-        content.add(browser,"connected");add(content,BorderLayout.CENTER);
-        var north=new JPanel(new BorderLayout(4,0));
-        north.setBorder(new javax.swing.border.AbstractBorder() {
-            @Override public Insets getBorderInsets(Component component,Insets insets) { insets.set(PanelStyle.scale(component,8),PanelStyle.scale(component,10),PanelStyle.scale(component,9),PanelStyle.scale(component,10));return insets; }
-            @Override public void paintBorder(Component component,Graphics graphics,int x,int y,int width,int height) { graphics.setColor(WorkspacePalette.current(component).border());graphics.fillRect(x,y+height-1,width,1); }
-        });
-        addButton(toolbar,"Back",IconName.PREVIOUS,()->back.run());
-        addButton(toolbar,"Forward",IconName.NEXT,()->forward.run());
-        toolbar.setBorder(new javax.swing.border.AbstractBorder() {
-            @Override public Insets getBorderInsets(Component component,Insets insets) { insets.set(1,1,1,1);return insets; }
-            @Override public void paintBorder(Component component,Graphics graphics,int x,int y,int width,int height) {
-                var g=(Graphics2D)graphics.create();
-                try {
-                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
-                    g.setColor(WorkspacePalette.current(component).border());int arc=PanelStyle.scale(component,8);
-                    g.drawRoundRect(x,y,width-1,height-1,arc,arc);g.drawLine(x+width/2,y+1,x+width/2,y+height-2);
-                } finally { g.dispose(); }
-            }
-        });toolbar.setBorderPainted(true);
-        north.add(toolbar,BorderLayout.WEST);
-        path.getAccessibleContext().setAccessibleName("Remote directory");path.putClientProperty("JTextField.minimumWidth",0);
-        north.add(path,BorderLayout.CENTER);
-        var fileActions=new dev.jasper.remote.ui.FlatToolBar();
-        addButton(fileActions,"Refresh",IconName.REFRESH,()->actions.refresh().run());
-        buttons.get("Refresh").setIcon(new RefreshIcon(icons.apply(IconName.REFRESH)));
-        addButton(fileActions,"Upload files",IconName.UPLOAD,()->actions.upload().run());
-        north.add(fileActions,BorderLayout.EAST);browser.add(north,BorderLayout.NORTH);
-        table.setModel(model);table.setAutoCreateRowSorter(false);table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);table.setFillsViewportHeight(true);table.setDefaultRenderer(Object.class,new Renderer());table.getTableHeader().setReorderingAllowed(false);
-        table.setShowGrid(false);table.setIntercellSpacing(new Dimension(0,0));
-        table.getColumnModel().getColumn(0).setPreferredWidth(240);
-        sizeColumn=table.getColumnModel().getColumn(1);sizeColumn.setPreferredWidth(68);sizeColumn.setMinWidth(58);sizeColumn.setMaxWidth(90);
-        table.getTableHeader().setDefaultRenderer(new HeaderRenderer());
-        var scroll=new JScrollPane(table);scroll.setBorder(BorderFactory.createEmptyBorder());scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);browser.add(scroll,BorderLayout.CENTER);
-        var south=new JPanel();south.setLayout(new BoxLayout(south,BoxLayout.Y_AXIS));
-        var controls=new dev.jasper.remote.ui.FlatToolBar();for(var chevron:List.of(previous,next)) { String name=chevron==previous?"Previous page":"Next page";chevron.setToolTipText(name);chevron.getAccessibleContext().setAccessibleName(name);controls.add(chevron); }paging.add(pageLabel,BorderLayout.CENTER);paging.add(controls,BorderLayout.EAST);paging.setBorder(BorderFactory.createEmptyBorder(0,8,0,8));paging.setVisible(false);south.add(paging);
-        status.setBorder(BorderFactory.createEmptyBorder(4,16,4,16));status.setVisible(false);cancel=new JButton("Cancel",icons.apply(IconName.CLOSE));cancel.setVisible(false);status.add(message,BorderLayout.CENTER);status.add(cancel,BorderLayout.EAST);south.add(status);operationResult.setVisible(false);operationResult.setBorder(BorderFactory.createEmptyBorder(4,16,4,16));south.add(operationResult);
-        configureFollow();south.add(followFooter);south.add(transfersSlot);for(var row:south.getComponents()) ((JComponent)row).setAlignmentX(LEFT_ALIGNMENT);add(south,BorderLayout.SOUTH);
-        path.addActionListener(event->{if(actions!=null) actions.navigate().accept(path.getText());});follow.addActionListener(event->{if(actions!=null) actions.follow().accept(follow.isSelected());});
-        previous.addActionListener(event->{if(actions!=null) actions.page().accept(Math.max(0,offset-200));});next.addActionListener(event->{if(actions!=null) actions.page().accept(offset+200);});cancel.addActionListener(event->{if(actions!=null) actions.cancel().run();});
-        table.getSelectionModel().addListSelectionListener(event->selectionChanged());
-        table.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER,0),"browse");table.getActionMap().put("browse",new AbstractAction() { public void actionPerformed(ActionEvent event) { activate(); } });
-        table.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_UP,InputEvent.ALT_DOWN_MASK),"parent");table.getActionMap().put("parent",new AbstractAction() { public void actionPerformed(ActionEvent event) { if(actions!=null && loaded && !working) actions.up().run(); } });
-        table.addMouseListener(new MouseAdapter() {
-            private void selectPopup(MouseEvent event) { if(event.isPopupTrigger()) { int row=table.rowAtPoint(event.getPoint());if(row>=0 && !table.isRowSelected(row)) table.setRowSelectionInterval(row,row); } }
-            @Override public void mousePressed(MouseEvent event) { selectPopup(event); }
-            @Override public void mouseReleased(MouseEvent event) { selectPopup(event); }
-            @Override public void mouseClicked(MouseEvent event) { if(event.getClickCount()==2 && SwingUtilities.isLeftMouseButton(event)) activate(); } });
-        openInEditor=new JMenuItem("Open in Editor",icons.apply(IconName.FILE));openInEditor.addActionListener(event->{if(editing!=null) editing.open().run();});
-        openInEditor.setVisible(false);editingSeparator.setVisible(false);popup.add(openInEditor);popup.add(editingSeparator);
-        item("Up",IconName.UP,()->actions.up().run());item("New folder…",IconName.NEW_FOLDER,()->actions.newFolder().run());popup.addSeparator();
-        item("Upload folder…",IconName.UPLOAD,()->actions.uploadFolder().run());item("Download selected…",IconName.DOWNLOAD,()->actions.download().run());item("Copy to host…",IconName.NETWORK,()->actions.copyToHost().run());popup.addSeparator();item("Copy paths",IconName.COPY,()->actions.copyPath().run());item("Delete selected…",IconName.DELETE,()->actions.delete().run());table.setComponentPopupMenu(popup);
-        buttons.get("Upload files").setComponentPopupMenu(popup);
-        bindNavigation("back",KeyEvent.VK_LEFT,()-> { if(browsingEnabled && canBack && !working) back.run(); });
-        bindNavigation("forward",KeyEvent.VK_RIGHT,()-> { if(browsingEnabled && canForward && !working) forward.run(); });
-        selectionChanged();
+
+    /** The sidebar explorer, owning its kit view. */
+    public SftpPanel(UiKit kit) { this(kit, Layout.ROWS); }
+
+    /** The sidebar explorer in {@code layout}'s composition. */
+    public SftpPanel(UiKit kit, Layout layout) {
+        this.layout=java.util.Objects.requireNonNull(layout);
+        changed=null;focuser=null;destination=false;
+        view=kit.create(new ViewSpec(panel()),event->{ if(!closed) handle(event); });
     }
-    private static JLabel label(String value) { var label=new JLabel(value);label.putClientProperty("html.disable",true);return label; }
-    private void addButton(JComponent bar,String name,IconName icon,Runnable action) {
-        var button=new JButton(icons.apply(icon));button.putClientProperty("JButton.minimumWidth",0);button.setToolTipText(name);button.getAccessibleContext().setAccessibleName(name);button.setMargin(new Insets(4,4,4,4));button.addActionListener(event->{if(actions!=null && !working) action.run();});buttons.put(name,button);bar.add(button);
+
+    private SftpPanel(Runnable changed,Consumer<String> focus) {
+        this.changed=Objects.requireNonNull(changed);this.focuser=Objects.requireNonNull(focus);destination=true;view=null;layout=Layout.ROWS;
     }
-    private void item(String text,IconName name,Runnable action) { var item=new JMenuItem(text,icons.apply(name));item.addActionListener(event->{if(actions!=null) action.run();});popup.add(item);buttons.put(text,item); }
-    public void actions(Actions actions) { this.actions=actions; }
+
+    /**
+     * A destination browser embedded in another owner's form: {@link #destinationBody()} is its content,
+     * {@link #handle} takes its events, {@code changed} renders the owner again and {@code focus} focuses a node there.
+     */
+    static SftpPanel destination(Runnable changed,Consumer<String> focus) { return new SftpPanel(changed,focus); }
+
+    /** The sidebar's kit view. */
+    public UiView view() { if(view==null) throw new IllegalStateException("An embedded browser has no view of its own");return view; }
+
+    public void actions(Actions actions) { this.actions=actions;render(); }
     /** Navigation commands apply to the currently connected browser's history. */
     public void navigation(Runnable back,Runnable forward) { this.back=Objects.requireNonNull(back);this.forward=Objects.requireNonNull(forward); }
-    public void navigationAvailable(boolean back,boolean forward) { canBack=back;canForward=forward;updateControls(); }
+    public void navigationAvailable(boolean back,boolean forward) { canBack=back;canForward=forward;render(); }
     /** Publishes connection detail to the owning app header, including the current state immediately. */
     public void onHeaderChanged(Consumer<PanelHeader> listener) { headerChanged=Objects.requireNonNull(listener);publishHeader(); }
-    private void publishHeader() { if(!destination) headerChanged.accept(new PanelHeader(loaded?host.getText():"",loaded,List.of())); }
-    private void bindNavigation(String name,int key,Runnable command) {
-        getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(key,InputEvent.ALT_DOWN_MASK),name);
-        getActionMap().put(name,new AbstractAction() { @Override public void actionPerformed(ActionEvent event) { command.run(); } });
-    }
-    /** Opens the owning window's existing SSH host chooser from the disconnected state. */
-    public void onChooseSession(Runnable action) { choose=Objects.requireNonNull(action); }
+    /** Browses the saved host chosen from the disconnected state's Choose Session menu. */
+    public void onChooseSession(Consumer<RemoteHost> action) { choose=Objects.requireNonNull(action); }
+    /** The saved hosts Choose Session offers, in order; shown literally. */
+    public void sessions(List<RemoteHost> hosts) { sessions=List.copyOf(hosts);render(); }
+    /** Runs after every listing or page shown. */
+    public void onLoaded(Runnable listener) { onLoaded=Objects.requireNonNull(listener); }
     /** Shows Open in Editor and sends files to {@code editing}: double-click and Enter on one file or link, and the menu item. */
-    public void editing(Editing editing) { this.editing=editing;openInEditor.setVisible(true);editingSeparator.setVisible(true);selectionChanged(); }
-    public FileTable table() { return table; }
-    public List<FileEntry> selection() { var result=new ArrayList<FileEntry>();for(int row:table.getSelectedRows()) if(row>=0 && row<entries.size()) result.add(entries.get(row));return List.copyOf(result); }
-    public String directory() { return path.getText(); }
-    public boolean following() { return follow.isSelected(); }
-    public void following(boolean value) { follow.setSelected(value); }
-    public void destinationMode() {
-        destination=true;followFooter.setVisible(false);showBrowser();
-        buttons.get("Upload files").setVisible(false);
-        var newFolder=new JButton(icons.apply(IconName.NEW_FOLDER));
-        newFolder.setToolTipText("New folder");newFolder.getAccessibleContext().setAccessibleName("New folder");
-        newFolder.putClientProperty("JButton.minimumWidth",0);newFolder.setMargin(new Insets(4,4,4,4));
-        newFolder.addActionListener(event-> { if(actions!=null && !working) actions.newFolder().run(); });
-        ((JComponent)buttons.get("Refresh").getParent()).add(newFolder);buttons.put("Destination new folder",newFolder);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);table.setComponentPopupMenu(null);updateControls();
+    public void editing(Editing editing) { this.editing=editing;render(); }
+    /** The window's transfers, shown at the bottom of the sidebar. */
+    public void transfers(TransferStrip strip) {
+        if(transfers!=null) transfers.onChanged(()->{});
+        transfers=strip;strip.onChanged(this::render);render();
     }
+
+    /** What file actions act on: the selected entries in display order, or the row whose own menu item is running. */
+    public List<FileEntry> selection() {
+        if(acting!=null) return acting;
+        var result=new ArrayList<FileEntry>();for(var entry:entries) if(selected.contains(rowId(entry))) result.add(entry);return List.copyOf(result);
+    }
+    public String directory() { return directory; }
+    public boolean following() { return following; }
+    public void following(boolean value) { following=value;render(); }
+    /** Whether hidden items (names starting with a dot) show; the toolbar's toggle is pressed while they do. */
+    public boolean showHidden() { return showHidden; }
+    public void showHidden(boolean value) { showHidden=value;render(); }
+
     public void showPage(String hostname,String directory,List<FileEntry> values,long offset,long total,boolean focus) {
-        this.entries=List.copyOf(values);this.offset=offset;this.total=total;loaded=true;showBrowser();host.setText(hostname);path.setText(directory);path.setToolTipText(directory);model.fireTableDataChanged();
-        pageLabel.setText(total==0?"Empty folder":(offset+1)+"–"+(offset+values.size())+" of "+total);previous.setEnabled(offset>0);next.setEnabled(offset+values.size()<total);
-        if(!entries.isEmpty()) table.setRowSelectionInterval(0,0);selectionChanged();busy(false,"");publishHeader();onLoaded.run();if(focus) table.requestFocusInWindow();
+        if(closed) return;
+        entries=List.copyOf(values);this.offset=offset;this.total=total;loaded=true;host=hostname;this.directory=directory;
+        // A new listing or page selects its first row, as the old table did.
+        selected=entries.isEmpty()?Set.of():Set.of(rowId(entries.getFirst()));
+        working=false;message="";render();publishHeader();onLoaded.run();
+        if(focus) focus(FILES);
     }
-    public void busy(boolean busy,String text) {
-        working=busy;chooseSession.setEnabled(!busy);status.setVisible(busy || !text.isEmpty());cancel.setVisible(busy);
-        table.setEnabled(!busy);path.setEnabled(browsingEnabled && !busy);updateControls();
-        message.setText(text);message.setToolTipText(text);revalidate();repaint();
-    }
+    public void busy(boolean busy,String text) { if(closed) return;working=busy;message=text;render(); }
     public void error(String text) { busy(false,text); }
     /** Empties the view: no host, folder or rows, and nothing for file actions to act on. */
     public void clear(String text) {
-        entries=List.of();offset=0;total=0;loaded=false;host.setText("Select an SSH host to browse files");path.setText("");model.fireTableDataChanged();pageLabel.setText("");
-        canBack=false;canForward=false;selectionChanged();showBrowser();busy(false,text);publishHeader();
+        if(closed) return;
+        entries=List.of();offset=0;total=0;loaded=false;host=NO_HOST;directory="";selected=Set.of();editingPath=false;
+        canBack=false;canForward=false;working=false;message=text;render();publishHeader();
     }
-    public void operationStatus(boolean running,String text) {
-        operationResult.setText(running?"":text);operationResult.setToolTipText(running?null:text);operationResult.setVisible(!running && !text.isEmpty());
-        busy(running,running?text:"");
+    public void operationStatus(boolean running,String text) { if(closed) return;result=running?"":text;busy(running,running?text:""); }
+    public void enableBrowsing(boolean enabled) { browsingEnabled=enabled;render(); }
+
+    /** The panel's Back shortcut (Alt+Left anywhere in the panel). */
+    public void back() { if(browsingEnabled && canBack && !working) back.run(); }
+    /** The panel's Forward shortcut (Alt+Right anywhere in the panel). */
+    public void forward() { if(browsingEnabled && canForward && !working) forward.run(); }
+    /** The panel's parent folder shortcut (Alt+Up). */
+    public void parent() { if(actions!=null && loaded && !working) actions.up().run(); }
+
+    String operationMessage() { return result; }
+    String hostText() { return host; }
+    String messageText() { return message; }
+    /** The names the table shows, in order. */
+    List<String> rowNames() { return entries.stream().map(FileEntry::name).toList(); }
+    static String rowId(FileEntry entry) { return ROW+entry.name(); }
+
+    // ---- the classic composition (Enterprise presentation spec 14.4)
+
+    public static final String CHOOSE_DROPDOWN = "sftp.choose.dropdown", TOOLS_SEPARATOR = "sftp.tools.separator", UPLOAD_SEPARATOR = "sftp.upload.separator";
+    static final String CHOOSE_PROMPT = "choose", NO_SESSIONS = "none";
+    /** The classic table's columns, in the Workstation mock's proportions. */
+    static final List<Column> CLASSIC_COLUMNS = List.of(new Column("name", "Name", Nodes.TextRole.BODY, false, 136, Optional.empty()),
+        new Column("size", "Size", Nodes.TextRole.DESCRIPTION, true, 77, Optional.empty()),
+        new Column("modified", "Modified", Nodes.TextRole.MONO_SMALL, false, 87, Optional.empty()));
+
+    private Nodes.Panel classicPanel() {
+        var header = new Nodes.Header(HEADER, ControlState.READY, "SFTP", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        var footer = List.<Nodes.Node>of(paging(), status(), resultLine(),
+            new Nodes.SettingRow(FOLLOW_ROW, ControlState.READY, FOLLOW_TEXT, "",
+                new Nodes.Toggle(FOLLOW, state(true, browsingEnabled), FOLLOW_TEXT, following, FOLLOW, true, FOLLOW_DESCRIPTION), false));
+        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(loaded ? classicNavigation() : chooser()), classicTable(),
+            Optional.of(new Nodes.Stack(FOOTER, ControlState.READY, Nodes.LayoutRole.VERTICAL, footer)));
     }
-    private void showBrowser() {
-        cards.show(content,loaded || destination?"connected":"disconnected");paging.setVisible(loaded && total>200);
-        revalidate();repaint();
+
+    private Nodes.Node classicNavigation() {
+        boolean ready = loaded && !working;
+        var tools = List.<Nodes.Node>of(
+            tool(BACK, "back", "Back", browsingEnabled && ready && canBack), tool(FORWARD, "forward", "Forward", browsingEnabled && ready && canForward),
+            tool(REFRESH, "refresh", "Refresh", browsingEnabled && ready), new Nodes.Separator(TOOLS_SEPARATOR, ControlState.READY),
+            new Nodes.Button(HIDDEN, state(true, browsingEnabled && ready), "Hidden files", "", Nodes.ButtonKind.GHOST, HIDDEN, "Show hidden items",
+                Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.of(showHidden)),
+            new Nodes.Separator(UPLOAD_SEPARATOR, ControlState.READY),
+            new Nodes.MenuButton(UPLOAD, state(true, ready), "Upload", "", Nodes.ButtonKind.GHOST, UPLOAD, menu(MENU, "", selection()), "Upload files"));
+        var crumbs = new ArrayList<Crumb>(); var steps = crumbs();
+        for (int i = 0; i < steps.size(); i++) crumbs.add(new Crumb(crumbId(i), steps.get(i)[0], List.of()));
+        var path = new Nodes.Breadcrumbs(PATH, state(true, browsingEnabled && !working), crumbs, "Remote directory", editingPath, pathValue, PATH_EDIT, PATH_GO, PATH_DONE);
+        return new Nodes.Stack(NAVIGATION, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Stack(TOOLS, ControlState.READY, Nodes.LayoutRole.INLINE, tools), path));
     }
-    private void configureFollow() {
-        follow.getAccessibleContext().setAccessibleName("Follow terminal folder");
-        follow.getAccessibleContext().setAccessibleDescription("Keep the SFTP browser in the active SSH terminal's folder");
-        follow.setToolTipText("Follow terminal folder");follow.setOpaque(false);follow.setBorder(BorderFactory.createEmptyBorder());follow.setMargin(new Insets(0,0,0,0));
-        var icon=new FollowIcon();follow.setIcon(icon);follow.setSelectedIcon(icon);follow.setDisabledIcon(icon);follow.setDisabledSelectedIcon(icon);follow.setFocusPainted(false);
-        followFooter.setBorder(new javax.swing.border.AbstractBorder() {
-            @Override public Insets getBorderInsets(Component component,Insets insets) { insets.set(PanelStyle.scale(component,12),PanelStyle.scale(component,16),PanelStyle.scale(component,12),PanelStyle.scale(component,16));return insets; }
-            @Override public void paintBorder(Component component,Graphics graphics,int x,int y,int width,int height) { graphics.setColor(WorkspacePalette.current(component).border());graphics.fillRect(x,y,width,1); }
-        });
-        followLabel.setLabelFor(follow);followFooter.add(followLabel,BorderLayout.CENTER);followFooter.add(follow,BorderLayout.EAST);
+
+    /** Disconnected: Choose Session… over the saved hosts, and the root as disabled breadcrumbs. */
+    private Nodes.Node chooser() {
+        var options = new ArrayList<Option>();
+        if (sessions.isEmpty()) options.add(new Option(NO_SESSIONS, "No saved sessions", Optional.empty()));
+        else {
+            options.add(new Option(CHOOSE_PROMPT, "Choose Session…", Optional.empty()));
+            for (var host : sessions) options.add(new Option(SESSION + host.id(), host.name(), Optional.empty()));
+        }
+        var choose = new Nodes.Choice(CHOOSE_DROPDOWN, state(true, !sessions.isEmpty() && !working), Nodes.ChoiceKind.DROPDOWN, options,
+            options.getFirst().id(), "Choose an SSH session", "");
+        var root = new Nodes.Breadcrumbs(PATH, state(true, false), List.of(new Crumb(crumbId(0), "/", List.of())), "Remote directory", false, "", PATH_EDIT, PATH_GO, PATH_DONE);
+        return new Nodes.Stack(NAVIGATION, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(choose, root));
     }
-    private final class FollowIcon implements Icon {
-        @Override public int getIconWidth() { return PanelStyle.scale(follow,34); }
-        @Override public int getIconHeight() { return PanelStyle.scale(follow,20); }
-        @Override public void paintIcon(Component component,Graphics graphics,int x,int y) {
-            var g=(Graphics2D)graphics.create();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
-                g.translate(x,y);double factor=getIconWidth()/34.0;g.scale(factor,factor);var palette=WorkspacePalette.current(component);
-                g.setColor(!follow.isEnabled()?palette.surfaceSunken():follow.isSelected()?PanelStyle.accent(follow):palette.border());
-                g.fillRoundRect(2,2,30,16,16,16);
-                g.setColor(follow.isEnabled()?Color.WHITE:palette.textMuted());g.fillOval(follow.isSelected()?18:4,4,12,12);
-                if(follow.hasFocus()) { g.setColor(PanelStyle.accent(follow));g.drawRoundRect(0,0,33,19,19,19); }
-            }finally { g.dispose(); }
+
+    private Nodes.Table classicTable() {
+        var rows = new ArrayList<TableRow>();
+        if (loaded) for (var entry : entries) {
+            String id = rowId(entry);
+            rows.add(new TableRow(id, Map.of("name", entry.name(), "size", formatSize(entry), "modified", shortModified(entry)), Optional.of(glyph(entry)), false,
+                Optional.of(menu(ROW_MENU, ":" + id, selected.contains(id) ? selection() : List.of(entry))),
+                entry.name() + " — " + formatSize(entry) + " — " + modified(entry)));
+        }
+        Optional<Nodes.Empty> empty = loaded ? Optional.empty() : Optional.of(new Nodes.Empty(EMPTY, ControlState.READY,
+            new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "folder", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "SFTP"), "Not Connected",
+            "Connect to an SSH session to browse its files.", List.of()));
+        return new Nodes.Table(FILES, state(true, !working), CLASSIC_COLUMNS, rows, loaded ? selected : Set.of(), OPEN, loaded ? menu(MENU, "", selection()) : List.of(),
+            Nodes.SelectionMode.MULTIPLE, Nodes.ScrollPolicy.STANDARD, empty, "");
+    }
+
+    /** The modified day as the classic table shows it: "Sep 28". */
+    static String shortModified(FileEntry entry) {
+        return entry.modifiedMillis() < 0 ? "" : DateTimeFormatter.ofPattern("MMM dd", Locale.ENGLISH).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(entry.modifiedMillis()));
+    }
+
+    @Override public void close() {
+        if(closed) return;closed=true;headerChanged=header->{};
+        if(transfers!=null) transfers.onChanged(()->{});
+        if(view!=null) view.close();
+    }
+
+    // ---- events
+
+    /** Acts on one of the browser's events and says whether it was one. */
+    public boolean handle(UiEvent event) {
+        if(closed) return false;
+        switch(event) {
+            case UiEvent.Selected chosen when chosen.id().equals(FILES) -> {
+                var known=new LinkedHashSet<String>();for(var entry:entries) if(chosen.ids().contains(rowId(entry))) known.add(rowId(entry));
+                selected=Set.copyOf(known);render();return true;
+            }
+            case UiEvent.Selected crumb when crumb.id().equals(PATH) -> {
+                crumb.ids().stream().findFirst().flatMap(this::crumbTarget).ifPresent(target-> { if(actions!=null && browsingEnabled && !working) actions.navigate().accept(target); });
+                return true;
+            }
+            case UiEvent.Edited edited when edited.id().equals(PATH) -> { pathValue=edited.text();return true; }
+            case UiEvent.Selected chosen when chosen.id().equals(CHOOSE_DROPDOWN) -> {
+                chosen.ids().stream().findFirst().filter(id -> id.startsWith(SESSION)).ifPresent(this::act);
+                render();return true;
+            }
+            case UiEvent.Toggled toggled when toggled.id().equals(FOLLOW) -> {
+                if(browsingEnabled) { following=toggled.checked();render();if(actions!=null) actions.follow().accept(following); }
+                return true;
+            }
+            case UiEvent.Action action -> { return act(action.id()) || transfers!=null && transfers.handle(event); }
+            default -> { return transfers!=null && transfers.handle(event); }
         }
     }
-    String operationMessage() { return operationResult.getText(); }
-    String hostText() { return host.getText(); }
-    String messageText() { return message.getText(); }
-    public void enableBrowsing(boolean enabled) { browsingEnabled=enabled;path.setEnabled(enabled && !working);follow.setEnabled(enabled);followLabel.setEnabled(enabled);updateControls(); }
+
+    private boolean act(String id) {
+        boolean ready=actions!=null && loaded && !working;
+        switch(id) {
+            case OPEN -> activate();
+            case BACK -> { if(ready) back(); }
+            case FORWARD -> { if(ready) forward(); }
+            case REFRESH -> { if(ready && browsingEnabled) actions.refresh().run(); }
+            case HIDDEN -> { if(ready && browsingEnabled) actions.hidden().accept(!showHidden); }
+            case UPLOAD -> { if(ready) actions.upload().run(); }
+            case NEW_FOLDER -> { if(ready) actions.newFolder().run(); }
+            case CANCEL -> { if(actions!=null) actions.cancel().run(); }
+            case PREVIOUS -> { if(ready && offset>0) actions.page().accept(Math.max(0,offset-PAGE_SIZE)); }
+            case NEXT -> { if(ready && offset+entries.size()<total) actions.page().accept(offset+PAGE_SIZE); }
+            case PATH_EDIT -> {
+                if(browsingEnabled && !working && (loaded || destination)) { editingPath=true;pathValue=directory;render();focus(PATH); }
+            }
+            case PATH_GO -> {
+                if(!editingPath) return true;
+                editingPath=false;String target=pathValue;render();
+                if(actions!=null && browsingEnabled && !working) actions.navigate().accept(target);
+            }
+            case PATH_DONE -> { if(editingPath) { editingPath=false;render(); } }
+            default -> {
+                if(id.startsWith(MENU)) { run(id.substring(MENU.length()),selection());return true; }
+                if(id.startsWith(ROW_MENU)) { rowMenu(id.substring(ROW_MENU.length()));return true; }
+                if(id.startsWith(SESSION)) {
+                    String chosen=id.substring(SESSION.length());
+                    if(!working && !loaded) sessions.stream().filter(host->host.id().toString().equals(chosen)).findFirst().ifPresent(choose);
+                    return true;
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Enter or a double click on exactly one entry. */
     private void activate() {
-        if(actions==null || working || !loaded) return;var selected=selection();if(selected.size()!=1) return;var entry=selected.getFirst();
+        if(actions==null || working || !loaded) return;var chosen=selection();if(chosen.size()!=1) return;var entry=chosen.getFirst();
         if(entry.kind()==FileEntry.Kind.DIRECTORY || entry.kind()==FileEntry.Kind.LINK && editing==null) actions.navigate().accept(entry.name());
         else if(editing!=null && (entry.kind()==FileEntry.Kind.FILE || entry.kind()==FileEntry.Kind.LINK)) editing.activate().accept(entry);
     }
-    private void selectionChanged() { updateControls(); }
-    private void updateControls() {
-        boolean ready=loaded && !working,selected=ready && !selection().isEmpty();
-        for(String name:List.of("Download selected…","Delete selected…","Copy paths","Copy to host…")) {
-            var button=buttons.get(name);if(button!=null) button.setEnabled(selected);
-        }
-        for(String name:List.of("Upload files","Upload folder…","New folder…","Destination new folder")) {
-            var button=buttons.get(name);if(button!=null) button.setEnabled(ready);
-        }
-        var up=buttons.get("Up");if(up!=null) up.setEnabled(ready && !path.getText().equals("/"));
-        buttons.get("Refresh").setEnabled(browsingEnabled && ready);
-        buttons.get("Back").setEnabled(browsingEnabled && ready && canBack);
-        buttons.get("Forward").setEnabled(browsingEnabled && ready && canForward);
-        previous.setEnabled(ready && offset>0);next.setEnabled(ready && offset+entries.size()<total);
-        if(openInEditor!=null) openInEditor.setEnabled(ready && selection().stream().anyMatch(entry->entry.kind()==FileEntry.Kind.FILE || entry.kind()==FileEntry.Kind.LINK));
+
+    /** A row's own menu item: on the selection when the row is selected, otherwise on that row alone. */
+    private void rowMenu(String rest) {
+        int colon=rest.indexOf(':');if(colon<0) return;
+        String verb=rest.substring(0,colon),row=rest.substring(colon+1);
+        var entry=entries.stream().filter(candidate->rowId(candidate).equals(row)).findFirst();if(entry.isEmpty()) return;
+        List<FileEntry> target=selected.contains(row)?selection():List.of(entry.get());
+        acting=target;
+        try { run(verb,target); } finally { acting=null; }
     }
-    public final class FileTable extends JTable {
-        @Override public void setFont(Font font) { super.setFont(font);updateRowHeight(); }
-        @Override public JToolTip createToolTip() { var tip=super.createToolTip();tip.putClientProperty("html.disable",true);return tip; }
-        @Override public void updateUI() { super.updateUI();updateRowHeight(); }
-        public void updateRowHeight() { if(getFont()!=null) setRowHeight(Math.max(27,Math.max(PanelStyle.scale(this,27),getFontMetrics(getFont()).getHeight()+8))); }
-        @Override public void doLayout() {
-            if(sizeColumn!=null) {
-                int width=getFontMetrics(getFont()).stringWidth("999.9 GB")+PanelStyle.scale(this,28);
-                sizeColumn.setMinWidth(width);sizeColumn.setMaxWidth(width);sizeColumn.setPreferredWidth(width);
-            }
-            super.doLayout();
-        }
-        @Override public String getToolTipText(MouseEvent event) { int row=rowAtPoint(event.getPoint());if(row<0 || row>=entries.size()) return null;var file=entries.get(row);return file.name()+" — "+formatSize(file)+" — "+modified(file); }
-    }
-    private final class Rows extends AbstractTableModel {
-        public int getRowCount() { return entries.size(); }public int getColumnCount() { return 2; }
-        public String getColumnName(int column) { return switch(column) { case 0->"Name";case 1->"Size";default->"Modified"; }; }
-        public Object getValueAt(int row,int column) { var file=entries.get(row);return switch(column) { case 0->file.name();case 1->formatSize(file);default->modified(file); }; }
-    }
-    private final class Renderer extends DefaultTableCellRenderer {
-        Renderer() { putClientProperty("html.disable",true);setBorder(BorderFactory.createEmptyBorder(0,3,0,3)); }
-        @Override public Component getTableCellRendererComponent(JTable table,Object value,boolean selected,boolean focus,int row,int column) {
-            super.getTableCellRendererComponent(table,value,selected,focus,row,column);setIcon(null);setHorizontalAlignment(column==1?SwingConstants.RIGHT:SwingConstants.LEFT);setBorder(BorderFactory.createEmptyBorder(0,PanelStyle.scale(table,14),0,PanelStyle.scale(table,14)));
-            if(!selected) setForeground(column==1?WorkspacePalette.current(table).textMuted():WorkspacePalette.current(table).text());
-            if(table.convertColumnIndexToModel(column)==0 && row<entries.size()) setIcon(entries.get(row).kind()==FileEntry.Kind.DIRECTORY?directoryIcon:entries.get(row).kind()==FileEntry.Kind.LINK?icons.apply(IconName.LINK):documentIcon);return this;
+
+    private void run(String verb,List<FileEntry> target) {
+        if(actions==null || !enabled(verb,target)) return;
+        switch(verb) {
+            case "open" -> editing.open().run();
+            case "up" -> actions.up().run();
+            case "new-folder" -> actions.newFolder().run();
+            case "upload-folder" -> actions.uploadFolder().run();
+            case "download" -> actions.download().run();
+            case "copy-host" -> actions.copyToHost().run();
+            case "copy-paths" -> actions.copyPath().run();
+            case "delete" -> actions.delete().run();
+            default -> { }
         }
     }
-    /** Local artwork follows the size of the host's semantic folder; no global icon mapping changes. */
-    private final class FolderIcon implements Icon {
-        private final Icon size;
-        FolderIcon(Icon size) { this.size=size; }
-        @Override public int getIconWidth() { return size==null?PanelStyle.scale(table,16):size.getIconWidth(); }
-        @Override public int getIconHeight() { return size==null?PanelStyle.scale(table,16):size.getIconHeight(); }
-        @Override public void paintIcon(Component component,Graphics graphics,int x,int y) {
-            var g=(Graphics2D)graphics.create();
-            try {
-                g.translate(x,y);g.scale(getIconWidth()/16.0,getIconHeight()/16.0);
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
-                var shape=new java.awt.geom.Path2D.Double();
-                shape.moveTo(2,3);shape.lineTo(6.3,3);shape.lineTo(8.2,5);shape.lineTo(14,5);
-                shape.quadTo(15,5,15,6);shape.lineTo(15,12);shape.quadTo(15,13,14,13);
-                shape.lineTo(2,13);shape.quadTo(1,13,1,12);shape.lineTo(1,4);shape.quadTo(1,3,2,3);shape.closePath();
-                var background=WorkspacePalette.current(table).background();
-                boolean dark=background.getRed()*.299+background.getGreen()*.587+background.getBlue()*.114<128;
-                g.setColor(new Color(dark?0x5e9bed:0x397ac4));g.fill(shape);
-            } finally { g.dispose(); }
-        }
+
+    /** Whether a menu verb applies to {@code target} now: the old popup's enabled rules. */
+    private boolean enabled(String verb,List<FileEntry> target) {
+        boolean ready=loaded && !working,any=ready && !target.isEmpty();
+        return switch(verb) {
+            case "open" -> editing!=null && ready && target.stream().anyMatch(entry->entry.kind()==FileEntry.Kind.FILE || entry.kind()==FileEntry.Kind.LINK);
+            case "up" -> ready && !directory.equals("/");
+            case "new-folder","upload-folder" -> ready;
+            case "download","copy-host","copy-paths","delete" -> any;
+            default -> false;
+        };
     }
-    private abstract class SizedIcon implements Icon {
-        private final Icon size;
-        SizedIcon(Icon size) { this.size=size; }
-        @Override public int getIconWidth() { return size==null?PanelStyle.scale(table,16):size.getIconWidth(); }
-        @Override public int getIconHeight() { return size==null?PanelStyle.scale(table,16):size.getIconHeight(); }
-        @Override public final void paintIcon(Component component,Graphics graphics,int x,int y) {
-            var g=(Graphics2D)graphics.create();
-            try {
-                g.translate(x,y);g.scale(getIconWidth()/16.0,getIconHeight()/16.0);
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setStroke(new BasicStroke(1.25f,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND));
-                g.setColor(WorkspacePalette.current(table).textMuted());paintGlyph(g);
-            } finally { g.dispose(); }
-        }
-        abstract void paintGlyph(Graphics2D graphics);
+
+    private Optional<String> crumbTarget(String crumbId) {
+        var crumbs=crumbs();
+        for(int i=0;i<crumbs.size();i++) if(crumbId(i).equals(crumbId)) return Optional.of(crumbs.get(i)[1]);
+        return Optional.empty();
     }
-    private final class DocumentIcon extends SizedIcon {
-        DocumentIcon(Icon size) { super(size); }
-        @Override void paintGlyph(Graphics2D g) {
-            var outline=new java.awt.geom.Path2D.Double();outline.moveTo(3,1.5);outline.lineTo(9,1.5);
-            outline.lineTo(13,5.5);outline.lineTo(13,14.5);outline.lineTo(3,14.5);outline.closePath();g.draw(outline);
-            g.drawLine(9,2,9,5);g.drawLine(9,5,12,5);g.drawLine(6,8,10,8);g.drawLine(6,11,10,11);
-        }
+
+    // ---- descriptors
+
+    private void render() {
+        if(closed) return;
+        if(view!=null) view.update(new ViewSpec(panel()));
+        else if(changed!=null) changed.run();
     }
-    private final class RefreshIcon extends SizedIcon {
-        RefreshIcon(Icon size) { super(size); }
-        @Override void paintGlyph(Graphics2D g) {
-            g.draw(new java.awt.geom.Arc2D.Double(2.5,2.5,11,11,45,290,java.awt.geom.Arc2D.OPEN));
-            g.drawLine(9,3,13,3);g.drawLine(13,3,13,7);
-        }
+
+    private void focus(String id) { if(view!=null) view.focus(id);else if(focuser!=null) focuser.accept(id); }
+
+    private void publishHeader() { if(!destination && !closed) headerChanged.accept(new PanelHeader(loaded?host:"",loaded,List.of())); }
+
+    private static ControlState state(boolean visible,boolean enabled) { return new ControlState(visible,enabled,false,""); }
+
+    private Nodes.Panel panel() { return layout == Layout.CLASSIC ? classicPanel() : rowsPanel(); }
+
+    private Nodes.Panel rowsPanel() {
+        var header=new Nodes.Header(HEADER,ControlState.READY,"SFTP",OptionalInt.empty(),Optional.empty(),Optional.empty(),List.of());
+        // Choose Session is a menu of the saved hosts: its label first, the menu chevron after it.
+        var choices=new ArrayList<MenuItem>();
+        for(var host:sessions) choices.add(new MenuItem("session."+host.id(),host.name(),"server",SESSION+host.id(),true,false));
+        if(choices.isEmpty()) choices.add(new MenuItem("session.none","No saved sessions","",SESSION+"none",false,false));
+        Nodes.Node body=loaded?table():new Nodes.Empty(EMPTY,ControlState.READY,
+            new Nodes.Icon(EMPTY+".icon",ControlState.READY,"folder",Nodes.Hue.NEUTRAL,Nodes.IconSize.EMPTY,"SFTP"),"Not Connected",
+            "Connect to an SSH session to browse its files.",
+            List.of(new Nodes.MenuButton(CHOOSE,state(true,!working),"Choose Session","",Nodes.ButtonKind.SECONDARY,"",choices,"Choose an SSH session")));
+        // The window's transfers, then paging and the status lines, above the persistent Follow terminal folder row.
+        var footer=new ArrayList<Nodes.Node>();
+        if(transfers!=null) transfers.node().ifPresent(footer::add);
+        footer.addAll(List.of(paging(),status(),resultLine(),
+            new Nodes.SettingRow(FOLLOW_ROW,ControlState.READY,FOLLOW_TEXT,"",
+                new Nodes.Toggle(FOLLOW,state(true,browsingEnabled),FOLLOW_TEXT,following,FOLLOW,true,FOLLOW_DESCRIPTION),false)));
+        return new Nodes.Panel(ROOT,ControlState.READY,header,Optional.of(navigation()),body,
+            Optional.of(new Nodes.Stack(FOOTER,ControlState.READY,Nodes.LayoutRole.VERTICAL,footer)));
     }
-    private final class HeaderRenderer extends DefaultTableCellRenderer {
-        HeaderRenderer() { putClientProperty("html.disable",true); }
-        @Override public Component getTableCellRendererComponent(JTable owner,Object value,boolean selected,boolean focus,int row,int column) {
-            super.getTableCellRendererComponent(owner,value,false,false,row,column);
-            setOpaque(true);var palette=WorkspacePalette.current(owner);setBackground(palette.background());setForeground(palette.textMuted());
-            setFont(owner.getFont());setHorizontalAlignment(column==1?SwingConstants.RIGHT:SwingConstants.LEFT);
-            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0,0,1,0,palette.border()),BorderFactory.createEmptyBorder(PanelStyle.scale(owner,7),PanelStyle.scale(owner,14),PanelStyle.scale(owner,6),PanelStyle.scale(owner,14))));
-            return this;
-        }
+
+    /** The Copy to host browser: tools and path, the status line, folders, paging and the last operation's result. */
+    Nodes.Node destinationBody() {
+        return new Nodes.Stack(BROWSER,ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(navigation(),status(),table(),paging(),resultLine()));
     }
-    /** The underlying value always stays a valid server path; focus exposes the ordinary text editor. */
-    private final class PathField extends JTextField {
-        PathField() { putClientProperty("FlatLaf.style","arc: 10");addFocusListener(new FocusAdapter() {
-            @Override public void focusGained(FocusEvent event) { repaint(); }
-            @Override public void focusLost(FocusEvent event) { repaint(); }
-        }); }
-        @Override public Dimension getMinimumSize() { return new Dimension(0,getPreferredSize().height); }
-        @Override public Dimension getPreferredSize() { var size=super.getPreferredSize();size.height=Math.max(size.height,PanelStyle.scale(this,28));return size; }
-        @Override protected void paintComponent(Graphics graphics) {
-            if(hasFocus()) { super.paintComponent(graphics);return; }
-            var g=(Graphics2D)graphics.create();
-            try {
-                var palette=WorkspacePalette.current(this);g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(palette.surfaceSunken());int arc=PanelStyle.scale(this,10);g.fillRoundRect(0,0,getWidth(),getHeight(),arc,arc);
-                g.setColor(isEnabled()?palette.text():palette.textMuted());g.setFont(getFont());
-                var metrics=g.getFontMetrics();int inset=PanelStyle.scale(this,9);g.clipRect(inset,0,Math.max(0,getWidth()-2*inset),getHeight());
-                String value=getText();String crumbs=value.equals("/")?"/":value.startsWith("/")?"/ "+value.substring(1).replace("/","  ›  "):value;
-                int available=Math.max(0,getWidth()-2*inset);
-                if(metrics.stringWidth(crumbs)>available && value.contains("/")) crumbs="… › "+value.substring(value.lastIndexOf('/')+1);
-                if(metrics.stringWidth(crumbs)>available) {
-                    while(!crumbs.isEmpty() && metrics.stringWidth(crumbs+"…")>available) crumbs=crumbs.substring(0,crumbs.offsetByCodePoints(crumbs.length(),-1));
-                    crumbs=crumbs.isEmpty()?"":crumbs+"…";
-                }
-                g.drawString(crumbs,inset,(getHeight()-metrics.getHeight())/2+metrics.getAscent());
-            } finally { g.dispose(); }
-        }
+
+    private Nodes.Node navigation() {
+        boolean ready=loaded && !working;
+        var tools=new ArrayList<Nodes.Node>();
+        tools.add(tool(BACK,"back","Back",browsingEnabled && ready && canBack));
+        tools.add(tool(FORWARD,"forward","Forward",browsingEnabled && ready && canForward));
+        tools.add(tool(REFRESH,"refresh","Refresh",browsingEnabled && ready));
+        tools.add(new Nodes.Button(HIDDEN,state(true,browsingEnabled && ready),"","hidden",Nodes.ButtonKind.GHOST,HIDDEN,"Show hidden items",
+            Nodes.ButtonPresentation.STANDARD,Optional.empty(),Optional.of(showHidden)));
+        if(destination) tools.add(tool(NEW_FOLDER,"folder.add","New folder",ready));
+        else tools.add(new Nodes.MenuButton(UPLOAD,state(true,ready),"","upload",Nodes.ButtonKind.GHOST,UPLOAD,menu(MENU,"",selection()),"Upload files"));
+        var crumbs=new ArrayList<Crumb>();var steps=crumbs();
+        for(int i=0;i<steps.size();i++) crumbs.add(new Crumb(crumbId(i),steps.get(i)[0],List.of()));
+        var path=new Nodes.Breadcrumbs(PATH,state(true,browsingEnabled && !working),crumbs,"Remote directory",editingPath,pathValue,PATH_EDIT,PATH_GO,PATH_DONE);
+        return new Nodes.Stack(NAVIGATION,state(loaded || destination,true),Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.Stack(TOOLS,ControlState.READY,Nodes.LayoutRole.INLINE,tools),path));
     }
-    private static String formatSize(FileEntry entry) { if(entry.kind()==FileEntry.Kind.DIRECTORY) return "—";long value=entry.size();if(value<0) return "—";if(value<1000) return value+" B";if(value<1000*1000) return String.format(Locale.ROOT,"%.1f KB",value/1000.0);if(value<1000L*1000*1000) return String.format(Locale.ROOT,"%.1f MB",value/(1000.0*1000));return String.format(Locale.ROOT,"%.1f GB",value/(1000.0*1000*1000)); }
-    private static String modified(FileEntry entry) { return entry.modifiedMillis()<0?"":DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(entry.modifiedMillis())); }
+
+    private static Nodes.Button tool(String id,String icon,String name,boolean enabled) {
+        return new Nodes.Button(id,state(true,enabled),"",icon,Nodes.ButtonKind.GHOST,id,name);
+    }
+
+    private static String crumbId(int index) { return "crumb."+index; }
+
+    /** Each crumb's label and the folder it opens: the root, then every folder down to the one shown. */
+    private List<String[]> crumbs() {
+        var result=new ArrayList<String[]>();
+        if(directory.isEmpty()) return result;
+        if(!directory.startsWith("/")) { result.add(new String[] {directory,directory});return result; }
+        result.add(new String[] {"/","/"});
+        var path=new StringBuilder();
+        for(String part:directory.substring(1).split("/")) {
+            if(part.isEmpty()) continue;
+            path.append('/').append(part);result.add(new String[] {part,path.toString()});
+        }
+        return result;
+    }
+
+    private Nodes.Table table() {
+        var rows=new ArrayList<TableRow>();
+        for(var entry:entries) {
+            String id=rowId(entry);
+            rows.add(new TableRow(id,Map.of("name",entry.name(),"size",formatSize(entry)),Optional.of(glyph(entry)),false,
+                Optional.of(destination?List.<MenuItem>of():menu(ROW_MENU,":"+id,selected.contains(id)?selection():List.of(entry))),
+                entry.name()+" — "+formatSize(entry)+" — "+modified(entry)));
+        }
+        return new Nodes.Table(FILES,state(true,!working),List.of(
+                new Column("name","Name",Nodes.TextRole.BODY,false,2.4,Optional.empty()),
+                new Column("size","Size",Nodes.TextRole.DESCRIPTION,true,1,Optional.empty())),
+            // The shared menu (on the selection) opens on a context press outside every row, empty folders included, as the
+            // old table's component popup did; each row's own menu takes precedence on the row.
+            rows,selected,OPEN,destination?List.of():menu(MENU,"",selection()),destination?Nodes.SelectionMode.SINGLE:Nodes.SelectionMode.MULTIPLE,Nodes.ScrollPolicy.STANDARD);
+    }
+
+    private static String glyph(FileEntry entry) {
+        return switch(entry.kind()) { case DIRECTORY->"folder";case LINK->"link";default->"file"; };
+    }
+
+    /** The folder's actions, as the old right-click menu listed them; {@code suffix} names the row a row menu acts on. */
+    private List<MenuItem> menu(String prefix,String suffix,List<FileEntry> target) {
+        var items=new ArrayList<MenuItem>();
+        if(editing!=null) { items.add(item(prefix,suffix,"open","Open in Editor","file",target));items.add(separator(0)); }
+        items.add(item(prefix,suffix,"up","Up","chevron.up",target));
+        items.add(item(prefix,suffix,"new-folder","New folder…","folder.add",target));
+        items.add(separator(1));
+        items.add(item(prefix,suffix,"upload-folder","Upload folder…","upload",target));
+        items.add(item(prefix,suffix,"download","Download selected…","download",target));
+        items.add(item(prefix,suffix,"copy-host","Copy to host…","server",target));
+        items.add(separator(2));
+        items.add(item(prefix,suffix,"copy-paths","Copy paths","copy",target));
+        items.add(item(prefix,suffix,"delete","Delete selected…","delete",target));
+        return items;
+    }
+
+    private MenuItem item(String prefix,String suffix,String verb,String label,String icon,List<FileEntry> target) {
+        return new MenuItem("menu."+verb,label,icon,prefix+verb+suffix,enabled(verb,target),false);
+    }
+
+    private static MenuItem separator(int index) { return new MenuItem("menu.separator."+index,"","","",false,true); }
+
+    private Nodes.Node paging() {
+        boolean ready=loaded && !working;
+        String label=total==0?"Empty folder":(offset+1)+"–"+(offset+entries.size())+" of "+total;
+        return new Nodes.Stack(PAGING,state(loaded && total>PAGE_SIZE,true),Nodes.LayoutRole.INLINE,List.of(
+            new Nodes.Text(PAGE,ControlState.READY,label,Nodes.TextRole.CAPTION),
+            tool(PREVIOUS,"back","Previous page",ready && offset>0),
+            tool(NEXT,"forward","Next page",ready && offset+entries.size()<total)));
+    }
+
+    /** What is happening or went wrong, in body text wrapping at the panel's width; Cancel while something runs. */
+    private Nodes.Node status() {
+        return new Nodes.Stack(STATUS,state(working || !message.isEmpty(),true),Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.Text(MESSAGE,state(!message.isEmpty(),true),message,Nodes.TextRole.BODY),
+            new Nodes.Button(CANCEL,state(working,true),"Cancel","close",Nodes.ButtonKind.SECONDARY,CANCEL,"")));
+    }
+
+    private Nodes.Node resultLine() { return new Nodes.Text(RESULT,state(!result.isEmpty(),true),result,Nodes.TextRole.DESCRIPTION); }
+
+    static String formatSize(FileEntry entry) { if(entry.kind()==FileEntry.Kind.DIRECTORY) return "—";long value=entry.size();if(value<0) return "—";if(value<1000) return value+" B";if(value<1000*1000) return String.format(Locale.ROOT,"%.1f KB",value/1000.0);if(value<1000L*1000*1000) return String.format(Locale.ROOT,"%.1f MB",value/(1000.0*1000));return String.format(Locale.ROOT,"%.1f GB",value/(1000.0*1000*1000)); }
+    static String modified(FileEntry entry) { return entry.modifiedMillis()<0?"":DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(entry.modifiedMillis())); }
 }

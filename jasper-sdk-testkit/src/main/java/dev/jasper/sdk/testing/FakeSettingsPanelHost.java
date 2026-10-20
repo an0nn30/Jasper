@@ -1,40 +1,219 @@
 package dev.jasper.sdk.testing;
 
+import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingsPanelHost;
+import dev.jasper.sdk.ui.*;
+import java.awt.EventQueue;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 
-/**
- * The fake's host for a plugin's own settings page: a labelled placeholder per row, and the values it staged.
- */
+/** Independent in-memory settings draft. Empty edits are Reset tombstones, not explicit defaults. */
 final class FakeSettingsPanelHost implements SettingsPanelHost {
     private final FakePluginSettings settings;
-    final Map<String, Object> pending = new LinkedHashMap<>();
+    private final Map<FakeSetting<?>, Optional<Object>> draft = new LinkedHashMap<>();
+    private final Map<String, Row> rows = new LinkedHashMap<>();
+    private final Subscription reloads;
+    private final java.util.function.Supplier<Optional<java.nio.file.Path>> chooseFile;
     int changes;
+    private String query = "";
+    boolean closed, applied;
+    FakeKitView view;
+    JComponent component;
 
-    FakeSettingsPanelHost(FakePluginSettings settings) { this.settings = settings; }
+    private static final class Row {
+        final FakeSetting<?> setting;
+        String invalidText;
+        String error = "";
+        /** An ordered list's entry text, kept until an Add stages it. */
+        String entry = "";
+        Row(FakeSetting<?> setting) { this.setting = setting; }
+        void clear() { invalidText = null; error = ""; }
+    }
 
-    @Override public JComponent row(Setting<?> setting) {
-        return new JLabel(settings.handle(setting).spec().label());
+    FakeSettingsPanelHost(FakePluginSettings settings, java.util.function.Supplier<Optional<java.nio.file.Path>> chooseFile) {
+        this.settings = settings;
+        this.chooseFile = chooseFile;
+        reloads = settings.onReloaded(() -> {
+            if (EventQueue.isDispatchThread()) rebase(); else EventQueue.invokeLater(this::rebase);
+        });
+    }
+
+    private void guard() { if (closed) throw new IllegalStateException("Settings page is closed"); }
+
+
+    @Override public Nodes.Node row(Setting<?> setting) {
+        guard();
+        var handle = settings.handle(setting);
+        var row = rows.computeIfAbsent("settings:" + handle.key(), ignored -> new Row(handle));
+        return KitSettingRows.row(handle.spec(), handle.defaultValue(), pending(handle), row.invalidText, row.error, row.entry);
     }
 
     @SuppressWarnings("unchecked")
     @Override public <T> T pending(Setting<T> setting) {
-        settings.handle(setting);
-        return pending.containsKey(setting.key()) ? (T) pending.get(setting.key()) : setting.get();
+        guard();
+        var handle = settings.handle(setting);
+        var edit = draft.get(handle);
+        return edit == null ? setting.get() : (T) edit.orElse(handle.defaultValue());
     }
 
-    @SuppressWarnings("unchecked")
     @Override public <T> void stage(Setting<T> setting, T value) {
-        var handle = (FakeSetting<T>) settings.handle(setting);
-        Optional<String> problem = handle.spec().kind().check(value);
-        if (problem.isPresent()) throw new IllegalArgumentException(problem.get());
-        pending.put(setting.key(), value);
+        guard();
+        var handle = settings.handle(setting);
+        Object checked = handle.checked(value);
+        Optional<Object> edit = checked.equals(handle.defaultValue()) && !settings.raw().containsKey(handle.key())
+            ? Optional.empty() : Optional.of(checked);
+        draft.put(handle, edit);
+        var row = rows.get("settings:" + handle.key());
+        if (row != null) row.clear();
+        applied = false;
+        rebase();
     }
 
-    @Override public void changed() { changes++; }
+    /** Refresh saved values while retaining edits until the saved representation matches them. */
+    private void rebase() {
+        if (closed) return;
+        draft.entrySet().removeIf(entry -> entry.getValue().isEmpty()
+            ? !settings.raw().containsKey(entry.getKey().key())
+            : settings.raw().containsKey(entry.getKey().key()) && entry.getValue().get().equals(entry.getKey().get()));
+        refresh();
+    }
+
+    private void refresh() { if (!closed && view != null) view.update(view.sourceSpec()); }
+    void highlight(String value) { guard(); query = java.util.Objects.requireNonNull(value); refresh(); }
+    boolean valid() { return rows.values().stream().allMatch(row -> row.error.isEmpty()); }
+
+    /** The fake receives typed intent directly and uses FakeSetting's own conversion/validation. */
+    boolean event(UiEvent event) {
+        guard();
+        String id = event.id();
+        Row row = rows.get(id);
+        for (Row listed : rows.values())
+            if (listed.setting.spec().kind() instanceof dev.jasper.sdk.settings.SettingKind.StringList && listEvent(listed, event)) return true;
+        if (event instanceof UiEvent.Action) {
+            Row browsed = rows.values().stream().filter(value -> id.equals("settings:" + value.setting.key() + ":browse")
+                && value.setting.spec().editor().orElse(null) instanceof dev.jasper.sdk.settings.EditorHint.File).findFirst().orElse(null);
+            if (browsed != null) {
+                // As the host: Browse asks for a file (the host's next queued file selection); cancelling changes nothing.
+                Optional<java.nio.file.Path> chosen = chooseFile.get();
+                if (chosen.isEmpty()) return true;
+                try { stageValue(browsed.setting, chosen.get().toString()); }
+                catch (RuntimeException invalid) {
+                    browsed.error = invalid.getMessage() == null ? "Enter a valid value." : invalid.getMessage();
+                    browsed.invalidText = chosen.get().toString();
+                }
+                changed();
+                refresh();
+                return true;
+            }
+            row = rows.values().stream().filter(value -> id.equals("settings:" + value.setting.key() + ":reset")).findFirst().orElse(null);
+            if (row == null) return false;
+            row.clear();
+            draft.put(row.setting, Optional.empty());
+            rebase();
+        } else {
+            if (row == null || !(event instanceof UiEvent.Edited || event instanceof UiEvent.Toggled || event instanceof UiEvent.Selected)) return false;
+            try { stageValue(row.setting, row.setting.edited(event)); }
+            catch (RuntimeException invalid) {
+                row.error = invalid.getMessage() == null ? "Enter a valid value." : invalid.getMessage();
+                if (event instanceof UiEvent.Edited edit) row.invalidText = edit.text();
+            }
+        }
+        changed();
+        refresh();
+        return true;
+    }
+
+    /** As the host's ordered-list row: the entry's text, Add, Remove and reorder; false when the event is not this row's. */
+    private boolean listEvent(Row row, UiEvent event) {
+        String id = "settings:" + row.setting.key();
+        var items = new java.util.ArrayList<Object>((java.util.List<?>) pending(row.setting));
+        switch (event) {
+            // A refused Add's error lasts only while its text is unchanged: the entry is never part of the value.
+            case UiEvent.Edited edited when edited.id().equals(id + ":new") -> {
+                row.entry = edited.text();
+                if (!row.error.isEmpty()) { row.error = ""; changed(); }
+                refresh();
+                return true;
+            }
+            // The list's own row selection stages nothing, as the host's row ignores it.
+            case UiEvent.Selected selected when selected.id().equals(id) -> { return true; }
+            case UiEvent.Action action when action.id().equals(id + ":add") -> {
+                if (row.entry.isBlank()) return true;
+                items.add(row.entry);
+            }
+            case UiEvent.Removed removed when removed.id().equals(id) -> {
+                int index = itemIndex(removed.itemId(), items.size());
+                if (index < 0) return true;
+                items.remove(index);
+            }
+            case UiEvent.Reordered moved when moved.id().equals(id) -> {
+                int index = itemIndex(moved.itemId(), items.size());
+                if (index < 0 || moved.destination() < 0 || moved.destination() >= items.size()) return true;
+                items.add(moved.destination(), items.remove(index));
+            }
+            default -> { return false; }
+        }
+        try {
+            stageValue(row.setting, java.util.List.copyOf(items));
+            if (event instanceof UiEvent.Action) row.entry = "";
+        } catch (RuntimeException invalid) {
+            row.error = invalid.getMessage() == null ? "Enter a valid value." : invalid.getMessage();
+        }
+        changed();
+        refresh();
+        return true;
+    }
+
+    /** The index an ordered list's {@code item-N} row id names, or -1 for a row that is gone. */
+    private static int itemIndex(String itemId, int size) {
+        if (!itemId.startsWith("item-")) return -1;
+        try { int index = Integer.parseInt(itemId.substring("item-".length())); return index < size ? index : -1; }
+        catch (NumberFormatException notARow) { return -1; }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void stageValue(FakeSetting setting, Object value) { stage(setting, value); }
+
+    ViewSpec descriptor(ViewSpec spec) {
+        return KitSettingRows.project(spec, node -> {
+            if (node instanceof Nodes.SettingRow row) {
+                var owned = rows.values().stream().filter(value -> row.id().equals("settings:" + value.setting.key() + ":row")).findFirst();
+                if (owned.isPresent()) {
+                    // Rebuilt from the draft, keeping the presentation the plugin asked for (its search highlight).
+                    var fresh = (Nodes.SettingRow) row(owned.get().setting);
+                    return new Nodes.SettingRow(fresh.id(), fresh.state(), row.title(), row.description(), fresh.control(), row.dependent(),
+                        row.highlighted() || KitSettingRows.matches(owned.get().setting.spec(), query), row.titleNote());
+                }
+            }
+            return node;
+        });
+    }
+
+    Map<String, Object> pendingValues() {
+        var result = new LinkedHashMap<String, Object>();
+        draft.forEach((setting, value) -> result.put(setting.key(), value.orElse(setting.defaultValue())));
+        return Map.copyOf(result);
+    }
+
+    void saveDraft() {
+        guard();
+        if (!valid()) throw new IllegalStateException("Settings page is invalid");
+        // Publish one snapshot, then one reload, rather than invalidating the draft during iteration.
+        Map.copyOf(draft).forEach(FakeSetting::writeDraft);
+        settings.reload();
+    }
+
+    void closeDraft() {
+        if (closed) return;
+        closed = true;
+        reloads.close();
+        draft.clear();
+        rows.clear();
+    }
+
+    @Override public void changed() { guard(); applied = false; changes++; }
 }

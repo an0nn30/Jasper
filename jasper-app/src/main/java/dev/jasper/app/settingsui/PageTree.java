@@ -1,140 +1,79 @@
 package dev.jasper.app.settingsui;
 
-import com.formdev.flatlaf.FlatClientProperties;
-import com.formdev.flatlaf.util.UIScale;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.Font;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.TreeItem;
 import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
-import javax.swing.BorderFactory;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTree;
-import javax.swing.UIManager;
-import javax.swing.event.TreeExpansionEvent;
-import javax.swing.event.TreeExpansionListener;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeModel;
-import javax.swing.tree.TreeCellRenderer;
-import javax.swing.tree.TreePath;
-import javax.swing.tree.TreeSelectionModel;
 
-/** The Settings category tree: bold top-level pages, chevrons, blue modified pages and search counts. EDT only. */
-final class PageTree extends JTree {
-    private final DefaultMutableTreeNode root = new DefaultMutableTreeNode();
-    private final DefaultTreeModel model = new DefaultTreeModel(root);
-    private final Set<String> expanded = new HashSet<>();
-    private final Map<String, DefaultMutableTreeNode> nodes = new HashMap<>();
+/**
+ * The Settings category tree as a kit tree descriptor: page titles with their ancestors, search counts at the row ends, and
+ * pages holding unsaved changes emphasized. Every group stays open, unless the look's navigation collapses (spec 12.1):
+ * then a section the user closed stays closed for this opening, except while a search runs. EDT only.
+ */
+final class PageTree {
+    static final String ID = "pages";
+    private final Map<String, SettingsPage> shown = new LinkedHashMap<>();
+    private List<SettingsPage> pages = List.of();
     private Map<String, Integer> counts = Map.of();
     private Predicate<String> modified = id -> false;
-    private boolean rebuilding;
-    private boolean searching;
+    private String selected;
+    private boolean collapsible;
+    private final Set<String> collapsed = new HashSet<>();
 
-    PageTree(Consumer<String> selected) {
-        setModel(model);
-        setRootVisible(false);
-        setShowsRootHandles(true);
-        setToggleClickCount(1);
-        setCellRenderer(new Row());
-        setBorder(BorderFactory.createEmptyBorder(UIScale.scale(4), UIScale.scale(4), UIScale.scale(4), UIScale.scale(4)));
-        putClientProperty(FlatClientProperties.STYLE, "icon.arrowType: chevron");
-        putClientProperty(FlatClientProperties.TREE_WIDE_SELECTION, true);
-        putClientProperty(FlatClientProperties.TREE_WIDE_CELL_RENDERER, true);
-        getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
-        getAccessibleContext().setAccessibleName("Settings categories");
-        addTreeSelectionListener(event -> {
-            if (!rebuilding) selectedId().ifPresent(selected);
-        });
-        addTreeExpansionListener(new TreeExpansionListener() {
-            @Override public void treeExpanded(TreeExpansionEvent event) { remember(event, true); }
-            @Override public void treeCollapsed(TreeExpansionEvent event) { remember(event, false); }
-            private void remember(TreeExpansionEvent event, boolean open) {
-                if (rebuilding || searching) return;
-                if (((DefaultMutableTreeNode) event.getPath().getLastPathComponent()).getUserObject() instanceof SettingsPage page) {
-                    if (open) expanded.add(page.id()); else expanded.remove(page.id());
-                }
-            }
-        });
+    /** Whether sections collapse (spec 12.1). */
+    void collapsible(boolean value) { collapsible = value; if (!value) collapsed.clear(); }
+
+    /**
+     * The user opened or closed a section; the state lives as long as this tree (spec 12.1: it is not saved). While a
+     * search runs every section shows, so a triangle's click there changes nothing.
+     */
+    void expanded(String id, boolean open) {
+        if (!collapsible || !counts.isEmpty()) return;
+        if (open) collapsed.remove(id); else collapsed.add(id);
     }
 
-    @Override public void updateUI() {
-        super.updateUI();
-        setBackground(UIManager.getColor("Panel.background"));
-        if (getFont() != null) setRowHeight(getFontMetrics(getFont()).getHeight() + UIScale.scale(10));
+    /** Opens the sections above {@code id}, so a page navigated to is in view. */
+    void reveal(String id) {
+        for (var at = find(id).flatMap(SettingsPage::parent); at.isPresent(); at = find(at.get()).flatMap(SettingsPage::parent)) collapsed.remove(at.get());
     }
+
+    boolean isCollapsed(String id) { return collapsed.contains(id); }
 
     /**
      * Shows the pages {@code visible} accepts, with their ancestors; a page that hides while childless never shows
-     * without children. Searching expands everything; otherwise remembered expansion applies (groups start open).
+     * without children.
      */
-    void show(List<SettingsPage> pages, Predicate<SettingsPage> visible, Map<String, Integer> counts, boolean searching) {
-        String selection = selectedId().orElse(null);
+    void show(List<SettingsPage> pages, Predicate<SettingsPage> visible, Map<String, Integer> counts) {
+        this.pages = List.copyOf(pages);
         this.counts = Map.copyOf(counts);
-        this.searching = searching;
-        rebuilding = true;
-        try {
-            if (expanded.isEmpty() && !searching)
-                for (SettingsPage page : pages) if (page.parent().isEmpty()) expanded.add(page.id());
-            root.removeAllChildren();
-            nodes.clear();
-            var keep = new HashSet<String>();
-            for (SettingsPage page : pages) {
-                boolean childless = pages.stream().noneMatch(other -> other.parent().equals(Optional.of(page.id())));
-                if (page.hiddenWhenChildless() && childless) continue;
-                if (!visible.test(page)) continue;
-                for (String id = page.id(); id != null; id = find(pages, id).flatMap(SettingsPage::parent).orElse(null)) keep.add(id);
-            }
-            for (SettingsPage page : pages) {
-                if (!keep.contains(page.id())) continue;
-                var node = new DefaultMutableTreeNode(page);
-                nodes.put(page.id(), node);
-                page.parent().map(nodes::get).orElse(root).add(node);
-            }
-            model.reload();
-            for (var node : nodes.values()) {
-                var page = (SettingsPage) node.getUserObject();
-                if (searching || expanded.contains(page.id())) expandPath(new TreePath(node.getPath()));
-            }
-            if (selection != null && nodes.containsKey(selection)) setSelectionPath(new TreePath(nodes.get(selection).getPath()));
-        } finally { rebuilding = false; }
+        var keep = new HashSet<String>();
+        for (SettingsPage page : pages) {
+            boolean childless = pages.stream().noneMatch(other -> other.parent().equals(Optional.of(page.id())));
+            if (page.hiddenWhenChildless() && childless) continue;
+            if (!visible.test(page)) continue;
+            for (String id = page.id(); id != null; id = find(id).flatMap(SettingsPage::parent).orElse(null)) keep.add(id);
+        }
+        shown.clear();
+        for (SettingsPage page : pages) if (keep.contains(page.id())) shown.put(page.id(), page);
     }
 
-    @Override public boolean getScrollableTracksViewportWidth() { return true; }
-
-    private static Optional<SettingsPage> find(List<SettingsPage> pages, String id) {
+    private Optional<SettingsPage> find(String id) {
         return pages.stream().filter(page -> page.id().equals(id)).findFirst();
     }
 
-    /** Selects {@code id} without reporting it back, expanding its ancestors. */
-    void select(String id) {
-        var node = nodes.get(id);
-        if (node == null) return;
-        rebuilding = true;
-        try {
-            var path = new TreePath(node.getPath());
-            if (path.getParentPath() != null) expandPath(path.getParentPath());
-            setSelectionPath(path);
-            scrollPathToVisible(path);
-        } finally { rebuilding = false; }
-    }
+    void select(String id) { selected = id; }
 
-    Optional<String> selectedId() {
-        return getLastSelectedPathComponent() instanceof DefaultMutableTreeNode node && node.getUserObject() instanceof SettingsPage page
-            ? Optional.of(page.id()) : Optional.empty();
-    }
+    Optional<String> selectedId() { return Optional.ofNullable(selected).filter(shown::containsKey); }
 
-    void modifiedBy(Predicate<String> value) { modified = value; repaint(); }
+    void modifiedBy(Predicate<String> value) { modified = value; }
 
     boolean isModified(String id) { return modified.test(id); }
 
@@ -143,52 +82,33 @@ final class PageTree extends JTree {
     /** Page ids in display order; for tests. */
     List<String> visibleIds() {
         var ids = new ArrayList<String>();
-        Enumeration<?> all = root.preorderEnumeration();
-        while (all.hasMoreElements())
-            if (((DefaultMutableTreeNode) all.nextElement()).getUserObject() instanceof SettingsPage page) ids.add(page.id());
+        for (var page : shown.values()) if (page.parent().isEmpty() || !shown.containsKey(page.parent().get())) walk(page, ids);
         return ids;
     }
 
-    /** Title at left (bold at the top level, blue when modified) and a search count at right. */
-    private final class Row extends JPanel implements TreeCellRenderer {
-        private final JLabel title = new JLabel();
-        private final JLabel count = new JLabel();
+    private void walk(SettingsPage page, List<String> ids) {
+        ids.add(page.id());
+        for (var child : children(page.id())) walk(child, ids);
+    }
 
-        Row() {
-            super(new BorderLayout(UIScale.scale(8), 0));
-            setOpaque(false);
-            title.putClientProperty("html.disable", true);
-            count.putClientProperty("html.disable", true);
-            add(title, BorderLayout.CENTER);
-            add(count, BorderLayout.EAST);
-            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(2), 0, UIScale.scale(10)));
-        }
+    private List<SettingsPage> children(String id) {
+        return shown.values().stream().filter(page -> page.parent().equals(Optional.of(id))).toList();
+    }
 
-        @Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean open,
-                                                                boolean leaf, int row, boolean focused) {
-            var page = (SettingsPage) ((DefaultMutableTreeNode) value).getUserObject();
-            if (page == null) return this;
-            title.setText(page.title());
-            title.setFont(tree.getFont().deriveFont(page.parent().isEmpty() ? Font.BOLD : Font.PLAIN));
-            Color foreground = UIManager.getColor(selected && tree.hasFocus() ? "Tree.selectionForeground" : "Label.foreground");
-            if (modified.test(page.id()) && !(selected && tree.hasFocus())) {
-                Color link = UIManager.getColor("Component.linkColor");
-                if (link != null) foreground = link;
-            }
-            title.setForeground(foreground);
-            int matches = counts.getOrDefault(page.id(), 0);
-            count.setText(matches > 0 ? Integer.toString(matches) : "");
-            count.setForeground(UIManager.getColor("Label.disabledForeground"));
-            count.setFont(tree.getFont());
-            getAccessibleContext().setAccessibleName(page.title() + (modified.test(page.id()) ? ", modified" : ""));
-            return this;
-        }
+    private TreeItem item(SettingsPage page) {
+        var children = children(page.id()).stream().map(this::item).toList();
+        int matches = count(page.id());
+        return new TreeItem(page.id(), page.title(), Optional.empty(), children.isEmpty(), children,
+            matches > 0 ? OptionalInt.of(matches) : OptionalInt.empty(), isModified(page.id()));
+    }
 
-        @Override public void setBounds(int x, int y, int width, int height) {
-            super.setBounds(x, y, width, height);
-            doLayout(); // CellRendererPane does not validate compound tree renderers.
-        }
-
-        @Override public Dimension getPreferredSize() { return new Dimension(UIScale.scale(200), getRowHeight()); }
+    /** The kit tree: every branch open but the collapsed ones (all while searching), the selection, counts and emphasis. */
+    Nodes.Tree node() {
+        var roots = shown.values().stream().filter(page -> page.parent().isEmpty() || !shown.containsKey(page.parent().get()))
+            .map(this::item).toList();
+        var open = new HashSet<String>();
+        for (var page : shown.values())
+            if (!children(page.id()).isEmpty() && (!counts.isEmpty() || !collapsed.contains(page.id()))) open.add(page.id());
+        return new Nodes.Tree(ID, ControlState.READY, roots, open, selectedId().map(Set::of).orElse(Set.of()), "");
     }
 }

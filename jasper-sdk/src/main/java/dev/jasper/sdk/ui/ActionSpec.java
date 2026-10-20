@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import javax.swing.Icon;
 
 /**
  * An action as the user sees it in the command palette, menus and toolbar.
@@ -12,7 +11,7 @@ import javax.swing.Icon;
  * @param id namespaced id that starts with the plugin's id and a dot, for example {@code dev.example.tool.run};
  *           it is also the key users write under {@code [keybindings]}
  * @param title non-blank title
- * @param icon icon for the palette and toolbar, normally from {@link Appearance#icon}
+ * @param icon icon for the palette and toolbar, a kit name or registered plugin icon
  * @param keywords extra palette search words; copied
  * @param defaultBinding shortcut in the configuration syntax, for example {@code cmd+alt+j}. The user's
  *                       configuration and the built-in shortcuts win; a default that collides is dropped. On Linux and
@@ -22,7 +21,7 @@ import javax.swing.Icon;
  *                            ctrl, alt and shift literally; {@code none} for no default there (since 0.11.0)
  * @param context where the shortcut applies; {@link ShortcutContext#global()} unless set (since 0.11.0)
  */
-public record ActionSpec(String id, String title, Optional<Icon> icon, List<String> keywords, Optional<String> defaultBinding,
+public record ActionSpec(String id, String title, Optional<String> icon, List<String> keywords, Optional<String> defaultBinding,
                          Optional<String> otherDefaultBinding, ShortcutContext context) {
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]*(\\.[a-z0-9_-]+)+");
 
@@ -47,7 +46,7 @@ public record ActionSpec(String id, String title, Optional<Icon> icon, List<Stri
      * @param keywords extra palette search words
      * @param defaultBinding shortcut in the configuration syntax
      */
-    public ActionSpec(String id, String title, Optional<Icon> icon, List<String> keywords, Optional<String> defaultBinding) {
+    public ActionSpec(String id, String title, Optional<String> icon, List<String> keywords, Optional<String> defaultBinding) {
         this(id, title, icon, keywords, defaultBinding, Optional.empty(), ShortcutContext.global());
     }
 
@@ -68,7 +67,7 @@ public record ActionSpec(String id, String title, Optional<Icon> icon, List<Stri
      * @param value the icon, or null for none
      * @return the copy
      */
-    public ActionSpec withIcon(Icon value) {
+    public ActionSpec withIcon(String value) {
         return new ActionSpec(id, title, Optional.ofNullable(value), keywords, defaultBinding, otherDefaultBinding, context);
     }
 

@@ -1,0 +1,254 @@
+## Remembered start-up cache failures (docs/superpowers/specs/2026-10-14-jasper-startup-recovery-design.md, 6.2).
+## Each vector: a line "record", the record's lines verbatim (none for an empty file), a line
+## "actual <size> <modified> <digest> <path>" (size and modified are both "absent" when no file is at the path; digest
+## "-" when the start has none; the path is the rest of the line and may contain spaces), then "= match" or
+## "= no match". Lines starting "##" are comments of this file. Read by the launcher's native tests and by the
+## application's tests (plan 3); keep both in step.
+## This file is split on LF only. Each record line is followed by LF; a record line that ends with the two characters
+## backslash and r stands for that line ending with a carriage return (CR LF). There are no other escapes.
+## exact match, options empty
+record
+# Jasper skips its start-up cache while this file matches it. Delete this file to try the cache again.
+cache=/Applications/Jasper.app/Contents/app/jasper.aot
+size=123456789
+modified=1760400000
+options=
+actual 123456789 1760400000 - /Applications/Jasper.app/Contents/app/jasper.aot
+= match
+## empty options match a start with custom options too
+record
+cache=/Applications/Jasper.app/Contents/app/jasper.aot
+size=123456789
+modified=1760400000
+options=
+actual 123456789 1760400000 0123456789abcdef /Applications/Jasper.app/Contents/app/jasper.aot
+= match
+## options equal to the start's digest
+record
+cache=/Applications/Jasper.app/Contents/app/jasper.aot
+size=123456789
+modified=1760400000
+options=0123456789abcdef
+actual 123456789 1760400000 0123456789abcdef /Applications/Jasper.app/Contents/app/jasper.aot
+= match
+## options differ from the start's digest
+record
+cache=/Applications/Jasper.app/Contents/app/jasper.aot
+size=123456789
+modified=1760400000
+options=0123456789abcdef
+actual 123456789 1760400000 fedcba9876543210 /Applications/Jasper.app/Contents/app/jasper.aot
+= no match
+## options set, but the start has no digest
+record
+cache=/Applications/Jasper.app/Contents/app/jasper.aot
+size=123456789
+modified=1760400000
+options=0123456789abcdef
+actual 123456789 1760400000 - /Applications/Jasper.app/Contents/app/jasper.aot
+= no match
+## size differs
+record
+cache=/Applications/Jasper.app/Contents/app/jasper.aot
+size=123456789
+modified=1760400000
+options=
+actual 123456790 1760400000 - /Applications/Jasper.app/Contents/app/jasper.aot
+= no match
+## modified differs
+record
+cache=/Applications/Jasper.app/Contents/app/jasper.aot
+size=123456789
+modified=1760400000
+options=
+actual 123456789 1760400001 - /Applications/Jasper.app/Contents/app/jasper.aot
+= no match
+## the cache path is not compared: a record written with another spelling of the path matches
+record
+cache=/Applications/./Jasper.app/Contents/app/jasper.aot
+size=123456789
+modified=1760400000
+options=
+actual 123456789 1760400000 - /Applications/Jasper.app/Contents/app/jasper.aot
+= match
+## no file at the cache's path
+record
+cache=/Applications/Jasper.app/Contents/app/jasper.aot
+size=123456789
+modified=1760400000
+options=
+actual absent absent - /Applications/Jasper.app/Contents/app/jasper.aot
+= no match
+## a cache path with a space and a non-ASCII character
+record
+cache=/Users/Jürgen/My Apps/Jasper.app/Contents/app/jasper.aot
+size=42
+modified=1760400000
+options=
+actual 42 1760400000 - /Users/Jürgen/My Apps/Jasper.app/Contents/app/jasper.aot
+= match
+## a path containing "=": the key ends at the first one
+record
+cache=/opt/a=b/jasper.aot
+size=42
+modified=1760400000
+options=
+actual 42 1760400000 - /opt/a=b/jasper.aot
+= match
+## CRLF line endings
+record
+# Jasper skips its start-up cache while this file matches it. Delete this file to try the cache again.\r
+cache=C:\Users\a\AppData\Local\Jasper\app\jasper.aot\r
+size=42\r
+modified=1760400000\r
+options=0123456789abcdef\r
+actual 42 1760400000 0123456789abcdef C:\Users\a\AppData\Local\Jasper\app\jasper.aot
+= match
+## comment lines and empty lines anywhere
+record
+# first
+
+cache=/opt/jasper/lib/app/jasper.aot
+# between
+size=42
+
+modified=1760400000
+
+options=
+#last
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= match
+## keys in any order
+record
+options=
+modified=1760400000
+size=42
+cache=/opt/jasper/lib/app/jasper.aot
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= match
+## leading zeros: size and modified compare as numbers
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=00042
+modified=01760400000
+options=
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= match
+## 19 digits are allowed
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=1000000000000000000
+modified=1760400000
+options=
+actual 1000000000000000000 1760400000 - /opt/jasper/lib/app/jasper.aot
+= match
+## sizes above the signed 64-bit range compare as unsigned numbers
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=9999999999999999999
+modified=1760400000
+options=
+actual 9999999999999999999 1760400000 - /opt/jasper/lib/app/jasper.aot
+= match
+## a missing key
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=42
+modified=1760400000
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## a repeated key, even with the same value
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=42
+size=42
+modified=1760400000
+options=
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## an unknown key
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=42
+modified=1760400000
+options=
+build=1
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## a key with a space before "=" is an unknown key
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size =42
+modified=1760400000
+options=
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## a line without "="
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=42
+modified=1760400000
+options=
+remembered
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## an empty cache path
+record
+cache=
+size=42
+modified=1760400000
+options=
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## a size that is not all digits
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=42b
+modified=1760400000
+options=
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## a size with a space
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size= 42
+modified=1760400000
+options=
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## a signed modification time
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=42
+modified=+1760400000
+options=
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## a 20-digit size
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=00000000000000000042
+modified=1760400000
+options=
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match
+## options of the wrong length
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=42
+modified=1760400000
+options=0123456789abcde
+actual 42 1760400000 0123456789abcde /opt/jasper/lib/app/jasper.aot
+= no match
+## options in uppercase hex
+record
+cache=/opt/jasper/lib/app/jasper.aot
+size=42
+modified=1760400000
+options=0123456789ABCDEF
+actual 42 1760400000 0123456789ABCDEF /opt/jasper/lib/app/jasper.aot
+= no match
+## an empty record
+record
+actual 42 1760400000 - /opt/jasper/lib/app/jasper.aot
+= no match

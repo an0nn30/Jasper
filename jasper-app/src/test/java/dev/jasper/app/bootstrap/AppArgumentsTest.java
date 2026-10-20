@@ -73,4 +73,25 @@ class AppArgumentsTest {
         }
         assertThat(AppArguments.USAGE).contains("--safe-mode", "--plugin-dir <path>", "--standalone");
     }
+
+    @Test void noWindowParsesOnceAndNeverWithBackground() {
+        assertThat(AppArguments.parse(new String[0], cwd).noWindow()).isFalse();
+        assertThat(AppArguments.parse(new String[]{"--no-window"}, cwd))
+            .isEqualTo(new AppArguments(null, false, false, false, null, false, false, true));
+        for (String[] args : new String[][]{{"--no-window", "--no-window"}, {"--no-window", "--background"}}) {
+            assertThatIllegalArgumentException().as(java.util.Arrays.toString(args))
+                .isThrownBy(() -> AppArguments.parse(args, cwd)).withMessageContaining("Usage:");
+        }
+        assertThat(AppArguments.USAGE).contains("--no-window");
+        assertThat(AppArguments.parse(new String[]{"--no-window"}, cwd).withHomeOverride(true).noWindow()).isTrue();
+    }
+
+    @Test void onlyAnotherConfigurationOrPluginSetServesAPrivateCommandSocket() {
+        assertThat(new AppArguments(null, false, false).privateCommands()).isFalse();
+        assertThat(new AppArguments(null, false, false).withHomeOverride(true).privateCommands()).as("a home override").isFalse();
+        assertThat(new AppArguments(cwd.resolve("c.toml"), false, false).privateCommands()).isTrue();
+        assertThat(new AppArguments(null, false, false, true, null, false).privateCommands()).isTrue();
+        assertThat(new AppArguments(null, false, false, false, cwd, false).privateCommands()).isTrue();
+        assertThat(new AppArguments(null, false, false, false, null, true).privateCommands()).isTrue();
+    }
 }

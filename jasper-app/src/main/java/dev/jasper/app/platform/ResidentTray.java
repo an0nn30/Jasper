@@ -216,7 +216,7 @@ public final class ResidentTray {
 
     /** Jasper's terminal glyph at 1x and 2x (16 and 32 pixels); as a template image only its shape counts. */
     static Image menuBarGlyph() {
-        URL artwork = AppIcons.artwork("TERMINAL");
+        URL artwork = AppIcons.trayArtwork();
         return new BaseMultiResolutionImage(FlatSVGUtils.svg2image(artwork, 16, 16), FlatSVGUtils.svg2image(artwork, 32, 32));
     }
 

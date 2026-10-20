@@ -3,16 +3,20 @@ package dev.jasper.vault.ui;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginWindow;
+import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.WindowSpec;
 import dev.jasper.vault.api.LockState;
 import dev.jasper.vault.lock.LockManager;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Note;
+import dev.jasper.vault.model.ManagedSshKey;
 import dev.jasper.vault.model.SshKey;
 import dev.jasper.vault.service.UnlockPrompt;
 import dev.jasper.vault.service.VaultService;
+import dev.jasper.vault.workstation.Layout;
 import java.awt.Dimension;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -22,8 +26,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import javax.swing.JCheckBox;
-import javax.swing.JLabel;
 
 /** Singleton window ownership and modal editors. The plugin forwards state/save/config changes here. */
 public final class VaultManagerWindow implements AutoCloseable {
@@ -32,10 +34,13 @@ public final class VaultManagerWindow implements AutoCloseable {
     private final LockManager lock;
     private final VaultManager manager;
     private final VaultService service;
-    private final SecretClipboard clipboard;
-    private final Supplier<String> status;
+    /** Presentation of the configured provider, auto-lock policy and actual vault path. */
+    public record Status(String deviceSecret, String autoLock, String path) { }
+    private final Supplier<Status> status;
     private final Runnable generate;
-    private final Map<PluginDialog, EditorForm> dialogs = new IdentityHashMap<>();
+    private final EntryPresenter editors;
+    private final Layout layout;
+    private final CopyCards copies;
     private PluginWindow window;
     private WindowHandle owner;
     private UnlockPrompt unlockPrompt;
@@ -43,25 +48,37 @@ public final class VaultManagerWindow implements AutoCloseable {
     PasswordPanel passwordPanel;
 
     public VaultManagerWindow(PluginContext context, LockManager lock, VaultManager manager,
-                              VaultService service, SecretClipboard clipboard, Supplier<String> status, Runnable generate) {
+                              VaultService service, Supplier<Status> status, Runnable generate) {
+        this(context, lock, manager, service, status, generate, Layout.ROWS);
+    }
+
+    /** The manager window in {@code layout}'s composition (Enterprise presentation spec 14.8). */
+    public VaultManagerWindow(PluginContext context, LockManager lock, VaultManager manager,
+                              VaultService service, Supplier<Status> status, Runnable generate, Layout layout) {
+        this.layout = layout;
         this.context = context; this.lock = lock; this.manager = manager; this.service = service;
-        this.clipboard = clipboard; this.status = status; this.generate = generate;
+        this.status = status; this.generate = generate;this.editors=new EntryPresenter(context, layout);
+        this.copies = CopyCards.declare(context);
     }
     public boolean isOpen() { return window != null; }
+    /** The plugin's kit, for the forms this window owns. */
+    public UiKit kit() { return context.kit(); }
     public void show(WindowHandle owner, Optional<UUID> selection) {
         this.owner = owner;
         if (window == null) {
-            window = context.windows().create(new WindowSpec(ID, "Credential Vault", new Dimension(800, 600), true));
-            panel = new ManagerPanel(manager::entry, this::add, this::edit, this::delete, this::copyPublic,
-                grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, this::changePassword, lock::lock,
-                () -> service.requestUnlock(this.owner), context.appearance()::icon);
-            panel.closeButton.addActionListener(event -> close());
-            panel.cancelButton.addActionListener(event -> close());
-            window.setContent(panel);
+            window = context.windows().create(new WindowSpec(ID, "Credential Vault", layout == Layout.CLASSIC ? new Dimension(820, 571) : new Dimension(900, 555), true, WindowSpec.SizeBasis.CONTENT));
+            var shown = new ManagerPanel(context.kit(), layout, manager::entry, this::add, this::edit, this::delete, this::copyPublic,
+                grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
+                () -> service.requestUnlock(this.owner), this::close);
+            shown.copies(copies);
+            panel = shown;
+            window.setContent(shown.view());
+            // The classic toolbar row carries the title actions (plan 10b Rulings 3).
+            window.setTitleActions(layout == Layout.CLASSIC ? Optional.empty() : Optional.of(shown.titleActions()));
             window.onClosed(() -> {
-                window = null; closeDialogs(); panel.close();
+                // The surface has already disposed the view and erased its storage; nothing touches it from here.
+                window = null; shown.close(); closeDialogs();
                 if (unlockPrompt != null) unlockPrompt.cancel();
-                if (passwordPanel != null) passwordPanel.clear();
                 passwordPanel = null; unlockPrompt = null;
             });
         }
@@ -78,75 +95,87 @@ public final class VaultManagerWindow implements AutoCloseable {
     /** Routes the service's existing shared prompt into this window, with no second unlock attempt. */
     public boolean showUnlock(UnlockPrompt prompt) {
         if (window == null) return false;
-        unlockPrompt = prompt; passwordPanel = PasswordPanel.unlock(prompt);
+        unlockPrompt = prompt; passwordPanel = panel.showUnlock(prompt);
         PasswordPanel shown = passwordPanel;
-        panel.unlockContent(shown);
+        boolean[] active = {true};
+        prompt.onPresentationRetired(() -> {
+            active[0] = false;
+            if (unlockPrompt == prompt && passwordPanel == shown) {
+                unlockPrompt = null; passwordPanel = null;
+                panel.passiveUnlock();
+            } else shown.close();
+        });
         prompt.onDismiss(() -> {
+            if (!active[0]) return;
             shown.clear();
-            if (unlockPrompt == prompt) { unlockPrompt = null; passwordPanel = null; changed(); }
+            if (unlockPrompt == prompt && passwordPanel == shown) { unlockPrompt = null; passwordPanel = null; changed(); }
         });
         window.toFront(); return true;
     }
     /** Every form, including the generator, gets the same modal ownership and close-time wipe. */
-    public void dialog(String title, Function<Runnable, ? extends EditorForm> factory) {
+    public void dialog(String title, Function<Runnable, ? extends EditorForm> factory) { dialog(title, Nodes.Hue.NONE, factory); }
+    /** As {@link #dialog(String, Function)}, the sheet's swatch in {@code hue} under the classic layout (plan 10b Rulings 5). */
+    public void dialog(String title, Nodes.Hue hue, Function<Runnable, ? extends EditorForm> factory) {
         if (window == null || lock.state() != LockState.UNLOCKED) return;
-        PluginDialog dialog = context.windows().dialog(new DialogSpec(title, window, true));
-        EditorForm form;
-        try { form = factory.apply(dialog::close); }
-        catch (RuntimeException failure) {
-            dialog.close();
-            context.notifications().group().error("Could not open the form", title + ": " + EditorForm.message(failure), failure);
-            return;
-        }
-        form.setFileChooser(dialog::chooseFile);
-        dialogs.put(dialog, form); dialog.setContent(form);
-        dialog.onClosed(() -> { form.close(); dialogs.remove(dialog); });
-        dialog.show();
+        editors.show(window,title,hue,factory,()->{});
     }
-    private void add(VaultManager.Type type) {
+    /** Opens the sheet for a new entry of the type over the open window; does nothing when it is closed or locked. */
+    public void add(VaultManager.Type type) {
+        UiKit kit = context.kit();
         switch (type) {
-            case LOGIN -> dialog("Add Login", close -> EntryEditor.login(null, manager::saveAccount, close));
-            case SSH_KEY -> dialog("Add SSH Key", close -> EntryEditor.key(null, manager::importKey, close));
-            case NOTE -> dialog("Add Secure Note", close -> EntryEditor.note(null, manager::saveNote, close));
+            case LOGIN -> dialog("Add Login", Nodes.Hue.BLUE, close -> EntryEditor.login(kit, null, manager::saveAccount, close));
+            case SSH_KEY -> dialog("Add SSH Key", Nodes.Hue.GREEN, close -> EntryEditor.key(kit, null, manager::importKey, close));
+            case NOTE -> dialog("Add Secure Note", Nodes.Hue.AMBER, close -> EntryEditor.note(kit, null, manager::saveNote, close));
         }
     }
     private void edit(UUID id) {
+        UiKit kit = context.kit();
         manager.entry(id).ifPresent(value -> {
             switch (value) {
-                case Account a -> dialog("Edit Login", close -> EntryEditor.login(a, manager::saveAccount, close));
-                case dev.jasper.vault.model.ManagedSshKey k -> dialog("Edit stored SSH key", close -> {
-                    var form = new EditorForm(close); var name = new javax.swing.JTextField(k.name(), 28);
-                    form.field("Name", name); form.field("Storage", new JLabel("Stored in Vault"));
-                    form.field("Fingerprint", new JLabel(k.fingerprint()));
-                    UUID keyId = k.id(); form.submit(() -> manager.renameManaged(keyId, name.getText().strip())); return form;
+                case Account a -> dialog("Edit Login", Nodes.Hue.BLUE, close -> EntryEditor.login(kit, a, manager::saveAccount, close));
+                case dev.jasper.vault.model.ManagedSshKey k -> dialog("Edit stored SSH key", Nodes.Hue.GREEN, close -> {
+                    var form = new EditorForm(kit, close);
+                    form.text(EntryEditor.NAME, "Name", k.name());
+                    form.display("storage", "Storage", "Stored in Vault");
+                    form.display("fingerprint", "Fingerprint", k.fingerprint());
+                    UUID keyId = k.id(); form.submit(() -> manager.renameManaged(keyId, form.value(EntryEditor.NAME).strip())); return form;
                 });
-                case SshKey k -> dialog("Edit SSH Key", close -> EntryEditor.key(k, manager::importKey, close));
-                case Note n -> dialog("Edit Secure Note", close -> EntryEditor.note(n, manager::saveNote, close));
+                case SshKey k -> dialog("Edit SSH Key", Nodes.Hue.GREEN, close -> EntryEditor.key(kit, k, manager::importKey, close));
+                case Note n -> dialog("Edit Secure Note", Nodes.Hue.AMBER, close -> EntryEditor.note(kit, n, manager::saveNote, close));
                 default -> throw new IllegalArgumentException("Unknown vault entry");
             }
         });
     }
+    static final String DELETE_FILES = "delete-files";
     private void delete(UUID id) {
+        UiKit kit = context.kit();
         manager.entry(id).ifPresent(value -> dialog("Delete entry", close -> {
-            var form = new EditorForm(close);
-            form.field("Remove this entry?", new JLabel(manager.rows().stream().filter(r -> r.id().equals(id)).findFirst().orElseThrow().name()));
-            var deleteFiles = new JCheckBox("Delete private and public key files too", false);
+            var form = new EditorForm(kit, close);
+            form.description("entry", "", "Remove this entry? " + manager.rows().stream().filter(r -> r.id().equals(id)).findFirst().orElseThrow().name());
             if (value instanceof SshKey key) {
-                form.field("Files", deleteFiles);
-                form.field("Private file", new JLabel(key.privatePath().toString()));
-                form.field("Public file", new JLabel(key.publicPath().toString()));
-                form.field("Shared files", new JLabel("Other accounts using these paths will also lose the files."));
+                form.toggle(DELETE_FILES, "Delete private and public key files too", false);
+                form.display("private-file", "Private file", key.privatePath().toString());
+                form.display("public-file", "Public file", key.publicPath().toString());
+                form.display("shared-files", "Shared files", "Other accounts using these paths will also lose the files.");
             }
-            form.save.setText("Delete"); form.submit(() -> manager.delete(id, deleteFiles.isSelected())); return form;
+            form.setSaveLabel("Delete"); form.submit(() -> manager.delete(id, form.checked(DELETE_FILES))); return form;
         }));
     }
-    private void changePassword() {
-        dialog("Change Master Password", close -> new ChangePasswordForm(lock, close, failure -> {
+    /** Shows the saved plugin grants in the open window; does nothing when it is closed or locked. */
+    public void showGrants() { if (window != null) { panel.showGrants(); window.toFront(); } }
+    /** Asks for a new master password over the open window; does nothing when it is closed or locked. */
+    public void changePassword() {
+        dialog("Change Master Password", close -> new ChangePasswordForm(context.kit(), lock, close, failure -> {
             if (failure != null) context.notifications().group().error("Master password was not changed", EditorForm.message(failure), failure);
         }));
     }
     private void copyPublic(UUID id) {
-        CompletableFuture<Void> copied = manager.publicKey(id).thenAccept(clipboard::copy);
+        String name = manager.entry(id).map(entry -> switch (entry) {
+            case SshKey key -> key.name();
+            case ManagedSshKey key -> key.name();
+            default -> "";
+        }).orElse("");
+        CompletableFuture<Void> copied = manager.publicKey(id).thenAccept(text -> copies.plain("public key", name, text));
         report("Could not copy the public key", copied);
     }
     private void report(String title, CompletableFuture<Void> operation) {
@@ -155,10 +184,7 @@ public final class VaultManagerWindow implements AutoCloseable {
             changed();
         });
     }
-    private void closeDialogs() {
-        for (var entry : List.copyOf(dialogs.entrySet())) { entry.getValue().close(); entry.getKey().close(); }
-        dialogs.clear();
-    }
+    private void closeDialogs() {editors.close();}
     @Override public void close() {
         closeDialogs();
         if (window != null) window.close();

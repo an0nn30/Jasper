@@ -1,34 +1,45 @@
 package dev.jasper.vault.ui;
 
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
 import dev.jasper.vault.service.GrantPrompt;
-import java.awt.BorderLayout;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
+import java.util.List;
+import java.util.Optional;
 
-/** "Allow SSH to use deploy@prod?" with Allow once, Always allow for SSH, Deny. */
-public final class GrantPanel extends JPanel {
-    final JButton once = new JButton("Allow once");
-    final JButton always;
-    final JButton deny = new JButton("Deny");
+/**
+ * "SSH wants to use deploy@prod from the vault." with Deny, Always allow for SSH and Allow once. No action is the
+ * form's primary, so Enter never grants (the former dialog had no default button); Escape denies.
+ */
+public final class GrantPanel implements AutoCloseable {
+    static final String FORM = "grant", QUESTION = "question", ONCE = "allow-once", ALWAYS = "allow-always", DENY = "deny";
+    private final UiView view;
+    private boolean closed;
 
-    public GrantPanel(GrantPrompt prompt) {
-        super(new BorderLayout(0, 12));
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
-        always = new JButton("Always allow for " + prompt.consumerName());
+    public GrantPanel(UiKit kit, GrantPrompt prompt) {
         String what = prompt.descriptor().subtitle().isBlank() ? prompt.descriptor().name() : prompt.descriptor().subtitle() + "@" + prompt.descriptor().name();
-        add(new JLabel("<html><b>" + escape(prompt.consumerName()) + "</b> wants to use <b>" + escape(what) + "</b> from the vault.</html>"), BorderLayout.CENTER);
-        var buttons = new JPanel();
-        buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.add(deny); buttons.add(Box.createHorizontalGlue()); buttons.add(always); buttons.add(Box.createHorizontalStrut(8)); buttons.add(once);
-        add(buttons, BorderLayout.SOUTH);
-        once.addActionListener(event -> prompt.answer(GrantPrompt.Decision.ALLOW_ONCE));
-        always.addActionListener(event -> prompt.answer(GrantPrompt.Decision.ALWAYS));
-        deny.addActionListener(event -> prompt.answer(GrantPrompt.Decision.DENY));
+        // Literal text: names are data, never markup.
+        var question = new Nodes.Text(QUESTION, ControlState.READY, prompt.consumerName() + " wants to use " + what + " from the vault.", Nodes.TextRole.BODY);
+        var actions = List.of(
+            new Nodes.Button(DENY, ControlState.READY, "Deny", "", Nodes.ButtonKind.SECONDARY, DENY, ""),
+            new Nodes.Button(ALWAYS, ControlState.READY, "Always allow for " + prompt.consumerName(), "", Nodes.ButtonKind.SECONDARY, ALWAYS, ""),
+            new Nodes.Button(ONCE, ControlState.READY, "Allow once", "", Nodes.ButtonKind.SECONDARY, ONCE, ""));
+        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, "Allow access", Optional.empty(), List.of(question), Optional.empty(), actions, DENY, Nodes.FormSubmission.NONE);
+        view = kit.create(new ViewSpec(form), event -> {
+            if (closed || !(event instanceof UiEvent.Action action)) return;
+            switch (action.id()) {
+                case ONCE -> prompt.answer(GrantPrompt.Decision.ALLOW_ONCE);
+                case ALWAYS -> prompt.answer(GrantPrompt.Decision.ALWAYS);
+                case DENY -> prompt.answer(GrantPrompt.Decision.DENY);
+                default -> { }
+            }
+        });
     }
 
-    static String escape(String text) { return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"); }
+    public UiView view() { return view; }
+
+    @Override public void close() { if (closed) return; closed = true; view.close(); }
 }

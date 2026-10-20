@@ -1,0 +1,37 @@
+{
+  "name": "Ocean",
+  "dark": true,
+  "author": "Jasper fixtures",
+  "editorScheme": "/themes/Ocean.xml",
+  "colors": {
+    "deep": "#0F1A24",
+    "sea": "#16242F",
+    "foam": "#D8E4EC",
+    "coral": "#FF7A6B",
+    "wave": "seaAccent",
+    "seaAccent": "#3A9AD9"
+  },
+  "ui": {
+    "*": {
+      "background": "sea",
+      "foreground": "foam",
+      "selectionBackground": "#24496B"
+    },
+    "StatusBar": { "background": "deep" },
+    "Button": {
+      "startBackground": "#1E3140",
+      "startBorderColor": "#2E4A60",
+      "default": { "startBackground": "wave", "foreground": "#FFFFFF" }
+    },
+    "ActionButton.hoverBackground": "#FFFFFF1A",
+    "ToolWindow.Header": { "background": "#1D3445", "inactiveBackground": "sea" },
+    "Table.hoverBackground": "#3A9AD933",
+    "Component.borderColor": "#2E4A60",
+    "Component.errorFocusColor": "coral",
+    "Label.infoForeground": "#8FA6B6",
+    "Link.activeForeground": { "os.default": "#6CC4FF", "os.windows": "#5AB0F0" },
+    "ProgressBar.failedColor": "coral",
+    "TextField.background": "#0B141C",
+    "Popup.borderColor": "not-a-colour"
+  }
+}

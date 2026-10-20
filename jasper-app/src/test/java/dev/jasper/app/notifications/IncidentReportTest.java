@@ -37,7 +37,7 @@ class IncidentReportTest {
 
     @Test void theCurrentEnvironmentDescribesThisProcess() {
         var current = IncidentReport.Environment.current();
-        assertThat(current.jasper()).isEqualTo(System.getProperty("jpackage.app-version", "development build"));
+        assertThat(current.jasper()).isEqualTo(dev.jasper.app.platform.BuildInfo.current().summary());
         assertThat(current.os()).startsWith(System.getProperty("os.name"));
         assertThat(current.java()).contains(System.getProperty("java.runtime.version"));
     }

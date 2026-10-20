@@ -68,8 +68,9 @@ class EditorThemeTest {
         assertThat(area.getBackground()).isEqualTo(EDITOR.background());
         assertThat(area.getCaretColor()).isEqualTo(EDITOR.caret());
         assertThat(scroll.getGutter().getBackground()).isEqualTo(EDITOR.gutter());
-        assertThat(scroll.getClientProperty("FlatLaf.style")).isEqualTo(
-            Map.of("background", EDITOR.background()));
+        assertThat(scroll.getBackground()).isEqualTo(EDITOR.background());
+        assertThat(scroll.getViewport().getBackground()).isEqualTo(EDITOR.background());
+        assertThat(scroll.getClientProperty("FlatLaf.style")).as("no raw style escape").isNull();
     }
 
     @Test void rethemingKeepsDocumentSelectionUndoAndDoesNotAccumulateListeners() {
@@ -117,7 +118,7 @@ class EditorThemeTest {
         assertThat(area.getSelectionColor()).isEqualTo(EDITOR.selection());
     }
 
-    @Test void translucentOpacityClearsEverySurfaceSoOnlyTheGlassSurfacePaints() {
+    @Test void translucentOpacityClearsEverySurfaceSoOnlyTheDocumentAreaPaints() {
         var area = new RSyntaxTextArea();
         var scroll = new RTextScrollPane(area);
         scroll.setLineNumbersEnabled(true);

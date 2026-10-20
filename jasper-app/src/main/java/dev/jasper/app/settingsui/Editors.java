@@ -1,39 +1,35 @@
 package dev.jasper.app.settingsui;
 
-import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.TerminalConfig;
-import dev.jasper.app.config.WorkspaceThemeChoice;
+import dev.jasper.app.config.AppearanceMode;
 import dev.jasper.app.lifecycle.Subscription;
-import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.settings.Setting;
 import dev.jasper.app.settings.SettingKind;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.ListItem;
+import dev.jasper.ui.model.MenuItem;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.Option;
+import dev.jasper.ui.model.UiEvent;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.IntPredicate;
 import java.util.function.Supplier;
-import javax.swing.*;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.event.PopupMenuEvent;
-import javax.swing.event.PopupMenuListener;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.text.JTextComponent;
 
-/** Editor factories for settings, chosen by kind unless a page asks for another. */
+/**
+ * Editor factories for settings, chosen by kind unless a page asks for another. Each editor maps its setting to a typed
+ * kit role: switches for booleans, number fields for ranges, dropdowns for choices, text and path fields, searchable
+ * choices for themes and font families, ordered lists and name/value rows. EDT only.
+ */
 public final class Editors {
     private Editors() { }
 
@@ -42,9 +38,32 @@ public final class Editors {
      *
      * @param build creates the editor
      * @param terms extra words the search should match, such as choice names
+     * @param lookTerms further words that depend on the page's context, such as the look's copy for a row
      */
-    public record Factory<T>(BiFunction<Setting<T>, PageContext, ValueEditor<T>> build, List<String> terms) {
-        public Factory { terms = List.copyOf(terms); }
+    public record Factory<T>(BiFunction<Setting<T>, PageContext, ValueEditor<T>> build, List<String> terms,
+                             Function<PageContext, List<String>> lookTerms) {
+        public Factory { terms = List.copyOf(terms); java.util.Objects.requireNonNull(lookTerms); }
+
+        /**
+         * A factory whose search words do not depend on the page's context.
+         *
+         * @param build creates the editor
+         * @param terms extra words the search should match, such as choice names
+         */
+        public Factory(BiFunction<Setting<T>, PageContext, ValueEditor<T>> build, List<String> terms) { this(build, terms, context -> List.of()); }
+
+        /**
+         * The words the search matches on a page with {@code context}: {@link #terms()} and then {@link #lookTerms()}.
+         *
+         * @param context the page's context
+         * @return the search words
+         */
+        public List<String> terms(PageContext context) {
+            var extra = lookTerms.apply(context);
+            if (extra.isEmpty()) return terms;
+            var all = new ArrayList<String>(terms); all.addAll(extra);
+            return List.copyOf(all);
+        }
     }
 
     /** The editor a setting's kind implies. */
@@ -52,7 +71,7 @@ public final class Editors {
     public static <T> Factory<T> byKind(Setting<T> setting) {
         Factory<?> factory = switch (setting.kind()) {
             case SettingKind.Bool ignored -> checkbox();
-            case SettingKind.IntegerRange ignored -> integer("");
+            case SettingKind.IntegerRange ignored -> stepper("");
             case SettingKind.NumberRange ignored -> number(1, "");
             case SettingKind.Choice<?> ignored -> choice(Map.of());
             case SettingKind.Text ignored -> text();
@@ -62,94 +81,168 @@ public final class Editors {
         return (Factory<T>) factory;
     }
 
+    /** A switch carrying the setting's label. */
     public static Factory<Boolean> checkbox() {
         return new Factory<>((setting, context) -> new Check(setting.label()), List.of());
     }
 
+    /** A whole-number field within the kind's range; Up and Down step by one. */
     public static Factory<Integer> integer(String unit) {
         return new Factory<>((setting, context) -> {
             var kind = (SettingKind.IntegerRange) setting.kind();
-            return new Spin<>(new SpinnerNumberModel(kind.min(), kind.min(), kind.max(), 1), unit, "0", Number::intValue);
+            return new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), 1, 0), unit, Integer::valueOf);
         }, List.of());
     }
 
+    /** A bounded whole-number stepper with an editable retained value and an integrated unit. */
+    public static Factory<Integer> stepper(String unit) {
+        return new Factory<>((setting, context) -> {
+            var kind = (SettingKind.IntegerRange) setting.kind();
+            return new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), 1, 0), unit, Integer::valueOf, Nodes.FieldPresentation.STEPPER);
+        }, List.of());
+    }
+
+    /** A bounded duration, keeping its unit in the stepper and its row title concise. */
+    public static Factory<Integer> notificationDelay() {
+        return new Factory<>((setting,context)->{
+            var kind=(SettingKind.IntegerRange)setting.kind();
+            return new NumberField<Integer>(setting.label(),new Nodes.Numeric(kind.min(),kind.max(),1,0),"s",Integer::valueOf,Nodes.FieldPresentation.STEPPER){
+                @Override public String rowLabel(String label){return "Notify after";}
+                @Override public boolean dependent(){return true;}
+            };
+        },List.of("Notify after"));
+    }
+
+    /** A height subordinate to the preceding visibility control. */
+    public static Factory<Integer> dependentHeight() {
+        return new Factory<>((setting,context)-> {
+            var kind=(SettingKind.IntegerRange)setting.kind();
+            return new NumberField<Integer>(setting.label(),new Nodes.Numeric(kind.min(),kind.max(),1,0),"px",Integer::valueOf,Nodes.FieldPresentation.STEPPER){
+                @Override public String rowLabel(String label){return "Height";}
+                @Override public boolean dependent(){return true;}
+            };
+        },List.of("Height"));
+    }
+
+    /** A compact exclusive segmented choice. */
+    public static <E> Factory<E> segments(Map<String,String> names) {
+        return new Factory<>((setting,context) -> new Pick<>(setting.label(),(SettingKind.Choice<E>)setting.kind(),names,Nodes.ChoiceKind.EXCLUSIVE),List.copyOf(names.values()));
+    }
+
+    /** A − value + stepper within the kind's range with up to two decimals; its buttons, Up and Down step by {@code step}. */
     public static Factory<Float> number(double step, String unit) {
         return new Factory<>((setting, context) -> {
             var kind = (SettingKind.NumberRange) setting.kind();
-            return new Spin<>(new SpinnerNumberModel(kind.min(), kind.min(), kind.max(), step), unit, "0.##", Number::floatValue);
+            return new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), step, DECIMALS), unit, Float::valueOf, Nodes.FieldPresentation.STEPPER);
         }, List.of());
     }
 
-    /** A combo box; {@code names} maps tokens to display names, and other tokens are prettified. */
+    /** The decimals a number setting shows and accepts, as the former spinners displayed them. */
+    static final int DECIMALS = 2;
+
+    /** A dropdown; {@code names} maps tokens to display names, and other tokens are prettified. */
     public static <E> Factory<E> choice(Map<String, String> names) {
-        return new Factory<>((setting, context) -> new Pick<>((SettingKind.Choice<E>) setting.kind(), names), List.copyOf(names.values()));
+        return new Factory<>((setting, context) -> new Pick<>(setting.label(), (SettingKind.Choice<E>) setting.kind(), names), List.copyOf(names.values()));
     }
 
     public static Factory<String> text() {
-        return new Factory<>((setting, context) -> new Line(), List.of());
+        return new Factory<>((setting, context) -> new Line(setting.label()), List.of());
     }
 
-    /** An editable combo of installed font families. */
+    /** A text field for a data value (a host, a port range, a path or a command), in the data face. */
+    public static Factory<String> technical() {
+        return new Factory<>((setting, context) -> new Line(setting.label(), Nodes.FieldPresentation.TECHNICAL), List.of());
+    }
+
+    /** A font family: free text, with the installed families as suggestions that filter as you type. */
     public static Factory<String> font(boolean monospaced) {
-        return new Factory<>((setting, context) -> new Combo(() -> Fonts.families(monospaced)), List.of());
+        return new Factory<>((setting, context) -> new FontField(setting.label(), () -> Fonts.families(monospaced)), List.of());
     }
 
-    /** The gear menu's one item beside the theme dropdown. */
-    static final String IMPORT_THEME = "Import theme\u2026";
-    /** The workspace scheme entry for {@code match}. */
+    /** What a font family editor says when no installed family matches the text typed. */
+    public static final String NO_FONT_MATCHES = "No installed font matches";
+
+    /**
+     * The families a font family editor offers, read once; plugin pages' standard rows offer the same.
+     *
+     * @param monospaced only the families that draw 'i' and 'W' at the same width
+     * @return the installed and bundled families
+     */
+    public static List<String> fontFamilies(boolean monospaced) { return Fonts.families(monospaced); }
+
+    /** Interface font with a readable platform-default choice, retaining arbitrary typed families. */
+    public static Factory<String> interfaceFont() {
+        return new Factory<>((setting,context)->new FontField(setting.label(),()->Fonts.families(false),true),List.of("System"));
+    }
+
+    /** The terminal scheme entry for {@code match}. */
     static final String SAME_AS_UI_THEME = "Same as UI theme";
 
-    /** Every installed theme by name, with a gear whose menu offers Import theme\u2026. */
-    public static Factory<String> theme(ThemeChoices themes) {
-        return new Factory<>((setting, context) -> new ThemePick(themes.names(), Map.of(), themes.importer().apply(context)),
-            List.of(IMPORT_THEME));
+    /** {@code terminal.scheme}: "Same as UI theme", then the installed schemes {@code appearance} lists, read again on refresh. */
+    public static Factory<String> schemeChoice(AppearanceChoices appearance) {
+        return new Factory<>((setting, context) -> new SchemePick(setting.label(), appearance.themes(), appearance.imports(), context, menuIcon(context)),
+            List.of(SAME_AS_UI_THEME, "Slate Cobalt Dark", "Slate Cobalt Light", "High Contrast", "Import theme", "Remove theme"));
     }
 
-    /** "Same as UI theme" ({@code match}), then every installed theme by name. */
-    public static Factory<String> workspaceScheme(ThemeChoices themes) {
-        return new Factory<>((setting, context) -> new ThemePick(themes.names(),
-            Map.of(WorkspaceThemeChoice.MATCH.name(), SAME_AS_UI_THEME), null), List.of(SAME_AS_UI_THEME));
+    /** The glyph of a theme menu's button: the classic composition's ⋯, else the gear (spec 12.2). */
+    static String menuIcon(PageContext context) {
+        return context.composition() == dev.jasper.app.presentation.Composition.CLASSIC ? "more" : "settings";
     }
 
-    /** A text field with Browse\u2026, for a program path. */
+    /** The Dark / Light / Match System tiles, then the Dark theme and Light theme rows over the installed themes. */
+    public static Factory<AppearanceMode> appearance(AppearanceChoices choices) {
+        return new Factory<>((setting, context) -> new AppearanceSelection(choices, context),
+            List.of("Dark", "Light", "Match System", "Theme", "Dark theme", "Light theme", "Slate Cobalt", "Import theme", "Remove theme"));
+    }
+
+    /** A path field with Browse…, for a program path. */
     public static Factory<String> executable() {
-        return new Factory<>((setting, context) -> new Browse(context, "Choose a shell program"), List.of());
+        return new Factory<>((setting, context) -> new Browse(setting.label(), context, "Choose a shell program"), List.of());
     }
 
-    /** A text field with Browse\u2026, for a file path. */
+    /** A path field with Browse…, for a file path. */
     public static Factory<String> path(String title) {
-        return new Factory<>((setting, context) -> new Browse(context, title), List.of());
+        return new Factory<>((setting, context) -> new Browse(setting.label(), context, title), List.of());
     }
 
-    /** An ordered list of strings; + asks for text. */
+    /** An ordered list of strings; a field below adds one. */
     public static Factory<List<String>> textList() {
-        return new Factory<>((setting, context) -> new Items(parent ->
-            Optional.ofNullable(JOptionPane.showInputDialog(parent, "Add:")).filter(text -> !text.isEmpty())), List.of());
+        return new Factory<>((setting, context) -> new Items(setting.label(), Optional.empty(), classic(context)), List.of());
     }
 
-    /** An ordered list of font families; + offers the installed ones. */
+    /** The composition root's reading: whether the page is composed classically (spec 12.2). */
+    private static boolean classic(PageContext context) { return context.composition() == dev.jasper.app.presentation.Composition.CLASSIC; }
+
+    /** An ordered list of font families; the entry below suggests the installed ones. */
     public static Factory<List<String>> fontList(boolean monospaced) {
-        return new Factory<>((setting, context) -> new Items(parent -> {
-            var box = new JComboBox<>(Fonts.families(monospaced).toArray(String[]::new));
-            box.setEditable(true);
-            int answer = JOptionPane.showConfirmDialog(parent, box, "Add a fallback font", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-            return answer == JOptionPane.OK_OPTION ? Optional.ofNullable((String) box.getSelectedItem()).filter(name -> !name.isBlank()) : Optional.empty();
-        }), List.of());
+        return new Factory<>((setting, context) -> new Items(setting.label(), Optional.of(() -> Fonts.families(monospaced)), classic(context)), List.of());
     }
 
-    /** A Name/Value table. */
+    /** Name/Value rows. */
     public static Factory<Map<String, String>> table() {
-        return new Factory<>((setting, context) -> new Table(), List.of());
+        return new Factory<>((setting, context) -> new Table(setting, context, classic(context)), List.of());
     }
 
-    /** A checkbox meaning "use the default", and a spinner enabled when it is cleared; the default removes the key. */
+    /** The {@code notifications.groups} editor: one line per group {@code choices} lists. */
+    public static Factory<Map<String, String>> notificationGroups(NotificationGroupChoices choices) {
+        return new Factory<>((setting, context) -> new NotificationGroupsEditor(choices, context.kit(), context.chrome().inlineReset(),
+            context.composition() == dev.jasper.app.presentation.Composition.CLASSIC),
+            List.of("group", "card", "sticky", "history only", "off", "mute"));
+    }
+
+    /** A switch meaning "use the default", and a number field enabled while it is off; the default removes the key. */
     public static Factory<Float> optionalNumber(String label, double step, String unit) {
-        return new Factory<>((setting, context) -> new OptionalNumber(setting, label, step, unit), List.of());
+        return new Factory<>((setting, context) -> new OptionalNumber(setting, label, step, unit, context.draft()), List.of());
+    }
+
+    /** {@code setting}'s effective default under {@code draft} (spec 5.8); the core default for a page made without a draft. */
+    static <T> T effectiveDefault(SettingsDraft draft, Setting<T> setting) {
+        return draft == null ? setting.defaultValue() : draft.defaultValue(setting);
     }
 
     /** The detected shell profiles and a button that detects them again; an empty value shows the effective profile. */
     public static Factory<String> profile(ShellChoices shells) {
-        return new Factory<>((setting, context) -> new Profile(shells, context.draft()),
+        return new Factory<>((setting, context) -> new Profile(setting.label(), shells, context.draft()),
             List.of("PowerShell", "Command Prompt", "WSL", "Custom", "default shell"));
     }
 
@@ -159,424 +252,493 @@ public final class Editors {
         return spaced.isEmpty() ? spaced : Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
     }
 
-    private static JPanel line(JComponent... parts) {
-        var panel = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0));
-        panel.setOpaque(false);
-        for (JComponent part : parts) panel.add(part);
-        return panel;
+    /** The row's state without its validation message, for a control's companions. */
+    private static ControlState plain(ControlState row) { return new ControlState(row.visible(), row.enabled(), row.busy(), ""); }
+
+    /** A control followed by its unit, such as "px", on one line. */
+    private static Nodes.Node withUnit(String id, Nodes.Node control, String unit, ControlState state) {
+        if (unit.isEmpty()) return control;
+        return new Nodes.Stack(id + ":line", plain(state), Nodes.LayoutRole.INLINE,
+            List.of(control, new Nodes.Text(id + ":unit", ControlState.READY, unit, Nodes.TextRole.LABEL)));
     }
 
-    private static void onText(JTextComponent field, Runnable listener) {
-        field.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent event) { listener.run(); }
-            @Override public void removeUpdate(DocumentEvent event) { listener.run(); }
-            @Override public void changedUpdate(DocumentEvent event) { listener.run(); }
-        });
+    private static Nodes.Button iconButton(String id, String icon, String tooltip, ControlState state) {
+        return new Nodes.Button(id, state, "", icon, Nodes.ButtonKind.GHOST, id, tooltip);
     }
 
     static final class Check implements ValueEditor<Boolean> {
-        private final JCheckBox box;
-        Check(String label) {
-            box = new JCheckBox(label);
-            box.putClientProperty("html.disable", true);
-            box.setOpaque(false);
+        private final String label;
+        private boolean checked;
+        Check(String label) { this.label = label; }
+        @Override public Nodes.Node node(String id, ControlState state) { return new Nodes.Toggle(id, state, label, checked, id, false); }
+        @Override public Boolean value() { return checked; }
+        @Override public void show(Boolean value) { checked = value; }
+        @Override public boolean event(String id, UiEvent event) {
+            if (!(event instanceof UiEvent.Toggled toggled) || !toggled.id().equals(id)) return false;
+            checked = toggled.checked();
+            return true;
         }
-        @Override public JComponent component() { return box; }
-        @Override public Boolean value() { return box.isSelected(); }
-        @Override public void show(Boolean value) { box.setSelected(value); }
-        @Override public void onEdit(Runnable listener) { box.addActionListener(event -> listener.run()); }
         @Override public boolean labelled() { return true; }
     }
 
-    static final class Spin<T extends Number> implements ValueEditor<T> {
-        final JSpinner spinner;
-        private final JComponent component;
-        private final Function<Number, T> convert;
-        private boolean showing;
-        Spin(SpinnerNumberModel model, String unit, String pattern, Function<Number, T> convert) {
-            this.convert = convert;
-            spinner = new JSpinner(model);
-            spinner.setEditor(new JSpinner.NumberEditor(spinner, pattern));
-            component = unit.isEmpty() ? spinner : line(spinner, new JLabel(unit));
+    /** A number as text of the bounds' shape; reading text that is no number throws. */
+    static class NumberField<T extends Number> implements ValueEditor<T> {
+        private final String label;
+        final Nodes.Numeric bounds;
+        private final String unit;
+        private final Function<String, T> parse;
+        private final Nodes.FieldPresentation presentation;
+        String text = "";
+        NumberField(String label, Nodes.Numeric bounds, String unit, Function<String, T> parse) {
+            this(label,bounds,unit,parse,Nodes.FieldPresentation.STANDARD);
         }
-        @Override public JComponent component() { return component; }
-        @Override public T value() { return convert.apply((Number) spinner.getValue()); }
-        @Override public void show(T value) {
-            showing = true;
-            try {
-                spinner.setValue(spinner.getModel().getValue() instanceof Double ? (Object) value.doubleValue() : (Object) value.intValue());
-            } finally { showing = false; }
+        NumberField(String label, Nodes.Numeric bounds, String unit, Function<String,T> parse, Nodes.FieldPresentation presentation) {
+            this.label = label; this.bounds = bounds; this.unit = unit; this.parse = parse; this.presentation=presentation;
         }
-        @Override public void onEdit(Runnable listener) { spinner.addChangeListener(event -> { if (!showing) listener.run(); }); }
+        @Override public Nodes.Node node(String id, ControlState state) {
+            if(presentation!=Nodes.FieldPresentation.STANDARD)return new Nodes.Field(id,state,Nodes.FieldKind.NUMBER,text,unit,label,"",Optional.of(bounds),presentation);
+            return withUnit(id, new Nodes.Field(id, state, Nodes.FieldKind.NUMBER, text, "", label, "", Optional.of(bounds)), unit, state);
+        }
+        @Override public T value() { return parse.apply(text.strip()); }
+        @Override public void show(T value) { text = format(value, bounds.decimals()); }
+        @Override public boolean event(String id, UiEvent event) {
+            if (!(event instanceof UiEvent.Edited edited) || !edited.id().equals(id)) return false;
+            text = edited.text();
+            return true;
+        }
+        static String format(Number value, int decimals) {
+            String plain = new BigDecimal(value.toString()).setScale(decimals, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
+            return plain.equals("-0") ? "0" : plain;
+        }
     }
 
     static final class Pick<E> implements ValueEditor<E> {
-        private final JComboBox<String> box = new JComboBox<>();
+        private final String label;
+        private final List<String> tokens = new ArrayList<>();
+        private final List<String> labels = new ArrayList<>();
         private final List<E> values = new ArrayList<>();
-        private boolean showing;
-        Pick(SettingKind.Choice<E> kind, Map<String, String> names) {
+        private int selected = -1;
+        private final Nodes.ChoiceKind presentation;
+        Pick(String label, SettingKind.Choice<E> kind, Map<String, String> names) {
+            this(label,kind,names,Nodes.ChoiceKind.DROPDOWN);
+        }
+        Pick(String label, SettingKind.Choice<E> kind, Map<String,String> names, Nodes.ChoiceKind presentation) {
+            this.label=label;this.presentation=presentation;
             for (var token : kind.tokens()) {
-                box.addItem(names.getOrDefault(token.getKey(), pretty(token.getKey())));
+                tokens.add(token.getKey());
+                labels.add(names.getOrDefault(token.getKey(), pretty(token.getKey())));
                 values.add(token.getValue());
             }
         }
-        @Override public JComponent component() { return box; }
-        @Override public E value() { return values.get(box.getSelectedIndex()); }
-        @Override public void show(E value) {
-            showing = true;
-            try { box.setSelectedIndex(values.indexOf(value)); } finally { showing = false; }
+        List<String> labels() { return List.copyOf(labels); }
+        String selectedLabel() { return selected < 0 ? null : labels.get(selected); }
+        @Override public Nodes.Node node(String id, ControlState state) {
+            var options = new ArrayList<Option>();
+            for (int i = 0; i < tokens.size(); i++) options.add(new Option(tokens.get(i), labels.get(i), Optional.empty()));
+            return new Nodes.Choice(id, state, presentation, options, selected < 0 ? "" : tokens.get(selected), label, "");
         }
-        @Override public void onEdit(Runnable listener) { box.addActionListener(event -> { if (!showing) listener.run(); }); }
+        @Override public E value() {
+            if (selected < 0) throw new IllegalArgumentException("Nothing is chosen");
+            return values.get(selected);
+        }
+        @Override public void show(E value) { selected = values.indexOf(value); }
+        @Override public boolean event(String id, UiEvent event) {
+            if (!(event instanceof UiEvent.Selected picked) || !picked.id().equals(id)) return false;
+            int index = tokens.indexOf(picked.ids().stream().findFirst().orElse(""));
+            if (index < 0) return false;
+            selected = index;
+            return true;
+        }
     }
 
     static final class Line implements ValueEditor<String> {
-        final JTextField field = new JTextField(24);
-        private boolean showing;
-        @Override public JComponent component() { return field; }
-        @Override public String value() { return field.getText(); }
-        @Override public void show(String value) {
-            showing = true;
-            try { field.setText(value); } finally { showing = false; }
+        private final String label;
+        private final Nodes.FieldPresentation presentation;
+        String text = "";
+        Line(String label) { this(label, Nodes.FieldPresentation.STANDARD); }
+        Line(String label, Nodes.FieldPresentation presentation) { this.label = label; this.presentation = presentation; }
+        @Override public Nodes.Node node(String id, ControlState state) {
+            return new Nodes.Field(id, state, Nodes.FieldKind.TEXT, text, "", label, "", Optional.empty(), presentation);
         }
-        @Override public void onEdit(Runnable listener) { onText(field, () -> { if (!showing) listener.run(); }); }
+        @Override public String value() { return text; }
+        @Override public void show(String value) { text = value; }
+        @Override public boolean event(String id, UiEvent event) {
+            if (!(event instanceof UiEvent.Edited edited) || !edited.id().equals(id)) return false;
+            text = edited.text();
+            return true;
+        }
     }
 
-    static final class Combo implements ValueEditor<String> {
-        private final JComboBox<String> box;
-        private final List<Runnable> listeners = new ArrayList<>();
-        private boolean showing;
-        Combo(Supplier<List<String>> options) {
-            box = new JComboBox<>(options.get().toArray(String[]::new));
-            box.setEditable(true);
-            box.setPrototypeDisplayValue("JetBrains Mono NL Extra");
-            // A look-and-feel update (every dialog replays the theme as it opens) gives the combo a new editor field,
-            // so follow each editor the combo gets rather than only the first.
-            onText(editor(), this::edited);
-            box.addPropertyChangeListener("editor", event -> { if (box.getEditor() != null) onText(editor(), this::edited); });
+    /** A font family as free text over the installed families, read again on each refresh. */
+    static final class FontField implements ValueEditor<String> {
+        private final String label;
+        private final Supplier<List<String>> families;
+        private List<String> offered;
+        String text = "";
+        private final boolean system;
+        FontField(String label, Supplier<List<String>> families) { this(label,families,false); }
+        FontField(String label, Supplier<List<String>> families, boolean system) { this.label = label; this.families = families; this.system=system;offered = List.copyOf(families.get()); }
+        @Override public String rowLabel(String label){return system?"Font":label;}
+        List<String> suggestions() { return offered; }
+        @Override public Nodes.Node node(String id, ControlState state) {
+            return new Nodes.Choice(id, state, Nodes.ChoiceKind.SEARCHABLE, options(offered), "", label, "", "",
+                Optional.of(new Nodes.ChoiceSearch(0, NO_FONT_MATCHES, Optional.of(system && text.equalsIgnoreCase("system") ? "System" : text))));
         }
-        private JTextComponent editor() { return (JTextComponent) box.getEditor().getEditorComponent(); }
-        private void edited() { if (!showing) for (Runnable listener : List.copyOf(listeners)) listener.run(); }
-        @Override public JComponent component() { return box; }
-        @Override public String value() { return editor().getText(); }
-        @Override public void show(String value) {
-            showing = true;
-            try { box.setSelectedItem(value); editor().setText(value); } finally { showing = false; }
+        @Override public String value() { return text; }
+        @Override public void show(String value) { text = value; }
+        @Override public boolean event(String id, UiEvent event) {
+            if (!(event instanceof UiEvent.Edited edited) || !edited.id().equals(id)) return false;
+            text = system && edited.text().equals("System") ? "system" : edited.text();
+            return true;
         }
-        @Override public void onEdit(Runnable listener) { listeners.add(listener); }
+        @Override public void refresh() { offered = List.copyOf(families.get()); }
     }
 
-    /**
-     * A theme by name: the {@code leading} entries (value to label), then the installed names, read again on each
-     * refresh. The dropdown searches as you type, keeping the leading entries. A saved name the list lacks shows as
-     * "(not found)" until another is chosen; a name matches an entry as the catalog finds themes, ignoring case and
-     * surrounding spaces, and keeps its saved spelling. With an import, a gear beside the dropdown offers Import theme\u2026.
-     */
-    static final class ThemePick implements ValueEditor<String> {
-        final JComboBox<String> box;
-        final JButton gear;
-        final JPopupMenu menu;
-        private final Supplier<List<String>> names;
-        private final Map<String, String> leading;
-        private final ThemeChoices.Import importer;
-        private final List<String> values = new ArrayList<>();
-        private final JComponent component;
-        private final List<Runnable> edits = new ArrayList<>();
-        /** How many entries are choices; any after them is the one missing choice being shown. */
-        private int listed;
-        private String shown = "";
-        /** The value shown or last chosen; Swing reports picking it again, which is no edit. */
-        private String current = "";
-        private boolean showing;
-
-        ThemePick(Supplier<List<String>> names, Map<String, String> leading, ThemeChoices.Import importer) {
-            this.names = names;
-            this.leading = leading;
-            this.importer = importer;
-            box = new SearchCombo(leading.size(), "No matching themes");
-            box.setPrototypeDisplayValue("Catppuccin Macchiato (Material)");
-            box.setMaximumRowCount(20);
-            if (importer == null) {
-                gear = null;
-                menu = null;
-                component = box;
-            } else {
-                menu = new JPopupMenu();
-                var item = new JMenuItem(IMPORT_THEME);
-                item.addActionListener(event -> importer.start().run());
-                menu.add(item);
-                gear = new JButton(AppIcons.icon("settings"));
-                gear.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
-                gear.setToolTipText("Theme actions");
-                gear.getAccessibleContext().setAccessibleName("Theme actions");
-                gear.addActionListener(event -> menu.show(gear, 0, gear.getHeight()));
-                component = line(box, gear);
-            }
-            fill();
-            box.addActionListener(event -> {
-                if (showing || value().equals(current)) return;
-                current = value();
-                if (box.getSelectedIndex() >= 0 && box.getSelectedIndex() < listed) dropMissing();
-                for (Runnable listener : List.copyOf(edits)) listener.run();
-            });
-        }
-
-        /** Rebuilds the entries from the current names, keeping the selection. */
-        private void fill() {
-            String keep = value();
-            showing = true;
-            try {
-                box.removeAllItems();
-                values.clear();
-                leading.forEach(this::add);
-                for (String name : names.get()) add(name, name);
-                listed = values.size();
-                select(keep);
-            } finally { showing = false; }
-        }
-
-        private void add(String value, String label) { values.add(value); box.addItem(label); }
-
-        private void select(String value) {
-            dropMissing();
-            int index = -1;
-            for (int i = 0; i < values.size() && index < 0; i++) if (same(values.get(i), value)) index = i;
-            if (index < 0) {
-                add(value, value.isBlank() ? "(none)" : value + " (not found)");
-                index = values.size() - 1;
-            }
-            box.setSelectedIndex(index);
-        }
-
-        private void dropMissing() {
-            boolean was = showing;
-            showing = true;
-            try {
-                while (values.size() > listed) {
-                    values.removeLast();
-                    box.removeItemAt(box.getItemCount() - 1);
-                }
-            } finally { showing = was; }
-        }
-
-        private static boolean same(String listed, String value) { return listed.strip().equalsIgnoreCase(value.strip()); }
-
-        @Override public JComponent component() { return component; }
-        @Override public String value() {
-            int index = box.getSelectedIndex();
-            if (index < 0) return shown;
-            String value = values.get(index);
-            return same(value, shown) ? shown : value;
-        }
-        @Override public void show(String value) {
-            showing = true;
-            try { shown = value; select(value); current = value(); } finally { showing = false; }
-        }
-        @Override public void onEdit(Runnable listener) { edits.add(listener); }
-        @Override public void refresh() { fill(); }
-        @Override public void dispose() { if (importer != null) importer.close().run(); }
+    private static List<Option> options(List<String> families) {
+        var options = new ArrayList<Option>();
+        for (int i = 0; i < families.size(); i++) options.add(new Option("family-" + i, families.get(i), Optional.empty()));
+        return options;
     }
 
     static final class Browse implements ValueEditor<String> {
-        private final Line line = new Line();
-        private final JComponent component;
+        private final String label;
         private final PageContext context;
         private final String title;
-        Browse(PageContext context, String title) {
-            this.context = context;
-            this.title = title;
-            var browse = new JButton("Browse\u2026");
-            browse.addActionListener(event -> browse());
-            component = line(line.field, browse);
-        }
+        String text = "";
+        Browse(String label, PageContext context, String title) { this.label = label; this.context = context; this.title = title; }
         void browse() {
-            String current = line.value();
+            String current = text;
             context.chooseFile().apply(title, current.isBlank() ? Optional.empty() : Optional.of(java.nio.file.Path.of(current)))
-                .ifPresent(path -> line.field.setText(path.toString()));
+                .ifPresent(path -> text = path.toString());
         }
-        @Override public JComponent component() { return component; }
-        @Override public String value() { return line.value(); }
-        @Override public void show(String value) { line.show(value); }
-        @Override public void onEdit(Runnable listener) { line.onEdit(listener); }
+        @Override public Nodes.Node node(String id, ControlState state) {
+            return new Nodes.Field(id, state, Nodes.FieldKind.PATH, text, "", label, id + ":browse");
+        }
+        @Override public String value() { return text; }
+        @Override public void show(String value) { text = value; }
+        @Override public boolean event(String id, UiEvent event) {
+            if (event instanceof UiEvent.Action action && action.id().equals(id + ":browse")) {
+                String before = text;
+                browse();
+                return !before.equals(text);
+            }
+            if (!(event instanceof UiEvent.Edited edited) || !edited.id().equals(id)) return false;
+            text = edited.text();
+            return true;
+        }
     }
 
+    /**
+     * An ordered list: rows move and remove themselves; the entry below adds, with font suggestions when given. Rows are
+     * keyed by position, so the editor keeps the selected row and moves it with its item: the classic side column acts on
+     * the selection.
+     */
     static final class Items implements ValueEditor<List<String>> {
-        private final DefaultListModel<String> model = new DefaultListModel<>();
-        private final JList<String> list = new JList<>(model);
-        private final JPanel component = new JPanel(new BorderLayout(0, 4));
-        private final List<Runnable> listeners = new ArrayList<>();
-        Items(Function<Component, Optional<String>> ask) {
-            component.setOpaque(false);
-            var scroll = new JScrollPane(list);
-            scroll.setPreferredSize(new Dimension(320, 110));
-            component.add(scroll, BorderLayout.CENTER);
-            var add = button("+", "Add", () -> ask.apply(component).ifPresent(this::add));
-            var remove = button("−", "Remove", this::removeSelected);
-            var up = button("↑", "Move up", this::moveUp);
-            var down = button("↓", "Move down", this::moveDown);
-            component.add(line(add, remove, up, down), BorderLayout.SOUTH);
+        private final String label;
+        private final Optional<Supplier<List<String>>> suggestions;
+        private final List<String> items = new ArrayList<>();
+        String pending = "";
+        /** The selected row's index, or -1. */
+        int selected = -1;
+        private final boolean classic;
+        /** {@code classic}: the list shows "Empty" while it holds nothing (plan 9b Rulings 15) and its Add has no glyph. */
+        Items(String label, Optional<Supplier<List<String>>> suggestions, boolean classic) { this.label = label; this.suggestions = suggestions; this.classic = classic; }
+
+        @Override public Nodes.Node node(String id, ControlState state) {
+            var rows = new ArrayList<ListItem>();
+            for (int i = 0; i < items.size(); i++)
+                rows.add(new ListItem("item-" + i, Optional.empty(),
+                    List.of(new Nodes.Text(id + ":item-" + i, ControlState.READY, items.get(i), Nodes.TextRole.BODY)), List.of(), List.of()));
+            var list = classic
+                ? new Nodes.ItemList(id, state, Nodes.ListKind.ORDERED, rows, selectedIds(selected, items.size()), "", List.of(), Nodes.SelectionMode.SINGLE,
+                    Optional.empty(), java.util.OptionalInt.empty(), "", "", "", "", "", "Empty")
+                : new Nodes.ItemList(id, state, Nodes.ListKind.ORDERED, rows, selectedIds(selected, items.size()), "", List.of());
+            // Enter in the entry adds it (the entry's own action); an empty entry leaves Enter to the dialog's OK.
+            String submit = pending.isBlank() ? "" : id + ":add";
+            Nodes.Node entry = suggestions.isPresent()
+                ? new Nodes.Choice(id + ":new", plain(state), Nodes.ChoiceKind.SEARCHABLE, options(suggestions.get().get()), "", "Add to " + label, id + ":add", "",
+                    Optional.of(new Nodes.ChoiceSearch(0, NO_FONT_MATCHES, Optional.of(pending))))
+                : new Nodes.Field(id + ":new", plain(state), Nodes.FieldKind.TEXT, pending, "Add…", "Add to " + label, submit);
+            var addState = new ControlState(state.visible(), state.enabled() && !pending.isBlank(), state.busy(), "");
+            var add = new Nodes.Button(id + ":add", addState, "Add", classic ? "" : "add", Nodes.ButtonKind.SECONDARY, id + ":add", "");
+            return new Nodes.Stack(id + ":editor", plain(state), Nodes.LayoutRole.VERTICAL,
+                List.of(list, new Nodes.Stack(id + ":entry", plain(state), Nodes.LayoutRole.INLINE, List.of(entry, add))));
         }
-        static JButton button(String text, String name, Runnable action) {
-            var button = new JButton(text);
-            button.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
-            button.setToolTipText(name);
-            button.getAccessibleContext().setAccessibleName(name);
-            button.addActionListener(event -> action.run());
-            return button;
+
+        @Override public List<String> value() { return List.copyOf(items); }
+        @Override public void show(List<String> value) { items.clear(); items.addAll(value); if (selected >= items.size()) selected = -1; }
+
+        @Override public boolean event(String id, UiEvent event) {
+            switch (event) {
+                case UiEvent.Edited edited when edited.id().equals(id + ":new") -> { pending = edited.text(); return false; }
+                case UiEvent.Selected chosen when chosen.id().equals(id) -> {
+                    selected = chosen.ids().stream().mapToInt(this::index).filter(i -> i >= 0).min().orElse(-1);
+                    return false;
+                }
+                case UiEvent.Action action when action.id().equals(id + ":add") -> {
+                    if (pending.isBlank()) return false;
+                    items.add(pending);
+                    pending = "";
+                    return true;
+                }
+                case UiEvent.Removed removed when removed.id().equals(id) -> {
+                    int index = index(removed.itemId());
+                    if (index < 0) return false;
+                    items.remove(index);
+                    selected = afterRemoval(selected, index);
+                    return true;
+                }
+                case UiEvent.Reordered moved when moved.id().equals(id) -> {
+                    int index = index(moved.itemId());
+                    if (index < 0 || moved.destination() >= items.size()) return false;
+                    items.add(moved.destination(), items.remove(index));
+                    selected = afterMove(selected, index, moved.destination());
+                    return true;
+                }
+                default -> { return false; }
+            }
         }
-        void add(String item) { model.addElement(item); edited(); }
-        void select(int index) { list.setSelectedIndex(index); }
-        void removeSelected() {
-            int index = list.getSelectedIndex();
-            if (index < 0) return;
-            model.remove(index);
-            edited();
+
+        private int index(String itemId) {
+            if (!itemId.startsWith("item-")) return -1;
+            int index = Integer.parseInt(itemId.substring("item-".length()));
+            return index < items.size() ? index : -1;
         }
-        void moveUp() { move(-1); }
-        void moveDown() { move(1); }
-        private void move(int by) {
-            int index = list.getSelectedIndex(), target = index + by;
-            if (index < 0 || target < 0 || target >= model.size()) return;
-            String item = model.remove(index);
-            model.add(target, item);
-            list.setSelectedIndex(target);
-            edited();
-        }
-        private void edited() { for (Runnable listener : List.copyOf(listeners)) listener.run(); }
-        @Override public JComponent component() { return component; }
-        @Override public List<String> value() { return List.copyOf(Collections.list(model.elements())); }
-        @Override public void show(List<String> value) { model.clear(); value.forEach(model::addElement); }
-        @Override public void onEdit(Runnable listener) { listeners.add(listener); }
     }
 
+    /** An ordered list's {@code item-N} selection for {@code selected}, or none. */
+    public static Set<String> selectedIds(int selected, int size) { return selected >= 0 && selected < size ? Set.of("item-" + selected) : Set.of(); }
+
+    /** Where the selected row {@code selected} is once row {@code removed} is gone: -1 when it was the one removed. */
+    public static int afterRemoval(int selected, int removed) { return selected == removed ? -1 : selected > removed ? selected - 1 : selected; }
+
+    /** Where the selected row {@code selected} is once row {@code from} moves to {@code to}: with its item. */
+    public static int afterMove(int selected, int from, int to) {
+        if (selected < 0) return selected;
+        if (selected == from) return to;
+        if (from < selected && to >= selected) return selected - 1;
+        if (from > selected && to <= selected) return selected + 1;
+        return selected;
+    }
+
+    /**
+     * Name/Value rows; a blank name is left out of the value. {@code classic} (spec 12.2): the setting's row with Add
+     * Variable… at its end; once there are variables, a Name / Value table laid under the row's title (the face's
+     * {@code listUnderTitle}, as the ordered lists) with Add Variable… below it; Edit… and Remove in each row's menu, a
+     * sheet for Add and Edit.
+     */
     static final class Table implements ValueEditor<Map<String, String>> {
-        private final DefaultTableModel model = new DefaultTableModel(new Object[]{"Name", "Value"}, 0);
-        private final JTable table = new JTable(model);
-        private final JPanel component = new JPanel(new BorderLayout(0, 4));
-        private boolean showing;
-        Table() {
-            component.setOpaque(false);
-            table.putClientProperty("terminateEditOnFocusLost", true);
-            var scroll = new JScrollPane(table);
-            scroll.setPreferredSize(new Dimension(420, 130));
-            component.add(scroll, BorderLayout.CENTER);
-            var add = Items.button("+", "Add variable", () -> addRow("", ""));
-            var remove = Items.button("−", "Remove variable", () -> {
-                int row = table.getSelectedRow();
-                if (row >= 0) model.removeRow(row);
-            });
-            component.add(line(add, remove), BorderLayout.SOUTH);
+        private final List<String[]> rows = new ArrayList<>();
+        private final boolean classic;
+        private final Setting<Map<String, String>> setting;
+        private final PageContext context;
+        /** The classic table's selected variable, or -1; a double-click or Enter edits it. */
+        private int selectedRow = -1;
+
+        Table(Setting<Map<String, String>> setting, PageContext context, boolean classic) {
+            this.setting = setting; this.context = context; this.classic = classic && setting != null && context != null;
         }
-        void addRow(String name, String value) { model.addRow(new Object[]{name, value}); }
-        @Override public JComponent component() { return component; }
+
+        @Override public boolean fullSpan() { return classic; }
+        @Override public boolean cardRows() { return classic; }
+
+        @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
+
+        @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
+            if (classic) return classicNode(id, state, highlighted);
+            var lines = new ArrayList<Nodes.Node>();
+            for (int i = 0; i < rows.size(); i++) {
+                var row = rows.get(i);
+                lines.add(new Nodes.Stack(id + ":row-" + i, plain(state), Nodes.LayoutRole.INLINE, List.of(
+                    new Nodes.Field(id + ":name-" + i, plain(state), Nodes.FieldKind.TEXT, row[0], "Name", "Name", ""),
+                    new Nodes.Field(id + ":value-" + i, plain(state), Nodes.FieldKind.TEXT, row[1], "Value", "Value", ""),
+                    iconButton(id + ":remove-" + i, "remove", "Remove variable", plain(state)))));
+            }
+            lines.add(new Nodes.Button(id + ":add", plain(state), "Add variable", "add", Nodes.ButtonKind.SECONDARY, id + ":add", ""));
+            return new Nodes.Stack(id, plain(state), Nodes.LayoutRole.VERTICAL, lines);
+        }
+
+        /**
+         * The classic composition's own row (a full-span editor builds it): the search highlight, and Reset to Default in
+         * its menu while the variables differ from the setting's effective default (spec 12.1 and 14.7). The table is the
+         * row's control, so it takes the rows' side inset and the row's padding keeps the next row's rule off its border.
+         */
+        private Nodes.Node classicNode(String id, ControlState state, boolean highlighted) {
+            String applies = switch (setting.applies()) {
+                case LIVE -> ""; case NEW_PANES -> "Applies to new panes"; case NEW_WINDOWS -> "Applies to new windows"; case RESTART -> "Takes effect after restart";
+            };
+            var add = new Nodes.Button(id + ":add", plain(state), "Add Variable…", "", Nodes.ButtonKind.SECONDARY, id + ":add", "");
+            var menu = SchemaPage.resetMenu(context, id + ":reset", !value().equals(Editors.effectiveDefault(context.draft(), setting)));
+            if (rows.isEmpty())
+                return new Nodes.Stack(id + ":environment", plain(state), Nodes.LayoutRole.VERTICAL,
+                    List.of(new Nodes.SettingRow("row:" + id, ControlState.READY, setting.label(), applies, add, false, highlighted, "", menu)));
+            var columns = List.of(new dev.jasper.ui.model.Column("name", "Name", Nodes.TextRole.MONO, false),
+                new dev.jasper.ui.model.Column("value", "Value", Nodes.TextRole.MONO, false, 2, Optional.empty()));
+            var tableRows = new ArrayList<dev.jasper.ui.model.TableRow>();
+            for (int i = 0; i < rows.size(); i++)
+                tableRows.add(new dev.jasper.ui.model.TableRow("variable-" + i, Map.of("name", rows.get(i)[0], "value", rows.get(i)[1]), Optional.empty(), false,
+                    Optional.of(List.of(new MenuItem("edit-" + i, "Edit…", "", id + ":edit-" + i, state.enabled(), false),
+                        new MenuItem("remove-" + i, "Remove", "", id + ":remove-" + i, state.enabled(), false)))));
+            var selection = selectedRow >= 0 && selectedRow < rows.size() ? Set.of("variable-" + selectedRow) : Set.<String>of();
+            var table = new Nodes.Table(id + ":table", plain(state), columns, tableRows, selection, id + ":activate", List.of(), Nodes.SelectionMode.SINGLE);
+            var control = new Nodes.Stack(id + ":variables", plain(state), Nodes.LayoutRole.VERTICAL,
+                List.of(table, new Nodes.Stack(id + ":entry", plain(state), Nodes.LayoutRole.INLINE, List.of(add))));
+            return new Nodes.Stack(id + ":environment", plain(state), Nodes.LayoutRole.VERTICAL,
+                List.of(new Nodes.SettingRow("row:" + id, ControlState.READY, setting.label(), applies, control, false, highlighted, "", menu)));
+        }
+
+        /** Asks the variable sheet with {@code name} and {@code value}; the answer as a name and value, or empty. */
+        private Optional<String[]> ask(String title, String confirm, String name, String value) {
+            return context.sheets().ask(new Sheets.Request(title, title, List.of(new Sheets.Field("name", "Name", name), new Sheets.Field("value", "Value", value)), confirm))
+                .filter(answer -> answer.size() == 2 && !answer.get(0).isBlank()).map(answer -> new String[]{answer.get(0).strip(), answer.get(1)});
+        }
+
+        /**
+         * Puts {@code entry} at {@code index} (or at the end), dropping another entry with the same name (the file holds one
+         * key). An edited entry is selected where it ends up; on an add the selection stays on its variable, or clears when
+         * that variable was the one dropped.
+         */
+        private void put(int index, String[] entry) {
+            int selected = selectedRow;
+            for (int i = rows.size() - 1; i >= 0; i--)
+                if (i != index && rows.get(i)[0].equals(entry[0])) { rows.remove(i); if (i < index) index--; selected = afterRemoval(selected, i); }
+            if (index < 0) rows.add(entry); else rows.set(index, entry);
+            selectedRow = index >= 0 ? index : selected;
+        }
+
+        void addRow(String name, String value) { rows.add(new String[]{name, value}); }
+
         @Override public Map<String, String> value() {
             var values = new LinkedHashMap<String, String>();
-            for (int row = 0; row < model.getRowCount(); row++) {
-                String name = String.valueOf(model.getValueAt(row, 0));
-                if (!name.isBlank()) values.put(name, String.valueOf(model.getValueAt(row, 1)));
-            }
+            for (var row : rows) if (!row[0].isBlank()) values.put(row[0], row[1]);
             return values;
         }
+
         @Override public void show(Map<String, String> value) {
-            showing = true;
-            try {
-                model.setRowCount(0);
-                new TreeMap<>(value).forEach(this::addRow);
-            } finally { showing = false; }
+            rows.clear();
+            selectedRow = -1;
+            new TreeMap<>(value).forEach(this::addRow);
         }
-        @Override public void onEdit(Runnable listener) { model.addTableModelListener(event -> { if (!showing) listener.run(); }); }
+
+        @Override public boolean event(String id, UiEvent event) {
+            if (classic && event instanceof UiEvent.Action action) {
+                if (action.id().equals(id + ":add")) { var answer = ask("Add Variable", "Add", "", ""); answer.ifPresent(entry -> put(-1, entry)); return answer.isPresent(); }
+                // A row's activation (double-click or Enter) selects it, then reports the table's activate action (fact 11).
+                boolean activated = action.id().equals(id + ":activate");
+                if (activated || action.id().startsWith(id + ":edit-")) {
+                    int index = activated ? selectedRow : Integer.parseInt(action.id().substring((id + ":edit-").length()));
+                    if (index < 0 || index >= rows.size()) return false;
+                    var answer = ask("Edit Variable", "Save", rows.get(index)[0], rows.get(index)[1]);
+                    answer.ifPresent(entry -> put(index, entry));
+                    return answer.isPresent();
+                }
+            }
+            if (classic && event instanceof UiEvent.Selected selected && selected.id().equals(id + ":table")) {
+                selectedRow = selected.ids().stream().filter(row -> row.startsWith("variable-")).mapToInt(row -> Integer.parseInt(row.substring("variable-".length())))
+                    .findFirst().orElse(-1);
+                return false;
+            }
+            if (event instanceof UiEvent.Action action && action.id().equals(id + ":add")) { addRow("", ""); return true; }
+            if (event instanceof UiEvent.Action action && action.id().startsWith(id + ":remove-")) {
+                int index = Integer.parseInt(action.id().substring((id + ":remove-").length()));
+                if (index >= rows.size()) return false;
+                rows.remove(index);
+                selectedRow = afterRemoval(selectedRow, index);
+                return true;
+            }
+            if (event instanceof UiEvent.Edited edited) {
+                for (int i = 0; i < rows.size(); i++) {
+                    if (edited.id().equals(id + ":name-" + i)) { rows.get(i)[0] = edited.text(); return true; }
+                    if (edited.id().equals(id + ":value-" + i)) { rows.get(i)[1] = edited.text(); return true; }
+                }
+            }
+            return false;
+        }
     }
 
     static final class OptionalNumber implements ValueEditor<Float> {
-        final JCheckBox platform;
-        private final Spin<Float> spin;
-        private final JComponent component;
+        private final String label;
+        private final NumberField<Float> number;
         private final float unset;
         private final float fallback;
-        private final List<Runnable> listeners = new ArrayList<>();
-        OptionalNumber(Setting<Float> setting, String label, double step, String unit) {
+        private boolean useDefault;
+        OptionalNumber(Setting<Float> setting, String label, double step, String unit, SettingsDraft draft) {
             var kind = (SettingKind.NumberRange) setting.kind();
-            unset = setting.defaultValue();
+            this.label = label;
+            unset = effectiveDefault(draft, setting);
             fallback = setting.example().orElse((float) kind.min());
-            platform = new JCheckBox(label);
-            platform.setOpaque(false);
-            spin = new Spin<>(new SpinnerNumberModel(fallback, kind.min(), kind.max(), step), unit, "0.##", Number::floatValue);
-            platform.addActionListener(event -> { spin.spinner.setEnabled(!platform.isSelected()); edited(); });
-            spin.onEdit(this::edited);
-            component = line(platform, spin.component());
+            number = new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), step, DECIMALS), unit, Float::valueOf, Nodes.FieldPresentation.STEPPER);
+            number.show(fallback);
         }
-        private void edited() { for (Runnable listener : List.copyOf(listeners)) listener.run(); }
-        @Override public JComponent component() { return component; }
-        @Override public Float value() { return platform.isSelected() ? unset : spin.value(); }
+        boolean usesDefault() { return useDefault; }
+        @Override public Nodes.Node node(String id, ControlState state) {
+            var toggle = new Nodes.Toggle(id + ":default", plain(state), label, useDefault, id + ":default", true);
+            var field = number.node(id, new ControlState(state.visible(), state.enabled() && !useDefault, state.busy(), state.error()));
+            return new Nodes.Stack(id + ":optional", plain(state), Nodes.LayoutRole.INLINE, List.of(toggle, field));
+        }
+        @Override public Float value() { return useDefault ? unset : number.value(); }
         @Override public void show(Float value) {
-            boolean useDefault = value == unset;
-            platform.setSelected(useDefault);
-            spin.spinner.setEnabled(!useDefault);
-            spin.show(useDefault ? fallback : value);
+            useDefault = value == unset;
+            number.show(useDefault ? fallback : value);
         }
-        @Override public void onEdit(Runnable listener) { listeners.add(listener); }
+        @Override public boolean event(String id, UiEvent event) {
+            if (event instanceof UiEvent.Toggled toggled && toggled.id().equals(id + ":default")) { useDefault = toggled.checked(); return true; }
+            return number.event(id, event);
+        }
         @Override public boolean removesAtDefault() { return true; }
     }
 
     static final class Profile implements ValueEditor<String> {
-        final JComboBox<String> box = new JComboBox<>();
-        final JButton detect;
+        private final String label;
         private final List<String> ids = new ArrayList<>();
-        private final JComponent component;
+        private final List<String> labels = new ArrayList<>();
         private final ShellChoices shells;
         private final SettingsDraft draft;
         private final Subscription listening;
+        private Runnable render = () -> { };
+        private int index = -1;
         private String shown = "";
-        /** The id the box displays for {@link #shown} or the last edit; picking it again is no edit. */
+        /** The id the dropdown displays for {@link #shown} or the last edit; picking it again is no edit. */
         private String current = "";
         /** How many entries are choices; any after them is the one "(not detected)" entry. */
         private int detected;
-        private boolean showing;
-        private final List<Runnable> edits = new ArrayList<>();
 
-        Profile(ShellChoices shells, SettingsDraft draft) {
+        Profile(String label, ShellChoices shells, SettingsDraft draft) {
+            this.label = label;
             this.shells = shells;
             this.draft = draft;
-            box.setPrototypeDisplayValue("Ubuntu-22.04 (WSL 2 \u00B7 default)");
-            detect = Items.button("\u21BB", "Detect shells again", shells.refresh());
-            component = line(box, detect);
             fill();
-            listening = shells.onChanged().apply(this::fill);
-            box.addActionListener(event -> {
-                if (showing || value().equals(current)) return;
-                current = value();
-                for (Runnable listener : List.copyOf(edits)) listener.run();
-            });
+            listening = shells.onChanged().apply(() -> { fill(); render.run(); });
         }
+
+        /** Every entry's label, the undetected one included; for tests. */
+        List<String> labels() { return List.copyOf(labels); }
+        String selectedLabel() { return index < 0 ? null : labels.get(index); }
 
         /** Rebuilds the entries from the current choices, keeping the selection. */
         void fill() {
-            String keep = box.getSelectedIndex() < 0 ? shown : ids.get(box.getSelectedIndex());
-            showing = true;
-            try {
-                box.removeAllItems();
-                ids.clear();
-                for (ShellChoices.Choice choice : shells.choices().get()) add(choice.id(), choice.label());
-                if (!ids.contains(ShellChoices.CUSTOM)) add(ShellChoices.CUSTOM, "Custom");
-                detected = ids.size();
-                select(keep);
-            } finally { showing = false; }
+            String keep = index < 0 ? shown : ids.get(index);
+            ids.clear();
+            labels.clear();
+            for (ShellChoices.Choice choice : shells.choices().get()) add(choice.id(), choice.label());
+            if (!ids.contains(ShellChoices.CUSTOM)) add(ShellChoices.CUSTOM, "Custom");
+            detected = ids.size();
+            index = -1;
+            select(keep);
         }
 
-        private void add(String id, String label) { ids.add(id); box.addItem(label); }
+        private void add(String id, String label) { ids.add(id); labels.add(label); }
 
         private void select(String value) {
             // At most one undetected entry: the one for the value shown now.
-            while (ids.size() > detected) {
-                ids.removeLast();
-                box.removeItemAt(box.getItemCount() - 1);
-            }
+            while (ids.size() > detected) { ids.removeLast(); labels.removeLast(); }
             String wanted = effective(value);
             // WSL distribution names ignore case, as the launcher's resolution does: select the detected spelling.
             String id = ids.stream().filter(known -> known.equals(wanted)
                 || known.startsWith(WSL_PREFIX) && wanted.startsWith(WSL_PREFIX) && known.equalsIgnoreCase(wanted))
                 .findFirst().orElse(wanted);
             if (!ids.contains(id)) add(id, id + " (not detected)");
-            box.setSelectedIndex(ids.indexOf(id));
+            index = ids.indexOf(id);
             current = id;
         }
 
@@ -590,20 +752,35 @@ public final class Editors {
             return ids.stream().filter(id -> !id.equals(ShellChoices.CUSTOM)).findFirst().orElse(ShellChoices.CUSTOM);
         }
 
-        @Override public JComponent component() { return component; }
-        @Override public String value() {
-            int index = box.getSelectedIndex();
-            return index < 0 ? "" : ids.get(index);
+        @Override public Nodes.Node node(String id, ControlState state) {
+            var options = new ArrayList<Option>();
+            for (int i = 0; i < labels.size(); i++) options.add(new Option("profile-" + i, labels.get(i), Optional.empty()));
+            var choice = new Nodes.Choice(id, state, Nodes.ChoiceKind.DROPDOWN, options, index < 0 ? "" : "profile-" + index, label, "");
+            return new Nodes.Stack(id + ":line", plain(state), Nodes.LayoutRole.INLINE,
+                List.of(choice, iconButton(id + ":detect", "refresh", "Detect shells again", plain(state))));
         }
-        @Override public void show(String value) {
-            showing = true;
-            try { shown = value; select(value); } finally { showing = false; }
-        }
+
+        @Override public String value() { return index < 0 ? "" : ids.get(index); }
+
+        @Override public void show(String value) { shown = value; select(value); }
+
         /**
-         * A pick that differs from what the box displayed. Swing reports picking the selected entry again too, which
-         * would turn an empty setting shown as its effective profile into an explicit one.
+         * A pick that differs from what the dropdown displayed. A pick of the displayed entry again would turn an empty
+         * setting shown as its effective profile into an explicit one, so it is no edit.
          */
-        @Override public void onEdit(Runnable listener) { edits.add(listener); }
+        @Override public boolean event(String id, UiEvent event) {
+            if (event instanceof UiEvent.Action action && action.id().equals(id + ":detect")) { shells.refresh().run(); return false; }
+            if (!(event instanceof UiEvent.Selected picked) || !picked.id().equals(id)) return false;
+            String option = picked.ids().stream().findFirst().orElse("");
+            if (!option.startsWith("profile-")) return false;
+            int chosen = Integer.parseInt(option.substring("profile-".length()));
+            if (chosen < 0 || chosen >= ids.size() || ids.get(chosen).equals(current)) return false;
+            index = chosen;
+            current = ids.get(chosen);
+            return true;
+        }
+
+        @Override public void onChanged(Runnable render) { this.render = render; }
         @Override public void dispose() { listening.close(); }
     }
 }

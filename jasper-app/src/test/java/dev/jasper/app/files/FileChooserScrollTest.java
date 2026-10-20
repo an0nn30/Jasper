@@ -28,10 +28,11 @@ class FileChooserScrollTest {
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
                 var model = new ChooserModel(request, List.of(new LocalSource(new LocalBrowser(dir))),
                     Runnable::run, Runnable::run, false);
-                panel.set(new FileChooserPanel(model, new ChooserPrefs(UiState.inMemory()), dir,
+                panel.set(new FileChooserPanel(dev.jasper.app.testsupport.KitTestSupport.context(), model, new ChooserPrefs(UiState.inMemory()), dir,
                     locations -> {}, location -> true, Optional::empty));
                 model.start();
-                var pane = (JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, panel.get().table());
+                // The listing is the kit table under the OVERLAY scroll policy.
+                var pane = dev.jasper.app.testsupport.KitTestSupport.require(panel.get(), FileChooserPanel.FILES, JScrollPane.class);
                 scroll.set(pane);
                 pane.setSize(500, 180);
                 panel.get().addNotify();

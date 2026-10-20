@@ -77,15 +77,17 @@ class BarHeightTest {
                 assertThat(status.getMinimumSize().height).isEqualTo(UIScale.scale(height));
             }
             owner.setStatusBarHeight(20);
+            var original=new java.util.HashMap<Object,Object>();UIManager.getDefaults().forEach(original::put);
+            int normal=status.getPreferredSize().height;
             Font font = UIManager.getFont("Label.font");
             try {
-                UIManager.put("Label.font", font.deriveFont(40f));
+                UIManager.put("defaultFont", font.deriveFont(40f));
                 status.refreshTheme();
-                int text = status.getFontMetrics(UIManager.getFont("Label.font").deriveFont(40f - UIScale.scale(2f))).getHeight();
+                int text = status.getFontMetrics(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.CAPTION)).getHeight();
                 assertThat(status.getPreferredSize().height).as("a large UI font grows the bar").isGreaterThanOrEqualTo(text)
-                    .isGreaterThan(UIScale.scale(20));
+                    .isGreaterThan(normal);
             } finally {
-                UIManager.put("Label.font", null);
+                UIManager.put("defaultFont",original.get("defaultFont"));
                 status.refreshTheme();
             }
             assertThat(status.getPreferredSize().height).isEqualTo(UIScale.scale(20));
@@ -95,8 +97,8 @@ class BarHeightTest {
     @Test void statusContentsAreCenteredBetweenWorkspaceSurfacesAndWindowBottom() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
-            for (var theme : java.util.List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                owner.selectTheme(theme);
+            for (boolean themeDark : new boolean[]{true, false}) {
+                owner.selectVariant(themeDark);
                 for (int height : new int[]{20, 24, 48}) {
                     owner.setStatusBarHeight(height); owner.setSize(1000, 600);
                     dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);

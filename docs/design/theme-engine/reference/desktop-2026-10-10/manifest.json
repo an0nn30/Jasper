@@ -1,0 +1,258 @@
+[
+  {
+    "name": "Screenshot 2026-10-06 at 11.16.25\u202fAM.png",
+    "width": 1806,
+    "height": 1648,
+    "sha256": "1ca696c307ee62915945b3d6bcf215573c63dfb4ed62e1279759fb36a87d09f0",
+    "content": "Actual Jasper workspace, toolbar/title and two terminal tabs, rails and status hidden",
+    "plan3_tasks": "10",
+    "required_actual_captures": "workspace: same-size two-tab, rails/status hidden; native controls and terminal distinct from standard-kit matching",
+    "content_crop_xywh": [
+      112,
+      76,
+      1582,
+      1424
+    ],
+    "scale_evidence": "2x inferred from tab54 ->27, title68 ->34 and 28 source traffic-light diameter; physical screenshot dimensions alone are insufficient"
+  },
+  {
+    "name": "Screenshot 2026-10-06 at 11.16.31\u202fAM.png",
+    "width": 1806,
+    "height": 1648,
+    "sha256": "7369b0fef26d6bf0753f9f621262f7940cd675974498ff07ca43591ef6c0724b",
+    "content": "Actual Jasper command palette open over the same workspace; focused search, recent/most-used sections, selected row and footer",
+    "plan3_tasks": "9/10",
+    "required_actual_captures": "palette: focused empty/populated, selected mixed row family, recent/most-used headers, preview/footer, search/scope/empty states",
+    "content_crop_xywh": [
+      342,
+      84,
+      1120,
+      712
+    ],
+    "scale_evidence": "2x inferred jointly with sibling workspace: 48 selected row =24; 64 outer search =32"
+  },
+  {
+    "name": "Screenshot 2026-10-06 at 11.16.41\u202fAM.png",
+    "width": 1806,
+    "height": 1648,
+    "sha256": "145383d455145cbc6201f331203f20dddd87e2f1569507e9b6ac0a59070874e3",
+    "content": "Actual Jasper workspace with both activity rails and status visible; two terminal tabs",
+    "plan3_tasks": "10",
+    "required_actual_captures": "workspace: rails/status visible, active route, breadcrumb/status items, collapsed/hidden rail variants",
+    "content_crop_xywh": [
+      112,
+      76,
+      1582,
+      1424
+    ],
+    "scale_evidence": "2x inferred jointly: 56 source rail width ->28, 54 tab ->27, ~56 status ->28"
+  },
+  {
+    "name": "Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "width": 2908,
+    "height": 1940,
+    "sha256": "6cb0edee474537c181454508fcb3143d52f226e23b0d20aea6bc1731d3a54585",
+    "content": "Actual integrated Jasper: Sessions selected footer top-left, disconnected SFTP+Cancelled footer bottom-left, empty File Servers top-right, empty Tunnels bottom-right",
+    "plan3_tasks": "5/6/7/10",
+    "required_actual_captures": "integrated-panels: four depicted states and arrangement, plus old populated File Server protocol-chip/switch reference; isolated panel captures too",
+    "content_crop_xywh": [
+      112,
+      76,
+      2684,
+      1716
+    ],
+    "scale_evidence": "2x inferred strongly from 520 panel width ->260, 54x28 switch interior + outline ->56x32 compact switch, 28 folder glyph ->14"
+  },
+  {
+    "name": "add_host_dialog_mock.png",
+    "width": 1122,
+    "height": 1562,
+    "sha256": "5877712785cd40e3e05c1b090889ce0f0018f896902c30b6184b91f817eab1ac",
+    "content": "Add Host; Vault authentication, two ordered keys; Favorite off, Track folder on; invalid/disabled Add Host",
+    "plan3_tasks": "2",
+    "required_actual_captures": "host-add: depicted Vault state, empty, valid, agent, ordered-reorder, picker-open, busy, error",
+    "content_crop_xywh": [
+      26,
+      82,
+      1080,
+      1464
+    ],
+    "scale_evidence": "2x inferred strongly: 56 default outer field, 64x36 switch, 28 card inset"
+  },
+  {
+    "name": "combo_box_mock.png",
+    "width": 1990,
+    "height": 1664,
+    "sha256": "09539eb2f89f4d0830bc9c8044fb020e17e3334402bf4e1fb6300bc2a9bb53b4",
+    "content": "Six-state credential picker design board: empty, selected, open, filtering, no matches, disabled",
+    "plan3_tasks": "2/4 (shared kit)",
+    "required_actual_captures": "credential-picker: all six states, popup keyboard selection/dismissal, create footer iff actual operation is supported",
+    "content_crop_xywh": [
+      0,
+      182,
+      1990,
+      1482
+    ],
+    "scale_evidence": "2x plausible but compact: 44 outer control = 22 logical, 2px border = 1, 6px focus = 3; does not establish default field size"
+  },
+  {
+    "name": "create_vault_dialog_mock.png",
+    "width": 820,
+    "height": 912,
+    "sha256": "ed8b5e80b0d56ef626cdac8f17359a3521e3556f141621c53335ea9d7ca0150a",
+    "content": "Create Vault; two empty secrets, four-segment meter, device binding on; disabled primary",
+    "plan3_tasks": "1",
+    "required_actual_captures": "vault-create: empty/invalid, focus, valid, revealed, mismatch, busy/error",
+    "content_crop_xywh": [
+      10,
+      46,
+      800,
+      856
+    ],
+    "scale_evidence": "2x inferred strongly: 64 hero field, 104 hero tile, 60 action"
+  },
+  {
+    "name": "new_file_server_mock.png",
+    "width": 1096,
+    "height": 1452,
+    "sha256": "82e63e92d5fe3b0ce66b89dce6ec60c74a89349c932ef5e9eb77a621c13229d4",
+    "content": "New File Server; HTTP, Anonymous, no folder; writable off, TLS off, Require TLS disabled, autostart off",
+    "plan3_tasks": "3",
+    "required_actual_captures": "fileserver-add: anonymous, vault-account (older source), session-password, each real protocol, TLS-dependency, busy/error",
+    "content_crop_xywh": [
+      8,
+      64,
+      1080,
+      1380
+    ],
+    "scale_evidence": "2x inferred strongly: 56 outer field, 48 selected segment, 28 card inset"
+  },
+  {
+    "name": "new_tunnel_mock.png",
+    "width": 1096,
+    "height": 1186,
+    "sha256": "81451ebc461638a102fb1922060d5188fadcaa6b89dc77d198d3e2fc5608669f",
+    "content": "New Tunnel; selected Via Host, Local type, incomplete ports, route preview, allow-other-computers off",
+    "plan3_tasks": "6",
+    "required_actual_captures": "tunnel-add: Local/Remote/Dynamic, missing-valid ports, alternate host, warning, busy/error",
+    "content_crop_xywh": [
+      8,
+      62,
+      1080,
+      1116
+    ],
+    "scale_evidence": "2x inferred strongly: 56 outer fields, 48 segment, 64x36 switch"
+  },
+  {
+    "name": "rename_vault_dialog.png",
+    "width": 770,
+    "height": 578,
+    "sha256": "216664c30d0cf66dc3c45075b40cbb0c91921529e4e3d071e57bcd691824b22f",
+    "content": "Unlock Vault (filename is misleading); focused empty secret, disabled Unlock",
+    "plan3_tasks": "1",
+    "required_actual_captures": "vault-unlock: focused empty, entered, revealed, busy/error; this is NOT Rename Vault",
+    "content_crop_xywh": [
+      2,
+      38,
+      760,
+      528
+    ],
+    "scale_evidence": "2x inferred strongly: 64 hero field, 104 hero tile, external 6-pixel halo"
+  },
+  {
+    "name": "settings_dialog_mock.png",
+    "width": 1970,
+    "height": 1372,
+    "sha256": "e59bc642cf95f4c6ad37cca863e1545a0b4740a0788beac90bd000beba7f0d29",
+    "content": "Settings Appearance; sidebar/search/header/breadcrumb, theme preview trio, theme/workspace choices, opacity/blur/font rows, pinned footer",
+    "plan3_tasks": "9",
+    "required_actual_captures": "settings-appearance: dark/light/system selection, theme/workspace popup, opacity policy, font fields, scroll; Apply/Cancel/OK",
+    "content_crop_xywh": [
+      4,
+      6,
+      1960,
+      1362
+    ],
+    "scale_evidence": "2x inferred strongly: 56 outer choices, 40 sidebar tile, 64x36 switches"
+  },
+  {
+    "name": "settings_keymap_mock.png",
+    "width": 1976,
+    "height": 1374,
+    "sha256": "d86e8ebbb0c24ae350dbce2a92f3348aa86a5d1fd30f2e92134fc3c374e10667",
+    "content": "Settings Keymap; grouped expandable action list, context/keys, recording expanded New Window row, disabled Set",
+    "plan3_tasks": "9",
+    "required_actual_captures": "settings-keymap: expanded/collapsed groups, search/record filter, editing/recording, contextual read-only, conflict/valid Set, keycaps",
+    "content_crop_xywh": [
+      8,
+      6,
+      1960,
+      1362
+    ],
+    "scale_evidence": "2x inferred strongly: 56 nav row, 64 recording field, 56 footer controls"
+  },
+  {
+    "name": "settings_notification_mock.png",
+    "width": 1982,
+    "height": 1372,
+    "sha256": "6c6c3bb321d3441cfcbe7b974bc2120020f38aae84eca23eb7f6a077651c27ac",
+    "content": "Settings Notifications; system switch, dependent delay, owner-group cards, dropdown with selected Sticky card / default mark",
+    "plan3_tasks": "9",
+    "required_actual_captures": "settings-notifications: system on/off, group owner sections, mode popup all supported modes/default/reset, no groups",
+    "content_crop_xywh": [
+      8,
+      2,
+      1960,
+      1362
+    ],
+    "scale_evidence": "2x inferred strongly: 56 outer choices, 64x36 switch, 56 selected popup row"
+  },
+  {
+    "name": "settings_plugins_mock.png",
+    "width": 1488,
+    "height": 1364,
+    "sha256": "c0532db82f5fba7f5d442540aaba833160d6931e825883d575e1d927576ef180",
+    "content": "Settings Plugins content crop; selected Vault, toggled plugin rows, hero identity/status, Overview/Details segments, footer",
+    "plan3_tasks": "9",
+    "required_actual_captures": "settings-plugins: selected Overview/Details, enabled/disabled, toggle pending/error, empty/filter-empty, overflow menu; capture mounted in full Settings",
+    "content_crop_xywh": [
+      0,
+      0,
+      1488,
+      1364
+    ],
+    "scale_evidence": "2x inferred strongly: 56 search/disable control, 104 detail tile, 56x32 compact row switch"
+  },
+  {
+    "name": "settings_windows_mock.png",
+    "width": 1966,
+    "height": 1366,
+    "sha256": "a8c736c3e6fced9e4d3708eb004631b595bade8c0daa8eb45b4af9b16d6d0065",
+    "content": "Settings Window; toolbar segments, numeric steppers, status switch + dependent Height, tab/rail, combined initial-size row",
+    "plan3_tasks": "9",
+    "required_actual_captures": "settings-window: toolbar variants, stepper limits, status off/on, initial-size pair/reset, Apply/Cancel",
+    "content_crop_xywh": [
+      4,
+      2,
+      1960,
+      1362
+    ],
+    "scale_evidence": "2x inferred strongly: 56 outer stepper, 64x36 switch, 40 sidebar tile"
+  },
+  {
+    "name": "vault_ui_mock.png",
+    "width": 1810,
+    "height": 1216,
+    "sha256": "c0c3d7233af8d7bad9ca6751765a79c0bd6f48f950881ab1c9462e8e30a5fe8d",
+    "content": "Credential Vault; All Items selected, five items, selected Login detail, stored password masked",
+    "plan3_tasks": "4",
+    "required_actual_captures": "vault-manager: selected login/key/note, masked/revealed, filter-empty/collection-empty; vault-menu and attached sheets retain old references",
+    "content_crop_xywh": [
+      4,
+      96,
+      1800,
+      1110
+    ],
+    "scale_evidence": "2x inferred strongly: 56 list tile, 88 detail tile, 384 sidebar and 544 list columns"
+  }
+]

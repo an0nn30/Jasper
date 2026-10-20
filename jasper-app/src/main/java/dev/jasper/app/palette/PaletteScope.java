@@ -25,6 +25,13 @@ public interface PaletteScope {
     /** One to three verbs, bound in order to Enter, Cmd/Ctrl+Enter and Shift+Enter. */
     List<PaletteVerb> verbs();
     default boolean monospaceRows() { return false; }
+    /**
+     * The hue of this scope's row squares where a presentation draws them: never NONE. A plugin scope that names no hue
+     * takes its plugin's manifest {@code icon_hue}.
+     */
+    default dev.jasper.ui.model.Nodes.Hue hue() { return dev.jasper.ui.model.Nodes.Hue.NEUTRAL; }
+    /** What one row is, as a lowercase singular noun such as "session"; the label when the scope names none. */
+    default String itemNoun() { return label(); }
     /** Whether a query with no chip (All) searches this scope too; true unless the scope opts out. */
     default boolean inAll() { return true; }
     /**

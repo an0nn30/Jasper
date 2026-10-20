@@ -5,12 +5,18 @@ import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class WindowToolbarTest {
+    /** The overflow button styles itself from the installed theme: install one rather than rely on another class's. */
+    @BeforeEach void installTheme() throws Exception {
+        SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeTestSupport.install(false));
+    }
+
     private JButton button(WindowToolbar bar, Action action, int priority) {
         var button = new JButton(action);
         button.setPreferredSize(new Dimension(60, 24));
@@ -22,6 +28,83 @@ class WindowToolbarTest {
         return new AbstractAction(name) {
             @Override public void actionPerformed(ActionEvent event) { calls.incrementAndGet(); }
         };
+    }
+
+    private JComponent view(WindowToolbar bar, int width, int height, int priority) {
+        var view = new JPanel();
+        view.setPreferredSize(new Dimension(width, height));
+        WindowToolbar.view(view, priority);
+        bar.add(view);
+        return view;
+    }
+
+    /** Plan 3d: a contributed view lays out at its preferred size, hides when the row is too narrow and never overflows. */
+    @Test void aViewHidesWhileTheRowIsTooNarrowAndNeverEntersTheOverflowMenu() {
+        var calls = new AtomicInteger();
+        var bar = new WindowToolbar(() -> {});
+        var view = view(bar, 200, 24, 40);
+        var settings = button(bar, action("Settings", calls), 100);
+        bar.finish();
+        assertThat(bar.fullWidth()).as("the view counts toward the full width").isEqualTo(16 + 200 + 4 + 60);
+        assertThat(bar.minimumWidth()).as("not toward the minimum: it can hide").isEqualTo(16 + 24);
+        bar.setSize(400, 30); bar.doLayout();
+        assertThat(view.isVisible()).isTrue();
+        assertThat(view.getBounds()).as("its preferred size, centred in the row").isEqualTo(new java.awt.Rectangle(128, 3, 200, 24));
+        assertThat(settings.getX()).isEqualTo(332);
+        bar.setSize(200, 30); bar.doLayout();
+        assertThat(view.isVisible()).as("too narrow: the view hides").isFalse();
+        assertThat(settings.isVisible()).isTrue();
+        assertThat(bar.overflowButton().isVisible()).as("a hidden view needs no overflow button").isFalse();
+        assertThat(bar.overflowMenu().getComponentCount()).as("and leaves nothing in the overflow menu").isZero();
+        bar.setSize(400, 30); bar.doLayout();
+        assertThat(view.isVisible()).as("room again: it shows").isTrue();
+    }
+
+    @Test void aLowerPriorityButtonOverflowsBeforeAViewHides() {
+        var calls = new AtomicInteger();
+        var bar = new WindowToolbar(() -> {});
+        var zoom = button(bar, action("Zoom", calls), 10);
+        var view = view(bar, 100, 24, 40);
+        button(bar, action("Settings", calls), 100);
+        bar.finish();
+        bar.setSize(16 + 100 + 4 + 60 + 4 + 24, 30); bar.doLayout();
+        assertThat(zoom.isVisible()).isFalse();
+        assertThat(view.isVisible()).isTrue();
+        assertThat(bar.overflowButton().isVisible()).isTrue();
+    }
+
+    /** Review fix (plan 3d): a button that gave way before a wide view hid comes back when it fits without the view. */
+    @Test void buttonsThatGaveWayBeforeAViewHidComeBack() {
+        var calls = new AtomicInteger();
+        var bar = new WindowToolbar(() -> {});
+        var zoom = button(bar, action("Zoom", calls), 10);
+        var view = view(bar, 200, 24, 40);
+        var settings = button(bar, action("Settings", calls), 100);
+        bar.finish();
+        bar.setSize(16 + 250, 30); bar.doLayout();
+        assertThat(view.isVisible()).as("too wide for the row").isFalse();
+        assertThat(zoom.isVisible()).as("Zoom and Settings fit once the view hid").isTrue();
+        assertThat(settings.isVisible()).isTrue();
+        assertThat(bar.overflowButton().isVisible()).as("so nothing overflows").isFalse();
+        assertThat(zoom.getX() + zoom.getWidth() + 4).isEqualTo(settings.getX());
+        assertThat(settings.getX() + settings.getWidth()).isEqualTo(16 + 250 - 8);
+    }
+
+    /** Review fix (plan 3d): labels that gave way for a wide view come back once it hid, when the row fits with them. */
+    @Test void labelsThatGaveWayForAViewComeBackOnceItHid() {
+        var calls = new AtomicInteger();
+        var bar = new WindowToolbar(() -> {});
+        var labelled = new JButton(action("Sessions", calls)) {
+            @Override public Dimension getPreferredSize() { return new Dimension(getText() == null ? 24 : 90, 24); }
+        };
+        labelled.putClientProperty("label", "Sessions");
+        WindowToolbar.entry(labelled, 80, () -> WindowToolbar.menuItem(labelled.getAction()));
+        bar.add(labelled);
+        var view = view(bar, 300, 24, 40);
+        bar.finish();
+        bar.setSize(16 + 200, 30); bar.doLayout();
+        assertThat(view.isVisible()).isFalse();
+        assertThat(labelled.getText()).as("the row fits the label without the view").isEqualTo("Sessions");
     }
 
     @Test void overflowRetainsActionsSelectionShortcutsAndLiveEnabledState() {
@@ -88,7 +171,7 @@ class WindowToolbarTest {
         }
         bar.setSize(bar.fullWidth(), 30); bar.doLayout();
         assertThat(bar.overflowButton().isVisible()).as("the full width shows everything").isFalse();
-        assertThat(bar.overflowButton().getIcon()).isSameAs(dev.jasper.app.platform.AppIcons.bundled("general/moreVertical"));
+        assertThat(bar.overflowButton().getIcon()).isSameAs(dev.jasper.app.platform.AppIcons.semantic("more.vertical"));
     }
 
     @Test void labelsGiveWayBeforeAnyControlOverflowsAndComeBackWithRoom() {

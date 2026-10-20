@@ -38,16 +38,80 @@ public final class AuxiliarySurface {
     private final UUID ownerWindow;
     private final AuxiliarySurface ownerSurface;
     private final Function<AuxiliarySurface, Shell> shells;
-    private final JPanel holder = new JPanel(new BorderLayout());
+    /** Its invalidation (any content revalidating) is how a fitted dialog notices its kit view's size changing. */
+    private final JPanel holder = new JPanel(new BorderLayout()) {
+        @Override public void invalidate() {
+            super.invalidate();
+            contentChanged();
+        }
+    };
     private final List<BooleanSupplier> guards = new ArrayList<>();
     private final List<BooleanSupplier> closeCommands = new ArrayList<>();
     private final List<Runnable> closedListeners = new ArrayList<>();
     private final List<Runnable> activatedListeners = new ArrayList<>();
+    private final JPanel titleActions = new JPanel(new BorderLayout());
+    private Runnable titleActionsChanged = () -> { };
+    /** Stable title slot, always outside the body holder. */
+    public JComponent titleActions() { return titleActions; }
+    public void setTitleActions(JComponent content) {
+        if (closed) return;
+        titleActions.removeAll();
+        if (closed) return;
+        // Kit content in the title slot takes the shared title-strip presentation (menu indicators, control surface).
+        if (content instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) view.titleStrip(true);
+        if (content != null) titleActions.add(content, BorderLayout.CENTER);
+        titleActions.setVisible(content != null); titleActionsChanged();
+    }
+    public void titleActionsChanged() { titleActions.revalidate(); titleActions.repaint(); titleActionsChanged.run(); }
+    void onTitleActionsChanged(Runnable handler) { titleActionsChanged = handler; }
     private String title;
     private Shell shell;
+    private JComponent anchorOwner;
+    void anchorOwner(JComponent anchor){anchorOwner=anchor;}
+    Optional<JComponent> anchorOwner(){return Optional.ofNullable(anchorOwner);}
     private boolean shown;
     private boolean closed;
     private Rectangle lastBounds;
+    private boolean contentSize, attachedSheet;
+    public boolean contentSize() { return contentSize; }
+    public void contentSize(boolean value) { contentSize = value; }
+    public boolean attachedSheet() { return attachedSheet; }
+    public void attachedSheet(boolean value) {
+        if (value && !modal) throw new IllegalArgumentException("Attached sheets must be modal");
+        attachedSheet = value;
+    }
+    private boolean classic, hostTitled, nativeDialog;
+    /** Whether a modal overlay or attached sheet of this surface is drawn in its window as a classic dialog (spec 10.8). */
+    public boolean classic() { return classic; }
+    void classic(boolean value) { classic = value; }
+    /**
+     * Whether a title bar the system draws already shows this dialog's title, so its FULL form draws none (spec 10.8): a
+     * dialog's, or a modal overlay's that opens as a native dialog; never an attached sheet's, which has no title bar.
+     */
+    public boolean hostTitled() { return hostTitled && !attachedSheet && (kind != Kind.OVERLAY || nativeDialog); }
+    void hostTitled(boolean value) { hostTitled = value; }
+    /** Whether this modal overlay opens as a native modal dialog, its owner having no showing window (spec 10.8). */
+    boolean nativeDialog() { return nativeDialog; }
+    void nativeDialog(boolean value) { nativeDialog = value; }
+    /** The shell's host flags for a kit view set as content after the shell exists (spec 10.8); none by default. */
+    private java.util.function.Consumer<dev.jasper.ui.swing.KitView> laterContent = view -> { };
+    /** The shell marks content set from now on with {@code marks}, as it marked the content it found. */
+    void laterContent(java.util.function.Consumer<dev.jasper.ui.swing.KitView> marks) { laterContent = Objects.requireNonNull(marks); }
+    private dev.jasper.ui.model.Nodes.Hue swatch = dev.jasper.ui.model.Nodes.Hue.NONE;
+    /** The hue of the square drawn before this surface's title wherever Jasper draws it; NONE draws none. Set before the first show. */
+    public void swatch(dev.jasper.ui.model.Nodes.Hue value) { swatch = Objects.requireNonNull(value); }
+    public dev.jasper.ui.model.Nodes.Hue swatch() { return swatch; }
+    private java.util.function.IntSupplier integratedTitle;
+    /**
+     * The content draws the window's title row itself, {@code height} pixels tall (Settings: its sidebar and header):
+     * the native shell then shows no title strip and centres the window controls on that row. Set before the first show.
+     */
+    public void integratedTitle(java.util.function.IntSupplier height) { integratedTitle = Objects.requireNonNull(height); }
+    public Optional<java.util.function.IntSupplier> integratedTitle() { return Optional.ofNullable(integratedTitle); }
+    private boolean fitContent;
+    private DialogFit fit;
+    private AttachedSheet attachment;
+    void attachWith(AttachedSheet value) { attachment = value; if (closed) value.close(); }
 
     AuxiliarySurface(String id, String title, Kind kind, boolean modal, Dimension preferredSize, UUID ownerWindow,
                      AuxiliarySurface ownerSurface, Function<AuxiliarySurface, Shell> shells) {
@@ -75,9 +139,39 @@ public final class AuxiliarySurface {
     Optional<Rectangle> lastBounds() { return Optional.ofNullable(lastBounds); }
 
     public void setContent(JComponent content) {
+        if (closed) return;
         holder.removeAll();
-        if (content != null) holder.add(content, BorderLayout.CENTER);
+        if (!closed && content != null) {
+            if (attachedSheet && content instanceof dev.jasper.ui.swing.KitView view) view.paintsSurface(false);
+            holder.add(content, BorderLayout.CENTER);
+            // Content replaced later keeps the shell's treatment (a classic dialog's strip and band).
+            if (content instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) laterContent.accept(kit);
+        }
         holder.revalidate(); holder.repaint();
+    }
+
+    /**
+     * Whether the content is a mounted kit view, whose preferred-size changes a host-packed dialog follows ({@link
+     * DialogFit}); raw Swing content keeps its own sizing.
+     */
+    public void fitContent(boolean value) {
+        fitContent = value;
+        contentChanged();
+    }
+
+    /**
+     * The mounted kit view changed (its descriptor was updated, or its layout was invalidated); a fitted dialog re-packs
+     * when the preferred size changed.
+     */
+    public void contentChanged() { if (closed) return; if (attachment != null) attachment.changed(); else if (fitContent && fit != null) fit.contentChanged(); }
+
+    /** Whether the content is a mounted kit view (see {@link #fitContent}). */
+    public boolean fitsContent() { return fitContent; }
+
+    /** The native shell's fitting rule for a dialog it packs itself; none for remembered bounds. Closed with the surface. */
+    public void fitWith(DialogFit value) {
+        fit = Objects.requireNonNull(value);
+        if (closed) value.close();
     }
 
     public void setTitle(String value) {
@@ -88,9 +182,22 @@ public final class AuxiliarySurface {
     /** Creates the native shell on first use. For a modal dialog this returns after the dialog closed. */
     public void show() {
         if (closed) return;
-        if (shell == null) shell = shells.apply(this);
-        shown = true;
-        shell.show().run();
+        try {
+            if (attachedSheet && ownerSurface != null && !ownerSurface.shown())
+                throw new IllegalArgumentException("Attached sheet needs a shown owner");
+            if (shell == null) {
+                Shell created = Objects.requireNonNull(shells.apply(this));
+                if (closed) { created.dispose().run(); return; }
+                shell = created;
+            }
+            if (ownerSurface != null && (ownerSurface.closed() || attachedSheet && !ownerSurface.shown())) { close(); return; }
+            shown = true;
+            shell.show().run();
+        } catch (RuntimeException | Error failure) {
+            shown = false;
+            try { close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            throw failure;
+        }
     }
 
     /** Opens a native existing-file picker owned by this shown surface. */
@@ -123,7 +230,8 @@ public final class AuxiliarySurface {
     /** A user's attempt to close: every guard is consulted; one that throws cannot trap the window open. */
     public boolean requestClose() {
         if (closed) return true;
-        if (kind == Kind.OVERLAY) return false;
+        // An overlay in its window has no close button; one opened as a native dialog closes as a dialog does.
+        if (kind == Kind.OVERLAY && !nativeDialog) return false;
         if (!mayClose()) return false;
         close();
         return true;
@@ -155,6 +263,8 @@ public final class AuxiliarySurface {
     public void close() {
         if (closed) return;
         closed = true;
+        if (fit != null) fit.close();
+        if (attachment != null) attachment.close();
         if (shell != null) {
             try { lastBounds = shell.bounds().get(); } catch (RuntimeException ignored) { lastBounds = null; }
             shell.dispose().run();
@@ -175,7 +285,9 @@ public final class AuxiliarySurface {
     }
 
     public Subscription onClosed(Runnable listener) {
-        closedListeners.add(java.util.Objects.requireNonNull(listener));
+        java.util.Objects.requireNonNull(listener);
+        if (closed) { listener.run(); return new Subscription(() -> { }); }
+        closedListeners.add(listener);
         return new Subscription(() -> closedListeners.remove(listener));
     }
 

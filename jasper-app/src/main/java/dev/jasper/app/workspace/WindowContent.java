@@ -1,7 +1,9 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.GlassLevels;
-import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+
+import dev.jasper.ui.theme.GlassLevels;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
@@ -15,7 +17,6 @@ import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.dock.DockState;
-import dev.jasper.app.dock.Side;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
@@ -24,9 +25,9 @@ import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.app.palette.ScopeRegistry;
 import dev.jasper.app.palette.CommandsScope;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.lifecycle.Subscription;
-import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
 import dev.jasper.app.config.ViewMode;
 
@@ -42,6 +43,7 @@ import javax.swing.text.JTextComponent;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.terminals.SessionRequest;
+import dev.jasper.terminal.view.FileLink;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 public final class WindowContent extends JPanel implements AutoCloseable {
@@ -51,13 +53,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Runnable quit;
     private final Runnable onEmpty;
     private final java.util.Map<Component, dev.jasper.app.contributions.ContentEntry> hosted = new IdentityHashMap<>();
-    private final Map<JComponent, WorkspaceStyler> hostedStylers = new IdentityHashMap<>();
     private dev.jasper.app.contributions.ContentRegistry contentRegistry;
     private Subscription contentHost;
     private Runnable bringToFront = () -> {};
     private final boolean detached;
     private final JTabbedPane tabs = new TerminalDeck();
-    private final WindowTabs windowTabs;
+    /** The look's editor tabs: the equal tabs, or the classic ones (spec 10.5). */
+    private final TabStrip windowTabs;
     private final WorkspaceActions workspaceActions;
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
@@ -88,7 +90,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Where this window's tool windows dock: its contributions change it, its area lays it out. */
     private final DockState dock = new DockState();
     private final ToolWindowArea area;
-    private final ToolStripe leftStripe = new ToolStripe(Side.LEFT), rightStripe = new ToolStripe(Side.RIGHT);
+    /** The window's stripes: icon rails, or labelled stripes and the bottom strip (spec 10.7). */
+    private final StripeSet stripes;
+    private final DockStripe leftStripe, rightStripe;
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
     private UiState uiState = UiState.inMemory();
@@ -97,6 +101,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private boolean rememberLayout = true;
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
+    /** The look's workspace strategies, fixed for this window's life. */
+    private final WorkspaceChrome look;
     private final ThemeController themes;
     private final Subscription themeRegistration;
     private JRootPane bindingRoot;
@@ -135,8 +141,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private Runnable unregisterConfiguration = () -> {};
     private java.util.function.Consumer<TerminalPane> firstTerminal = pane -> { };
     private boolean firstTerminalSeen;
-    Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
-        this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
+    /** Whether this window's macOS appearance follows the theme (a native-titled look, spec 10.1); its dialogs follow too. */
+    private boolean followsThemeAppearance;
+    /** IntelliJ Classic's macOS title band over the toolbar under a classic title (Enterprise plan 14), or null. */
+    private MacTitleBand titleBand;
+    /** The frame's formatted title, which the Windows classic title shows too. */
+    private String frameTitle = "Jasper";
+    /** The Windows classic title bar's title under a classic title (Enterprise plan 14), or null until decorated. */
+    private ClassicWindowTitle classicWindowTitle;
+    Consumer<JComponent> showConfigDiagnostics = control -> {
+        if (!followsThemeAppearance) JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
+        else showOptionDialog(new JOptionPane(control, JOptionPane.PLAIN_MESSAGE), "Configuration");
+    };
     Consumer<String> onTitle = title -> {};
     /** An error to tell the user about, as a title and details; the application posts it as a notification. */
     public java.util.function.BiConsumer<String, String> onError = WindowContent::unheard;
@@ -154,6 +170,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final java.util.List<Consumer<WorkspaceActivity.Event>> activityListeners = new ArrayList<>();
     /** Whether any Jasper window has focus; application-supplied, EDT-only. */
     public java.util.function.BooleanSupplier anyWindowActive = () -> true;
+    /**
+     * A Cmd-click (Ctrl-click elsewhere) named a file in one of this window's local panes: the resolved path, and the
+     * line written after it, 0 for none. The application checks the file off the EDT and opens it; by default nothing
+     * opens. EDT.
+     */
+    public java.util.function.BiConsumer<Path, Integer> onOpenFile = (file, line) -> { };
+    /**
+     * File › Open File…'s chooser: given the active pane's folder, the file the person chose, or empty when they cancelled.
+     * The application shows its file chooser over this window; by default nothing is chosen. EDT.
+     */
+    public java.util.function.Function<java.util.Optional<Path>, java.util.Optional<Path>> fileChooser = folder -> java.util.Optional.empty();
 
     /** Replays existing producers before returning; the listener receives later events until closed. */
     public Subscription activity(Consumer<WorkspaceActivity.Event> listener) {
@@ -182,7 +209,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty) {
-        this(launcher, directory, newWindow, quit, onEmpty, new ThemeController());
+        this(launcher, directory, newWindow, quit, onEmpty, new ThemeController(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
     }
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
@@ -208,7 +235,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      */
     WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
+        this(launcher, directory, detached, newWindow, quit, onEmpty, themes, bindings, history, macOs, WorkspaceChrome.STANDARD);
+    }
+
+    /** As above, under the look's workspace chrome (Enterprise presentation spec 9.1). */
+    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs, WorkspaceChrome look) {
         super(new BorderLayout());
+        this.look = Objects.requireNonNull(look, "look");
         this.detached = detached;
         setFocusTraversalPolicyProvider(true);
         setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
@@ -230,36 +264,41 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         chrome = new WindowChrome(this);
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
         scopes.register(commandsScope);
-        commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs);
+        commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs,
+            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), look.palette(), look.paletteHome());
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             this::ownsKeySource);
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = new WindowTabs(this);
+        windowTabs = look.tabs(this);
         // The tabs belong to the terminal column, so the stripes and the side panels reach the toolbar.
         var terminalColumn = new JPanel(new BorderLayout());
         // The rounded host paints behind this layout-only container, including partial tab repaints.
         terminalColumn.setOpaque(false);
-        terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
-        area = new ToolWindowArea(terminalColumn, dock);
+        terminalColumn.add(windowTabs.component(), BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
+        stripes = look().dock().stripes(themes.kit(), look().chromeArtwork());
+        leftStripe = stripes.left();
+        rightStripe = stripes.right();
+        area = new ToolWindowArea(terminalColumn, dock, themes.kit(), look().dock().flushFrames(), look().chromeArtwork());
         area.setStatusVisible(chrome.status().isVisible());
         area.setHeaderVisible(true);
-        leftStripe.setVisible(false);
-        rightStripe.setVisible(false);
-        var body = new JPanel(new BorderLayout());
+        for (DockStripe stripe : stripes.all()) stripe.setVisible(false);
+
         body.add(leftStripe, BorderLayout.WEST); body.add(area, BorderLayout.CENTER); body.add(rightStripe, BorderLayout.EAST);
-        dockDrag = new DockDrag(this, dock, area, leftStripe, rightStripe);
-        leftStripe.dragSource = dockDrag::install;
-        rightStripe.dragSource = dockDrag::install;
+        stripes.bottom().ifPresent(strip -> body.add(strip, BorderLayout.SOUTH));
+        dockDrag = new DockDrag(this, dock, area, stripes);
+        dockDrag.railsEnabled = this::railsEnabled;
+        for (DockStripe stripe : stripes.all()) stripe.dragSource = dockDrag::install;
         area.dragSource = dockDrag::install;
+        area.releaseDragSource = dockDrag::uninstall;
         // A dock change moves the window's minimum size; read the hook when it fires, as the frame sets it later.
         area.onMinimumSizeChanged = () -> onMinimumSizeChanged.run();
         add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
                 if (terminals != null) terminals.tabSelected();
-                if (commandPalette != null) commandPalette.dismiss();
+                if (commandPalette != null) commandPalette.tabChanged();
                 update();
                 focusSelected();
             }
@@ -269,8 +308,73 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         else setPreferredSize(new Dimension(900, 650));
     }
 
+    private final JPanel body = new JPanel(new BorderLayout());
+    private dev.jasper.app.platform.WindowBody bodyLease;
+
+    java.awt.Rectangle bodyRegion() {
+        var region = javax.swing.SwingUtilities.convertRectangle(body.getParent(), body.getBounds(), this);
+        var status = chrome.status();
+        if (status.isVisible() && status.getWidth() > 0 && status.getHeight() > 0)
+            region = region.union(javax.swing.SwingUtilities.convertRectangle(status.getParent(), status.getBounds(), this));
+        return region;
+    }
+    @Override public void doLayout() {
+        super.doLayout();
+        if (bodyLease != null) bodyLease.changed();
+    }
+
+    /**
+     * Mounts {@code content} in a terminal frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
+     * unified macOS bar hosting the header, the system's title bar with the header as a row in the window, or, under a
+     * classic title, IntelliJ Classic's band in the toolbar's colour above that row on macOS and FlatLaf's title pane with
+     * the menus and the title on Windows. Either way the menu bar is the root's (the unified bar's {@code setMenuBar} puts
+     * it there too); on macOS the screen menu bar shows it while the look keeps that on, and otherwise it is a row in the
+     * window or of the Windows title bar. TerminalWindow and the chrome renders share this path. Returns the unified bar,
+     * or null.
+     */
+    static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
+        MacTitleBar bar = installTitleBar(root, content, look.unifiedTitle(), look.followThemeAppearance(), nativeTitle);
+        // IntelliJ Classic's frame (plan 14): the band on macOS, FlatLaf's title pane with the menus and the title on Windows.
+        if (bar == null && look.classicTitle() && content.macOs) installMacTitleBand(root, content);
+        else if (bar == null && look.classicTitle()) installClassicTitleBar(root, content);
+        else if (bar == null) installCustomTitleBar(root, content);
+        // Under a native-titled look the header is a row of window chrome, whichever composition draws it (spec 10.1,
+        // and spec 9.1's fallback row); the default look keeps today's title-bar zone.
+        if (bar == null && look.followThemeAppearance()) content.chrome().chromeRow();
+        if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
+        return bar;
+    }
+
+    /**
+     * The macOS classic title (plan 14 Rulings 7 and 8): IntelliJ Classic's band above the toolbar row, filled with the
+     * header's {@code surface.app} so the band and the toolbar read as one, never the title-bar zone's colour. The window
+     * takes the vibrant appearance of the theme's darkness in place of {@link #installTitleBar}'s Aqua follower; the
+     * window's dialogs still follow through {@code followsThemeAppearance}. Compact keeps the system title bar without
+     * the band.
+     */
+    static void installMacTitleBand(JRootPane root, WindowContent content) {
+        // Under a classic title macOS always shows the menus in the screen menu bar (Rulings 5 and 18), Compact included.
+        content.chrome.menuBar().screenMenuBar(true);
+        if (content.viewMode == ViewMode.COMPACT) return;
+        content.titleBand = MacTitleBand.install(root, () -> ThemeZone.color(content.chrome().header(), SemanticColor.SURFACE_APP));
+        content.onThemeChanged = theme -> content.titleBand.setDark(theme.chrome().dark());
+        content.onThemeChanged.accept(content.theme());
+    }
+
+    /** The macOS classic title band, or null without it. */
+    MacTitleBand titleBand() { return titleBand; }
+
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
+                                      Consumer<String> nativeTitle) {
+        return installTitleBar(root, content, supported, false, nativeTitle);
+    }
+
+    /**
+     * As above; with {@code followTheme} a frame that has the system's title bar on macOS takes the theme's appearance,
+     * as Compact does (spec 10.1).
+     */
+    static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported, boolean followTheme,
                                       Consumer<String> nativeTitle) {
         MacTitleBar bar;
         if (content.viewMode == ViewMode.COMPACT) {
@@ -286,22 +390,33 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         content.onTitle = value -> {
             TerminalPane pane = content.currentPane();
             var document = content.selectedContent();
-            var context = WindowHeaderContext.from(pane == null ? null : pane.snapshot(),
-                Path.of(System.getProperty("user.home")), pane == null ? "" : pane.programTitle(),
+            var snapshot = pane == null ? null : pane.snapshot();
+            Path home = Path.of(System.getProperty("user.home"));
+            var context = WindowHeaderContext.from(snapshot, home, pane == null ? "" : pane.programTitle(),
                 pane == null ? "" : pane.commandLabel());
             if (document != null) context = new WindowHeaderContext(document.title() + (document.host().isEmpty() ? "" : " — " + document.host()), document.location(), document.host().isEmpty() ? "FILE" : "SERVER");
-            nativeTitle.accept(context.label());
+            // The frame title follows the look's template (spec 10.4); the title field keeps the context.
+            String formatted = WindowTitle.format(content.look().title(), context.label(),
+                document != null ? document.title() : WindowTitle.session(snapshot),
+                document != null ? document.location() : WindowTitle.directory(snapshot, home));
+            nativeTitle.accept(formatted);
+            content.frameTitle = formatted;
+            if (content.classicWindowTitle != null) content.classicWindowTitle.setText(formatted);
             content.chrome.search().setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
         };
         if (bar != null) {
-            content.onThemeChanged = theme -> bar.setLight(!theme.chrome().dark());
-            bar.setLight(!content.theme().chrome().dark());
+            // The native controls sit on the title bar, which a theme may make dark on a light theme or light on a dark one.
+            content.onThemeChanged = theme -> bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(theme.chrome()).dark());
+            bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(content.theme().chrome()).dark());
         }
-        if (content.viewMode == ViewMode.COMPACT && content.macOs) {
-            content.onThemeChanged = theme -> root.putClientProperty("apple.awt.windowAppearance",
-                theme.chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
+        // The window's own dialogs (the configuration diagnostics, Rename Tab) follow with it under a native-titled look.
+        content.followsThemeAppearance = bar == null && followTheme && content.macOs;
+        if ((content.viewMode == ViewMode.COMPACT || bar == null && followTheme) && content.macOs) {
+            content.onThemeChanged = theme -> dev.jasper.app.platform.MacAppearance.follow(root, theme.chrome().dark());
             content.onThemeChanged.accept(content.theme());
         }
+        if (content.bodyLease != null) content.bodyLease.close();
+        content.bodyLease = dev.jasper.app.platform.WindowBody.install(root, content, content::bodyRegion);
         content.update();
         return bar;
     }
@@ -314,16 +429,31 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * is created (on {@code pack} or first show), so a new frame's root pane still reads {@code NONE} here.
      */
     static boolean installCustomTitleBar(JRootPane root, WindowContent content) {
+        return whenDecorated(root, content, WindowContent::decorateTitleBar);
+    }
+
+    /**
+     * The Windows classic title (plan 14 Rulings 13 to 15): FlatLaf's title pane, 28 px in the toolbar's colour, embeds the
+     * menus and then the frame's title, left-aligned after them; the header stays a row of the window under it. Returns
+     * as {@link #installCustomTitleBar} does, and with native decorations FlatLaf never decorates, so the menus stay a
+     * row of the window.
+     */
+    static boolean installClassicTitleBar(JRootPane root, WindowContent content) {
+        return whenDecorated(root, content, WindowContent::decorateClassicTitleBar);
+    }
+
+    /** Runs {@code decorate} now if {@code root} has look-and-feel decorations, else once when they arrive; never in Compact. */
+    private static boolean whenDecorated(JRootPane root, WindowContent content, BiConsumer<JRootPane, WindowContent> decorate) {
         if (content.viewMode == ViewMode.COMPACT) return false;
         if (root.getWindowDecorationStyle() != JRootPane.NONE) {
-            decorateTitleBar(root, content);
+            decorate.accept(root, content);
             return true;
         }
         root.addPropertyChangeListener("windowDecorationStyle", new java.beans.PropertyChangeListener() {
             @Override public void propertyChange(java.beans.PropertyChangeEvent event) {
                 if (root.getWindowDecorationStyle() == JRootPane.NONE) return;
                 root.removePropertyChangeListener("windowDecorationStyle", this);
-                decorateTitleBar(root, content);
+                decorate.accept(root, content);
             }
         });
         return false;
@@ -338,13 +468,36 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         header.addPropertyChangeListener("barHeight",
             event -> root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, event.getNewValue()));
         Runnable colors = () -> {
-            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, UIManager.getColor("Jasper.titleBackground"));
-            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, UIManager.getColor("Jasper.titleForeground"));
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, ThemeZone.color(null, SemanticColor.SURFACE_APP));
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
         };
         colors.run();
         content.onThemeChanged = theme -> colors.run();
         content.revalidate();
     }
+
+    private static void decorateClassicTitleBar(JRootPane root, WindowContent content) {
+        var title = new ClassicWindowTitle();
+        title.setText(content.frameTitle);
+        title.setActive(content.active);
+        content.classicWindowTitle = title;
+        content.chrome.menuBar().setTitle(title);
+        root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_SHOW_TITLE, false);
+        root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, ClassicWindowTitle.BAR_HEIGHT);
+        Runnable colors = () -> {
+            // The toolbar's colour, not a title-bar zone, so any theme's bar matches its toolbar (Rulings 13).
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, ThemeZone.color(content.chrome().header(), SemanticColor.SURFACE_APP));
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
+            title.refresh();
+        };
+        colors.run();
+        content.onThemeChanged = theme -> colors.run();
+        dev.jasper.app.platform.TitleInset.publish(root, () -> root.getContentPane() == null ? 0 : root.getContentPane().getY());
+        content.revalidate();
+    }
+
+    /** The Windows classic title bar's title, or null until FlatLaf decorates the window under a classic title. */
+    ClassicWindowTitle classicWindowTitle() { return classicWindowTitle; }
 
     void installRootBindings(JRootPane root) {
         removeRootBindings();
@@ -576,27 +729,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions();
     }
 
-    private java.util.function.Supplier<dev.jasper.app.appearance.ThemeCatalog.Snapshot> themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest();
-    /** Connects a read-only current catalog; released with the configuration/window lifetime. */
-    public void connectThemeCatalog(java.util.function.Supplier<dev.jasper.app.appearance.ThemeCatalog.Snapshot> catalog) {
-        if (!closed) themeCatalog = java.util.Objects.requireNonNull(catalog);
-    }
-    dev.jasper.app.appearance.ThemeCatalog.Snapshot availableThemes() { return themeCatalog.get(); }
-    void chooseUiTheme(String name) {
-        choose(dev.jasper.app.config.CoreSettings.UI_THEME_NAME, name, () -> selectTheme(availableThemes().find(name).orElse(themes.choice().dark() ? Theme.DARK : Theme.JASPER_LIGHT)));
-    }
-    void chooseWorkspaceTheme(String name) {
-        var choice = new dev.jasper.app.config.WorkspaceThemeChoice(name);
-        choose(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE, choice.name(), () -> {
-            themes.configureWorkspace(choice, choice.matchesChrome() ? null : availableThemes().find(choice.name()).orElse(null));
-            chrome.refreshTheme();
-        });
-    }
     void openThemesSettings() { if (openSettingsAt != null) openSettingsAt.accept("appearance"); }
     public void disconnectConfiguration() {
         openSettings = null; reloadConfiguration = null; migrateConfiguration = null; unregisterConfiguration = () -> {};
         saveSettings = null; openSettingsAt = null; configurationState = null;
-        themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest();
         status().onConfigurationDetails = () -> {};
         status().configButton().setEnabled(false);
         updateActions();
@@ -611,12 +747,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 ? (state.present() ? "Configuration loaded successfully." : "Using built-in defaults. Open Settings to create this file.")
                 : String.join("\n", state.diagnostics().stream().map(ConfigDiagnostic::formatted).toList()));
             JTextArea text = new JTextArea(details, 12, 64);
+            dev.jasper.ui.swing.NativeStyles.installed().textArea(text, () -> ThemeZone.theme(text));
             text.setEditable(false); text.setLineWrap(true); text.setWrapStyleWord(true); text.setCaretPosition(0);
             text.getAccessibleContext().setAccessibleName("Configuration details");
             JScrollPane scroll = new JScrollPane(text);
             Runnable migrate = migrateConfiguration;
             if (!state.migratable() || migrate == null) { showConfigDiagnostics.accept(scroll); return; }
             var button = new JButton("Migrate Config\u2026");
+            dev.jasper.ui.swing.NativeStyles.installed().framedButton(button, () -> ThemeZone.theme(button));
             button.setName("configuration.migrate");
             button.setToolTipText("Rewrite old keys in this file to the current layout; the original is backed up first.");
             button.addActionListener(event -> {
@@ -654,9 +792,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void openWindowSettings() { if (openSettingsAt != null) openSettingsAt.accept("window"); }
     void reloadConfiguration() { reloadConfiguration.run(); }
     void requestNewWindow() { newWindow.accept(directory()); }
+    /** File › Open File…: {@link #fileChooser} from the active pane's folder, then the route a Cmd-click takes, at no line. */
+    void openFile() { fileChooser.apply(java.util.Optional.ofNullable(directory())).ifPresent(file -> onOpenFile.accept(file, 0)); }
     void requestQuit() { quit.run(); }
 
     CommandRegistry commands() { return commands; }
+    /** The application's theme controller, shared by every window. */
+    ThemeController themes() { return themes; }
     ScopeRegistry scopes() { return scopes; }
     CommandsScope commandsScope() { return commandsScope; }
     void dispatchCommand(Command command) {
@@ -680,13 +822,37 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (SwingUtilities.getRootPane(field) != SwingUtilities.getRootPane(target)) return null;
         return SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), target);
     }
+    /** The title row inside the insets that keep the header clear of the window controls, in {@code target}'s coordinates. */
+    java.awt.Rectangle titleRowClear(Component target) {
+        WindowHeader header = chrome.header();
+        java.awt.Insets insets = header.getInsets();
+        var row = new java.awt.Rectangle(insets.left, 0, Math.max(0, header.getWidth() - insets.left - insets.right), header.getHeight());
+        return SwingUtilities.convertRectangle(header, row, target);
+    }
+    /**
+     * The dock work area in {@code target}'s coordinates: between the stripes, above the bottom strip and the status bar
+     * (spec 11.5, the Run window's home); null while the area is not in {@code target}'s root. Plan 7 mounts the bottom
+     * strip under the area, so the area's own bounds end above it.
+     */
+    java.awt.Rectangle paletteWorkArea(Component target) {
+        if (area.getParent() == null || SwingUtilities.getRootPane(area) != SwingUtilities.getRootPane(target)) return null;
+        return SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), target);
+    }
     WindowChrome chrome() { return chrome; }
+    WorkspaceChrome look() { return look; }
+    /** The application's one animations flag: the look's motion folded into the setting (spec 10.9). EDT. */
+    boolean lookAnimates() { return themes.animationsEnabled(); }
+    /** Whether the palette is open; the run item shows it (spec 10.6). Null-safe while the window is being built. */
+    boolean paletteOpen() { return commandPalette != null && commandPalette.isOpen(); }
+    /** The palette opened or closed: the run item repaints. */
+    void paletteChanged() { var run = chrome.status().runItem(); if (run != null) run.paletteChanged(); }
+    UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
     boolean statusVisible() { return statusVisible; }
     boolean zenMode() { return zenMode; }
 
-    /** Saves this window's mode without changing its normal visibility or dock layout. */
+    /** Saves this window's mode; the saved dock layout keeps the windows that showed before Zen. */
     void toggleZenMode() {
         if (closed) return;
         setZenMode(!zenMode());
@@ -698,11 +864,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || zenMode == enabled) return;
         dockDrag.cancel();
         zenMode = enabled;
+        area.cancelResize();
         refreshChromeVisibility();
-        area.setToolsSuppressed(zenMode());
         syncRailVisibility();
+        if (contributed != null) contributed.zenChanged();
         if (zenMode()) focusSelected();
-        if (contributed != null) contributed.viewModeChanged();
         updateActions();
     }
     ViewMode viewMode() { return viewMode; }
@@ -728,6 +894,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || terminals != null) return;
         bringToFront = toFront;
         terminals = new WindowTerminals(this, Objects.requireNonNull(registry), Objects.requireNonNull(toFront));
+        chrome.windowOpened();
     }
 
     java.util.List<TerminalTab> terminalTabs() {
@@ -773,23 +940,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     private void mountContent(dev.jasper.app.contributions.ContentEntry entry) {
         JComponent component = entry.component();
-        WorkspaceStyler styler = null;
         try {
             WorkspaceTheme.apply(component, themes.current());
-            styler = new WorkspaceStyler(component);
-            hostedStylers.put(component, styler);
             hosted.put(component, entry);
             contentListeners.put(component, entry.onChanged(this::update));
             tabs.addTab(entry.title(), component);
-            styler.apply(themes.current());
             selectTab(component); update();
         } catch (RuntimeException | Error failure) {
             var listener = contentListeners.remove(component);
             if (listener != null) listener.close();
             hosted.remove(component);
             tabs.remove(component);
-            hostedStylers.remove(component);
-            if (styler != null) styler.close();
             WorkspaceTheme.clear(component);
             throw failure;
         }
@@ -797,11 +958,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (backgroundOpacity < 1) glassListener.run();
     }
     private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
-        if (!hosted.containsKey(entry.component()) && !hostedStylers.containsKey(entry.component())) return;
+        if (!hosted.containsKey(entry.component())) return;
         var listener = contentListeners.remove(entry.component());
         if (listener != null) listener.close();
-        var styler = hostedStylers.remove(entry.component());
-        if (styler != null) styler.close();
         hosted.remove(entry.component()); tabs.remove(entry.component());
         WorkspaceTheme.clear(entry.component()); update();
         if (backgroundOpacity < 1) glassListener.run();
@@ -823,15 +982,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             for (var command : entry.commands()) { var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
                 item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut()); item.addActionListener(event -> command.run().run()); menu.add(item); }
         }
-        var close = new JMenuItem("Close Tab"); close.addActionListener(event -> closeTab(component)); menu.add(close); return menu;
+        var close = new JMenuItem("Close Tab"); close.setAccelerator(bindings().strokeFor(ActionId.CLOSE_TAB).orElse(null)); close.addActionListener(event -> closeTab(component)); menu.add(close); dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
     }
     public void focusSelected() { var entry = selectedContent(); if (entry != null) entry.focus(); else if (currentTab() != null) currentTab().focusTerminal(); }
     public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(() -> contentRegistry.inWindow(id)); }
 
     ToolWindowArea area() { return area; }
     DockState dock() { return dock; }
-    ToolStripe leftStripe() { return leftStripe; }
-    ToolStripe rightStripe() { return rightStripe; }
+    DockStripe leftStripe() { return leftStripe; }
+    DockStripe rightStripe() { return rightStripe; }
+    /** The bottom strip of labelled stripes; empty under the icon rails. */
+    java.util.Optional<DockStripe> bottomStrip() { return stripes.bottom(); }
+    /** The window's stripes. */
+    StripeSet stripes() { return stripes; }
     DockDrag dockDrag() { return dockDrag; }
     boolean railVisible() { return railVisible; }
 
@@ -846,20 +1009,26 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Both stripes show together while either has a tool window or an action (an empty right stripe included: it is a
-     * place to move windows to), unless the user hid them with View > Rail.
+     * Each stripe shows while it has a tool window or an action, unless View > Rail or Zen hides the rails. An empty
+     * stripe stays hidden; a dock drag still drops onto it at its edge ({@link DockDrag#railsEnabled}), and its guides
+     * predict this rule for the layout after the drop.
      */
     void syncRailVisibility() {
-        boolean wanted = !zenMode() && !(leftStripe.empty() && rightStripe.empty()) && railVisible;
-        area.setStripesVisible(wanted);
-        if (leftStripe.isVisible() != wanted || rightStripe.isVisible() != wanted) {
-            leftStripe.setVisible(wanted);
-            rightStripe.setVisible(wanted);
+        boolean left = railsEnabled() && !leftStripe.empty(), right = railsEnabled() && !rightStripe.empty();
+        boolean bottom = stripes.bottom().map(strip -> railsEnabled() && !strip.empty()).orElse(false);
+        area.setStripesVisible(left, right);
+        boolean bottomChanged = stripes.bottom().map(strip -> strip.isVisible() != bottom).orElse(false);
+        if (leftStripe.isVisible() != left || rightStripe.isVisible() != right || bottomChanged) {
+            leftStripe.setVisible(left);
+            rightStripe.setVisible(right);
+            stripes.bottom().ifPresent(strip -> strip.setVisible(bottom));
             revalidate(); repaint();
             // The stripes' own width, and the area's lower inset, are part of the window's minimum size.
             onMinimumSizeChanged.run();
         }
     }
+    /** Whether the stripes may show: neither View > Rail nor Zen hides them. */
+    boolean railsEnabled() { return !zenMode() && railVisible; }
     boolean updatingActions() { return workspaceActions.updating(); }
     Action action(ActionId id) { return workspaceActions.action(id); }
     KeyBindings bindings() { return bindings; }
@@ -867,7 +1036,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowStatusBar status() { return chrome.status(); }
     JMenuBar menuBar() { return chrome.menuBar(); }
     JTabbedPane tabStrip() { return tabs; }
-    WindowTabs windowTabs() { return windowTabs; }
+    /** The equal tabs; the default look's tests read them. */
+    WindowTabs windowTabs() { return (WindowTabs) windowTabs; }
+    TabStrip tabBar() { return windowTabs; }
     private void refreshTabs() { windowTabs.refresh(); }
 
     public TerminalTab currentTab() { return tabs.getSelectedComponent() instanceof TerminalTab tab ? tab : null; }
@@ -888,8 +1059,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /** As above; {@code profile} names a local first pane's shell profile, empty for the user's default. */
     TerminalTab openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile) {
+        return openTab(directory, requestOrNull, profile, Optional.empty());
+    }
+
+    /** As above; {@code program} runs in the local first pane instead of its shell. */
+    TerminalTab openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile, Optional<java.util.List<String>> program) {
         if (closed) return null;
-        TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull, profile);
+        TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull, profile, program);
         if (terminals != null) terminals.tabOpened(tab);
         tab.onChanged = () -> {
             for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current());
@@ -902,7 +1078,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         tab.onPaneCreated = pane -> connectActivity(tab, pane);
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
         WorkspaceTheme.apply(tab, themes.current());
-        tab.setBackground(themes.current().palette().background());
+        tab.setBackground(themes.current().surface());
         tab.setBackgroundOpacity((float) backgroundOpacity);
         for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current());
         tabs.addTab(tab.title(), tab);
@@ -950,7 +1126,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
-        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
+        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.blocksActions();
         pane.applyTheme(themes.current());
         ConfigSnapshot configured = workspaceConfiguration.snapshot();
         float configuredFontSize = workspaceConfiguration.configuredFontSize();
@@ -967,6 +1143,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             JPopupMenu popup = chrome.contextMenu();
             popup.show(pane.view(), event.getX(), event.getY());
         });
+        pane.view().setFileLinkHandler(link -> openFileLink(pane, link));
         if (!firstTerminalSeen) {
             firstTerminalSeen = true;
             try {
@@ -975,6 +1152,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 LOG.log(System.Logger.Level.WARNING, "The first-terminal observer failed", failure);
             }
         }
+    }
+
+    /**
+     * A Cmd-click on a file in {@code pane}: resolved against the pane's local directory and given to {@link #onOpenFile}.
+     * A provided session, or a shell that reports a directory on another host, opens nothing.
+     */
+    private void openFileLink(TerminalPane pane, FileLink link) {
+        Optional<Path> local = pane.localDirectory();
+        if (local.isEmpty()) return;
+        FileLinks.resolve(link.path(), local, Path.of(System.getProperty("user.home")),
+                System.getProperty("os.name", "").startsWith("Windows"), pane.wsl())
+            .ifPresent(file -> onOpenFile.accept(file, link.line()));
     }
 
     void selectTab(Component tab) {
@@ -1031,7 +1220,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Side-effect free apart from refreshing enablement: whether {@link #dispatchShortcut} would take the key. */
     boolean claimsShortcut(KeyStroke stroke, Component source) {
         if (dev.jasper.app.platform.WindowInput.blocked(source == null ? this : source)) return true;
-        if (paletteKeys.claimsShortcut(stroke)) return true;
+        if (paletteKeys.claimsShortcut(stroke, source == null ? this : source)) return true;
         var document = selectedContent();
         if (document != null) {
             if (source instanceof JTextComponent && nativeContentClipboard(document, stroke)) return false;
@@ -1112,36 +1301,58 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     ResolvedTheme theme() { return themes.current(); }
+    boolean followsThemeAppearance() { return followsThemeAppearance; }
 
-    /** Applies {@code theme} to every window, as the saved configuration applies its theme. */
-    void selectTheme(Theme theme) {
+    /**
+     * Gives a dialog of this window the window's macOS appearance when the window follows the theme (spec 10.1): an
+     * option pane's dialog is a window of its own, which otherwise takes the system's appearance.
+     */
+    void followAppearance(JRootPane dialogRoot) {
+        if (followsThemeAppearance) dev.jasper.app.platform.MacAppearance.follow(dialogRoot, theme().chrome().dark());
+    }
+
+    /** Shows {@code pane} in a modal dialog over this window, as {@code JOptionPane}'s own show methods do, with its appearance. */
+    private void showOptionDialog(JOptionPane pane, String title) {
+        JDialog dialog = pane.createDialog(this, title);
+        followAppearance(dialog.getRootPane());
+        pane.selectInitialValue();
+        dialog.setVisible(true);
+        dialog.dispose();
+    }
+
+    /** Rename Tab's question: the new name, blank for automatic, or null when cancelled. */
+    String askTabName(String current) {
+        String message = "Tab name (leave blank for automatic):";
+        if (!followsThemeAppearance) return JOptionPane.showInputDialog(this, message, current);
+        // As showInputDialog does, with the window's appearance on its dialog.
+        var pane = new JOptionPane(message, JOptionPane.QUESTION_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
+        pane.setWantsInput(true);
+        pane.setInitialSelectionValue(current);
+        showOptionDialog(pane, UIManager.getString("OptionPane.inputDialogTitle", getLocale()));
+        Object value = pane.getInputValue();
+        return value == JOptionPane.UNINITIALIZED_VALUE ? null : (String) value;
+    }
+
+    /**
+     * Slate Cobalt's Dark ({@code dark}) or Light variant in every window sharing this window's themes, as
+     * {@code ui.appearance} applies it; the terminal scheme stays. Tests and previews switch variants this way.
+     */
+    void selectVariant(boolean dark) {
         if (closed) return;
-        try { themes.configure(theme); }
+        try { themes.configure(dark, themes.schemeChoice()); }
         catch (ThemeController.InstallationFailure failure) { onError.accept("Could not apply the theme", failure.getMessage()); }
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
-    dev.jasper.app.config.WorkspaceThemeChoice workspaceChoice() { return themes.workspaceChoice(); }
-
-    boolean terminalColorsSelected(TerminalColors colors) {
-        return workspaceChoice().name().equalsIgnoreCase(workspaceName(colors));
-    }
-
-    private static String workspaceName(TerminalColors colors) {
-        return switch (colors.name()) {
-            case "light" -> "Jasper Light";
-            case "dark" -> "Jasper Dark";
-            default -> colors.name();
-        };
-    }
-
-    /** View \u203a Terminal Colors: saved for every window; applied to this window's themes when no configuration is connected. */
-    void selectTerminalColors(TerminalColors colors) {
-        choose(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE, workspaceName(colors), () -> {
-            themes.configureTerminal(colors);
+    /** View \u203a Terminal Scheme: saved for every window; applied to this window's themes when no configuration is connected. */
+    void selectTerminalScheme(dev.jasper.app.config.TerminalSchemeChoice scheme) {
+        choose(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME, scheme.key(), () -> {
+            themes.configureScheme(scheme);
             chrome.refreshTheme();
         });
     }
+
+    boolean terminalSchemeSelected(dev.jasper.app.config.TerminalSchemeChoice scheme) { return themes.schemeChoice().equals(scheme); }
 
     /** View \u203a Toolbar. */
     void chooseToolbarMode(ToolbarMode mode) {
@@ -1188,47 +1399,37 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         if (closed) return;
         var retained = terminalTabs();
-        var suspended = new ArrayList<WorkspaceStyler>();
         retained.forEach(TerminalTab::beginThemeUpdate);
         try {
-            if (updateDelegates) for (var styler : new ArrayList<>(hostedStylers.values())) {
-                styler.beforeUiUpdate();
-                suspended.add(styler);
-            }
             if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
             if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
-            leftStripe.refreshTheme();
-            rightStripe.refreshTheme();
+            for (DockStripe stripe : stripes.all()) stripe.refreshTheme();
             area.refreshTheme();
-            area.setTerminalBackground(theme.palette().background());
-            WorkspaceTheme.apply(windowTabs, theme);
+            area.setTerminalBackground(theme.surface());
+            WorkspaceTheme.apply(windowTabs.component(), theme);
             windowTabs.refresh();
-            for (var component : new ArrayList<>(hostedStylers.keySet())) {
-                var styler = hostedStylers.get(component);
-                if (styler == null) continue;
-                WorkspaceTheme.apply(component, theme, () -> hostedStylers.get(component) == styler);
-                if (hostedStylers.get(component) == styler) styler.apply(theme);
+            for (var component : new ArrayList<>(hosted.keySet())) {
+                var entry = hosted.get(component);
+                if (entry != null) WorkspaceTheme.apply(entry.component(), theme, () -> hosted.get(component) == entry);
             }
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
                 WorkspaceTheme.apply(tab, theme);
-                tab.setBackground(theme.palette().background());
+                tab.setBackground(theme.surface());
                 for (TerminalPane pane : tab.panes()) {
                     // Zoom detaches sibling panes from the visible component hierarchy.
                     if (updateDelegates && !SwingUtilities.isDescendingFrom(pane, this)) SwingUtilities.updateComponentTreeUI(pane);
                     pane.applyTheme(theme);
                 }
             }
-            setBackground(theme.palette().background());
-            tabs.setBackground(theme.palette().background());
-            chrome.status().applyPalette(theme.palette());
+            setBackground(theme.surface());
+            tabs.setBackground(theme.surface());
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
             onThemeChanged.accept(theme); update();
             requestGlass();
             revalidate(); repaint();
         } finally {
-            for (var styler : suspended) styler.afterUiUpdate();
             retained.forEach(TerminalTab::endThemeUpdate);
         }
     }
@@ -1247,14 +1448,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return;
         ConfigSnapshot configured = workspaceConfiguration.snapshot();
         var workspace = themes.current().workspace();
-        glassRequests.accept(GlassLevels.resolve(configured == null ? GlassSettings.UNSET : configured.glass(), workspace.glass()),
+        glassRequests.accept((configured == null ? GlassSettings.UNSET : configured.glass()).resolve(workspace.glass()),
             workspace.dark());
     }
 
     /**
      * The opacity actually in effect for this window, 1 being opaque. The terminal surface and each pane paint the
-     * terminal background at that opacity, each replacing what lies beneath. The selected folder follows it; chrome,
-     * the recessed strip and dividers stay solid.
+     * terminal background at that opacity, each replacing what lies beneath. The flat tab strip follows it; chrome
+     * and dividers stay solid.
      */
     void applyBackgroundOpacity(double opacity) {
         if (closed || opacity == backgroundOpacity) return;
@@ -1270,11 +1471,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * The workspace surface's colour: the terminal background, at the window's opacity while translucent. The selected
-     * folder shares it, so the active tab, terminals and hosted content read as one space.
+     * The workspace surface's colour: the terminal background, at the window's opacity while translucent. The flat
+     * tab strip shares it, so tabs, terminals and hosted content read as one space.
      */
     java.awt.Color workspaceSurface() {
-        java.awt.Color background = themes.current().palette().background();
+        java.awt.Color background = themes.current().surface();
         if (backgroundOpacity >= 1) return background;
         return new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue(),
             (int) Math.round(255 * backgroundOpacity));
@@ -1336,21 +1537,22 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         requireSize("Rail width", width, ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH);
         if (closed || railWidth == width) return;
         railWidth = width;
-        leftStripe.setRailWidth(width);
-        rightStripe.setRailWidth(width);
+        for (DockStripe stripe : stripes.all()) stripe.setRailWidth(width);
         revalidate(); repaint();
         onMinimumSizeChanged.run();
     }
 
     void setAnimations(dev.jasper.app.config.AnimationSettings settings) {
-        if (!closed && windowTabs != null) windowTabs.setAnimations(settings);
+        if (closed) return;
+        if (windowTabs != null) windowTabs.setAnimations(settings);
+        commandPalette.setAnimations(settings);
     }
 
     void setTabHeight(int height) {
         requireSize("Tab height", height, MIN_TAB_HEIGHT, MAX_TAB_HEIGHT);
         if (closed || tabHeight == height) return;
         tabHeight = height;
-        if (windowTabs != null) { windowTabs.revalidate(); windowTabs.repaint(); }
+        if (windowTabs != null) { windowTabs.component().revalidate(); windowTabs.component().repaint(); }
         onTabHeightChanged.run();
         revalidate(); repaint();
         JRootPane root = SwingUtilities.getRootPane(this);
@@ -1359,9 +1561,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void setActive(boolean value) {
-        if (!value && commandPalette != null) commandPalette.dismiss();
+        if (!value && commandPalette != null) commandPalette.windowDeactivated();
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
         if (!value) dockDrag.cancel();
+        if (classicWindowTitle != null) classicWindowTitle.setActive(value);
         active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
@@ -1381,16 +1584,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
+        if (bodyLease != null) { bodyLease.close(); bodyLease = null; }
         dockDrag.cancel();
         paletteKeys.close();
         if (contributed != null) { contributed.close(rememberLayout); contributed = null; }
+        area.close();
         commandPalette.close(); windowCommands.close(); commands.close();
         scopes.close();
         closed = true;
         if (contentHost != null) { contentHost.close(); contentHost = null; }
-        for (var component : new ArrayList<>(hostedStylers.keySet())) {
-            hostedStylers.remove(component).close();
-            WorkspaceTheme.clear(component);
+        for (var component : new ArrayList<>(hosted.keySet())) {
+            WorkspaceTheme.clear(hosted.get(component).component());
         }
         syncPaletteDispatcher();
         unregisterConfiguration.run(); disconnectConfiguration();
@@ -1407,10 +1611,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (terminals != null) { terminals.close(); terminals = null; }
         workspaceActions.disable();
         refreshTabs();
+        if (titleBand != null) { titleBand.close(); titleBand = null; }
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
-        onToggleBuddy = () -> {}; buddyEnabled = () -> false;
+        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; fileChooser = folder -> java.util.Optional.empty();
         activityListeners.clear();
         anyWindowActive = () -> false;
     }

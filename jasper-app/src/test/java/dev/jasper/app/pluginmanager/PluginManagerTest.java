@@ -25,7 +25,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import javax.swing.JButton;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -70,8 +69,10 @@ class PluginManagerTest {
 
     @AfterEach void stop() throws Exception {
         var pending = new CompletableFuture<List<CompletableFuture<?>>>();
+        var pluginWorkers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime);
         edt(() -> pending.complete(runtime.stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        pluginWorkers.await();
         edt(() -> { if (page != null) page.dispose(); windows.close(); });
     }
 
@@ -92,13 +93,21 @@ class PluginManagerTest {
         edt(() -> {
             host = windows.window("app.settings", "Settings", new java.awt.Dimension(1000, 700), true);
             page = manager.page(new PageContext(null, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { },
-                () -> host));
+                () -> host, dev.jasper.app.testsupport.KitTestSupport::context));
             page.component();
             page.selected();
         });
     }
 
-    private List<String> bannerButtons() { return manager.panel().bannerButtons().stream().map(JButton::getText).toList(); }
+    /** The banner's mounted buttons, as the user sees them. */
+    private List<String> bannerButtons() {
+        var labels = manager.panel().bannerLabels();
+        for (int i = 0; i < labels.size(); i++)
+            assertThat(PluginKit.button(manager.panel().headerView(), PluginManagerPanel.BANNER + i).getText()).isEqualTo(labels.get(i));
+        return labels;
+    }
+
+    private void pressBanner(int index) { PluginKit.press(manager.panel().headerView(), PluginManagerPanel.BANNER + index); }
 
     @Test void installsAZipAfterConsentAndOffersTheRestart() throws Exception {
         start(false, false);
@@ -110,13 +119,13 @@ class PluginManagerTest {
             assertThat(page.id()).isEqualTo("plugins");
             assertThat(page.modified()).isFalse();
             assertThat(manager.panel().bannerText()).isEmpty();
-            manager.panel().clickGear("Install from Zip\u2026");
+            PluginKit.clickGear(manager.panel(), "Install from Zip\u2026");
         });
         until(() -> manager.consent() != null);
         edt(() -> {
             assertThat(manager.consent().text()).contains("zipped 1.0.0", "Type into your terminals (terminal.inject)");
             assertThat(windows.open()).as("the consent dialog opens over Settings").hasSize(2);
-            manager.consent().allow.doClick();
+            PluginKit.press(manager.consent().view(), ConsentView.ALLOW);
         });
         until(() -> manager.panel().listed().size() == 1);
         edt(() -> {
@@ -126,10 +135,31 @@ class PluginManagerTest {
             assertThat(manager.panel().messageText()).isEqualTo("dev.example.zipped 1.0.0 will be installed when Jasper restarts.");
             assertThat(manager.panel().bannerText()).isEqualTo("Restart Jasper to apply your changes.");
             assertThat(bannerButtons()).containsExactly("Restart Now");
-            manager.panel().bannerButtons().get(0).doClick();
+            pressBanner(0);
         });
         assertThat(restarts).containsExactly(RestartMode.SAME);
         assertThat(user().resolve(".pending").resolve("dev.example.zipped").resolve("main.jar")).exists();
+    }
+
+    /** Allowing after the Plugins page went away cannot install: it is a refusal, so the staged plugin is discarded. */
+    @Test void allowingAfterThePageWentAwayDiscardsTheStagedPlugin() throws Exception {
+        start(false, false);
+        chosenZip = zipOf("dev.example.orphan", "1.0.0", "");
+        open();
+        until(() -> manager.panel().details().contains("No plugins"));
+        edt(() -> PluginKit.clickGear(manager.panel(), "Install from Zip\u2026"));
+        until(() -> manager.consent() != null);
+        try (var all = Files.list(user())) {
+            assertThat(all.anyMatch(path -> path.getFileName().toString().startsWith(".staging-"))).as("staged while asking").isTrue();
+        }
+        edt(() -> { page.dispose(); page = null; });
+        edt(() -> PluginKit.press(manager.consent().view(), ConsentView.ALLOW));
+        until(() -> {
+            try (var all = Files.list(user())) { return all.noneMatch(path -> path.getFileName().toString().startsWith(".staging-")); }
+            catch (java.io.IOException failure) { return false; }
+        });
+        assertThat(user().resolve(".pending").resolve("dev.example.orphan")).doesNotExist();
+        edt(() -> assertThat(manager.consent()).isNull());
     }
 
     @Test void decliningConsentDiscardsTheStagedPluginAndABadZipIsExplained() throws Exception {
@@ -137,9 +167,9 @@ class PluginManagerTest {
         chosenZip = zipOf("dev.example.zipped", "1.0.0", "");
         open();
         until(() -> manager.panel().details().contains("No plugins"));
-        edt(() -> manager.panel().clickGear("Install from Zip\u2026"));
+        edt(() -> PluginKit.clickGear(manager.panel(), "Install from Zip\u2026"));
         until(() -> manager.consent() != null);
-        edt(() -> manager.consent().cancel.doClick());
+        edt(() -> PluginKit.press(manager.consent().view(), ConsentView.CANCEL));
         until(() -> {
             try (var all = Files.list(user())) { return all.noneMatch(path -> path.getFileName().toString().startsWith(".staging-")); }
             catch (java.io.IOException failure) { return false; }
@@ -148,12 +178,12 @@ class PluginManagerTest {
 
         Files.writeString(root.resolve("bad.zip"), "not a zip");
         chosenZip = root.resolve("bad.zip");
-        edt(() -> manager.panel().clickGear("Install from Zip\u2026"));
+        edt(() -> PluginKit.clickGear(manager.panel(), "Install from Zip\u2026"));
         until(() -> !manager.panel().messageText().isEmpty());
         edt(() -> assertThat(manager.panel().messageText()).contains("could not be read"));
 
         chosenZip = null;
-        edt(() -> manager.panel().clickGear("Install from Zip\u2026"));
+        edt(() -> PluginKit.clickGear(manager.panel(), "Install from Zip\u2026"));
         edt(() -> assertThat(manager.consent()).as("cancelling the file dialog does nothing").isNull());
     }
 
@@ -165,9 +195,9 @@ class PluginManagerTest {
         until(() -> manager.panel().listed().size() == 1);
         edt(() -> {
             assertThat(manager.panel().listed()).containsExactly("dev.example.found  1.0.0 \u2014 Needs review");
-            manager.panel().primary().doClick();
-            assertThat(manager.consent().allow.getText()).isEqualTo("Allow and Enable");
-            manager.consent().allow.doClick();
+            PluginKit.press(manager.panel().detailsPane().header(), PluginDetails.PRIMARY);
+            assertThat(PluginKit.button(manager.consent().view(), ConsentView.ALLOW).getText()).isEqualTo("Allow and Enable");
+            PluginKit.press(manager.consent().view(), ConsentView.ALLOW);
         });
         until(() -> manager.panel().bannerText().startsWith("Restart Jasper"));
         assertThat(Files.readString(root.resolve("plugins.toml"))).contains("consented = [\"terminal.observe\"]");
@@ -185,14 +215,14 @@ class PluginManagerTest {
         until(() -> manager.panel().bannerText().startsWith("Safe mode"));
         edt(() -> {
             assertThat(bannerButtons()).containsExactly("Restart Normally");
-            manager.panel().bannerButtons().get(0).doClick();
+            pressBanner(0);
             assertThat(manager.panel().bannerText()).contains("Another Jasper process is running with the previous plugin set");
             assertThat(bannerButtons()).containsExactly("Quit It and Restart", "Launch Anyway", "Cancel");
-            manager.panel().bannerButtons().get(0).doClick();
+            pressBanner(0);
             assertThat(manager.panel().bannerText()).as("the fake resident refuses").contains("did not quit");
             assertThat(bannerButtons()).containsExactly("Try Again", "Launch Anyway", "Cancel");
             assertThat(restarts).isEmpty();
-            manager.panel().bannerButtons().get(1).doClick();
+            pressBanner(1);
         });
         assertThat(restarts).containsExactly(RestartMode.STANDALONE);
     }
@@ -216,16 +246,16 @@ class PluginManagerTest {
             open();
             until(() -> manager.panel().listed().stream().anyMatch(line -> line.contains("dev.example.gone")));
             edt(() -> manager.panel().select("dev.example.gone"));
-            edt(() -> manager.panel().clickMenu("Remove\u2026"));
+            edt(() -> PluginKit.clickMenu(manager.panel(), "Remove\u2026"));
             until(() -> manager.confirm() != null);
             edt(() -> assertThat(manager.confirm().text()).contains("dev.example.gone", "jars, settings and data"));
-            edt(() -> manager.confirm().cancel.doClick());
+            edt(() -> PluginKit.press(manager.confirm().view(), ConfirmView.CANCEL));
             edt(() -> assertThat(manager.panel().menuLabels()).contains("Remove\u2026"));
-            edt(() -> manager.panel().clickMenu("Remove\u2026"));
+            edt(() -> PluginKit.clickMenu(manager.panel(), "Remove\u2026"));
             until(() -> manager.confirm() != null);
-            edt(() -> manager.confirm().ok.doClick());
+            edt(() -> PluginKit.press(manager.confirm().view(), ConfirmView.OK));
             until(() -> manager.panel().menuLabels().contains("Keep"));
-            edt(() -> { manager.panel().clickMenu("Open Settings"); manager.panel().clickMenu("Open Plugin Folder"); manager.panel().clickMenu("Open Data Folder"); });
+            edt(() -> { PluginKit.clickMenu(manager.panel(), "Open Settings"); PluginKit.clickMenu(manager.panel(), "Open Plugin Folder"); PluginKit.clickMenu(manager.panel(), "Open Data Folder"); });
             until(() -> edited.size() == 1 && revealed.size() == 2);
             assertThat(edited).containsExactly(user().resolve("dev.example.gone/dev.example.gone.toml"));
             assertThat(user().resolve("dev.example.gone/dev.example.gone.toml")).as("seeded before opening").isRegularFile();
@@ -252,7 +282,7 @@ class PluginManagerTest {
         edt(() -> {
             assertThat(runtime.hasSettingsPage("dev.example.declares")).isTrue();
             manager.panel().select("dev.example.declares");
-            manager.panel().clickMenu("Open Settings");
+            PluginKit.clickMenu(manager.panel(), "Open Settings");
         });
         assertThat(navigated).containsExactly("plugin.dev.example.declares");
         assertThat(edited).as("a running plugin's page, not its file").isEmpty();
@@ -272,5 +302,13 @@ class PluginManagerTest {
             assertThat(manager.panel()).isNull();
         });
         page = null;
+    }
+
+    @org.junit.jupiter.api.Test void theRestartBannerNamesTheLooksTurnedOff() throws Exception {
+        start(false, false); // the class's @AfterEach stops the runtime and closes the windows that start makes
+        var plain = new dev.jasper.app.plugins.PluginRuntime.Snapshot(java.util.List.of(), true, false);
+        org.assertj.core.api.Assertions.assertThat(PluginManager.restartText(plain)).isEqualTo("Restart Jasper to apply your changes.");
+        org.assertj.core.api.Assertions.assertThat(PluginManager.restartText(plain.withTurnedOff(java.util.List.of("Alpha", "Beta"))))
+            .isEqualTo("Restart Jasper to apply your changes. Alpha and Beta were turned off: one look can be active at a time.");
     }
 }

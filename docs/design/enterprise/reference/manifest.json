@@ -1,0 +1,540 @@
+[
+  {
+    "name": "01 Workstation/Workstation - Connected (plugins in use).png",
+    "width": 2884,
+    "height": 1804,
+    "sha256": "5258672b8c23d5cc3770204bbb487fe9f0a85d698e434df48403e63ba08472fd"
+  },
+  {
+    "name": "01 Workstation/Workstation - Disconnected.png",
+    "width": 2884,
+    "height": 1804,
+    "sha256": "5b3b8bdb58cb2b4244658518aa99677f7baee46315777b1abcdb614a48b179b2"
+  },
+  {
+    "name": "02 New File Server/New File Server - FTP.png",
+    "width": 1044,
+    "height": 1272,
+    "sha256": "fb338952db4a9298f3c9216493b39388fff8768bdf3243bbf2ed1ed318e9be6e"
+  },
+  {
+    "name": "02 New File Server/New File Server - HTTP.png",
+    "width": 1044,
+    "height": 1048,
+    "sha256": "25fc8cb1b1e2f498de413fe4968ab76ace33a5b249feea098a9e1a5a5b8c9c88"
+  },
+  {
+    "name": "02 New File Server/New File Server - SFTP.png",
+    "width": 1044,
+    "height": 1234,
+    "sha256": "67aeb274aadf7678b801cd2640b5506bded7dd9b588f19bbf52f24a3fec3b663"
+  },
+  {
+    "name": "02 New File Server/New File Server - TFTP.png",
+    "width": 1044,
+    "height": 924,
+    "sha256": "277798850ac58cb512f0669b0682b1fa7b26d368590bd80cd89a64544bb0c02e"
+  },
+  {
+    "name": "03 Add Host/Add Host - Credential menu open.png",
+    "width": 1044,
+    "height": 1104,
+    "sha256": "791077000d3837b5a89b9c9c889688a0d128f531fc7a06eb456d47ab2c20e592"
+  },
+  {
+    "name": "03 Add Host/Add Host - Default.png",
+    "width": 1044,
+    "height": 1104,
+    "sha256": "14a00c1d36598c2d667ca2b410a8a8c31a9d74e486e2abeb41e5008dcb880aa3"
+  },
+  {
+    "name": "04 New Tunnel/New Tunnel - Dynamic (SOCKS).png",
+    "width": 1044,
+    "height": 884,
+    "sha256": "424a5291a15298634c4dd7d499b93bee2cc57bbede3d57de98d7094637a7770a"
+  },
+  {
+    "name": "04 New Tunnel/New Tunnel - Local.png",
+    "width": 1044,
+    "height": 960,
+    "sha256": "c04f14e40b99b73ca8d2987c884900e4b98418f4544c2d79c556a693a8b00835"
+  },
+  {
+    "name": "04 New Tunnel/New Tunnel - Remote.png",
+    "width": 1044,
+    "height": 988,
+    "sha256": "b922d9e6d1318b1b88de3ed41a6a7f187ccfe22e5de40fe79957f3100835cfb3"
+  },
+  {
+    "name": "05 Settings/Settings 01 - Appearance & Behavior - Appearance.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "01b6ac4c4d6216c592e84968a32e22d984541d47fd057519dfcb8511a81c4e79"
+  },
+  {
+    "name": "05 Settings/Settings 02 - Appearance & Behavior - Window.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "28d324eaa389a6188f7a5974e2d676d0e8f0eefc45c0bd8f24dbdb680d76813c"
+  },
+  {
+    "name": "05 Settings/Settings 03 - Appearance & Behavior - Notifications.png",
+    "width": 2084,
+    "height": 1716,
+    "sha256": "8e329f6bf3993a730ac0a8cec6c227c3de0f8ccc923c124d9d11b0eac2e183c7"
+  },
+  {
+    "name": "05 Settings/Settings 04 - Appearance & Behavior - Command Palette.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "98d2bdd0d8e6ae60c614637c1f53367fb73eb1bcf106fa270812aa64e8045d6d"
+  },
+  {
+    "name": "05 Settings/Settings 05 - Appearance & Behavior - Desk Buddy.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "f1559ed7c2f793273e32980e7d2230d9d1e7479c78b72f20dd6434ae8167017f"
+  },
+  {
+    "name": "05 Settings/Settings 06 - Appearance & Behavior - System Settings.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "9bdc3ed1bcf7bc0fe27b250be5dc446ee98c912c8e28345b36c57fd11e345429"
+  },
+  {
+    "name": "05 Settings/Settings 07 - Keymap.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "8d062fbec3de65fc035f157eeefd5797ecd6003e37ca0c08342632b84374fc8c"
+  },
+  {
+    "name": "05 Settings/Settings 07b - Keymap - Recording shortcut.png",
+    "width": 2084,
+    "height": 1488,
+    "sha256": "69b138849a88175dffb4924e731f9f058e04a73571e4e5d5430cbecfd7ff4c84"
+  },
+  {
+    "name": "05 Settings/Settings 08 - Plugins.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "4b68febc0202376d4e06bba1e3ef5160aff10f92e5edb3b85a25f8468684e096"
+  },
+  {
+    "name": "05 Settings/Settings 09 - Terminal - Font & Colors.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "1d55b2a716f5ab6d937ea8b164e2d78ea17a49ffe248b506d363a82eac271840"
+  },
+  {
+    "name": "05 Settings/Settings 10 - Terminal - Cursor.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "318dd9b2b81014891c838cd0d5748eda0c42ee9384b552574186705496efcdab"
+  },
+  {
+    "name": "05 Settings/Settings 11 - Terminal - Shell.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "5b99b122a5b04f02c5b1fa39291eaa4e7a27ea45ce99823e53f1c9ab26e68d0d"
+  },
+  {
+    "name": "05 Settings/Settings 12 - Tools - Credential Vault.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "af5c87c0729c654708091d7d1d36bfbc6fb1a1217f5f1be801e6024a823ffa31"
+  },
+  {
+    "name": "05 Settings/Settings 13 - Tools - Editor.png",
+    "width": 2084,
+    "height": 1524,
+    "sha256": "d9d96a444c236c10ae44594a8e119d386e91391472c17ef4ac09d7aa7fd41dd8"
+  },
+  {
+    "name": "05 Settings/Settings 14 - Tools - File Server.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "e9036c0db656851519ed92f5b0c08b6bd604d2172a7a5e9383779419f0eac09e"
+  },
+  {
+    "name": "05 Settings/Settings 15 - Tools - Project Index.png",
+    "width": 2084,
+    "height": 1960,
+    "sha256": "22de32b8d890ee0918f6f7d4bee51071c110d7e609d46b032d1b7cbb90fbef1c"
+  },
+  {
+    "name": "05 Settings/Settings 16 - Tools - Remote.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "8e598162c2e4a397f4cf5fcac2751db41da76651d44d2d6f6c95b978183d1a21"
+  },
+  {
+    "name": "05 Settings/Settings 17 - Tools - Sample.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "3d1e4217a8e36bd1d8a24ca43dc9c3397c2f077362e14ca5b98b104170a79d89"
+  },
+  {
+    "name": "05 Settings/Settings 18 - Tools - Shell History.png",
+    "width": 2084,
+    "height": 1444,
+    "sha256": "4e22ed17a78346d6257a34147be7048dfc341f86480ce41c5943de74383fe040"
+  },
+  {
+    "name": "06 Run Dialog/Run Dialog - Just opened (recent + most used).png",
+    "width": 2884,
+    "height": 1804,
+    "sha256": "ce6937e4f00c900941ec50b5d5150789558e55200bef08f0ac1ea997fcfc6c15"
+  },
+  {
+    "name": "06 Run Dialog/Run Dialog - Typing auth (filtered).png",
+    "width": 2884,
+    "height": 1804,
+    "sha256": "685a7dbdfe37b53347feb101ec682b50bc619486c140a0b98cc8163c7e9857d6"
+  },
+  {
+    "name": "07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "width": 3012,
+    "height": 1932,
+    "sha256": "ee5043f3d62a291cfd53adbe81bb7abb21e323c8d7606743027e9963e13308a1"
+  },
+  {
+    "name": "07 Credential Vault/Credential Vault 2 - New menu.png",
+    "width": 1644,
+    "height": 1204,
+    "sha256": "39d5229ea87a8167434f56d123b70c0fcc7f76bfdc8e1935964eaed0676bb6d1"
+  },
+  {
+    "name": "07 Credential Vault/Credential Vault 3 - Item selected.png",
+    "width": 1644,
+    "height": 1204,
+    "sha256": "357032fe60d2904a21dcf4dfcfb46ff54958e1647a436d42908f7060774ee36e"
+  },
+  {
+    "name": "07 Credential Vault/Credential Vault 4 - Add Login.png",
+    "width": 1644,
+    "height": 1204,
+    "sha256": "04acc3894cadbf9f85456313eca2d41da79671f5db66135c67441b8407dee503"
+  },
+  {
+    "name": "07 Credential Vault/Credential Vault 5 - Add SSH Key.png",
+    "width": 1644,
+    "height": 1204,
+    "sha256": "0aaa571eafcfb28a7aa2d835cb2e5c15c84e1b964b28ced803e9c59700133fb5"
+  },
+  {
+    "name": "08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "width": 2884,
+    "height": 1804,
+    "sha256": "f5bee3d8deefd3a0f381580383b4904cfafef2a7259d564a03aa50e2af80bee7"
+  },
+  {
+    "name": "09 App Icon/JPEG/Jasper-1024x1024.jpg",
+    "width": 1024,
+    "height": 1024,
+    "sha256": "4fb8cbf5f20938c94e5d202809ecb2337ef9e7474d92ac5952c214fad2a65bd8"
+  },
+  {
+    "name": "09 App Icon/JPEG/Jasper-128x128.jpg",
+    "width": 128,
+    "height": 128,
+    "sha256": "ebe3d88618290eaa7e2cda88f56155b038c65487132f2fd3c6f8dd9a7a674e40"
+  },
+  {
+    "name": "09 App Icon/JPEG/Jasper-256x256.jpg",
+    "width": 256,
+    "height": 256,
+    "sha256": "4b1fcb095c309af102e76e27d1bc4fb7d2442aebd73305106fb4427e9ebb7111"
+  },
+  {
+    "name": "09 App Icon/JPEG/Jasper-512x512.jpg",
+    "width": 512,
+    "height": 512,
+    "sha256": "54e7ada55c2679d339fb95cdbbbc7e0b9dc5375d9b9d424624b3800bda771d09"
+  },
+  {
+    "name": "09 App Icon/JPEG/Jasper-64x64.jpg",
+    "width": 64,
+    "height": 64,
+    "sha256": "72b0f94e43ddd2c7081e7a4ff70092a8a8377345f37534f7e52387da1871ab02"
+  },
+  {
+    "name": "09 App Icon/Jasper-1024.png",
+    "width": 1024,
+    "height": 1024,
+    "sha256": "fecc2f8b5eaeb9a9ab471d281aaee736a16bfe623e056c419752ff3a050a66d6"
+  },
+  {
+    "name": "09 App Icon/Jasper.svg",
+    "sha256": "b4162789aa736a053be9f4c4852acd18a5d54f59052ac2ada2141b0398fdfcd9"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/128x128/apps/jasper.png",
+    "width": 128,
+    "height": 128,
+    "sha256": "2e9b967d0515870ce1e88511a7070d38c86c95d000b128980ebd45e4dcfd15dc"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/16x16/apps/jasper.png",
+    "width": 16,
+    "height": 16,
+    "sha256": "6015bbb01ff649f3930a9d5e5c533fd57b66de175d38b7c9a3702da52012d466"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/22x22/apps/jasper.png",
+    "width": 22,
+    "height": 22,
+    "sha256": "dbd94ffad402720e00d6c7bb90b415b3ef86780fd582929f1908eac60c6df75c"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/24x24/apps/jasper.png",
+    "width": 24,
+    "height": 24,
+    "sha256": "1f1d6509554f15c2f96025be3120bd6f719b4bb3f315f3476bd29e44f133e22d"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/256x256/apps/jasper.png",
+    "width": 256,
+    "height": 256,
+    "sha256": "4940e4fef8195b3210c47b6fdbe56e192c9a56322f58b98847aaf08566e4a643"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/32x32/apps/jasper.png",
+    "width": 32,
+    "height": 32,
+    "sha256": "1b1dc37d8716b1e13e9adcf9c25c9bc6923fcaa33251d2496ece5b685e5bd728"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/48x48/apps/jasper.png",
+    "width": 48,
+    "height": 48,
+    "sha256": "2eb2a9b07b94face0457a2a42d3b537356d1da747be4d639cd267d858af05f61"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/512x512/apps/jasper.png",
+    "width": 512,
+    "height": 512,
+    "sha256": "ffaaf678eccd066cac842db46cf549f0001c675935e001edd513f244dd6708ab"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/64x64/apps/jasper.png",
+    "width": 64,
+    "height": 64,
+    "sha256": "d232b1e0d07cadff8c54f45698efee1916559328c29b102b2d3d9a45a9953436"
+  },
+  {
+    "name": "09 App Icon/Linux/hicolor/scalable/apps/jasper.svg",
+    "sha256": "b4162789aa736a053be9f4c4852acd18a5d54f59052ac2ada2141b0398fdfcd9"
+  },
+  {
+    "name": "09 App Icon/README.md",
+    "sha256": "104223e36af298a311037977aeed31f168c3b88bd002a80abea2b1495ecdb13b"
+  },
+  {
+    "name": "09 App Icon/Windows/Jasper.ico",
+    "sha256": "6d9e673d88ce8532d89ee24ac4a305a15670c03c5526387172d88dc1e708fd85"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-128.png",
+    "width": 128,
+    "height": 128,
+    "sha256": "2e9b967d0515870ce1e88511a7070d38c86c95d000b128980ebd45e4dcfd15dc"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-16.png",
+    "width": 16,
+    "height": 16,
+    "sha256": "6015bbb01ff649f3930a9d5e5c533fd57b66de175d38b7c9a3702da52012d466"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-20.png",
+    "width": 20,
+    "height": 20,
+    "sha256": "b837c635d9d1002a046c0af9147c2dacf24dca7cf55421a157e3bf77318ff915"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-24.png",
+    "width": 24,
+    "height": 24,
+    "sha256": "1f1d6509554f15c2f96025be3120bd6f719b4bb3f315f3476bd29e44f133e22d"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-256.png",
+    "width": 256,
+    "height": 256,
+    "sha256": "4940e4fef8195b3210c47b6fdbe56e192c9a56322f58b98847aaf08566e4a643"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-32.png",
+    "width": 32,
+    "height": 32,
+    "sha256": "1b1dc37d8716b1e13e9adcf9c25c9bc6923fcaa33251d2496ece5b685e5bd728"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-40.png",
+    "width": 40,
+    "height": 40,
+    "sha256": "daf0c554723295b1eda8e3d13911a6750f38153b8f1098bd59de4645fdd8369a"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-48.png",
+    "width": 48,
+    "height": 48,
+    "sha256": "2eb2a9b07b94face0457a2a42d3b537356d1da747be4d639cd267d858af05f61"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-64.png",
+    "width": 64,
+    "height": 64,
+    "sha256": "d232b1e0d07cadff8c54f45698efee1916559328c29b102b2d3d9a45a9953436"
+  },
+  {
+    "name": "09 App Icon/Windows/png/Jasper-96.png",
+    "width": 96,
+    "height": 96,
+    "sha256": "190fe204c6b0e0346d103ae82d5f66de50ceade79a9897774bd2d607fda55677"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_128x128-2x.png",
+    "width": 256,
+    "height": 256,
+    "sha256": "4940e4fef8195b3210c47b6fdbe56e192c9a56322f58b98847aaf08566e4a643"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_128x128.png",
+    "width": 128,
+    "height": 128,
+    "sha256": "2e9b967d0515870ce1e88511a7070d38c86c95d000b128980ebd45e4dcfd15dc"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_16x16-2x.png",
+    "width": 32,
+    "height": 32,
+    "sha256": "1b1dc37d8716b1e13e9adcf9c25c9bc6923fcaa33251d2496ece5b685e5bd728"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_16x16.png",
+    "width": 16,
+    "height": 16,
+    "sha256": "6015bbb01ff649f3930a9d5e5c533fd57b66de175d38b7c9a3702da52012d466"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_256x256-2x.png",
+    "width": 512,
+    "height": 512,
+    "sha256": "ffaaf678eccd066cac842db46cf549f0001c675935e001edd513f244dd6708ab"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_256x256.png",
+    "width": 256,
+    "height": 256,
+    "sha256": "4940e4fef8195b3210c47b6fdbe56e192c9a56322f58b98847aaf08566e4a643"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_32x32-2x.png",
+    "width": 64,
+    "height": 64,
+    "sha256": "d232b1e0d07cadff8c54f45698efee1916559328c29b102b2d3d9a45a9953436"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_32x32.png",
+    "width": 32,
+    "height": 32,
+    "sha256": "1b1dc37d8716b1e13e9adcf9c25c9bc6923fcaa33251d2496ece5b685e5bd728"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_512x512-2x.png",
+    "width": 1024,
+    "height": 1024,
+    "sha256": "fecc2f8b5eaeb9a9ab471d281aaee736a16bfe623e056c419752ff3a050a66d6"
+  },
+  {
+    "name": "09 App Icon/macOS/AppIcon.iconset/icon_512x512.png",
+    "width": 512,
+    "height": 512,
+    "sha256": "ffaaf678eccd066cac842db46cf549f0001c675935e001edd513f244dd6708ab"
+  },
+  {
+    "name": "09 App Icon/macOS/Jasper.icns",
+    "sha256": "35d70a638fbd69d8a9d80db59708b62de9a04c87a0f2bfcf33cc13c926f7ffc9"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash - Animated Mock.html",
+    "sha256": "4ae6f351bda605c15c31770a4cd96a6c5673671aa7edb26ff45258321e8248e5"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 01 - Starting Java runtime.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "8368ce05564fc20ce6e0150259547e0239831cb4b037a792ad66b413d74d789e"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 02 - Reading configuration.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "04dad6dc1da1c190204ae181c274f7b796fea1782b834ce69af88d32af9e9a7b"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 03 - Unlocking credential vault.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "1047ee8f81b2f1094d1a89831179631722c2987c44c5412c279be1121038f3dc"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 04 - Loading plugin File Server.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "8004c6373d1f5dfaa800dbcde2b1f0b7095a7a79fc36ecff036c926f8e60aed8"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 05 - Loading plugin Tunnels.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "1a4ddfd30809032cfdc1ff60e2eabd40aa5cceb304cf990e1a873d028a1684ae"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 06 - Loading plugin Credential Vault.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "1e596fa9b671157b3ebc3ab6263ec313a277a03ecd040b66ee262781707038dc"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 07 - Loading plugin Run Dialog.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "8daa64aaa5f3ac4b15f262bc518bc3108ca20229f98c417b1d9648500684d890"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 08 - Indexing hosts.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "f394cdc062bb309e2910fe07a76652c8ad3b410a35c4daeb1c7b4e12a6efc699"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 09 - Restoring workspace.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "a261e5c9201b209f0fd2ad98da6d9e97d5c0bc829b02daf575a030463bff23e5"
+  },
+  {
+    "name": "10 Boot Splash/Boot Splash 10 - Starting Workstation.png",
+    "width": 720,
+    "height": 440,
+    "sha256": "8bf587603b7c687434d3eedd2373edc3b9a7f5f35213f5aa4ee8b8d7758ce922"
+  },
+  {
+    "name": "10 Boot Splash/extracted/art.svg",
+    "sha256": "eda029835c14f871aabd9674eecfa39d5840a40e70278963cda61756b499d4c1"
+  },
+  {
+    "name": "10 Boot Splash/extracted/icon.svg",
+    "sha256": "b4162789aa736a053be9f4c4852acd18a5d54f59052ac2ada2141b0398fdfcd9"
+  },
+  {
+    "name": "10 Boot Splash/extracted/template.html",
+    "sha256": "f9f43a93f78224706f2ccaf4b03294b149debffdfed2d4e3c48dd5aec7680e6d"
+  },
+  {
+    "name": "DESIGN_LANGUAGE.md",
+    "sha256": "6fcb0eae77b591ae3f2f471ff4e721355ab6c728916579c3d2e4f197cc46ece8"
+  }
+]

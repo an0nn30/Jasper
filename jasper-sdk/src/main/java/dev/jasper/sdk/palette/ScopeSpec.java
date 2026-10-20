@@ -1,12 +1,13 @@
 package dev.jasper.sdk.palette;
 
+import dev.jasper.sdk.ui.Nodes;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
-import javax.swing.Icon;
 
 /**
  * What a scope is: identity, wording, verbs and how it is reached. The palette shows an All tab first,
@@ -17,19 +18,26 @@ import javax.swing.Icon;
  * @param label            the tab text, such as "History"
  * @param description      one line, shown as the tab's tooltip
  * @param placeholder      the query field's hint while this scope's tab is open
- * @param verbs            one to three verbs with distinct ids, bound to Enter, Cmd/Ctrl+Enter, Shift+Enter
- * @param monospaceRows    whether rows are painted in the terminal font (commands, paths)
+ * @param verbs            one to three verbs with distinct ids, bound to Enter, Cmd/Ctrl+Enter, Shift+Enter; at most
+ *                         one is a {@link PaletteVerb.Role#SPLIT} verb, and never the first
+ * @param monospaceRows    whether rows are data values (commands, paths), drawn in the data face
  * @param icon             the tab icon
  * @param shortcutActionId one of the plugin's own actions: while the palette is open, that action's
  *                         shortcut switches to or dismisses this scope's tab instead of running the handler
  * @param inAll            whether the All tab searches this scope too (since 0.8.0)
  * @param inRecents        whether the palette may offer this scope's rows before anything is typed, among the
  *                         recently and most used items (since 0.9.2)
+ * @param hue              the hue of this scope's row squares where a presentation draws them; NONE takes the plugin's
+ *                         manifest {@code icon_hue}, and NEUTRAL without one (since 0.18.0)
+ * @param itemNoun         what one row is, as a lowercase singular noun such as "session", which a presentation shows
+ *                         capitalised before a row's detail; blank uses the label (since 0.18.0)
  */
 public record ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
-                        boolean monospaceRows, Optional<Icon> icon, Optional<String> shortcutActionId, boolean inAll,
-                        boolean inRecents) {
+                        boolean monospaceRows, Optional<String> icon, Optional<String> shortcutActionId, boolean inAll,
+                        boolean inRecents, Nodes.Hue hue, String itemNoun) {
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]*(\\.[a-z0-9_-]+)+");
+    /** The most characters an item noun has. */
+    private static final int NOUN_LENGTH = 40;
 
     /** Validates every part and copies the verbs. */
     public ScopeSpec {
@@ -41,8 +49,36 @@ public record ScopeSpec(String id, String label, String description, String plac
         if (verbs.isEmpty() || verbs.size() > 3) throw new IllegalArgumentException("A scope has one to three verbs");
         Set<String> ids = new HashSet<>();
         for (PaletteVerb verb : verbs) if (!ids.add(verb.id())) throw new IllegalArgumentException("Duplicate verb id: " + verb.id());
+        if (verbs.getFirst().role() == PaletteVerb.Role.SPLIT)
+            throw new IllegalArgumentException("A scope's first verb cannot be its split variant: " + verbs.getFirst().id());
+        if (verbs.stream().filter(verb -> verb.role() == PaletteVerb.Role.SPLIT).count() > 1)
+            throw new IllegalArgumentException("A scope has at most one split verb");
         Objects.requireNonNull(icon, "icon");
         Objects.requireNonNull(shortcutActionId, "shortcutActionId");
+        Objects.requireNonNull(hue, "hue");
+        itemNoun = itemNoun == null || itemNoun.isBlank() ? "" : itemNoun;
+        if (!itemNoun.isEmpty() && (!itemNoun.equals(itemNoun.strip()) || !itemNoun.equals(itemNoun.toLowerCase(Locale.ROOT))
+                || itemNoun.length() > NOUN_LENGTH || itemNoun.chars().anyMatch(Character::isISOControl)))
+            throw new IllegalArgumentException("An item noun is a lowercase singular noun, such as \"session\": " + itemNoun);
+    }
+
+    /**
+     * The 0.9.2 shape: no hue of its own and the label as the item noun.
+     *
+     * @param id               the scope id
+     * @param label            the tab text
+     * @param description      the tooltip line
+     * @param placeholder      the query hint
+     * @param verbs            the verbs
+     * @param monospaceRows    whether rows are data values
+     * @param icon             the tab icon
+     * @param shortcutActionId the plugin's action whose shortcut reaches this scope
+     * @param inAll            whether the All tab searches this scope
+     * @param inRecents        whether the palette may offer this scope's rows before anything is typed
+     */
+    public ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
+                     boolean monospaceRows, Optional<String> icon, Optional<String> shortcutActionId, boolean inAll, boolean inRecents) {
+        this(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, inRecents, Nodes.Hue.NONE, "");
     }
 
     /**
@@ -53,18 +89,19 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param description      the tooltip line
      * @param placeholder      the query hint
      * @param verbs            the verbs
-     * @param monospaceRows    whether rows use the terminal font
+     * @param monospaceRows    whether rows are data values
      * @param icon             the tab icon
      * @param shortcutActionId the plugin's action whose shortcut reaches this scope
      * @param inAll            whether the All tab searches this scope
      */
     public ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
-                     boolean monospaceRows, Optional<Icon> icon, Optional<String> shortcutActionId, boolean inAll) {
-        this(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, true);
+                     boolean monospaceRows, Optional<String> icon, Optional<String> shortcutActionId, boolean inAll) {
+        this(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, true, Nodes.Hue.NONE, "");
     }
 
     /**
-     * The minimum: no description, icon or shortcut, proportional rows, searched by the All tab.
+     * The minimum: no description, icon or shortcut, proportional rows, searched by the All tab, no hue of its own and
+     * the label as the item noun.
      *
      * @param id          the scope id
      * @param label       the tab text
@@ -73,7 +110,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @return the spec
      */
     public static ScopeSpec of(String id, String label, String placeholder, List<PaletteVerb> verbs) {
-        return new ScopeSpec(id, label, "", placeholder, verbs, false, Optional.empty(), Optional.empty(), true, true);
+        return new ScopeSpec(id, label, "", placeholder, verbs, false, Optional.empty(), Optional.empty(), true, true, Nodes.Hue.NONE, "");
     }
 
     /**
@@ -82,15 +119,15 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param value the tooltip line
      * @return a copy with that description
      */
-    public ScopeSpec withDescription(String value) { return new ScopeSpec(id, label, value, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, inRecents); }
+    public ScopeSpec withDescription(String value) { return new ScopeSpec(id, label, value, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, inRecents, hue, itemNoun); }
 
     /**
      * Derives a value.
      *
-     * @param value whether rows use the terminal font
+     * @param value whether rows are data values
      * @return a copy with that setting
      */
-    public ScopeSpec withMonospaceRows(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, value, icon, shortcutActionId, inAll, inRecents); }
+    public ScopeSpec withMonospaceRows(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, value, icon, shortcutActionId, inAll, inRecents, hue, itemNoun); }
 
     /**
      * Derives a value.
@@ -98,7 +135,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param value the tab icon, or null for none
      * @return a copy with that icon
      */
-    public ScopeSpec withIcon(Icon value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, Optional.ofNullable(value), shortcutActionId, inAll, inRecents); }
+    public ScopeSpec withIcon(String value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, Optional.ofNullable(value), shortcutActionId, inAll, inRecents, hue, itemNoun); }
 
     /**
      * Derives a value.
@@ -106,7 +143,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param value the plugin's action whose shortcut reaches this scope, or null for none
      * @return a copy naming it
      */
-    public ScopeSpec withShortcutActionId(String value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, Optional.ofNullable(value), inAll, inRecents); }
+    public ScopeSpec withShortcutActionId(String value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, Optional.ofNullable(value), inAll, inRecents, hue, itemNoun); }
 
     /**
      * Derives a value. A scope whose rows should not appear beside others, such as secrets, opts out.
@@ -115,7 +152,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @return a copy with that setting
      * @since 0.8.0
      */
-    public ScopeSpec withInAll(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, value, inRecents); }
+    public ScopeSpec withInAll(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, value, inRecents, hue, itemNoun); }
 
     /**
      * Derives a value. A scope whose rows should appear only when searched for, such as shell history, opts out.
@@ -124,5 +161,23 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @return a copy with that setting
      * @since 0.9.2
      */
-    public ScopeSpec withInRecents(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, value); }
+    public ScopeSpec withInRecents(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, value, hue, itemNoun); }
+
+    /**
+     * Derives a value.
+     *
+     * @param value the hue of this scope's row squares; NONE takes the plugin's {@code icon_hue}
+     * @return a copy with that hue
+     * @since 0.18.0
+     */
+    public ScopeSpec withHue(Nodes.Hue value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, inRecents, value, itemNoun); }
+
+    /**
+     * Derives a value.
+     *
+     * @param value what one row is, as a lowercase singular noun such as "session"; blank or null uses the label
+     * @return a copy with that noun
+     * @since 0.18.0
+     */
+    public ScopeSpec withItemNoun(String value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, inRecents, hue, value); }
 }

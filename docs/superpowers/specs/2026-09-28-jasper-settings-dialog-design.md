@@ -6,6 +6,8 @@ This is sub-project **B** of the Settings work. It builds on sub-project A, the 
 a31b53cb): `CoreSettings.SCHEMA`, `SettingValues`, `ConfigService.save(SettingsEdit)`, `saveKeybindings`,
 `migrate`. Sub-project C (SDK settings API and plugin pages) follows; see [Roadmap](#roadmap-c).
 
+Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): the integrated title row applies under a unified title bar; the Enterprise look gives Settings a native title, collapsible ▼ sections and a square full-width selection; everything else in this document stands.
+
 ## Outcome
 
 An IntelliJ-style **Settings** dialog replaces "open config.toml in an editor". It looks and behaves like

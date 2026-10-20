@@ -31,12 +31,12 @@ class PanelContributionsTest {
         assertThat(model.actions()).filteredOn(action -> action.title().startsWith("Toggle ")).extracting(ActionEntry::id)
             .containsExactlyInAnyOrder("dev.x.show", "dev.x.files.toggle");
         assertThat(model.menus()).singleElement().satisfies(section -> assertThat(section.entries()).containsExactly(
-            new MenuEntry.Submenu("Tools", List.of(new MenuEntry.Item("dev.x.show"), new MenuEntry.Item("dev.x.files.toggle")))));
+            new MenuEntry.Submenu("Tool Windows", List.of(new MenuEntry.Item("dev.x.show"), new MenuEntry.Item("dev.x.files.toggle")))));
 
         hosts.close();
         assertThat(model.action("dev.x.show")).as("the plugin still owns its action").containsSame(show);
         assertThat(model.menus()).singleElement().satisfies(section -> assertThat(section.entries()).containsExactly(
-            new MenuEntry.Submenu("Tools", List.of(new MenuEntry.Item("dev.x.files.toggle")))));
+            new MenuEntry.Submenu("Tool Windows", List.of(new MenuEntry.Item("dev.x.files.toggle")))));
         assertThat(requests).isEmpty();
     }
 
@@ -55,10 +55,11 @@ class PanelContributionsTest {
         assertThat(toggle.title()).isEqualTo("Toggle Hosts");
         UUID window = UUID.randomUUID();
         toggle.invoke(new Contributions.Invocation(window, Optional.empty()));
-        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, "dev.x.hosts", Contributions.PanelRequest.Op.TOGGLE));
+        // Plan 12 Rulings 18: the View toggle action is a user gesture.
+        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
         assertThat(model.menus()).singleElement().satisfies(section -> {
             assertThat(section.target()).isEqualTo(MenuTarget.standard(MenuTarget.Slot.VIEW));
-            assertThat(section.entries()).containsExactly(new MenuEntry.Submenu("Tools", List.of(new MenuEntry.Item("dev.x.hosts.toggle"))));
+            assertThat(section.entries()).containsExactly(new MenuEntry.Submenu("Tool Windows", List.of(new MenuEntry.Item("dev.x.hosts.toggle"))));
         });
 
         hosts.close();

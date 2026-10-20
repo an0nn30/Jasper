@@ -23,6 +23,7 @@ class KeymapDefaultsTest {
         new Row("new_window", KeyContext.GLOBAL, "cmd+n", "ctrl+shift+n"),                     // 1
         new Row("quit", KeyContext.GLOBAL, "cmd+q", "ctrl+alt+shift+q"),                       // 3
         new Row("open_settings", KeyContext.GLOBAL, "cmd+,", "ctrl+shift+,"),                  // 4
+        new Row("open_file", KeyContext.GLOBAL, "none", "none"),  // Enterprise spec 13: File › Open File…, unbound
         new Row("reload_config", KeyContext.GLOBAL, "none", "none"),                           // 5
         new Row("command_palette", KeyContext.GLOBAL, "cmd+shift+p", "ctrl+shift+p"),          // 14
         new Row("new_tab", KeyContext.GLOBAL, "cmd+t", "ctrl+shift+t"),                        // 22
@@ -51,6 +52,7 @@ class KeymapDefaultsTest {
         new Row("copy", KeyContext.GLOBAL, "cmd+c", "ctrl+shift+c"),                           // 42
         new Row("paste", KeyContext.GLOBAL, "cmd+v", "ctrl+shift+v"),                          // 43
         new Row("clear_scrollback", KeyContext.TERMINAL, "cmd+k", "ctrl+shift+k"),             // 45
+        new Row("clear_terminal", KeyContext.TERMINAL, "none", "none"),                       // Clear Terminal follow-up
         new Row("find", KeyContext.GLOBAL, "cmd+f", "ctrl+shift+f"),                           // 47
         new Row("find_next", KeyContext.GLOBAL, "cmd+g", "ctrl+shift+g"),                      // 48
         new Row("find_previous", KeyContext.GLOBAL, "cmd+shift+g", "ctrl+alt+shift+g"),        // 49

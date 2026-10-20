@@ -19,12 +19,14 @@ final class PluginIconFiles {
 
     private PluginIconFiles() { }
 
-    /** The candidate's icon; empty when it names none, or the file is missing or larger than {@link #MAX_BYTES}. */
+    /** The candidate's icon; empty when it names none, or the file is missing, empty or larger than {@link #MAX_BYTES}. */
     static Optional<PluginRuntime.PluginIcon> read(PluginCandidate candidate) {
         String name = candidate.descriptor().icon();
         if (name.isEmpty()) return Optional.empty();
         String key = candidate.id() + "@" + candidate.descriptor().version() + "@" + candidate.directory() + "@" + name;
-        return CACHE.computeIfAbsent(key, ignored -> load(candidate, name));
+        // The cache owns raw content only. Presentation belongs to this descriptor, including same-version replacements.
+        return CACHE.computeIfAbsent(key, ignored -> load(candidate, name))
+            .map(bytes -> bytes.withMetadata(candidate.descriptor().iconHue(), candidate.descriptor().iconSelectedInk()));
     }
 
     /** Test seam: how many icons have been read from jars. */
@@ -38,6 +40,10 @@ final class PluginIconFiles {
                 if (entry == null) continue;
                 try (var input = file.getInputStream(entry)) {
                     byte[] bytes = input.readNBytes(MAX_BYTES + 1);
+                    if (bytes.length == 0) {
+                        LOG.log(System.Logger.Level.DEBUG, "The icon of " + candidate.id() + " is empty; the default is used");
+                        return Optional.empty();
+                    }
                     if (bytes.length > MAX_BYTES) {
                         LOG.log(System.Logger.Level.DEBUG, "The icon of " + candidate.id() + " is larger than 256 KiB; the default is used");
                         return Optional.empty();

@@ -1,0 +1,2554 @@
+[
+  {
+    "name": "settings-appearance",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_dialog_mock.png",
+    "crop": [
+      4,
+      6,
+      1960,
+      1362
+    ],
+    "render": "jasper-app/build/theme-surfaces/settings/dark-0/appearance/default.png"
+  },
+  {
+    "name": "settings-window",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_windows_mock.png",
+    "crop": [
+      4,
+      2,
+      1960,
+      1362
+    ],
+    "render": "jasper-app/build/theme-surfaces/settings/dark-0/window/default.png"
+  },
+  {
+    "name": "settings-notifications",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_notification_mock.png",
+    "crop": [
+      8,
+      2,
+      1960,
+      1362
+    ],
+    "render": "jasper-app/build/theme-surfaces/settings/dark-0/notifications/popup.png"
+  },
+  {
+    "name": "settings-keymap",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_keymap_mock.png",
+    "crop": [
+      8,
+      6,
+      1960,
+      1362
+    ],
+    "render": "jasper-app/build/theme-surfaces9b/dark-0/keymap-recording.png",
+    "note": "Spec 13 (plan 3e): the Keymap lists File's Open File… (Unassigned) under Application and File Server's Share Folder…, so the rows below New Window move one row down. Edge agreement 0.294 before, 0.293 after."
+  },
+  {
+    "name": "settings-plugins",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/settings_plugins_mock.png",
+    "crop": [
+      0,
+      0,
+      1488,
+      1364
+    ],
+    "render": "jasper-app/build/theme-surfaces9b/dark-0/plugins-content.png"
+  },
+  {
+    "name": "vault-create",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/create_vault_dialog_mock.png",
+    "crop": [
+      10,
+      46,
+      800,
+      856
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/vault-create/empty.png"
+  },
+  {
+    "name": "vault-unlock",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/rename_vault_dialog.png",
+    "crop": [
+      2,
+      38,
+      760,
+      528
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/vault-unlock/empty.png"
+  },
+  {
+    "name": "host-add",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/add_host_dialog_mock.png",
+    "crop": [
+      26,
+      82,
+      1080,
+      1464
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/add-host/actual/source-depicted-keys-natural.png",
+    "note": "Spec 13 (plan 3e): the label \"Jump host\" is sentence case. Edge agreement 0.191 before, 0.190 after; the two managed keys' rows also swap run to run (the import returns them in a Map.copyOf's order)."
+  },
+  {
+    "name": "fileserver-add",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/new_file_server_mock.png",
+    "crop": [
+      8,
+      64,
+      1080,
+      1380
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/fileserver-add/actual/anonymous.png",
+    "note": "Spec 13 (plan 3e): the label \"Reachable from\" is sentence case; the read-only folder field draws as before in this state, which has no warning. Edge agreement 0.228 before, 0.228 after."
+  },
+  {
+    "name": "vault-manager",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/vault_ui_mock.png",
+    "crop": [
+      4,
+      96,
+      1800,
+      1110
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-manager.png",
+    "render_crop": [
+      0,
+      91,
+      1800,
+      1110
+    ]
+  },
+  {
+    "name": "vault-manager-title",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/vault_ui_mock.png",
+    "crop": [
+      200,
+      6,
+      1600,
+      90
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-manager.png",
+    "render_crop": [
+      196,
+      0,
+      1600,
+      90
+    ]
+  },
+  {
+    "name": "workspace-tabs",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.25 AM.png",
+    "crop": [
+      112,
+      76,
+      1582,
+      1424
+    ],
+    "render": "jasper-app/build/workspace-surfaces/tabs/dark-791x712.png"
+  },
+  {
+    "name": "workspace-rails",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.41 AM.png",
+    "crop": [
+      112,
+      76,
+      1582,
+      1424
+    ],
+    "render": "jasper-app/build/workspace-surfaces/rails/dark-791x712.png",
+    "note": "Spec 13 (plan 3e): the Vault status item reads \"Vault: Locked\". Edge agreement 0.818 before, 0.807 after."
+  },
+  {
+    "name": "workspace-integrated",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
+    "crop": [
+      112,
+      76,
+      2684,
+      1716
+    ],
+    "render": "jasper-app/build/workspace-surfaces/integrated/dark-1342x858.png",
+    "note": "Spec 13 (plan 3e): the Vault status item reads \"Vault: Locked\". Edge agreement 0.586 before, 0.583 after."
+  },
+  {
+    "name": "workspace-palette",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.31 AM.png",
+    "crop": [
+      342,
+      84,
+      1120,
+      712
+    ],
+    "render": "jasper-app/build/palette-surfaces/dark-13.0-791x712.png",
+    "render_crop": [
+      230,
+      8,
+      1120,
+      712
+    ],
+    "note": "Spec 13 (plan 3e): the empty query shows three recent rows, so Most used starts one row lower. Edge agreement 0.375 before, 0.349 after."
+  },
+  {
+    "name": "sessions-panel",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
+    "crop": [
+      168,
+      144,
+      520,
+      790
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/sessions-panel/selected.png"
+  },
+  {
+    "name": "vault-menu",
+    "mock": "docs/design/theme-engine/reference/vault-add-menu.png",
+    "crop": [
+      160,
+      140,
+      444,
+      274
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-menu.png"
+  },
+  {
+    "name": "vault-login-sheet",
+    "mock": "docs/design/theme-engine/reference/add-login-sheet.png",
+    "crop": [
+      434,
+      106,
+      964,
+      730
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-login-sheet.png"
+  },
+  {
+    "name": "vault-key-sheet",
+    "mock": "docs/design/theme-engine/reference/add-ssh-key-sheet.png",
+    "crop": [
+      446,
+      120,
+      964,
+      614
+    ],
+    "render": "jasper-app/build/task-4b-captures/dark/vault-key-sheet.png"
+  },
+  {
+    "name": "picker-empty",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      214,
+      198,
+      396,
+      60
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/empty.png",
+    "render_crop": [
+      256,
+      92,
+      396,
+      60
+    ]
+  },
+  {
+    "name": "picker-selected",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      862,
+      198,
+      396,
+      60
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/selected.png",
+    "render_crop": [
+      256,
+      92,
+      396,
+      60
+    ]
+  },
+  {
+    "name": "picker-open-face",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      1510,
+      198,
+      396,
+      60
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/open-face.png",
+    "render_crop": [
+      256,
+      92,
+      396,
+      60
+    ]
+  },
+  {
+    "name": "picker-open-top",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      1518,
+      256,
+      444,
+      124
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/open.png",
+    "render_crop": [
+      0,
+      0,
+      444,
+      124
+    ]
+  },
+  {
+    "name": "picker-open-footer",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      1518,
+      716,
+      444,
+      72
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/open.png",
+    "render_crop": [
+      0,
+      164,
+      444,
+      72
+    ]
+  },
+  {
+    "name": "picker-filtering-top",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      222,
+      1065,
+      444,
+      56
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/filtering.png",
+    "render_crop": [
+      0,
+      0,
+      444,
+      56
+    ]
+  },
+  {
+    "name": "picker-no-matches",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      870,
+      1065,
+      444,
+      214
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/no-matches.png"
+  },
+  {
+    "name": "picker-disabled",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/combo_box_mock.png",
+    "crop": [
+      1510,
+      1006,
+      396,
+      60
+    ],
+    "render": "jasper-app/build/theme-migration-evidence/anchored-picker/actual/disabled.png",
+    "render_crop": [
+      256,
+      92,
+      396,
+      60
+    ]
+  },
+  {
+    "name": "tunnels-panel",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
+    "crop": [
+      2220,
+      946,
+      520,
+      790
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/tunnels-panel/empty.png"
+  },
+  {
+    "name": "tunnels-panel-plugin-panels",
+    "mock": "docs/design/theme-engine/reference/plugin-panels.png",
+    "crop": [
+      168,
+      994,
+      520,
+      836
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/tunnels-panel/empty-418.png"
+  },
+  {
+    "name": "sftp-panel",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
+    "crop": [
+      168,
+      946,
+      520,
+      790
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/sftp-panel/cancelled.png"
+  },
+  {
+    "name": "sftp-panel-plugin-panels",
+    "mock": "docs/design/theme-engine/reference/plugin-panels.png",
+    "crop": [
+      2122,
+      144,
+      520,
+      838
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/sftp-panel/disconnected-419.png"
+  },
+  {
+    "name": "fileservers-panel",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
+    "crop": [
+      2220,
+      144,
+      520,
+      790
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/fileservers-panel/empty.png"
+  },
+  {
+    "name": "fileservers-panel-populated",
+    "mock": "docs/design/theme-engine/reference/plugin-panels.png",
+    "crop": [
+      2122,
+      994,
+      520,
+      836
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/fileservers-panel/populated.png"
+  },
+  {
+    "name": "tunnel-new",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/new_tunnel_mock.png",
+    "crop": [
+      8,
+      62,
+      1080,
+      1116
+    ],
+    "render": "jasper-app/build/theme-surfaces/dark/tunnel-new/local.png",
+    "note": "Spec 13 (plan 3e): the labels \"Via host\", \"Listen on\" and \"Forward to\" are sentence case. Edge agreement 0.340 before, 0.341 after."
+  },
+  {
+    "name": "run-window-just-opened",
+    "mock": "docs/design/enterprise/reference/06 Run Dialog/Run Dialog - Just opened (recent + most used).png",
+    "crop": [
+      60,
+      854,
+      924,
+      632
+    ],
+    "render": "jasper-app/build/run-window/light/just-opened@2x.png",
+    "render_crop": [
+      0,
+      0,
+      924,
+      632
+    ],
+    "min_agreement": 0.7,
+    "colours": [
+      "#DFE2E9",
+      "#F2F2F2",
+      "#042C99",
+      "#2675BF",
+      "#DFDFDF",
+      "#FFFFFF",
+      "#C4C4C4"
+    ],
+    "note": "The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "run-window-just-opened-lower",
+    "mock": "docs/design/enterprise/reference/06 Run Dialog/Run Dialog - Just opened (recent + most used).png",
+    "crop": [
+      60,
+      1488,
+      924,
+      208
+    ],
+    "render": "jasper-app/build/run-window/light/just-opened@2x.png",
+    "render_crop": [
+      0,
+      646,
+      924,
+      208
+    ],
+    "min_agreement": 0.7,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB",
+      "#D1D1D1",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "run-window-typing-auth",
+    "mock": "docs/design/enterprise/reference/06 Run Dialog/Run Dialog - Typing auth (filtered).png",
+    "crop": [
+      60,
+      854,
+      924,
+      632
+    ],
+    "render": "jasper-app/build/run-window/light/typing-auth@2x.png",
+    "render_crop": [
+      0,
+      0,
+      924,
+      632
+    ],
+    "min_agreement": 0.7,
+    "colours": [
+      "#DFE2E9",
+      "#F2F2F2",
+      "#2675BF",
+      "#DFDFDF",
+      "#FFFFFF",
+      "#C4C4C4"
+    ],
+    "note": "The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "run-window-typing-auth-lower",
+    "mock": "docs/design/enterprise/reference/06 Run Dialog/Run Dialog - Typing auth (filtered).png",
+    "crop": [
+      60,
+      1488,
+      924,
+      208
+    ],
+    "render": "jasper-app/build/run-window/light/typing-auth@2x.png",
+    "render_crop": [
+      0,
+      646,
+      924,
+      208
+    ],
+    "min_agreement": 0.7,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB",
+      "#D1D1D1",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "chrome-menu-row-light",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      60,
+      2880,
+      50
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-light-window.png",
+    "render_crop": [
+      0,
+      0,
+      2880,
+      50
+    ],
+    "min_agreement": 0.5,
+    "colours": [
+      "#F2F2F2",
+      "#DDDDDD",
+      "#000000"
+    ]
+  },
+  {
+    "name": "chrome-menu-row-dark",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      60,
+      2880,
+      50
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-dark-window.png",
+    "render_crop": [
+      0,
+      0,
+      2880,
+      50
+    ],
+    "min_agreement": 0.5,
+    "colours": [
+      "#2B2D30",
+      "#DFE1E5"
+    ]
+  },
+  {
+    "name": "classic-new-tunnel",
+    "mock": "docs/design/enterprise/reference/04 New Tunnel/New Tunnel - Local.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      898
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-new-tunnel.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F2F2F2",
+      "#C4C4C4",
+      "#FFFFFF",
+      "#D1D1D1",
+      "#042C99",
+      "#2675BF",
+      "#045810"
+    ],
+    "note": "The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port. The user's 2026-10-18 direction: #2E9E4F (status.success, hue.green) maps to #34B171, which this crop does not paint under the port."
+  },
+  {
+    "name": "classic-add-host",
+    "mock": "docs/design/enterprise/reference/03 Add Host/Add Host - Default.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1042
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-add-host.png",
+    "min_agreement": 0.5,
+    "colours": [
+      "#F2F2F2",
+      "#C4C4C4",
+      "#FFFFFF",
+      "#D1D1D1",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "classic-new-file-server-ftp",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - FTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1210
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-new-file-server-ftp.png",
+    "min_agreement": 0.45,
+    "colours": [
+      "#F2F2F2",
+      "#C4C4C4",
+      "#FFFFFF",
+      "#D1D1D1",
+      "#042C99",
+      "#2675BF",
+      "#7D067D",
+      "#7D6200"
+    ],
+    "note": "The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port. The user's 2026-10-18 direction: #2D984D (not a theme value) maps to #2D984D, which this crop does not paint under the port."
+  },
+  {
+    "name": "classic-notifications-groups",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 03 - Appearance & Behavior - Notifications.png",
+    "crop": [
+      522,
+      504,
+      1502,
+      1058
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-notifications-groups.png",
+    "min_agreement": 0.75,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#DDDDDD"
+    ],
+    "note": "The user's 2026-10-18 direction: the IntelliJ Light port. Edge agreement 0.923 before, 0.788 after."
+  },
+  {
+    "name": "classic-project-markers",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 15 - Tools - Project Index.png",
+    "crop": [
+      522,
+      792,
+      1502,
+      184
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-project-markers.png",
+    "min_agreement": 0.45,
+    "colours": [
+      "#C4C4C4",
+      "#F2F2F2",
+      "#FFFFFF",
+      "#F2F5F9"
+    ]
+  },
+  {
+    "name": "classic-keymap-tree",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 07 - Keymap.png",
+    "crop": [
+      496,
+      226,
+      1554,
+      978
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-keymap-tree.png",
+    "min_agreement": 0.45,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#DDDDDD"
+    ]
+  },
+  {
+    "name": "classic-file-servers",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      46,
+      992,
+      604,
+      90
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-file-servers.png",
+    "min_agreement": 0.6,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#DDDDDD"
+    ],
+    "note": "The user's 2026-10-18 direction: #E8EEFA (not a theme value) maps to #E8EEFA, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-light-sessions",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      184,
+      697,
+      516
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/sessions@2x.png",
+    "min_agreement": 0.26,
+    "colours": [
+      "#C4C4C4",
+      "#F2F2F2",
+      "#FFFFFF",
+      "#2675BF",
+      "#DFDFDF",
+      "#EAEAEA"
+    ],
+    "note": "The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-light-tunnels",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      1014,
+      697,
+      268
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/tunnels-added@2x.png",
+    "min_agreement": 0.25,
+    "colours": [
+      "#F2F2F2",
+      "#DFDFDF",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "enterprise-light-sftp",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      49,
+      184,
+      598,
+      759
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/sftp-connected@2x.png",
+    "min_agreement": 0.12,
+    "colours": [
+      "#C4C4C4",
+      "#F2F2F2",
+      "#FFFFFF",
+      "#2675BF",
+      "#DFDFDF",
+      "#EAEAEA"
+    ],
+    "note": "The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-light-fileservers",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      49,
+      945,
+      598,
+      150
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/fileservers@2x.png",
+    "min_agreement": 0.27,
+    "colours": [
+      "#C4C4C4",
+      "#F2F2F2",
+      "#FFFFFF",
+      "#DFDFDF"
+    ]
+  },
+  {
+    "name": "enterprise-dark-sessions",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      184,
+      697,
+      516
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/sessions@2x.png",
+    "min_agreement": 0.27,
+    "colours": [
+      "#1E1F22",
+      "#2B2D30",
+      "#393B40",
+      "#FFFFFF",
+      "#366ACE",
+      "#2E436E",
+      "#36383B",
+      "#3D3F42",
+      "#313336"
+    ],
+    "note": "The user's 2026-10-18 direction: #3D74D6 stood for accent and selection.bg (within Delta E 1.5 of the old theme's) and maps to #366ACE and #2E436E."
+  },
+  {
+    "name": "enterprise-dark-tunnels",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      1014,
+      697,
+      268
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/tunnels-added@2x.png",
+    "min_agreement": 0.23,
+    "colours": [
+      "#2B2D30",
+      "#36383B",
+      "#3D3F42",
+      "#313336"
+    ]
+  },
+  {
+    "name": "enterprise-dark-sftp",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      49,
+      184,
+      598,
+      759
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/sftp-connected@2x.png",
+    "min_agreement": 0.1,
+    "colours": [
+      "#366ACE",
+      "#2B2D30",
+      "#36383B",
+      "#3D3F42",
+      "#313336"
+    ],
+    "note": "The user's 2026-10-18 direction: #3D74D6 (selection.bg) maps to #2E436E, which this crop does not paint under the port. The user's 2026-10-18 direction: #3D74D6 stood for accent and selection.bg (within Delta E 1.5 of the old theme's) and maps to #366ACE."
+  },
+  {
+    "name": "enterprise-dark-fileservers",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      49,
+      945,
+      598,
+      150
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/fileservers@2x.png",
+    "min_agreement": 0.26,
+    "colours": [
+      "#2B2D30",
+      "#36383B",
+      "#3D3F42",
+      "#313336"
+    ],
+    "note": "The user's 2026-10-18 direction: #2E3135 (surface.card, surface.input, surface.field.raised, surface.control, surface.menu, surface.terminal, segment.selected.bg, toggle.knob) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-18 direction: #2E3135 (surface.card, surface.input, surface.field.raised, surface.control, surface.menu, surface.terminal, segment.selected.bg, toggle.knob) maps to #393B40, which this crop does not paint under the port. The user's 2026-10-18 direction: #2E3135 (surface.card, surface.input, surface.field.raised, surface.control, surface.menu, surface.terminal, segment.selected.bg, toggle.knob) maps to #FFFFFF, which this crop does not paint under the port."
+  },
+  {
+    "name": "chrome-toolbar-light",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      116,
+      2880,
+      56
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-light-workstation.png",
+    "render_crop": [
+      0,
+      50,
+      2880,
+      56
+    ],
+    "min_agreement": 0.3,
+    "colours": [
+      "#F2F2F2",
+      "#D1D1D1",
+      "#C4C4C4"
+    ],
+    "note": "The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights. The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field; #FFFFFF, the field's surface.input, is no longer painted in the row."
+  },
+  {
+    "name": "chrome-toolbar-dark",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      116,
+      2880,
+      56
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-dark-workstation.png",
+    "render_crop": [
+      0,
+      50,
+      2880,
+      56
+    ],
+    "min_agreement": 0.3,
+    "colours": [
+      "#2B2D30"
+    ],
+    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights. The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field."
+  },
+  {
+    "name": "chrome-tabs-light",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      650,
+      180,
+      700,
+      58
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-light-tabs.png",
+    "render_crop": [
+      0,
+      0,
+      700,
+      58
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#F2F2F2",
+      "#FFFFFF",
+      "#4083C9"
+    ],
+    "note": "The user's 2026-10-18 direction: #FFFFFF (surface.card, surface.input, surface.field.raised, surface.control, surface.menu, surface.terminal, text.onAccent, text.onSelection, segment.selected.bg, toggle.knob, button.secondary.bg) maps to #C4C4C4, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #2675BF, which this crop does not paint under the port."
+  },
+  {
+    "name": "chrome-tabs-dark",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      650,
+      180,
+      700,
+      58
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-dark-tabs.png",
+    "render_crop": [
+      0,
+      0,
+      700,
+      58
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#1E1F22",
+      "#2B2D30"
+    ],
+    "note": "The user's 2026-10-18 direction: #3A3D42 (surface.panel.raised, surface.tabstrip) maps to #323437, which this crop does not paint under the port. The user's 2026-10-18 direction: #2E3135 (surface.card, surface.input, surface.field.raised, surface.control, surface.menu, surface.terminal, segment.selected.bg, toggle.knob) maps to #393B40, which this crop does not paint under the port. The user's 2026-10-18 direction: #2E3135 (surface.card, surface.input, surface.field.raised, surface.control, surface.menu, surface.terminal, segment.selected.bg, toggle.knob) maps to #FFFFFF, which this crop does not paint under the port. The user's 2026-10-18 direction: #3D74D6 (accent) maps to #366ACE, which this crop does not paint under the port. The user's 2026-10-18 direction: #3D74D6 (selection.bg) maps to #2E436E, which this crop does not paint under the port."
+  },
+  {
+    "name": "chrome-status-light",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      1900,
+      1756,
+      982,
+      46
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-light-status.png",
+    "render_crop": [
+      0,
+      0,
+      982,
+      46
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#F2F2F2",
+      "#DDDDDD",
+      "#FBF2E3"
+    ]
+  },
+  {
+    "name": "chrome-status-dark",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      1900,
+      1756,
+      982,
+      46
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-dark-status.png",
+    "render_crop": [
+      0,
+      0,
+      982,
+      46
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#2B2D30",
+      "#3E3F42",
+      "#3B3934"
+    ]
+  },
+  {
+    "name": "chrome-dialog-unlock-strip",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      1104,
+      782,
+      560,
+      56
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-unlock-strip.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      56
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#DFE2E9",
+      "#D1D1D1"
+    ],
+    "note": "The user's 2026-10-18 direction: #8E949C (not a theme value) maps to #8E949C, which this crop does not paint under the port."
+  },
+  {
+    "name": "chrome-dialog-unlock-footer",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      1104,
+      1064,
+      560,
+      86
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-unlock-footer.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      86
+    ],
+    "min_agreement": 0.3,
+    "colours": [
+      "#EBEBEB",
+      "#D1D1D1"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  },
+  {
+    "name": "chrome-dialog-add-login-strip",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 4 - Add Login.png",
+    "crop": [
+      380,
+      58,
+      560,
+      54
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-add-login-strip.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      54
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#DFE2E9",
+      "#D1D1D1"
+    ]
+  },
+  {
+    "name": "chrome-dialog-add-ssh-key-strip",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 5 - Add SSH Key.png",
+    "crop": [
+      380,
+      58,
+      560,
+      54
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-add-ssh-key-strip.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      54
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#DFE2E9",
+      "#D1D1D1"
+    ]
+  },
+  {
+    "name": "chrome-dialog-add-login-footer",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 4 - Add Login.png",
+    "crop": [
+      380,
+      522,
+      560,
+      86
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-add-login-footer.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      86
+    ],
+    "min_agreement": 0.3,
+    "colours": [
+      "#EBEBEB"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #C4C7CC (border.window) maps to #D1D1D1, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-splash-01",
+    "mock": "docs/design/enterprise/reference/10 Boot Splash/Boot Splash 01 - Starting Java runtime.png",
+    "crop": [
+      0,
+      0,
+      720,
+      440
+    ],
+    "render": "jasper-app/build/enterprise-splash/01.png"
+  },
+  {
+    "name": "enterprise-splash-04",
+    "mock": "docs/design/enterprise/reference/10 Boot Splash/Boot Splash 04 - Loading plugin File Server.png",
+    "crop": [
+      0,
+      0,
+      720,
+      440
+    ],
+    "render": "jasper-app/build/enterprise-splash/04.png"
+  },
+  {
+    "name": "enterprise-splash-10",
+    "mock": "docs/design/enterprise/reference/10 Boot Splash/Boot Splash 10 - Starting Workstation.png",
+    "crop": [
+      0,
+      0,
+      720,
+      440
+    ],
+    "render": "jasper-app/build/enterprise-splash/10.png"
+  },
+  {
+    "name": "enterprise-settings-01",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 01 - Appearance & Behavior - Appearance.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/01.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-02",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 02 - Appearance & Behavior - Window.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/02.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's direction of 2026-10-18: Panel rail width is hidden under the stripes look (spec 12.1), so Tabs & Panels holds only Tab height and New Windows stands a row higher than the mock. The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-03",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 03 - Appearance & Behavior - Notifications.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1654
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/03.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-04",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 04 - Appearance & Behavior - Command Palette.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/04.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-05",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 05 - Appearance & Behavior - Desk Buddy.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/05.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-06",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 06 - Appearance & Behavior - System Settings.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/06.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-07",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 07 - Keymap.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/07.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-07b",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 07b - Keymap - Recording shortcut.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1426
+    ],
+    "render": "jasper-app/build/enterprise-settings/pages/07b.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-08",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 08 - Plugins.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/08.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-09",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 09 - Terminal - Font & Colors.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/09.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#E6E7EA",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-10",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 10 - Terminal - Cursor.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/10.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-11",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 11 - Terminal - Shell.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/11.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-12",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 12 - Tools - Credential Vault.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/12.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-13",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 13 - Tools - Editor.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1462
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/13.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-14",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 14 - Tools - File Server.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/14.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-15",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 15 - Tools - Project Index.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1898
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/15.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#E6E7EA",
+      "#2675BF"
+    ],
+    "note": "Plan 9a: the crop is the whole page, and Project Index is the tallest (949 px) with the most body content, so its agreement waits on plan 9b's Project Index composition. Edge agreement 0.379 at plan 9a in the platform face, 0.428 in IBM Plex since the merge with plan 5b. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-16",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 16 - Tools - Remote.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/16.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-17",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 17 - Tools - Sample.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/17.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#EBEBEB",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "enterprise-settings-18",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 18 - Tools - Shell History.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/18.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#E6EBF0",
+      "#FFFFFF",
+      "#C4C4C4",
+      "#F2F2F2",
+      "#D1D1D1",
+      "#E6E7EA",
+      "#2675BF"
+    ],
+    "note": "The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #042C99, which this crop does not paint under the port. The user's 2026-10-18 direction: #2F65CA (accent, selection.bg, tab.indicator, hue.blue) maps to #4083C9, which this crop does not paint under the port."
+  },
+  {
+    "name": "dock-light-kit-sftp-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      48,
+      180,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-kit-sftp-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#DFE2E9",
+      "#D1D1D1",
+      "#000000"
+    ]
+  },
+  {
+    "name": "dock-light-kit-servers-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      48,
+      944,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-kit-servers-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#F2F2F2",
+      "#D1D1D1",
+      "#000000"
+    ]
+  },
+  {
+    "name": "dock-light-kit-sessions-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      180,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-kit-sessions-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#DFE2E9",
+      "#D1D1D1",
+      "#000000"
+    ]
+  },
+  {
+    "name": "dock-light-kit-tunnels-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      1014,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-kit-tunnels-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#F2F2F2",
+      "#D1D1D1",
+      "#000000"
+    ]
+  },
+  {
+    "name": "dock-light-left-stripe",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      180,
+      44,
+      332
+    ],
+    "render": "jasper-app/build/dock-renders/light-left-stripe-text-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#D1D1D1",
+      "#000000",
+      "#EAEAEA"
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-light-left-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      180,
+      44,
+      400
+    ],
+    "render": "jasper-app/build/dock-renders/light-left-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
+  },
+  {
+    "name": "dock-light-right-stripe",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2838,
+      180,
+      44,
+      276
+    ],
+    "render": "jasper-app/build/dock-renders/light-right-stripe-text-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#D1D1D1",
+      "#000000",
+      "#EAEAEA"
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-light-right-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2838,
+      180,
+      44,
+      344
+    ],
+    "render": "jasper-app/build/dock-renders/light-right-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
+  },
+  {
+    "name": "dock-light-bottom-strip",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      1706,
+      520,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-bottom-strip-text-render.png",
+    "min_agreement": 0.8,
+    "colours": [
+      "#EAEAEA",
+      "#000000",
+      "#DDDDDD"
+    ],
+    "note": "The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-light-bottom-strip-iconed",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      1706,
+      588,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-bottom-strip-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
+  },
+  {
+    "name": "dock-light-disconnected-kit-sftp-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      48,
+      180,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-disconnected-kit-sftp-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#DFE2E9",
+      "#D1D1D1",
+      "#000000"
+    ]
+  },
+  {
+    "name": "dock-light-disconnected-kit-servers-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      48,
+      944,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-disconnected-kit-servers-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#F2F2F2",
+      "#D1D1D1",
+      "#000000"
+    ]
+  },
+  {
+    "name": "dock-light-disconnected-kit-sessions-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      2136,
+      180,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-disconnected-kit-sessions-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#DFE2E9",
+      "#D1D1D1",
+      "#000000"
+    ]
+  },
+  {
+    "name": "dock-light-disconnected-kit-tunnels-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      2136,
+      1014,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-disconnected-kit-tunnels-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#F2F2F2",
+      "#D1D1D1",
+      "#000000"
+    ]
+  },
+  {
+    "name": "dock-dark-kit-sftp-header",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      48,
+      180,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-kit-sftp-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#2C3340",
+      "#DFE1E5"
+    ],
+    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port."
+  },
+  {
+    "name": "dock-dark-kit-servers-header",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      48,
+      944,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-kit-servers-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#2B2D30",
+      "#DFE1E5"
+    ],
+    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port."
+  },
+  {
+    "name": "dock-dark-kit-sessions-header",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      180,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-kit-sessions-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#2C3340",
+      "#DFE1E5"
+    ],
+    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port."
+  },
+  {
+    "name": "dock-dark-kit-tunnels-header",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      1014,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-kit-tunnels-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#2B2D30",
+      "#DFE1E5"
+    ],
+    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port."
+  },
+  {
+    "name": "dock-dark-left-stripe",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      180,
+      44,
+      332
+    ],
+    "render": "jasper-app/build/dock-renders/dark-left-stripe-text-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#4B4C4F",
+      "#DFE1E5",
+      "#313336"
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #43454A, which this crop does not paint under the port. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-dark-left-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      180,
+      44,
+      400
+    ],
+    "render": "jasper-app/build/dock-renders/dark-left-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
+  },
+  {
+    "name": "dock-dark-right-stripe",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2838,
+      180,
+      44,
+      276
+    ],
+    "render": "jasper-app/build/dock-renders/dark-right-stripe-text-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#4B4C4F",
+      "#DFE1E5",
+      "#313336"
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #43454A, which this crop does not paint under the port. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-dark-right-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2838,
+      180,
+      44,
+      344
+    ],
+    "render": "jasper-app/build/dock-renders/dark-right-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
+  },
+  {
+    "name": "dock-dark-bottom-strip",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      1706,
+      520,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-bottom-strip-text-render.png",
+    "min_agreement": 0.8,
+    "colours": [
+      "#313336",
+      "#DFE1E5",
+      "#3E3F42"
+    ],
+    "note": "The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-dark-bottom-strip-iconed",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      1706,
+      588,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-bottom-strip-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
+  },
+  {
+    "name": "dock-vault-kit-sftp-header",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      112,
+      244,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-kit-sftp-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#B0B3B8",
+      "#A5A5A5",
+      "#000000"
+    ],
+    "note": "The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim."
+  },
+  {
+    "name": "dock-vault-kit-servers-header",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      112,
+      1008,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-kit-servers-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#BFBFBF",
+      "#A5A5A5",
+      "#000000"
+    ],
+    "note": "The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim."
+  },
+  {
+    "name": "dock-vault-kit-sessions-header",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      2200,
+      244,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-kit-sessions-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#B0B3B8",
+      "#A5A5A5",
+      "#000000"
+    ],
+    "note": "The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim."
+  },
+  {
+    "name": "dock-vault-kit-tunnels-header",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      2200,
+      1078,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-kit-tunnels-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#BFBFBF",
+      "#A5A5A5",
+      "#000000"
+    ],
+    "note": "The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim."
+  },
+  {
+    "name": "dock-vault-left-stripe",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      66,
+      244,
+      44,
+      332
+    ],
+    "render": "jasper-app/build/dock-renders/vault-left-stripe-text-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#A5A5A5",
+      "#000000",
+      "#B9B9B9"
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-vault-left-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      66,
+      244,
+      44,
+      400
+    ],
+    "render": "jasper-app/build/dock-renders/vault-left-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
+  },
+  {
+    "name": "dock-vault-right-stripe",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      2902,
+      244,
+      44,
+      276
+    ],
+    "render": "jasper-app/build/dock-renders/vault-right-stripe-text-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#A5A5A5",
+      "#B9B9B9"
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-vault-right-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      2902,
+      244,
+      44,
+      344
+    ],
+    "render": "jasper-app/build/dock-renders/vault-right-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
+  },
+  {
+    "name": "dock-vault-bottom-strip",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      66,
+      1770,
+      520,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-bottom-strip-text-render.png",
+    "min_agreement": 0.8,
+    "colours": [
+      "#B9B9B9",
+      "#000000",
+      "#AFAFAF"
+    ],
+    "note": "The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-vault-bottom-strip-iconed",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      66,
+      1770,
+      588,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-bottom-strip-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
+  },
+  {
+    "name": "composition-light-sessions",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      230,
+      700,
+      782
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/sessions@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "composition-dark-sessions",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      230,
+      700,
+      782
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/sessions@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#36383B",
+      "#3D3F42"
+    ]
+  },
+  {
+    "name": "composition-light-sessions-locked",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      2136,
+      230,
+      700,
+      782
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/sessions-locked@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "composition-light-session-toolbar",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      660,
+      110,
+      720,
+      68
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/session-toolbar@2x.png",
+    "min_agreement": 0.5,
+    "colours": [
+      "#F2F2F2"
+    ],
+    "note": "The user's 2026-10-18 direction: IntelliJ's run-configuration combo and Run replace the mock's \"Session:\", combo and Connect. Edge agreement 0.962 before, 0.666 after."
+  },
+  {
+    "name": "composition-dark-session-toolbar",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      660,
+      110,
+      720,
+      68
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/session-toolbar@2x.png",
+    "min_agreement": 0.5,
+    "colours": [
+      "#2B2D30"
+    ],
+    "note": "The user's 2026-10-18 direction: IntelliJ's run-configuration combo and Run replace the mock's \"Session:\", combo and Connect. Edge agreement 0.826 before, 0.653 after."
+  },
+  {
+    "name": "composition-light-tunnels",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      1064,
+      700,
+      642
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/tunnels@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "composition-dark-tunnels",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      1064,
+      700,
+      642
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/tunnels@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#36383B",
+      "#3D3F42"
+    ]
+  },
+  {
+    "name": "composition-light-tunnels-none",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      2136,
+      1064,
+      700,
+      642
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/tunnels-none@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "composition-light-sftp",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      48,
+      230,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/sftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "composition-dark-sftp",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      48,
+      230,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/sftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#36383B",
+      "#3D3F42"
+    ]
+  },
+  {
+    "name": "composition-light-sftp-disconnected",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      48,
+      230,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/sftp-disconnected@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "composition-light-file-servers",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      48,
+      994,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/file-servers@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "composition-dark-file-servers",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      48,
+      994,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/file-servers@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#36383B",
+      "#3D3F42"
+    ]
+  },
+  {
+    "name": "composition-light-file-servers-none",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      48,
+      994,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/file-servers-none@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#DFDFDF",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "composition-light-add-host",
+    "mock": "docs/design/enterprise/reference/03 Add Host/Add Host - Default.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1042
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/add-host@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  },
+  {
+    "name": "composition-light-new-tunnel",
+    "mock": "docs/design/enterprise/reference/04 New Tunnel/New Tunnel - Local.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      898
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-tunnel@2x.png",
+    "min_agreement": 0.53,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  },
+  {
+    "name": "composition-light-new-file-server-http",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - HTTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      986
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-file-server-http@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  },
+  {
+    "name": "composition-light-new-file-server-ftp",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - FTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1210
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-file-server-ftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  },
+  {
+    "name": "composition-light-new-file-server-sftp",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - SFTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1172
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-file-server-sftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  },
+  {
+    "name": "composition-light-new-file-server-tftp",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - TFTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      862
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-file-server-tftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  },
+  {
+    "name": "composition-light-vault-manager",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 2 - New menu.png",
+    "crop": [
+      2,
+      60,
+      1640,
+      1142
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-manager@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#E6E7EA",
+      "#D1D1D1"
+    ]
+  },
+  {
+    "name": "composition-light-vault-manager-selected",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 3 - Item selected.png",
+    "crop": [
+      2,
+      60,
+      1640,
+      1142
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-manager-selected@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#E6E7EA",
+      "#D1D1D1"
+    ]
+  },
+  {
+    "name": "composition-light-vault-add-login",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 4 - Add Login.png",
+    "crop": [
+      382,
+      112,
+      880,
+      494
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-add-login@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB",
+      "#D1D1D1"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  },
+  {
+    "name": "composition-light-vault-add-ssh-key",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 5 - Add SSH Key.png",
+    "crop": [
+      382,
+      112,
+      880,
+      430
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-add-ssh-key@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB",
+      "#D1D1D1"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  },
+  {
+    "name": "composition-light-vault-unlock",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      1106,
+      838,
+      800,
+      310
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-unlock@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F2F2F2",
+      "#EBEBEB",
+      "#D1D1D1"
+    ],
+    "note": "The user's 2026-10-18 direction: #E6E7EA stood for surface.footer (within Delta E 1.5 of the old theme's) and maps to #EBEBEB."
+  }
+]

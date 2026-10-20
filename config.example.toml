@@ -9,14 +9,18 @@ tab_height = 30
 # Live across open windows. Range: 28-64 logical pixels; out-of-range values use the nearest limit.
 rail_width = 28
 # Live across open windows. Options: "icons_and_labels", "icons", or "hidden".
+# The default depends on the active look.
 toolbar = "icons_and_labels"
 # Live across open windows, including the unified macOS title bar.
 # Range: 28-64 logical pixels; out-of-range values use the nearest limit.
+# The default depends on the active look.
 toolbar_height = 30
 # Live across open windows.
 status_bar = true
 # Live across open windows. Range: 20-48 logical pixels; out-of-range values use the nearest limit.
 status_bar_height = 24
+# Live across open windows.
+memory_indicator = false
 # Initial grid for new windows only. Columns: 5-500; lines: 2-200.
 columns = 100
 lines = 35
@@ -42,6 +46,12 @@ long_command_seconds = 10
 # balloons, or notify-send on Linux.
 system = true
 
+[notifications.groups]
+# Live. How each group's notifications appear: "card" (a card that hides itself), "sticky" (a card
+# that stays until you close it), "history" (only the Notifications panel) or "off". Settings > Notifications
+# lists every group; a group not listed here keeps its default.
+# "jasper.commands" = "history"
+
 [system]
 # Keep Jasper running with no windows so a new window opens instantly, and start it in the background at login.
 # On by default on macOS and Windows and off on Linux, so it is commented out here: uncomment it to choose.
@@ -52,13 +62,14 @@ system = true
 
 [palette]
 # Live. Result rows the palette list shows before it scrolls. Range: 1-20.
+# The default depends on the active look.
 visible_rows = 5
 
 [terminal.font]
-# Live across existing and new panes. Missing fonts use JBR/system fallback.
-family = "JetBrains Mono"
+# Live across existing and new panes. Cousine Nerd Font Mono is bundled; other missing fonts use JBR/system fallback.
+family = "Cousine Nerd Font Mono"
 # Range: 6-72 points. A saved size change is live; new panes and Font reset use this value.
-size = 16.0
+size = 12.0
 # Ordered live fallbacks; names must be nonblank. An empty list is allowed.
 fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
 # Live across existing and new panes.
@@ -85,6 +96,9 @@ on_exit = "keep_open"
 # New panes only. "auto" loads Jasper's shell integration script (zsh, bash, fish) after your startup files;
 # "manual" only exports JASPER_SHELL_INTEGRATION for you to source; "off" does neither.
 shell_integration = "auto"
+# Colors for terminal panes, live: "match" uses the shown theme's own scheme; or a scheme id, <theme id>/<scheme key>,
+# such as "slate-cobalt/dark", "slate-cobalt/light" or "slate-cobalt/high-contrast".
+scheme = "match"
 
 [terminal.shell]
 # New panes only. The shell new tabs start: "powershell", "pwsh" (PowerShell 7) or "cmd" on Windows,
@@ -114,25 +128,32 @@ blink = true
 # On macOS, LANG defaults to en_US.UTF-8 only when absent or blank; LC_* values are preserved.
 # MY_VARIABLE = "a value with spaces"
 
-[ui.font]
-# Live UI font for app chrome and plugin controls, independent of [terminal.font].
-# "system" uses the platform font on macOS, Linux and Windows.
-# A missing named font falls back to that platform font.
-family = "system"
-# Optional size: 8-32 points, including fractional values. Omit to keep platform sizing.
-# size = 14.0
+[ui]
+# The UI appearance, live across windows: "system" follows the operating system's light or dark setting;
+# "dark" or "light" chooses one. [ui.theme] names the theme each shows.
+appearance = "system"
 
 [ui.theme]
-# Live across open windows: "Jasper Dark", "Jasper Light", "Nord", "Clear Dark", "Clear Light", or a theme in the themes folder.
-name = "Jasper Dark"
-# Workspace scheme, live: "match" follows the UI theme; or name a native theme.
-workspace = "match"
+# The themes the Dark and Light appearances show, live: "slate-cobalt" (Dark), "jasper-meadow" (Light), a built-in Catppuccin flavour such as
+# "catppuccin-mocha", or an imported theme's id (its file name in the themes folder without .json). A theme without that variant is reported and the corresponding appearance default is used.
+# The default depends on the active look.
+dark = "slate-cobalt"
+light = "jasper-meadow"
+
+[ui.font]
+# Live UI font for app chrome and plugin controls, independent of [terminal.font].
+# "system" uses the look's UI font: the platform font under the default look, IBM Plex Sans under Enterprise.
+# A missing named font falls back to the look's UI font.
+family = "system"
+# Optional size: 8-32 points, including fractional values. Omit to keep the look's size (the platform size, or 12
+# under Enterprise); a set size scales every role.
+# size = 14.0
 
 [ui.workspace]
-# macOS only (ignored on other platforms), live: translucent terminal and editor backgrounds. Omit opacity to use the workspace theme's value.
+# macOS only (ignored on other platforms), live: translucent terminal and editor backgrounds. Omit opacity to keep the terminal area opaque.
 # Opacity: 10-100 percent.
 # opacity = 95
-# Blur behind a translucent workspace: "theme", "on" or "off".
+# Blur behind a translucent workspace: "theme" (Slate Cobalt does not blur), "on" or "off".
 blur = "theme"
 
 [ui.animations]

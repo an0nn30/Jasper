@@ -43,4 +43,9 @@ class RestartCommandTest {
         assertThat(RestartCommand.plan(Optional.of("/bin/jasper"), Optional.empty(), RestartMode.SAME)).isEmpty();
         assertThat(RestartCommand.plan(Optional.of(" "), Optional.of(new String[0]), RestartMode.SAME)).isEmpty();
     }
+
+    @Test void aRestartComesBackWithAWindow() {
+        assertThat(RestartCommand.plan(Optional.of("/app/Jasper"), Optional.of(new String[]{"--no-window"}), RestartMode.SAME))
+            .contains(List.of("/app/Jasper"));
+    }
 }

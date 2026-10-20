@@ -6,13 +6,16 @@ import dev.jasper.editor.api.LocationResolver;
 import dev.jasper.editor.api.Revision;
 import dev.jasper.editor.open.Locations;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.files.FileChoice;
 import java.util.concurrent.CompletableFuture;
 import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.session.Question;
 import dev.jasper.editor.syntax.Languages;
+import dev.jasper.editor.testsupport.Kits;
 import dev.jasper.editor.testsupport.StubDocument;
+import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
@@ -20,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.UUID;
 import dev.jasper.sdk.files.FileLocation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -27,7 +32,6 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.swing.JMenuItem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_PYTHON;
 
+@org.junit.jupiter.api.extension.ExtendWith(dev.jasper.editor.testsupport.EdtTests.class)
 class EditorWindowTest {
     @TempDir Path home;
     private FakePluginHost host;
@@ -89,6 +94,21 @@ class EditorWindowTest {
         window.openLocal(file);
         drain();
         return window.selected().orElseThrow();
+    }
+
+    @Test void hostedDocumentUsesTheKitDocumentLayoutEvenWhileLoading() throws Exception {
+        Kits.edt(() -> {
+            window.openLocal(file("kit.txt", "text"));
+            var views = ((dev.jasper.sdk.testing.FakeKit) context.kit()).views();
+            assertThat(views).hasSize(1);
+            assertThat(views.getFirst().spec().root()).isInstanceOf(Nodes.Split.class);
+            var root = (Nodes.Split) views.getFirst().spec().root();
+            assertThat(root.kind()).isEqualTo(Nodes.SplitKind.DOCUMENT);
+            assertThat(root.children()).anySatisfy(node -> {
+                assertThat(node).isInstanceOf(Nodes.Custom.class);
+                assertThat(node.state().visible()).as("loading hides rather than removes the document").isFalse();
+            });
+        });
     }
 
     @Test void aTabsGlassSurfaceFollowsTheWorkspaceOpacity() throws Exception {
@@ -154,6 +174,22 @@ class EditorWindowTest {
         assertThat(tab.area().getText()).isEqualTo("a = 1\n");
         assertThat(window.headerTitle(0)).isEqualTo("config.toml");
         assertThat(window.showingEmpty()).isFalse();
+    }
+
+    @Test void asynchronousSaveMayFinishAfterTheHostedTabCloses() throws Exception {
+        Path file = file("late-save.txt", "before");
+        var tab = opened(file);
+        tab.area().append(" after");
+        window.save();
+        assertThat(tab.session().saving()).isTrue();
+        host.contentTabs().getFirst().close();
+        assertThat(Kits.closed(tab.view())).isTrue();
+        assertThat(window.sessions()).isEmpty();
+        drain();
+        assertThat(Files.readString(file)).isEqualTo("before after");
+        assertThat(tab.session().saving()).isFalse();
+        assertThat(window.sessions()).isEmpty();
+        assertThat(host.failures()).isEmpty();
     }
 
     @Test void editingShowsTheMarkerAndSavingWritesTheFile() throws Exception {
@@ -358,19 +394,43 @@ class EditorWindowTest {
 
     @Test void theLanguagePickerSoftWrapGoToLineAndToggleCommentActOnTheCurrentTab() throws Exception {
         EditorTab tab = opened(file("notes.txt", "one\ntwo\nthree\n"));
-        window.chooseLanguage();
-        var picker = (LanguagePicker) host.windowContent("dev.jasper.editor", "Language").orElseThrow();
-        picker.filter("tom");
-        picker.chooseSelected();
+        Kits.edt(() -> {
+            window.chooseLanguage();
+            var picker = host.windowView("dev.jasper.editor", "Language").orElseThrow();
+            Kits.type(picker, LanguagePicker.FILTER, "tom");
+            Kits.press(picker, LanguagePicker.CHOOSE);
+            assertThat(Kits.closed(picker)).as("choosing closes the dialog and disposes its view").isTrue();
+        });
         assertThat(tab.session().style()).isEqualTo(Languages.TOML);
         assertThat(host.windows()).isEmpty();
         assertThat(host.contentTabs()).hasSize(1);
+        Kits.edt(() -> {
+            window.chooseLanguage();
+            Kits.escape(host.windowView("dev.jasper.editor", "Language").orElseThrow());
+        });
+        assertThat(host.windows()).as("Escape closes the picker").isEmpty();
+        assertThat(tab.session().style()).as("without changing the language").isEqualTo(Languages.TOML);
         window.toggleWrap();
         assertThat(tab.area().getLineWrap()).isTrue();
-        window.goToLine();
-        var goTo = (GoToLinePanel) host.windowContent("dev.jasper.editor", "Go to Line").orElseThrow();
-        goTo.field().setText("3");
-        goTo.submit();
+        Kits.edt(() -> {
+            window.goToLine();
+            var goTo = host.windowView("dev.jasper.editor", "Go to Line").orElseThrow();
+            assertThat(Kits.node(goTo, GoToLinePanel.LINE, Nodes.Field.class).value()).as("the field starts at the caret's line").isEqualTo("1");
+            Kits.type(goTo, GoToLinePanel.LINE, "9");
+            Kits.press(goTo, GoToLinePanel.GO_ACTION);
+            assertThat(host.windowView("dev.jasper.editor", "Go to Line")).as("an invalid line keeps the dialog open").containsSame(goTo);
+            assertThat(Kits.node(goTo, GoToLinePanel.LINE, Nodes.Field.class).state().error()).isNotEmpty();
+            Kits.type(goTo, GoToLinePanel.LINE, "3");
+            Kits.press(goTo, GoToLinePanel.GO_ACTION);
+            assertThat(Kits.closed(goTo)).isTrue();
+        });
+        assertThat(host.windows()).isEmpty();
+        assertThat(tab.area().getCaretLineNumber()).isEqualTo(2);
+        Kits.edt(() -> {
+            window.goToLine();
+            Kits.escape(host.windowView("dev.jasper.editor", "Go to Line").orElseThrow());
+        });
+        assertThat(host.windows()).as("Escape closes Go to Line").isEmpty();
         assertThat(tab.area().getCaretLineNumber()).isEqualTo(2);
         window.toggleComment();
         assertThat(tab.area().getText()).contains("#three");
@@ -385,11 +445,8 @@ class EditorWindowTest {
         assertThat(tab.area().getText()).isEqualTo("a = 22\n");
     }
 
-    @Test void theMenuListsEveryCommandAndSettingsApplyToOpenTabs() throws Exception {
+    @Test void settingsApplyToOpenTabs() throws Exception {
         EditorTab tab = opened(file("a.json", "{}\n"));
-        assertThat(window.menu().getComponents()).extracting(item -> ((JMenuItem) item).getText())
-            .contains("Save", "Save As…", "Save All", "Open…", "New File", "Close Tab", "Find…", "Replace…", "Go to Line…",
-                "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode");
         settings.set(new EditorSettings("Monospaced", 18, 2, false, 1, false));
         window.apply();
         assertThat(tab.area().getFont().getSize()).isEqualTo(18);
@@ -462,7 +519,7 @@ class EditorWindowTest {
     /** Types Vim keys on the event thread, where the caret follows the text as in the app. */
     private static void vimKeys(EditorTab tab, String keys) throws Exception {
         var vim = tab.vimEditor().orElseThrow();
-        javax.swing.SwingUtilities.invokeAndWait(() -> { for (var key : dev.jasper.editor.vim.KeyInput.parse(keys)) vim.feed(key); });
+        Kits.edt(() -> { for (var key : dev.jasper.editor.vim.KeyInput.parse(keys)) vim.feed(key); });
     }
 
     @Test void theVimrcIsReadWhenVimFirstTurnsOnAndReloadReadsItAgain() throws Exception {
@@ -646,5 +703,75 @@ class EditorWindowTest {
         window.saveAs();
         drain();
         assertThat(Files.readString(copy)).as("back to the local disk").isEqualTo("hello\n");
+    }
+
+    @Test void openAtPutsTheCaretOnTheLineAndColumnOnceTheTextHasLoaded() throws Exception {
+        Path file = file("lines.txt", "one\ntwo\nthree\n");
+        var settled = window.openAt(file, 2, 3, null);
+        assertThat(settled).isNotDone();
+        host.runBackground();
+        assertThat(settled).isCompleted();
+        EditorTab tab = window.selected().orElseThrow();
+        assertThat(tab.area().getCaretPosition()).as("line 2, column 3").isEqualTo(6);
+        assertThat(window.openAt(file, 9, 99, null)).as("already loaded").isCompleted();
+        assertThat(tab.area().getCaretPosition()).as("past the end: the end of the last line").isEqualTo(14);
+        window.openAt(file, 1, 0, null);
+        assertThat(tab.area().getCaretPosition()).as("no column: the line's start").isZero();
+    }
+
+    @Test void openAtSettlesWhenTheTabClosesBeforeTheTextHasLoaded() throws Exception {
+        Path file = file("lines.txt", "one\ntwo\n");
+        var settled = window.openAt(file, 2, 1, null);
+        assertThat(settled).isNotDone();
+        host.contentTabs().getFirst().close();
+        assertThat(settled).as("closing cancels the read, which never reports").isCompleted();
+        assertThat(window.sessions()).isEmpty();
+    }
+
+    @Test void openNewMakesOneTabPerPathThatItsFirstSaveCreates() {
+        Path file = home.resolve("new.txt");
+        DocumentSession first = window.openNew(file, null);
+        assertThat(window.openNew(file, null)).isSameAs(first);
+        assertThat(host.contentTabs()).hasSize(1);
+        assertThat(first.untitled()).isTrue();
+        assertThat(file).doesNotExist();
+    }
+
+    @Test void closedCompletesWhenTheTabCloses() throws Exception {
+        Path file = file("a.txt", "a\n");
+        var settled = window.openAt(file, 0, 0, null);
+        host.runBackground();
+        DocumentSession session = settled.join();
+        var closed = window.closed(session);
+        assertThat(closed).isNotDone();
+        host.contentTabs().getFirst().close();
+        assertThat(closed).isCompleted();
+        assertThat(window.closed(session)).as("it has no tab any more").isCompleted();
+    }
+
+    @Test void editOpensAnExistingFileAtTheLineAndAMissingOneAsATabItsFirstSaveCreates() throws Exception {
+        Path file = file("lines.txt", "one\ntwo\nthree\n");
+        assertThat(window.edit(file, OptionalInt.of(3), Optional.empty())).isTrue();
+        drain();
+        assertThat(window.selected().orElseThrow().area().getCaretPosition()).as("the start of line 3").isEqualTo(8);
+        Path missing = home.resolve("new.txt");
+        assertThat(window.edit(missing, OptionalInt.empty(), Optional.empty())).isTrue();
+        assertThat(host.contentTabs()).hasSize(2);
+        assertThat(missing).doesNotExist();
+    }
+
+    @Test void editLeavesAFolderAndAFileInAMissingFolderToTheDesktop() {
+        assertThat(window.edit(home, OptionalInt.empty(), Optional.empty())).isFalse();
+        assertThat(window.edit(home.resolve("nowhere").resolve("x.txt"), OptionalInt.of(1), Optional.empty())).isFalse();
+        assertThat(host.contentTabs()).isEmpty();
+    }
+
+    @Test void editOpensInTheTerminalWindowItWasGivenAndOtherwiseInTheLastMainWindow() throws Exception {
+        UUID terminal = host.addTerminalWindow();
+        WindowHandle handle = context.terminals().window(terminal).orElseThrow();
+        assertThat(window.edit(file("a.txt", "a\n"), OptionalInt.empty(), Optional.of(handle))).isTrue();
+        assertThat(host.contentOwner(host.contentTabs().getFirst())).isEqualTo(handle);
+        assertThat(window.edit(file("b.txt", "b\n"), OptionalInt.empty(), Optional.of(new WindowOwner() { }))).as("not a terminal window").isTrue();
+        assertThat(host.contentTabs()).hasSize(2);
     }
 }

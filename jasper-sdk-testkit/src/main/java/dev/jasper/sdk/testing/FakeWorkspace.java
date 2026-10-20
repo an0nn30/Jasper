@@ -128,6 +128,7 @@ final class FakeWorkspace {
                 window.open = false;
                 windows.remove(window);
                 if (lastActive == window) lastActive = null;
+                host.closeToolbarViews(window.id);
                 host.publishApp(TerminalEvents.WINDOW_CLOSED, new TerminalEvents.WindowEvent(window.id));
             }
         }

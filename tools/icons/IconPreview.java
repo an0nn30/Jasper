@@ -1,6 +1,6 @@
 import com.formdev.flatlaf.extras.FlatSVGIcon;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.platform.AppIcons;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -29,27 +29,27 @@ class IconPreview {
         var oldPaths = new Properties();
         try (var in = Files.newInputStream(baseline.resolve("icons.properties"))) { oldPaths.load(in); }
         try (var loader = new URLClassLoader(new java.net.URL[]{baseline.toUri().toURL()}, null)) {
-            var controller = new ThemeController(Theme.LIGHT);
+            var controller = new ThemeController(false, TerminalSchemeChoice.MATCH);
             for (int panel = 0; panel < 2; panel++) {
-                controller.configure(panel == 0 ? Theme.DARK : Theme.LIGHT);
+                controller.configure(panel == 0, TerminalSchemeChoice.MATCH);
                 int left = panel * width / 2;
-                graphics.setColor(UIManager.getColor("Jasper.titleBackground")); graphics.fillRect(left, 0, width / 2, height);
-                graphics.setColor(UIManager.getColor("Jasper.chromeForeground"));
+                graphics.setColor(UIManager.getColor("Jasper.semantic.surface.app")); graphics.fillRect(left, 0, width / 2, height);
+                graphics.setColor(UIManager.getColor("Jasper.semantic.text.primary"));
                 graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
-                graphics.drawString(panel == 0 ? "Jasper Dark" : "IntelliJ Light", left + 28, 40);
+                graphics.drawString(panel == 0 ? "Slate Cobalt Dark" : "Slate Cobalt Light", left + 28, 40);
                 graphics.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
                 graphics.drawString("Same 16 px icons. Layout unchanged.", left + 28, 65);
                 graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
                 graphics.drawString("Classic", left + 222, 102); graphics.drawString("New UI", left + 305, 102);
                 for (int row = 0; row < names.length; row++) {
                     String name = names[row]; int y = 120 + row * 27;
-                    graphics.setColor(UIManager.getColor("Jasper.chromeForeground"));
+                    graphics.setColor(UIManager.getColor("Jasper.semantic.text.primary"));
                     graphics.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
                     graphics.drawString(name.toLowerCase().replace('_', ' '), left + 28, y + 13);
                     String path = oldPaths.getProperty(name);
                     var old = new FlatSVGIcon(path, 16, 16, loader);
                     if (path.contains("/standard/")) old.setColorFilter(new FlatSVGIcon.ColorFilter(color -> {
-                        Color target = UIManager.getColor("Jasper.chromeForeground");
+                        Color target = UIManager.getColor("Jasper.semantic.text.primary");
                         return new Color(target.getRed(), target.getGreen(), target.getBlue(), color.getAlpha());
                     }));
                     old.paintIcon(new JLabel(), graphics, left + 237, y);

@@ -13,20 +13,21 @@ import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginWindow;
+import dev.jasper.sdk.ui.Presentation;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
 import dev.jasper.sdk.ui.WindowSpec;
-import java.awt.BorderLayout;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.Dimension;
 import java.util.List;
 import java.util.Optional;
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
+import java.util.OptionalInt;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import dev.jasper.sdk.terminal.OpenRequest;
@@ -53,17 +54,20 @@ public final class SamplePlugin implements Plugin {
     private static final String ECHO = "dev.jasper.sample.echo";
     private static final String GREETINGS = "dev.jasper.sample.greetings";
     private static final String GREETINGS_OPEN = "dev.jasper.sample.greetings.open";
+    private static final String FLASK = "dev.jasper.sample:flask";
+    private static final String RUN_BUTTON = "sample.run", DETAILS_BUTTON = "sample.about.details", CLOSE_BUTTON = "sample.close";
 
     /** Created by the runtime. */
     public SamplePlugin() { }
 
     // example:plugin:start
     @Override public void start(PluginContext context) {
+        context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("dev.jasper.sample:flask", "M 6 2 H 10 M 6.67 6 H 9.33 M 6.67 2 V 6 L 4 13.33 Q 3.8 14 4.33 14 H 11.67 Q 12.2 14 12 13.33 L 9.33 6 V 2"));
         context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
         context.events().subscribe(AppEvents.THEME_CHANGED,
-            event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
+            event -> context.log().log(System.Logger.Level.INFO, "The theme is now " + event.variant()));
         var settings = new SampleSettings(context.settings());
-        context.settings().page(new SampleSettingsPanel(settings));
+        context.settings().page(new SampleSettingsPanel(context.kit(), settings));
         long stepMillis = settings.stepMillis.get();
         if (settings.ui.get()) installUi(context, stepMillis);
         if (settings.terminal.get()) installTerminalDemo(context);
@@ -77,7 +81,7 @@ public final class SamplePlugin implements Plugin {
     private static void installUi(PluginContext context, long stepMillis) {
         PluginAction[] demo = new PluginAction[1];
         demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
-                .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg"))
+                .withIcon("dev.jasper.sample:flask")
                 .withKeywords(List.of("sample", "demo", "activity"))
                 .withDefaultBinding("cmd+alt+j"),
             invoked -> {
@@ -86,7 +90,7 @@ public final class SamplePlugin implements Plugin {
             });
         context.toolbar().add(ToolbarItem.action(DEMO));
         context.menus().create("dev.jasper.sample.menu", "Sample").add(DEMO);
-        context.menus().standard(StandardMenu.VIEW).add(DEMO);
+        context.menus().standard(StandardMenu.TOOLS).add(DEMO);
         context.menus().terminalContext().add(DEMO);
 
         StatusItem status = context.statusBar().add(new StatusItemSpec("dev.jasper.sample.status", Side.RIGHT, 100));
@@ -105,38 +109,42 @@ public final class SamplePlugin implements Plugin {
 
     // example:pluginpanels:start
     private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-        var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
-        // One instance per window, built the first time the panel is shown there.
-        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", icon, Anchor.LEFT), host -> {
-            var run = new JButton("Run sample activity");
-            run.addActionListener(event -> context.background().execute(() -> demo(context, stepMillis)));
-            var panel = new JPanel(new BorderLayout(0, 8));
-            panel.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-            panel.add(new JLabel("Runs a short demo activity in the background."), BorderLayout.NORTH);
-            panel.add(run, BorderLayout.SOUTH);
-            return panel;
-        });
+        // One instance per window, built the first time the panel is shown there. Its body is the kit's empty state:
+        // a tile, a title, one sentence and one secondary action, centered in the panel.
+        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host ->
+            context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
+                new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+                Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
+                    new Nodes.Icon("sample.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"),
+                    "Sample Activity", "Runs a short demo activity in the background.",
+                    List.of(new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run Sample Activity", "", Nodes.ButtonKind.SECONDARY, RUN_BUTTON, ""))),
+                Optional.empty())), event -> {
+                    if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
+                        context.background().execute(() -> demo(context, stepMillis));
+                }));
 
-        context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(icon), invoked -> {
+        context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(FLASK), invoked -> {
             // The application builds the frame, title bar and menu bar; a singleton comes back while it is open.
             PluginWindow window = context.windows().create(
                 new WindowSpec("dev.jasper.sample.about-window", "About Sample", new Dimension(360, 200), true));
-            var details = new JButton("Details…");
-            details.addActionListener(event -> {
-                PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample details", window, true));
-                var close = new JButton("Close");
-                close.addActionListener(closing -> dialog.close());
-                var body = new JPanel(new BorderLayout(0, 8));
-                body.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-                body.add(new JLabel("Sample plugin " + context.plugin().version()), BorderLayout.CENTER);
-                body.add(close, BorderLayout.SOUTH);
+            var content = context.kit().create(new ViewSpec(new Nodes.Empty("sample.about", ControlState.READY,
+                new Nodes.Icon("sample.about.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"), "Sample Plugin",
+                "This window's chrome belongs to Jasper; its content to the plugin.",
+                List.of(new Nodes.Button(DETAILS_BUTTON, ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, DETAILS_BUTTON, "")))), event -> {
+                if (!(event instanceof UiEvent.Action action) || !action.id().equals(DETAILS_BUTTON)) return;
+                PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample Details", window, true));
+                // A sheet's canonical body: a form card of label/value rows, then the one primary action.
+                var body = context.kit().create(new ViewSpec(new Nodes.Form("sample.details", ControlState.READY,
+                    Nodes.FormKind.SHEET, "Sample Details", Optional.empty(), List.of(new Nodes.Card("sample.details.card", ControlState.READY,
+                        Nodes.CardKind.FORM, List.of(new Nodes.FormRow("sample.version.row", ControlState.READY, "Version", "",
+                            new Nodes.Text("sample.version", ControlState.READY, context.plugin().version(), Nodes.TextRole.BODY), Optional.empty())))),
+                    Optional.empty(), List.of(new Nodes.Button(CLOSE_BUTTON, ControlState.READY, "Close", "", Nodes.ButtonKind.PRIMARY, CLOSE_BUTTON, "")),
+                    CLOSE_BUTTON)), answer -> {
+                    if (answer instanceof UiEvent.Action chosen && chosen.id().equals(CLOSE_BUTTON)) dialog.close();
+                });
                 dialog.setContent(body);
                 dialog.show();
             });
-            var content = new JPanel(new BorderLayout(0, 8));
-            content.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-            content.add(new JLabel("This window's chrome belongs to Jasper; its content to the plugin."), BorderLayout.CENTER);
-            content.add(details, BorderLayout.SOUTH);
             window.setContent(content);
             window.show();
             window.toFront();
@@ -144,6 +152,14 @@ public final class SamplePlugin implements Plugin {
         context.rail().add("dev.jasper.sample.about");
     }
     // example:pluginpanels:end
+
+    // example:pluginlook:start
+    /** IntelliJ's classic layout keeps a tool window like this one in the bottom strip: under labelled stripes it starts there. */
+    private static Anchor panelAnchor(PluginContext context) {
+        var look = context.appearance().presentation();
+        return look.toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;
+    }
+    // example:pluginlook:end
 
     // example:pluginterminal:start
     private static void installTerminalDemo(PluginContext context) {
@@ -211,7 +227,7 @@ public final class SamplePlugin implements Plugin {
             @Override public ScopeSpec spec() {
                 return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings",
                         List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run")))
-                    .withShortcutActionId(GREETINGS_OPEN);
+                    .withShortcutActionId(GREETINGS_OPEN).withItemNoun("greeting");
             }
             // Search runs on the UI thread for every keystroke: rank what is already in memory, never read files here.
             @Override public PaletteResults search(String query, PaletteQuery palette) {

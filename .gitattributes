@@ -1,5 +1,5 @@
-# Check text out with LF on every platform. Bundled SVGs and IntelliJ themes are pinned by
-# SHA-256, and the shell integration scripts must run under bash, zsh and fish, so a CRLF
-# checkout (Git for Windows' default) breaks both the tests and a jar built on Windows.
+# Check text out with LF on every platform. Bundled SVGs are pinned by SHA-256, and the shell
+# integration scripts must run under bash, zsh and fish, so a CRLF checkout (Git for Windows'
+# default) breaks both the tests and a jar built on Windows.
 * text=auto eol=lf
 *.bat -text

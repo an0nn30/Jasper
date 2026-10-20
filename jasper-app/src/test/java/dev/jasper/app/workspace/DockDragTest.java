@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockGeometry;
@@ -47,6 +48,7 @@ class DockDragTest {
 
     @BeforeEach void recordKeyDispatchers() throws Exception {
         edt(() -> {
+            dev.jasper.app.appearance.ThemeTestSupport.install(true);
             previousKeys = KeyboardFocusManager.getCurrentKeyboardFocusManager();
             keys = new CommandPaletteShortcutsTest.RecordingFocusManager();
             KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);
@@ -176,7 +178,7 @@ class DockDragTest {
     }
 
     /** The first drag event is at least the threshold and one more pixel from the press. */
-    private static int firstDragEvent() { return UIScale.scale(DockDrag.THRESHOLD) + 1; }
+    private static int firstDragEvent() { return UIScale.scale(dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.DOCK_DRAG_THRESHOLD)) + 1; }
 
     @Test void aWobbleOutOfTheLastRowAndBackStaysHome() {
         var w = window();
@@ -279,6 +281,30 @@ class DockDragTest {
         assertThat(w.state.ids(Slot.LEFT_TOP)).containsExactly("a", "b");
     }
 
+    @Test void theFirstIconUnderAnEmptyTopGroupDragsStraightUpIntoIt() {
+        var w = window();
+        w.state.move("d", Slot.RIGHT_BOTTOM, 0);
+        w.state.add("e", Slot.RIGHT_BOTTOM);
+        var source = w.button(w.right, "d");
+        Rectangle home = SwingUtilities.convertRectangle(w.right, source.getBounds(), w.content);
+        Point start = w.center(source);
+        w.mouse(source, MouseEvent.MOUSE_PRESSED, start);
+        Point at = new Point(start);
+        while (!w.drag.active()) { at.translate(0, -1); w.mouse(source, MouseEvent.MOUSE_DRAGGED, at); }
+        Rectangle top = SwingUtilities.convertRectangle(w.right, w.right.dropGroups().get(0).bounds(), w.content);
+        int middle = (int) top.getCenterY();
+        assertThat(home.contains(at.x, middle)).as("the drag layout puts the empty top group's drop space over d's old place").isTrue();
+        // Straight up a pixel at a time, as a hand moves, to the middle of that drop space.
+        while (at.y > middle) { at.translate(0, -1); w.mouse(source, MouseEvent.MOUSE_DRAGGED, at); }
+        assertThat(w.drag.target()).as("the drop space the stripe shows wins over d's old place")
+            .hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
+        assertThat(w.right.gapBounds()).as("the gap opens in the top group, under the cursor")
+            .hasValueSatisfying(gap -> assertThat(gap.intersects(w.right.dropGroups().get(0).bounds())).isTrue());
+        w.mouse(source, MouseEvent.MOUSE_RELEASED, at);
+        assertThat(w.state.ids(Slot.RIGHT_TOP)).containsExactly("d");
+        assertThat(w.state.ids(Slot.RIGHT_BOTTOM)).containsExactly("e");
+    }
+
     @Test void theHomeOnlyAppliesUntilTheCursorLeavesIt() {
         var w = window();
         var source = w.button(w.left, "b");
@@ -362,7 +388,7 @@ class DockDragTest {
         w.dragTo(w.button(w.left, "b"), w.zone(Slot.BOTTOM_LEFT));
         Rectangle area = new Rectangle(0, 0, w.area.getWidth(), w.area.getHeight());
         Rectangle expected = SwingUtilities.convertRectangle(w.area,
-            DockGeometry.landing(area, w.state, "b", Slot.BOTTOM_LEFT, ToolWindowArea.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
+            DockGeometry.landing(area, w.state, "b", Slot.BOTTOM_LEFT, w.area.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
         assertThat(w.drag.overlay().highlight()).isEqualTo(expected);
         assertThat(expected.width).as("the bottom area spans stripe to stripe").isEqualTo(w.area.getWidth());
         assertThat(w.area.content(Slot.BOTTOM_LEFT)).as("the real layout does not reflow").isNull();
@@ -437,7 +463,7 @@ class DockDragTest {
         assertThat(w.drag.target()).hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
         Rectangle area = new Rectangle(0, 0, w.area.getWidth(), w.area.getHeight());
         Rectangle expected = SwingUtilities.convertRectangle(w.area,
-            DockGeometry.landing(area, w.state, "a", Slot.RIGHT_TOP, ToolWindowArea.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
+            DockGeometry.landing(area, w.state, "a", Slot.RIGHT_TOP, w.area.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
         assertThat(w.drag.overlay().highlight()).as("a visible window keeps its visibility, so its frame moves with it").isEqualTo(expected);
         assertThat(w.drag.overlay().placeholder()).isNotNull();
     }

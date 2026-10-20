@@ -12,16 +12,12 @@ import java.util.function.Supplier;
 
 /** Application-built windows and dialogs with consistent chrome. */
 public interface Windows {
-    /** Opens or selects plugin-scoped content in the main workspace.
-     * @param spec stable identity and title
-     * @param owner originating window, or null for the last main window; a closed origin uses fallback
-     * @param content plugin-owned specialized content; outer chrome is host-owned
-     * @return the live content handle
-     * @since 0.8.5
-     */
-    default ContentTab openTab(ContentSpec spec, WindowOwner owner, javax.swing.JComponent content) {
-        throw new UnsupportedOperationException("Workspace content is unavailable");
-    }
+    /** Create a nonblocking popup attached to a host-issued live capability.
+     * @param anchor attachment authority from this host @return initially hidden popup */
+    PluginPopover popover(UiAnchor anchor);
+    /** Opens an owned view as content; moving retains it, final closure disposes it. */
+    ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content);
+
     /** Registers this plugin's batch closing guard. No requested content closes unless every guard accepts.
      * A pending decision blocks moves; failures refuse close. Runs for tab, window, quit and restart closes.
      * @param guard requested subset and true for window/quit batch closing, returning its asynchronous decision

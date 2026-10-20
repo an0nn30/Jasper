@@ -17,7 +17,7 @@ class MacGlassTest {
 
     @Test void aPackagedAppLoadsItFromContentsApp() {
         assertThat(MacGlass.library(null, "/Applications/Jasper.app/Contents/MacOS/Jasper"))
-            .isEqualTo(Path.of("/Applications/Jasper.app/Contents/app/libjasper-glass.dylib"));
+            .isEqualTo(Path.of("/Applications/Jasper.app/Contents/app/libjasper-glass.dylib").toAbsolutePath());
     }
 
     @Test void anUnpackagedJvmHasNoLibrary() {

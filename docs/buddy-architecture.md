@@ -98,8 +98,8 @@ directly while relative offsets spring through flips.
 [BuddyCard](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/presentation/BuddyCard.java)
 is the shared capsule painter. Options supply the font family/attributes and explicit
 dark mode; the painter derives fixed styles/sizes. Live detail is read at paint time;
-null detail results or suppliers throwing a runtime exception display empty text. The sprite uses nearest-neighbor
-integer scaling. Its 20-frame, 840 × 48 PNG lives beside `BuddySprite` in the produced jar.
+null detail results or suppliers throwing a runtime exception display empty text. The sprite uses nearest-neighbor sampling of shaded pixel artwork from an 84 × 96 source cell into a 105 × 120 logical-pixel window (base frame 42 × 48, default scale 2.5).
+Its 20-frame, 1680 × 96 PNG lives beside `BuddySprite` in the produced jar.
 See [sprite maintenance](../packaging/buddy/README.md) for the generated master and order.
 
 ## Application boundary and verification

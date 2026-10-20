@@ -3,15 +3,19 @@ import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JvmVendorSpec
 
+@Suppress("UNCHECKED_CAST")
+val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.gradle.api.artifacts.Configuration>
+
 // The build-time twin of PluginClassLoader: an in-repo plugin may reference only the JDK, the SDK,
 // its own packages, libraries it bundles, and the exported packages of plugins it requires.
 // Every plugins/<name>/ module (settings.gradle.kts discovers them) is checked; a plugin that requires
 // another plugin lists that plugin's exported packages here, and nothing else may be imported.
-val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api", "dev.jasper.editor.api"), ":jasper-plugin-fileserver" to listOf("dev.jasper.vault.api"))
+val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api", "dev.jasper.editor.api"), ":jasper-plugin-fileserver" to listOf("dev.jasper.vault.api"), ":jasper-plugin-indexer" to listOf("dev.jasper.editor.api", "dev.jasper.remote.api"))
 val pluginProjects = subprojects.filter { it.projectDir.parentFile == file("plugins") }.associateBy { it.path }
 val pluginImports = pluginProjects.keys.associateWith { declaredImports[it] ?: listOf<String>() }
 val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
     pluginImports.keys.forEach { dependsOn("$it:classes") }
+    inputs.files(pluginProjects.keys.map { verificationClasspaths.getValue(it) })
     doLast {
         val launcher = pluginProjects.values.first().extensions.getByType<JavaToolchainService>().launcherFor {
             languageVersion = JavaLanguageVersion.of(25)
@@ -25,6 +29,8 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
             val output = process.inputStream.bufferedReader().readText()
             check(process.waitFor() == 0) { output }; return output
         }
+        val checker = file("gradle/architecture/PluginPresentationCheck.java").absolutePath
+        tool("java", listOf(checker, "--self-test", layout.buildDirectory.dir("presentation-check-fixtures").get().asFile.absolutePath))
         fun jdk(name: String) = name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.") || name.startsWith("com.sun.net.httpserver.")
         val edge = Regex("^\\s*(\\S+)\\s+->\\s+(\\S+)\\s*(.*)$")
         for ((path, imports) in pluginImports) {
@@ -34,7 +40,9 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
                 it.relativeTo(classes).invariantSeparatorsPath.removeSuffix(".class").replace('/', '.').substringBeforeLast('.')
             }.toSet()
             // Bundled libraries are whatever the plugin ships beside its jar: its runtime classpath.
-            val bundled = module.configurations.getByName("runtimeClasspath").asPath
+            val bundled = verificationClasspaths.getValue(module.path).asPath
+            // Source launch is explicitly the JetBrains25 toolchain, never the Gradle daemon JVM.
+            tool("java", listOf("--class-path", bundled, checker, classes.absolutePath))
             val args = mutableListOf("--multi-release", "25", "--ignore-missing-deps", "-verbose:class", "-filter:none")
             if (bundled.isNotEmpty()) args += listOf("--class-path", bundled)
             tool("jdeps", args + classes.absolutePath).lineSequence().forEach { line ->

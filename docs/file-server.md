@@ -1,7 +1,7 @@
 # File Server: share a folder with other computers
 
 File Server is bundled with Jasper. It shares a folder on this computer with other programs and computers, the way
-MobaXterm's Servers window does. This version serves **HTTP, HTTPS, FTP and FTPS**; SFTP and TFTP follow.
+MobaXterm's Servers window does. This version serves **HTTP, HTTPS, FTP, FTPS, SFTP and TFTP**.
 
 ## The File Servers panel
 
@@ -11,9 +11,13 @@ row is one server: a dot for its state, its name, protocol and port, and ▶ or 
 address the server answers on (each with **Copy**), warnings, and its activity: logins, failed logins, downloads
 and uploads with their sizes, and errors. The activity stays in memory; **Clear** empties it.
 
-Press **+** (or **New File Server…**) to add a server. Right-click a row for Start/Stop, Edit…, Duplicate, Delete…,
+Press **+** (or **Transfer › Share Folder…** or **Transfer › New File Server…**) to add a server; **Choose…** picks its folder. Right-click a row for Start/Stop, Edit…, Duplicate, Delete…,
 Reveal Folder, Copy Address and Copy Password. The status bar shows "⇅ 2 servers" while servers run; click it to toggle
 the panel.
+
+Under the Enterprise look the File Servers panel is a Folder/Address/Status table beneath SFTP whose rows start or stop
+on Enter or a double click; the chosen server's details are Properties (**Show Activity** in its context menu shows its
+log), and New File Server lists the authorized keys as a Type/Fingerprint/Comment table.
 
 ## Safe by default
 
@@ -21,7 +25,7 @@ the panel.
 - **This computer only.** *Reachable from* chooses *All networks* or one network interface; the panel then lists
   the addresses others can use. macOS and Windows ask once whether Jasper may accept connections; on macOS, Jasper
   also needs Privacy & Security › Local Network.
-- **Unprivileged ports.** HTTP starts at 8080 and FTP at 2121. On Linux, ports below 1024 need root or `CAP_NET_BIND_SERVICE`; the
+- **Unprivileged ports.** HTTP starts at 8080, FTP at 2121, SFTP at 2222 and TFTP at 6969 (UDP). On Linux, ports below 1024 need root or `CAP_NET_BIND_SERVICE`; the
   editor suggests one 8000 higher.
 - **Jailed.** Clients cannot leave the folder, through `..` or through a link that points outside it.
 - **Warnings.** The panel and the editor warn about plain HTTP or plain FTP with a password ("Plain FTP sends the
@@ -38,6 +42,20 @@ growing to half a minute; after ten wrong passwords the address is refused for f
 
 HTTP logins use Basic auth, which sends the password unencrypted; turn on **Use TLS** to serve HTTPS instead.
 
+## Share Path from the terminal
+
+Right-click a terminal and choose **Share Path → HTTP, HTTPS, FTP, FTPS, SFTP or TFTP**. The selected type starts immediately
+with that pane's current local folder, without a setup dialog. Jasper chooses a name and an available port starting
+at 8080 for HTTP/HTTPS, 2121 for FTP/FTPS, 2222 for SFTP or 6969 for TFTP, then opens File Servers with the new server selected.
+
+Quick shares are temporary, read-only and reachable on **this computer only**. HTTP/HTTPS and TFTP need no login;
+FTP/FTPS and SFTP generate a session password, available through **Copy Password**. FTPS requires TLS, and HTTPS/FTPS use
+Jasper's existing certificate. Stop the share to remove it, or use **Save as a Server…** to keep it and change settings
+such as network access.
+
+If the pane has no known local folder, reports a remote folder, or its folder no longer exists, Jasper reports that
+it cannot share the path. This menu never substitutes your home folder or another terminal's folder.
+
 ## Serve Current Folder
 
 **Serve Current Folder over HTTP** shares the folder your shell is in (or your home folder), read-only and on this
@@ -46,6 +64,12 @@ keeps it.
 
 **Serve Current Folder over FTP** does the same with a temporary read-only FTP server on this computer only. It uses a
 session password; copy it with **Copy Password** in the server's menu.
+
+**Serve Current Folder over SFTP** does the same with a temporary read-only SFTP server on this computer only. It
+uses a session password; copy it with **Copy Password** in the server's menu.
+
+**Serve Current Folder over TFTP** does the same with a temporary read-only TFTP server on this computer only. TFTP
+has no login, so there is no password. It uses UDP port 6969, or the next free port above it.
 
 ## FTP and FTPS
 
@@ -72,8 +96,58 @@ account when the Credential Vault is installed and a session password otherwise;
 **Use TLS** on an HTTP server serves HTTPS. HTTPS and FTPS share one self-signed certificate, which File Server
 creates the first time a TLS server starts and keeps in `data/tls/` (owner-only). Browsers warn about a self-signed
 certificate; compare the fingerprint before you accept it. The server card shows the certificate's SHA-256
-fingerprint. **Show Fingerprints…** in a server's menu shows it too, and offers **Regenerate Certificate…**. A new
+fingerprint. **Show Fingerprints…** in a server's menu shows it too, and offers **Regenerate Certificate…**; so does
+the palette's **Show TLS Certificate Fingerprint…** (`dev.jasper.fileserver.tls-fingerprint`, unbound by default). A new
 certificate makes clients that trusted the old one warn again; running servers keep the old one until they restart.
+
+## SFTP
+
+An SFTP server shares the folder with any SFTP client (`sftp`, `scp` from OpenSSH 9 on, FileZilla, Cyberduck,
+WinSCP). It serves file transfer only: no shell, no commands and no port forwarding.
+
+- **Logins.** A Vault account or a session password, and/or **authorized keys**: OpenSSH public key lines added in
+  the editor with Add from File… (for example `~/.ssh/id_ed25519.pub`) or Paste. A server with a password login
+  accepts keys only for that user name. **Keys Only** accepts any user name with an authorized key, and no password.
+  Key lines with options (`command=`, `from=`, `restrict`) are refused. Wrong passwords are throttled as for FTP; an
+  offered key that isn't authorized doesn't count.
+- **Host key.** File Server creates an Ed25519 host key the first time an SFTP server starts and keeps it in
+  `data/hostkey` (owner-only). Clients ask you to trust it on first connection; compare the fingerprint with the
+  server card's "SSH host key SHA256:…", Show Fingerprints… or the palette's **Show SFTP Host Key Fingerprint…**
+  (`dev.jasper.fileserver.host-key-fingerprint`). If the key file becomes unreadable, a new key replaces
+  it and clients warn about the change.
+- **The shared folder is a jail.** `..` stops at the top; links that lead outside are invisible, and links can't be
+  created or read. A path whose real location is outside the shared folder is refused ("permission denied"), however
+  deep it goes behind an outward link. Only the real location counts: a path that leaves through one link and comes
+  back through another is allowed. Server-side copy, checksum and disk-space requests are not supported.
+- **Uploads** replace a file only when the client closes it normally and every write succeeded; a dropped connection
+  or a failed write (a full disk, say) leaves the old file. An exclusive create fails if the file appeared during the
+  upload. Resuming, appending and writing part of a file happen in place.
+- On a writable server, a client may change a file's times and permissions. SFTP clients can't set owners or groups.
+
+## TFTP
+
+TFTP serves network boot files and firmware to devices that speak nothing else (PXE clients, switches, phones,
+embedded boards). It has **no login and no encryption**: anyone who can reach the port can read the folder, and on a
+writable server can replace its files. Keep it on This computer only or on a private network, and read-only unless a
+device must upload.
+
+- Reads work on any server; writes (WRQ) only on a writable one, where they replace a file only once it has arrived
+  completely.
+- In octet mode, a write that announced its size (`tsize`) and delivers a different amount is refused and the old
+  file kept. Netascii writes skip this check, because line ends change the size on the wire. A block larger than the
+  agreed size is refused in either mode.
+- Modes `octet` and `netascii`; options `blksize` (8–65464) and `tsize`. Other options are ignored.
+- Each transfer gets its own UDP port; at most 16 run at once, and a further request is told "Server busy". A lost
+  packet is resent after a second, up to five times.
+- `..` stops at the shared folder, links that lead outside are refused, and errors never name paths on this
+  computer.
+- TFTP runs over UDP: open the port for UDP in your firewall. Each transfer also uses a random UDP port, so a strict
+  firewall must allow the replies too.
+- UDP senders can be forged. A forged read request makes the server send up to about 3 KB (the first block and its
+  resends) to the forged address, and a few forged requests a second can keep all 16 transfers busy for about 6 s
+  each. Keep TFTP on This computer only or on a trusted network.
+- The server never answers an error packet, or a datagram that isn't well-formed TFTP, so a forged packet can't start
+  an endless exchange with another TFTP server or with a service such as chargen or echo.
 
 ## Quitting
 
@@ -87,7 +161,8 @@ only closes the windows and keeps Jasper in the background: servers keep running
 Saved servers live in `plugins/dev.jasper.fileserver/data/servers.toml` under Jasper's home; the file never holds a
 password. Settings (`confirm_quit`, `activity_entries`, `passive_ports`) live in
 `plugins/dev.jasper.fileserver/dev.jasper.fileserver.toml`. The certificate lives in
-`plugins/dev.jasper.fileserver/data/tls/server.p12`, with its generated password in `data/tls/password`.
+`plugins/dev.jasper.fileserver/data/tls/server.p12`, with its generated password in `data/tls/password`. The SFTP host key lives in
+`plugins/dev.jasper.fileserver/data/hostkey`.
 
 ## For other programs
 

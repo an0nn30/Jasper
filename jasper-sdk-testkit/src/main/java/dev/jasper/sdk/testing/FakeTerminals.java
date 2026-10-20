@@ -14,9 +14,11 @@ import dev.jasper.sdk.terminal.WindowHandle;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.concurrent.CompletableFuture;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
@@ -159,7 +161,7 @@ final class FakeTerminals implements Terminals {
         if (!knownProfile(request)) return Optional.empty();
         return workspace.window(window.id()).map(target -> switch (request) {
             case OpenRequest.Local local -> {
-                workspace.openRequests.add("tab|" + target.id + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-") + profile(local));
+                workspace.openRequests.add("tab|" + target.id + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-") + profile(local) + program(local));
                 FakeWorkspace.Tab tab = workspace.addTab(target, "opened");
                 FakeWorkspace.Pane pane = workspace.addPane(tab, openedInfo(local));
                 yield new Pane(pane.id, tab.id);
@@ -184,7 +186,7 @@ final class FakeTerminals implements Terminals {
             FakeWorkspace.Pane pane = switch (request) {
                 case OpenRequest.Local local -> {
                     workspace.openRequests.add("split|" + model.id + "|" + direction + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-")
-                        + profile(local));
+                        + profile(local) + program(local));
                     yield workspace.addPane(model.tab, openedInfo(local));
                 }
                 case OpenRequest.Session session -> {
@@ -216,6 +218,13 @@ final class FakeTerminals implements Terminals {
         return subscription;
     }
 
+    @Override public Subscription environment(Function<Map<String, String>, Map<String, String>> contributor) {
+        Objects.requireNonNull(contributor, "contributor");
+        require(Capabilities.TERMINAL_ENVIRONMENT);
+        context.requireOpen();
+        return context.host().contributeShell(context, contributor);
+    }
+
     /** The default shell, or a profile the test listed; anything else opens nothing, as in the application. */
     private boolean knownProfile(OpenRequest request) {
         if (!(request instanceof OpenRequest.Local local) || local.spec().profile().isEmpty()) return true;
@@ -226,6 +235,10 @@ final class FakeTerminals implements Terminals {
     }
 
     private static String profile(OpenRequest.Local local) { return local.spec().profile().map(id -> "|" + id).orElse(""); }
+
+    private static String program(OpenRequest.Local local) {
+        return local.spec().command().map(command -> "|run:" + String.join(" ", command)).orElse("");
+    }
 
     private static PaneInfo openedInfo(OpenRequest.Local local) {
         PaneInfo blank = PaneInfo.unknown();
@@ -248,7 +261,10 @@ final class FakeTerminals implements Terminals {
     private void requireFor(OpenRequest request) {
         switch (Objects.requireNonNull(request, "request")) {
             case OpenRequest.Local local -> require(Capabilities.TERMINAL_OPEN);
-            case OpenRequest.Session session -> require(Capabilities.SESSION_PROVIDE);
+            case OpenRequest.Session session -> {
+                require(Capabilities.SESSION_PROVIDE);
+                session.spec().icon().ifPresent(context.kit()::validateIcon);
+            }
         }
     }
 }

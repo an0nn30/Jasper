@@ -42,7 +42,7 @@ class PluginSettingsPageTest {
     private final int[] changes = {0};
     private PluginHost host;
     private final PageContext context = new PageContext(null, navigated::add, Runnable::run, (title, initial) -> Optional.empty(),
-        () -> changes[0]++);
+        () -> changes[0]++, () -> null, dev.jasper.app.testsupport.KitTestSupport::context);
 
     @BeforeEach void open() {
         host = AppContractTest.host(data, Duration.ofMillis(200), onEdtValue(Contributions::new), new AtomicBoolean(true),
@@ -85,7 +85,7 @@ class PluginSettingsPageTest {
 
     private static void declareEditor(PluginSettings settings) {
         settings.declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size")
-            .description("Font size in points.").section("Editor"));
+            .description("Font size in points.").section("Editor").unit("pt"));
         settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode").section("Editor"));
         settings.declare(SettingSpec.of("sftp.parallel", SettingKind.integer(1, 8), 2).label("Parallel files").section("SFTP"));
         settings.declare(SettingSpec.of("mode", SettingKind.choice(List.of(Choice.of("fast", "Fast", 1), Choice.of("safe", "Safe", 2))), 1)
@@ -105,7 +105,44 @@ class PluginSettingsPageTest {
             assertThat(page.component()).isNotNull();
             assertThat(page.modified()).isFalse();
             assertThat(page.valid()).isTrue();
+            // A bounded integer is the Settings stepper, as on the core pages, with its declared unit after the value.
+            var steppers = new ArrayList<javax.swing.JButton>();
+            collect(page.component(), name -> name.endsWith(".plus"), steppers);
+            assertThat(steppers).as("both integer settings step").hasSize(2);
+            assertThat(texts(page.component())).contains("13", " pt");
         });
+    }
+
+    /** Spec 12.2 and 13: a generated page's rows before its first section are titled with the page's name. */
+    @Test void aGeneratedPagesLeadingRowsAreTitledWithThePagesName() {
+        start(ID, "Pages", settings -> {
+            settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode"));
+            settings.declare(SettingSpec.of("sftp.parallel", SettingKind.integer(1, 8), 2).label("Parallel files").section("SFTP"));
+        });
+        var page = page();
+        onEdt(() -> assertThat(sectionTitles(page.component())).containsExactly("Pages", "SFTP"));
+    }
+
+    /** The mounted section headings below {@code root}, in order. */
+    private static List<String> sectionTitles(java.awt.Component root) {
+        var titles = new ArrayList<String>();
+        if (root instanceof javax.swing.JLabel label && label.getName() != null && label.getName().matches("section-\\d+\\.title"))
+            titles.add(label.getText());
+        if (root instanceof java.awt.Container container) for (var child : container.getComponents()) titles.addAll(sectionTitles(child));
+        return titles;
+    }
+
+    private static void collect(java.awt.Component root, java.util.function.Predicate<String> name, List<javax.swing.JButton> found) {
+        if (root instanceof javax.swing.JButton button && button.getName() != null && name.test(button.getName())) found.add(button);
+        if (root instanceof java.awt.Container container) for (var child : container.getComponents()) collect(child, name, found);
+    }
+
+    private static List<String> texts(java.awt.Component root) {
+        var texts = new ArrayList<String>();
+        if (root instanceof javax.swing.text.JTextComponent text) texts.add(text.getText());
+        if (root instanceof javax.swing.JLabel label && label.getText() != null) texts.add(label.getText());
+        if (root instanceof java.awt.Container container) for (var child : container.getComponents()) texts.addAll(texts(child));
+        return texts;
     }
 
     @Test @SuppressWarnings("unchecked") void applyWritesThePluginsFileAndTheDraftFollows() throws Exception {
@@ -131,6 +168,50 @@ class PluginSettingsPageTest {
         onEdt(() -> assertThat(page.modified()).as("the draft follows the saved file").isFalse());
     }
 
+    /**
+     * Plan 15a: on the generated page the look's default is the row's default. Reset is hidden at it, the plugin's own
+     * default saves as an explicit value, and Reset then removes the key.
+     */
+    @Test @SuppressWarnings("unchecked") void stagingThePluginsOwnDefaultUnderAKitDefaultSavesItAndResetReturnsToTheKits() throws Exception {
+        host.defaults = new dev.jasper.app.config.DefaultSource(Map.of(), Map.of(ID, Map.of("size", 15L)));
+        start(ID, "Pages", settings -> settings.declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+        var page = page();
+        var size = (Setting<Integer>) page.declared().handles().get(0).appSetting();
+        String reset = size.name() + ":reset";
+        onEdt(() -> {
+            page.component();
+            assertThat(page.draft().value(size)).isEqualTo(15);
+            assertThat(resetShown(page, reset)).as("at the look's default").isFalse();
+            page.draft().stage(size, Optional.of(13));
+            assertThat(page.modified()).as("the plugin's own default differs from the look's").isTrue();
+            assertThat(resetShown(page, reset)).isTrue();
+        });
+        applyNow(page);
+        assertThat(TomlDocument.leaves(Files.readString(file(ID)))).as("an explicit value").containsEntry(List.of("size"), 13L);
+        onEdt(() -> {
+            assertThat(resetShown(page, reset)).isTrue();
+            dev.jasper.app.testsupport.KitTestSupport.require(page.component(), reset, javax.swing.JButton.class).doClick(0);
+            assertThat(page.draft().value(size)).as("Reset returns to the look's default").isEqualTo(15);
+        });
+        applyNow(page);
+        assertThat(TomlDocument.leaves(Files.readString(file(ID)))).as("Reset removes the saved value").doesNotContainKey(List.of("size"));
+        onEdt(() -> assertThat(resetShown(page, reset)).as("no longer resettable").isFalse());
+    }
+
+    /** Whether the row's Reset button is mounted and visible. */
+    private static boolean resetShown(PluginSettingsPage page, String reset) {
+        var button = dev.jasper.app.testsupport.KitTestSupport.find(page.component(), reset, javax.swing.JButton.class);
+        return button != null && button.isVisible();
+    }
+
+    /** Applies the page and waits for the write. */
+    private static void applyNow(PluginSettingsPage page) throws Exception {
+        var applied = new AtomicReference<java.util.concurrent.CompletableFuture<Void>>();
+        onEdt(() -> applied.set(page.apply()));
+        applied.get().get(5, TimeUnit.SECONDS);
+        onEdt(() -> { });
+    }
+
     @Test @SuppressWarnings("unchecked") void aRejectedFileShowsItsMessageAndBlocksItsEditsUntilFixed() throws Exception {
         write(ID, "font_size = \"big\"\n");
         start(ID, "Pages", PluginSettingsPageTest::declareEditor);
@@ -140,7 +221,7 @@ class PluginSettingsPageTest {
             page.component();
             assertThat(page.valid()).as("an untouched page does not hold up the dialog").isTrue();
             assertThat(page.message().isVisible()).isTrue();
-            assertThat(page.message().getText()).contains("has errors");
+            assertThat(((javax.swing.JLabel) StagedVaultHost.named(page.message(), "plugin-page-text")).getText()).contains("has errors");
             page.draft().stage(size, Optional.of(15));
             assertThat(page.valid()).as("an edit cannot be saved to a rejected file").isFalse();
             page.reset();

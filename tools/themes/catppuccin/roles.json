@@ -1,0 +1,4 @@
+{
+  "dark": { "surface.dialog": "base", "surface.card": "mantle", "surface.sidebar": "crust" },
+  "light": { "surface.card": "base", "surface.sidebar": "crust" }
+}

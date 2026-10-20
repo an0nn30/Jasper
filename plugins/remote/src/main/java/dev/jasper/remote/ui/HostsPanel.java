@@ -1,88 +1,76 @@
 package dev.jasper.remote.ui;
 
-import dev.jasper.sdk.ui.WorkspacePalette;
+import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
+import dev.jasper.remote.workstation.Layout;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
-import dev.jasper.sdk.ui.BundledIcon;
+import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.ListItem;
+import dev.jasper.sdk.ui.MenuItem;
+import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PanelHeader;
-import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Font;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import dev.jasper.sdk.ui.TreeItem;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
-import javax.swing.ListSelectionModel;
-import javax.swing.SwingUtilities;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 
 /**
- * The "Sessions" rail panel: search, the WSL distributions the application detected, grouped hosts, and the selected
- * row's card with Connect (a host) or Open (a distribution). One per window.
+ * The "Sessions" rail panel on one host-rendered kit view: search, the WSL distributions the application detected,
+ * grouped hosts, and the selected row's card with Connect (a host) or Open (a distribution). One per window.
+ *
+ * <p>Rows are keyed by stable ids (a host's UUID, a distribution's profile id, a group's name). A single click toggles
+ * a group; Enter or a double click connects to a host, opens a distribution or toggles a group. A host's star reports
+ * only its own action (favourite on or off), never selecting or activating the row. Each row has its own context menu,
+ * whose actions name that row, so a menu acts on the row it opened on whatever is selected. The count and the New and
+ * Import actions are the window's: {@link #onHeaderChanged} feeds {@code PanelHost.setHeader}. UI thread only; after
+ * {@link #close()} nothing touches the view.
+ *
+ * <p>Under {@link Layout#CLASSIC} (Enterprise presentation spec 14.4) the same rows are a Name, Host and Port column tree,
+ * whose disclosure collapses a group, over the selected row's Properties and Edit… and Connect; the header detail is the
+ * count.
  */
-public final class HostsPanel extends JPanel {
+public final class HostsPanel implements AutoCloseable {
     public record Actions(Consumer<RemoteHost> connect, Consumer<RemoteHost> connectSplit, Consumer<Optional<RemoteHost>> edit, Consumer<RemoteHost> duplicate,
                           Consumer<RemoteHost> delete, BiConsumer<RemoteHost, Boolean> favorite, Runnable importConfig) { }
 
-    final JTextField search = new JTextField() {
-        @Override public java.awt.Color getBackground() { return WorkspacePalette.current(this).surfaceSunken(); }
-        @Override public java.awt.Dimension getPreferredSize() {
-            var size = super.getPreferredSize();
-            return new java.awt.Dimension(size.width, Math.max(PanelStyle.scale(this, 28), getFontMetrics(getFont()).getHeight() + 8));
-        }
-    };
-    final JList<HostRows.Row> list;
-    final JPanel card = new JPanel(new BorderLayout(0, 8)) {
-        @Override public java.awt.Color getBackground() { return WorkspacePalette.current(this).surfaceRaised(); }
-        @Override protected void paintComponent(java.awt.Graphics graphics) {
-            super.paintComponent(graphics);
-            graphics.setColor(WorkspacePalette.current(this).border());
-            graphics.drawLine(0, 0, getWidth(), 0);
-        }
-    };
-    final JLabel cardName = heading(""), cardAddress = muted(true), cardJump = muted(false), cardInfo = muted(false);
-    final JLabel cardCredential = new JLabel() {
-        @Override public java.awt.Color getForeground() {
-            var palette = WorkspacePalette.current(this);
-            return "Connected".equals(getText()) ? connectionColor(this, true) : palette.textMuted();
-        }
-    };
-    final JButton connect = PanelStyle.primaryButton("Connect"), edit = new JButton("Edit"), add = new JButton("+"), importButton = new JButton("Import");
-    final JLabel empty = new JLabel("No hosts yet \u2014 Add or Import from ~/.ssh/config");
+    public static final String ROOT = "sessions", HEADER = "sessions.header", SEARCH = "sessions.search", ROWS = "sessions.rows",
+        FOOTER = "sessions.footer", HINT = "sessions.hint", CARD = "card", CARD_TILE = "card.tile", CARD_NAME = "card.name",
+        CARD_ADDRESS = "card.address", CARD_INFO = "card.info", CARD_JUMP = "card.jump", CARD_CREDENTIAL = "card.credential",
+        CARD_CONNECTED = "card.connected", CARD_LOCKED = "card.locked", EDIT = "card.edit", CONNECT = "card.connect", ACTIVATE = "activate";
+    /** Star actions are this prefix and the host's id; menu actions are {@code menu:<verb>:<row id>}. */
+    static final String FAVORITE = "favorite:", MENU = "menu:";
+    private static final String WSL_GROUP = "group.wsl", ERROR = "error";
+
     private final Actions actions;
-    private final Function<BundledIcon, javax.swing.Icon> icons;
-    private final DefaultListModel<HostRows.Row> model = new DefaultListModel<>();
+    /** Which composition this panel takes, fixed at construction (spec 3.6). */
+    private final Layout layout;
+    private Consumer<Optional<String>> selectionChanged = row -> { };
+    private final UiView view;
     private final Set<String> collapsed = new HashSet<>();
     private boolean wslCollapsed;
     private final List<Runnable> collapseListeners = new ArrayList<>();
     private List<RemoteHost> hosts = List.of();
     private Optional<String> error = Optional.empty();
     private Function<RemoteHost, String> credentialLabels = host -> "";
-    private UUID selected;
-    private String selectedDistro;
-    private String defaultGroup = HostRows.OTHER;
+    private List<HostRows.Row> rows = List.of();
+    private String query = "", selectedRow, defaultGroup = HostRows.OTHER;
     private Runnable renameDefaultGroup = () -> {};
     private Consumer<RemoteHost> activate;
     private Consumer<RemoteHost> browseFiles;
@@ -94,157 +82,70 @@ public final class HostsPanel extends JPanel {
     private Consumer<ShellProfileInfo> splitDistro = profile -> { };
     private Consumer<PanelHeader> headerChanged;
     private int headerCount = -1;
-    private int hovered = -1;
+    private boolean closed;
+    private final LongSupplier clock;
+    private final long multiClickNanos;
+    private String lastStar;
+    private long lastStarAt;
 
-    private static JLabel heading(String text) {
-        return new JLabel(text) {
-            @Override public void updateUI() {
-                super.updateUI();
-                setFont(javax.swing.UIManager.getFont("Label.font").deriveFont(Font.BOLD));
-            }
+    /** {@code icons} supplies the header actions' artwork, which the window draws. */
+    public HostsPanel(UiKit kit, Actions actions) {
+        this(kit, actions, System::nanoTime, multiClickNanos());
+    }
+
+    /** The panel in {@code layout}'s composition. */
+    public HostsPanel(UiKit kit, Actions actions, Layout layout) {
+        this(kit, actions, System::nanoTime, multiClickNanos(), layout);
+    }
+
+    /**
+     * {@code clock} (nanoseconds) and {@code multiClickNanos} (the desktop's double-click interval) tell a double click on a
+     * star from two separate clicks.
+     */
+    HostsPanel(UiKit kit, Actions actions, LongSupplier clock, long multiClickNanos) { this(kit, actions, clock, multiClickNanos, Layout.ROWS); }
+
+    HostsPanel(UiKit kit, Actions actions, LongSupplier clock, long multiClickNanos, Layout layout) {
+        this.layout = Objects.requireNonNull(layout);
+        this.clock = Objects.requireNonNull(clock);
+        if (multiClickNanos < 0) throw new IllegalArgumentException("multiClickNanos must not be negative");
+        this.multiClickNanos = multiClickNanos;
+        this.actions = Objects.requireNonNull(actions);
+        this.activate = actions.connect();
+        rebuildRows();
+        view = kit.create(new ViewSpec(node()), this::handle);
+    }
+
+    public UiView view() { return view; }
+
+    /** The rows shown now, in order (the panel's model). */
+    public List<HostRows.Row> rows() { return rows; }
+
+    /** The selected row, if any. */
+    public Optional<HostRows.Row> selectedRow() { return rows.stream().filter(row -> rowId(row).equals(selectedRow)).findFirst(); }
+
+    /** The row's stable id in the list. */
+    public static String rowId(HostRows.Row row) {
+        return switch (row) {
+            case HostRows.Host host -> "host:" + host.host().id();
+            case HostRows.Distro distro -> "distro:" + distro.profile().id();
+            case HostRows.Group group -> group.wsl() ? WSL_GROUP : "group:" + group.name();
+            case HostRows.Error ignored -> ERROR;
         };
     }
 
-    private static JLabel muted(boolean monospace) {
-        return new JLabel() {
-            @Override public java.awt.Color getForeground() { return WorkspacePalette.current(this).textMuted(); }
-            @Override public void updateUI() {
-                super.updateUI();
-                Font uiFont = javax.swing.UIManager.getFont("Label.font");
-                if (monospace && uiFont != null) setFont(new Font(Font.MONOSPACED, Font.PLAIN, 1).deriveFont(uiFont.getSize2D()));
-                putClientProperty("html.disable", true);
-            }
-        };
-    }
+    /** The panel became visible: as when the old list was shown, the first host (or distribution) is selected. */
+    public void shown() { if (closed) return; selectFirstHost(); render(); }
 
-    public HostsPanel(Actions actions) {
-        this(actions, name -> javax.swing.UIManager.getIcon(name == BundledIcon.NODES_FOLDER ? "Tree.closedIcon" : "Tree.openIcon"));
-    }
-
-    public HostsPanel(Actions actions, Function<BundledIcon, javax.swing.Icon> icons) {
-        super(new BorderLayout(0, 6));
-        this.icons = java.util.Objects.requireNonNull(icons);
-        this.actions = actions; this.activate = actions.connect();
-        setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
-        importButton.putClientProperty("JButton.buttonType", "toolBarButton");
-        add.putClientProperty("JButton.buttonType", "toolBarButton");
-        add.setToolTipText("New session"); add.getAccessibleContext().setAccessibleName("New session");
-        var north = new JPanel(new BorderLayout());
-        north.setOpaque(false);
-        north.setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(this, 7), PanelStyle.scale(this, 10), 2, PanelStyle.scale(this, 10)));
-        search.putClientProperty("JTextField.placeholderText", "Search sessions");
-        search.putClientProperty("JTextField.leadingIcon", icons.apply(BundledIcon.GENERAL_SEARCH));
-        search.putClientProperty("FlatLaf.style", "arc: 10");
-        search.putClientProperty(javax.accessibility.AccessibleContext.ACCESSIBLE_NAME_PROPERTY, "Search sessions");
-        north.add(search, BorderLayout.CENTER);
-        add(north, BorderLayout.NORTH);
-        list = new JList<>(model) {
-            @Override public boolean getScrollableTracksViewportWidth() { return true; }
-            @Override public java.awt.Color getBackground() { return HostsPanel.this.getBackground(); }
-        };
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setCellRenderer(new Renderer());
-        var center = new JPanel(new BorderLayout());
-        center.setOpaque(false);
-        center.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 6));
-        var scroll = new JScrollPane(list);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        center.add(scroll, BorderLayout.CENTER);
-        empty.setBorder(BorderFactory.createEmptyBorder(12, 4, 12, 4));
-        center.add(empty, BorderLayout.SOUTH);
-        add(center, BorderLayout.CENTER);
-        card.setBorder(BorderFactory.createEmptyBorder(12, 12, 10, 12));
-        card.setOpaque(true);
-        var identity = new JPanel(new BorderLayout(10, 0)); identity.setOpaque(false);
-        identity.add(PanelStyle.iconTile(icons.apply(BundledIcon.TOOLWINDOWS_WEB_SERVER), 30), BorderLayout.WEST);
-        var details = new JPanel(); details.setOpaque(false);
-        details.setLayout(new BoxLayout(details, BoxLayout.Y_AXIS));
-        for (JLabel detail : List.of(cardName, cardAddress, cardInfo, cardJump)) {
-            detail.setAlignmentX(Component.LEFT_ALIGNMENT);
-            detail.putClientProperty("html.disable", true);
-            details.add(detail);
-        }
-        identity.add(details, BorderLayout.CENTER);
-        card.add(identity, BorderLayout.CENTER);
-        var footer = new JPanel(new BorderLayout(6, 0)); footer.setOpaque(false);
-        cardCredential.putClientProperty("html.disable", true);
-        footer.add(cardCredential, BorderLayout.CENTER);
-        var buttons = new JPanel(); buttons.setOpaque(false);
-        buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        PanelStyle.button(edit); PanelStyle.button(connect);
-        edit.setText(""); edit.setIcon(icons.apply(BundledIcon.GENERAL_EDIT));
-        edit.setToolTipText("Edit session"); edit.getAccessibleContext().setAccessibleName("Edit session");
-        edit.setMargin(new java.awt.Insets(4, 4, 4, 4));
-        edit.putClientProperty("JButton.buttonType", "toolBarButton");
-        buttons.add(edit); buttons.add(Box.createHorizontalStrut(8)); buttons.add(connect);
-        footer.add(buttons, BorderLayout.EAST);
-        card.add(footer, BorderLayout.SOUTH);
-        card.setVisible(false);
-        add(card, BorderLayout.SOUTH);
-
-        search.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent e) { rebuild(); }
-            @Override public void removeUpdate(DocumentEvent e) { rebuild(); }
-            @Override public void changedUpdate(DocumentEvent e) { rebuild(); }
-        });
-        list.addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) selectionChanged(); });
-        list.addMouseListener(new MouseAdapter() {
-            @Override public void mouseExited(MouseEvent event) { hovered = -1; list.repaint(); }
-            @Override public void mouseClicked(MouseEvent event) {
-                int index = list.locationToIndex(event.getPoint());
-                if (index < 0 || !list.getCellBounds(index, index).contains(event.getPoint())) return;
-                if (SwingUtilities.isRightMouseButton(event)) { list.setSelectedIndex(index); JPopupMenu menu = menuFor(index); if (menu != null) menu.show(list, event.getX(), event.getY()); }
-                else if (event.getX() >= list.getWidth() - PanelStyle.scale(list, 10) - favoriteWidth(list) && model.get(index) instanceof HostRows.Host row) {
-                    if (event.getClickCount() == 1) actions.favorite().accept(row.host(), !row.host().favorite());
-                }
-                else if (event.getClickCount() == 2) activate(index);
-                else if (model.get(index) instanceof HostRows.Group) toggle(index);
-            }
-        });
-        list.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
-            @Override public void mouseMoved(MouseEvent event) {
-                int index = list.locationToIndex(event.getPoint());
-                int next = index >= 0 && list.getCellBounds(index, index).contains(event.getPoint()) ? index : -1;
-                if (next != hovered) { hovered = next; list.repaint(); }
-            }
-        });
-        list.getInputMap().put(javax.swing.KeyStroke.getKeyStroke("ENTER"), "activateHost");
-        list.getActionMap().put("activateHost", new javax.swing.AbstractAction() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent event) { activate(list.getSelectedIndex()); }
-        });
-        add.addActionListener(event -> actions.edit().accept(Optional.empty()));
-        importButton.addActionListener(event -> actions.importConfig().run());
-        connect.addActionListener(event -> {
-            Optional<ShellProfileInfo> distro = selectedDistro();
-            if (distro.isPresent()) openDistro.accept(distro.get());
-            else selectedHost().ifPresent(host -> {
-                if (sessionCount.applyAsInt(host) > 0) activate.accept(host);
-                else actions.connect().accept(host);
-            });
-        });
-        edit.addActionListener(event -> selectedHost().ifPresent(host -> actions.edit().accept(Optional.of(host))));
-        addHierarchyListener(event -> {
-            if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
-                selectFirstHost();
-            }
-        });
-        rebuild();
-    }
-
-    /** Focus an explicit opening in a visible window, never a restored panel before startup. */
-    public void focusWhenOpened() {
-        if (!isShowing()) return;
-        SwingUtilities.invokeLater(() -> { if (isShowing()) list.requestFocusInWindow(); });
-    }
+    /** Focus an explicit opening in a visible window; a panel that is not showing yet keeps focus where it is. */
+    public void focusWhenOpened() { if (!closed) view.focus(ROWS); }
 
     public void setDefaultGroup(String name) { defaultGroup = name; rebuild(); }
     public void onRenameDefaultGroup(Runnable rename) { renameDefaultGroup = rename; }
-    public void onBrowseFiles(Consumer<RemoteHost> action) { browseFiles=action; }
+    public void onBrowseFiles(Consumer<RemoteHost> action) { browseFiles = action; rebuild(); }
     public void onActivate(Consumer<RemoteHost> action) { activate = action; }
     /** Supplies this window's app-owned header immediately and whenever the saved-session count changes. */
     public void onHeaderChanged(Consumer<PanelHeader> listener) {
-        headerChanged = java.util.Objects.requireNonNull(listener); headerCount = -1; refreshHeader();
+        headerChanged = Objects.requireNonNull(listener); headerCount = -1; refreshHeader();
     }
     public void setHostDetails(Function<RemoteHost, String> details, ToIntFunction<RemoteHost> sessions) {
         metadata = details; sessionCount = sessions; rebuild();
@@ -261,7 +162,7 @@ public final class HostsPanel extends JPanel {
     }
 
     public void setHosts(List<RemoteHost> hosts, Optional<String> error) { this.hosts = List.copyOf(hosts); this.error = error; rebuild(); }
-    public void setCredentialLabels(Function<RemoteHost, String> labels) { credentialLabels = labels; refreshCard(); }
+    public void setCredentialLabels(Function<RemoteHost, String> labels) { credentialLabels = labels; render(); }
     /** The collapsed host groups, by name; the WSL group is never among them (see {@link #wslCollapsed()}). */
     public Set<String> collapsed() { return Set.copyOf(collapsed); }
     public void setCollapsed(Set<String> groups) { collapsed.clear(); collapsed.addAll(groups); rebuild(); }
@@ -271,333 +172,409 @@ public final class HostsPanel extends JPanel {
     public Subscription onCollapsedChanged(Runnable listener) { collapseListeners.add(listener); return () -> collapseListeners.remove(listener); }
 
     public void select(UUID hostId) {
-        for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof HostRows.Host row && row.host().id().equals(hostId)) { list.setSelectedIndex(i); return; }
+        rows.stream().filter(row -> row instanceof HostRows.Host host && host.host().id().equals(hostId)).findFirst()
+            .ifPresent(row -> { selectedRow = rowId(row); render(); });
     }
 
     void selectDistro(String profileId) {
-        for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof HostRows.Distro row && row.profile().id().equals(profileId)) { list.setSelectedIndex(i); return; }
+        rows.stream().filter(row -> row instanceof HostRows.Distro distro && distro.profile().id().equals(profileId)).findFirst()
+            .ifPresent(row -> { selectedRow = rowId(row); render(); });
     }
+
+    Optional<RemoteHost> selectedHost() { return selectedRow().filter(HostRows.Host.class::isInstance).map(row -> ((HostRows.Host) row).host()); }
+
+    Optional<ShellProfileInfo> selectedDistro() { return selectedRow().filter(HostRows.Distro.class::isInstance).map(row -> ((HostRows.Distro) row).profile()); }
 
     private void selectFirstHost() {
-        int firstGroup = -1;
-        for (int i = 0; i < model.size(); i++) {
-            if (model.get(i) instanceof HostRows.Host || model.get(i) instanceof HostRows.Distro) {
-                list.setSelectedIndex(i);
-                list.ensureIndexIsVisible(i);
-                return;
-            }
-            if (firstGroup < 0 && model.get(i) instanceof HostRows.Group) firstGroup = i;
-        }
+        Optional<HostRows.Row> first = rows.stream().filter(row -> row instanceof HostRows.Host || row instanceof HostRows.Distro).findFirst();
         // When all folders are collapsed, Enter can expand the first folder. Never select an error.
-        if (firstGroup >= 0) { list.setSelectedIndex(firstGroup); list.ensureIndexIsVisible(firstGroup); }
-        else list.clearSelection();
+        if (first.isEmpty()) first = rows.stream().filter(HostRows.Group.class::isInstance).findFirst();
+        selectedRow = first.map(HostsPanel::rowId).orElse(null);
     }
 
-    Optional<RemoteHost> selectedHost() { return hosts.stream().filter(host -> host.id().equals(selected)).findFirst(); }
+    private void handle(UiEvent event) {
+        if (closed) return;
+        switch (event) {
+            case UiEvent.Edited edited when edited.id().equals(SEARCH) -> {
+                String before = selectedRow;
+                query = edited.text(); rebuild();
+                // A filter that hides the selected row selects another: that is the user's selection too.
+                if (!Objects.equals(before, selectedRow)) selectionChanged.accept(Optional.ofNullable(selectedRow));
+            }
+            case UiEvent.Selected selected when selected.id().equals(ROWS) -> {
+                selectedRow = selected.ids().stream().findFirst().filter(id -> rows.stream().anyMatch(row -> rowId(row).equals(id))).orElse(null);
+                render();
+                selectionChanged.accept(Optional.ofNullable(selectedRow));
+            }
+            case UiEvent.Clicked clicked when clicked.id().equals(ROWS) -> rowById(clicked.itemId()).ifPresent(row -> {
+                if (layout == Layout.ROWS && row instanceof HostRows.Group group) toggle(group);
+            });
+            case UiEvent.Expanded expanded when expanded.id().equals(ROWS) -> rowById(expanded.itemId()).ifPresent(row -> {
+                if (row instanceof HostRows.Group group && expanded.expanded() == collapsedGroup(group)) toggle(group);
+            });
+            case UiEvent.Action action -> act(action.id());
+            default -> { }
+        }
+    }
 
-    Optional<ShellProfileInfo> selectedDistro() { return distros.stream().filter(profile -> profile.id().equals(selectedDistro)).findFirst(); }
+    /** The desktop's double-click interval, 500 ms where it has none. */
+    private static long multiClickNanos() {
+        Object interval = null;
+        try { interval = java.awt.Toolkit.getDefaultToolkit().getDesktopProperty("awt.multiClickInterval"); } catch (RuntimeException | java.awt.AWTError headless) { }
+        return java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(interval instanceof Integer millis ? millis : 500);
+    }
+
+    private Optional<HostRows.Row> rowById(String id) { return rows.stream().filter(row -> rowId(row).equals(id)).findFirst(); }
+
+    private Optional<RemoteHost> host(String rowId) { return rowById(rowId).filter(HostRows.Host.class::isInstance).map(row -> ((HostRows.Host) row).host()); }
+
+    private Optional<ShellProfileInfo> distro(String rowId) { return rowById(rowId).filter(HostRows.Distro.class::isInstance).map(row -> ((HostRows.Distro) row).profile()); }
+
+    private void act(String id) {
+        if (id.equals(ACTIVATE)) { selectedRow().ifPresent(this::activate); return; }
+        if (id.equals(CONNECT)) { connectSelected(); return; }
+        if (id.equals(EDIT)) { selectedHost().ifPresent(host -> actions.edit().accept(Optional.of(host))); return; }
+        if (id.startsWith(FAVORITE)) {
+            String hostId = id.substring(FAVORITE.length());
+            // The star reports each click; the second click of a double click is not a second toggle, as the old list
+            // acted only on a single click.
+            long now = clock.getAsLong();
+            boolean second = hostId.equals(lastStar) && now - lastStarAt < multiClickNanos;
+            lastStar = hostId; lastStarAt = now;
+            if (second) return;
+            hosts.stream().filter(host -> host.id().toString().equals(hostId)).findFirst().ifPresent(host -> actions.favorite().accept(host, !host.favorite()));
+            return;
+        }
+        if (!id.startsWith(MENU)) return;
+        String rest = id.substring(MENU.length());
+        int colon = rest.indexOf(':');
+        if (colon < 0) return;
+        String verb = rest.substring(0, colon), row = rest.substring(colon + 1);
+        switch (verb) {
+            case "connect" -> host(row).ifPresent(actions.connect());
+            case "split" -> host(row).ifPresent(actions.connectSplit());
+            case "browse" -> host(row).ifPresent(host -> { if (browseFiles != null) browseFiles.accept(host); });
+            case "edit" -> host(row).ifPresent(host -> actions.edit().accept(Optional.of(host)));
+            case "duplicate" -> host(row).ifPresent(actions.duplicate());
+            case "delete" -> host(row).ifPresent(actions.delete());
+            case "favorite" -> host(row).ifPresent(host -> actions.favorite().accept(host, !host.favorite()));
+            case "rename" -> renameDefaultGroup.run();
+            case "open" -> distro(row).ifPresent(openDistro);
+            case "open-split" -> distro(row).ifPresent(splitDistro);
+            default -> { }
+        }
+    }
+
+    private void connectSelected() {
+        Optional<ShellProfileInfo> distro = selectedDistro();
+        if (distro.isPresent()) { openDistro.accept(distro.get()); return; }
+        selectedHost().ifPresent(host -> {
+            if (sessionCount.applyAsInt(host) > 0) activate.accept(host);
+            else actions.connect().accept(host);
+        });
+    }
 
     /** Double-click or Enter on a row: connect to a host, open a distribution, toggle a group. */
-    void activate(int index) {
-        if (index < 0 || index >= model.size()) return;
-        switch (model.get(index)) {
-            case HostRows.Host row -> activate.accept(row.host());
-            case HostRows.Group group -> toggle(index);
-            case HostRows.Distro row -> openDistro.accept(row.profile());
+    private void activate(HostRows.Row row) {
+        switch (row) {
+            case HostRows.Host host -> activate.accept(host.host());
+            case HostRows.Group group -> toggle(group);
+            case HostRows.Distro distro -> openDistro.accept(distro.profile());
             case HostRows.Error ignored -> { }
         }
     }
 
-    void toggle(int index) {
-        if (!(model.get(index) instanceof HostRows.Group group)) return;
+    private void toggle(HostRows.Group group) {
         if (group.wsl()) wslCollapsed = !wslCollapsed;
         else if (!collapsed.remove(group.name())) collapsed.add(group.name());
         collapseListeners.forEach(Runnable::run);
         rebuild();
     }
 
-    JPopupMenu menuFor(int index) {
-        if (index < 0 || index >= model.size()) return null;
-        if (model.get(index) instanceof HostRows.Distro row) {
-            var menu = new JPopupMenu();
-            menu.add(item("Open in new tab", () -> openDistro.accept(row.profile())));
-            menu.add(item("Open in split", () -> splitDistro.accept(row.profile())));
-            return menu;
-        }
-        if (model.get(index) instanceof HostRows.Group group && !group.wsl() && group.name().equals(defaultGroup)) {
-            var menu = new JPopupMenu(); menu.add(item("Rename group\u2026", renameDefaultGroup)); return menu;
-        }
-        if (!(model.get(index) instanceof HostRows.Host row)) return null;
-        RemoteHost host = row.host();
-        var menu = new JPopupMenu();
-        menu.add(item("Connect in new tab", () -> actions.connect().accept(host)));
-        menu.add(item("Connect in split", () -> actions.connectSplit().accept(host)));
-        if(browseFiles!=null) menu.add(item("Browse files",()->browseFiles.accept(host)));
-        menu.add(item("Edit\u2026", () -> actions.edit().accept(Optional.of(host))));
-        menu.add(item("Duplicate", () -> actions.duplicate().accept(host)));
-        menu.add(item("Delete\u2026", () -> actions.delete().accept(host)));
-        menu.add(item(host.favorite() ? "Remove from favorites" : "Add to favorites", () -> actions.favorite().accept(host, !host.favorite())));
-        if (host.group().isEmpty() && defaultGroup.equals(HostRows.OTHER) && hosts.stream().allMatch(h -> h.group().isEmpty()))
-            menu.add(item("Rename group\u2026", renameDefaultGroup));
-        return menu;
+    private void rebuildRows() {
+        String needle = query.strip().toLowerCase(Locale.ROOT);
+        List<RemoteHost> matching = hosts.stream().filter(host -> HostRows.matches(host, needle)
+            || (host.group().isEmpty() && defaultGroup.toLowerCase(Locale.ROOT).contains(needle))
+            || metadata.apply(host).toLowerCase(Locale.ROOT).contains(needle)).toList();
+        List<HostRows.Distro> distroRows = distros.stream().filter(profile -> HostRows.matches(profile, needle))
+            .map(profile -> new HostRows.Distro(profile, distroSessions.applyAsInt(profile))).toList();
+        var next = new ArrayList<HostRows.Row>();
+        error.ifPresent(message -> next.add(new HostRows.Error(message)));
+        // The classic tree keeps every row and shows the collapsed groups through its expanded ids.
+        boolean flat = layout == Layout.CLASSIC;
+        next.addAll(HostRows.rows(matching, "", flat || !needle.isEmpty() ? Set.of() : collapsed, defaultGroup, distroRows, !flat && needle.isEmpty() && wslCollapsed));
+        rows = List.copyOf(next);
+        // A refresh keeps the selected row (a host, distribution or group by identity); otherwise the first host.
+        if (selectedRow == null || rows.stream().noneMatch(row -> rowId(row).equals(selectedRow))) selectFirstHost();
     }
 
-    private static JMenuItem item(String title, Runnable action) { var item = new JMenuItem(title); item.addActionListener(event -> action.run()); return item; }
-
     private void rebuild() {
-        UUID keep = selected;
-        String keepDistro = selectedDistro;
-        HostRows.Row previous = list.getSelectedValue();
-        hovered = -1;
-        model.clear();
-        error.ifPresent(message -> model.addElement(new HostRows.Error(message)));
-        String query = search.getText().strip().toLowerCase(java.util.Locale.ROOT);
-        List<RemoteHost> matching = hosts.stream().filter(host -> HostRows.matches(host, query)
-            || (host.group().isEmpty() && defaultGroup.toLowerCase(java.util.Locale.ROOT).contains(query))
-            || metadata.apply(host).toLowerCase(java.util.Locale.ROOT).contains(query)).toList();
-        List<HostRows.Distro> distroRows = distros.stream().filter(profile -> HostRows.matches(profile, query))
-            .map(profile -> new HostRows.Distro(profile, distroSessions.applyAsInt(profile))).toList();
-        HostRows.rows(matching, "", query.isEmpty() ? collapsed : Set.of(), defaultGroup, distroRows, query.isEmpty() && wslCollapsed)
-            .forEach(model::addElement);
-        boolean searching = !search.getText().strip().isEmpty();
-        // With a WSL group shown, the hint sits under it and speaks of SSH hosts only; without WSL the panel holds hosts alone.
-        empty.setText(hosts.isEmpty() ? (distros.isEmpty() ? "No hosts yet" : "No SSH hosts yet") + " \u2014 Add or Import from ~/.ssh/config"
-            : distros.isEmpty() ? "No hosts match" : "No sessions match");
-        empty.setVisible(hosts.isEmpty() || (searching && model.size() == (error.isPresent() ? 1 : 0)));
-        if (keep != null) select(keep);
-        else if (keepDistro != null) selectDistro(keepDistro);
-        else if (previous instanceof HostRows.Group group) {
-            for (int i = 0; i < model.size(); i++)
-                if (model.get(i) instanceof HostRows.Group next && next.wsl() == group.wsl() && next.name().equals(group.name())) {
-                    list.setSelectedIndex(i); break;
-                }
-        }
-        if (list.isSelectionEmpty()) selectFirstHost();
-        selectionChanged();
+        rebuildRows();
+        render();
         refreshHeader();
     }
 
+    private void render() { if (!closed && view != null) view.update(new ViewSpec(node())); }
+
     private void refreshHeader() {
-        if (headerChanged == null) return;
+        if (headerChanged == null || closed) return;
         int count = hosts.size() + distros.size();
         if (count == headerCount) return;
         headerCount = count;
-        headerChanged.accept(new PanelHeader(String.valueOf(count), false, List.of(
-            new PanelHeader.Action("New session", icons.apply(BundledIcon.GENERAL_ADD), add::doClick),
-            new PanelHeader.Action("Import sessions", icons.apply(BundledIcon.GENERAL_IMPORT), importButton::doClick))));
+        headerChanged.accept(new PanelHeader(layout == Layout.CLASSIC ? String.valueOf(count) : "", false, List.of(
+            new PanelHeader.Action("New session", "add", () -> { if (!closed) actions.edit().accept(Optional.empty()); }),
+            new PanelHeader.Action("Import sessions", "import", () -> { if (!closed) actions.importConfig().run(); }))));
     }
 
-    private void selectionChanged() {
-        HostRows.Row row = list.getSelectedValue();
-        selected = row instanceof HostRows.Host host ? host.host().id() : null;
-        selectedDistro = row instanceof HostRows.Distro distro ? distro.profile().id() : null;
-        refreshCard();
+    private static ControlState state(boolean visible) { return new ControlState(visible, true, false, ""); }
+
+    private Nodes.Panel node() { return layout == Layout.CLASSIC ? classicNode() : rowsNode(); }
+
+    private Nodes.Panel rowsNode() {
+        var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.of(hosts.size() + distros.size()), Optional.empty(), Optional.empty(), List.of());
+        var search = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Search sessions", "Search sessions", "");
+        var items = rows.stream().map(this::item).toList();
+        var list = new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.SINGLE, items,
+            selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), "", "");
+        var footer = new ArrayList<Nodes.Node>();
+        boolean searching = !query.strip().isEmpty();
+        // With a WSL group shown, the hint sits under it and speaks of SSH hosts only; without WSL the panel holds hosts alone.
+        if (hosts.isEmpty() || (searching && rows.size() == (error.isPresent() ? 1 : 0))) {
+            String hint = hosts.isEmpty() ? (distros.isEmpty() ? "No hosts yet" : "No SSH hosts yet") + " — Add or Import from ~/.ssh/config"
+                : distros.isEmpty() ? "No hosts match" : "No sessions match";
+            footer.add(new Nodes.Text(HINT, ControlState.READY, hint, Nodes.TextRole.DESCRIPTION));
+        }
+        card().ifPresent(footer::add);
+        Optional<Nodes.Node> bottom = footer.isEmpty() ? Optional.empty()
+            : Optional.of(new Nodes.Stack(FOOTER, ControlState.READY, Nodes.LayoutRole.DETAIL, footer));
+        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(search), list, bottom);
     }
 
-    private void refreshCard() {
+    private ListItem item(HostRows.Row row) {
+        String id = rowId(row);
+        return switch (row) {
+            case HostRows.Error failure -> new ListItem(id, Optional.empty(),
+                List.of(new Nodes.Text("row." + id + ".message", ControlState.READY, failure.message(), Nodes.TextRole.BODY_STRONG)), List.of(), List.of(), true);
+            case HostRows.Group group -> {
+                boolean renamable = !group.wsl() && group.name().equals(defaultGroup);
+                yield new ListItem(id,
+                    Optional.of(new Nodes.Icon("row." + id + ".state", ControlState.READY, group.collapsed() ? "chevron.right" : "chevron.down",
+                        Nodes.Hue.NONE, Nodes.IconSize.CONTROL, group.collapsed() ? "Collapsed group" : "Expanded group")),
+                    List.of(new Nodes.Text("row." + id + ".name", ControlState.READY, group.name(), Nodes.TextRole.BODY_STRONG),
+                        new Nodes.Text("row." + id + ".count", ControlState.READY, String.valueOf(group.count()), Nodes.TextRole.COUNT)),
+                    List.of(), List.of(), false,
+                    renamable ? Optional.of(List.of(menu("rename", id, "Rename group…"))) : Optional.empty(),
+                    renamable ? "Right-click to rename this group" : "");
+            }
+            case HostRows.Distro distro -> {
+                var trailing = new ArrayList<Nodes.Node>();
+                String badge = distro.profile().detail().orElse("");
+                if (!badge.isEmpty()) trailing.add(new Nodes.Chip("row." + id + ".badge", ControlState.READY, badge, Nodes.Hue.NEUTRAL));
+                int sessions = distro.sessions();
+                if (sessions > 0) trailing.add(new Nodes.StatusDot("row." + id + ".dot", ControlState.READY, Nodes.StatusKind.SUCCESS));
+                if (sessions > 1) trailing.add(new Nodes.Text("row." + id + ".sessions", ControlState.READY, String.valueOf(sessions), Nodes.TextRole.COUNT));
+                yield new ListItem(id,
+                    Optional.of(new Nodes.Icon("row." + id + ".icon", ControlState.READY, "terminal", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "WSL distribution")),
+                    List.of(new Nodes.Text("row." + id + ".name", ControlState.READY, distro.profile().name(), Nodes.TextRole.BODY)),
+                    List.of(), trailing, false,
+                    Optional.of(List.of(menu("open", id, "Open in new tab"), menu("open-split", id, "Open in split"))),
+                    distro.profile().name() + ", " + (badge.isEmpty() ? HostRows.WSL : badge) + ", " + sessions + (sessions == 1 ? " session" : " sessions"));
+            }
+            case HostRows.Host entry -> {
+                RemoteHost host = entry.host();
+                int sessions = sessionCount.applyAsInt(host);
+                String facts = metadata.apply(host);
+                String via = via(host);
+                var menu = hostMenu(id, host);
+                var star = new Nodes.Button("row." + id + ".star", ControlState.READY, "", host.favorite() ? "star.filled" : "star", Nodes.ButtonKind.GHOST,
+                    FAVORITE + host.id(), host.favorite() ? "Remove from favorites" : "Add to favorites", host.favorite() ? Nodes.ButtonPresentation.EMBEDDED : Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED,
+                    host.favorite() ? Optional.of(Nodes.Severity.WARNING) : Optional.empty());
+                yield new ListItem(id,
+                    Optional.of(new Nodes.StatusDot("row." + id + ".dot", ControlState.READY, sessions > 0 ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.IDLE)),
+                    List.of(new Nodes.Text("row." + id + ".name", ControlState.READY, host.name(), Nodes.TextRole.BODY),
+                        new Nodes.Text("row." + id + ".address", ControlState.READY, host.hostname(), Nodes.TextRole.DESCRIPTION)),
+                    List.of(), List.of(star), false, Optional.of(List.copyOf(menu)),
+                    host.name() + ", " + host.label() + (facts.isBlank() ? "" : ", " + facts) + (via == null ? "" : ", via " + via)
+                        + ", " + sessions + (sessions == 1 ? " session" : " sessions"));
+            }
+        };
+    }
+
+    /** A host row's menu, the same in both compositions. */
+    private List<MenuItem> hostMenu(String id, RemoteHost host) {
+        var menu = new ArrayList<MenuItem>(List.of(menu("connect", id, "Connect in new tab"), menu("split", id, "Connect in split")));
+        if (browseFiles != null) menu.add(menu("browse", id, "Browse files"));
+        menu.addAll(List.of(menu("edit", id, "Edit…"), menu("duplicate", id, "Duplicate"), menu("delete", id, "Delete…"),
+            menu("favorite", id, host.favorite() ? "Remove from favorites" : "Add to favorites")));
+        if (host.group().isEmpty() && defaultGroup.equals(HostRows.OTHER) && hosts.stream().allMatch(h -> h.group().isEmpty()))
+            menu.add(menu("rename", id, "Rename group…"));
+        return menu;
+    }
+
+    private static MenuItem menu(String verb, String rowId, String label) {
+        return new MenuItem("menu." + verb, label, "", MENU + verb + ":" + rowId, true, false);
+    }
+
+    private String via(RemoteHost host) {
+        return host.jump().flatMap(id -> hosts.stream().filter(other -> other.id().equals(id)).findFirst()).map(RemoteHost::name).orElse(null);
+    }
+
+    /** The selected host's or distribution's persistent detail, keyed by identity. */
+    private Optional<Nodes.Node> card() {
         Optional<ShellProfileInfo> distro = selectedDistro();
-        if (distro.isPresent()) { distroCard(distro.get()); return; }
         Optional<RemoteHost> host = selectedHost();
-        card.setVisible(host.isPresent());
-        edit.setVisible(true); cardCredential.setVisible(true);
-        host.ifPresent(h -> {
+        if (distro.isEmpty() && host.isEmpty()) return Optional.empty();
+        String name, address, info, jump = "", credential = "", button;
+        boolean connected = false, terminal;
+        if (distro.isPresent()) {
+            var profile = distro.get();
+            name = profile.name(); address = profile.detail().orElse(HostRows.WSL); info = "wsl.exe -d " + profile.name();
+            button = "Open"; terminal = true;
+        } else {
+            var h = host.get();
+            connected = sessionCount.applyAsInt(h) > 0;
+            name = h.name(); address = h.label(); info = metadata.apply(h);
+            String via = via(h);
+            jump = via == null ? "" : "via " + via;
+            credential = connected ? "Connected" : credentialLabels.apply(h);
+            button = connected ? "Open Shell" : "Connect"; terminal = connected;
+        }
+        boolean isHost = host.isPresent();
+        var details = new Nodes.Stack("card.details", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text(CARD_NAME, ControlState.READY, name, Nodes.TextRole.PANEL_TITLE),
+            new Nodes.Text(CARD_ADDRESS, ControlState.READY, address, Nodes.TextRole.MONO_CAPTION),
+            // A host's OS and address facts stay in its row tooltip, as the old card kept them in a tooltip.
+            new Nodes.Text(CARD_INFO, state(!isHost), info, Nodes.TextRole.DESCRIPTION),
+            new Nodes.Text(CARD_JUMP, state(false), jump, Nodes.TextRole.DESCRIPTION)));
+        var identity = new Nodes.Stack("card.identity", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
+            new Nodes.Icon(CARD_TILE, ControlState.READY, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.PROMPT, isHost ? "SSH host" : "WSL distribution"), details));
+        var status = new ArrayList<Nodes.Node>();
+        if (isHost && connected) status.add(new Nodes.StatusDot(CARD_CONNECTED, ControlState.READY, Nodes.StatusKind.SUCCESS));
+        else if (isHost && credential.equals("Vault locked")) status.add(new Nodes.Icon(CARD_LOCKED, ControlState.READY, "lock", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "Vault locked"));
+        status.add(new Nodes.Text(CARD_CREDENTIAL, state(isHost), credential, Nodes.TextRole.CAPTION));
+        status.add(new Nodes.Button(EDIT, state(isHost), "", "edit", Nodes.ButtonKind.GHOST, EDIT, "Edit session"));
+        status.add(new Nodes.Button(CONNECT, ControlState.READY, button, terminal ? "terminal" : "", Nodes.ButtonKind.PRIMARY, CONNECT, ""));
+        // NAVIGATION reserves fixed actions, lets the credential caption elide and wraps at genuinely narrow widths.
+        var actionsRow = new Nodes.Stack("card.actions", ControlState.READY, Nodes.LayoutRole.NAVIGATION, status);
+        return Optional.of(new Nodes.Stack(CARD, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(identity, actionsRow)));
+    }
+
+    // ---- the classic composition (Enterprise presentation spec 14.4)
+
+    /** The classic tree's columns: the title, then a host's address and port (its trailing values). */
+    static final List<Column> COLUMNS = List.of(new Column("name", "Name", Nodes.TextRole.BODY, false, 3, Optional.empty()),
+        new Column("host", "Host", Nodes.TextRole.MONO, false, 2.3, Optional.empty()), new Column("port", "Port", Nodes.TextRole.MONO, true, 1, Optional.empty()));
+    public static final String PROPERTIES = "sessions.properties", PROPERTY_ACTIONS = "sessions.properties.actions";
+
+    /** Selects a row by its id ({@link #rowId}), as the window's toolbar view does; an unknown row changes nothing. */
+    public void selectRow(String rowId) {
+        if (closed || rowId.equals(selectedRow) || rows.stream().noneMatch(row -> rowId(row).equals(rowId))) return;
+        selectedRow = rowId; render();
+    }
+
+    /** Hears every selection the user makes in the panel, including one a filter makes, as the row id, or empty for none. */
+    public void onSelectionChanged(Consumer<Optional<String>> listener) { selectionChanged = Objects.requireNonNull(listener); }
+
+    private boolean collapsedGroup(HostRows.Group group) { return group.wsl() ? wslCollapsed : collapsed.contains(group.name()); }
+
+    private Nodes.Panel classicNode() {
+        // The count is the window header's detail (refreshHeader), which the strip draws as "(n)": not a second count here.
+        var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        var filter = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Filter sessions", "Filter sessions", "");
+        boolean searching = !query.strip().isEmpty();
+        var roots = new ArrayList<TreeItem>();
+        var expanded = new HashSet<String>();
+        HostRows.Group group = null;
+        var children = new ArrayList<TreeItem>();
+        for (HostRows.Row row : rows) {
+            if (row instanceof HostRows.Group next) {
+                if (group != null) roots.add(groupItem(group, children));
+                group = next; children = new ArrayList<>();
+                if (searching || !collapsedGroup(next)) expanded.add(rowId(next));
+            } else if (group != null && !(row instanceof HostRows.Error)) children.add(treeItem(row));
+            else roots.add(treeItem(row));
+        }
+        if (group != null) roots.add(groupItem(group, children));
+        var tree = new Nodes.Tree(ROWS, ControlState.READY, roots, expanded, selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, COLUMNS);
+        var footer = new ArrayList<Nodes.Node>();
+        if (hosts.isEmpty() || (searching && rows.size() == (error.isPresent() ? 1 : 0))) {
+            String hint = hosts.isEmpty() ? (distros.isEmpty() ? "No hosts yet" : "No SSH hosts yet") + " — Add or Import from ~/.ssh/config"
+                : distros.isEmpty() ? "No hosts match" : "No sessions match";
+            footer.add(new Nodes.Text(HINT, ControlState.READY, hint, Nodes.TextRole.DESCRIPTION));
+        }
+        footer.addAll(classicDetails());
+        Optional<Nodes.Node> bottom = footer.isEmpty() ? Optional.empty()
+            : Optional.of(new Nodes.Stack(FOOTER, ControlState.READY, Nodes.LayoutRole.VERTICAL, footer));
+        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(filter), tree, bottom);
+    }
+
+    private TreeItem groupItem(HostRows.Group group, List<TreeItem> children) {
+        String id = rowId(group);
+        boolean renamable = !group.wsl() && group.name().equals(defaultGroup);
+        return new TreeItem(id, group.name(), Optional.empty(), false, children, OptionalInt.empty(), false,
+            renamable ? "Right-click to rename this group" : "", Optional.empty(), List.of(),
+            renamable ? Optional.of(List.of(menu("rename", id, "Rename group…"))) : Optional.empty());
+    }
+
+    private TreeItem treeItem(HostRows.Row row) {
+        String id = rowId(row);
+        return switch (row) {
+            case HostRows.Error failure -> new TreeItem(id, failure.message(), Optional.empty(), true, List.of(), OptionalInt.empty(), true,
+                failure.message(), Optional.of(Nodes.StatusKind.DANGER), List.of(), Optional.of(List.of()));
+            case HostRows.Group group -> groupItem(group, List.of());
+            case HostRows.Distro distro -> {
+                int sessions = distro.sessions();
+                String badge = distro.profile().detail().orElse(HostRows.WSL);
+                yield new TreeItem(id, distro.profile().name(), Optional.empty(), true, List.of(), OptionalInt.empty(), false,
+                    distro.profile().name() + ", " + badge + ", " + sessions + (sessions == 1 ? " session" : " sessions"),
+                    Optional.of(sessions > 0 ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.IDLE), List.of(badge),
+                    Optional.of(List.of(menu("open", id, "Open in new tab"), menu("open-split", id, "Open in split"))));
+            }
+            case HostRows.Host entry -> {
+                RemoteHost host = entry.host();
+                int sessions = sessionCount.applyAsInt(host);
+                String facts = metadata.apply(host), via = via(host);
+                yield new TreeItem(id, host.favorite() ? host.name() + " ★" : host.name(), Optional.empty(), true, List.of(), OptionalInt.empty(), false,
+                    host.name() + ", " + host.label() + (facts.isBlank() ? "" : ", " + facts) + (via == null ? "" : ", via " + via)
+                        + ", " + sessions + (sessions == 1 ? " session" : " sessions"),
+                    Optional.of(sessions > 0 ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.IDLE), List.of(host.hostname(), String.valueOf(host.port())),
+                    Optional.of(hostMenu(id, host)));
+            }
+        };
+    }
+
+    /** The selected host's or distribution's Properties and actions; nothing while no session is selected. */
+    private List<Nodes.Node> classicDetails() {
+        Optional<RemoteHost> host = selectedHost();
+        if (host.isPresent()) {
+            RemoteHost h = host.get();
+            String credential = credentialLabels.apply(h);
+            boolean locked = credential.equals("Vault locked");
+            boolean named = h.auth() instanceof Auth.Vault && !locked && !credential.equals("needs Credential Vault") && !credential.equals("credential missing");
             boolean connected = sessionCount.applyAsInt(h) > 0;
-            connect.setText(connected ? "Open Shell" : "Connect");
-            connect.setIcon(connected ? terminalGlyph() : null);
-            cardName.setText(h.name());
-            cardAddress.setText(h.label());
-            cardCredential.setText(connected ? "Connected" : credentialLabels.apply(h));
-            cardCredential.setIcon(connected ? connectedDot() : cardCredential.getText().equals("Vault locked") ? icons.apply(BundledIcon.GENERAL_LOCKED) : null);
-            cardCredential.setToolTipText(cardCredential.getText());
-            String facts = metadata.apply(h);
-            cardInfo.setText(facts); cardInfo.setVisible(false);
-            String via = h.jump().flatMap(id -> hosts.stream().filter(other -> other.id().equals(id)).findFirst()).map(RemoteHost::name).orElse(null);
-            cardJump.setVisible(false);
-            cardJump.setText(via == null ? "" : "via " + via);
-            cardAddress.setToolTipText(h.label() + (facts.isBlank() ? "" : ", " + facts) + (via == null ? "" : ", via " + via));
-        });
-    }
-
-    private javax.swing.Icon connectedDot() {
-        return new javax.swing.Icon() {
-            @Override public int getIconWidth() { return PanelStyle.scale(cardCredential, 8); }
-            @Override public int getIconHeight() { return PanelStyle.scale(cardCredential, 8); }
-            @Override public void paintIcon(Component component, java.awt.Graphics graphics, int x, int y) {
-                var g = (java.awt.Graphics2D) graphics.create();
-                try {
-                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-                    g.setColor(connectionColor(component, true));
-                    g.fillOval(x, y, getIconWidth(), getIconHeight());
-                } finally { g.dispose(); }
-            }
-        };
-    }
-
-    private javax.swing.Icon terminalGlyph() {
-        return new javax.swing.Icon() {
-            @Override public int getIconWidth() { return PanelStyle.scale(connect, 14); }
-            @Override public int getIconHeight() { return PanelStyle.scale(connect, 14); }
-            @Override public void paintIcon(Component component, java.awt.Graphics graphics, int x, int y) {
-                var g = (java.awt.Graphics2D) graphics.create();
-                try {
-                    g.translate(x, y);
-                    double scale = getIconWidth() / 14d; g.scale(scale, scale);
-                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-                    g.setColor(component.getForeground());
-                    g.setStroke(new java.awt.BasicStroke(1.4f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
-                    g.drawLine(2, 4, 5, 7); g.drawLine(5, 7, 2, 10); g.drawLine(8, 10, 12, 10);
-                } finally { g.dispose(); }
-            }
-        };
-    }
-
-    /** A distribution's card: its name, WSL version and the command Jasper runs; nothing to edit. */
-    private void distroCard(ShellProfileInfo profile) {
-        card.setVisible(true);
-        cardName.setText(profile.name());
-        cardAddress.setText(profile.detail().orElse(HostRows.WSL));
-        cardAddress.setToolTipText(cardAddress.getText());
-        cardInfo.setText("wsl.exe -d " + profile.name()); cardInfo.setVisible(true);
-        cardCredential.setText(""); cardCredential.setIcon(null); cardCredential.setVisible(false);
-        cardJump.setText(""); cardJump.setVisible(false);
-        edit.setVisible(false);
-        connect.setText("Open");
-        connect.setIcon(terminalGlyph());
-    }
-
-    private final class Renderer implements javax.swing.ListCellRenderer<HostRows.Row> {
-        @Override public Component getListCellRendererComponent(JList<? extends HostRows.Row> owner, HostRows.Row value, int index, boolean selected, boolean focused) {
-            if (value instanceof HostRows.Host row) return hostRow(owner, row.host(), selected, focused || index == hovered || selected && owner.hasFocus());
-            if (value instanceof HostRows.Distro row) return distroRow(owner, row, selected);
-            JLabel label = new JLabel(); label.putClientProperty("html.disable", true);
-            label.setOpaque(selected);
-            label.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-            label.setForeground(selected ? owner.getSelectionForeground() : owner.getForeground());
-            label.setFont(owner.getFont().deriveFont(Font.BOLD));
-            label.setBorder(BorderFactory.createEmptyBorder(5, 4, 4, 4));
-            if (value instanceof HostRows.Group group) {
-                label.setIcon(icons.apply(group.collapsed() ? BundledIcon.NODES_FOLDER : BundledIcon.GENERAL_OPEN));
-                label.setIconTextGap(6);
-                label.setText(group.name() + "   " + group.count());
-                label.getAccessibleContext().setAccessibleDescription(group.collapsed() ? "Collapsed group" : "Expanded group");
-                if (!group.wsl() && group.name().equals(defaultGroup)) label.setToolTipText("Right-click to rename this group");
-            } else if (value instanceof HostRows.Error error) label.setText(error.message());
-            return label;
+            return List.of(new Nodes.Properties(PROPERTIES, ControlState.READY, "Properties — " + h.name(), List.of(
+                    new Nodes.PropertyRow("Host", h.hostname(), true), new Nodes.PropertyRow("User", h.username(), true),
+                    new Nodes.PropertyRow("Port", String.valueOf(h.port()), true),
+                    new Nodes.PropertyRow("Credentials", named ? "Vault: " + credential : credential, false,
+                        locked ? Optional.of(Nodes.Severity.WARNING) : Optional.empty()))),
+                new Nodes.Stack(PROPERTY_ACTIONS, ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+                    new Nodes.Button(EDIT, ControlState.READY, "Edit…", "", Nodes.ButtonKind.SECONDARY, EDIT, "Edit session"),
+                    new Nodes.Button(CONNECT, ControlState.READY, connected ? "Open Shell" : "Connect", "", Nodes.ButtonKind.PRIMARY, CONNECT, ""))));
         }
+        Optional<ShellProfileInfo> distro = selectedDistro();
+        if (distro.isEmpty()) return List.of();
+        var profile = distro.get();
+        return List.of(new Nodes.Properties(PROPERTIES, ControlState.READY, "Properties — " + profile.name(), List.of(
+                new Nodes.PropertyRow("Distribution", profile.name(), false), new Nodes.PropertyRow("Version", profile.detail().orElse(HostRows.WSL), false),
+                new Nodes.PropertyRow("Command", "wsl.exe -d " + profile.name(), true))),
+            new Nodes.Stack(PROPERTY_ACTIONS, ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+                new Nodes.Button(CONNECT, ControlState.READY, "Open", "", Nodes.ButtonKind.PRIMARY, CONNECT, ""))));
     }
 
-    private static int favoriteWidth(JList<?> owner) {
-        var metrics = owner.getFontMetrics(owner.getFont().deriveFont(owner.getFont().getSize2D() + 1));
-        return Math.max(16, Math.max(metrics.stringWidth("\u2605"), metrics.stringWidth("\u2606")) + 2);
-    }
-
-    private Component hostRow(JList<?> owner, RemoteHost host, boolean selected, boolean showFavorite) {
-        var row = new JPanel(new BorderLayout(8, 0)) {
-            @Override protected void paintComponent(java.awt.Graphics graphics) {
-                var g = (java.awt.Graphics2D) graphics.create();
-                try {
-                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-                    g.setColor(getBackground());
-                    int arc = PanelStyle.scale(this, 10);
-                    g.fillRoundRect(0, 1, getWidth(), getHeight() - 2, arc, arc);
-                } finally { g.dispose(); }
-            }
-        };
-        row.setOpaque(false);
-        row.setBackground(selected ? dark(owner) ? new java.awt.Color(0x304e77) : owner.getSelectionBackground() : owner.getBackground());
-        row.setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(owner, 5), PanelStyle.scale(owner, 8),
-            PanelStyle.scale(owner, 5), PanelStyle.scale(owner, 10)));
-        var palette = WorkspacePalette.current(owner);
-        java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
-        Font font = owner.getFont();
-        int sessions = sessionCount.applyAsInt(host);
-        var dot = text("\u25CF", connectionColor(owner, sessions > 0),
-            font.deriveFont(Math.max(8f, font.getSize2D() - 3f)));
-        row.add(dot, BorderLayout.WEST);
-        var identity = new JPanel(null) {
-            @Override public java.awt.Dimension getPreferredSize() {
-                var nameSize = getComponent(0).getPreferredSize(); var addressSize = getComponent(1).getPreferredSize();
-                return new java.awt.Dimension(nameSize.width + PanelStyle.scale(this, 10) + addressSize.width, Math.max(nameSize.height, addressSize.height));
-            }
-            @Override public void doLayout() {
-                int gap = PanelStyle.scale(this, 10);
-                int nameWidth = Math.min(getComponent(0).getPreferredSize().width, Math.max(0, (getWidth() - gap) * 3 / 5));
-                getComponent(0).setBounds(0, 0, nameWidth, getHeight());
-                getComponent(1).setBounds(nameWidth + gap, 0, Math.max(0, getWidth() - nameWidth - gap), getHeight());
-            }
-        };
-        identity.setOpaque(false);
-        identity.add(text(host.name(), foreground, font));
-        identity.add(text(host.hostname(), selected ? mix(foreground, row.getBackground(), .7f) : palette.textMuted(), font));
-        row.add(identity, BorderLayout.CENTER);
-        var trailing = new JPanel(new BorderLayout(4, 0)); trailing.setOpaque(false);
-        var favorite = text(host.favorite() ? "\u2605" : showFavorite ? "\u2606" : "", host.favorite() ? palette.warning() : palette.textMuted(), font);
-        favorite.setPreferredSize(new java.awt.Dimension(favoriteWidth(owner), favorite.getPreferredSize().height));
-        trailing.add(favorite, BorderLayout.EAST);
-        row.add(trailing, BorderLayout.EAST);
-        row.setPreferredSize(new java.awt.Dimension(row.getPreferredSize().width, PanelStyle.scale(owner, 30)));
-        String facts = metadata.apply(host);
-        String description = host.name() + ", " + host.label() + (facts.isBlank() ? "" : ", " + facts)
-            + ", " + sessions + (sessions == 1 ? " session" : " sessions");
-        row.setToolTipText(description);
-        row.getAccessibleContext().setAccessibleName(description);
-        return row;
-    }
-
-    /** A distribution: terminal icon, name, its WSL version as a badge, and the session dot and count as for hosts. */
-    private Component distroRow(JList<?> owner, HostRows.Distro distro, boolean selected) {
-        var row = new JPanel(new BorderLayout(6, 0));
-        row.setOpaque(true);
-        row.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-        row.setBorder(BorderFactory.createEmptyBorder(3, 12, 3, 8));
-        java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
-        Font font = owner.getFont().deriveFont(owner.getFont().getSize2D() + 1);
-        var icon = new JLabel(icons.apply(BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL));
-        icon.setPreferredSize(new java.awt.Dimension(favoriteWidth(owner), icon.getPreferredSize().height));
-        row.add(icon, BorderLayout.WEST);
-        row.add(text(distro.profile().name(), foreground, font), BorderLayout.CENTER);
-        var east = new JPanel();
-        east.setLayout(new BoxLayout(east, BoxLayout.X_AXIS));
-        east.setOpaque(false);
-        String badge = distro.profile().detail().orElse("");
-        if (!badge.isEmpty()) {
-            java.awt.Color muted = WorkspacePalette.current(owner).textMuted();
-            east.add(text(badge, selected || muted == null ? foreground : muted, owner.getFont().deriveFont(Math.max(9f, owner.getFont().getSize2D() - 1f))));
-        }
-        int sessions = distro.sessions();
-        if (sessions > 0) {
-            java.awt.Color active = WorkspacePalette.current(owner).success();
-            east.add(Box.createHorizontalStrut(6));
-            east.add(text("\u25CF", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f))));
-            if (sessions > 1) { east.add(Box.createHorizontalStrut(4)); east.add(text(String.valueOf(sessions), foreground, owner.getFont())); }
-        }
-        row.add(east, BorderLayout.EAST);
-        String description = distro.profile().name() + ", " + (badge.isEmpty() ? HostRows.WSL : badge) + ", " + sessions
-            + (sessions == 1 ? " session" : " sessions");
-        row.setToolTipText(description);
-        row.getAccessibleContext().setAccessibleName(description);
-        return row;
-    }
-
-    private static java.awt.Color mix(java.awt.Color foreground, java.awt.Color background, float weight) {
-        return new java.awt.Color(Math.round(foreground.getRed() * weight + background.getRed() * (1 - weight)),
-            Math.round(foreground.getGreen() * weight + background.getGreen() * (1 - weight)),
-            Math.round(foreground.getBlue() * weight + background.getBlue() * (1 - weight)));
-    }
-
-    private static boolean dark(Component component) {
-        java.awt.Color background = WorkspacePalette.current(component).background();
-        return background.getRed() * .299 + background.getGreen() * .587 + background.getBlue() * .114 < 128;
-    }
-
-    private static java.awt.Color connectionColor(Component component, boolean active) {
-        var palette = WorkspacePalette.current(component);
-        if (dark(component)) return new java.awt.Color(active ? 0x38ba54 : 0x49515c);
-        return active ? palette.success() : palette.textMuted();
-    }
-
-    private static JLabel text(String value, java.awt.Color foreground, Font font) {
-        var label = new JLabel(value); label.putClientProperty("html.disable", true);
-        label.setForeground(foreground); label.setFont(font); return label;
+    @Override public void close() {
+        if (closed) return;
+        closed = true;
+        headerChanged = null;
+        view.close();
     }
 }

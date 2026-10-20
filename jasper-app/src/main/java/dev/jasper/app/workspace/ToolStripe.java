@@ -1,5 +1,10 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeStyles;
+
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -19,14 +24,10 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
 import javax.swing.Icon;
 import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.JToggleButton;
 import javax.swing.UIManager;
@@ -45,11 +46,18 @@ import javax.swing.UIManager;
  * existing button in place via {@link #updateBadge}, and an action's title change renames its button in place via
  * {@link #refreshActions} (the button follows the action's enabled state itself). EDT only.
  */
-final class ToolStripe extends JPanel {
-    /** One tool window's button, with its unread badge if it has one. */
-    record Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge) {
+final class ToolStripe extends DockStripe {
+    /**
+     * One tool window's button, with its unread badge if it has one and the digit its toggle's shortcut ends in, if any;
+     * a rail shows no digit, a labelled stripe starts its label with it.
+     */
+    record Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge, java.util.OptionalInt number) {
         Button(String id, String title, Icon icon, Slot slot, boolean selected) {
-            this(id, title, icon, slot, selected, Optional.empty());
+            this(id, title, icon, slot, selected, Optional.empty(), java.util.OptionalInt.empty());
+        }
+
+        Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge) {
+            this(id, title, icon, slot, selected, badge, java.util.OptionalInt.empty());
         }
     }
 
@@ -61,11 +69,6 @@ final class ToolStripe extends JPanel {
         Rectangle gap;
     }
 
-    Consumer<String> onToggle = id -> { };
-    BiConsumer<String, Slot> onMove = (id, slot) -> { };
-    Consumer<String> onHide = id -> { };
-    /** Hears of each window button a render creates, so that a drag can start from it. */
-    BiConsumer<JComponent, String> dragSource = (component, id) -> { };
     private final Side side;
     private final List<AbstractButton> buttons = new ArrayList<>();
     private final EnumMap<Slot.Group, List<AbstractButton>> groups = new EnumMap<>(Slot.Group.class);
@@ -90,6 +93,7 @@ final class ToolStripe extends JPanel {
         if (side == Side.BOTTOM) throw new IllegalArgumentException("A stripe stands on the left or the right");
         this.side = side;
         getAccessibleContext().setAccessibleName(side == Side.LEFT ? "Left tool windows" : "Right tool windows");
+        AppIcons.chromeReceiver(this);
         render(List.of(), List.of());
         refreshTheme();
     }
@@ -99,8 +103,7 @@ final class ToolStripe extends JPanel {
     private static void style(AbstractButton button) {
         button.setHideActionText(true);
         button.setText(null);
-        button.putClientProperty("JButton.buttonType", "toolBarButton");
-        button.putClientProperty("FlatLaf.style", "arc: 10");
+        NativeStyles.installed().button(button, () -> ThemeZone.theme(button), DesignMetrics.Role.RAIL_BUTTON_ARC);
         button.setMargin(new Insets(0, 0, 0, 0));
         button.setFocusable(false);
     }
@@ -174,7 +177,7 @@ final class ToolStripe extends JPanel {
         AbstractButton button = byId.get(id);
         Button window = windows.get(id);
         if (button == null || window == null) return;
-        Button updated = new Button(window.id(), window.title(), window.icon(), window.slot(), window.selected(), badge);
+        Button updated = new Button(window.id(), window.title(), window.icon(), window.slot(), window.selected(), badge, window.number());
         windows.put(id, updated);
         decorate(button, updated);
         button.repaint();
@@ -182,12 +185,17 @@ final class ToolStripe extends JPanel {
 
     private AbstractButton action(Action action) {
         var button = new JButton(action);
-        Icon icon = action.getValue(Command.ICON) instanceof Icon contributed ? contributed : AppIcons.icon("command");
+        Icon icon = actionIcon(action);
         style(button);
         button.setIcon(icon);
         name(button, action);
         buttons.add(button);
         return button;
+    }
+
+    /** A rail action's icon: the one it contributes ({@code Command.ICON}), else the command glyph. */
+    static Icon actionIcon(Action action) {
+        return action.getValue(Command.ICON) instanceof Icon contributed ? contributed : AppIcons.icon("command");
     }
 
     /** Names the action's button after the action's current title, in its tooltip and its accessible name. */
@@ -213,6 +221,9 @@ final class ToolStripe extends JPanel {
     /** True when there are neither tool windows nor actions on this stripe. */
     boolean empty() { return buttons.isEmpty(); }
 
+    /** True when the window's button, if it has one here, is all this stripe has: moving it away empties it. */
+    boolean emptyWithout(String id) { return buttons.stream().allMatch(button -> id.equals(ids.get(button))); }
+
     /** Every button, top to bottom: the groups' toggles and the actions. */
     List<AbstractButton> buttons() { return List.copyOf(buttons); }
 
@@ -236,6 +247,9 @@ final class ToolStripe extends JPanel {
         if (actionsSeparator == null && !actions.isEmpty()) actionsSeparator = dragSeparator();
         doLayout(); repaint();
     }
+
+    /** A rail's gap is one button's step whatever the label and the icon. */
+    @Override void beginDrag(String id, String label, Icon icon) { beginDrag(id); }
 
     private JSeparator dragSeparator() {
         var separator = new JSeparator();
@@ -284,7 +298,7 @@ final class ToolStripe extends JPanel {
         return result;
     }
 
-    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(railWidth), UIScale.scale(80)); }
+    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(railWidth), NativeStyles.installed().metric(DesignMetrics.Role.RAIL_MIN_HEIGHT)); }
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 
     @Override public void doLayout() {
@@ -301,26 +315,26 @@ final class ToolStripe extends JPanel {
      */
     private Placement place(boolean withGap) {
         var placement = new Placement();
-        int x = UIScale.scale(3), square = UIScale.scale(railWidth - 6), step = square + UIScale.scale(4);
-        int y = column(Slot.Group.TOP, UIScale.scale(4), x, square, step, withGap, placement);
+        int x = NativeStyles.installed().metric(DesignMetrics.Role.RAIL_EDGE), square = UIScale.scale(railWidth - 6), step = square + NativeStyles.installed().metric(DesignMetrics.Role.RAIL_GAP);
+        int y = column(Slot.Group.TOP, NativeStyles.installed().metric(DesignMetrics.Role.RAIL_GAP), x, square, step, withGap, placement);
         int split = y;
         if (secondSeparator != null && (dragging || !groups.get(Slot.Group.SECOND).isEmpty())) {
             placement.bounds.put(secondSeparator, separator(y));
-            split = y + UIScale.scale(4);
-            y += UIScale.scale(8);
+            split = y + NativeStyles.installed().metric(DesignMetrics.Role.RAIL_GAP);
+            y += NativeStyles.installed().metric(DesignMetrics.Role.RAIL_SECTION_GAP);
         }
         y = column(Slot.Group.SECOND, y, x, square, step, withGap, placement);
         if (actionsSeparator != null) {
             placement.bounds.put(actionsSeparator, separator(y));
-            y += UIScale.scale(8);
+            y += NativeStyles.installed().metric(DesignMetrics.Role.RAIL_SECTION_GAP);
         }
         for (AbstractButton action : actions) {
             placement.bounds.put(action, new Rectangle(x, y, square, square));
             y += step;
         }
         int count = footCount(withGap);
-        int footHeight = count == 0 ? 0 : count * step - UIScale.scale(4);
-        int footY = Math.max(y, getHeight() - UIScale.scale(4) - footHeight);
+        int footHeight = count == 0 ? 0 : count * step - NativeStyles.installed().metric(DesignMetrics.Role.RAIL_GAP);
+        int footY = Math.max(y, getHeight() - NativeStyles.installed().metric(DesignMetrics.Role.RAIL_GAP) - footHeight);
         column(Slot.Group.FOOT, footY, x, square, step, withGap, placement);
         int boundary = (y + footY) / 2;
         placement.groups.put(Slot.Group.TOP, new Rectangle(0, 0, getWidth(), split));
@@ -330,7 +344,7 @@ final class ToolStripe extends JPanel {
     }
 
     private Rectangle separator(int y) {
-        return new Rectangle(UIScale.scale(7), y + UIScale.scale(3), UIScale.scale(railWidth - 14), UIScale.scale(1));
+        return new Rectangle(NativeStyles.installed().metric(DesignMetrics.Role.RAIL_SEPARATOR_INSET), y + NativeStyles.installed().metric(DesignMetrics.Role.RAIL_EDGE), UIScale.scale(railWidth - 14), NativeStyles.installed().metric(DesignMetrics.Role.HAIRLINE));
     }
 
     /** The group's shown buttons, the lifted one left out. */
@@ -374,7 +388,7 @@ final class ToolStripe extends JPanel {
     }
 
     void refreshTheme() {
-        setBackground(UIManager.getColor("Jasper.titleBackground"));
+        setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
         repaint();
     }
 }

@@ -4,7 +4,6 @@ import dev.jasper.sdk.Subscription;
 import java.util.function.BooleanSupplier;
 import java.nio.file.Path;
 import java.util.Optional;
-import javax.swing.JComponent;
 
 /**
  * What plugin windows and dialogs share. The application owns the frame, title bar, icon, menu bar,
@@ -12,12 +11,9 @@ import javax.swing.JComponent;
  * closes at once, without consulting {@link #onClosing} guards, and is idempotent.
  */
 public interface WindowSurface extends Subscription {
-    /**
-     * Replaces the content.
-     *
-     * @param content ordinary Swing components
-     */
-    void setContent(JComponent content);
+
+    /** Mounts an owned view. Replacement and final closure dispose it exactly once. */
+    void setContent(UiView content);
 
     /** Shows the surface; overlays return immediately. For a modal dialog this returns after the dialog has closed. */
     void show();

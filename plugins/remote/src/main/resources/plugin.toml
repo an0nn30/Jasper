@@ -1,11 +1,14 @@
 id = "dev.jasper.remote"
 name = "Remote"
-version = "0.11.0"
+version = "0.15.0"
 entry = "dev.jasper.remote.RemotePlugin"
-sdk = ">=0.14.2, <0.15"
-description = "SSH, SFTP and tunnels: browsing, persistent file transfers, editing remote files in the Editor, local, remote and SOCKS tunnels with live counters, and saved hosts with groups and favorites, managed Vault imports and optional SSH-agent authentication, ProxyJump, host-key trust, a Sessions panel that also lists WSL distributions, and palette scopes."
+sdk = ">=0.18.2, <0.19"
+description = "SSH, SFTP and tunnels: browsing, persistent file transfers, editing remote files in the Editor, local, remote and SOCKS tunnels with live counters, and saved hosts with groups and favorites, managed Vault imports and optional SSH-agent authentication, ProxyJump, host-key trust, a Sessions panel that also lists WSL distributions, and palette scopes. It also lets other plugins index projects on saved hosts."
 vendor = "Jasper"
+icon_hue = "green"
+icon_selected_ink = "foreground"
 icon = "icons/remote.svg"
 homepage = "https://github.com/an0nn30/Jasper"
 capabilities = ["terminal.open", "session.provide", "terminal.observe", "palette.contribute", "files.source"]
 requires = [{ id = "dev.jasper.vault", version = ">=0.2", optional = true }, { id = "dev.jasper.editor", version = ">=0.2", optional = true }]
+exports = ["dev.jasper.remote.api"]

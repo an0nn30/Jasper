@@ -1,5 +1,7 @@
 package dev.jasper.app.documentation;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -19,15 +21,16 @@ class AppDocumentationTest {
         "docs/rebranding.md", "docs/terminal-readiness.md", "docs/terminal-refactor-verification.md",
         "docs/app-refactor-verification.md", "docs/documentation-audit.md",
         "packaging/icons/README.md", "packaging/buddy/README.md",
-        "jasper-sdk/README.md", "docs/sdk-architecture.md", "docs/plugin-authoring.md")
+        "jasper-sdk/README.md", "docs/sdk-architecture.md", "docs/plugin-authoring.md", "docs/plugin-ui.md")
         .stream().map(ROOT::resolve).toList();
 
     @Test void guideLinksResolveAndExamplesMatchCompiledSource() throws Exception {
         String source = Files.readString(ROOT.resolve("jasper-app/src/test/java/dev/jasper/app/documentation/AppExamplesTest.java"));
         source += "\n" + Files.readString(ROOT.resolve("jasper-buddy/src/test/java/dev/jasper/buddy/documentation/BuddyExamplesTest.java"));
         source += "\n" + Files.readString(ROOT.resolve("plugins/sample/src/main/java/dev/jasper/sample/SamplePlugin.java"));
+        source += "\n" + Files.readString(ROOT.resolve("jasper-app/src/test/java/dev/jasper/app/documentation/PluginUiExamplesTest.java"));
         var guides = new java.util.ArrayList<>(GUIDES);
-        // Dated records retain old code examples, but their local links must still resolve.
+        // Dated records retain old code examples: they get the link check only, not the example snippets.
         for (String directory : List.of("docs/superpowers", "docs/design", "docs/benchmarks")) {
             try (var files = Files.walk(ROOT.resolve(directory))) {
                 guides.addAll(files.filter(path -> path.toString().endsWith(".md")).toList());
@@ -36,12 +39,12 @@ class AppDocumentationTest {
         for (Path guide : guides) {
             assertThat(guide).exists();
             String text = Files.readString(guide);
-            var links = Pattern.compile("\\[[^\\]]*]\\(([^)]+)\\)").matcher(text.replaceAll("(?s)```.*?```", ""));
+            var links = Pattern.compile("\\[[^\\]]*]\\(([^)]+)\\)").matcher(withoutCode(text));
             while (links.find()) {
                 String link = links.group(1);
                 if (link.matches("[a-zA-Z][a-zA-Z0-9+.-]*:.*")) continue;
                 String[] parts = link.split("#", 2);
-                Path target = parts[0].isEmpty() ? guide : guide.getParent().resolve(parts[0]).normalize();
+                Path target = parts[0].isEmpty() ? guide : guide.getParent().resolve(linkPath(parts[0])).normalize();
                 assertThat(target).as("%s: %s", guide, link).exists();
                 if (parts.length == 2 && target.toString().endsWith(".md")) {
                     List<String> anchors = Files.readAllLines(target).stream().filter(l -> l.startsWith("#"))
@@ -50,6 +53,7 @@ class AppDocumentationTest {
                     assertThat(anchors).as("%s: fragment %s", target, parts[1]).contains(parts[1]);
                 }
             }
+            if (!GUIDES.contains(guide)) continue;
             var snippets = Pattern.compile("<!-- example:([a-z]+) -->\\s*```java\\n(.*?)```", Pattern.DOTALL).matcher(text);
             while (snippets.find()) {
                 String name = snippets.group(1);
@@ -58,6 +62,45 @@ class AppDocumentationTest {
                 assertThat(snippets.group(2).stripIndent().strip()).as("compiled example %s", name).isEqualTo(snippet);
             }
         }
+    }
+
+    @Test void fencesCloseOnlyOnALineOfAtLeastAsManyBackticks() {
+        String text = String.join("\n",
+            "Before [kept](a.md).",
+            "`````bash",
+            " ```json",
+            " [inside](nowhere.md)",
+            " ```",
+            "`````",
+            "Between [kept too](b.md).",
+            "  ```toml",
+            "  [also inside](nowhere.md)",
+            "  ```",
+            "After.");
+        assertThat(withoutCode(text)).contains("[kept](a.md)", "[kept too](b.md)", "After.").doesNotContain("nowhere.md");
+    }
+
+    @Test void linkDestinationsAreDecodedBeforeTheyAreResolvedAsPaths() {
+        assertThat(linkPath("01%20Workstation")).isEqualTo("01 Workstation");
+        assertThat(linkPath("a+b/caf%C3%A9.md")).isEqualTo("a+b/café.md");
+        assertThat(linkPath("100%")).as("a malformed escape is kept so the missing-file message shows it").isEqualTo("100%");
+    }
+
+    /** The file path a Markdown link destination names: percent-escapes decoded, a literal plus kept. */
+    static String linkPath(String destination) {
+        try {
+            return URLDecoder.decode(destination.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException malformedEscape) {
+            return destination;
+        }
+    }
+
+    /**
+     * {@code text} without its fenced code blocks, CommonMark-style: a fence of three or more backticks (optionally
+     * indented) closes only on a line holding nothing but at least as many backticks, so a fence can hold shorter ones.
+     */
+    static String withoutCode(String text) {
+        return text.replaceAll("(?ms)^[ \\t]*(`{3,})[^\\n]*$.*?^[ \\t]*\\1`*[ \\t]*$", "");
     }
 
     @Test void everyProductionPackageHasAnOwnershipContract() throws Exception {

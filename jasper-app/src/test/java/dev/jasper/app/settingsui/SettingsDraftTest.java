@@ -63,4 +63,19 @@ class SettingsDraftTest {
         assertThat(SearchText.matches("Terminal font size", "font colour")).isFalse();
         assertThat(SearchText.matches("anything", "   ")).isFalse();
     }
+
+    /** The template's [notifications.groups] header is uncommented: an empty table holds nothing, so it is no change. */
+    @Test void anEmptyTableIsTheSameAsNoTable() {
+        var draft = new SettingsDraft(values("[notifications.groups]\n"));
+        draft.stage(CoreSettings.NOTIFICATIONS_GROUPS, Optional.of(Map.of("jasper.commands", "history")));
+        assertThat(draft.modified()).isTrue();
+        draft.stage(CoreSettings.NOTIFICATIONS_GROUPS, Optional.empty());
+        assertThat(draft.modified()).as("back to no entries").isFalse();
+
+        var reset = new SettingsDraft(values("[notifications.groups]\n\"jasper.commands\" = \"off\"\n"));
+        reset.stage(CoreSettings.NOTIFICATIONS_GROUPS, Optional.empty());
+        assertThat(reset.modified()).isTrue();
+        reset.rebase(values("[notifications.groups]\n"));
+        assertThat(reset.modified()).as("the file now holds what the reset would write").isFalse();
+    }
 }

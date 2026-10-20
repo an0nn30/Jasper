@@ -18,11 +18,11 @@ import javax.swing.SwingUtilities;
 public final class PaletteController implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(PaletteController.class.getName());
     /** Rows the empty query offers: this many recently used, then ranked ones up to the total. */
-    static final int RECENT_ROWS = 2, SUGGESTED_ROWS = 10;
+    static final int RECENT_ROWS = 3, SUGGESTED_ROWS = 10;
     private final ScopeRegistry scopes;
     private final dev.jasper.app.commands.CommandHistory history;
     private final boolean macOs;
-    private final CommandPalette palette;
+    private final PaletteView palette;
     private final Runnable layout, dismissed, updateActions;
     private final BooleanSupplier batching;
     private final Consumer<String> reportError, reopen;
@@ -36,17 +36,25 @@ public final class PaletteController implements AutoCloseable {
     private PaletteScope stepScope;
     private PaletteContext context;
     private BooleanSupplier originValid = () -> false;
+    /** The Run window's live target (plan 8b Rulings 4): its window's current pane, read before every search and run. */
+    private java.util.function.Supplier<PaletteTarget> follow;
     private boolean open, closed, completing, dirty = true, rosterChanged;
     private long generation;
 
-    public PaletteController(ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history, boolean macOs,
-                      Runnable layout, Runnable dismissed, BooleanSupplier batching, Runnable updateActions,
-                      Consumer<String> reportError, Consumer<String> reopen) {
+    /**
+     * A controller whose view {@code look} names (spec 11.1); {@code openerShortcut} is the opener's current shortcut text
+     * and {@code browse} runs File, Open File… (spec 11.7).
+     */
+    public PaletteController(dev.jasper.ui.swing.KitContext kit, dev.jasper.app.presentation.PaletteLook look, ScopeRegistry scopes,
+                      dev.jasper.app.commands.CommandHistory history, boolean macOs, Runnable layout, Runnable dismissed,
+                      BooleanSupplier batching, Runnable updateActions, Consumer<String> reportError, Consumer<String> reopen,
+                      java.util.function.Supplier<String> openerShortcut, Runnable browse) {
         this.scopes = scopes; this.history = java.util.Objects.requireNonNull(history); this.macOs = macOs; this.layout = layout; this.dismissed = dismissed;
         this.batching = batching; this.updateActions = updateActions;
         this.reportError = reportError; this.reopen = reopen;
         context = new PaletteContext(macOs, PaletteTarget.none());
-        palette = new CommandPalette(macOs, this::queryChanged, this::execute, this::prefix, scope -> selectTab(scope.id()));
+        palette = PaletteViews.of(look, kit, macOs, new PaletteView.Host(this::queryChanged, this::execute, this::prefix,
+            scope -> selectTab(scope == null ? PaletteScope.ALL_ID : scope.id()), this::modeScopes, openerShortcut, this::dismiss, browse));
         scopesListener = scopes.onChanged(this::rosterChanged);
     }
 
@@ -64,23 +72,29 @@ public final class PaletteController implements AutoCloseable {
     /**
      * As {@link #open(String, PaletteTarget, BooleanSupplier)}; afterwards {@code queryOrNull} replaces the
      * query text and {@code rowIdOrNull} selects a row of the resulting list. Opening the chip that is
-     * already showing dismisses instead, and then neither is applied.
+     * already showing dismisses the card instead, and then neither is applied; the Run window focuses its field and
+     * rebuilds its list for the current target.
      */
     public boolean open(String tabId, PaletteTarget target, BooleanSupplier valid, String queryOrNull, String rowIdOrNull) {
         if (closed || !hasScope(tabId)) return false;
         if (open) {
-            if (tabId.equals(tab)) { dismiss(); return false; }
-            activate(tabId);
+            if (!tabId.equals(tab)) activate(tabId);
+            // The Run window stays open: its opener focuses it, its rows follow the pane the person left (the list ranks by
+            // the target's folder and project) and a query or row it carries applies (spec 11.6, Execution notes R8); the
+            // card closes.
+            else if (palette.modeless()) { palette.focusQuery(); rebuild(true); }
+            else { dismiss(); return false; }
         } else {
             generation++;
             originValid = valid;
             context = new PaletteContext(macOs, target);
-            palette.queryField().setText("");
+            palette.setQueryText("");
             open = true;
-            palette.setVisible(true);
+            palette.component().setVisible(true);
+            palette.opened();
             activate(tabId);
         }
-        if (queryOrNull != null) palette.queryField().setText(queryOrNull);
+        if (queryOrNull != null) palette.setQueryText(queryOrNull);
         if (rowIdOrNull != null) palette.selectRow(rowIdOrNull);
         return true;
     }
@@ -115,7 +129,7 @@ public final class PaletteController implements AutoCloseable {
     }
 
     private void showChip() {
-        palette.setChip(active == null ? null : active.label(), active == null ? null : active.icon());
+        palette.setChip(active);
         palette.setPlaceholder(active == null ? "Search everything" : active.placeholder());
     }
 
@@ -129,10 +143,23 @@ public final class PaletteController implements AutoCloseable {
     public int visibleRows() { return palette.visibleRows(); }
     public void dismiss() { if (open) restoreAndHide(); }
     public boolean isOpen() { return open; }
+    /** Whether the view stays open while the person works elsewhere (the Run window). */
+    public boolean modeless() { return palette.modeless(); }
+    /** Whether {@code component} is inside the view. */
+    public boolean owns(java.awt.Component component) {
+        return component != null && javax.swing.SwingUtilities.isDescendingFrom(component, palette.component());
+    }
+    /** Until the palette closes, rebuilds its context from {@code target} before every search and every run. */
+    public void follow(java.util.function.Supplier<PaletteTarget> target) { follow = target; }
+
+    private void retarget() { if (follow != null) context = new PaletteContext(macOs, follow.get()); }
     /** The chip: {@link PaletteScope#ALL_ID} for none, or a scope id; null while closed. */
     public String activeScopeId() { return tab; }
     public boolean composing() { return palette.composing(); }
-    public CommandPalette component() { return palette; }
+    /** The view's Swing surface. */
+    public javax.swing.JComponent component() { return palette.component(); }
+    /** The view this controller drives. */
+    public PaletteView view() { return palette; }
 
     /** Enter and its modifier variants: completes an open step, otherwise acts on the selected entry. */
     public void enterPressed(int verb) {
@@ -160,7 +187,7 @@ public final class PaletteController implements AutoCloseable {
 
     /** Backspace in an empty query removes the chip; false leaves the key to the field. */
     public boolean backspacePressed() {
-        if (!open || step != null || active == null || !palette.queryField().getText().isEmpty()) return false;
+        if (!open || step != null || active == null || !palette.queryText().isEmpty()) return false;
         activate(PaletteScope.ALL_ID);
         return true;
     }
@@ -212,8 +239,12 @@ public final class PaletteController implements AutoCloseable {
                 if (seen.add(item.key())) ranked.add(item);
             }
         }
-        if (!recent.isEmpty()) { entries.add(new PaletteEntry.Header("Recently used")); entries.addAll(recent); }
-        if (!ranked.isEmpty()) { entries.add(new PaletteEntry.Header(used ? "Most used" : "Suggested")); entries.addAll(ranked); }
+        if (!recent.isEmpty()) { entries.add(new PaletteEntry.Header(PaletteEntry.Header.Kind.RECENT, "Recently used")); entries.addAll(recent); }
+        if (!ranked.isEmpty()) {
+            entries.add(used ? new PaletteEntry.Header(PaletteEntry.Header.Kind.USED, "Most used")
+                : new PaletteEntry.Header(PaletteEntry.Header.Kind.SUGGESTED, "Suggested"));
+            entries.addAll(ranked);
+        }
     }
 
     /** The row a use names, found by searching its title in its scope; empty when the scope or row is gone. */
@@ -248,7 +279,7 @@ public final class PaletteController implements AutoCloseable {
         completing = false;
         palette.hideStep();
         rebuild(true);
-        palette.queryField().requestFocusInWindow();
+        palette.focusQuery();
     }
 
     private void completeStep() {
@@ -269,7 +300,7 @@ public final class PaletteController implements AutoCloseable {
                     restoreAndHide();
                     if (result.reopenScopeId() != null) {
                         reopen.accept(result.reopenScopeId());
-                        if (open && result.reopenQuery() != null) palette.queryField().setText(result.reopenQuery());
+                        if (open && result.reopenQuery() != null) palette.setQueryText(result.reopenQuery());
                         if (open && result.reopenRowId() != null) palette.selectRow(result.reopenRowId());
                     }
                 };
@@ -338,14 +369,15 @@ public final class PaletteController implements AutoCloseable {
     private void rebuild(boolean preserve) {
         if (!open || tab == null) return;
         if (step != null) { dirty = true; return; }
+        retarget();
         dirty = false;
         String keep = preserve ? palette.selectedKey() : null;
-        String query = palette.queryField().getText();
+        String query = palette.queryText();
         var entries = new ArrayList<PaletteEntry>();
         String initial = null;
         if (active != null) {
             PaletteResults results = active.search(query, context);
-            if (results.sectionLabel() != null && !results.rows().isEmpty()) entries.add(new PaletteEntry.Header(results.sectionLabel()));
+            if (results.sectionLabel() != null && !results.rows().isEmpty()) entries.add(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, results.sectionLabel()));
             for (PaletteRow row : results.rows()) entries.add(new PaletteEntry.Item(active, row));
             if (results.initialSelectionId() != null) initial = PaletteEntry.key(active, results.initialSelectionId());
         } else if (query.isBlank()) {
@@ -367,7 +399,7 @@ public final class PaletteController implements AutoCloseable {
                 }
                 if (results.rows().isEmpty()) continue;
                 List<PaletteRow> shown = results.rows().subList(0, Math.min(remaining, results.rows().size()));
-                entries.add(new PaletteEntry.Header(scope.label()));
+                entries.add(new PaletteEntry.Header(PaletteEntry.Header.Kind.MATCHES, scope.label()));
                 for (PaletteRow row : shown) entries.add(new PaletteEntry.Item(scope, row));
                 if (results.rows().size() > shown.size()) entries.add(new PaletteEntry.More(scope));
                 remaining -= shown.size();
@@ -383,6 +415,7 @@ public final class PaletteController implements AutoCloseable {
 
     private void execute(PaletteEntry entry, int verbIndex) {
         if (!open) return;
+        retarget();
         if (entry instanceof PaletteEntry.More more) { selectTab(more.scope().id()); return; }
         if (!(entry instanceof PaletteEntry.Item item)) return;
         PaletteScope scope = item.scope();
@@ -407,8 +440,8 @@ public final class PaletteController implements AutoCloseable {
 
     private void restoreAndHide() {
         generation++;
-        open = false; step = null; stepScope = null; completing = false;
-        palette.hideStep(); palette.setVisible(false);
+        open = false; step = null; stepScope = null; completing = false; follow = null;
+        palette.hideStep(); palette.component().setVisible(false);
         tabListeners.forEach(Subscription::close);
         tabListeners.clear();
         tab = null;
@@ -422,5 +455,6 @@ public final class PaletteController implements AutoCloseable {
         if (closed) return;
         dismiss(); closed = true; generation++;
         scopesListener.close();
+        palette.close();
     }
 }

@@ -44,7 +44,8 @@ public final class PluginsPage implements SettingsPage {
 
     @Override public JComponent component() {
         if (body != null) return body;
-        panel = manager.attach(context.surface(), context.navigate());
+        panel = manager.attach(context.surface(), context.navigate(), context.kit(),
+            context.composition() == dev.jasper.app.presentation.Composition.CLASSIC ? PluginShape.CLASSIC : PluginShape.ROWS);
         body = new FillingPage(panel);
         return body;
     }

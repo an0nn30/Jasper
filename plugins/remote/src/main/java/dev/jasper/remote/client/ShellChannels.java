@@ -5,9 +5,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.sshd.client.channel.ChannelShell;
+import org.apache.sshd.client.channel.ChannelExec;
+import org.apache.sshd.client.channel.PtyCapableChannelSession;
 import org.apache.sshd.client.session.ClientSession;
 import org.apache.sshd.common.channel.PtyChannelConfiguration;
 
@@ -19,12 +21,19 @@ final class ShellChannels {
      * Blocks (background thread) until the channel is open. {@code released} runs exactly once, on the
      * caller's thread of {@code close}, after the channel is closed; the registry drops a reference there.
      */
-    static TerminalConnection open(ClientSession session, int columns, int rows, Duration timeout, Runnable entered, Runnable released) throws IOException {
+    static TerminalConnection open(ClientSession session, int columns, int rows, Duration timeout, Runnable entered, Runnable released,
+                                   Optional<String> folder) throws IOException {
         var pty = new PtyChannelConfiguration();
         pty.setPtyType(TerminalConnection.TERM);
         pty.setPtyColumns(Math.max(1, columns)); pty.setPtyLines(Math.max(1, rows));
         pty.setPtyWidth(Math.max(1, columns) * 8); pty.setPtyHeight(Math.max(1, rows) * 16);
-        ChannelShell channel = session.createShellChannel(pty, Map.of("TERM", TerminalConnection.TERM, "COLORTERM", "truecolor"));
+        Map<String, String> env = Map.of("TERM", TerminalConnection.TERM, "COLORTERM", "truecolor");
+        PtyCapableChannelSession channel;
+        if (folder.isPresent()) {
+            ChannelExec exec = session.createExecChannel(StartFolder.command(folder.get()), pty, env);
+            exec.setUsePty(true);
+            channel = exec;
+        } else channel = session.createShellChannel(pty, env);
         var exited = new CompletableFuture<Integer>();
         var releasedOnce = new AtomicBoolean();
         Runnable release = () -> { if (releasedOnce.compareAndSet(false, true)) released.run(); };

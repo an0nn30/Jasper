@@ -1,33 +1,50 @@
 package dev.jasper.remote.ui;
 
 import dev.jasper.remote.client.HostKeyVerifier;
-import java.awt.BorderLayout;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiKit;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
 
-/** The unknown-host-key question: Cancel, Connect once, Trust and connect. */
-public final class HostKeyPanel extends JPanel {
-    final JLabel text;
-    final JButton cancel = new JButton("Cancel"), once = new JButton("Connect once"), trust = new JButton("Trust and connect");
+/**
+ * The unknown-host-key question: Cancel, Connect once, Trust and connect. None is the form's primary, so Enter never
+ * trusts a key (the former dialog had no default button); Escape cancels, as closing the dialog does. The host, key type
+ * and fingerprint are literal text, the fingerprint in the code face. UI thread only.
+ */
+public final class HostKeyPanel implements AutoCloseable {
+    public static final String FORM = "host-key", AUTHENTICITY = "host-key.authenticity", KEY_TYPE = "host-key.type",
+        FINGERPRINT = "host-key.fingerprint", ADVICE = "host-key.advice", CANCEL = "host-key.cancel", ONCE = "host-key.once", TRUST = "host-key.trust";
+    private final UiView view;
+    private boolean closed;
 
-    public HostKeyPanel(HostKeyVerifier.Question question, Consumer<HostKeyVerifier.Decision> decide) {
-        super(new BorderLayout(0, 12));
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
-        text = new JLabel("<html>The authenticity of <b>" + escape(question.host()) + "</b> port " + question.port() + " can't be established.<br>"
-            + escape(question.keyType()) + " key fingerprint: <code>" + escape(question.fingerprint()) + "</code><br>Compare it with the server's before trusting.</html>");
-        add(text, BorderLayout.CENTER);
-        var buttons = new JPanel(); buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.add(cancel); buttons.add(Box.createHorizontalGlue()); buttons.add(once); buttons.add(Box.createHorizontalStrut(8)); buttons.add(trust);
-        add(buttons, BorderLayout.SOUTH);
-        cancel.addActionListener(event -> decide.accept(HostKeyVerifier.Decision.CANCEL));
-        once.addActionListener(event -> decide.accept(HostKeyVerifier.Decision.ONCE));
-        trust.addActionListener(event -> decide.accept(HostKeyVerifier.Decision.TRUST));
+    public HostKeyPanel(UiKit kit, HostKeyVerifier.Question question, Consumer<HostKeyVerifier.Decision> decide) {
+        var sections = List.<Nodes.Node>of(
+            new Nodes.Text(AUTHENTICITY, ControlState.READY, "The authenticity of " + question.host() + " port " + question.port() + " can't be established.", Nodes.TextRole.BODY),
+            new Nodes.Text(KEY_TYPE, ControlState.READY, question.keyType() + " key fingerprint:", Nodes.TextRole.BODY),
+            new Nodes.Text(FINGERPRINT, ControlState.READY, question.fingerprint(), Nodes.TextRole.MONO),
+            new Nodes.Text(ADVICE, ControlState.READY, "Compare it with the server's before trusting.", Nodes.TextRole.BODY));
+        var actions = List.of(
+            new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
+            new Nodes.Button(ONCE, ControlState.READY, "Connect once", "", Nodes.ButtonKind.SECONDARY, ONCE, ""),
+            new Nodes.Button(TRUST, ControlState.READY, "Trust and connect", "", Nodes.ButtonKind.SECONDARY, TRUST, ""));
+        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.FULL, "Verify host key", Optional.empty(), sections, Optional.empty(), actions, CANCEL);
+        view = kit.create(new ViewSpec(form), event -> {
+            if (closed || !(event instanceof UiEvent.Action action)) return;
+            switch (action.id()) {
+                case CANCEL -> decide.accept(HostKeyVerifier.Decision.CANCEL);
+                case ONCE -> decide.accept(HostKeyVerifier.Decision.ONCE);
+                case TRUST -> decide.accept(HostKeyVerifier.Decision.TRUST);
+                default -> { }
+            }
+        });
     }
 
-    static String escape(String value) { return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"); }
+    public UiView view() { return view; }
+
+    @Override public void close() { if (closed) return; closed = true; view.close(); }
 }

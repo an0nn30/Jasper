@@ -17,9 +17,11 @@ import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -59,6 +61,8 @@ final class WindowContributions implements AutoCloseable {
     private final DockState dock;
     private final Consumer<DockState.Change> docked = this::docked;
     private final Map<String, PanelInstance> panels = new LinkedHashMap<>();
+    /** In Zen, the panels that showed before it, which show again when it ends and stay saved as showing; else null. */
+    private Set<String> beforeZen;
     private Subscription panelRequests;
 
     WindowContributions(WindowContent owner, Contributions model, UiState state) {
@@ -66,12 +70,14 @@ final class WindowContributions implements AutoCloseable {
         this.model = model;
         this.state = state;
         this.dock = owner.dock();
+        // A window restored in Zen remembers its saved panels for leaving it instead of showing them.
+        if (owner.zenMode()) beforeZen = new LinkedHashSet<>();
         syncActions();
         owner.chrome().connect(this);
         renderStatus();
         restoreSizes();
-        for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) {
-            stripe.onToggle = this::togglePanel;
+        for (DockStripe stripe : owner.stripes().all()) {
+            stripe.onToggle = this::toggleAndActivate;
             stripe.onMove = this::movePanel;
             stripe.onHide = this::hidePanel;
         }
@@ -79,6 +85,7 @@ final class WindowContributions implements AutoCloseable {
         owner.area().onHide = this::hidePanel;
         owner.dockDrag().onDrop = this::dropped;
         owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
+        owner.dockDrag().labels = this::stripeLabel;
         dock.addListener(docked);
         panelRequests = model.onPanelRequest(this::requested);
         paletteRequests = model.onPaletteRequest(this::requestedPalette);
@@ -103,12 +110,42 @@ final class WindowContributions implements AutoCloseable {
 
     void applyAccelerators() {
         actions.forEach((id, action) -> action.putValue(Action.ACCELERATOR_KEY, owner.bindings().strokeFor(id).orElse(null)));
+        // A rebind that changes a toggle's digit renames its labelled stripe's label at once (spec 10.7); under the
+        // icon rails every number is empty, so this never re-renders them.
+        if (!numbers().equals(numbers)) renderStripes();
+    }
+
+    /** The digits the stripes last showed, by panel id. */
+    private Map<String, java.util.OptionalInt> numbers = Map.of();
+
+    /** Each docked panel's stripe digit under the window's keymap now. */
+    private Map<String, java.util.OptionalInt> numbers() {
+        var current = new LinkedHashMap<String, java.util.OptionalInt>();
+        for (PanelInstance panel : panels.values()) current.put(panel.entry.id(), number(panel));
+        return current;
+    }
+
+    /**
+     * The digit a panel's label shows: its toggle's under the window's keymap, on labelled stripes only. The icon rails
+     * show no digit, so under them every number is empty and a rebind never re-renders (and so never cancels a drag).
+     */
+    private java.util.OptionalInt number(PanelInstance panel) {
+        if (!(owner.stripes() instanceof StripeSet.LabelledStripes)) return java.util.OptionalInt.empty();
+        return StripeNumbers.of(owner.bindings().strokeFor(panel.entry.toggleActionId()));
+    }
+
+    /** A panel's stripe label, as a drag's gap measures it. */
+    private String stripeLabel(String id) {
+        PanelInstance panel = panels.get(id);
+        if (panel == null) return "";
+        return StripeLabels.text(new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), Slot.LEFT_TOP, false,
+            panel.entry.badge(), number(panel)));
     }
 
     /** From a shortcut, the palette, a menu, the toolbar or a status item. */
     void invoke(String id) {
         if (dev.jasper.app.platform.WindowInput.blocked(owner)) return;
-        if (owner.closed() || owner.commandPalette() != null && owner.commandPalette().isOpen()) return;
+        if (owner.closed() || owner.commandPalette() != null && owner.commandPalette().blocksActions()) return;
         Optional<java.util.UUID> pane = Optional.ofNullable(owner.currentPane()).map(TerminalPane::id);
         model.action(id).ifPresent(entry -> entry.invoke(new Contributions.Invocation(owner.id(), pane)));
     }
@@ -149,10 +186,47 @@ final class WindowContributions implements AutoCloseable {
             case SHOW -> showPanel(request.panelId());
             case HIDE -> hidePanel(request.panelId());
             case TOGGLE -> togglePanel(request.panelId());
+            case ACTIVATING_TOGGLE -> activatingToggle(request.panelId());
+            case ACTIVATING_SHOW -> showAndActivate(request.panelId());
         }
     }
 
     private void togglePanel(String id) { if (panels.containsKey(id)) dock.toggle(id); }
+
+    /** A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). */
+    private void toggleAndActivate(String id) {
+        if (!panels.containsKey(id)) return;
+        // Standard frames activate nothing, so a window replaced there still hands focus back to the terminal.
+        activating = owner.area().flush() ? id : null;
+        try { dock.toggle(id); } finally { activating = null; }
+        if (dock.visible(id)) owner.area().activate(id);
+    }
+
+    /**
+     * A toggle by the user's View action or the panel's own toggle action, as IntelliJ's ActivateToolWindowAction: under
+     * flush frames a visible tool window that is not the active one is activated, and only the active one hides; else a
+     * toggle that activates what it shows. A stripe click stays {@link #toggleAndActivate}.
+     */
+    private void activatingToggle(String id) {
+        if (!panels.containsKey(id)) return;
+        var area = owner.area();
+        if (area.flush() && dock.visible(id) && !area.focusedSlot().equals(dock.slot(id))) { area.activate(id); return; }
+        toggleAndActivate(id);
+    }
+
+    /** A show by the panel's own toggle action: the panel becomes the active tool window under flush frames (plan 15b Rulings 1). */
+    private void showAndActivate(String id) {
+        if (!panels.containsKey(id)) return;
+        activating = owner.area().flush() ? id : null;
+        try { dock.show(id); } finally { activating = null; }
+        if (dock.visible(id)) owner.area().activate(id);
+    }
+
+    /**
+     * The panel a user gesture is toggling or showing and activating, or null: when it shows in place of another window,
+     * focus is not handed back to the terminal, whose focus events would otherwise land after the activation and undo it.
+     */
+    private String activating;
 
     private void showPanel(String id) { if (panels.containsKey(id)) dock.show(id); }
 
@@ -192,7 +266,8 @@ final class WindowContributions implements AutoCloseable {
 
     /**
      * Docks new panels where they were saved (a saved slot wins over the default) or at the end of their default
-     * slot's group, showing those that showed; undocks the panels that left the model and discards their instances.
+     * slot's group, showing those that showed (in Zen, remembering them for when it ends); undocks the panels that left
+     * the model and discards their instances.
      */
     private void syncPanels() {
         Map<String, PanelEntry> current = new LinkedHashMap<>();
@@ -209,8 +284,11 @@ final class WindowContributions implements AutoCloseable {
             panels.put(entry.id(), new PanelInstance(entry));
             Optional<UiState.Panel> saved = state.panel(entry.id());
             Slot slot = saved.map(UiState.Panel::slot).orElse(entry.defaultSlot());
+            boolean showed = saved.map(UiState.Panel::visible).orElse(false);
+            // Remembered before docking: docking saves, and in Zen the saved visibility is the remembered one.
+            if (showed && beforeZen != null) beforeZen.add(entry.id());
             dock.add(entry.id(), slot, insertionIndex(slot, saved.map(UiState.Panel::order).orElse(UiState.Panel.LAST)));
-            if (saved.map(UiState.Panel::visible).orElse(false)) dock.show(entry.id());
+            if (showed && beforeZen == null) dock.show(entry.id());
         }
     }
 
@@ -232,32 +310,42 @@ final class WindowContributions implements AutoCloseable {
     private void docked(DockState.Change change) {
         // A dock change mid-drag (a plugin unloading, a panel showing itself) ends the drag: what it drew renders again.
         owner.dockDrag().cancel();
-        if (!owner.zenMode()) for (String id : change.shown()) build(id);
+        for (String id : change.shown()) build(id);
         if (change.layout()) owner.area().sync();
         if (change.stripes()) renderStripes();
         for (String id : change.hidden()) notifyVisibility(id, false);
-        // Hiding a window by any route returns focus to the terminal.
-        if (!change.hidden().isEmpty()) owner.focusSelected();
-        for (String id : change.shown()) notifyVisibility(id, !owner.zenMode());
+        // Hiding a window by any route returns focus to the terminal, unless a window being activated replaces it.
+        if (!change.hidden().isEmpty() && (activating == null || !change.shown().contains(activating))) owner.focusSelected();
+        for (String id : change.shown()) notifyVisibility(id, true);
         persist();
     }
 
-    /** Sends actual visibility to plugins while leaving the normal dock layout (and its saved state) alone. */
-    void viewModeChanged() {
-        if (!owner.zenMode()) {
-            for (String id : List.copyOf(panels.keySet())) if (dock.visible(id)) build(id);
-            owner.area().sync();
+    /**
+     * Entering Zen hides the panels that show and remembers them; any panel opened in Zen then shows in its slot as
+     * usual, without the rail. Leaving Zen hides those and shows the remembered panels again.
+     */
+    void zenChanged() {
+        if (owner.zenMode() == (beforeZen != null)) return;
+        if (owner.zenMode()) {
+            beforeZen = new LinkedHashSet<>();
+            for (Slot slot : Slot.values()) dock.active(slot).ifPresent(beforeZen::add);
+            for (String id : List.copyOf(beforeZen)) dock.hide(id);
+            return;
         }
-        for (String id : List.copyOf(panels.keySet())) notifyVisibility(id, visible(id));
+        Set<String> restore = beforeZen;
+        beforeZen = null;
+        for (Slot slot : Slot.values()) dock.active(slot).filter(id -> !restore.contains(id)).ifPresent(dock::hide);
+        for (String id : restore) showPanel(id);
     }
 
-    private boolean visible(String id) { return !owner.zenMode() && dock.visible(id); }
+    /** Whether the saved layout has the panel showing: in Zen, whether it showed before Zen. */
+    private boolean savedVisible(String id) { return beforeZen != null ? beforeZen.contains(id) : dock.visible(id); }
 
     /** Builds the panel's instance the first time it shows in this window; a failing factory yields a placeholder. */
     private void build(String id) {
         PanelInstance panel = panels.get(id);
         if (panel == null || panel.component != null) return;
-        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> visible(id), header -> owner.area().setHeader(id, header));
+        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id), header -> owner.area().setHeader(id, header));
         JComponent built = null;
         try { built = panel.entry.factory().apply(panel.site); }
         catch (RuntimeException failure) {
@@ -266,13 +354,15 @@ final class WindowContributions implements AutoCloseable {
         }
         if (built == null) panel.site.setHeader(dev.jasper.app.contributions.PanelHeaderState.EMPTY);
         panel.component = built != null ? built : new JLabel("This panel could not be loaded.", SwingConstants.CENTER);
+        if (built == null) dev.jasper.ui.swing.NativeStyles.installed().label((JLabel) panel.component, dev.jasper.ui.metrics.Typography.Role.LABEL,
+            dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY, () -> dev.jasper.app.platform.ThemeZone.theme(panel.component));
         owner.area().setContent(id, panel.entry.title(), panel.component);
     }
 
     /** Tells the panel only what is still true and not yet told: a listener's own show or hide may have changed it. */
     private void notifyVisibility(String id, boolean visible) {
         PanelInstance panel = panels.get(id);
-        if (panel == null || panel.site == null || visible(id) != visible || panel.notified == visible) return;
+        if (panel == null || panel.site == null || dock.visible(id) != visible || panel.notified == visible) return;
         panel.notified = visible;
         panel.site.notifyVisibility(visible);
     }
@@ -293,7 +383,7 @@ final class WindowContributions implements AutoCloseable {
                 .forEach(entry -> merged.add(Math.min(entry.getValue().order(), merged.size()), entry.getKey()));
             for (int i = 0; i < merged.size(); i++) {
                 String id = merged.get(i);
-                boolean visible = panels.containsKey(id) ? dock.visible(id) : state.panel(id).map(UiState.Panel::visible).orElse(false);
+                boolean visible = panels.containsKey(id) ? savedVisible(id) : state.panel(id).map(UiState.Panel::visible).orElse(false);
                 state.putPanel(id, new UiState.Panel(slot, Math.min(i, UiState.Panel.LAST), visible));
             }
         }
@@ -306,19 +396,21 @@ final class WindowContributions implements AutoCloseable {
 
     private void renderStripes() {
         owner.dockDrag().cancel();
-        List<ToolStripe.Button> left = new ArrayList<>(), right = new ArrayList<>();
+        List<ToolStripe.Button> windows = new ArrayList<>();
         for (Slot slot : Slot.values())
             for (String id : dock.ids(slot)) {
                 PanelInstance panel = panels.get(id);
                 if (panel == null) continue;
-                var button = new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
-                    panel.entry.badge());
-                (slot.stripe() == Side.LEFT ? left : right).add(button);
+                windows.add(new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
+                    panel.entry.badge(), number(panel)));
             }
         List<Action> railActions = new ArrayList<>();
         for (String id : model.railActions()) if (actions.get(id) != null) railActions.add(actions.get(id));
-        owner.leftStripe().render(left, railActions);
-        owner.rightStripe().render(right, List.of());
+        // Every stripe keeps the windows of the slots it shows.
+        owner.leftStripe().render(windows, railActions);
+        owner.rightStripe().render(windows, List.of());
+        owner.bottomStrip().ifPresent(strip -> strip.render(windows, List.of()));
+        numbers = numbers();
         owner.syncRailVisibility();
     }
 
@@ -329,15 +421,14 @@ final class WindowContributions implements AutoCloseable {
      */
     private void updateBadges() {
         for (PanelInstance panel : panels.values()) {
-            owner.leftStripe().updateBadge(panel.entry.id(), panel.entry.badge());
-            owner.rightStripe().updateBadge(panel.entry.id(), panel.entry.badge());
+            for (DockStripe stripe : owner.stripes().all()) stripe.updateBadge(panel.entry.id(), panel.entry.badge());
         }
     }
 
     /** Panel content that is not showing is outside the window's component tree and must be updated by hand. */
     void refreshTheme() {
         for (PanelInstance panel : panels.values())
-            if (panel.component != null && !visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
+            if (panel.component != null && !dock.visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
     }
 
     private void changed(Contributions.Kind kind) {
@@ -352,7 +443,7 @@ final class WindowContributions implements AutoCloseable {
                 // Which actions the stripe shows changes only when one is added or removed, which rebuilds it. A title or
                 // enabled change renames and repaints the buttons it has, so that it does not end a drag.
                 if (structural) renderStripes();
-                else for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) stripe.refreshActions();
+                else for (DockStripe stripe : owner.stripes().all()) stripe.refreshActions();
             }
             case PANELS -> { syncPanels(); renderStripes(); }
             case RAIL -> renderStripes();
@@ -415,6 +506,7 @@ final class WindowContributions implements AutoCloseable {
         owner.dockDrag().cancel();
         owner.dockDrag().onDrop = (id, target) -> { };
         owner.dockDrag().icons = id -> null;
+        owner.dockDrag().labels = id -> "";
         dock.removeListener(docked);
         commands.values().forEach(Subscription::close);
         commands.clear();
@@ -425,7 +517,7 @@ final class WindowContributions implements AutoCloseable {
         if (panelRequests != null) { panelRequests.close(); panelRequests = null; }
         for (PanelInstance panel : panels.values()) if (panel.site != null) panel.site.notifyClosed();
         panels.clear();
-        for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) {
+        for (DockStripe stripe : owner.stripes().all()) {
             stripe.onToggle = id -> { };
             stripe.onMove = (id, slot) -> { };
             stripe.onHide = id -> { };

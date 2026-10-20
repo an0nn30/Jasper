@@ -10,6 +10,7 @@ import dev.jasper.fileserver.engine.EngineFailure;
 import dev.jasper.fileserver.engine.LoginThrottle;
 import dev.jasper.fileserver.engine.ServerAddresses;
 import dev.jasper.fileserver.engine.ServerEvent;
+import dev.jasper.fileserver.engine.sftp.HostKey;
 import dev.jasper.fileserver.engine.tls.TlsMaterial;
 import dev.jasper.fileserver.runtime.Engines;
 import dev.jasper.fileserver.runtime.ServerRegistry;
@@ -23,16 +24,17 @@ import dev.jasper.fileserver.ui.ServerRows;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
+import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.DialogSpec;
-import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
+import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
@@ -40,11 +42,9 @@ import dev.jasper.vault.api.CredentialDescriptor;
 import dev.jasper.vault.api.LockState;
 import dev.jasper.vault.api.VaultApi;
 import java.awt.Desktop;
-import java.awt.HeadlessException;
-import java.awt.Toolkit;
-import java.awt.datatransfer.StringSelection;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -70,7 +70,6 @@ import java.util.function.Consumer;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
@@ -80,17 +79,24 @@ public final class FileServerPlugin implements Plugin {
     public static final String PANEL = ID + ".panel";
     public static final String SHOW = ID + ".show-panel";
     public static final String NEW = ID + ".new";
+    public static final String SHARE_FOLDER = ID + ".share-folder";
     public static final String STOP_ALL = ID + ".stop-all";
     public static final String STATUS = ID + ".status";
     public static final String SERVERS = ID + ".servers";
+    public static final String TLS_FINGERPRINT = ID + ".tls-fingerprint";
+    public static final String HOST_KEY_FINGERPRINT = ID + ".host-key-fingerprint";
     public static final String SERVE_HTTP = ID + ".serve-http";
     public static final String SERVE_FTP = ID + ".serve-ftp";
+    public static final String SERVE_SFTP = ID + ".serve-sftp";
+    public static final String SERVE_TFTP = ID + ".serve-tftp";
+    /** The largest public key file read; a real one is well under 16 KiB. */
+    private static final long MAX_KEY_FILE = 64 * 1024;
 
     /** What the plugin takes from the machine; tests replace each part. */
-    record Environment(Executor ui, Supplier<List<ServerAddresses.Nic>> nics, IntPredicate portFree, Consumer<String> clipboard,
+    record Environment(Executor ui, Supplier<List<ServerAddresses.Nic>> nics, IntPredicate portFree,
                        Consumer<Path> reveal, Path home, String osName, ZoneId zone, BiFunction<Duration, Runnable, Runnable> every) {
         static Environment system() {
-            return new Environment(SwingUtilities::invokeLater, ServerAddresses::system, FileServerPlugin::portFree, FileServerPlugin::copy,
+            return new Environment(SwingUtilities::invokeLater, ServerAddresses::system, FileServerPlugin::portFree,
                 FileServerPlugin::reveal, Path.of(System.getProperty("user.home")), System.getProperty("os.name", ""), ZoneId.systemDefault(),
                 (interval, task) -> {
                     var timer = new Timer((int) interval.toMillis(), event -> task.run());
@@ -104,11 +110,16 @@ public final class FileServerPlugin implements Plugin {
 
     private final Environment environment;
     private PluginContext context;
+    /** Which composition this run takes (Enterprise presentation spec 14.3), read once in {@link #start}. */
+    private dev.jasper.fileserver.workstation.Layout layout = dev.jasper.fileserver.workstation.Layout.ROWS;
+    /** The composition this run takes. */
+    dev.jasper.fileserver.workstation.Layout layout() { return layout; }
     private FileServerSettings settings;
     private Optional<VaultApi> vault = Optional.empty();
     private DefinitionStore store;
     private ServerRegistry registry;
     private TlsMaterial tls;
+    private HostKey hostKey;
     private TransferActivities transfers;
     private FileServerScope scope;
     private StatusItem status;
@@ -133,35 +144,66 @@ public final class FileServerPlugin implements Plugin {
         Files.createDirectories(context.dataDirectory());
         settings = new FileServerSettings(context.settings());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
+        layout = dev.jasper.fileserver.workstation.Layout.of(context.appearance().presentation());
         var logins = new LoginResolver(vault, () -> System.getProperty("user.name", "jasper"), SessionPasswords::generate);
         transfers = new TransferActivities(context.activities()::begin, SHOW);
         tls = new TlsMaterial(context.dataDirectory().resolve("tls"), Clock.systemUTC(), FileServerPlugin::hostName);
-        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls, settings::passiveRange), logins,
+        hostKey = new HostKey(context.dataDirectory().resolve("hostkey"));
+        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls, settings::passiveRange, hostKey), logins,
             context.background(), environment.ui(), Clock.systemUTC(), settings.activityEntries::get, this::observe);
         store = new DefinitionStore(context.dataDirectory().resolve("servers.toml"), context.background(), environment.ui());
-        var icon = context.appearance().icon(IconName.SERVER);
+        var icon = "server";
         context.actions().register(ActionSpec.of(SHOW, "Toggle File Servers").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "http", "ftp", "sftp", "tftp", "panel")),
             invoked -> context.panels().toggle(PANEL, invoked.window()));
-        context.actions().register(ActionSpec.of(NEW, "New File Server…").withIcon(context.appearance().icon(IconName.ADD))
+        context.actions().register(ActionSpec.of(NEW, "New File Server…").withIcon("add")
                 .withKeywords(List.of("file server", "share", "folder", "http")),
             invoked -> edit(invoked.window(), Optional.empty(), false));
+        // Spec 13: Share Folder… runs what the empty File Servers panel's button runs; it and New File Server… sit in Transfer.
+        context.actions().register(ActionSpec.of(SHARE_FOLDER, "Share Folder…").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "folder", "serve")),
+            invoked -> edit(invoked.window(), Optional.empty(), false));
+        var transfer = context.menus().standard(dev.jasper.sdk.ui.StandardMenu.TRANSFER);
+        transfer.add(SHARE_FOLDER);
+        transfer.add(NEW);
         stopAll = context.actions().register(ActionSpec.of(STOP_ALL, "Stop All File Servers").withKeywords(List.of("file server", "stop", "share")),
             invoked -> registry.stopAll());
         stopAll.setEnabled(false);
         context.actions().register(ActionSpec.of(SERVERS, "Start or Stop a File Server…").withIcon(icon)
                 .withKeywords(List.of("file server", "start", "stop", "share")),
             invoked -> context.palette().open(invoked.window(), FileServerScope.ID, Optional.empty(), Optional.empty()));
+        context.actions().register(ActionSpec.of(TLS_FINGERPRINT, "Show TLS Certificate Fingerprint…")
+                .withKeywords(List.of("file server", "tls", "https", "ftps", "certificate", "fingerprint")),
+            invoked -> showTlsFingerprint(invoked.window()));
+        context.actions().register(ActionSpec.of(HOST_KEY_FINGERPRINT, "Show SFTP Host Key Fingerprint…")
+                .withKeywords(List.of("file server", "sftp", "ssh", "host key", "fingerprint")),
+            invoked -> showHostKey(invoked.window()));
         context.actions().register(ActionSpec.of(SERVE_HTTP, "Serve Current Folder over HTTP").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "serve", "http", "folder")),
             invoked -> serve(invoked, Protocol.HTTP));
         context.actions().register(ActionSpec.of(SERVE_FTP, "Serve Current Folder over FTP").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "serve", "ftp", "folder")),
             invoked -> serve(invoked, Protocol.FTP));
+        context.actions().register(ActionSpec.of(SERVE_SFTP, "Serve Current Folder over SFTP").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "serve", "sftp", "ssh", "folder")),
+            invoked -> serve(invoked, Protocol.SFTP));
+        context.actions().register(ActionSpec.of(SERVE_TFTP, "Serve Current Folder over TFTP").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "serve", "tftp", "boot", "folder")),
+            invoked -> serve(invoked, Protocol.TFTP));
+        var shareMenu = context.menus().terminalContext().submenu("Share Path");
+        registerShareAction(shareMenu, Protocol.HTTP, false);
+        registerShareAction(shareMenu, Protocol.HTTP, true);
+        registerShareAction(shareMenu, Protocol.FTP, false);
+        registerShareAction(shareMenu, Protocol.FTP, true);
+        registerShareAction(shareMenu, Protocol.SFTP, false);
+        registerShareAction(shareMenu, Protocol.TFTP, false);
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
-        context.panels().register(new PanelSpec(PANEL, "File Servers", icon, Anchor.LEFT).withToggleActionId(SHOW), this::createPanel);
+        // Enterprise's default slots (spec 14.5): File Servers beneath SFTP on the left.
+        context.panels().register(layout == dev.jasper.fileserver.workstation.Layout.CLASSIC
+            ? new PanelSpec(PANEL, "File Servers", "server", Anchor.LEFT).withToggleActionId(SHOW).withSplit()
+            : new PanelSpec(PANEL, "File Servers", "server", Anchor.LEFT).withToggleActionId(SHOW), this::createPanel);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 70));
         status.setIcon(icon);
         status.setAction(SHOW);
@@ -182,6 +224,8 @@ public final class FileServerPlugin implements Plugin {
         context.background().execute(() -> {
             try { tls.fingerprint(); }
             catch (EngineFailure unreadable) { /* reported when a TLS server starts or the fingerprints are shown */ }
+            try { hostKey.fingerprint(); }
+            catch (EngineFailure unreadable) { /* reported when an SFTP server starts or the fingerprints are shown */ }
             environment.ui().execute(() -> { if (!stopped) refreshPanels(); });
         });
     }
@@ -196,12 +240,14 @@ public final class FileServerPlugin implements Plugin {
     ServerRegistry registry() { return registry; }
     ServerEditor currentEditor() { return currentEditor; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
+    FileServersPanel panel(UUID window) { return panels.get(window); }
     WindowHandle windowHandle(UUID id) { return context.terminals().window(id).orElseThrow(); }
 
     /** Engine events reach the transfer activities only while the plugin runs: a late one must not open an activity on a closed context. */
     void observe(ServerEvent event) { if (!stopped) transfers.accept(event); }
 
     TlsMaterial tls() { return tls; }
+    HostKey hostKey() { return hostKey; }
 
     /** This computer's name for the certificate; empty when the system will not say. Slow on some networks, so call it off the UI thread. */
     static String hostName() {
@@ -209,25 +255,26 @@ public final class FileServerPlugin implements Plugin {
         catch (UnknownHostException | SecurityException unknown) { return ""; }
     }
 
-    private JComponent createPanel(PanelHost host) {
+    private dev.jasper.sdk.ui.UiView createPanel(PanelHost host) {
         WindowHandle window = host.window();
-        var panel = new FileServersPanel(new FileServersPanel.Actions(
+        var panel = new FileServersPanel(context.kit(), new FileServersPanel.Actions(
             id -> toggle(window, id),
             editing -> editing.ifPresentOrElse(id -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)),
                 () -> edit(window, Optional.empty(), false)),
-            this::duplicate, id -> delete(window, id), this::reveal, environment.clipboard(),
-            id -> registry.password(id).ifPresent(environment.clipboard()), registry::clearActivity,
+            this::duplicate, id -> delete(window, id), this::reveal, this::copy,
+            id -> registry.password(id).ifPresent(this::copy), registry::clearActivity,
             id -> showFingerprints(window, id)),
             registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
-            context.appearance().icon(IconName.SERVER));
+            "add", layout);
         panel.onHeaderChanged(host::setHeader);
         panel.setTlsFingerprint(tls.cachedFingerprint());
+        panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
         panel.setServers(registry.servers(), store.error());
         panels.put(window.id(), panel);
         panelHosts.put(window.id(), host);
         host.onVisibility(visible -> { if (visible) registry.refreshAddresses(); });
-        host.onClosed(() -> { panels.remove(window.id()); panelHosts.remove(window.id()); });
-        return panel;
+        host.onClosed(() -> { panel.close(); panels.remove(window.id()); panelHosts.remove(window.id()); });
+        return panel.view();
     }
 
     void toggle(WindowHandle window, UUID id) {
@@ -248,29 +295,84 @@ public final class FileServerPlugin implements Plugin {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(title, window, true));
         boolean[] closed = {false};
         ServerEditor[] editor = new ServerEditor[1];
-        editor[0] = new ServerEditor(store.definitions(), initial, existing, Engines.AVAILABLE, environment.nics().get(), vault.isPresent(),
-            this::accountName, () -> pickAccount(window),
+        ServerDefinition[] saved = new ServerDefinition[1];
+        editor[0] = new ServerEditor(context.kit(), store.definitions(), initial, existing, Engines.AVAILABLE, environment.nics().get(), vault.isPresent(),
+            this::accountDescriptor, vault.isPresent() ? request -> vault.get().pick(window, request) : null,
             () -> context.windows().chooseDirectory(window, "Folder to share", initial.map(ServerDefinition::folder)),
+            new ServerEditor.KeySources(() -> keyFiles(window), this::pasted),
             environment.linux(),
-            definition -> store.put(definition).whenComplete((ignored, failure) -> environment.ui().execute(() -> {
+            definition -> { saved[0] = definition; return store.put(definition); },
+            () -> {
                 if (stopped) return;
-                if (failure != null) { if (!closed[0]) editor[0].showError(message(failure)); return; }
                 boolean dismissed = closed[0] || !window.isOpen();
                 dialog.close();
                 if (dismissed) return;
-                registry.server(definition.id()).filter(ServerRegistry.View::restartNeeded).ifPresent(view -> confirmRestart(window, view));
-            })),
+                registry.server(saved[0].id()).filter(ServerRegistry.View::restartNeeded).ifPresent(view -> confirmRestart(window, view));
+            },
             dialog::close);
+        editor[0].layout(layout);
         currentEditor = editor[0];
-        dialog.setContent(editor[0]);
-        dialog.onClosed(() -> { closed[0] = true; if (currentEditor == editor[0]) currentEditor = null; });
+        dialog.setContent(editor[0].view());
+        dialog.onClosed(() -> { closed[0] = true; editor[0].close(); if (currentEditor == editor[0]) currentEditor = null; });
         dialog.show();
+    }
+
+    /**
+     * The text of public key files the user picks. A file that can't be read is reported and skipped, and so is one
+     * that is not a regular file or is larger than 64 KiB: this runs on the UI thread.
+     */
+    Optional<String> keyFiles(WindowHandle window) {
+        List<Path> chosen = context.windows().chooseFiles(window, "Public keys to allow", Optional.of(environment.home().resolve(".ssh")));
+        var text = new StringBuilder();
+        for (Path file : chosen) {
+            try {
+                if (!Files.isRegularFile(file) || Files.size(file) > MAX_KEY_FILE) {
+                    context.notifications().group().error("Could not read a public key file",
+                        file + ": not a public key file (too large or not a regular file)");
+                    continue;
+                }
+                text.append(Files.readString(file)).append('\n');
+            }
+            catch (IOException | RuntimeException failure) {
+                context.notifications().group().error("Could not read a public key file", file + ": " + message(failure), failure);
+            }
+        }
+        return text.isEmpty() ? Optional.empty() : Optional.of(text.toString());
+    }
+
+    /** The clipboard's text, for a key or certificate pasted into the editor; empty when there is none or it is blank. */
+    private Optional<String> pasted() { return context.platform().clipboardText().filter(text -> !text.isBlank()); }
+
+    private void registerShareAction(PluginMenu menu, Protocol protocol, boolean tls) {
+        if (!Engines.AVAILABLE.contains(protocol)) return;
+        String type = protocol.label() + (tls ? "S" : "");
+        String id = ID + ".share-" + type.toLowerCase(Locale.ROOT);
+        context.actions().register(ActionSpec.of(id, type).withIcon("server")
+                .withKeywords(List.of("file server", "share path", "folder", type.toLowerCase(Locale.ROOT))),
+            invoked -> sharePath(invoked, protocol, tls));
+        menu.add(id);
+    }
+
+    /** A context-menu share must use this pane's local directory, never a substitute. */
+    private void sharePath(ActionContext invoked, Protocol protocol, boolean tls) {
+        Optional<Path> folder = invoked.pane().map(pane -> pane.info())
+            .filter(info -> info.kind() == SessionKind.LOCAL && info.remoteDirectory().isEmpty())
+            .flatMap(info -> info.workingDirectory()).filter(Path::isAbsolute).filter(Files::isDirectory);
+        if (folder.isEmpty()) {
+            context.notifications().group().error("Could not share path", "This terminal has no available local folder to share.");
+            return;
+        }
+        serve(invoked.window(), folder.get(), protocol, tls);
     }
 
     /** Shares the folder the shell is in, read-only and on this computer only, until stopped. */
     void serve(ActionContext invoked, Protocol protocol) {
         Path folder = invoked.pane().or(() -> context.terminals().activePane())
             .flatMap(pane -> pane.info().workingDirectory()).filter(Files::isDirectory).orElse(environment.home());
+        serve(invoked.window(), folder, protocol, false);
+    }
+
+    private void serve(WindowHandle window, Path folder, Protocol protocol, boolean tls) {
         Set<Integer> used = registry.servers().stream().filter(view -> !view.state().phase().startable())
             .map(view -> view.definition().port()).collect(Collectors.toSet());
         int port = protocol.defaultPort();
@@ -278,11 +380,12 @@ public final class FileServerPlugin implements Plugin {
         Path leaf = folder.getFileName();
         String folderName = leaf == null ? folder.toString() : leaf.toString();
         if (folderName.length() > 60) folderName = folderName.substring(0, 60) + "…";
-        var created = ServerDefinition.create(uniqueName(folderName + " (" + protocol.label() + ")"), protocol, folder);
+        String type = protocol.label() + (tls ? "S" : "");
+        var created = ServerDefinition.create(uniqueName(folderName + " (" + type + ")"), protocol, folder);
         var definition = new ServerDefinition(created.id(), created.name(), protocol, folder, Bind.LOOPBACK, port, Optional.empty(), false,
-            created.login(), List.of(), false, false, false);
-        registry.startTemporary(definition, invoked.window());
-        showPanel(invoked.window(), definition.id());
+            created.login(), List.of(), tls, tls && protocol == Protocol.FTP, false);
+        registry.startTemporary(definition, window);
+        showPanel(window, definition.id());
     }
 
     private void showPanel(WindowHandle window, UUID id) {
@@ -348,12 +451,13 @@ public final class FileServerPlugin implements Plugin {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(title, window, true));
         boolean[] decided = {false};
         ConfirmPanel[] panel = new ConfirmPanel[1];
-        panel[0] = new ConfirmPanel(text, confirmLabel, cancelLabel,
+        panel[0] = new ConfirmPanel(context.kit(), text, confirmLabel, cancelLabel,
             () -> { decided[0] = true; dialog.close(); onConfirm.run(); },
             () -> { decided[0] = true; dialog.close(); onCancel.run(); });
         currentConfirm = panel[0];
-        dialog.setContent(panel[0]);
+        dialog.setContent(panel[0].view());
         dialog.onClosed(() -> {
+            panel[0].close();
             if (currentConfirm == panel[0]) currentConfirm = null;
             if (!decided[0]) { decided[0] = true; onCancel.run(); }
         });
@@ -362,6 +466,7 @@ public final class FileServerPlugin implements Plugin {
 
     private void definitionsChanged() {
         if (stopped) return;
+        if (!SwingUtilities.isEventDispatchThread()) { environment.ui().execute(this::definitionsChanged); return; }
         registry.setDefinitions(store.definitions());
         List<String> warnings = store.warnings();
         if (!warnings.isEmpty() && !warnings.equals(reportedWarnings)) for (String warning : warnings) {
@@ -378,6 +483,7 @@ public final class FileServerPlugin implements Plugin {
 
     private void serversChanged() {
         if (stopped) return;
+        if (!SwingUtilities.isEventDispatchThread()) { environment.ui().execute(this::serversChanged); return; }
         refreshPanels();
         scope.changed();
         int running = registry.running();
@@ -401,16 +507,28 @@ public final class FileServerPlugin implements Plugin {
     }
 
     private void refreshPanels() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            environment.ui().execute(this::refreshPanels);
+            return;
+        }
         for (FileServersPanel panel : panels.values()) {
             panel.setTlsFingerprint(tls.cachedFingerprint());
+            panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
             panel.setServers(registry.servers(), store.error());
             panel.refreshActivity();
         }
     }
 
-    /** Shows the shared certificate's fingerprint, offering to regenerate it; the file I/O runs off the UI thread. */
+    /** Shows the fingerprint the server presents: the shared SSH host key's for SFTP, else the shared certificate's. */
     void showFingerprints(WindowHandle window, UUID id) {
-        if (registry.server(id).isEmpty()) return;
+        Optional<ServerRegistry.View> server = registry.server(id);
+        if (server.isEmpty()) return;
+        if (server.get().definition().protocol() == Protocol.SFTP) showHostKey(window);
+        else showTlsFingerprint(window);
+    }
+
+    /** Shows the shared certificate's fingerprint, offering to regenerate it; the file I/O runs off the UI thread. */
+    private void showTlsFingerprint(WindowHandle window) {
         context.background().execute(() -> {
             String text;
             try {
@@ -424,6 +542,29 @@ public final class FileServerPlugin implements Plugin {
                 if (stopped || !window.isOpen()) return;
                 refreshPanels();
                 confirm(window, "Fingerprints", shown, "Regenerate Certificate…", "Close", () -> confirmRegenerate(window), () -> { });
+            });
+        });
+    }
+
+    /** Shows the SSH host key's fingerprint, offering to copy it; the file I/O runs off the UI thread. */
+    private void showHostKey(WindowHandle window) {
+        context.background().execute(() -> {
+            Optional<String> fingerprint;
+            String text;
+            try {
+                fingerprint = hostKey.fingerprint();
+                text = fingerprint.map(value -> "SSH host key: " + value)
+                    .orElse("No SSH host key yet: Jasper creates one when an SFTP server first starts.");
+            } catch (EngineFailure unreadable) {
+                fingerprint = Optional.empty();
+                text = unreadable.getMessage();
+            }
+            Optional<String> copy = fingerprint;
+            String shown = text;
+            environment.ui().execute(() -> {
+                if (stopped || !window.isOpen()) return;
+                refreshPanels();
+                confirm(window, "Fingerprints", shown, "Copy Fingerprint", "Close", () -> copy.ifPresent(this::copy), () -> { });
             });
         });
     }
@@ -444,14 +585,9 @@ public final class FileServerPlugin implements Plugin {
             }), () -> { });
     }
 
-    private Optional<String> accountName(UUID id) {
+    private Optional<CredentialDescriptor> accountDescriptor(UUID id) {
         if (vault.isEmpty()) return Optional.empty();
-        return vault.get().credentials().stream().filter(d -> d.id().equals(id)).findFirst().map(CredentialDescriptor::name);
-    }
-
-    private CompletableFuture<Optional<ServerEditor.Account>> pickAccount(WindowHandle window) {
-        if (vault.isEmpty()) return CompletableFuture.completedFuture(Optional.empty());
-        return vault.get().pick(window).thenApply(chosen -> chosen.map(d -> new ServerEditor.Account(d.id(), d.name())));
+        return vault.get().credentials().stream().filter(d -> d.id().equals(id)).findFirst();
     }
 
     private String uniqueName(String base) {
@@ -474,20 +610,21 @@ public final class FileServerPlugin implements Plugin {
         return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
     }
 
+    /** Whether a port is free on loopback for both TCP and UDP, so Serve Current Folder can use it for any protocol. */
     static boolean portFree(int port) {
-        try (var socket = new ServerSocket()) {
-            socket.setReuseAddress(false);
-            socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
+        var loopback = new InetSocketAddress(InetAddress.getLoopbackAddress(), port);
+        try (var tcp = new ServerSocket(); var udp = new DatagramSocket(null)) {
+            tcp.setReuseAddress(false);
+            tcp.bind(loopback);
+            udp.setReuseAddress(false);
+            udp.bind(loopback);
             return true;
         } catch (IOException taken) {
             return false;
         }
     }
 
-    static void copy(String text) {
-        try { Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null); }
-        catch (HeadlessException | IllegalStateException unavailable) { /* nothing to copy to */ }
-    }
+    private void copy(String text) { context.platform().copy(text); }
 
     static void reveal(Path folder) {
         if (!Desktop.isDesktopSupported()) throw new UnsupportedOperationException("This system cannot show folders");

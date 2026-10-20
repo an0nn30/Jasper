@@ -59,22 +59,24 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import javax.swing.Icon;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 /**
  * Wires the plugin: the hosts store and its poll, trust, the agent, the connection registry, the session
- * provider, the Sessions panel (saved hosts and WSL distributions), the scope, the actions, the SSH menu, the status item and the dialogs.
+ * provider, the Sessions panel (saved hosts and WSL distributions), the scope, the actions, its Session and Transfer menu entries, the status item and the dialogs.
  */
 public class RemotePlugin implements Plugin {
     public static final String CONNECT = "dev.jasper.remote.connect", HOSTS = "dev.jasper.remote.hosts", SPLIT = "dev.jasper.remote.split";
-    public static final String IMPORT = "dev.jasper.remote.import", STATUS = "dev.jasper.remote.status", MENU = "dev.jasper.remote.menu", PANEL = "dev.jasper.remote.panel";
+    public static final String NEW_HOST = "dev.jasper.remote.hosts.new";
+    public static final String IMPORT = "dev.jasper.remote.import", STATUS = "dev.jasper.remote.status", PANEL = "dev.jasper.remote.panel";
 
     private final Executor ui;
     private final Function<PluginContext,Executor> transferExecutor;
     private dev.jasper.remote.transfer.TransferCoordinator transfers;
     private dev.jasper.remote.ui.transfers.TransferUi transferUi;
+    /** The classic Transfers bottom panels (spec 14.4); null under ROWS. */
+    private dev.jasper.remote.ui.transfers.TransfersPanels transfersPanels;
     private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
     private dev.jasper.remote.tunnels.TunnelStore tunnelStore;
     private dev.jasper.remote.ui.tunnels.TunnelsUi tunnelsUi;
@@ -83,12 +85,17 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.sdk.Subscription reopener;
     private dev.jasper.remote.chooser.RemoteHosts remoteHosts;
     private dev.jasper.sdk.Subscription locations;
+    private java.util.function.BiConsumer<dev.jasper.remote.api.RemoteFolder, WindowHandle> remoteOpener;
     private final Map<UUID, PendingSession> attachedPanes = new java.util.HashMap<>();
     public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=dev.jasper.remote.ui.sftp.SftpUi.TOGGLE;
     private final Function<PluginContext, Optional<AgentClient>> agentFactory;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
     private final Path sshDir;
     private PluginContext context;
+    /** Which composition this run takes (Enterprise presentation spec 14.3), read once in {@link #start}. */
+    private dev.jasper.remote.workstation.Layout layout = dev.jasper.remote.workstation.Layout.ROWS;
+    /** The composition this run takes. */
+    dev.jasper.remote.workstation.Layout layout() { return layout; }
     private RemoteSettings.Declared settings;
     private HostStore store;
     private PanelState panelState;
@@ -99,9 +106,11 @@ public class RemotePlugin implements Plugin {
     private StatusItem status;
     private PluginAction splitAction;
     private SessionsToolbar sessionsToolbar;
+    /** Each window's chosen session, shared by its toolbar view and its Sessions tree under CLASSIC (spec 14.4). */
+    private final SessionSelection sessionSelection = new SessionSelection();
     private Timer poll;
-    private Icon icon;
-    private Icon serverIcon;
+    private String icon;
+    private String serverIcon;
     private boolean stopped;
     private final Set<CompletableFuture<HostKeyVerifier.Decision>> questions = new java.util.HashSet<>();
     private final Map<UUID, HostsPanel> panels = new HashMap<>();
@@ -145,13 +154,14 @@ public class RemotePlugin implements Plugin {
         context.background().execute(() -> { hostInfo.load(); ui.execute(() -> { if (!stopped) refreshPanels(); }); });
         trust = new KnownHosts(context.dataDirectory().resolve("known_hosts"), () -> settings.connection().readUserKnownHosts() ? Optional.of(sshDir.resolve("known_hosts")) : Optional.empty());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
+        layout = dev.jasper.remote.workstation.Layout.of(context.appearance().presentation());
         Optional<java.util.function.BiFunction<WindowHandle, UUID, CompletableFuture<Optional<dev.jasper.vault.api.Credential>>>> credentialSource = Optional.empty();
         if (vault.isPresent()) credentialSource = Optional.of((owner, id) -> vault.get().credential(owner, id));
         connections = new Connections(settings::connection, trust, agentFactory.apply(context), store::host,
             credentialSource, this::askHostKey, context.background(), ui, schedule);
         connections.onChanged(this::refreshStatus);
-        icon = context.appearance().icon(dev.jasper.sdk.ui.IconName.NETWORK);
-        serverIcon = context.appearance().icon(dev.jasper.sdk.ui.IconName.SERVER);
+        icon = "network";
+        serverIcon = "server";
         // Before the panels: each names its toggle action, which must already be registered.
         registerNavigation();
 
@@ -167,16 +177,23 @@ public class RemotePlugin implements Plugin {
                 return validateResumeIdentity(expected,connections.resolveIdentity(ref.hostId().orElseThrow(),owner));
             }catch(Exception failure) { return CompletableFuture.failedFuture(failure); }
         });
-        transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui,window->sftpUi.reveal(window));
-        sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release);
+        transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui,window->{
+            if(transfersPanels!=null) transfersPanels.show(window); else sftpUi.reveal(window);
+        });
+        if(layout==dev.jasper.remote.workstation.Layout.CLASSIC) transfersPanels=new dev.jasper.remote.ui.transfers.TransfersPanels(context,transferUi);
+        sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release,layout);
+        sftpUi.hiddenItems(panelState.sftpShowHidden(),shown-> { try { panelState.saveSftpShowHidden(shown); }
+            catch(IOException failure) { context.log().log(System.Logger.Level.WARNING,"panel state: {0}",failure.getMessage()); } });
         tunnelStore = new dev.jasper.remote.tunnels.TunnelStore(context.dataDirectory().resolve("tunnels.toml"), context.background(), ui);
         tunnelsUi = new dev.jasper.remote.ui.tunnels.TunnelsUi(context, ui, tunnelStore,
             new dev.jasper.remote.tunnels.TunnelManager(connections, () -> settings.connection().connectTimeout(), context.background(), ui),
-            store::hosts, store::host, paneId -> Optional.ofNullable(panes.get(paneId)).flatMap(store::host));
+            store::hosts, store::host, paneId -> Optional.ofNullable(panes.get(paneId)).flatMap(store::host), layout);
         remoteHosts=new dev.jasper.remote.chooser.RemoteHosts(store::hosts,connections::connected,store::onChanged,connections::onChanged,
             paneId->context.terminals().pane(paneId).flatMap(this::sftpPane).map(target->new dev.jasper.remote.chooser.RemoteHosts.Located(target.identity(),target.directory())),
             connections::resolveIdentity,(identity,window)->endpoints.open(Optional.of(identity),window,status->{}),()->context.terminals().activeWindow());
         context.fileSources().register(remoteHosts);
+        remoteOpener = (file, window) -> context.notifications().group().error("Could not open a remote file",
+            "Install the Editor plugin to open " + file.path() + ".");
         try {
             var editor=context.services().find(dev.jasper.editor.api.Editor.class);
             if(editor.isPresent()) {
@@ -184,14 +201,20 @@ public class RemotePlugin implements Plugin {
                 var editing=new dev.jasper.remote.edit.RemoteEditing(editor.orElseThrow(),editChannels,()->context.terminals().activeWindow(),context.notifications().group(),
                     id->store.hosts().stream().filter(host->host.id().equals(id)).findFirst());
                 sftpUi.editing(editing);
+                remoteOpener = (file, window) -> remoteIdentity(file.hostId()).ifPresentOrElse(
+                    identity -> editing.open(identity, file.path(), window),
+                    () -> context.notifications().group().error("Could not open a remote file", file.hostName() + " is no longer saved."));
                 try { reopener=editing.registerReopener(); } catch(NoSuchMethodError older) { /* an Editor before 0.4 keeps no recent files */ }
                 try { locations=editing.registerLocations(dev.jasper.remote.chooser.RemoteHosts.ID,root->remoteHosts.identity(root).or(()->configuredIdentity(root))); }
                 catch(NoSuchMethodError older) { /* an Editor before 0.6 opens only local files from its chooser */ }
             }
         } catch(NoClassDefFoundError absent) { /* the Editor is not installed: files in the SFTP panel do not open */ }
+        context.services().publish(dev.jasper.remote.api.RemoteProjects.class, new dev.jasper.remote.projects.ProjectsService(connections,
+            store::host, this::paneFolder, (file, window) -> remoteOpener.accept(file, window),
+            (folder, window) -> store.host(folder.hostId()).ifPresent(saved -> openHostIn(window, saved, folder.path())), context.background()));
         follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id)||context.terminals().activePane().map(pane->pane.id().equals(id)).orElse(false),this::probedDirectory,sftpUi::notice);
         sftpUi.onFollowRequested(follower::request);
-        context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote"))
+        context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon("folder").withKeywords(List.of("sftp","files","browse","remote"))
                 .withDefaultBinding("cmd+shift+o").withContext(dev.jasper.sdk.ui.ShortcutContext.terminal()),invoked->{
             invoked.pane().flatMap(this::sftpPane).ifPresentOrElse(pane->sftpUi.show(invoked.window(),pane),()->sftpUi.show(invoked.window()));
         });
@@ -199,12 +222,16 @@ public class RemotePlugin implements Plugin {
         splitAction = context.actions().register(ActionSpec.of(SPLIT, "Split with Same Host").withKeywords(List.of("ssh", "split"))
             .withContext(dev.jasper.sdk.ui.ShortcutContext.terminal()), invoked -> invoked.pane().ifPresent(this::splitSameHost));
         splitAction.setEnabled(false);
+        context.actions().register(ActionSpec.of(NEW_HOST, "New Host...").withIcon("add").withKeywords(List.of("ssh", "host", "session", "add")),
+            invoked -> editHost(invoked.window(), Optional.empty()));
         context.actions().register(ActionSpec.of(IMPORT, "Import from ~/.ssh/config...").withKeywords(List.of("ssh", "import", "config")), invoked -> importConfig(invoked.window()));
-        PluginMenu menu = context.menus().create(MENU, "SSH");
-        menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(IMPORT);
-        menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
-        tunnelsUi.addToMenu(menu);
-        // View > Tools lists HOSTS, SFTP_TOGGLE and the Tunnels toggle: the panels name them as their toggles.
+        // Spec 13: Remote's entries live in the Session and Transfer standard menus, which show only while they have entries.
+        PluginMenu session = context.menus().standard(dev.jasper.sdk.ui.StandardMenu.SESSION);
+        session.add(CONNECT); session.add(HOSTS); session.add(SPLIT); session.addSeparator(); session.add(NEW_HOST); session.add(IMPORT);
+        tunnelsUi.addToMenu(session);
+        PluginMenu transfer = context.menus().standard(dev.jasper.sdk.ui.StandardMenu.TRANSFER);
+        transfer.add(SFTP); transfer.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
+        // View > Tool Windows lists HOSTS, SFTP_TOGGLE and the Tunnels toggle: the panels name them as their toggles.
 
         distros = wslProfiles();
         scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)),
@@ -212,13 +239,16 @@ public class RemotePlugin implements Plugin {
         context.palette().register(scope);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 60));
         status.setIcon(icon); status.setAction(HOSTS); status.setVisible(false);
-        context.panels().register(new PanelSpec(PANEL, "Sessions", icon, Anchor.LEFT).withToggleActionId(HOSTS), this::createPanel);
+        // Enterprise's default slots (spec 14.4): Sessions on the right; the default look keeps the left.
+        context.panels().register(new PanelSpec(PANEL, "Sessions", icon, layout == dev.jasper.remote.workstation.Layout.CLASSIC ? Anchor.RIGHT : Anchor.LEFT)
+            .withToggleActionId(HOSTS), this::createPanel);
         sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
             PanelHost panel = panelHosts.get(window.id());
             if (panel == null) showPanel(window); else panel.show();
-        }, () -> distros, this::openDistro);
+        }, () -> distros, this::openDistro, layout, sessionSelection, this::activeHostId);
+        sessionSelection.onChanged((windowId, row) -> { var shown = panels.get(windowId); if (shown != null) row.ifPresent(shown::selectRow); });
 
-        store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); tunnelsUi.hostsChanged(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
+        store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); tunnelsUi.hostsChanged(); sftpUi.hostsChanged(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
         store.load();
         tunnelStore.load();
         poll = new Timer(1000, event -> { store.poll(); tunnelStore.poll(); });
@@ -229,17 +259,18 @@ public class RemotePlugin implements Plugin {
             scope.changed(); sessionsToolbar.refresh(); refreshPanels();
         });
         context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, event -> {
-            event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit();
+            event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit(); syncSessions();
         });
-        context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); });
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { attachedPanes.remove(event.paneId()); panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); distroPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); syncSessions(); });
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { attachedPanes.remove(event.paneId()); panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); distroPanes.remove(event.paneId()); refreshPanels(); syncSessions(); });
         context.events().subscribe(TerminalEvents.SESSION_STATE_CHANGED, event -> { if (distroPanes.containsKey(event.paneId())) refreshPanels(); });
         context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
+            sessionSelection.forget(event.windowId());
         });
         if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels());
         context.events().subscribe(TerminalEvents.CWD_CHANGED,event->event.remoteDirectory().ifPresent(directory->{follower.reported(event.paneId());sftpUi.directory(event.paneId(),directory.path());}));
-        context.events().subscribe(TerminalEvents.TAB_SELECTED,event->context.terminals().window(event.windowId()).flatMap(window->window.activeTab()).flatMap(tab->tab.activePane()).ifPresent(pane->sftpFocused(pane.id())));
+        context.events().subscribe(TerminalEvents.TAB_SELECTED,event->{context.terminals().window(event.windowId()).flatMap(window->window.activeTab()).flatMap(tab->tab.activePane()).ifPresent(pane->sftpFocused(pane.id())); syncSessions();});
     }
 
     /** Remote's navigation actions with their default bindings; Keymap rebinds them. */
@@ -251,7 +282,7 @@ public class RemotePlugin implements Plugin {
                 .withKeywords(List.of("ssh", "hosts", "panel", "show", "hide")).withDefaultBindings("cmd+alt+1", "alt+1"),
             invoked -> showPanel(invoked.window()));
         context.actions().register(ActionSpec.of(SFTP_TOGGLE, "Toggle SFTP")
-                .withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp", "files", "panel", "show", "hide"))
+                .withIcon("folder").withKeywords(List.of("sftp", "files", "panel", "show", "hide"))
                 .withDefaultBindings("cmd+alt+2", "alt+2"),
             invoked -> sftpUi.toggle(invoked.window()));
     }
@@ -279,6 +310,18 @@ public class RemotePlugin implements Plugin {
     private Optional<dev.jasper.remote.client.ConnectionIdentity> configuredIdentity(String root) {
         try { return Optional.of(connections.identity(UUID.fromString(root))); }
         catch (RuntimeException unknown) { return Optional.empty(); }
+    }
+    /** The identity last used for a host, else its configured route; empty when it is no longer saved. */
+    private Optional<dev.jasper.remote.client.ConnectionIdentity> remoteIdentity(UUID hostId) {
+        String root = hostId.toString();
+        return remoteHosts.identity(root).or(() -> configuredIdentity(root));
+    }
+
+    /** Where an SSH pane Remote opened is, for {@code RemoteProjects.locate}; empty until its folder is known. */
+    private Optional<dev.jasper.remote.api.RemoteFolder> paneFolder(UUID paneId) {
+        return context.terminals().pane(paneId).flatMap(this::sftpPane).filter(target -> target.directory().startsWith("/"))
+            .flatMap(target -> store.host(target.identity().host().id())
+                .map(saved -> new dev.jasper.remote.api.RemoteFolder(saved.id(), saved.name(), target.directory())));
     }
     private void sftpFocused(UUID id) {
         context.terminals().pane(id).ifPresent(pane->sftpPane(pane).ifPresent(target->sftpUi.pane(pane.tab().window(),target)));
@@ -314,14 +357,14 @@ public class RemotePlugin implements Plugin {
 
     // ---- sessions
 
-    private void connect(PendingSession pending, UUID hostId) {
+    private void connect(PendingSession pending, UUID hostId, Optional<String> folder) {
         var host = store.host(hostId);
         if (host.isEmpty()) { pending.fail("Host not found"); return; }
         if (pending.isCancelled() || stopped) return;
         WindowHandle window = pending.pane().tab().window();
         if (focusExistingAttempt(window)) { pending.fail("Another connection is already in progress"); return; }
         final ConnectAttempt attempt;
-        try { attempt = new ConnectAttempt(window, host.get(), shell -> attach(pending, shell)); }
+        try { attempt = new ConnectAttempt(window, host.get(), folder, shell -> attach(pending, shell)); }
         catch (RuntimeException failure) { pending.fail(message(failure)); return; }
         attempt.cancelled = () -> { if (!stopped) pending.fail("Cancelled"); };
         var cancellation = pending.onCancelled(() -> ui.execute(attempt::close));
@@ -330,10 +373,14 @@ public class RemotePlugin implements Plugin {
     }
 
     void openHost(WindowHandle window, RemoteHost host) {
-        prepare(window, host, request -> context.terminals().openTab(window, request));
+        prepare(window, host, Optional.empty(), request -> context.terminals().openTab(window, request));
+    }
+    /** Opens a new tab on a saved host whose login shell starts in {@code folder}; Reconnect returns there. */
+    void openHostIn(WindowHandle window, RemoteHost host, String folder) {
+        prepare(window, host, Optional.of(folder), request -> context.terminals().openTab(window, request));
     }
     void splitHost(PaneHandle pane, RemoteHost host) {
-        prepare(pane.tab().window(), host, request -> context.terminals().split(pane, Direction.RIGHT, request));
+        prepare(pane.tab().window(), host, Optional.empty(), request -> context.terminals().split(pane, Direction.RIGHT, request));
     }
 
     void activateHost(WindowHandle window, RemoteHost host) {
@@ -389,14 +436,14 @@ public class RemotePlugin implements Plugin {
         return false;
     }
 
-    private void prepare(WindowHandle window, RemoteHost host, Function<OpenRequest, Optional<PaneHandle>> open) {
+    private void prepare(WindowHandle window, RemoteHost host, Optional<String> folder, Function<OpenRequest, Optional<PaneHandle>> open) {
         if (!window.isOpen() || stopped || focusExistingAttempt(window)) return;
         final ConnectAttempt attempt;
-        try { attempt = new ConnectAttempt(window, host, shell -> {
+        try { attempt = new ConnectAttempt(window, host, folder, shell -> {
             var ready = new java.util.concurrent.atomic.AtomicReference<>(shell);
             SessionSpec spec = new SessionSpec(host.name(), java.util.Optional.of(serverIcon), dev.jasper.sdk.terminal.ExitPolicy.KEEP_OPEN, pending -> {
                 Connections.Shell first = ready.getAndSet(null);
-                if (first == null) connect(pending, host.id());
+                if (first == null) connect(pending, host.id(), folder);
                 else ui.execute(() -> attach(pending, first));
             });
             try {
@@ -419,12 +466,12 @@ public class RemotePlugin implements Plugin {
         UUID paneId = pending.pane().id();
         attachedPanes.put(paneId, pending);
         follower.forget(paneId);
-        panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);sftpFocused(paneId);
+        panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);sftpFocused(paneId); syncSessions();
         shell.connection().exited().whenComplete((ignored, exit) -> ui.execute(() -> {
             if (attachedPanes.get(paneId) != pending) return;
             attachedPanes.remove(paneId);
             panes.remove(paneId); paneIdentities.remove(paneId); follower.forget(paneId); recentPanes.remove(paneId); refreshSplit();
-            if (!stopped) { sftpUi.ended(paneId); refreshPanels(); }
+            if (!stopped) { sftpUi.ended(paneId); refreshPanels(); syncSessions(); }
         }));
         pending.attach(shell.connection());
         RemoteHost authenticatedHost = shell.host();
@@ -443,18 +490,19 @@ public class RemotePlugin implements Plugin {
     private final class ConnectAttempt {
         final WindowHandle window;
         final RemoteHost host;
+        final Optional<String> folder;
         final java.util.function.Consumer<Connections.Shell> success;
         final PluginDialog dialog;
         final ConnectionPanel panel;
         CompletableFuture<Connections.Shell> future;
         boolean closed, delivered;
         Runnable cancelled = () -> {}, finished = () -> {};
-        ConnectAttempt(WindowHandle window, RemoteHost host, java.util.function.Consumer<Connections.Shell> success) {
-            this.window = window; this.host = host; this.success = success;
+        ConnectAttempt(WindowHandle window, RemoteHost host, Optional<String> folder, java.util.function.Consumer<Connections.Shell> success) {
+            this.window = window; this.host = host; this.folder = folder; this.success = success;
             dialog = context.windows().overlay(new OverlaySpec("Connecting to " + host.name(), window));
-            panel = new ConnectionPanel(host.name(), host.label(), this::start, this::close);
+            panel = new ConnectionPanel(context.kit(), host.name(), host.label(), this::start, this::close);
             currentConnectionPanel = panel;
-            dialog.setContent(panel); dialog.onClosed(this::close);
+            dialog.setContent(panel.view()); dialog.onClosed(this::close);
         }
         void start() {
             if (closed || stopped || !window.isOpen()) { close(); return; }
@@ -471,7 +519,7 @@ public class RemotePlugin implements Plugin {
             int rows = dimensions.map(info -> Math.max(1, info.rows())).orElse(24);
             // Followed panes get their own connection so the probe can tell their shell apart (see the directory probe spec).
             boolean dedicated = host.followDirectory() && !"Windows".equals(hostInfo.get(host).os());
-            future = connections.shell(host.id(), window, cols, rows, panel::status, dedicated);
+            future = connections.shell(host.id(), window, cols, rows, panel::status, dedicated, folder);
             future.whenComplete((shell, failure) -> ui.execute(() -> {
                 if (closed || stopped || !window.isOpen()) { if (shell != null) shell.connection().close().run(); close(); return; }
                 if (failure != null) { panel.failed(message(failure)); return; }
@@ -483,7 +531,8 @@ public class RemotePlugin implements Plugin {
             if (closed) return;
             closed = true; attempts.remove(this);
             if (future != null && !future.isDone()) future.cancel(true);
-            panel.finished(); finished.run();
+            // The overlay may already have disposed the view; the panel ignores any later status (a stale completion).
+            panel.close(); finished.run();
             if (!delivered) cancelled.run();
             dialog.close();
             if (currentConnectionPanel == panel) currentConnectionPanel = null;
@@ -522,10 +571,12 @@ public class RemotePlugin implements Plugin {
             questions.add(decision);
             if (owner == null || !owner.isOpen()) { decision.complete(HostKeyVerifier.Decision.CANCEL); return; }
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Verify host key " + question.host(), owner, true));
-            currentHostKeyPanel = new HostKeyPanel(question, answer -> { decision.complete(answer); dialog.close(); });
-            dialog.setContent(currentHostKeyPanel);
+            var panel = new HostKeyPanel(context.kit(), question, answer -> { decision.complete(answer); dialog.close(); });
+            currentHostKeyPanel = panel;
+            dialog.setContent(panel.view());
             decision.whenComplete((answer, failure) -> ui.execute(() -> { questions.remove(decision); dialog.close(); }));
-            dialog.onClosed(() -> { currentHostKeyPanel = null; decision.complete(HostKeyVerifier.Decision.CANCEL); });
+            // The surface disposed the view first; closing never trusts: it answers Cancel, as before.
+            dialog.onClosed(() -> { panel.close(); if (currentHostKeyPanel == panel) currentHostKeyPanel = null; decision.complete(HostKeyVerifier.Decision.CANCEL); });
             dialog.show();
         });
         return decision;
@@ -537,33 +588,32 @@ public class RemotePlugin implements Plugin {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(editing.isPresent() ? "Edit " + editing.get().name() : "Add Host", window, true));
         HostEditor[] editor = new HostEditor[1];
         boolean[] closed = {false};
-        editor[0] = new HostEditor(store.hosts(), editing, vault.isPresent(), this::credentialName,
-            () -> vault.isPresent() ? vault.get().pick(window) : CompletableFuture.completedFuture(Optional.empty()),
+        editor[0] = new HostEditor(context.kit(), ui, store.hosts(), editing, vault.isPresent(), this::credentialDescriptor,
+            vault.isPresent() ? request -> vault.get().pick(window, request) : null,
             host -> store.put(host).whenComplete((ignored, failure) -> ui.execute(() -> {
-                if (stopped) return;
-                if (failure == null) dialog.close();
-                else {
-                    if (!closed[0]) editor[0].showError(message(failure));
+                if (!stopped && failure != null)
                     context.notifications().group().error("Could not save the host", message(failure), failure);
-                }
             })),
-            dialog::close);
+            () -> { if (!stopped && !closed[0]) dialog.close(); }, dialog::close,
+            host -> { if (!stopped && window.isOpen()) openHost(window, host); });
+        editor[0].layout(layout);
         editor[0].setDefaultGroupName(panelState.defaultGroup());
         currentEditor = editor[0];
-        dialog.setContent(editor[0]);
-        dialog.onClosed(() -> { closed[0] = true; if (currentEditor == editor[0]) currentEditor = null; });
+        dialog.setContent(editor[0].view());
+        dialog.onClosed(() -> { closed[0] = true; editor[0].close(); if (currentEditor == editor[0]) currentEditor = null; });
         dialog.show();
     }
 
     private void deleteHost(WindowHandle window, RemoteHost host) {
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Delete " + host.name() + "?", window, true));
-        currentConfirm = new ConfirmPanel(deleteHostText(host), "Delete",
+        var confirm = new ConfirmPanel(context.kit(), deleteHostText(host), "Delete",
             () -> store.remove(host.id()).whenComplete((ignored, failure) -> ui.execute(() -> {
                 if (failure != null) context.notifications().group().error("Could not delete the host", message(failure), failure);
                 dialog.close();
             })), dialog::close);
-        dialog.setContent(currentConfirm);
-        dialog.onClosed(() -> currentConfirm = null);
+        currentConfirm = confirm;
+        dialog.setContent(confirm.view());
+        dialog.onClosed(() -> { confirm.close(); if (currentConfirm == confirm) currentConfirm = null; });
         dialog.show();
     }
 
@@ -583,12 +633,13 @@ public class RemotePlugin implements Plugin {
 
     // ---- panel and status
 
-    private javax.swing.JComponent createPanel(PanelHost host) {
+    private dev.jasper.sdk.ui.UiView createPanel(PanelHost host) {
         WindowHandle window = host.window();
-        var panel = new HostsPanel(new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitHost(pane, h)),
+        var panel = new HostsPanel(context.kit(), new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitHost(pane, h)),
             editing -> editHost(window, editing), h -> reportMutation("Could not duplicate the host", store.put(duplicate(h))), h -> deleteHost(window, h),
-            (h, favorite) -> reportMutation("Could not update favorites", store.put(h.withFavorite(favorite))), () -> importConfig(window)), context.appearance()::icon);
+            (h, favorite) -> reportMutation("Could not update favorites", store.put(h.withFavorite(favorite))), () -> importConfig(window)), layout);
         panel.onHeaderChanged(host::setHeader);
+        if (layout == dev.jasper.remote.workstation.Layout.CLASSIC) panel.onSelectionChanged(row -> sessionSelection.set(window.id(), row));
         panel.setCredentialLabels(this::credentialLabel);
         panel.setDefaultGroup(panelState.defaultGroup());
         panel.onRenameDefaultGroup(() -> renameDefaultGroup(window));
@@ -603,9 +654,14 @@ public class RemotePlugin implements Plugin {
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed(), panel.wslCollapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
         panel.setHosts(store.hosts(), store.error());
         panels.put(window.id(), panel); panelHosts.put(window.id(), host);
-        host.onVisibility(visible -> { if (visible) panel.focusWhenOpened(); });
-        host.onClosed(() -> { panels.remove(window.id()); panelHosts.remove(window.id()); });
-        return panel;
+        seedSessions(window.id(), panel);
+        // Shown again, the first host is selected as when the old list was shown (under CLASSIC the window's row, which the
+        // toolbar view shares); focus follows an explicit opening only (a restored panel's window is not showing yet, so
+        // the kit's focus request does nothing).
+        host.onVisibility(visible -> { if (visible) { panel.shown(); seedSessions(window.id(), panel); panel.focusWhenOpened(); } });
+        // The host disposed the view; the panel goes inert so no later refresh touches it.
+        host.onClosed(() -> { panel.close(); if (panels.get(window.id()) == panel) { panels.remove(window.id()); panelHosts.remove(window.id()); } });
+        return panel.view();
     }
 
     private void reportMutation(String title, CompletableFuture<Void> mutation) {
@@ -636,6 +692,39 @@ public class RemotePlugin implements Plugin {
             panel.setDistros(distros, this::distroSessions);
             panel.setHosts(store.hosts(), store.error());
         }
+        for (var entry : List.copyOf(panels.entrySet())) seedSessions(entry.getKey(), entry.getValue());
+    }
+
+    /**
+     * Under CLASSIC, after the window's active pane or its SSH panes changed: each toolbar view and Sessions tree shows the
+     * window's row again (its choice, else the active SSH pane's host, else the first), as Connect would act on it.
+     */
+    private void syncSessions() {
+        if (stopped || layout != dev.jasper.remote.workstation.Layout.CLASSIC || sessionsToolbar == null) return;
+        sessionsToolbar.renderViews();
+        for (var entry : List.copyOf(panels.entrySet())) seedSessions(entry.getKey(), entry.getValue());
+    }
+
+    /**
+     * Under CLASSIC the Sessions tree selects the window's row as its toolbar view shows it (spec 14.4). A row the tree
+     * does not list (filtered out) leaves the tree's own selection, which then becomes the window's choice.
+     */
+    private void seedSessions(UUID windowId, HostsPanel panel) {
+        if (layout != dev.jasper.remote.workstation.Layout.CLASSIC || sessionsToolbar == null) return;
+        var window = context.terminals().window(windowId).filter(WindowHandle::isOpen);
+        if (window.isEmpty()) return;
+        var selected = panel.selectedRow().map(HostsPanel::rowId);
+        // The user's own choice of a row the toolbar does not list (a group) stays selected in the tree.
+        if (sessionSelection.get(windowId).isPresent() && sessionSelection.get(windowId).equals(selected)) return;
+        var row = sessionsToolbar.current(window.get());
+        row.ifPresent(panel::selectRow);
+        var shown = panel.selectedRow().map(HostsPanel::rowId);
+        if (row.isPresent() && !row.equals(shown)) sessionSelection.set(windowId, shown);
+    }
+
+    /** The host of the window's active pane, when Remote opened that pane. */
+    private Optional<UUID> activeHostId(WindowHandle window) {
+        return window.activeTab().flatMap(tab -> tab.activePane()).flatMap(pane -> Optional.ofNullable(panes.get(pane.id())));
     }
 
     private int sessionCount(RemoteHost host) { return (int) panes.values().stream().filter(host.id()::equals).count(); }
@@ -648,7 +737,7 @@ public class RemotePlugin implements Plugin {
     private void renameDefaultGroup(WindowHandle window) {
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Rename default group", window, true));
         GroupNamePanel[] editor = new GroupNamePanel[1];
-        editor[0] = new GroupNamePanel(panelState.defaultGroup(), name -> {
+        editor[0] = new GroupNamePanel(context.kit(), panelState.defaultGroup(), name -> {
             try {
                 String value = name.strip();
                 if (store.hosts().stream().anyMatch(host -> !host.group().isEmpty() && host.group().equalsIgnoreCase(value)))
@@ -658,8 +747,8 @@ public class RemotePlugin implements Plugin {
                 refreshPanels(); dialog.close();
             } catch (IOException | IllegalArgumentException failure) { editor[0].showError(message(failure)); }
         }, dialog::close);
-        currentGroupEditor = editor[0]; dialog.setContent(editor[0]);
-        dialog.onClosed(() -> { if (currentGroupEditor == editor[0]) currentGroupEditor = null; }); dialog.show();
+        currentGroupEditor = editor[0]; dialog.setContent(editor[0].view());
+        dialog.onClosed(() -> { editor[0].close(); if (currentGroupEditor == editor[0]) currentGroupEditor = null; }); dialog.show();
     }
 
     private String credentialLabel(RemoteHost host) {
@@ -670,9 +759,14 @@ public class RemotePlugin implements Plugin {
         };
     }
 
+    private Optional<CredentialDescriptor> credentialDescriptor(UUID id) {
+        if (vault.isEmpty()) return Optional.empty();
+        return vault.get().credentials().stream().filter(descriptor -> descriptor.id().equals(id)).findFirst();
+    }
+
     private Optional<String> credentialName(UUID id) {
         if (vault.isEmpty()) return Optional.empty();
-        return vault.get().credentials().stream().filter(descriptor -> descriptor.id().equals(id)).findFirst().map(CredentialDescriptor::name);
+        return credentialDescriptor(id).map(CredentialDescriptor::name);
     }
 
     private void refreshStatus() {
@@ -690,6 +784,10 @@ public class RemotePlugin implements Plugin {
     GroupNamePanel currentGroupEditor() { return currentGroupEditor; }
     ConnectionPanel currentConnectionPanel() { return currentConnectionPanel; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
+    /** The Sessions panel open in a window, for tests. */
+    HostsPanel hostsPanel(UUID windowId) { return panels.get(windowId); }
     dev.jasper.remote.ui.tunnels.TunnelsUi tunnels() { return tunnelsUi; }
+    /** The SFTP explorers, for tests. */
+    dev.jasper.remote.ui.sftp.SftpUi sftp() { return sftpUi; }
     dev.jasper.remote.tunnels.TunnelStore tunnelStore() { return tunnelStore; }
 }

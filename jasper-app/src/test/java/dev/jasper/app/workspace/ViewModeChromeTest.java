@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.ToolbarMode;
 import dev.jasper.app.config.ViewMode;
@@ -38,9 +37,9 @@ class ViewModeChromeTest {
             owner.selectTab(first); owner.update();
             assertThat(titles.getLast()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
-            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            owner.selectVariant(false);
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
-            owner.selectTheme(Theme.DARK);
+            owner.selectVariant(true);
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
             int listeners = root.getPropertyChangeListeners("windowDecorationStyle").length;
             assertThat(WindowContent.installCustomTitleBar(root, owner)).isFalse();

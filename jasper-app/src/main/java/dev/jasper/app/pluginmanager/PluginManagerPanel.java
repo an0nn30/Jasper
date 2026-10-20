@@ -1,35 +1,29 @@
 package dev.jasper.app.pluginmanager;
 
-import com.formdev.flatlaf.FlatClientProperties;
-import com.formdev.flatlaf.extras.FlatSVGIcon;
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.plugins.PluginRuntime;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.MenuItem;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
 import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JMenuItem;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTabbedPane;
-import javax.swing.JTextField;
-import javax.swing.UIManager;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 
 /**
- * The Plugins page's passive view: a search bar and gear menu, the restart banner, the plugin cards and the selected
- * plugin's details. It renders a snapshot and reports clicks; it decides nothing. EDT only.
+ * The Plugins page's passive view: a search field and gear menu, the restart banner and notice, the plugin rows and the
+ * selected plugin's details, and a message line. It is an app-owned arrangement (Plan 3 recomposes it) of kit views on
+ * the chrome context; it renders a snapshot and reports what the user asks for; it decides nothing. EDT only; close it
+ * with the page.
  */
 final class PluginManagerPanel extends JPanel {
     /** What the user can ask for. */
@@ -40,107 +34,183 @@ final class PluginManagerPanel extends JPanel {
     /** One button of the banner. */
     record BannerAction(String label, Runnable run) { }
 
-    final JTextField search = new JTextField(18);
-    final JButton gear = new JButton();
+    static final String SEARCH = "search", GEAR = "gear", INSTALL = "install", BANNER = "banner:";
+    /** The list's share of extra width when the page grows, as before. */
+    private static final double LIST_SHARE = 0.4;
+    private final KitContext kit;
     private final Handlers handlers;
-    private final PluginDetails details;
+    private final KitView searchView, gearView, headerView, messageView;
     private final PluginCardList list;
-    private final JPanel banner = new JPanel(new BorderLayout(12, 0));
-    private final JLabel bannerLabel = plain(new JLabel());
-    private final JPanel bannerActions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
-    private final JLabel notice = plain(new JLabel());
-    private final JLabel message = plain(new JLabel(" "));
-    private boolean busy;
+    private final PluginDetails details;
+    private final JPanel bar = new JPanel(new BorderLayout()), top = new JPanel(new BorderLayout()), listLane = new JPanel(new BorderLayout());
+    private final JSplitPane split;
+    private final AutoCloseable theme;
+    private String bannerText = "";
+    private List<BannerAction> bannerActions = List.of();
+    private String notice = "", message = "";
+    private boolean error, busy, closed;
+    private final PluginShape shape;
 
-    /** Swing renders label text that starts with an html tag; plugin-supplied text must never be markup. */
-    static <T extends JComponent> T plain(T component) {
-        component.putClientProperty("html.disable", Boolean.TRUE);
-        return component;
-    }
+    PluginManagerPanel(KitContext kit, Handlers handlers) { this(kit, handlers, PluginShape.ROWS); }
 
-    PluginManagerPanel(Handlers handlers) {
-        super(new BorderLayout(0, 8));
+    PluginManagerPanel(KitContext kit, Handlers handlers, PluginShape shape) {
+        super(new BorderLayout());
+        this.shape = shape;
+        this.kit = kit;
         this.handlers = handlers;
-        setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        details = new PluginDetails(handlers);
+        setOpaque(false);
+        searchView = new KitView(kit, new ViewSpec(new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, "", "Search plugins",
+            "Search plugins", "")), this::event);
+        dev.jasper.ui.swing.SettingsShell.settingsPage(searchView);
+        gearView = new KitView(kit, gearSpec(), this::event);
+        headerView = new KitView(kit, headerSpec(), this::event);
+        messageView = new KitView(kit, messageSpec(), this::event);
+        details = new PluginDetails(kit, this::event, shape);
         // The list reports its first selection while it is being built, before this field is set.
-        list = new PluginCardList(row -> (row.needsConsent() ? handlers.review() : handlers.toggle()).accept(row),
-            () -> { PluginCardList built = cardList(); if (built != null) details.show(built.selectedRow(), busy); },
-            (at, point) -> { if (!busy) details.menu().show(at, point.x, point.y); });
+        list = new PluginCardList(kit, this::event, () -> { if (cardList() != null) details.show(cardList().selectedRow(), busy); }, shape);
+        bar.setOpaque(false);
+        bar.add(searchView, BorderLayout.CENTER);
+        bar.add(gearView, BorderLayout.EAST);
+        top.setOpaque(false);
 
-        search.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Search plugins");
-        search.getAccessibleContext().setAccessibleName("Search plugins");
-        search.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent event) { list.search(search.getText()); }
-            @Override public void removeUpdate(DocumentEvent event) { list.search(search.getText()); }
-            @Override public void changedUpdate(DocumentEvent event) { list.search(search.getText()); }
-        });
-        gear.setIcon(new FlatSVGIcon("dev/jasper/app/icons/intellij/general/settings.svg", 16, 16, PluginManagerPanel.class.getClassLoader()));
-        gear.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
-        gear.setToolTipText("Plugin options");
-        gear.getAccessibleContext().setAccessibleName("Plugin options");
-        gear.addActionListener(event -> gearMenu().show(gear, 0, gear.getHeight()));
-        var bar = new JPanel(new BorderLayout(8, 0));
-        bar.add(search, BorderLayout.CENTER);
-        bar.add(gear, BorderLayout.EAST);
-
-        banner.add(bannerLabel, BorderLayout.CENTER);
-        banner.add(bannerActions, BorderLayout.EAST);
-        banner.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
-        banner.setVisible(false);
-        notice.setVisible(false);
-        var top = new JPanel(new BorderLayout());
-        top.add(bar, BorderLayout.NORTH);
-        top.add(banner, BorderLayout.CENTER);
-        top.add(notice, BorderLayout.SOUTH);
+        top.add(headerView, BorderLayout.CENTER);
         add(top, BorderLayout.NORTH);
-
-        var listScroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        listScroll.setMinimumSize(new Dimension(240, 100));
-        var split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listScroll, details);
-        split.setDividerLocation(340);
-        split.setResizeWeight(0.4);
+        listLane.setOpaque(false);listLane.add(bar,BorderLayout.NORTH);listLane.add(list.view(),BorderLayout.CENTER);
+        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listLane, details.component()) {
+            @Override public void updateUI() {
+                // Mock 08 draws no rule between the boxed list and the details: the classic divider is draggable but unpainted.
+                setUI(shape.checkboxRows() ? new UnpaintedSplitUI() : dev.jasper.ui.swing.NativeStyles.installed().splitPaneUI(kit::theme));
+                setOpaque(false);
+            }
+        };
+        split.setResizeWeight(LIST_SHARE);
         split.setBorder(null);
+        split.setContinuousLayout(true);
+        split.setDividerLocation(metric(DesignMetrics.Role.PLUGIN_LIST_WIDTH));
         add(split, BorderLayout.CENTER);
-        add(message, BorderLayout.SOUTH);
+        add(messageView, BorderLayout.SOUTH);
+        theme = kit.binding().subscribe(pair -> restyle());
         restyle();
         details.show(list.selectedRow(), false);
     }
 
+    @Override public java.awt.Dimension getMinimumSize() {
+        var minimum=super.getMinimumSize();
+        if(split!=null && split.getOrientation()==JSplitPane.HORIZONTAL_SPLIT) {
+            var insets=getInsets();
+            // Preserve the user's allocated list lane while keeping the detail receiver readable.
+            // The Settings viewport scrolls this minimum instead of silently compressing the right pane.
+            minimum.width=Math.max(minimum.width,insets.left+insets.right+Math.max(split.getLeftComponent().getMinimumSize().width,split.getDividerLocation())+split.getDividerSize()+split.getRightComponent().getMinimumSize().width);
+        }
+        return minimum;
+    }
+
     private PluginCardList cardList() { return list; }
 
-    @Override public void updateUI() {
-        super.updateUI();
-        // Called by JPanel's constructor, before the labels exist.
-        if (message != null) restyle();
-    }
+    private int metric(DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }
 
+    /** The former paddings and gaps, as named metrics. */
     private void restyle() {
-        Font base = UIManager.getFont("Label.font");
-        if (base != null) bannerLabel.setFont(base.deriveFont(Font.BOLD));
+        int pad = metric(DesignMetrics.Role.PLUGIN_MANAGER_PADDING), gap = metric(DesignMetrics.Role.PLUGIN_MANAGER_GAP);
+        int side=metric(DesignMetrics.Role.PLUGIN_MANAGER_SIDE_PADDING);
+        // The list and details pad themselves, so the divider between them runs the page's full height.
+        setBorder(BorderFactory.createEmptyBorder(0, side, 0, pad));
+        listLane.setBorder(BorderFactory.createEmptyBorder(pad,0,pad,0));
+        // The gear sits a little in from the rows' trailing edge, close to the search it qualifies.
+        bar.setBorder(BorderFactory.createEmptyBorder(0,side,0,metric(DesignMetrics.Role.PLUGIN_SEARCH_TRAILING)));
+        list.view().setBorder(BorderFactory.createEmptyBorder(0,0,0,side));
+        if (shape.checkboxRows()) {
+            // Spec 12.2 and plan 9b Rulings 12: one boxed lane on the card surface holding the search row and the rows.
+            var palette = kit.theme().semantic();
+            int inset = metric(DesignMetrics.Role.PLUGIN_SEARCH_GAP) + 1;
+            // The box's top line is level with the details' top (the mock's Disable), its bottom a page padding above the footer.
+            listLane.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createEmptyBorder(pad + metric(DesignMetrics.Role.PLUGIN_DETAILS_EDGE_PADDING), 0, pad, 0),
+                BorderFactory.createLineBorder(palette.color(dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL))));
+            // The search row is a strip on surface.sidebar ruled in border.row above the rows, as 9a's Settings search strip.
+            bar.setOpaque(true);
+            bar.setBackground(palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
+            bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, metric(DesignMetrics.Role.HAIRLINE), 0, dev.jasper.ui.theme.DerivedColor.BORDER_ROW.color(kit.theme())),
+                BorderFactory.createEmptyBorder(inset, inset, inset, inset)));
+            list.view().setBorder(BorderFactory.createEmptyBorder());
+            list.view().setOpaque(true);
+            list.view().setBackground(palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));
+        }
+        ((BorderLayout) getLayout()).setVgap(gap);
+        ((BorderLayout) bar.getLayout()).setHgap(metric(DesignMetrics.Role.PLUGIN_SEARCH_GAP));
+        top.setVisible(!bannerText.isEmpty() || !notice.isEmpty());
+        headerView.setBorder(BorderFactory.createEmptyBorder(bannerText.isEmpty() && notice.isEmpty() ? 0 : pad, 0, 0, 0));
+        messageView.setVisible(!message.isEmpty());
+        messageView.setBorder(BorderFactory.createEmptyBorder(0, 0, pad, 0));
+        split.setDividerSize(metric(DesignMetrics.Role.WORKSPACE_GUTTER));
+        revalidate();
+        repaint();
     }
 
-    private JPopupMenu gearMenu() {
-        var menu = new JPopupMenu();
-        var install = new JMenuItem("Install from Zip…");
-        install.setEnabled(!busy);
-        install.addActionListener(event -> handlers.install().run());
-        menu.add(install);
-        return menu;
+    /** Routes the kit views' events: the search, the gear, the banner, the rows' switches and menus and the details. */
+    private void event(UiEvent event) {
+        if (closed) return;
+        switch (event) {
+            case UiEvent.Edited edited when edited.id().equals(SEARCH) -> list.search(edited.text());
+            case UiEvent.Toggled toggled when toggled.id().startsWith(PluginCard.TOGGLE) -> {
+                var row = list.row(toggled.id().substring(PluginCard.TOGGLE.length()));
+                if (row != null && !busy && PluginCard.toggleable(row)) (row.needsConsent() ? handlers.review() : handlers.toggle()).accept(row);
+            }
+            case UiEvent.Action action -> act(action.id());
+            default -> { }
+        }
     }
 
-    List<String> gearLabels() {
-        List<String> labels = new ArrayList<>();
-        for (Component component : gearMenu().getComponents()) if (component instanceof JMenuItem item) labels.add(item.getText());
-        return labels;
+    private void act(String id) {
+        if (id.equals(INSTALL)) { if (!busy) handlers.install().run(); return; }
+        if (id.startsWith(BANNER)) {
+            int index = Integer.parseInt(id.substring(BANNER.length()));
+            if (index < bannerActions.size()) bannerActions.get(index).run().run();
+            return;
+        }
+        var shown = list.selectedRow();
+        switch (id) {
+            case PluginDetails.PRIMARY -> { if (shown != null && !busy) (shown.needsConsent() ? handlers.review() : handlers.toggle()).accept(shown); return; }
+            case PluginDetails.HOMEPAGE -> { if (shown != null) PluginDetails.homepage(shown).ifPresent(handlers.browse()); return; }
+            default -> { }
+        }
+        if (busy) return;
+        for (var entry : List.<java.util.Map.Entry<String, Consumer<PluginRuntime.Row>>>of(
+                java.util.Map.entry(PluginCard.SETTINGS, handlers.openSettings()), java.util.Map.entry(PluginCard.FOLDER, handlers.openFolder()),
+                java.util.Map.entry(PluginCard.DATA, handlers.openData()), java.util.Map.entry(PluginCard.REMOVE, handlers.remove()),
+                java.util.Map.entry(PluginCard.DISCARD, handlers.discard())))
+            if (id.startsWith(entry.getKey())) {
+                var row = list.row(id.substring(entry.getKey().length()));
+                if (row != null) entry.getValue().accept(row);
+                return;
+            }
     }
 
-    /** Test seam: clicks the gear menu's item; a disabled item does nothing. */
-    void clickGear(String label) {
-        for (Component component : gearMenu().getComponents())
-            if (component instanceof JMenuItem item && item.getText().equals(label)) { item.doClick(); return; }
-        throw new IllegalArgumentException("No gear menu item " + label);
+    private ViewSpec gearSpec() {
+        return new ViewSpec(new Nodes.MenuButton(GEAR, ControlState.READY, "", "more", Nodes.ButtonKind.GHOST, "",
+            List.of(new MenuItem(INSTALL, "Install from Zip…", "", INSTALL, !busy, false)), "Plugin options"));
     }
+
+    private ViewSpec headerSpec() {
+        var hidden = new ControlState(false, true, false, "");
+        var buttons = new ArrayList<Nodes.Node>();
+        for (int i = 0; i < bannerActions.size(); i++)
+            buttons.add(new Nodes.Button(BANNER + i, ControlState.READY, bannerActions.get(i).label(), "", Nodes.ButtonKind.SECONDARY, BANNER + i, ""));
+        var banner = new Nodes.Card("banner", bannerText.isEmpty() ? hidden : ControlState.READY, Nodes.CardKind.MIXED, List.of(
+            new Nodes.Text("banner-text", ControlState.READY, bannerText.isEmpty() ? " " : bannerText, Nodes.TextRole.BODY_STRONG),
+            new Nodes.Stack("banner-actions", buttons.isEmpty() ? hidden : ControlState.READY, Nodes.LayoutRole.ACTIONS, buttons)));
+        return new ViewSpec(new Nodes.Stack("plugins-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(banner,
+            new Nodes.Text("notice", notice.isEmpty() ? hidden : ControlState.READY, notice.isEmpty() ? " " : notice, Nodes.TextRole.DESCRIPTION))));
+    }
+
+    private ViewSpec messageSpec() {
+        return new ViewSpec(new Nodes.Stack("message-line", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.StatusDot("message-dot", error && !message.isEmpty() ? ControlState.READY : new ControlState(false, true, false, ""), Nodes.StatusKind.DANGER),
+            new Nodes.Text("message", ControlState.READY, message.isEmpty() ? " " : message, Nodes.TextRole.BODY))));
+    }
+
+    private void render(KitView view, ViewSpec spec) { if (!view.isClosed()) view.update(spec); }
 
     /** Replaces the plugins, keeping the selection and the search. */
     void show(PluginRuntime.Snapshot snapshot) { list.show(snapshot.rows()); }
@@ -148,54 +218,75 @@ final class PluginManagerPanel extends JPanel {
     void busy(boolean value) {
         busy = value;
         list.busy(value);
-        gear.setEnabled(!value);
+        render(gearView, gearSpec());
         details.show(list.selectedRow(), value);
     }
 
     /** An empty text hides the banner. */
     void banner(String text, List<BannerAction> actions) {
-        bannerLabel.setText(text);
-        bannerActions.removeAll();
-        for (BannerAction action : actions) {
-            var button = new JButton(action.label());
-            button.addActionListener(event -> action.run().run());
-            bannerActions.add(button);
-        }
-        banner.setVisible(!text.isEmpty());
-        banner.revalidate();
-        banner.repaint();
+        bannerText = text;
+        bannerActions = text.isEmpty() ? List.of() : List.copyOf(actions);
+        render(headerView, headerSpec());
+        restyle();
     }
 
-    void notice(String text) { notice.setText(text); notice.setVisible(!text.isEmpty()); }
+    void notice(String text) { notice = text; render(headerView, headerSpec()); restyle(); }
 
     void message(String text, boolean error) {
-        message.setText(text.isEmpty() ? " " : text);
-        message.setForeground(UIManager.getColor(error ? "Actions.Red" : "Label.foreground"));
+        message = text;
+        this.error = error;
+        render(messageView, messageSpec());
+        restyle();
     }
+
+    /** Closes the kit views; the page calls this when Settings lets it go. Idempotent. */
+    void close() {
+        if (closed) return;
+        closed = true;
+        try { theme.close(); } catch (Exception ignored) { /* nothing else holds the subscription */ }
+        searchView.close(); gearView.close(); headerView.close(); messageView.close();
+        list.close();
+        details.close();
+    }
+
+    boolean closed() { return closed; }
 
     List<String> listed() { return list.listed(); }
     List<String> groupTitles() { return list.groupTitles(); }
     String selected() { return list.selected(); }
     void select(String id) { list.select(id); }
-    PluginCard card(String id) { return list.card(id); }
-    void search(String text) { search.setText(text); }
-    JButton primary() { return details.primary; }
-    JTabbedPane tabs() { return details.tabs; }
+    PluginRuntime.Row row(String id) { return list.row(id); }
+    boolean busy() { return busy; }
+    PluginDetails detailsPane() { return details; }
+    KitView listView() { return list.view(); }
+    KitView searchView() { return searchView; }
+    KitView gearView() { return gearView; }
+    KitView headerView() { return headerView; }
+    KitView messageView() { return messageView; }
+    JSplitPane split() { return split; }
+
+    /** A split whose divider keeps its drag but paints nothing (the classic Plugins page, plan 9b final review). */
+    static final class UnpaintedSplitUI extends javax.swing.plaf.basic.BasicSplitPaneUI {
+        @Override public javax.swing.plaf.basic.BasicSplitPaneDivider createDefaultDivider() {
+            var divider = new javax.swing.plaf.basic.BasicSplitPaneDivider(this) {
+                @Override public void paint(java.awt.Graphics graphics) { }
+            };
+            divider.setBorder(null);
+            return divider;
+        }
+    }
     List<String> menuLabels() { return details.menuLabels(); }
-    void clickMenu(String label) { details.clickMenu(label); }
-    boolean homepageShown() { return details.homepage.isVisible(); }
-    void clickHomepage() { details.homepage.doClick(); }
+    boolean homepageShown() { return details.homepageShown(); }
+
+    /** The gear menu's labels, from its descriptor. */
+    List<String> gearLabels() { return ((Nodes.MenuButton) gearView.spec().root()).items().stream().map(MenuItem::label).toList(); }
 
     /** The selected plugin's details as text, or the list's empty text when nothing is selected. */
     String details() { return list.selectedRow() == null ? list.emptyText() : details.text(); }
 
-    String bannerText() { return banner.isVisible() ? bannerLabel.getText() : ""; }
-    String noticeText() { return notice.isVisible() ? notice.getText() : ""; }
-    String messageText() { return message.getText().strip(); }
-
-    List<JButton> bannerButtons() {
-        List<JButton> buttons = new ArrayList<>();
-        if (banner.isVisible()) for (Component component : bannerActions.getComponents()) buttons.add((JButton) component);
-        return buttons;
-    }
+    String bannerText() { return bannerText; }
+    String noticeText() { return notice; }
+    String messageText() { return message.strip(); }
+    boolean messageIsError() { return error && !message.isEmpty(); }
+    List<String> bannerLabels() { return bannerActions.stream().map(BannerAction::label).toList(); }
 }

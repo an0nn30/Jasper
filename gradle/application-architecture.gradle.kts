@@ -3,11 +3,15 @@ import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JvmVendorSpec
 
+@Suppress("UNCHECKED_CAST")
+val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.gradle.api.artifacts.Configuration>
+
 // Bytecode, rather than imports, catches fully-qualified references and inferred type edges.
 val app = project(":jasper-app")
 val buddy = project(":jasper-buddy")
 val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitecture") {
     dependsOn(":jasper-app:classes", ":jasper-buddy:jar", ":jasper-terminal:jar", ":jasper-sdk:jar")
+    inputs.files(listOf(app, buddy).map { verificationClasspaths.getValue(it.path) })
     doLast {
         val launcher = app.extensions.getByType<JavaToolchainService>().launcherFor {
             languageVersion = JavaLanguageVersion.of(25)
@@ -47,7 +51,7 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                 "Flat app production types remain; only Main belongs at the root"
             }
             val output = tool("jdeps", listOf("--multi-release", "25", "-verbose:class", "-filter:none",
-                "--class-path", module.configurations.getByName("runtimeClasspath").asPath.ifEmpty { classes.absolutePath }, classes.absolutePath))
+                "--class-path", verificationClasspaths.getValue(module.path).asPath.ifEmpty { classes.absolutePath }, classes.absolutePath))
             val edge = Regex("^\\s*(dev\\.jasper\\.\\S+)\\s+->\\s+(\\S+).*$")
             val graph = mutableMapOf<String, MutableSet<String>>()
             output.lineSequence().forEach { line ->
@@ -64,6 +68,11 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                     check(to.startsWith("dev.jasper.app.dock.") || (to.startsWith("java.") && !to.startsWith("java.awt.")) || to in dockAwt) {
                         "dev.jasper.app.dock is JDK-only and holds no Swing or AWT components: $line"
                     }
+                if (module == app && packageOf(from) == "dev.jasper.app.vmoptions")
+                    check(to.startsWith("dev.jasper.app.vmoptions.") || to.startsWith("com.sun.management.")
+                        || (jdk(to) && !to.startsWith("java.awt.") && !to.startsWith("javax.swing."))) {
+                        "dev.jasper.app.vmoptions is JDK-only and holds no Swing or AWT: $line"
+                    }
                 if (to.startsWith(prefix) && packageOf(from) != packageOf(to))
                     graph.getOrPut(packageOf(from)) { linkedSetOf() }.add(packageOf(to))
             }
@@ -78,8 +87,13 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                         }
                 }
             } else {
+                val removed = setOf("dev.jasper.app.appearance.LegacyAppearanceDefaults", "dev.jasper.app.appearance.WorkspaceDefaults",
+                    "dev.jasper.app.appearance.AppListUI", "dev.jasper.app.workspace.WorkspaceStyler", "dev.jasper.app.workspace.WorkspaceStyles",
+                    "dev.jasper.app.workspace.WorkspaceStyleLayer", "dev.jasper.app.workspace.WorkspaceComboPopup")
+                check(types.none { topLevel(it) in removed }) { "Removed private presentation adapter reintroduced" }
                 for (batch in types.chunked(100)) {
                     val code = tool("javap", listOf("-classpath", classes.absolutePath, "-c", "-p") + batch)
+                    check(removed.none { code.contains(it.replace('.', '/')) }) { "Application references removed private presentation adapters" }
                     check(!code.contains("dev/jasper/terminal/internal/") && !code.contains("TerminalSession.internalAccess")) {
                         "Application bypasses supported terminal API"
                     }

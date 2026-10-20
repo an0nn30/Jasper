@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import javax.swing.Icon;
 
 /**
  * What a plugin posts. Text is plain and never markup.
@@ -21,7 +20,7 @@ import javax.swing.Icon;
  *     Show more…, which opens its stack trace
  * @param window the window whose card it is; absent means the window the user used last
  */
-public record NotificationSpec(Severity severity, String title, String content, Optional<Icon> icon,
+public record NotificationSpec(Severity severity, String title, String content, Optional<String> icon,
                                List<NotificationAction> actions, Optional<Runnable> activate, Optional<Throwable> cause,
                                Optional<WindowHandle> window) {
     static final int MAX_TITLE = 200;
@@ -72,7 +71,7 @@ public record NotificationSpec(Severity severity, String title, String content, 
      * @param value a 16 px icon
      * @return the copy
      */
-    public NotificationSpec withIcon(Icon value) {
+    public NotificationSpec withIcon(String value) {
         return new NotificationSpec(severity, title, content, Optional.of(value), actions, activate, cause, window);
     }
 

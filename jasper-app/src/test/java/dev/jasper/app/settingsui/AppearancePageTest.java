@@ -1,166 +1,208 @@
 package dev.jasper.app.settingsui;
 
+import static dev.jasper.app.settingsui.PageKit.kit;
+import static dev.jasper.app.settingsui.PageKit.node;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ViewMode;
+import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import java.awt.event.KeyEvent;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import javax.swing.JButton;
 import javax.swing.JComboBox;
-import javax.swing.JMenuItem;
+import javax.swing.plaf.basic.ComboPopup;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(EdtTestExtension.class)
 class AppearancePageTest {
-    private final List<String> names = new ArrayList<>(List.of("Darcula", "Jasper Dark", "Jasper Light"));
-    private final List<String> calls = new ArrayList<>();
-    private final ThemeChoices themes = new ThemeChoices(() -> List.copyOf(names),
-        context -> new ThemeChoices.Import(() -> calls.add("import"), () -> calls.add("closed")));
+    private final AppearanceChoices appearance = AppearanceFixtures.CHOICES;
     private final SettingsDraft draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
-    private final PageContext context = new PageContext(draft, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
+    private final PageContext context = PageKit.context(draft, id -> { }, () -> { });
     private final CorePages.SystemActions system = new CorePages.SystemActions(() -> Path.of("config.toml"),
-        () -> { }, () -> { }, () -> { }, () -> { }, () -> false);
-    private final SchemaPage.Spec spec = CorePages.specs(themes, system, ShellChoices.NONE, id -> { }).stream()
+        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty());
+    private final SchemaPage.Spec spec = CorePages.specs(appearance, system, ShellChoices.NONE, id -> { }).stream()
         .filter(spec -> spec.id().equals("appearance")).findFirst().orElseThrow();
     private final SchemaPage page = spec.build(context);
 
-    private Editors.ThemePick editor(int row) { page.component(); return (Editors.ThemePick) page.rows().get(row).editor(); }
-    private static List<String> items(JComboBox<String> box) {
+    private JComboBox<?> combo(String setting) { return kit(page, setting + ".input", JComboBox.class); }
+    private SchemaPage.Row<?> row(String name) {
+        page.component();
+        return page.rows().stream().filter(row -> row.setting().name().equals(name)).findFirst().orElseThrow();
+    }
+    private static List<String> items(JComboBox<?> box) {
         var items = new ArrayList<String>();
-        for (int i = 0; i < box.getItemCount(); i++) items.add(box.getItemAt(i));
+        for (int i = 0; i < box.getItemCount(); i++) items.add(((dev.jasper.ui.model.Option) box.getItemAt(i)).label());
         return items;
+    }
+    private static String selected(JComboBox<?> box) { return ((dev.jasper.ui.model.Option) box.getSelectedItem()).label(); }
+    private static void pick(JComboBox<?> box, String label) { box.setSelectedIndex(items(box).indexOf(label)); }
+    /** Slate Cobalt, with Ocean as a second Dark theme and Dawn as a second Light theme, so a pick other than Slate Cobalt is installed. */
+    private static final InstalledThemes TWO_EACH = new InstalledThemes(
+        List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", AppearanceFixtures.preview(true)),
+            new InstalledThemes.ThemeOption("ocean", "Ocean", AppearanceFixtures.preview(true))),
+        List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", AppearanceFixtures.preview(false)),
+            new InstalledThemes.ThemeOption("jasper-meadow", "Jasper Meadow Light", AppearanceFixtures.preview(false)),
+            new InstalledThemes.ThemeOption("dawn", "Dawn", AppearanceFixtures.preview(false))),
+        InstalledThemes.slateCobalt(AppearanceFixtures.preview(true), AppearanceFixtures.preview(false)).schemes(),
+        java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "dawn", "Dawn", "jasper-meadow", "Jasper Meadow Light"));
+    /** The Appearance page over {@code themes}, built on the test's draft. */
+    private SchemaPage pageWith(InstalledThemes themes) {
+        var choices = new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes, Optional.empty());
+        var appearanceSpec = CorePages.specs(choices, system, ShellChoices.NONE, id -> { }).stream()
+            .filter(spec -> spec.id().equals("appearance")).findFirst().orElseThrow();
+        return appearanceSpec.build(context);
+    }
+
+    /** {@code target}'s left edge within {@code page}'s body, laid out at a Settings window's width. */
+    private static int left(SchemaPage page, String target) {
+        var body = page.component();
+        var viewport = new javax.swing.JViewport();
+        viewport.setSize(900, 2400);
+        viewport.setView(body);
+        layOut(viewport);
+        return javax.swing.SwingUtilities.convertPoint(kit(page, target, java.awt.Component.class), 0, 0, body).x;
+    }
+    private static void layOut(java.awt.Component component) {
+        if (!(component instanceof java.awt.Container container)) return;
+        container.doLayout();
+        for (var child : container.getComponents()) layOut(child);
+    }
+
+    @Test void theDarkLightAndTerminalDropdownsLineUp() {
+        int dark = left(page, "ui.appearance:dark-theme.input");
+        assertThat(List.of(left(page, "ui.appearance:light-theme.input"), left(page, "terminal.scheme.input")))
+            .as("the Light row keeps the Reset lane the other rows have").containsOnly(dark);
+    }
+
+    @Test void withImportsEachThemeDropdownHasAGearAndTheyLineUp() {
+        var imports = new ThemeImports(new dev.jasper.app.appearance.ThemeFolder(Path.of("themes")), surface -> Optional.empty(),
+            (surface, question) -> { }, (surface, notice) -> { }, edit -> java.util.concurrent.CompletableFuture.completedFuture(null),
+            () -> java.util.concurrent.CompletableFuture.completedFuture(null), Runnable::run, Runnable::run);
+        var withGears = CorePages.specs(new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> TWO_EACH,
+                Optional.of(imports)), system, ShellChoices.NONE, id -> { }).stream()
+            .filter(spec -> spec.id().equals("appearance")).findFirst().orElseThrow().build(context);
+        int dark = left(withGears, "ui.appearance:dark-theme.input");
+        assertThat(List.of(left(withGears, "ui.appearance:light-theme.input"), left(withGears, "terminal.scheme.input"))).containsOnly(dark);
+        int gear = left(withGears, "ui.appearance:dark-gear.main");
+        assertThat(gear).as("the gear follows its dropdown").isGreaterThan(dark);
+        assertThat(List.of(left(withGears, "ui.appearance:light-gear.main"), left(withGears, "terminal.scheme:gear.main"))).containsOnly(gear);
+        assertThatThrownBy(() -> kit(page, "ui.appearance:dark-gear.main", java.awt.Component.class))
+            .as("pages built without an application have no gears").isInstanceOf(Throwable.class);
     }
 
     @Test void viewModeOffersNormalAndCompact() {
-        page.component();
-        var setting = spec.settings().stream().filter(item -> item.name().equals("window.view_mode"))
-            .findFirst().orElseThrow();
-        var row = page.rows().get(spec.settings().indexOf(setting));
-        @SuppressWarnings("unchecked")
-        var box = (JComboBox<String>) row.editor().component();
+        var box = combo("window.view_mode");
+        assertThat(node(page, "window.view_mode")).isInstanceOfSatisfying(Nodes.Choice.class,
+            choice -> assertThat(choice.kind()).isEqualTo(Nodes.ChoiceKind.DROPDOWN));
         assertThat(items(box)).containsExactly("Normal", "Compact");
-        assertThat(box.getSelectedItem()).isEqualTo("Normal");
+        assertThat(selected(box)).isEqualTo("Normal");
         assertThat(String.join(" ", page.searchTerms()).toLowerCase(java.util.Locale.ROOT)).contains("compact");
     }
 
     @Test void choosingCompactStagesItForApplyAndResetRestoresNormal() {
-        page.component();
-        var setting = spec.settings().stream().filter(item -> item.name().equals("window.view_mode"))
-            .findFirst().orElseThrow();
-        var row = page.rows().get(spec.settings().indexOf(setting));
-        var box = (JComboBox<?>) row.editor().component();
-        assertThat(row.comment().getText()).contains("Takes effect after restart");
+        var row = row("window.view_mode");
+        var box = combo("window.view_mode");
+        assertThat(row.comment()).contains("Takes effect after restart");
         assertThat(draft.modified()).isFalse();
-        box.setSelectedItem("Compact");
+        pick(box, "Compact");
         assertThat(draft.value(CoreSettings.WINDOW_VIEW_MODE)).isEqualTo(ViewMode.COMPACT);
         assertThat(draft.edit().changes()).containsEntry(CoreSettings.WINDOW_VIEW_MODE, Optional.of(ViewMode.COMPACT));
         assertThat(page.modified()).isTrue();
-        assertThat(row.reset().isVisible()).isTrue();
-        row.reset().doClick();
+        var reset = kit(page, "window.view_mode:reset", JButton.class);
+        assertThat(reset.isVisible()).isTrue();
+        reset.doClick();
         assertThat(draft.value(CoreSettings.WINDOW_VIEW_MODE)).isEqualTo(ViewMode.NORMAL);
-        assertThat(box.getSelectedItem()).isEqualTo("Normal");
+        assertThat(selected(box)).isEqualTo("Normal");
         assertThat(draft.modified()).isFalse();
-        assertThat(row.reset().isVisible()).isFalse();
+        assertThat(reset.isVisible()).isFalse();
     }
 
     @Test void resettingASavedCompactModeStagesRemovalOfTheKey() {
         draft.rebase(ConfigLoader.parse(Path.of("config.toml"), "window.view_mode = 'compact'", true).values());
-        page.component();
-        var setting = spec.settings().stream().filter(item -> item.name().equals("window.view_mode"))
-            .findFirst().orElseThrow();
-        var row = page.rows().get(spec.settings().indexOf(setting));
-        var box = (JComboBox<?>) row.editor().component();
-        assertThat(box.getSelectedItem()).isEqualTo("Compact");
+        var box = combo("window.view_mode");
+        assertThat(selected(box)).isEqualTo("Compact");
         assertThat(draft.modified()).isFalse();
-        row.reset().doClick();
-        assertThat(box.getSelectedItem()).isEqualTo("Normal");
+        kit(page, "window.view_mode:reset", JButton.class).doClick();
+        assertThat(selected(box)).isEqualTo("Normal");
         assertThat(draft.edit().changes()).containsEntry(CoreSettings.WINDOW_VIEW_MODE, Optional.empty());
         assertThat(draft.edit().expected()).containsEntry(CoreSettings.WINDOW_VIEW_MODE, Optional.of(ViewMode.COMPACT));
         assertThat(draft.modified()).isTrue();
-    }
-
-    @Test void theThemeAndWorkspaceSchemeAreDropdownsOfEveryThemeName() {
-        var theme = editor(0);
-        var workspace = editor(1);
-        assertThat(List.of(CoreSettings.UI_THEME_NAME.label(), CoreSettings.UI_THEME_WORKSPACE.label())).containsExactly("Theme", "Workspace scheme");
-        assertThat(items(theme.box)).containsExactly("Darcula", "Jasper Dark", "Jasper Light");
-        assertThat(theme.box.getSelectedItem()).isEqualTo("Jasper Dark");
-        assertThat(items(workspace.box)).containsExactly("Same as UI theme", "Darcula", "Jasper Dark", "Jasper Light");
-        assertThat(workspace.box.getSelectedItem()).isEqualTo("Same as UI theme");
-        assertThat(workspace.gear).as("only the theme has the gear").isNull();
-        assertThat(page.searchTerms()).contains("Workspace scheme", "Same as UI theme", "Import theme…");
-    }
-
-    @Test void choosingStagesTheChoiceForApply() {
-        var theme = editor(0);
-        var workspace = editor(1);
-        theme.box.setSelectedItem("Darcula");
-        assertThat(draft.value(CoreSettings.UI_THEME_NAME)).isEqualTo("Darcula");
-        workspace.box.setSelectedItem("Jasper Light");
-        assertThat(draft.value(CoreSettings.UI_THEME_WORKSPACE)).isEqualTo("Jasper Light");
-        workspace.box.setSelectedItem("Same as UI theme");
-        assertThat(draft.value(CoreSettings.UI_THEME_WORKSPACE)).isEqualTo("match");
-        assertThat(page.modified()).isTrue();
     }
 
     @Test void animationSectionOnlyStagesTheSharedPolicyAndHasNoDurationEditors() {
         page.component();
         var animationRows = page.rows().stream().filter(row -> row.setting().table().equals(List.of("ui", "animations"))).toList();
         assertThat(animationRows).extracting(row -> row.setting().name()).containsExactly("ui.animations.enabled");
-        var toggle = animationRows.getFirst();
-        ((javax.swing.JCheckBox) toggle.editor().component()).doClick();
+        assertThat(node(page, "ui.animations.enabled")).isInstanceOf(Nodes.Toggle.class);
+        kit(page, "ui.animations.enabled", JButton.class).doClick();
         assertThat(draft.value(CoreSettings.UI_ANIMATIONS_ENABLED)).isFalse();
         assertThat(page.modified()).isTrue();
         assertThat(page.searchTerms()).doesNotContain("Open tab duration", "Close tab duration", "Switch tab duration");
     }
 
-    @Test void bothDropdownsSearchAndEnterStagesTheMatch() {
-        var theme = editor(0);
-        var keys = ((SearchCombo) theme.box).searchPopup().getKeyListener();
-        for (char c : "darc".toCharArray())
-            keys.keyTyped(new java.awt.event.KeyEvent(theme.box, java.awt.event.KeyEvent.KEY_TYPED, 0, 0, java.awt.event.KeyEvent.VK_UNDEFINED, c));
-        assertThat(((SearchCombo) theme.box).searchPopup().shown()).containsExactly("Darcula");
-        keys.keyPressed(new java.awt.event.KeyEvent(theme.box, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, java.awt.event.KeyEvent.CHAR_UNDEFINED));
-        assertThat(draft.value(CoreSettings.UI_THEME_NAME)).isEqualTo("Darcula");
-        var workspace = ((SearchCombo) editor(1).box).searchPopup();
-        workspace.getKeyListener().keyTyped(new java.awt.event.KeyEvent(editor(1).box, java.awt.event.KeyEvent.KEY_TYPED, 0, 0, java.awt.event.KeyEvent.VK_UNDEFINED, 'l'));
-        assertThat(workspace.shown()).as("Same as UI theme stays pinned").containsExactly("Same as UI theme", "Darcula", "Jasper Light");
+    @Test void choosingTheLightTileStagesTheAppearance() {
+        page.component();
+        kit(page, "ui.appearance:policy.option.light", JButton.class).doClick(0);
+        assertThat(draft.value(CoreSettings.UI_APPEARANCE)).isEqualTo(dev.jasper.app.config.AppearanceMode.LIGHT);
+        assertThat(page.modified()).isTrue();
     }
 
-    @Test void pickingTheEntryAlreadyShownIsNoEdit() {
-        var theme = editor(0);
-        theme.box.setSelectedItem("Jasper Dark");
-        assertThat(draft.modified()).as("the default stays unsaved").isFalse();
-        theme.box.setSelectedItem("Darcula");
-        theme.box.setSelectedItem("Darcula");
-        assertThat(draft.value(CoreSettings.UI_THEME_NAME)).isEqualTo("Darcula");
-    }
-
-    @Test void theListsFollowTheCatalogAndKeepAChoiceItNoLongerHas() {
-        var theme = editor(0);
-        draft.stage(CoreSettings.UI_THEME_NAME, Optional.of("Gone"));
-        assertThat(theme.box.getSelectedItem()).isEqualTo("Gone (not found)");
-        assertThat(theme.value()).isEqualTo("Gone");
-        names.add("Nord");
+    @Test void pickingADarkThemeStagesItForApplyAndResetReturnsToSlateCobalt() {
+        page.component();
+        var box = kit(page, "ui.appearance:dark-theme.input", JComboBox.class);
+        assertThat(items(box)).containsExactly("Slate Cobalt");
+        assertThat(selected(box)).isEqualTo("Slate Cobalt");
+        draft.rebase(ConfigLoader.parse(Path.of("config.toml"), "[ui.theme]\ndark = 'ocean'\n", true).values());
         page.refresh();
-        assertThat(items(theme.box)).containsExactly("Darcula", "Jasper Dark", "Jasper Light", "Nord", "Gone (not found)");
-        assertThat(theme.value()).as("a refresh keeps the choice").isEqualTo("Gone");
-        theme.box.setSelectedItem("Nord");
-        assertThat(items(theme.box)).as("only the shown missing choice is listed").doesNotContain("Gone (not found)");
-        draft.stage(CoreSettings.UI_THEME_NAME, Optional.of(" darcula "));
-        assertThat(theme.box.getSelectedItem()).as("names match as the catalog does").isEqualTo("Darcula");
-        assertThat(theme.value()).as("and are not rewritten").isEqualTo(" darcula ");
+        assertThat(items(kit(page, "ui.appearance:dark-theme.input", JComboBox.class))).containsExactly("Slate Cobalt", "ocean (not installed)");
+        pick(kit(page, "ui.appearance:dark-theme.input", JComboBox.class), "Slate Cobalt");
+        assertThat(draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("slate-cobalt");
+        assertThat(draft.edit().changes()).containsEntry(CoreSettings.UI_THEME_DARK, Optional.empty());
+        assertThat(page.modified()).isTrue();
     }
 
-    @Test void theGearOffersImportThemeAndThePageClosesIt() {
-        var theme = editor(0);
-        assertThat(theme.gear.getAccessibleContext().getAccessibleName()).isEqualTo("Theme actions");
-        assertThat(theme.menu.getComponents()).extracting(item -> ((JMenuItem) item).getText()).containsExactly("Import theme…");
-        ((JMenuItem) theme.menu.getComponent(0)).doClick();
-        assertThat(calls).containsExactly("import");
-        page.dispose();
-        assertThat(calls).containsExactly("import", "closed");
+    @Test void pickingOnlyADarkThemeStagesOnlyThatPick() {
+        var page = pageWith(TWO_EACH);
+        page.component();
+        pick(kit(page, "ui.appearance:dark-theme.input", JComboBox.class), "Ocean");
+        assertThat(draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("ocean");
+        assertThat(draft.edit().changes()).containsOnlyKeys(CoreSettings.UI_THEME_DARK);
+        assertThat(draft.modified(CoreSettings.UI_APPEARANCE)).isFalse();
+    }
+
+    @Test void resetReturnsTheTileAndBothThemePicksToTheirDefaults() {
+        var page = pageWith(TWO_EACH);
+        page.component();
+        pick(kit(page, "ui.appearance:dark-theme.input", JComboBox.class), "Ocean");
+        pick(kit(page, "ui.appearance:light-theme.input", JComboBox.class), "Dawn");
+        kit(page, "ui.appearance:policy.option.light", JButton.class).doClick(0);
+        assertThat(draft.edit().changes()).containsOnlyKeys(CoreSettings.UI_APPEARANCE, CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT);
+        var reset = kit(page, "ui.appearance:reset", JButton.class);
+        assertThat(reset.isVisible()).isTrue();
+        reset.doClick();
+        assertThat(draft.value(CoreSettings.UI_APPEARANCE)).isEqualTo(CoreSettings.UI_APPEARANCE.defaultValue());
+        assertThat(draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("slate-cobalt");
+        assertThat(draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("jasper-meadow");
+        assertThat(draft.modified()).isFalse();
+        assertThat(selected(kit(page, "ui.appearance:dark-theme.input", JComboBox.class))).isEqualTo("Slate Cobalt");
+        assertThat(selected(kit(page, "ui.appearance:light-theme.input", JComboBox.class))).isEqualTo("Jasper Meadow Light");
+    }
+
+    @Test void theTerminalSchemeIsADropdownOfTheFourSchemes() {
+        var box = combo("terminal.scheme");
+        assertThat(items(box)).containsExactly("Same as UI theme", "Slate Cobalt Dark", "Slate Cobalt Light", "High Contrast");
+        assertThat(selected(box)).isEqualTo("Same as UI theme");
+        pick(box, "High Contrast");
+        assertThat(draft.value(CoreSettings.TERMINAL_SCHEME)).isEqualTo("slate-cobalt/high-contrast");
+        assertThat(page.searchTerms()).contains("Terminal scheme", "Same as UI theme", "Slate Cobalt", "Match System").doesNotContain("Import theme…");
     }
 }

@@ -1,0 +1,21 @@
+# Where the jasper command finds Jasper's command socket (packaging/cli/README.md).
+# packaging/cli's core tests and the application's AppDirsTest both read this file.
+# Fields, separated by "|": os (mac, linux or windows), JASPER_COMMAND_SOCKET, JASPER_HOME, APPDATA,
+# XDG_CONFIG_HOME, the user's home, the working directory and the expected socket. "-" is an unset variable and
+# "_" a variable holding one space. Paths are written with "/"; on Windows the core writes "\", and both tests
+# compare with "/" in its place. A JASPER_COMMAND_SOCKET vector is the client's alone.
+mac|-|-|-|-|/Users/ann|/tmp|/Users/ann/.config/jasper/daemon/commands
+mac|-|-|-|/x/xdg|/Users/ann|/tmp|/Users/ann/.config/jasper/daemon/commands
+mac|-|/srv/jasper|-|-|/Users/ann|/tmp|/srv/jasper/daemon/commands
+mac|-|_|-|-|/Users/ann|/tmp|/Users/ann/.config/jasper/daemon/commands
+mac|/run/jasper.sock|/srv/jasper|-|-|/Users/ann|/tmp|/run/jasper.sock
+linux|-|-|-|-|/home/ann|/tmp|/home/ann/.config/jasper/daemon/commands
+linux|-|-|-|/x/xdg|/home/ann|/tmp|/x/xdg/jasper/daemon/commands
+linux|-|-|-|relative/xdg|/home/ann|/tmp|/home/ann/.config/jasper/daemon/commands
+linux|-|-|-|_|/home/ann|/tmp|/home/ann/.config/jasper/daemon/commands
+linux|-|/srv/a/../b/./c|-|/x/xdg|/home/ann|/tmp|/srv/b/c/daemon/commands
+linux|-|-|-|/x//xdg/|/home/ann|/tmp|/x/xdg/jasper/daemon/commands
+windows|-|-|C:/Users/ann/AppData/Roaming|-|C:/Users/ann|C:/tmp|C:/Users/ann/AppData/Roaming/jasper/daemon/commands
+windows|-|-|-|-|C:/Users/ann|C:/tmp|C:/Users/ann/AppData/Roaming/jasper/daemon/commands
+windows|-|-|relative|-|C:/Users/ann|C:/tmp|C:/Users/ann/AppData/Roaming/jasper/daemon/commands
+windows|-|D:/jasper|C:/x|-|C:/Users/ann|C:/tmp|D:/jasper/daemon/commands

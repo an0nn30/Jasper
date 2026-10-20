@@ -1,71 +1,54 @@
 # Plugin icons
 
-SDK 0.8.2 supplies 47 semantic meanings and the complete vendored platform New UI catalog
-plus Terminal: **885 choices / 1,744 SVGs** including automatic dark variants. No icon downloads
-happen at build time or runtime.
-
-Prefer a semantic name so Jasper can update its artwork centrally:
-
-```java
-import dev.jasper.sdk.ui.IconName;
-
-button.setIcon(context.appearance().icon(IconName.LOCK));
-```
-
-For another icon, use the generated catalog. IDE completion and `BundledIcon.values()` expose
-every choice, including upstream size variants:
+SDK 0.15 uses semantic strings for ordinary presentation: actions, palette scopes and rows,
+notifications, session tabs, panel stripes and header actions, toolbar menus, content tabs and
+status items. Examples include `"lock"`, `"unlock"`, `"file"`, `"folder"`, `"server"`, `"tunnel"`,
+`"download"` and `"add"`. Optional icons retain their Optional or nullable convention.
 
 ```java
-import dev.jasper.sdk.ui.BundledIcon;
-
-button.setIcon(context.appearance().icon(BundledIcon.TOOLWINDOWS_PROJECT));
-var search = context.appearance().icon(BundledIcon.GENERAL_SEARCH);
+context.actions().register(ActionSpec.of("your.plugin.open", "Open").withIcon("file"), event -> {});
+status.setIcon("lock");
 ```
 
-The app's `AppIcons` manager owns loading, caching, size, light/dark selection and validation.
-`NamedIcons` alone maps meanings to artwork IDs. Plugins never import app classes or use app
-resource paths. Host artwork loads through the host's class loader, independently of plugin
-resources. A retained icon follows live theme switches. Catalog icons preserve their authored
-colours and upstream dark siblings, and fit proportionally in a 16-logical-pixel square.
+The host validates every name against the plugin's scoped registry. Unknown and foreign names
+are rejected. Host and fake enforce the same rule. Retained host icons resolve the current theme
+at paint time, including a change between Slate Cobalt Dark and Light.
 
-The collection comes from IntelliJ's `platform/icons/src/expui` and the Terminal plugin's
-`resources/icons/expui` at `60b8fbadc2f08ef18a6ecab0c138a849e14f13fb`. It includes every SVG
-in those collections, including intentional empty/stub artwork, rather than every language
-plugin's assets across the repository. Source paths, hashes, license and notice live beside
-the resources. The semantic KEY keeps Jasper's existing tinted Tabler key because this
-upstream collection has no key symbol; the mapping and fallback remain central.
+Two built-in names are authored host artwork (SDK 0.18.1): `"run"`, IntelliJ's classic Run triangle,
+and `"application"`, its run-configuration icon. Controls draw them in their own colours in both
+looks; panels, prompts and tiles draw a monochrome glyph of the same name.
 
-SDK 0.8.2 adds EDIT, MORE, PREVIOUS, NEXT, DROPDOWN, CLOSE_HOVERED, MATCH_CASE, REGEX,
-SEARCH_HISTORY, NEW_WINDOW, EXIT, PREVIOUS_MATCH and NEXT_MATCH. Remote and Vault require
-`>=0.8.2, <0.9`; plugins using only older semantic meanings continue to work. Older custom
-`Appearance` implementations inherit defaults that throw UnsupportedOperationException for
-unsupported host catalogs. Null enum arguments throw NullPointerException.
+Under the Enterprise look a panel's stripe label starts with its icon at 13 px: `"network"`,
+`"folder"`, `"tunnel"`, `"download"`, `"server"` and `"bell"` draw IntelliJ's classic tool-window
+icons, and any other name (a registered path included) its monochrome glyph in the label's colour;
+an identity name such as `more.vertical` keeps its authored art.
 
-## Custom artwork
+Under the Enterprise look IntelliJ's classic icons also draw `"add"`, `"split"`, `"zoom"`,
+`"settings"`, `"window.add"` and `"search"` in the toolbar (actions and toolbar views), the status
+bar and tool-window headers (your `PanelHeader` actions and your panel's header controls); in a
+panel's or window's body these names keep their ordinary art.
 
-`icon("path/in/your/jar.svg")` remains available for plugin-specific artwork. This optional
-API draws an authored SVG in a 16px square, with FlatLaf's classic palette remapping. The
-sample plugin intentionally demonstrates it. Ordinary controls should use the host catalogs.
-
-## Headless testing
-
-`FakeNamedIcon` and `FakeBundledIcon` record the choice, report 16px dimensions and paint nothing:
+For original artwork, register a constrained monochrome path in a 16-unit coordinate space:
 
 ```java
-var icon = context.appearance().icon(BundledIcon.GENERAL_SEARCH);
-assertThat(icon).isEqualTo(new FakeBundledIcon(BundledIcon.GENERAL_SEARCH));
+var registration = context.kit().registerIcon(
+    new IconAsset("your.plugin:mark", "M 2 2 L 14 14 M 2 14 L 14 2"));
 ```
 
-## Updating the catalog
+Use `"your.plugin:mark"` wherever an icon name is accepted. Close the registration when no
+presentation uses it; plugin shutdown clears its registry. Paths have bounded commands and geometry;
+SVG markup, resource loading and authored colors are not supported standard-control icon routes.
+The host supplies stroke, size and semantic tint. Standard UI has no arbitrary Swing Icon overload.
 
-Update the commit and subtree pins in `tools/icons/fetch-intellij-icons.py`, then run it.
-It stages and verifies every download against Git blob IDs, writes SHA-256 provenance,
-and regenerates the host catalog and SDK enum together. The canonical Apache-2.0 license is
-retained; upstream's root IDE build-terms file is not the artwork license.
-Run `./gradlew check`: rendering tests cover all choices in light/dark at 1x/2x, live switching,
-non-square artwork, invalid IDs, provenance, SDK defaults and plugin class-loader isolation.
+Manifest identity PNG/SVG images remain supported in the app-managed plugin preview. They are
+separate from the kit glyph registry and do not grant a custom standard-control painter.
 
-For a headless before/after contact sheet, run `python3 tools/icons/render-preview.py`.
-It uses the configured JBR toolchain and writes `jasper-app/build/icon-preview/comparison.png`.
-It creates no native windows and starts no terminal session. The baseline is pinned to
-Jasper commit `90c2e574` and must be present in the local Git history.
+The 0.15 boundary removes `IconName`, `BundledIcon`, their fake raw Icon values, all `Appearance.icon`
+overloads and SDK UIManager palette readers. Declare `sdk = ">=0.18.0, <0.19"` after migrating.
+
+Native palette and notification views retain immutable glyph snapshots in registries scoped to the receiving view. Removing the original registration prevents new use; already-posted notification history can still show its captured glyph after expiry or plugin shutdown. Each receiver resolves tint from its live theme and releases unused registrations after successful reconciliation or when closed. Failed reconciliation keeps both glyph generations available until recovery or close.
+
+Private app cleanup in Task11b removes the old authored standard-control catalog and resource loaders.
+The native tray template and manifest identity fallback keep their original artwork and legal provenance.
+The notification action now uses the module bell glyph. PresentationIcon/PresentationIcons remain the
+supported app-internal immutable snapshot projection, including receiver-local aliases and failure retention.

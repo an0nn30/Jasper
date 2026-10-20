@@ -22,11 +22,15 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class TerminalViewInteractionTest {
@@ -233,6 +237,149 @@ class TerminalViewInteractionTest {
 
         assertThat(opened.get()).isEqualTo("https://m.dev");
         assertThat(connector.written()).isEmpty();
+    }
+
+    @Test
+    void theLinkModifierHandsAPathToTheFileLinkHandler() throws Exception {
+        AtomicReference<FileLink> clicked = new AtomicReference<>();
+        view.setFileLinkHandler(clicked::set);
+        show("at src/A.java:42:5:", 0, "at src/A.java:42:5:");
+
+        view.handleMouse(press(5, 0, 1, LINK));
+        view.handleMouse(release(5, 0));
+
+        assertThat(clicked.get()).isEqualTo(new FileLink("src/A.java", 42, 5));
+        assertThat(view.hasSelection()).isFalse();
+    }
+
+    /** A path soft-wrapped across two rows is one path: a click on either row hands the handler all of it. */
+    @Test
+    void aSoftWrappedPathReachesTheFileLinkHandlerWholeFromEitherRow() throws Exception {
+        List<FileLink> clicked = new ArrayList<>();
+        view.setFileLinkHandler(clicked::add);
+        // 35 cells on the 20-column grid: row 0 holds "src/main/java/dev/ja", row 1 the rest. Row 1 is waited for.
+        show("src/main/java/dev/jasper/Foo.java:3", 1, "sper/Foo.java:3");
+
+        view.handleMouse(press(2, 0, 1, LINK));
+        view.handleMouse(release(2, 0));
+        view.handleMouse(press(5, 1, 1, LINK));
+        view.handleMouse(release(5, 1));
+
+        var whole = new FileLink("src/main/java/dev/jasper/Foo.java", 3, 0);
+        assertThat(clicked).containsExactly(whole, whole);
+        assertThat(view.hasSelection()).isFalse();
+    }
+
+    /** An OSC 8 link to a file on this machine, whether its host is empty or localhost, gives the decoded path and no line. */
+    @Test
+    void anOsc8FileLinkReachesTheFileLinkHandlerWithItsDecodedPathAndNoLine() throws Exception {
+        List<FileLink> clicked = new ArrayList<>();
+        List<String> opened = new ArrayList<>();
+        view.setFileLinkHandler(clicked::add);
+        view.setLinkOpener(opened::add);
+        show("\033]8;;file://localhost/tmp/My%20Notes.txt\007notes\033]8;;\007 "
+            + "\033]8;;file:///tmp/b.txt\007b\033]8;;\007", 0, "notes b");
+
+        view.handleMouse(press(2, 0, 1, LINK));
+        view.handleMouse(release(2, 0));
+        view.handleMouse(press(6, 0, 1, LINK));
+        view.handleMouse(release(6, 0));
+
+        assertThat(clicked).containsExactly(new FileLink(Path.of("/tmp/My Notes.txt").toString(), 0, 0),
+            new FileLink(Path.of("/tmp/b.txt").toString(), 0, 0));
+        assertThat(opened).as("a file link is not for the browser").isEmpty();
+    }
+
+    /** A plain-text {@code file://} URL as Kotlin prints one carries its line and column; the browser hears nothing. */
+    @Test
+    void aPlainTextFileUrlReachesTheFileLinkHandlerWithItsLineAndColumn() throws Exception {
+        List<FileLink> clicked = new ArrayList<>();
+        List<String> opened = new ArrayList<>();
+        view.setFileLinkHandler(clicked::add);
+        view.setLinkOpener(opened::add);
+        show("e: file:///tmp/Foo.kt:12:5 boom", 1, "t:12:5 boom");
+
+        view.handleMouse(press(5, 0, 1, LINK));
+        view.handleMouse(release(5, 0));
+
+        assertThat(clicked).containsExactly(new FileLink(Path.of("/tmp/Foo.kt").toString(), 12, 5));
+        assertThat(opened).as("a file link is not for the browser").isEmpty();
+    }
+
+    /** Review Focus 5: a URL still opens the browser, and the file link handler hears nothing. */
+    @Test
+    void aUrlStillOpensTheBrowserWhenFileLinksAreHandled() throws Exception {
+        AtomicReference<String> opened = new AtomicReference<>();
+        AtomicReference<FileLink> clicked = new AtomicReference<>();
+        view.setLinkOpener(opened::set);
+        view.setFileLinkHandler(clicked::set);
+        show("https://m.dev/a.txt", 0, "https://m.dev/a.txt");
+
+        view.handleMouse(press(15, 0, 1, LINK));
+
+        assertThat(opened.get()).isEqualTo("https://m.dev/a.txt");
+        assertThat(clicked.get()).isNull();
+    }
+
+    /** Review Focus 5: a modified click on text that is no path still starts a selection. */
+    @Test
+    void aModifiedClickOnTextThatIsNoPathStillSelects() throws Exception {
+        AtomicReference<FileLink> clicked = new AtomicReference<>();
+        view.setFileLinkHandler(clicked::set);
+        show("hello world", 0, "hello world");
+
+        selectByDragging(0, 0, 4, 0, LINK);
+
+        assertThat(view.selectedText()).contains("hello");
+        assertThat(clicked.get()).isNull();
+    }
+
+    /** Review Focus 5: with no file link handler, or once it is removed, a path click selects as before. */
+    @Test
+    void withoutAFileLinkHandlerAPathClickSelects() throws Exception {
+        show("./notes.md x", 0, "./notes.md x");
+        selectByDragging(0, 0, 9, 0, LINK);
+        assertThat(view.selectedText()).contains("./notes.md");
+
+        AtomicReference<FileLink> clicked = new AtomicReference<>();
+        view.setFileLinkHandler(clicked::set);
+        view.setFileLinkHandler(null);
+        selectByDragging(2, 0, 9, 0, LINK);
+        assertThat(view.selectedText()).contains("notes.md");
+        assertThat(clicked.get()).isNull();
+    }
+
+    @Test
+    void commandClickOpensAPathEvenWhenTheProgramWantsTheMouse() throws Exception {
+        assumeTrue(MAC);
+        AtomicReference<FileLink> clicked = new AtomicReference<>();
+        view.setFileLinkHandler(clicked::set);
+        enableSgrMouse();
+        show("./notes.md:3", 0, "./notes.md:3");
+
+        view.handleMouse(press(4, 0, 1, InputEvent.META_DOWN_MASK));
+        view.handleMouse(new MouseEvent(view, MouseEvent.MOUSE_RELEASED, 0, InputEvent.META_DOWN_MASK,
+            x(4), y(0), 1, false, MouseEvent.BUTTON1));
+
+        assertThat(clicked.get()).isEqualTo(new FileLink("./notes.md", 3, 0));
+        assertThat(connector.written()).isEmpty();
+    }
+
+    @Test
+    void ctrlClickGoesToAProgramThatWantsTheMouseAndCtrlShiftClickOpensThePath() throws Exception {
+        assumeFalse(MAC);
+        AtomicReference<FileLink> clicked = new AtomicReference<>();
+        view.setFileLinkHandler(clicked::set);
+        enableSgrMouse();
+        show("./notes.md:3", 0, "./notes.md:3");
+
+        view.handleMouse(press(4, 0, 1, InputEvent.CTRL_DOWN_MASK));
+        view.handleMouse(release(4, 0));
+        assertThat(clicked.get()).as("the program has the click").isNull();
+        assertThat(connector.written()).isNotEmpty();
+
+        view.handleMouse(press(4, 0, 1, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        assertThat(clicked.get()).isEqualTo(new FileLink("./notes.md", 3, 0));
     }
 
     @Test

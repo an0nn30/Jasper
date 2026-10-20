@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
@@ -47,7 +48,7 @@ class CommandPaletteShortcutsTest {
                 int primary = primary(mac);
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, primary | InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isTrue();
-                owner.commandPalette().component().queryField().setText("no such command");
+                dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("no such command");
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_1, primary))).isTrue();
                 assertThat(owner.currentTab()).isSameAs(second);
                 owner.action(ActionId.NEW_TAB).actionPerformed(new ActionEvent(root, 0, "menu"));
@@ -101,7 +102,7 @@ class CommandPaletteShortcutsTest {
                 assertThat(manager.dispatchers).hasSize(2);
                 var dispatcher = manager.dispatchers.getFirst();
                 assertThat(dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.press(owner, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK))).isTrue();
-                owner.commandPalette().component().queryField().setText("close.fixture");
+                dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("close.fixture");
                 owner.commands().register(PaletteKeyRouterTest.command("close.fixture", owner::close));
                 dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.release(owner, KeyEvent.VK_P));
                 assertThat(dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, 0))).isTrue();
@@ -127,12 +128,12 @@ class CommandPaletteShortcutsTest {
                 older.commands().register(PaletteKeyRouterTest.command("destination.fixture", calls::incrementAndGet));
                 newer.commands().register(PaletteKeyRouterTest.command("focus.fixture", () -> {
                     newer.setActive(false); older.commandPalette().toggle();
-                    older.commandPalette().component().queryField().setText("destination.fixture");
+                    dev.jasper.app.palette.PaletteTestSupport.query(older.commandPalette().component()).setText("destination.fixture");
                     if (closeSource) ((Runnable) newer::close).run();
                 }));
                 manager.send(PaletteKeyRouterTest.press(newer, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK));
                 manager.send(PaletteKeyRouterTest.release(newer, KeyEvent.VK_P));
-                newer.commandPalette().component().queryField().setText("focus.fixture");
+                dev.jasper.app.palette.PaletteTestSupport.query(newer.commandPalette().component()).setText("focus.fixture");
                 assertThat(manager.send(PaletteKeyRouterTest.press(newer, KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(older.commandPalette().isOpen()).isTrue();
                 assertThat(manager.send(PaletteKeyRouterTest.press(older, KeyEvent.VK_ENTER, 0))).isTrue();
@@ -168,10 +169,10 @@ class CommandPaletteShortcutsTest {
         edt(() -> {
             var previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();
             var laf = UIManager.getLookAndFeel();
-            dev.jasper.app.appearance.ThemeTestSupport.install(dev.jasper.app.appearance.Theme.DARK);
+            dev.jasper.app.appearance.ThemeTestSupport.install(true);
             try (var owner = owner(System.getProperty("os.name").startsWith("Mac"))) {
                 var root = install(owner); owner.commandPalette().toggle();
-                var field = owner.commandPalette().component().queryField();
+                var field = dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component());
                 var router = PaletteKeyRouterTest.router(owner, System.getProperty("os.name").startsWith("Mac"), root);
                 KeyboardFocusManager.setCurrentKeyboardFocusManager(new DefaultKeyboardFocusManager() {
                     @Override public Component getFocusOwner() { return field; }
@@ -232,7 +233,7 @@ class CommandPaletteShortcutsTest {
                         } catch (java.io.IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
                     }, "controlled input fixture");
                     owner[0] = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {},
-                        new ThemeController(), KeyBindings.defaults(mac), new CommandHistory(), mac);
+                        ThemeTestSupport.controller(true), KeyBindings.defaults(mac), new CommandHistory(), mac);
                     install(owner[0]);
                 });
                 pending.remove().run();
@@ -249,7 +250,7 @@ class CommandPaletteShortcutsTest {
                     send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_P, primary(mac) | InputEvent.SHIFT_DOWN_MASK));
                     send.accept(PaletteKeyRouterTest.typed(view, 'P'));
                     send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_P));
-                    content.commandPalette().component().queryField().setText("byte.fixture");
+                    dev.jasper.app.palette.PaletteTestSupport.query(content.commandPalette().component()).setText("byte.fixture");
                     for (int code : new int[]{KeyEvent.VK_UP, KeyEvent.VK_DOWN}) {
                         send.accept(PaletteKeyRouterTest.press(view, code, 0));
                         send.accept(PaletteKeyRouterTest.release(view, code));
@@ -294,7 +295,7 @@ class CommandPaletteShortcutsTest {
     static int primary(boolean mac) { return mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK; }
     static WindowContent owner(boolean mac) {
         return new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
-            new ThemeController(), KeyBindings.defaults(mac), new CommandHistory(), mac);
+            ThemeTestSupport.controller(true), KeyBindings.defaults(mac), new CommandHistory(), mac);
     }
     static JRootPane install(WindowContent owner) {
         var root = new JRootPane(); root.setContentPane(owner); owner.installRootBindings(root);

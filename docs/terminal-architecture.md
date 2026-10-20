@@ -104,6 +104,11 @@ Mouse routing first decides between local gestures and terminal reports. A
 reported gesture uses geometry only; it must not copy screen rows or trigger a
 local repaint. Ownership and modifiers are captured at press and survive release.
 Shift bypasses application mouse capture. Fractional wheel motion accumulates.
+A Cmd-click (Ctrl-click elsewhere) opens the URL under the pointer in the browser;
+otherwise, once the application set `setFileLinkHandler`, it reports the path or
+local `file:` link there as a `FileLink`; otherwise it starts a selection.
+`internal.text.PathDetector` reads the soft-wrap-joined row, which `BufferQueries`
+captures under the buffer lock and matches after releasing it.
 
 ```mermaid
 sequenceDiagram
@@ -173,7 +178,9 @@ sequenceDiagram
 ```
 
 OSC 7 and 133 are rewritten because the pinned emulator swallows them. OSC 8
-links use the installed hyperlink filter. CSI `q` lacking a space intermediate
+links use the installed hyperlink filter: `http`, `https`, `ftp` and `mailto`
+targets open in the browser, a `file:` target that the OSC 7 host rule places on
+this machine is a file link, and other targets open nothing. CSI `q` lacking a space intermediate
 is dropped so XTVERSION/DECLL cannot override the configured cursor. DECSCUSR 0
 is rewritten to restore configuration. Keep split-chunk parsing and payload
 bounds. Do not infer a command's duration from session exit; commands run inside
@@ -216,12 +223,14 @@ whatever runs in the pane: a remote machine that reports this machine's name, `l
 at all is indistinguishable from local. A local working directory stays a hint that may not exist.
 
 A local process may also pass `SessionLaunchOptions.localPathMapper`. It receives the decoded path of
-every report classified as local and returns the directory that path means on this machine, or empty,
-and then the report is ignored and the last directory stays. A mapper that throws or returns null
-counts as empty; it runs on the reader thread and must not block. Remote reports never reach it. The
+every report classified as local, and of every clicked `file:` link classified as local, and returns the
+path that means on this machine, or empty, and then the report is ignored and the last directory stays.
+A mapper that throws or returns null counts as empty; it runs on the reader thread for a report and on
+the EDT for a click, and must not block. Remote reports never reach it. The
 default, `SessionLaunchOptions.DEFAULT_LOCAL_PATHS`, reads the path as a `file` URI path on this
 machine, as before. Jasper's WSL panes map `/mnt/c/...` to `C:\...` and any other path to the
-distribution's `\\wsl.localhost` share, so a Linux path never reaches the local surface as `\home\x`.
+distribution's `\\wsl.localhost` share, so a Linux path never reaches the local surface as `\home\x`. On Windows,
+Jasper's mappers also ignore a directory on a UNC host other than a WSL pane's own share.
 
 ## Threads and failures
 
@@ -294,7 +303,8 @@ scrollback capacity are new-session choices; changing the view's options does
 not resize its existing history. Grid dimensions can change through view layout
 or explicit session resize. Program cursor requests still override configured
 defaults until reset. App configuration reload and temporary overrides remain
-app policy, tested separately.
+app policy, tested separately. The palette's bold foreground colours bold text
+drawn in the default foreground; an explicit SGR colour stays.
 
 Future SDK work can adapt typed actions, immutable settings and listener events,
 with capability/lifetime/thread contracts decided at that time. Do not export

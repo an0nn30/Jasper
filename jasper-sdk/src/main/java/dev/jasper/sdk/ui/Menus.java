@@ -11,7 +11,7 @@ public interface Menus {
     PluginMenu standard(StandardMenu menu);
 
     /**
-     * A new top-level menu, placed after the Tab menu.
+     * A new top-level menu, placed where the presentation puts plugin menus: after the Tab menu in the default look.
      *
      * @param menuId namespaced id that starts with the plugin's id and a dot
      * @param title non-blank title

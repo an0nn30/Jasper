@@ -1,65 +1,88 @@
 package dev.jasper.editor.ui;
 
-import java.awt.event.ActionEvent;
-import java.awt.event.KeyEvent;
 import java.util.Optional;
-import javax.swing.JComponent;
-import javax.swing.KeyStroke;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.extension.ExtendWith(dev.jasper.editor.testsupport.EdtTests.class)
 class FindBarTest {
     private final RSyntaxTextArea area = new RSyntaxTextArea("foo bar Foo foo\n");
-    private final FindBar bar = new FindBar(() -> Optional.of(area));
+    private final FindBar bar = new FindBar(() -> Optional.of(area), () -> { }, id -> { });
+
+    private void type(String id, String text) { bar.event(new dev.jasper.sdk.ui.UiEvent.Edited(id, text)); }
+    private void press(String id) { bar.event(new dev.jasper.sdk.ui.UiEvent.Action(id)); }
 
     @Test void countsMatchesAndHonoursTheToggles() {
         assertThat(bar.isVisible()).isFalse();
         bar.open(false);
         assertThat(bar.isVisible()).isTrue();
         assertThat(bar.replaceVisible()).isFalse();
-        bar.findField().setText("foo");
+        type(FindBar.FIND, "foo");
         assertThat(bar.status()).isEqualTo("3 matches");
-        bar.matchCase().doClick();
+        press(FindBar.CASE);
         assertThat(bar.status()).isEqualTo("2 matches");
-        bar.findField().setText("fo+");
+        type(FindBar.FIND, "fo+");
         assertThat(bar.status()).isEqualTo("No matches");
-        bar.regex().doClick();
+        press(FindBar.REGEX);
         assertThat(bar.status()).isEqualTo("2 matches");
-        bar.findField().setText("(");
+        type(FindBar.FIND, "(");
         assertThat(bar.status()).isEqualTo("Invalid pattern");
-        bar.regex().doClick();
-        bar.matchCase().doClick();
-        bar.wholeWord().doClick();
-        bar.findField().setText("fo");
+        press(FindBar.REGEX);
+        press(FindBar.CASE);
+        press(FindBar.WORD);
+        type(FindBar.FIND, "fo");
         assertThat(bar.status()).as("whole words only").isEqualTo("No matches");
+    }
+
+    @Test void theBarIsOneCompactRowOfIconTogglesAndIconActionsOverAnAlignedReplaceRow() {
+        bar.open(true);
+        var root = bar.node();
+        var row = (dev.jasper.sdk.ui.Nodes.Stack) root.children().getFirst();
+        var replace = (dev.jasper.sdk.ui.Nodes.Stack) root.children().getLast();
+        assertThat(row.role()).isEqualTo(dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE);
+        assertThat(row.children()).extracting(dev.jasper.sdk.ui.Nodes.Node::id).containsExactly(FindBar.FIND, FindBar.CASE, FindBar.WORD,
+            FindBar.REGEX, FindBar.STATUS, FindBar.PREVIOUS, FindBar.NEXT, FindBar.CLOSE);
+        assertThat(((dev.jasper.sdk.ui.Nodes.Field) row.children().getFirst()).kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.SEARCH);
+        for (var child : row.children()) if (child instanceof dev.jasper.sdk.ui.Nodes.Button button) {
+            assertThat(button.label()).as("%s is icon-only", button.id()).isEmpty();
+            assertThat(button.icon()).isNotEmpty();
+            assertThat(button.tooltip()).as("%s names its action for assistive technology", button.id()).isNotBlank();
+        }
+        java.util.function.Function<String, dev.jasper.sdk.ui.Nodes.Button> option = id -> (dev.jasper.sdk.ui.Nodes.Button)
+            ((dev.jasper.sdk.ui.Nodes.Stack) bar.node().children().getFirst()).children().stream().filter(n -> n.id().equals(id)).findFirst().orElseThrow();
+        assertThat(option.apply(FindBar.CASE).selected()).as("a match option is a toggle").contains(false);
+        press(FindBar.CASE);
+        assertThat(option.apply(FindBar.CASE).selected()).contains(true);
+        assertThat(replace.state().visible()).isTrue();
+        assertThat(replace.children()).extracting(dev.jasper.sdk.ui.Nodes.Node::id).containsExactly(FindBar.REPLACE, FindBar.ONE, FindBar.ALL);
+        assertThat(((dev.jasper.sdk.ui.Nodes.Field) replace.children().getFirst()).kind()).as("the replacement is plain text, not a search").isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.TEXT);
+        assertThat(root.cancelAction()).as("Escape anywhere closes the bar").isEqualTo(FindBar.CLOSE);
     }
 
     @Test void wholeWordRegexValidatesThePatternSearchEngineActuallyCompiles() {
         bar.open(false);
-        bar.regex().doClick();
-        bar.wholeWord().doClick();
-        bar.matchCase().doClick();
-        bar.findField().setText("*foo");
+        press(FindBar.REGEX);
+        press(FindBar.WORD);
+        press(FindBar.CASE);
+        type(FindBar.FIND, "*foo");
         assertThat(bar.status()).isEqualTo("2 matches");
-        bar.findField().setText("(");
+        type(FindBar.FIND, "(");
         assertThat(bar.status()).isEqualTo("Invalid pattern");
     }
 
     @Test void escapeClosesTheBarFromAnyFocusedChild() {
         bar.open(false);
         assertThat(bar.isVisible()).isTrue();
-        Object key = bar.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
-            .get(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0));
-        assertThat(key).isNotNull();
-        bar.getActionMap().get(key).actionPerformed(new ActionEvent(bar, ActionEvent.ACTION_PERFORMED, ""));
+        assertThat(bar.node().cancelAction()).isEqualTo(FindBar.CLOSE);
+        press(bar.node().cancelAction());
         assertThat(bar.isVisible()).isFalse();
     }
 
     @Test void nextAndPreviousSelectMatches() {
         area.setCaretPosition(0);
         bar.open(false);
-        bar.findField().setText("foo");
+        type(FindBar.FIND, "foo");
         bar.next();
         assertThat(area.getSelectionStart()).isEqualTo(0);
         bar.next();
@@ -71,7 +94,7 @@ class FindBarTest {
     @Test void openingTakesTheSelectionAndClosingHidesTheBar() {
         area.select(4, 7);
         bar.open(true);
-        assertThat(bar.findField().getText()).isEqualTo("bar");
+        assertThat(((dev.jasper.sdk.ui.Nodes.Field) ((dev.jasper.sdk.ui.Nodes.Stack) bar.node().children().getFirst()).children().getFirst()).value()).isEqualTo("bar");
         assertThat(bar.replaceVisible()).isTrue();
         bar.close();
         assertThat(bar.isVisible()).isFalse();
@@ -81,8 +104,8 @@ class FindBarTest {
         area.setText("a1 a2 a3");
         area.setCaretPosition(0);
         bar.open(true);
-        bar.findField().setText("a");
-        bar.replaceField().setText("b");
+        type(FindBar.FIND, "a");
+        type(FindBar.REPLACE, "b");
         bar.replaceOne();
         assertThat(area.getText()).isEqualTo("b1 a2 a3");
         bar.replaceAll();

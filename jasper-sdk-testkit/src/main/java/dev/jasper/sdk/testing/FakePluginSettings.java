@@ -20,6 +20,12 @@ final class FakePluginSettings implements PluginSettings {
     private final Path file;
     private final List<FakeSetting<?>> declared = new ArrayList<>();
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<Runnable> reloadListeners = new CopyOnWriteArrayList<>();
+    int reloadListenerCount() { return reloadListeners.size(); }
+    Subscription onReloaded(Runnable listener) {
+        reloadListeners.add(listener);
+        return () -> reloadListeners.remove(listener);
+    }
     private boolean open = true;
     private dev.jasper.sdk.settings.SettingsPanel panel;
 
@@ -36,7 +42,7 @@ final class FakePluginSettings implements PluginSettings {
             if (other.key().startsWith(spec.key() + ".") || spec.key().startsWith(other.key() + "."))
                 throw new IllegalArgumentException(spec.key() + " overlaps the setting " + other.key());
         }
-        var setting = new FakeSetting<>(this, spec);
+        var setting = new FakeSetting<>(this, spec, java.util.Optional.ofNullable(host.kitDefaults(pluginId).get(spec.key())));
         declared.add(setting);
         setting.load(raw().get(spec.key()), false, new ArrayList<>());
         return setting;
@@ -76,10 +82,18 @@ final class FakePluginSettings implements PluginSettings {
         throw new IllegalArgumentException("Not a setting of this plugin: " + setting.key());
     }
 
-    /** The plugin's start returned: declarations close, and the file's problems are reported. */
+    /** The plugin's start returned: declarations close, look defaults for undeclared keys and the file's problems are reported. */
     void complete() {
         open = false;
+        for (String key : host.kitDefaults(pluginId).keySet().stream().sorted().toList())
+            if (declared.stream().noneMatch(setting -> setting.key().equals(key)))
+                host.lookDefaultProblem(pluginId, "the look gives a default for " + key + ", which the plugin does not declare");
         reload();
+    }
+
+    /** A look default for {@code key} that its kind rejects; the plugin's own default stays. */
+    void lookDefaultRejected(String key, String reason) {
+        host.lookDefaultProblem(pluginId, "the look's default for " + key + " is not used: " + reason);
     }
 
     /** Re-reads every value, replacing this plugin's reports; listeners of changed values run. */
@@ -91,11 +105,13 @@ final class FakePluginSettings implements PluginSettings {
             if (declared.stream().noneMatch(setting -> setting.key().equals(key))) reports.add(key + ": " + UNKNOWN);
         host.settingsReports.put(pluginId, List.copyOf(reports));
         if (changed) for (Runnable listener : listeners) listener.run();
+        for (Runnable listener : reloadListeners) listener.run();
     }
 
     void close() {
         open = false;
         listeners.clear();
+        reloadListeners.clear();
         declared.forEach(FakeSetting::close);
     }
 }

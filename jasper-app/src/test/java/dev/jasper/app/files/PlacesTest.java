@@ -1,7 +1,6 @@
 package dev.jasper.app.files;
 
 import static dev.jasper.app.files.Places.Section.*;
-import dev.jasper.app.platform.AppIcons;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -39,7 +38,9 @@ class PlacesTest {
         assertThat(root.location()).isEqualTo(Location.home("dev.x.hosts", "box"));
         assertThat(root.tooltip()).isEqualTo("me@box:22");
         assertThat(root.connected()).isTrue();
-        assertThat(places).extracting(Places.Place::icon).allSatisfy(id -> assertThat(AppIcons.bundledIds()).contains(id));
+        try (var glyphs = new dev.jasper.ui.icons.IconRegistry()) {
+            assertThat(places).extracting(Places.Place::icon).allSatisfy(id -> assertThat(glyphs.names()).as("named kit glyph").contains(id));
+        }
     }
 
     @Test void aMissingTerminalFolderIsLeftOutAndARemoteOneNeedsItsSource() {

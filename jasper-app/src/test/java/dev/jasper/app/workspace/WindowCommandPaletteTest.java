@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.palette.PaletteTestSupport;
 import dev.jasper.app.testsupport.LayoutTestSupport;
@@ -19,19 +19,19 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
-import javax.swing.event.ListDataEvent;
-import javax.swing.event.ListDataListener;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class WindowCommandPaletteTest {
+    static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
+
     static JRootPane install(WindowContent owner) {
         var root = new JRootPane(); root.setContentPane(owner); owner.installRootBindings(root);
         root.setSize(900, 600); LayoutTestSupport.layoutTree(root); return root;
     }
     static WindowContent owner(CommandHistory history) {
         return new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
-            path -> {}, () -> {}, () -> {}, new ThemeController(), KeyBindings.defaults(true), history, true);
+            path -> {}, () -> {}, () -> {}, ThemeTestSupport.controller(true), KeyBindings.defaults(true), history, true);
     }
     static Command command(String id, Runnable run) {
         return new Command(id, new AbstractAction(id) {
@@ -99,10 +99,10 @@ class WindowCommandPaletteTest {
                 assertThat(card.getX() + card.getWidth() / 2).isEqualTo(workspace.x + workspace.width / 2);
                 assertThat(card.getY()).isEqualTo(workspace.y + workspace.height / 5);
                 int top = card.getY(); int initialHeight = card.getHeight();
-                card.queryField().setText("no matching commands anywhere"); LayoutTestSupport.layoutTree(root);
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("no matching commands anywhere"); LayoutTestSupport.layoutTree(root);
                 assertThat(card.getY()).isEqualTo(top);
                 assertThat(card.getHeight()).isLessThan(initialHeight);
-                card.queryField().setText(""); LayoutTestSupport.layoutTree(root);
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText(""); LayoutTestSupport.layoutTree(root);
                 assertThat(card.getY()).isEqualTo(top);
                 for (Dimension size : List.of(new Dimension(350, 210), new Dimension(80, 65))) {
                     root.setSize(size); LayoutTestSupport.layoutTree(root);
@@ -165,16 +165,27 @@ class WindowCommandPaletteTest {
     @Test void anAnchoredCardCoversTheFieldIsAtLeast560WideAndStaysInTheWindow() {
         var window = new Rectangle(0, 0, 1400, 900);
         var field = new Rectangle(420, 4, 560, 22);
-        assertThat(WindowCommandPalette.anchored(field, window, new Dimension(680, 300), 560, 16))
+        assertThat(WindowCommandPalette.anchored(field, window, window, new Dimension(680, 300), 560, 16))
             .isEqualTo(new Rectangle(420, 4, 560, 300));
         var narrow = new Rectangle(500, 4, 300, 22);
-        assertThat(WindowCommandPalette.anchored(narrow, window, new Dimension(680, 300), 560, 16))
+        assertThat(WindowCommandPalette.anchored(narrow, window, window, new Dimension(680, 300), 560, 16))
             .as("centred on the field, widened to the minimum").isEqualTo(new Rectangle(370, 4, 560, 300));
         var edge = new Rectangle(20, 4, 300, 22);
-        assertThat(WindowCommandPalette.anchored(edge, window, new Dimension(680, 300), 560, 16).x).isEqualTo(16);
+        assertThat(WindowCommandPalette.anchored(edge, window, window, new Dimension(680, 300), 560, 16).x).isEqualTo(16);
         var small = new Rectangle(0, 0, 350, 210);
-        assertThat(WindowCommandPalette.anchored(new Rectangle(20, 4, 286, 22), small, new Dimension(680, 400), 560, 16))
+        assertThat(WindowCommandPalette.anchored(new Rectangle(20, 4, 286, 22), small, small, new Dimension(680, 400), 560, 16))
             .isEqualTo(new Rectangle(16, 4, 318, 210 - 16 - 4));
+    }
+    @Test void anAnchoredCardStaysClearOfTheWindowControls() {
+        var field = new Rectangle(250, 4, 200, 22);
+        var window = new Rectangle(0, 0, 700, 600);
+        assertThat(WindowCommandPalette.anchored(field, window, new Rectangle(96, 0, 596, 38), new Dimension(680, 300), 560, 16))
+            .as("controls at the left: moved right, still the minimum wide").isEqualTo(new Rectangle(96, 4, 560, 300));
+        assertThat(WindowCommandPalette.anchored(field, window, new Rectangle(0, 0, 562, 38), new Dimension(680, 300), 560, 16))
+            .as("controls at the right: narrowed to the room before them").isEqualTo(new Rectangle(16, 4, 546, 300));
+        var narrow = new Rectangle(0, 0, 658, 600);
+        assertThat(WindowCommandPalette.anchored(new Rectangle(229, 4, 200, 22), narrow, new Rectangle(96, 0, 554, 38),
+            new Dimension(680, 300), 560, 16)).as("no room for the minimum").isEqualTo(new Rectangle(96, 4, 546, 300));
     }
     @Test void overlayDoesNotResizeTerminalAndTheCardDropsFromTheTitleField() throws Exception {
         DesktopTestSupport.edt(() -> {
@@ -234,15 +245,275 @@ class WindowCommandPaletteTest {
             }
         });
     }
-    @Test void overlayShadowTintsTowardThePopupDropShadowColour() throws Exception {
+    @Test void aNarrowWindowKeepsTheDroppedCardClearOfTheWindowControls() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
+                var root = new JRootPane();
+                try (var title = WindowContent.installTitleBar(root, owner, true, value -> {})) {
+                    owner.installRootBindings(root); root.setSize(com.formdev.flatlaf.util.UIScale.scale(658), 600);
+                    LayoutTestSupport.layoutTree(root);
+                    owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
+                    var palette = owner.commandPalette().component();
+                    var header = owner.chrome().header();
+                    int clear = SwingUtilities.convertPoint(header, header.getInsets().left, 0, palette.getParent()).x;
+                    assertThat(clear).as("the header keeps room for the controls").isPositive();
+                    assertThat(palette.getX()).as("the card starts past the window controls").isGreaterThanOrEqualTo(clear);
+                    assertThat(palette.getBounds().getMaxX()).as("and stays inside the window")
+                        .isLessThanOrEqualTo(root.getWidth() - com.formdev.flatlaf.util.UIScale.scale(16));
+                    var search = owner.chrome().search();
+                    var field = SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), palette.getParent());
+                    assertThat(palette.getY()).as("still dropped from the field").isEqualTo(field.y);
+                }
+            }
+        });
+    }
+    @Test void theCardDripsOpenFastThenSlowWithoutMovingOrResizing() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var clock = new java.util.concurrent.atomic.AtomicLong(1_000_000_000L);
+                var palette = owner.commandPalette(); palette.useClock(clock::get);
                 var root = install(owner);
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                Rectangle placed = card.getBounds();
+                assertThat(palette.revealRunning()).isTrue();
+                assertThat(palette.view().revealedHeight()).as("the reveal starts closed").isZero();
+                int previous = 0;
+                for (int quarter = 1; quarter <= 4; quarter++) {
+                    clock.addAndGet(WindowCommandPalette.REVEAL_MILLIS * 1_000_000L / 4);
+                    palette.animate(clock.get());
+                    LayoutTestSupport.layoutTree(root);
+                    assertThat(card.getBounds()).as("only the visible edge moves").isEqualTo(placed);
+                    assertThat(palette.view().revealedHeight()).as("quarter %d", quarter).isGreaterThanOrEqualTo(previous);
+                    previous = palette.view().revealedHeight();
+                    if (quarter == 1) assertThat(previous).as("fast at first").isGreaterThan(placed.height / 2);
+                }
+                assertThat(palette.view().revealedHeight()).isEqualTo(placed.height);
+                assertThat(palette.revealRunning()).isFalse();
+            }
+        });
+    }
+    private static void mouse(JComponent card, int type, Point overlayPoint, int clicks) {
+        var at = SwingUtilities.convertPoint(card.getParent(), overlayPoint, card);
+        card.dispatchEvent(new MouseEvent(card, type, 0, type == MouseEvent.MOUSE_RELEASED || type == MouseEvent.MOUSE_CLICKED
+            ? 0 : InputEvent.BUTTON1_DOWN_MASK, at.x, at.y, clicks, false, MouseEvent.BUTTON1));
+    }
+    private static Point grab(JComponent card) {
+        // The field row's top padding: no field, chip or row takes a press there.
+        return new Point(card.getX() + card.getWidth() / 2, card.getY() + com.formdev.flatlaf.util.UIScale.scale(3));
+    }
+    @Test void draggingTheCardByItsEmptyAreasMovesSnapsAndRemembersItForEveryWindow() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            var state = dev.jasper.app.persistence.UiState.inMemory();
+            try (var owner = owner(new CommandHistory()); var other = owner(new CommandHistory())) {
+                owner.connectContributions(new dev.jasper.app.contributions.Contributions(), state);
+                other.connectContributions(new dev.jasper.app.contributions.Contributions(), state);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                var palette = owner.commandPalette();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                var overlay = (JComponent) card.getParent();
+                Rectangle anchoredBounds = card.getBounds();
+                Point press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + 2, press.y + 1), 1);
+                assertThat(palette.dragging()).as("a press that barely moves is a click").isFalse();
+                assertThat(card.getBounds()).isEqualTo(anchoredBounds);
+
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x - 300, press.y + 250), 1);
+                assertThat(palette.dragging()).isTrue();
+                assertThat(palette.snappedToCenter() || palette.snappedToTop()).isFalse();
+                assertThat(card.getLocation()).isEqualTo(new Point(anchoredBounds.x - 300, anchoredBounds.y + 250));
+                LayoutTestSupport.layoutTree(root);
+                assertThat(card.getLocation()).as("layout keeps the dragged place").isEqualTo(new Point(anchoredBounds.x - 300, anchoredBounds.y + 250));
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x - 300, press.y + 250), 1);
+                assertThat(palette.dragging()).isFalse();
+                var saved = state.palettePosition().orElseThrow();
+                Rectangle window = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), overlay);
+                assertThat(saved.centerX()).isCloseTo((card.getX() + card.getWidth() / 2.0 - window.x) / window.width, within(0.002));
+                assertThat(saved.top()).isCloseTo((card.getY() - window.y) / (double) window.height, within(0.002));
+                Rectangle dropped = card.getBounds();
+                palette.dismiss(); palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getBounds()).as("reopening keeps the saved place").isEqualTo(dropped);
+                palette.dismiss();
+
+                var otherRoot = install(other); otherRoot.setSize(1000, 700); LayoutTestSupport.layoutTree(otherRoot);
+                other.commandPalette().toggle(); LayoutTestSupport.layoutTree(otherRoot);
+                var otherCard = other.commandPalette().component();
+                var otherWindow = SwingUtilities.convertRectangle(other.getParent(), other.getBounds(), otherCard.getParent());
+                assertThat(otherCard.getBounds()).as("another window opens it in the same relative place")
+                    .isEqualTo(WindowCommandPalette.placed(otherWindow, otherCard.getSize(), saved, com.formdev.flatlaf.util.UIScale.scale(16)));
+                other.commandPalette().dismiss();
+
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                press = grab(card);
+                int guideX = window.x + (int) Math.round(window.width * 0.5), guideY = window.y + (int) Math.round(window.height * 0.2);
+                int dx = guideX - (card.getX() + card.getWidth() / 2) + 5, dy = guideY - card.getY() - 6;
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx, press.y + dy), 1);
+                assertThat(palette.snappedToCenter()).isTrue();
+                assertThat(palette.snappedToTop()).isTrue();
+                assertThat(card.getX() + card.getWidth() / 2).isEqualTo(guideX);
+                assertThat(card.getY()).isEqualTo(guideY);
+                var image = new java.awt.image.BufferedImage(overlay.getWidth(), overlay.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var graphics = image.createGraphics();
+                try { overlay.paint(graphics); } finally { graphics.dispose(); }
+                assertThat(image.getRGB(guideX, window.y + window.height - 5) >>> 24).as("the centre guide is felt, not drawn").isZero();
+                assertThat(image.getRGB(window.x + 5, guideY) >>> 24).as("the top guide is felt, not drawn").isZero();
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x + dx, press.y + dy), 1);
+                assertThat(state.palettePosition()).hasValue(new dev.jasper.app.persistence.UiState.PalettePosition(0.5, 0.2));
+
+                press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_RELEASED, press, 1);
+                mouse(card, MouseEvent.MOUSE_CLICKED, press, 2);
+                assertThat(state.palettePosition()).as("a double click forgets the place").isEmpty();
+                assertThat(card.getBounds()).as("back under the title field").isEqualTo(anchoredBounds);
+            }
+        });
+    }
+    @Test void draggingTheCardBackToTheTitleFieldReattachesIt() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            var state = dev.jasper.app.persistence.UiState.inMemory();
+            try (var owner = owner(new CommandHistory())) {
+                owner.connectContributions(new dev.jasper.app.contributions.Contributions(), state);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                var palette = owner.commandPalette();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                Rectangle home = card.getBounds();
+                Point press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x - 300, press.y + 250), 1);
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x - 300, press.y + 250), 1);
+                assertThat(state.palettePosition()).isPresent();
+                palette.dismiss(); palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getBounds()).isNotEqualTo(home);
+
+                press = grab(card);
+                int dx = home.x - card.getX(), dy = home.y - card.getY();
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx + 30, press.y + dy + 60), 1);
+                assertThat(palette.snappedHome()).as("still too far below its home").isFalse();
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx + 12, press.y + dy - 80), 1);
+                assertThat(palette.snappedHome()).as("near it across and above it").isTrue();
+                assertThat(card.getBounds()).isEqualTo(home);
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x + dx + 12, press.y + dy - 80), 1);
+                assertThat(state.palettePosition()).as("re-attached: the dragged place is forgotten").isEmpty();
+                assertThat(card.getBounds()).isEqualTo(home);
+                palette.dismiss(); palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getBounds()).isEqualTo(home);
+            }
+        });
+    }
+    @Test void compactModeHasNoHomeToSnapTo() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder()
+                    .viewMode(dev.jasper.app.config.ViewMode.COMPACT).build(), true);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                var palette = owner.commandPalette();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                var card = palette.component();
+                Point press = grab(card);
+                mouse(card, MouseEvent.MOUSE_PRESSED, press, 1);
+                mouse(card, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y - 400), 1);
+                assertThat(palette.dragging()).isTrue();
+                assertThat(palette.snappedHome()).isFalse();
+                mouse(card, MouseEvent.MOUSE_RELEASED, new Point(press.x, press.y - 400), 1);
+                assertThat(owner.uiState().palettePosition()).isPresent();
+            }
+        });
+    }
+    @Test void aSavedPlaceKeepsTheCardInsideTheWindow() {
+        var window = new Rectangle(0, 40, 1000, 600);
+        var size = new Dimension(560, 300);
+        assertThat(WindowCommandPalette.placed(window, size, new dev.jasper.app.persistence.UiState.PalettePosition(0.5, 0.2), 16))
+            .isEqualTo(new Rectangle(220, 160, 560, 300));
+        assertThat(WindowCommandPalette.placed(window, size, new dev.jasper.app.persistence.UiState.PalettePosition(1, 1), 16))
+            .as("pulled back inside the margin").isEqualTo(new Rectangle(1000 - 16 - 560, 40 + 600 - 16 - 300, 560, 300));
+        assertThat(WindowCommandPalette.placed(new Rectangle(0, 0, 400, 200), size, new dev.jasper.app.persistence.UiState.PalettePosition(0, 0), 16))
+            .as("narrower than the card").isEqualTo(new Rectangle(16, 16, 400 - 32, 200 - 32));
+    }
+    @Test void theDripEasesOutMonotonically() {
+        assertThat(WindowCommandPalette.drip(0)).isZero();
+        assertThat(WindowCommandPalette.drip(1)).isEqualTo(1);
+        double previous = 0, previousStep = Double.MAX_VALUE;
+        for (int i = 1; i <= 20; i++) {
+            double value = WindowCommandPalette.drip(i / 20.0), step = value - previous;
+            assertThat(value).isGreaterThan(previous);
+            assertThat(step).as("each step is smaller than the last").isLessThan(previousStep);
+            previous = value; previousStep = step;
+        }
+    }
+    @Test void disabledAnimationsOpenTheCardFullyAndDisablingMidwayFinishesTheReveal() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var clock = new java.util.concurrent.atomic.AtomicLong(1_000_000_000L);
+                var palette = owner.commandPalette(); palette.useClock(clock::get);
+                var root = install(owner);
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).isFalse();
+                assertThat(palette.view().revealedHeight()).isEqualTo(palette.component().getHeight()).isPositive();
+                palette.dismiss();
+
+                owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).isTrue();
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
+                assertThat(palette.revealRunning()).isFalse();
+                assertThat(palette.view().revealedHeight()).isEqualTo(palette.component().getHeight());
+                palette.dismiss();
+
+                owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                clock.addAndGet(WindowCommandPalette.REVEAL_MILLIS * 1_000_000L / 3);
+                palette.animate(clock.get());
+                palette.dismiss();
+                assertThat(palette.revealRunning()).as("dismissing stops the reveal").isFalse();
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).as("every fresh open drips again").isTrue();
+                assertThat(palette.view().revealedHeight()).isZero();
+            }
+        });
+    }
+    /** Spec 10.9: under a still look the card opens fully at once, though the window's animation settings are on. */
+    @Test void aStillLookOpensTheCardFullyAtOnce() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            themes.configureAnimations(false);
+            try (var owner = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
+                    path -> {}, () -> {}, () -> {}, themes, KeyBindings.defaults(true), new CommandHistory(), true)) {
+                var palette = owner.commandPalette();
+                var root = install(owner);
+                owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).isFalse();
+                assertThat(palette.view().revealedHeight()).isEqualTo(palette.component().getHeight()).isPositive();
+                palette.dismiss();
+            } finally { themes.close(); }
+        });
+    }
+    /** theme.md's shadows are black, never theme colours: a red scrim leaves the palette's shadow neutral. */
+    @Test void overlayShadowIsBlackWhateverTheScrim() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            try (var owner = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
+                    path -> {}, () -> {}, () -> {}, themes, KeyBindings.defaults(true), new CommandHistory(), true)) {
+                var root = install(owner);
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                 var overlay = (JComponent) owner.commandPalette().component().getParent();
                 var card = owner.commandPalette().component().getBounds();
                 try {
+                    // A red scrim in the window's binding and the installed look, and a red popup shadow over the installed one.
+                    var red = ThemeTestSupport.recolored(ThemeTestSupport.generated(true),
+                        java.util.Map.of(dev.jasper.ui.theme.SemanticColor.SURFACE_SCRIM, Color.RED));
+                    ThemeTestSupport.install(red);
                     UIManager.put("Popup.dropShadowColor", Color.RED);
+                    themes.appearance().binding().publish(new dev.jasper.ui.theme.ThemePair(red, red));
+                    owner.commandPalette().refreshTheme();
                     var image = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
                     var graphics = image.createGraphics();
                     try {
@@ -251,8 +522,8 @@ class WindowCommandPaletteTest {
                         overlay.paint(graphics);
                     } finally { graphics.dispose(); }
                     var pixel = new Color(image.getRGB(card.x - 2, card.y - 2), true);
-                    assertThat(pixel.getRed()).as("the shadow is tinted toward the configured drop-shadow colour")
-                        .isGreaterThan(pixel.getGreen());
+                    assertThat(pixel.getRed()).as("the shadow darkens what lies beneath").isLessThan(Color.GRAY.getRed());
+                    assertThat(pixel.getRed()).as("and stays neutral, not the scrim's red").isCloseTo(pixel.getGreen(), org.assertj.core.api.Assertions.within(1));
                 } finally {
                     // Putting the saved value back would pin it in the developer defaults, ahead of
                     // whatever look and feel installs next; clearing the override is the real restore.
@@ -270,7 +541,7 @@ class WindowCommandPaletteTest {
                 var a = new AtomicInteger(); var b = new AtomicInteger();
                 first.commands().register(command("custom", a::incrementAndGet));
                 second.commands().register(command("custom", b::incrementAndGet));
-                first.commandPalette().toggle(); first.commandPalette().component().queryField().setText("custom");
+                first.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(first.commandPalette().component()).setText("custom");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(first.commandPalette().component());
                 assertThat(a.get()).isEqualTo(1); assertThat(b.get()).isZero();
                 second.commandPalette().open(dev.jasper.app.palette.PaletteScope.COMMANDS_ID);
@@ -285,7 +556,7 @@ class WindowCommandPaletteTest {
             try (var owner = owner(new CommandHistory())) {
                 install(owner); var count = new AtomicInteger(); var stale = command("custom", count::incrementAndGet);
                 var registration = owner.commands().register(stale);
-                owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("custom");
+                owner.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("custom");
                 registration.close(); owner.commands().register(command("custom", count::incrementAndGet));
                 // Simulate a row already selected by a queued mouse/key event.
                 PaletteTestSupport.setRows(owner.commandPalette().component(), owner.commandsScope(), PaletteTestSupport.rows(owner.commandsScope(), List.of(stale)), null);
@@ -301,13 +572,11 @@ class WindowCommandPaletteTest {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
                 install(owner); owner.commandPalette().toggle();
-                var changes = new AtomicInteger();
-                dev.jasper.app.palette.PaletteTestSupport.entryList(owner.commandPalette().component()).getModel().addListDataListener(new ListDataListener() {
-                    public void intervalAdded(ListDataEvent e) { changes.incrementAndGet(); }
-                    public void intervalRemoved(ListDataEvent e) { changes.incrementAndGet(); }
-                    public void contentsChanged(ListDataEvent e) { changes.incrementAndGet(); }
-                });
-                owner.update(); owner.update(); assertThat(changes.get()).isZero();
+                long revision = dev.jasper.app.palette.PaletteTestSupport.revision(owner.commandPalette().component());
+                var spec = dev.jasper.app.palette.PaletteTestSupport.resultsSpec(owner.commandPalette().component());
+                owner.update(); owner.update();
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.revision(owner.commandPalette().component())).as("the list was not replaced").isEqualTo(revision);
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.resultsSpec(owner.commandPalette().component())).isSameAs(spec);
                 owner.newTab(DesktopTestSupport.HOME); assertThat(owner.commandPalette().isOpen()).isFalse();
             }
         });
@@ -316,14 +585,14 @@ class WindowCommandPaletteTest {
         DesktopTestSupport.edt(() -> {
             var owner = owner(new CommandHistory()); var root = install(owner);
             int listeners = root.getComponentListeners().length;
-            owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("status bar");
+            owner.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("status bar");
             // "Status Bar Height…" matches too; follow the visibility toggle's own row.
             java.util.function.Supplier<String> toggle = () -> dev.jasper.app.palette.PaletteTestSupport.rows(owner.commandPalette().component())
                 .stream().filter(row -> row.id().equals("view.status_bar")).findFirst().orElseThrow().title();
             assertThat(toggle.get()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
             assertThat(toggle.get()).isEqualTo("Show Status Bar");
-            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
+            owner.selectVariant(false); assertThat(owner.commandPalette().isOpen()).isTrue();
             var overlay = owner.commandPalette().component().getParent(); owner.close();
             assertThat(overlay.getParent()).isNull(); assertThat(root.getComponentListeners().length).isLessThan(listeners);
             assertThat(owner.commands().entries()).isEmpty();
@@ -355,6 +624,8 @@ class WindowCommandPaletteTest {
                 var fake = new PaletteScopesTest.FakeScope();
                 fake.rows = List.of(new PaletteRow("alpha", "Alpha", "a detail", null, null, true, null));
                 owner.scopes().register(fake);
+                // A settled card: while it drips open, only its shown part takes presses.
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
                 owner.commandPalette().open(fake.id());
                 LayoutTestSupport.layoutTree(root);
                 var palette = owner.commandPalette().component();
@@ -412,10 +683,10 @@ class WindowCommandPaletteTest {
                 WindowContent[] content = new WindowContent[1];
                 content[0] = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
                     path -> {}, () -> { content[0].close(); application.quit(); },
-                    () -> { content[0].close(); ApplicationTestSupport.windowClosed(application, null); }, new ThemeController(),
+                    () -> { content[0].close(); ApplicationTestSupport.windowClosed(application, null); }, ThemeTestSupport.controller(true),
                     KeyBindings.defaults(true), history[0], true);
                 install(content[0]); content[0].commandPalette().toggle();
-                content[0].commandPalette().component().queryField().setText(quit ? "quit" : "close tab");
+                dev.jasper.app.palette.PaletteTestSupport.query(content[0].commandPalette().component()).setText(quit ? "quit" : "close tab");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(content[0].commandPalette().component());
                 assertThat(history[0].recent()).containsExactly(quit ? "quit" : "close_tab");
                 assertThat(history[0].closedFuture()).isNotDone();
@@ -440,7 +711,7 @@ class WindowCommandPaletteTest {
             try (var history = new CommandHistory(); var owner = owner(history)) {
                 install(owner); var errors = new ArrayList<String>(); owner.onError = (title, message) -> errors.add(message);
                 owner.commands().register(command("failing", () -> { throw new IllegalStateException("fixture"); }));
-                owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("failing");
+                owner.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("failing");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(owner.commandPalette().component());
                 assertThat(errors).containsExactly("Could not run failing. See the application log for details.");
                 assertThat(history.recent()).isEmpty(); assertThat(owner.commandPalette().isOpen()).isFalse();
@@ -456,19 +727,15 @@ class WindowCommandPaletteTest {
                 var first = command("custom.one", () -> {}); var second = command("custom.two", () -> {});
                 owner.commands().register(first); owner.commands().register(second);
                 owner.commandPalette().toggle(); var palette = owner.commandPalette().component();
-                palette.queryField().setText("custom"); PaletteTestSupport.selectRelative(palette, 1);
+                dev.jasper.app.palette.PaletteTestSupport.query(palette).setText("custom"); PaletteTestSupport.selectRelative(palette, 1);
                 var selected = dev.jasper.app.palette.PaletteTestSupport.selectedRow(palette); first.action().putValue(Command.TITLE, "custom one");
                 // Rows are rebuilt as fresh PaletteRow records on every refresh; only their
                 // content (matched by row ID) is stable across an edit to an unrelated command.
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRow(palette)).isEqualTo(selected);
-                palette.queryField().setText("custom "); assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRowIndex(palette)).isZero();
-                var changes = new AtomicInteger(); dev.jasper.app.palette.PaletteTestSupport.entryList(palette).getModel().addListDataListener(new ListDataListener() {
-                    public void intervalAdded(ListDataEvent e) { changes.incrementAndGet(); }
-                    public void intervalRemoved(ListDataEvent e) { changes.incrementAndGet(); }
-                    public void contentsChanged(ListDataEvent e) { changes.incrementAndGet(); }
-                });
+                dev.jasper.app.palette.PaletteTestSupport.query(palette).setText("custom "); assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRowIndex(palette)).isZero();
+                long revision = dev.jasper.app.palette.PaletteTestSupport.revision(palette);
                 owner.commandPalette().close(); history.record("custom.one"); first.action().setEnabled(false);
-                assertThat(changes.get()).isZero();
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.revision(palette)).as("closed: the list is never rebuilt").isEqualTo(revision);
                 assertThat(root.getLayeredPane().getComponentListeners().length).isLessThan(baseline);
             }
         });
@@ -480,12 +747,12 @@ class WindowCommandPaletteTest {
                 var root = install(owner);
                 for (int i = 0; i < 5; i++) owner.commands().register(command("custom." + i, () -> {}));
                 owner.commandPalette().toggle(); var palette = owner.commandPalette().component();
-                palette.queryField().setText("custom"); root.setSize(350, 210); LayoutTestSupport.layoutTree(root);
+                dev.jasper.app.palette.PaletteTestSupport.query(palette).setText("custom"); root.setSize(350, 210); LayoutTestSupport.layoutTree(root);
                 root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED)); LayoutTestSupport.layoutTree(root);
                 assertThat(palette.getWidth()).isLessThanOrEqualTo(318);
-                assertThat(palette.queryField().getParent().getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(44));
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.fieldRow(palette).getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.PALETTE_FIELD_HEIGHT)));
                 PaletteTestSupport.selectRelative(palette, 4); LayoutTestSupport.layoutTree(root);
-                assertThat(dev.jasper.app.palette.PaletteTestSupport.entryList(palette).getVisibleRect().intersects(dev.jasper.app.palette.PaletteTestSupport.rowBounds(palette, 4))).isTrue();
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.resultsCanvas(palette).getVisibleRect().intersects(dev.jasper.app.palette.PaletteTestSupport.rowBounds(palette, 4))).isTrue();
                 assertThat(palette.getHeight()).isLessThan(palette.getPreferredSize().height);
             }
         });
@@ -497,14 +764,14 @@ class WindowCommandPaletteTest {
                 var root = install(owner);
                 for (int i = 0; i < 5; i++) owner.commands().register(command("custom." + i, () -> {}));
                 owner.commandPalette().toggle(); var palette = owner.commandPalette().component();
-                palette.queryField().setText("custom"); root.setSize(350, 210); LayoutTestSupport.layoutTree(root);
+                dev.jasper.app.palette.PaletteTestSupport.query(palette).setText("custom"); root.setSize(350, 210); LayoutTestSupport.layoutTree(root);
                 root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED)); LayoutTestSupport.layoutTree(root);
                 PaletteTestSupport.selectRelative(palette, 4); LayoutTestSupport.layoutTree(root);
 
-                palette.queryField().setText("custom "); LayoutTestSupport.layoutTree(root);
+                dev.jasper.app.palette.PaletteTestSupport.query(palette).setText("custom "); LayoutTestSupport.layoutTree(root);
 
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRowIndex(palette)).isZero();
-                assertThat(dev.jasper.app.palette.PaletteTestSupport.entryList(palette).getVisibleRect().contains(
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.resultsCanvas(palette).getVisibleRect().contains(
                     dev.jasper.app.palette.PaletteTestSupport.rowBounds(palette, 0))).isTrue();
             }
         });
@@ -516,7 +783,7 @@ class WindowCommandPaletteTest {
         try {
             DesktopTestSupport.edt(() -> {
                 owner[0] = DesktopTestSupport.content(DesktopTestSupport.launcher(pending)); root[0] = install(owner[0]);
-                owner[0].commandPalette().toggle(); owner[0].commandPalette().component().queryField().setText("split");
+                owner[0].commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(owner[0].commandPalette().component()).setText("split");
             });
             pending.remove().run(); DesktopTestSupport.until(() -> owner[0].currentPane().view() != null);
             DesktopTestSupport.edt(() -> {
@@ -528,7 +795,7 @@ class WindowCommandPaletteTest {
                 content.commandPalette().toggle(); LayoutTestSupport.layoutTree(root[0]); assertThat(origin.view().getBounds()).isEqualTo(before);
                 content.currentTab().split(SplitTree.Axis.RIGHT); assertThat(content.commandPalette().isOpen()).isFalse();
                 content.commandPalette().toggle(); content.currentTab().focus(origin); assertThat(content.commandPalette().isOpen()).isFalse();
-                content.commandPalette().toggle(); content.commandPalette().component().queryField().setText("zoom");
+                content.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(content.commandPalette().component()).setText("zoom");
                 content.currentTab().toggleZoom();
                 assertThat(content.commandPalette().isOpen()).isTrue();
                 assertThat(content.action(ActionId.ZOOM_PANE).getValue(Command.TITLE)).isEqualTo("Restore Pane");
@@ -550,7 +817,7 @@ class WindowCommandPaletteTest {
             DesktopTestSupport.edt(() -> {
                 owner[0] = DesktopTestSupport.content(DesktopTestSupport.launcher(pending)); install(owner[0]);
                 owner[0].toolbar().add(previous);
-                var query = owner[0].commandPalette().component().queryField();
+                var query = dev.jasper.app.palette.PaletteTestSupport.query(owner[0].commandPalette().component());
                 query.removeCaretListener((javax.swing.event.CaretListener) query.getAccessibleContext());
                 var host = new JPanel(); host.add(SwingUtilities.getRootPane(owner[0])); host.addNotify();
                 KeyboardFocusManager.setCurrentKeyboardFocusManager(new DefaultKeyboardFocusManager() {
@@ -566,7 +833,7 @@ class WindowCommandPaletteTest {
                 owner[0].commands().register(command("find.fixture", () -> {
                     ordered.add("find"); owner[0].action(ActionId.FIND).actionPerformed(new ActionEvent(owner[0], 0, "find"));
                 }));
-                owner[0].commandPalette().component().queryField().setText("find.fixture");
+                dev.jasper.app.palette.PaletteTestSupport.query(owner[0].commandPalette().component()).setText("find.fixture");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(owner[0].commandPalette().component());
                 assertThat(ordered).containsExactly("restore", "find");
                 assertThat(owner[0].currentPane().findBar().isVisible()).isTrue();
@@ -609,7 +876,7 @@ class WindowCommandPaletteTest {
                 // lightweight fixture deliberately does not create.
                 for (var listener : prior.getComponentListeners()) prior.removeComponentListener(listener);
                 original.add(prior, BorderLayout.NORTH);
-                var query = owner[0].commandPalette().component().queryField();
+                var query = dev.jasper.app.palette.PaletteTestSupport.query(owner[0].commandPalette().component());
                 query.removeCaretListener((javax.swing.event.CaretListener) query.getAccessibleContext());
                 for (var listener : query.getComponentListeners()) query.removeComponentListener(listener);
                 var root = SwingUtilities.getRootPane(owner[0]);

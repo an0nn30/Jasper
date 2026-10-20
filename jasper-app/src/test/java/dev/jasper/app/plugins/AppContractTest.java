@@ -9,6 +9,7 @@ import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.testing.contract.ContractCall;
 import dev.jasper.sdk.testing.contract.ContractHarness;
 import dev.jasper.sdk.testing.contract.PluginContractTest;
 import java.io.IOException;
@@ -89,7 +90,7 @@ class AppContractTest extends PluginContractTest {
             GlassSource.NONE);
     }
 
-    private static PluginHost host(Path data, Duration drainGrace,
+    static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, NotificationsFixture notifications, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
@@ -104,6 +105,12 @@ class AppContractTest extends PluginContractTest {
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
     static AuxiliaryWindows headlessWindows() { return headlessWindows(UiState.inMemory()); }
+
+    /** UI thread: {@link #headlessWindows()} whose file chooser is {@code chooser}, for tests that pick files. */
+    static AuxiliaryWindows headlessWindows(dev.jasper.app.windows.PathChooser chooser) {
+        return new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
+            () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()), chooser);
+    }
 
     /** UI thread: plugin windows over shells that touch no native window. */
     static AuxiliaryWindows headlessWindows(UiState state) {
@@ -152,6 +159,16 @@ class AppContractTest extends PluginContractTest {
         });
         PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notifications, edited,
             diagnostics, shells.source(), browsed, appearance, glass);
+        boolean[] clipboardBusy = {false};
+        var clipboardContents = new java.awt.datatransfer.Clipboard("contract") {
+            @Override public synchronized void setContents(java.awt.datatransfer.Transferable contents, java.awt.datatransfer.ClipboardOwner owner) {
+                if (clipboardBusy[0]) throw new IllegalStateException("cannot open system clipboard");
+                super.setContents(contents, owner);
+            }
+        };
+        List<Runnable> clipboardClears = new CopyOnWriteArrayList<>();
+        onEdt(() -> host.clipboard = new dev.jasper.app.platform.HostClipboard(() -> clipboardContents,
+            (delay, task) -> { clipboardClears.add(task); return () -> clipboardClears.remove(task); }));
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
@@ -161,7 +178,24 @@ class AppContractTest extends PluginContractTest {
         onEdt(() -> contributions.onPaletteRequest(request -> opens.add(request.windowId() + " " + request.scopeId() + " "
             + request.query().orElse("-") + " " + request.rowId().orElse("-"))));
         Map<String, Map<String, dev.jasper.app.palette.PaletteRow>> lastRows = new java.util.HashMap<>();
+        List<Subcommands.Owner> declared = new java.util.concurrent.CopyOnWriteArrayList<>();
+        Set<String> bundled = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        List<String> lookProblems = new CopyOnWriteArrayList<>();
+        onEdt(() -> host.lookDefaultProblem = lookProblems::add);
         return new ContractHarness() {
+            @Override public void setKitDefault(String pluginId, String key, Object rawValue) {
+                Object raw = org.tomlj.Toml.parse("v = " + literal(rawValue)).get("v");
+                onEdt(() -> {
+                    var tables = new java.util.HashMap<String, Map<String, Object>>(host.defaults.plugins());
+                    var table = new java.util.LinkedHashMap<String, Object>(host.defaults.plugin(pluginId));
+                    table.put(key, raw);
+                    tables.put(pluginId, table);
+                    host.defaults = new dev.jasper.app.config.DefaultSource(host.defaults.overrides(), tables);
+                });
+            }
+            @Override public List<String> lookDefaultProblems(String pluginId) {
+                return lookProblems.stream().filter(line -> line.startsWith(pluginId + ": ")).toList();
+            }
             @Override public void setSetting(String pluginId, String key, Object rawValue) {
                 Path file = files.file(pluginId);
                 try {
@@ -225,6 +259,7 @@ class AppContractTest extends PluginContractTest {
                                 List<String> live = dropdown.actionIds().stream().filter(id -> contributions.action(id).isPresent()).toList();
                                 if (!live.isEmpty()) lines.add("menu:" + dropdown.title() + ":" + String.join(",", live));
                             }
+                            case dev.jasper.app.contributions.ToolbarEntry.View view -> lines.add("view");
                         }
                     }
                     return lines;
@@ -258,10 +293,81 @@ class AppContractTest extends PluginContractTest {
                         + (panel.defaultSlot().split() ? "+split" : "")
                         + (panel.namedToggle() ? "|" + panel.toggleActionId() : "")).toList());
             }
+            /** Open instances' sites and the header metadata each last published, keyed by panel id and window, as a window keeps them. */
+            final java.util.Map<String, dev.jasper.app.contributions.PanelSite> sites = new java.util.HashMap<>();
+            final java.util.Map<String, dev.jasper.app.contributions.PanelHeaderState> headers = new java.util.HashMap<>();
             @Override public javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId) {
+                String key = panelId + "|" + windowId;
                 return onEdtValue(() -> contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
-                    .map(panel -> panel.factory().apply(new dev.jasper.app.contributions.PanelSite(windowId, () -> { }, () -> { }, () -> true)))
+                    .map(panel -> {
+                        var site = new dev.jasper.app.contributions.PanelSite(windowId, () -> { }, () -> { }, () -> true, header -> headers.put(key, header));
+                        var built = panel.factory().apply(site);
+                        if (built != null) sites.put(key, site);
+                        return built;
+                    })
                     .orElse(null));
+            }
+            @Override public String panelHeader(String panelId, java.util.UUID windowId) {
+                return onEdtValue(() -> {
+                    var header = headers.getOrDefault(panelId + "|" + windowId, dev.jasper.app.contributions.PanelHeaderState.EMPTY);
+                    var labels = header.actions().stream().map(dev.jasper.app.contributions.PanelHeaderState.Action::label).toList();
+                    return header.detail() + "|" + header.active() + "|" + (labels.isEmpty() ? "-" : String.join(";", labels));
+                });
+            }
+            @Override public boolean runPanelHeaderAction(String panelId, java.util.UUID windowId, String label) {
+                return onEdtValue(() -> {
+                    var action = headers.getOrDefault(panelId + "|" + windowId, dev.jasper.app.contributions.PanelHeaderState.EMPTY)
+                        .actions().stream().filter(a -> a.label().equals(label)).findFirst();
+                    action.ifPresent(a -> a.invoke().run());
+                    return action.isPresent();
+                });
+            }
+            @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((HostedKitView) view).component().route().name(); }
+            @Override public void closePanel(String panelId, java.util.UUID windowId) {
+                onEdt(() -> { var site = sites.remove(panelId + "|" + windowId); if (site != null) site.notifyClosed(); });
+            }
+            /** Each toolbar view's instance per window, built once as a window builds it when it opens; empty when it failed. */
+            final java.util.Map<dev.jasper.app.contributions.ToolbarEntry.View, java.util.Map<UUID, Optional<dev.jasper.app.contributions.ToolbarEntry.Mounted>>> toolbarViews =
+                new java.util.IdentityHashMap<>();
+            /** Windows whose toolbar views closed: like a closed window, they build none again. */
+            final java.util.Set<UUID> closedToolbarWindows = new java.util.HashSet<>();
+            @Override public List<String> openToolbarViews(UUID windowId) {
+                return onEdtValue(() -> {
+                    List<String> roots = new java.util.ArrayList<>();
+                    if (closedToolbarWindows.contains(windowId) || terminalFixture.registry.window(windowId).isEmpty()) return roots;
+                    for (var entry : contributions.toolbar()) {
+                        if (!(entry instanceof dev.jasper.app.contributions.ToolbarEntry.View view)) continue;
+                        var built = toolbarViews.computeIfAbsent(view, key -> new java.util.HashMap<>());
+                        var mounted = built.get(windowId);
+                        if (mounted == null) built.put(windowId, mounted = view.factory().apply(windowId));
+                        else if (mounted.isPresent()) {
+                            // Asks the host again, as a second pass of a window's toolbar could: it keeps the window's view.
+                            var again = view.factory().apply(windowId);
+                            if (again.isPresent()) throw new AssertionError("The host built a second toolbar view for " + windowId);
+                        }
+                        mounted.ifPresent(shown -> roots.add(((dev.jasper.ui.swing.KitView) shown.component()).spec().root().id()));
+                    }
+                    return roots;
+                });
+            }
+            @Override public void closeToolbarViews(UUID windowId) {
+                onEdt(() -> {
+                    closedToolbarWindows.add(windowId);
+                    for (var built : toolbarViews.values()) {
+                        var mounted = built.remove(windowId);
+                        if (mounted != null) mounted.ifPresent(dev.jasper.app.contributions.ToolbarEntry.Mounted::close);
+                    }
+                });
+            }
+            @Override public void clickToolbarViewButton(UUID windowId, String buttonId) {
+                onEdt(() -> {
+                    for (var built : toolbarViews.values()) {
+                        var button = built.getOrDefault(windowId, Optional.empty())
+                            .map(mounted -> WorkspaceContentRouteTest.named(mounted.component(), buttonId, javax.swing.AbstractButton.class)).orElse(null);
+                        if (button != null) { button.doClick(); return; }
+                    }
+                    throw new AssertionError("No toolbar view button " + buttonId + " in " + windowId);
+                });
             }
             @Override public List<String> rail() {
                 return onEdtValue(() -> contributions.railActions().stream().filter(id -> contributions.action(id).isPresent()).toList());
@@ -270,6 +376,11 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> auxiliary.open().stream()
                     .map(surface -> (switch (surface.kind()) { case DIALOG -> "dialog"; case OVERLAY -> "overlay"; case WINDOW -> surface.id(); })
                         + "|" + surface.title() + "|" + surface.shown()).toList());
+            }
+            @Override public String dialogSwatch(String pluginId, String title) {
+                return onEdtValue(() -> auxiliary.open().stream()
+                    .filter(surface -> surface.kind() != AuxiliarySurface.Kind.WINDOW && surface.title().equals(title))
+                    .findFirst().map(surface -> surface.swatch().name()).orElse("-"));
             }
             @Override public boolean requestClose(String windowId) {
                 return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
@@ -320,10 +431,36 @@ class AppContractTest extends PluginContractTest {
                 dark.set(variant == dev.jasper.sdk.Variant.DARK);
                 host.bus.publish(EventBus.APP, dev.jasper.sdk.events.AppEvents.THEME_CHANGED, new dev.jasper.sdk.events.AppEvents.ThemeChanged(variant));
             }
+            @Override public void setPresentation(dev.jasper.sdk.ui.Presentation presentation) { onEdt(() -> host.presentation = presentation); }
             @Override public void stopAll() {
                 var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
                 onEdt(() -> pending.set(host.stop()));
                 CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).join();
+            }
+            @Override public void declareSubcommand(String pluginId, String name, String summary) {
+                declared.add(new Subcommands.Owner(name, summary, pluginId, pluginId));
+                onEdt(() -> host.commands.declare(Subcommands.of(declared)));
+            }
+            @Override public ContractCall call(String name, List<String> arguments, Path workingDirectory, UUID paneOrNull) {
+                var out = new StringBuffer();
+                var err = new StringBuffer();
+                var all = new java.util.ArrayList<String>();
+                all.add(name);
+                all.addAll(arguments);
+                var invocation = new dev.jasper.app.commandline.Invocation(all, workingDirectory,
+                    java.util.Optional.ofNullable(paneOrNull), out::append, err::append);
+                var exit = host.commands.dispatch(invocation).toCompletableFuture();
+                onEdt(() -> { });
+                return new ContractCall() {
+                    @Override public int exitCode() {
+                        try { return exit.get(5, java.util.concurrent.TimeUnit.SECONDS); }
+                        catch (Exception failure) { throw new AssertionError(failure); }
+                    }
+                    @Override public boolean finished() { return exit.isDone(); }
+                    @Override public String out() { return out.toString(); }
+                    @Override public String err() { return err.toString(); }
+                    @Override public void cancel() { invocation.cancel(); onEdt(() -> { }); }
+                };
             }
                         private dev.jasper.app.palette.PaletteScope scope(String scopeId) {
                             return contributions.scopes().stream().filter(scope -> scope.id().equals(scopeId)).findFirst()
@@ -349,6 +486,10 @@ class AppContractTest extends PluginContractTest {
                         @Override public List<String> scopes() {
                             return onEdtValue(() -> contributions.scopes().stream().map(scope -> scope.id() + "|" + scope.label() + "|"
                                 + String.join(",", scope.verbs().stream().map(dev.jasper.app.palette.PaletteVerb::id).toList())).toList());
+                        }
+                        @Override public String scopePresentation(String scopeId) {
+                            return onEdtValue(() -> { var scope = scope(scopeId); return scope.hue().name() + "|" + scope.itemNoun() + "|"
+                                + String.join(",", scope.verbs().stream().map(verb -> verb.role().name()).toList()); });
                         }
                         @Override public List<String> searchScope(String scopeId, String query, UUID windowId, UUID paneIdOrNull) {
                             return onEdtValue(() -> {
@@ -390,6 +531,23 @@ class AppContractTest extends PluginContractTest {
                         @Override public boolean clickNotification(String title) { return notifications.click(title); }
                         @Override public List<Path> openedInEditor() { return List.copyOf(edited); }
                         @Override public List<java.net.URI> browsed() { return List.copyOf(browsed); }
+                        @Override public java.util.Optional<String> clipboard() { return onEdtValue(() -> host.clipboard.text()); }
+                        @Override public void userCopies(String text) {
+                            onEdt(() -> clipboardContents.setContents(new java.awt.datatransfer.StringSelection(text), null));
+                        }
+                        @Override public void clipboardBusy(boolean busy) { clipboardBusy[0] = busy; }
+                        @Override public void expireClipboardSecret() { onEdt(() -> List.copyOf(clipboardClears).forEach(Runnable::run)); }
+            @Override public Map<String, String> shellVariables(Map<String, String> jasperEnvironment) {
+                return onEdtValue(() -> host.shellContributions.variables(jasperEnvironment));
+            }
+            @Override public void declareBundled(String pluginId) {
+                bundled.add(pluginId);
+                onEdt(() -> host.fileEditors.bundled(Set.copyOf(bundled)));
+            }
+            @Override public boolean edit(Path file, java.util.OptionalInt line, Optional<UUID> windowId) {
+                return onEdtValue(() -> host.fileEditors.edit(file, line, windowId));
+            }
+            @Override public void commandClient(Path client) { onEdt(() -> host.commandClient = Optional.of(client)); }
             @Override public void close() { stopAll(); flush(); }
         };
     }

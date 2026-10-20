@@ -1,6 +1,7 @@
 package dev.jasper.app.settingsui;
 
 import dev.jasper.app.config.SettingsEdit;
+import static dev.jasper.app.config.CoreSettings.*;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settings.Setting;
 import dev.jasper.app.settings.SettingValues;
@@ -20,17 +21,28 @@ public final class SettingsDraft {
     private final Map<Setting<?>, Optional<?>> pending = new LinkedHashMap<>();
     private final List<Runnable> listeners = new ArrayList<>();
     private SettingValues baseline;
+    private final dev.jasper.app.config.DefaultSource defaults;
 
-    public SettingsDraft(SettingValues baseline) { this.baseline = Objects.requireNonNull(baseline, "baseline"); }
+    /** A draft over {@code baseline} under the core look's defaults. */
+    public SettingsDraft(SettingValues baseline) { this(baseline, dev.jasper.app.config.DefaultSource.CORE); }
+
+    /** A draft over {@code baseline} whose defaults are {@code defaults}'s (spec 5.8). */
+    public SettingsDraft(SettingValues baseline, dev.jasper.app.config.DefaultSource defaults) {
+        this.baseline = Objects.requireNonNull(baseline, "baseline");
+        this.defaults = Objects.requireNonNull(defaults, "defaults");
+    }
+
+    /** {@code setting}'s effective default: the look's, else the core default. */
+    public <T> T defaultValue(Setting<T> setting) { return defaults.value(setting); }
 
     public SettingValues baseline() { return baseline; }
 
-    /** The value the dialog shows: the pending edit, else the saved value, else the default. */
+    /** The value the dialog shows: the pending edit, else the saved value, else the effective default. */
     @SuppressWarnings("unchecked")
     public <T> T value(Setting<T> setting) {
-        if (!pending.containsKey(setting)) return baseline.get(setting);
+        if (!pending.containsKey(setting)) return baseline.saved(setting).orElseGet(() -> defaultValue(setting));
         Optional<T> staged = (Optional<T>) pending.get(setting);
-        return staged.orElse(setting.defaultValue());
+        return staged.orElseGet(() -> defaultValue(setting));
     }
 
     /** The saved value, or empty when the file does not set it. */
@@ -38,9 +50,16 @@ public final class SettingsDraft {
 
     /** Records an edit; one that matches the saved state removes any pending edit instead. */
     public <T> void stage(Setting<T> setting, Optional<T> value) {
-        Objects.requireNonNull(value, "value");
-        if (value.equals(baseline.saved(setting))) pending.remove(setting);
-        else pending.put(setting, value);
+        stageAll(Map.of(setting, Objects.requireNonNull(value, "value")));
+    }
+
+    /** Publishes one edit atomically. */
+    public void stageAll(Map<Setting<?>, Optional<?>> values) {
+        values.forEach((setting, value) -> { Objects.requireNonNull(setting); Objects.requireNonNull(value); });
+        values.forEach((setting, value) -> {
+            if (setting.sameSaved(value, baseline.saved(setting))) pending.remove(setting);
+            else pending.put(setting, value);
+        });
         changed();
     }
 
@@ -61,7 +80,7 @@ public final class SettingsDraft {
     /** Adopts newer saved values; pending edits the new values already hold are dropped. */
     public void rebase(SettingValues next) {
         baseline = Objects.requireNonNull(next, "next");
-        pending.entrySet().removeIf(entry -> entry.getValue().equals(baseline.saved(entry.getKey())));
+        pending.entrySet().removeIf(entry -> entry.getKey().sameSaved(entry.getValue(), baseline.saved(entry.getKey())));
         changed();
     }
 

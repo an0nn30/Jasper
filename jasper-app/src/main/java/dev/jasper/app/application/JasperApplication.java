@@ -1,8 +1,8 @@
 package dev.jasper.app.application;
 
-import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.commandline.CommandDispatcher;
+import dev.jasper.app.commandline.CommandInstall;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -78,10 +78,16 @@ import dev.jasper.app.terminals.TerminalRegistry;
 public final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
     private final ThemeController themes;
-    private final ThemeCatalog themeCatalog;
+    /** The application's theme controller. */
+    ThemeController themes() { return themes; }
+    private final dev.jasper.app.platform.SystemAppearance systemAppearance;
+    private Runnable systemAppearanceListening = () -> { };
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     /** Workspace glass exists only on macOS; elsewhere plugins see {@code GlassSource.NONE} and windows make no glass requests. */
     private static final boolean WORKSPACE_GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+    private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
+    /** The trigger of a window another launch asked for through the handoff endpoint. */
+    public static final String HANDOFF = "handoff";
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
@@ -128,14 +134,25 @@ public final class JasperApplication {
     static final Duration DETECTION_WAIT = Duration.ofSeconds(12);
     private final ApplicationShutdown shutdown;
     private final Path shellIntegrationDir;
+    /** The imported themes' folder, or null for the built-in theme alone. */
+    private final Path themesFolder;
     private final BuddyIntegration buddy;
     private final dev.jasper.app.lifecycle.Subscription buddyAppearance;
     private final SystemNotices systemNotices;
     private final CommandNotifier notifications;
-    private PluginRuntime plugins;
+    private volatile PluginRuntime plugins;
+    /** The command socket this Jasper serves; new local shells name it in JASPER_COMMAND_SOCKET. */
+    private volatile Path commandSocket;
+    /** Where {@code jasper --help} reads the subcommands, or null for a private launch. */
+    private Path subcommandList;
     private ActionEntry migrateAction;
+    private CommandInstall commandInstall;
     private dev.jasper.app.settingsui.SettingsDialog settings;
+    private VmOptionsFeature vmOptions;
+    private final MemoryIndicator memoryIndicator;
+    private volatile MemoryWarnings memoryWarnings;
     private boolean preferencesHandlerInstalled;
+    private boolean aboutHandlerInstalled;
     private UiState uiState = UiState.inMemory();
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
@@ -165,8 +182,12 @@ public final class JasperApplication {
     private final IncidentNotices incidentNotices;
     /** Built once plugins start, with the auxiliary windows it opens in. */
     private ErrorsWindow errorsWindow;
+    /** Built with the errors window, once plugins start. */
+    private AboutWindows aboutWindows;
     /** Where Open Log Folder points, known once plugins start. */
     private Path logFolder;
+    /** The clipboard Jasper and its plugins share. */
+    private final dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
     private dev.jasper.app.lifecycle.Subscription pluginTheme;
 
     private int configuredLongCommandSeconds() {
@@ -178,8 +199,54 @@ public final class JasperApplication {
 
     TerminalRegistry terminals() { return terminals; }
 
-    private volatile List<ThemeCatalog.Problem> migrationProblems = List.of();
-    private List<ThemeCatalog.Problem> startupConfigProblems = List.of();
+    /** The plugin selection this process starts, fixed at construction. */
+    private volatile dev.jasper.app.plugins.PluginSelection selection;
+    /** The look's font files that could not be registered, for its notice. */
+    private List<String> lookFontProblems = List.of();
+    /** The presentation every surface of this process receives (spec 4.9). */
+    private volatile dev.jasper.app.presentation.Presentation presentation;
+
+    /** The presentation this process runs. EDT. */
+    public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
+
+    /** The steps a branded look's splash shows (spec 10.11); none until the bootstrap hands them over. EDT. */
+    private dev.jasper.app.startup.StartupSteps startupSteps = dev.jasper.app.startup.StartupSteps.NONE;
+
+    /**
+     * The steps this application reports to a branded look's splash (spec 10.11): each plugin as it starts, then the
+     * first window as it is composed and shown. A presentation without branding, as a look that fell back at start has
+     * (spec 4.7), ends them at once. Before {@link #startPlugins(AppDirs)}. EDT.
+     *
+     * @param steps the bootstrap's steps
+     */
+    public void startupSteps(dev.jasper.app.startup.StartupSteps steps) {
+        startupSteps = java.util.Objects.requireNonNull(steps, "steps");
+        if (!presentation.branding().present()) steps.done();
+    }
+
+    /** What terminal windows and the rehearsal's are made of under this process's presentation. */
+    dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }
+    /** The auxiliary windows; null before {@link #startPlugins(AppDirs)}. Tests. */
+    dev.jasper.app.windows.AuxiliaryWindows auxiliary() { return auxiliary; }
+
+    /** The auxiliary windows' shells; null before {@link #startPlugins(AppDirs)}. Tests. */
+    dev.jasper.app.windows.NativeShells nativeShells() { return shells; }
+
+    /** The rehearsal painted: the look proved itself (spec 4.6), recorded off the EDT. */
+    void rehearsalPainted() {
+        var attempt = presentationAttempt();
+        Thread.ofVirtual().name("jasper-presentation-proven").start(attempt::proven);
+    }
+
+    /** The attempt record of the look this process runs; none for the default look or one that fell back. Any thread. */
+    public dev.jasper.app.presentation.PresentationAttempt presentationAttempt() {
+        var current = presentation;
+        return current.provider().isPresent() ? selection.attempt() : dev.jasper.app.presentation.PresentationAttempt.NONE;
+    }
+
+    /** The running plugins; null before {@link #startPlugins(AppDirs)}. Tests. */
+    PluginRuntime pluginRuntime() { return plugins; }
+
 
     public JasperApplication() { this(null); }
 
@@ -210,27 +277,67 @@ public final class JasperApplication {
      */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
-        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, List.of());
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, null);
     }
+
+    /** As above; {@code themesFolder} holds the imported themes, or is null for the built-in theme alone. */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
-                      Runnable terminate, Path shellIntegrationDir, List<ThemeCatalog.Problem> startupThemeProblems) {
-        migrationProblems = List.copyOf(startupThemeProblems);
-        if (service != null) startupConfigProblems = startupThemeProblems.stream().filter(problem -> problem.file().equals(service.initialState().file())).toList();
+                      Runnable terminate, Path shellIntegrationDir, Path themesFolder) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, themesFolder,
+            dev.jasper.app.plugins.PluginSelection.none());
+    }
+
+    /**
+     * As above, under {@code bootstrapSelection}: the bootstrap's plugin selection, whose presentation every surface of
+     * this process receives (spec 4.9) and whose plugins {@link #startPlugins(AppDirs)} starts.
+     */
+    public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, themesFolder, bootstrapSelection,
+            dev.jasper.app.appearance.ThemeController.INSTALLERS);
+    }
+
+    /** As above, with the installers that put a theme in place under a kit: the seam of spec 4.7's fallback tests. */
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection,
+                      java.util.function.Function<dev.jasper.ui.kit.Kit, java.util.function.Predicate<dev.jasper.ui.theme.GeneratedTheme>> installers) {
+        // Not named selection: the field changes during construction when the kit is blamed (spec 4.7), the parameter never.
+        this.selection = Objects.requireNonNull(bootstrapSelection, "bootstrapSelection");
+        presentation = this.selection.presentation();
+        dev.jasper.app.platform.BundledFonts.register();
+        // The look's own faces, before any font list is cached (spec 4.9).
+        lookFontProblems = LookFonts.register(presentation.faces());
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         startupViewMode = startup.viewMode();
-        themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
-        if (service != null) scanThemes(service);
-        Theme saved = themeCatalog.latest().find(startup.theme()).orElse(Theme.DARK);
-        ThemeController created;
-        try { created = new ThemeController(saved); }
-        catch (ThemeController.InstallationFailure failure) {
-            // A theme that cannot be installed never stops start-up; the configuration reports it.
-            LOG.log(System.Logger.Level.WARNING, "Starting in Jasper Dark: " + failure.getMessage(), failure);
-            created = new ThemeController(Theme.DARK);
+        systemAppearance = dev.jasper.app.platform.SystemAppearance.open();
+        try {
+        boolean dark = AppearancePolicy.dark(startup.appearance(), systemAppearance.current());
+        // First Swing work: every later component may read the installed snapshot. A variant that cannot be installed
+        // never stops start-up; the configuration reports it.
+        var library = themesFolder == null ? dev.jasper.app.appearance.ThemeLibrary.of(selection.themes())
+            : dev.jasper.app.appearance.ThemeLibrary.read(themesFolder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly(), selection.themes());
+        // The configuration reports unusable picks; start-up only replaces them.
+        var picks = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
+            startup.terminalScheme(), (key, message) -> { });
+        var started = ThemeController.start(dark, picks, presentation.kit(), installers,
+            failure -> LOG.log(System.Logger.Level.WARNING, "Could not start with this theme and look; trying the next: " + failure.getMessage(), failure));
+        themes = started.controller();
+        // Spec 4.7: the kit was at fault. Every consumer gets the fallback before plugins start, and the provider is skipped.
+        // The field, not the constructor's bootstrapSelection: startPlugins(AppDirs) starts this.selection.
+        if (started.step().blamesKit()) {
+            LOG.log(System.Logger.Level.WARNING, "The " + presentation.look() + " look could not be installed; Jasper uses its standard look");
+            var attempt = this.selection.attempt();
+            this.selection = this.selection.blamed();
+            presentation = this.selection.presentation();
+            // The start-up line names the look this process runs: the fallback is the default look.
+            trace.look(presentation.look());
+            Thread.ofVirtual().name("jasper-presentation-attempt").start(attempt::failed);
         }
-        themes = created;
+        // App-native menus show each item's action binding from the live keymap.
+        themes.appearance().shortcuts(this::shortcutLabel);
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
-        notificationViews = new NotificationsFeature(notificationCenter, contributions);
+        notificationViews = new NotificationsFeature(notificationCenter, contributions,
+            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), presentation().projections().panels());
         systemNotices = new SystemNotices(notificationCenter, this::systemNotificationsEnabled,
             new SystemNotices.Windows(this::raiseFor, notificationViews::showHistory, this::showErrors));
         incidents = new Incidents(notificationCenter.clock());
@@ -242,12 +349,17 @@ public final class JasperApplication {
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
         this.shutdown = new ApplicationShutdown(() -> { relaunchIfRequested(); terminate.run(); });
         this.shellIntegrationDir = shellIntegrationDir;
+        this.themesFolder = themesFolder;
         buddy = new BuddyIntegration(buddyStateFile, SystemFonts.system(java.awt.Font.PLAIN, 13f),
             themes.current().chrome().dark(), this::raiseTerminal, this::toggleBuddy, this::owns);
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
-        configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, new dev.jasper.app.platform.ConfigEditor()::open, () -> migrationProblems);
+        configuration = service == null ? null : new ConfigurationController(themes, service, this::openForEditing,
+            systemAppearance.current(), themesFolder, LookMotion.of(presentation.projections()));
+        // Without a configuration the setting is its default, on; the look still decides (spec 10.9).
+        if (configuration == null) themes.configureAnimations(LookMotion.of(presentation.projections()).allows(true));
+        if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
         // A supplied launcher (the benchmark, tests) never starts a detected profile, so reg.exe and wsl.exe stay
@@ -256,12 +368,23 @@ public final class JasperApplication {
             warnWhenDetected(shellProfiles, savedShell, this::shellProfileProblem);
             shellProfiles.refresh();
         }
+        // The indicator reads the heap only while shown; nothing here runs before the first output paints.
+        memoryIndicator = new MemoryIndicator(contributions, dev.jasper.app.vmoptions.HeapReading::current, System::gc,
+            MemoryIndicator::swingTimer);
+        if (configuration != null) {
+            showMemoryIndicator(configuration.state());
+            configuration.onState(this::showMemoryIndicator);
+        }
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             loginItems.accept(snapshot.backgroundEnabled());
             if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
             updateMigrateAction();
         });
+        if (configuration != null) {
+            applyGroupModes(configuration.state());
+            configuration.onState(this::applyGroupModes);
+        }
         if (configuration != null) {
             var problems = new ConfigProblemNotices(notificationCenter, this::showConfigurationProblems, this::openConfigFile);
             configuration.onProblems(problems::accept);
@@ -281,34 +404,15 @@ public final class JasperApplication {
             Desktop.getDesktop().setPreferencesHandler(event -> SwingUtilities.invokeLater(() -> openSettings(null, null)));
             preferencesHandlerInstalled = true;
         }
-    }
-
-    /**
-     * The first native scan runs on the configuration worker; start-up waits for it, at most 10 s,
-     * so the first window shows the saved theme. Later scans run on every configuration poll.
-     */
-    private void scanThemes(ConfigService service) {
-        try { service.watchChanges(() -> {
-            var before = themeCatalog.latest(); var previousProblems = migrationProblems;
-            scanQuietly("native themes", themeCatalog::scan);
-            var refreshed = new java.util.LinkedHashSet<>(startupConfigProblems);
-            refreshed.addAll(ThemeUpgrade.diagnostics(service.initialState().file()));
-            migrationProblems = List.copyOf(refreshed);
-            return !before.equals(themeCatalog.latest()) || !previousProblems.equals(migrationProblems);
-        })
-            .get(10, java.util.concurrent.TimeUnit.SECONDS); }
-        catch (ExecutionException | TimeoutException failure) {
-            LOG.log(System.Logger.Level.WARNING, "The themes folder could not be read at start-up", failure);
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
+        // Jasper › About Jasper: this window instead of AWT's default panel.
+        if (supports(Desktop.Action.APP_ABOUT)) {
+            Desktop.getDesktop().setAboutHandler(event -> SwingUtilities.invokeLater(this::showAbout));
+            aboutHandlerInstalled = true;
         }
-    }
-
-    /** Runs one catalog scan, logging a failure so the next catalog is still scanned. */
-    private static void scanQuietly(String what, Runnable scan) {
-        try { scan.run(); }
-        catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
-            LOG.log(System.Logger.Level.WARNING, "The " + what + " could not be scanned", failure);
+        } catch (RuntimeException | Error failure) {
+            systemAppearanceListening.run();
+            systemAppearance.close();
+            throw failure;
         }
     }
 
@@ -381,7 +485,7 @@ public final class JasperApplication {
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(watchOutput(startSession(path, settings))), shellIntegrationDir, shellProfiles::resolve,
-            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem);
+            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem, this::paneVariables, this::pluginShellVariables);
         // Back in the Dock before the window exists: macOS gives a window of a hidden application neither Jasper's menu
         // bar nor focus. If composing fails nothing opened, so the presence is worked out again.
         windowOpening();
@@ -391,13 +495,16 @@ public final class JasperApplication {
                 requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quitRequested,
                 this::windowActivated, this::windowClosed,
                 state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
-                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history);
+                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history, windowLook());
             if (configuration != null) configuration.register(window.content());
             window.content().connectContributions(contributions, uiState);
             UUID windowId = window.content().id();
             window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
             window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
             window.content().onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
+            window.content().onOpenFile = (file, line) -> openFileAt(file, line, windowId);
+            // File › Open File… (spec 13): the plugins' file chooser over this window; nothing before plugins start.
+            window.content().fileChooser = folder -> auxiliary == null ? Optional.empty() : auxiliary.openFile(windowId, folder);
             notificationViews.attach(window.content());
             window.content().connectTerminals(terminals, window::toFront);
             if (WORKSPACE_GLASS) window.content().setGlassListener(this::glassChanged);
@@ -423,7 +530,8 @@ public final class JasperApplication {
                     }
                 }
             });
-            windows.add(window); window.restoreLayout(uiState); window.show();
+            windows.add(window); window.restoreLayout(uiState); startupSteps.workstation(); window.show();
+            memoryIndicator.windows(windows.size());
         } catch (RuntimeException | Error failure) {
             // A half-composed window must not outlive the failure, nor keep Jasper in the Dock with nothing open.
             try {
@@ -435,6 +543,7 @@ public final class JasperApplication {
         }
         windowTrace.mark(WindowTrace.Milestone.SHOWN);
         trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
+        startupSteps.done();
         return window;
     }
 
@@ -484,6 +593,88 @@ public final class JasperApplication {
     }
 
     public boolean resident() { return resident; }
+
+    /** Where {@code jasper --help} reads the subcommands; before {@link #startPlugins}. Never set for a private launch. */
+    public void subcommandList(Path file) { subcommandList = file; }
+
+    /** The command socket this Jasper serves, named in each new local shell's {@code JASPER_COMMAND_SOCKET}. */
+    public void commandSocket(Path socket) { commandSocket = socket; }
+
+    /** The command socket new local shells are given; null when this Jasper serves none. */
+    public Path commandSocket() { return commandSocket; }
+
+    /**
+     * Opens a file for editing on a worker thread: the editor a plugin provides, else the desktop's edit or open action,
+     * else revealing the file. Reads {@link #plugins} at call time, so openers built before the plugins start use it too.
+     */
+    private void openForEditing(Path file) {
+        var desktop = new dev.jasper.app.platform.ConfigEditor();
+        PluginRuntime runtime = plugins;
+        if (runtime == null) desktop.open(file); else runtime.open(file, desktop::open);
+    }
+
+    /**
+     * Opens a file that a Cmd-click in window {@code window} named, at {@code line} (0 for none), when it is an existing
+     * regular file: on a virtual thread, through the editor a plugin provides, else the desktop's edit or reveal action.
+     * The file's path is program output, so it is opened for editing only: never the desktop's open action, which runs
+     * programs and scripts. Anything else opens nothing and tells nobody. Reads {@link #plugins} when the thread runs.
+     */
+    void openFileAt(Path file, int line, UUID window) {
+        openFileAt(file, line, window, new dev.jasper.app.platform.ConfigEditor());
+    }
+
+    /** As {@link #openFileAt(Path, int, UUID)}, falling back to {@code desktop}; tests inject its actions. */
+    void openFileAt(Path file, int line, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
+        Thread.ofVirtual().name("jasper-open-file").start(() -> {
+            try {
+                if (!java.nio.file.Files.isRegularFile(file)) return;
+                PluginRuntime runtime = plugins;
+                if (runtime == null) desktop.editOrReveal(file);
+                else runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), desktop::editOrReveal);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "Could not open a clicked file", failure);
+            }
+        });
+    }
+
+    /** What running plugins add to a new local shell, given Jasper's own environment; nothing before they start. EDT. */
+    private Map<String, String> pluginShellVariables(Map<String, String> inherited) {
+        PluginRuntime runtime = plugins;
+        return runtime == null ? Map.of() : runtime.shellVariables(inherited);
+    }
+
+    /** What a new local shell in {@code pane} gets last, over everything else. Any thread. */
+    Map<String, String> paneVariables(UUID pane) {
+        Path socket = commandSocket;
+        return socket == null ? Map.of("JASPER_PANE", pane.toString())
+            : Map.of("JASPER_PANE", pane.toString(), "JASPER_COMMAND_SOCKET", socket.toString());
+    }
+
+    /**
+     * What the command socket runs: no arguments opens a window or raises one, as a launch would; anything else is a
+     * plugin's subcommand. Called on listener threads.
+     */
+    public CommandDispatcher commands() {
+        return invocation -> {
+            if (invocation.arguments().isEmpty()) {
+                SwingUtilities.invokeLater(() -> openOrRaise(HANDOFF));
+                return CompletableFuture.completedFuture(0);
+            }
+            PluginRuntime runtime = plugins;
+            if (runtime == null) {
+                invocation.err("jasper: Jasper's plugins are not running\n");
+                return CompletableFuture.completedFuture(1);
+            }
+            return runtime.commands().dispatch(invocation);
+        };
+    }
+
+    /** Quits a Jasper that is not resident once nothing keeps it: no terminal or plugin window, and {@code busy} false. EDT. */
+    public void quitIfUnused(BooleanSupplier busy) {
+        if (resident || quitting || stopped) return;
+        boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
+        if (windows.isEmpty() && !pluginWindowsOpen && !busy.getAsBoolean()) requestShutdown();
+    }
 
     /**
      * Who shows that this process is resident (the macOS menu bar item, the Windows notification-area icon), given its
@@ -704,7 +895,7 @@ public final class JasperApplication {
      */
     private Rehearsal.Stage rehearsalWindow(Rehearsal.Feed feed, ConfigSnapshot snapshot) {
         TerminalWindow window = new TerminalWindow(Rehearsal.CALLBACKS, Rehearsal.launcher(feed), null, false, themes, snapshot,
-            new CommandHistory());
+            new CommandHistory(), windowLook());
         // The pane's launch completion is queued, so this is in place before a failed launch could ask for a dialog.
         Rehearsal.silence(window.content());
         // Discarded, not closed: never shown and at the default size, it must not become the last window closed.
@@ -723,7 +914,10 @@ public final class JasperApplication {
             }
             throw failure;
         }
-        return new Rehearsal.Stage(() -> Rehearsal.paint(window.nativeWindow()), close);
+        return new Rehearsal.Stage(() -> {
+            Rehearsal.paint(window.nativeWindow());
+            rehearsalPainted();
+        }, close);
     }
 
     /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
@@ -733,17 +927,35 @@ public final class JasperApplication {
     }
 
     /**
-     * Starts plugins once, before the first window, so their contributions are in place when windows
-     * appear. {@code codeSource} locates bundled plugins beside the application jar and may be null;
+     * Scans for plugins here and starts them: for an application made without the bootstrap's selection. A scan that
+     * chooses a presentation is refused, because the look must be chosen before the application is made.
+     * {@code codeLocation} locates bundled plugins beside the application jar and may be null;
      * {@code developmentDirectory} is the {@code --plugin-dir} value or null.
      */
-    public void startPlugins(Path codeSource, Path developmentDirectory, boolean safeMode, AppDirs dirs) {
+    public void startPlugins(Path codeLocation, Path developmentDirectory, boolean safeMode, AppDirs dirs) {
         if (plugins != null || quitting || stopped) return;
+        if (!selection.isNone()) throw new IllegalStateException("This application starts the bootstrap's plugin selection");
+        var scanned = dev.jasper.app.plugins.PluginSelection.of(dirs, codeLocation, "", developmentDirectory, safeMode);
+        if (scanned.presentation().provider().isPresent())
+            throw new IllegalStateException("A presentation provider needs the bootstrap's selection");
+        selection = scanned;
+        startPlugins(dirs);
+    }
+
+    /** Starts the selection's plugins once, before the first window, so their contributions are in place when windows appear. */
+    public void startPlugins(AppDirs dirs) {
+        if (plugins != null || quitting || stopped) return;
+        if (selection.isNone()) {
+            var scanned = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "", null, false);
+            if (scanned.presentation().provider().isPresent())
+                throw new IllegalStateException("A presentation provider needs the bootstrap's selection");
+            selection = scanned;
+        }
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
-        uiState = UiState.load(dirs.uiState());
+        uiState = UiState.load(dirs.uiState(), presentation().projections().dockLayout().key());
         shells = new NativeShells(themes, uiState, this::nativeWindow,
-            () -> newWindow(), this::quit);
-        auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);
+            () -> newWindow(), this::quit, dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
+        auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());
         auxiliary.onAllClosed = () -> {
             if (windows.isEmpty() && !resident && !quitting) requestShutdown();
             else updateDock();
@@ -752,9 +964,12 @@ public final class JasperApplication {
         logFolder = dirs.logs();
         errorsWindow = new ErrorsWindow(contributions, auxiliary, incidents, new ErrorsView.Hooks(this::pluginName,
             id -> plugins == null ? "" : plugins.pluginVersions().getOrDefault(id, ""), IncidentReport.Environment.current(),
-            this::copyReport, incidentNotices::disablePlugin, this::openLogFolder), notificationCenter.clock().getZone());
-        plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
-            developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
+            this::copyReport, incidentNotices::disablePlugin, this::openLogFolder), notificationCenter.clock().getZone(),
+            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
+        aboutWindows = new AboutWindows(contributions, auxiliary, () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+            new AboutWindows.Hooks(dev.jasper.app.platform.BuildInfo.current(), IncidentReport.Environment.current(),
+                notificationCenter.clock().getZone(), this::copyBuildInformation, this::browse, JasperApplication::afterDelay));
+        plugins = new PluginRuntime(selection.options(), activityNotifier,
             new PluginRuntime.SettingsReports(
                 diagnostic -> { if (configuration != null) configuration.report(diagnostic); },
                 file -> { if (configuration != null) configuration.clearReports(file); }), contributions, auxiliary, terminals,
@@ -769,6 +984,13 @@ public final class JasperApplication {
             return new Subscription(() -> glassListeners.remove(listener));
         }) : dev.jasper.app.plugins.GlassSource.NONE);
         plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
+        plugins.animations(themes::animationsEnabled);
+        // The kit the controller installed and the look plugins read: the presentation's, or the fallback when the kit was blamed (spec 4.7).
+        plugins.presentation(themes.kit(), presentation.projections().plugins(), presentation.defaults());
+        plugins.shortcuts(this::shortcutLabel);
+        plugins.clipboard(clipboard);
+        plugins.commandClient(CommandInstall.client(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),
+            System.getProperty("jasper.commandClient")));
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
@@ -778,14 +1000,44 @@ public final class JasperApplication {
         migrateAction = contributions.addAction("config.migrate", "Migrate Config", null,
             List.of("configuration", "settings", "upgrade", "old keys", "config.toml"), Optional.empty(), invocation -> migrateConfiguration());
         updateMigrateAction();
+        commandInstall = CommandInstall.forThisPlatform(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),
+            Path.of(System.getProperty("user.home")));
+        List<String> commandKeywords = List.of("jasper", "command", "shell", "terminal", "path", "cli");
+        contributions.addAction("commandline.install", "Install 'jasper' Command in PATH", null, commandKeywords,
+            Optional.empty(), invocation -> installCommand(false)).setEnabled(commandInstall.available());
+        contributions.addAction("commandline.uninstall", "Uninstall 'jasper' Command from PATH", null, commandKeywords,
+            Optional.empty(), invocation -> uninstallCommand()).setEnabled(commandInstall.available());
         contributions.content().setFactory(separate -> {
             var created = separate ? newWindow(null) : newWindow();
             if (created == null) throw new IllegalStateException("Application is closing");
             return created.content().id();
         });
-        plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
+        if (subcommandList != null) plugins.subcommandList(subcommandList);
+        plugins.starting(startupSteps::plugin);
+        plugins.start(selection, configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
         new PluginProblemNotices(notificationCenter, incidentNotices,
             () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
+        // Spec 4.6: a look the attempt record skipped says so once, and Try Again forgets the record and restarts.
+        selection.skipped().ifPresent(skipped -> notificationCenter.post(NotificationRequest.of(IncidentNotices.PLUGINS.id(), Severity.WARNING,
+                "Jasper started with its standard look")
+            .withContent("The last start with the " + skipped.name() + " look did not finish, so Jasper uses its standard look until you try again.")
+            .withAction(new dev.jasper.app.notifications.NotificationAction("Try Again", () -> Thread.ofVirtual().name("jasper-presentation-retry").start(() -> {
+                skipped.attempt().clear();
+                SwingUtilities.invokeLater(() -> {
+                    if (!restart(RestartMode.SAME))
+                        notificationCenter.post(NotificationRequest.of(IncidentNotices.PLUGINS.id(), Severity.INFO, "Restart Jasper to try the look again")
+                            .withContent("Jasper could not work out how it was started. Quit and reopen it to start with the " + skipped.name() + " look."));
+                });
+            }), false))));
+        // Spec 5.8 and 5.9: a look that starts without some of its files says so once.
+        var missing = new ArrayList<String>(lookFontProblems);
+        presentation.droppedDefaults().forEach(key -> missing.add("[defaults].\"" + key + "\": its theme did not load, so the setting keeps its core default"));
+        presentation.provider().filter(provider -> !missing.isEmpty()).ifPresent(provider -> notificationCenter.post(NotificationRequest.of(
+            IncidentNotices.PLUGINS.id(), Severity.WARNING, "The " + provider.name() + " look is missing some of its files")
+            .withContent(String.join("\n", missing))));
+        // Spec 4.6: the first window's first paint proves the look, off the EDT.
+        trace.when(StartupTrace.Milestone.FIRST_PAINT, task -> Thread.ofVirtual().name("jasper-presentation-proven").start(task),
+            () -> presentationAttempt().proven());
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
         var keymap = new dev.jasper.app.shortcuthelp.KeymapPage.Hooks(contributions,
             () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).keybindings(),
@@ -794,31 +1046,73 @@ public final class JasperApplication {
                 : configuration.saveKeybindings(changes, contributions.actions().stream()
                     .filter(a -> KeyBindings.extensionId(a.id()))
                     .map(ActionEntry::extension).toList()));
+        var vmEditor = new dev.jasper.app.platform.ConfigEditor();
+        vmOptions = new VmOptionsFeature(dev.jasper.app.vmoptions.VmOptionsLaunch.current(),
+            () -> dev.jasper.app.vmoptions.LauncherImage.locate(System.getProperty("jpackage.app-path")),
+            image -> new dev.jasper.app.vmoptions.VmOptionsCheck(dev.jasper.app.vmoptions.VmOptionsCheck.runtimeJava(), image,
+                dev.jasper.app.vmoptions.VmOptionsCheck::runProcess, Duration.ofSeconds(10)),
+            work -> Thread.ofVirtual().name("jasper-vmoptions").start(work), SwingUtilities::invokeLater, notificationCenter,
+            () -> restart(RestartMode.SAME), this::openForEditing, vmEditor::reveal,
+            dev.jasper.app.vmoptions.VmOptionsLaunch::runningMaxHeapMiB, dev.jasper.app.vmoptions.VmOptionsLaunch::physicalMemoryMiB,
+            Duration.ofSeconds(2));
+        memoryWarnings = new MemoryWarnings(new dev.jasper.app.vmoptions.LowMemoryWatch(java.time.Clock.systemUTC()),
+            signal -> dev.jasper.app.vmoptions.HeapThreshold.install(dev.jasper.app.vmoptions.LowMemoryWatch.FRACTION, signal)
+                .<Runnable>map(threshold -> threshold::close).orElse(() -> { }),
+            notificationCenter, dev.jasper.app.vmoptions.VmOptionsLaunch::runningMaxHeapMiB, vmOptions::savedHeapMiB,
+            page -> openSettings(null, page));
+        vmOptions.onHeapSaved(memoryWarnings::heapChanged);
+        // Never on the start-up path: the options file is read and the heap watched and shown once the first output shows, the warm-up ends, or 5 s after the first paint.
+        Runnable settled = () -> {
+            vmOptions.startupSettled();
+            memoryWarnings.start();
+            memoryIndicator.ready();
+        };
+        trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, SwingUtilities::invokeLater, settled);
+        trace.when(StartupTrace.Milestone.WARMED_UP, SwingUtilities::invokeLater, settled);
+        trace.when(StartupTrace.Milestone.FIRST_PAINT, SwingUtilities::invokeLater, () -> afterDelay(Duration.ofSeconds(5), settled));
         contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings", "keymap", "edit shortcuts", "keyboard settings"),
             Optional.empty(), invocation -> openSettings(null, dev.jasper.app.shortcuthelp.KeymapPage.ID));
-        contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts")));
+        contributions.addAction("app.memory", "Change Memory Settings…", null, List.of("memory", "heap", "xmx", "jvm", "java", "vm options"),
+            Optional.empty(), invocation -> openSettings(invocation.windowId(), "system#vm.heap"));
+        contributions.addAction("app.vmoptions", "Edit Custom VM Options…", null, List.of("memory", "heap", "xmx", "jvm", "java", "vm options", "vmoptions"),
+            Optional.empty(), invocation -> {
+                if (vmOptions.editable()) vmOptions.editCustomOptions();
+                else openSettings(invocation.windowId(), "system#vm.heap");
+            });
+        contributions.addMenuSection(MenuTarget.topLevel(MenuTarget.HELP, "Help")).set(AboutWindows.helpEntries(AboutWindows.aboutInApplicationMenu(macOs, presentation.committedDesktop().screenMenuBar())));
         if (configuration != null) {
+            var commandLine = new dev.jasper.app.settingsui.CorePages.CommandLineActions(() -> commandInstall.state().text(),
+                () -> installCommand(true),
+                () -> commandInstall.state().kind() != CommandInstall.Kind.INSTALLED && commandInstall.available(),
+                this::uninstallCommand, () -> commandInstall.state().kind() == CommandInstall.Kind.INSTALLED);
             var system = new dev.jasper.app.settingsui.CorePages.SystemActions(() -> configuration.state().file(),
                 this::openConfigFile, this::revealConfigFile, () -> configuration.reload(), this::migrateConfiguration,
-                configuration::migrationAvailable);
+                configuration::migrationAvailable, Optional.of(vmOptions.hooks()), Optional.of(commandLine));
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
-            var themeChoices = new dev.jasper.app.settingsui.ThemeChoices(() -> themeCatalog.latest().names(), context -> {
-                var imports = new dev.jasper.app.themesui.ThemeImport(context, configuration.state().file().toAbsolutePath().getParent(), auxiliary,
-                    () -> configuration.reload().thenApply(ignored -> null),
-                    java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
-                        var thread = new Thread(runnable, "jasper-theme-import"); thread.setDaemon(true); return thread;
-                    }));
-                return new dev.jasper.app.settingsui.ThemeChoices.Import(imports::start, imports::close);
-            });
+            // ThemeFolder.prepare runs on the import worker (ThemeMenu.chooseAndImport), so the folder reads the session's
+            // fixed plugin tier, never ThemeController.library(), which requires the EDT.
+            var pluginThemes = dev.jasper.app.appearance.ThemeLibrary.of(selection.themes());
+            Optional<dev.jasper.app.settingsui.ThemeImports> imports = themesFolder == null ? Optional.empty()
+                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder, () -> pluginThemes),
+                    surface -> surface == null ? Optional.empty() : this.shells.chooseFile(surface, "Import Theme", ".json"),
+                    this::confirmOver, this::informOver, configuration::save, configuration::reload));
+            var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
-                dev.jasper.app.settingsui.CorePages.pages(themeChoices, system, shells, new dev.jasper.app.settingsui.CorePages.Pages(
+                dev.jasper.app.settingsui.CorePages.pages(appearanceChoices, system, shells,
+                    new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName, plugins == null ? Map.of() : plugins.pluginIcons())),
+                    new dev.jasper.app.settingsui.CorePages.Pages(
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
                         context -> plugins.settingsPages(context))),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
-                    this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));
+                    this::openConfigFile, this::migrateConfiguration, this::browse, (parent, count) -> settings.askDiscard(parent, count),
+                    () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+                    presentation.projections().settings(), presentation.projections().composition()));
             configuration.settingsOpener((owner, page) -> openSettings(owner.id(), page));
+            // Never on the start-up path: the font families are read once the first output shows or the warm-up ends.
+            trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, Runnable::run, dev.jasper.app.settingsui.SettingsDialog::prepareFonts);
+            trace.when(StartupTrace.Milestone.WARMED_UP, Runnable::run, dev.jasper.app.settingsui.SettingsDialog::prepareFonts);
         }
         boolean[] replayed = new boolean[1];
         // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.
@@ -842,12 +1136,73 @@ public final class JasperApplication {
             }));
         }
 
-        /** Opens Settings over the given window, or the active one when null, at a page (the last visited when null). */
+        /**
+         * Puts the jasper command on PATH off the EDT. Another program of that name is replaced only after Settings asks;
+         * from the palette, Settings opens instead so the question has a place. EDT.
+         */
+        private void installCommand(boolean fromSettings) {
+            CommandInstall install = commandInstall;
+            if (install == null || !install.available()) return;
+            CommandInstall.State state = install.state();
+            boolean replace = false;
+            if (state.kind() == CommandInstall.Kind.OTHER_PROGRAM) {
+                if (!fromSettings || settings == null) {
+                    openSettings(null, "system");
+                    return;
+                }
+                if (!settings.confirm("Replace the jasper Command?", state.text() + ". Replace it with Jasper's command?", "Replace")) return;
+                replace = true;
+            }
+            boolean replacing = replace;
+            commandWork(() -> install.install(replacing), "Installed the jasper Command",
+                () -> install.state().text() + install.hint(System.getenv().getOrDefault("PATH", "")).map(hint -> ". " + hint).orElse(""),
+                "Could not install the jasper Command");
+        }
+
+        /** Takes the jasper command off PATH, if Jasper put it there, off the EDT; otherwise says it did not. EDT. */
+        private void uninstallCommand() {
+            CommandInstall install = commandInstall;
+            if (install == null || !install.available()) return;
+            CommandInstall.State state = install.state();
+            if (state.kind() != CommandInstall.Kind.INSTALLED) {
+                notificationViews.info("The jasper Command is not installed by Jasper", state.text());
+                return;
+            }
+            commandWork(install::uninstall, "Removed the jasper Command", () -> "jasper is no longer on your PATH.",
+                "Could not remove the jasper Command");
+        }
+
+        private interface CommandWork { void run() throws java.io.IOException; }
+
+        private void commandWork(CommandWork work, String done, Supplier<String> details, String failed) {
+            CompletableFuture.runAsync(() -> {
+                try { work.run(); }
+                catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+            }, task -> Thread.ofPlatform().daemon().name("jasper-command-install").start(task)).whenComplete((ignored, failure) -> {
+                Throwable cause = failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure;
+                if (cause instanceof java.io.UncheckedIOException unchecked) cause = unchecked.getCause();
+                Throwable problem = cause;
+                String text = problem == null ? details.get() : null;
+                SwingUtilities.invokeLater(() -> {
+                    if (problem == null) notificationViews.info(done, text);
+                    else if (problem instanceof CommandInstall.Declined) notificationViews.info(failed, "The administrator prompt was cancelled; nothing changed.");
+                    else notificationViews.error(failed, problem.getMessage());
+                    if (settings != null) settings.refreshPages();
+                });
+            });
+        }
+
+        /**
+         * Opens Settings over the given window, or the active one when null, at a page (the last visited when null). The
+         * dialog is modal, so the first call returns once it closed; then a pending VM-options restart is repeated.
+         */
         void openSettings(java.util.UUID ownerOrNull, String pageOrNull) {
             if (settings == null || quitting || stopped) return;
             java.util.UUID owner = ownerOrNull != null ? ownerOrNull
                 : lastActive != null && windows.contains(lastActive) ? lastActive.content().id() : null;
+            boolean opening = !settings.isOpen();
             settings.open(owner, pageOrNull);
+            if (opening && !settings.isOpen() && vmOptions != null && !quitting && !stopped) vmOptions.settingsClosed();
         }
 
         private void openConfigFile() {
@@ -902,9 +1257,45 @@ public final class JasperApplication {
         return jasperWindowActive ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
     }
 
-    /** An uncaught failure, after the default handler logged it: an incident (spec section 7, producer 6). Any thread. */
+    /**
+     * An uncaught failure, after the default handler logged it: an incident (spec section 7, producer 6), and the
+     * low-memory warning when it is an {@code OutOfMemoryError} (spec section 5.4). Any thread.
+     */
     public void unexpected(Thread thread, Throwable failure) {
+        MemoryWarnings warnings = memoryWarnings;
+        if (warnings != null && MemoryWarnings.isOutOfMemory(failure)) warnings.outOfMemory();
         incidentNotices.jasperFailure(thread == null ? "an unknown thread" : "thread " + thread.getName(), failure);
+    }
+
+    /** {@code notifications.groups}, live: each listed group's mode replaces its default from the next post on. */
+    private void applyGroupModes(dev.jasper.app.config.ConfigService.State state) {
+        notificationCenter.useModes(groupModes(state.values().get(dev.jasper.app.config.CoreSettings.NOTIFICATIONS_GROUPS)));
+    }
+
+    /** {@code window.memory_indicator}, live; the indicator shows only where the status bar does. */
+    private void showMemoryIndicator(dev.jasper.app.config.ConfigService.State state) {
+        memoryIndicator.show(state.values().get(dev.jasper.app.config.CoreSettings.WINDOW_MEMORY_INDICATOR)
+            && state.values().get(dev.jasper.app.config.CoreSettings.WINDOW_STATUS_BAR));
+    }
+
+    /** The configured modes the center understands; the reader has already left out anything else. */
+    static Map<String, dev.jasper.app.notifications.DisplayMode> groupModes(Map<String, String> configured) {
+        var modes = new LinkedHashMap<String, dev.jasper.app.notifications.DisplayMode>();
+        configured.forEach((id, token) -> dev.jasper.app.notifications.DisplayMode.parse(token).ifPresent(mode -> modes.put(id, mode)));
+        return modes;
+    }
+
+    /** What Settings › Notifications lists: every group declared so far, with who declared it as people know them. */
+    static List<dev.jasper.app.settingsui.NotificationGroupChoices.Group> groupChoices(
+            List<dev.jasper.app.notifications.NotificationGroup> groups, java.util.function.Function<String, String> pluginName) {
+        return groupChoices(groups,pluginName,Map.of());
+    }
+    static List<dev.jasper.app.settingsui.NotificationGroupChoices.Group> groupChoices(
+            List<dev.jasper.app.notifications.NotificationGroup> groups, java.util.function.Function<String,String> pluginName,
+            Map<String,PluginRuntime.PluginIcon> artwork) {
+        return groups.stream().map(group -> new dev.jasper.app.settingsui.NotificationGroupChoices.Group(group.id(), group.name(),
+            group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "Jasper" : pluginName.apply(group.owner()),
+            group.defaultMode().token(), group.owner(), group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "appearance" : "plugin", Optional.ofNullable(artwork.get(group.owner())).map(PluginRuntime.PluginIcon::artwork), Optional.ofNullable(artwork.get(group.owner())).map(icon -> icon.identityArtwork().tileHue()).orElse(dev.jasper.ui.model.Nodes.Hue.NEUTRAL), Optional.ofNullable(artwork.get(group.owner())).map(icon -> icon.identityArtwork().selectedInk()).orElse(dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED))).toList();
     }
 
     private String pluginName(String id) {
@@ -927,12 +1318,27 @@ public final class JasperApplication {
         if (errorsWindow != null && !quitting && !stopped) errorsWindow.show(Optional.of(incident));
     }
 
+    /** Jasper › About Jasper on macOS: the About window, once the auxiliary windows exist. */
+    private void showAbout() {
+        if (aboutWindows != null && !quitting && !stopped) aboutWindows.showAbout();
+    }
+
     private void copyReport(String text) {
         try {
-            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
-                .setContents(new java.awt.datatransfer.StringSelection(text), null);
+            clipboard.copy(text);
         } catch (RuntimeException failure) {
             notificationViews.error("Could not copy the report", failure.getMessage());
+        }
+    }
+
+    /** About's Copy; false (after saying so) when the clipboard refused. */
+    private boolean copyBuildInformation(String text) {
+        try {
+            clipboard.copy(text);
+            return true;
+        } catch (RuntimeException failure) {
+            notificationViews.error("Could not copy the build information", failure.getMessage());
+            return false;
         }
     }
 
@@ -953,14 +1359,23 @@ public final class JasperApplication {
         target.content().showConfigurationDetails();
     }
 
-    /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */
-    List<KeyBindings.Problem> bindingProblems() {
-        boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
+    private boolean macOs() { return configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs(); }
+
+    /** The keymap every window resolves right now: the saved shortcuts with the contributed actions' defaults. */
+    KeyBindings.Resolved resolvedBindings() {
         ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
         List<KeyBindings.Extension> extensions = new ArrayList<>();
         for (ActionEntry action : contributions.actions())
             if (KeyBindings.extensionId(action.id())) extensions.add(action.extension());
-        return snapshot.bindings(macOs).withExtensions(extensions).problems();
+        return snapshot.bindings(macOs()).withExtensions(extensions);
+    }
+
+    /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */
+    List<KeyBindings.Problem> bindingProblems() { return resolvedBindings().problems(); }
+
+    /** A menu's text for {@code actionId}'s current binding in the platform's glyphs; "" when it is unbound or unknown. */
+    String shortcutLabel(String actionId) {
+        return KeyBindings.display(resolvedBindings().bindings().strokeFor(actionId).orElse(null), macOs());
     }
 
     /** A user's binding for an unknown action is theirs to fix; a plugin's losing default is only worth a log line. */
@@ -986,6 +1401,13 @@ public final class JasperApplication {
             () -> false, message -> LOG.log(System.Logger.Level.WARNING, message));
     }
 
+    static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
+                                        BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
+                                        BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
+                                        BooleanSupplier awaitDetection, Consumer<String> problems) {
+        return windowLauncher(executor, snapshots, start, integrationDir, profiles, awaitDetection, problems, pane -> Map.of());
+    }
+
     /**
      * Each request's profile is resolved on the EDT by {@code profiles}, from the requested id (empty: the configured
      * default) and the saved shell settings; {@code problems} hears, on the EDT, why a profile was replaced.
@@ -1000,7 +1422,23 @@ public final class JasperApplication {
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
                                         BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
                                         BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
-                                        BooleanSupplier awaitDetection, Consumer<String> problems) {
+                                        BooleanSupplier awaitDetection, Consumer<String> problems,
+                                        Function<UUID, Map<String, String>> paneVariables) {
+        return windowLauncher(executor, snapshots, start, integrationDir, profiles, awaitDetection, problems, paneVariables,
+            inherited -> Map.of());
+    }
+
+    /**
+     * As above; a local shell also gets what plugins add ({@code contributions}, given Jasper's own environment, on the
+     * EDT) after Jasper's own variables and before {@code [terminal.env]}. A PowerShell 7 launch confirmed after
+     * detection resolves again, so its contributions are asked twice.
+     */
+    static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
+                                        BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
+                                        BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
+                                        BooleanSupplier awaitDetection, Consumer<String> problems,
+                                        Function<UUID, Map<String, String>> paneVariables,
+                                        Function<Map<String, String>, Map<String, String>> contributions) {
         ConfigSnapshot initial = snapshots.get();
         String os = System.getProperty("os.name");
         Map<String, String> environment = System.getenv();
@@ -1008,7 +1446,8 @@ public final class JasperApplication {
             ConfigSnapshot snapshot = snapshots.get();
             ShellProfiles.Resolution resolution = profiles.apply(requested, snapshot.terminal().shell());
             resolution.warning().ifPresent(problems);
-            return LaunchSettings.resolve(snapshot, resolution.profile(), os, environment, initial.columns(), initial.lines(), integrationDir);
+            return LaunchSettings.resolve(snapshot, resolution.profile(), os, environment, initial.columns(), initial.lines(), integrationDir,
+                contributions);
         };
         BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm = (requested, captured) -> {
             ShellProfile profile = captured.profile();
@@ -1028,7 +1467,7 @@ public final class JasperApplication {
         return new ShellLauncher(executor, settings, confirm, () -> {
             ConfigSnapshot snapshot = snapshots.get();
             return new ShellLauncher.SessionDefaults(initial.columns(), initial.lines(), snapshot.terminal().scrollback());
-        }, start);
+        }, start, paneVariables);
     }
 
     /**
@@ -1051,12 +1490,17 @@ public final class JasperApplication {
 
     private static TerminalSession startSession(Path directory, LaunchSettings settings) {
         try {
-            return TerminalSession.start(SessionLaunchOptions.builder().command(settings.command()).environment(settings.environment()).workingDirectory(directory).grid(new GridSize(settings.columns(), settings.lines())).scrollback(settings.scrollback())
-                .localHostNames(dev.jasper.app.launch.LocalHostNames.cached()).localPathMapper(settings.localPaths()).build());
+            return TerminalSession.start(sessionOptions(directory, settings));
         } catch (IOException failure) {
             LOG.log(System.Logger.Level.ERROR, "Shell launch failed", failure);
             throw new UncheckedIOException(failure);
         }
+    }
+
+    /** The session a shell starts as; on Windows it ignores a reported directory on another host ({@link LaunchSettings#localPaths}). */
+    static SessionLaunchOptions sessionOptions(Path directory, LaunchSettings settings) {
+        return SessionLaunchOptions.builder().command(settings.command()).environment(settings.environment()).workingDirectory(directory).grid(new GridSize(settings.columns(), settings.lines())).scrollback(settings.scrollback())
+            .localHostNames(dev.jasper.app.launch.LocalHostNames.cached()).localPathMapper(settings.localPaths(WINDOWS)).build();
     }
 
     /** Marks the first spawn and watches the session's first output from right after its start. Any thread. */
@@ -1111,6 +1555,7 @@ public final class JasperApplication {
      */
     private void forget(TerminalWindow window) {
         windows.remove(window);
+        memoryIndicator.windows(windows.size());
         if (window != null) notificationViews.detach(window.content()); // tests close "the last window" with null
         buddy.removeWindow(window);
         if (lastActive == window) lastActive = null;
@@ -1125,6 +1570,8 @@ public final class JasperApplication {
         boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
         if (windows.isEmpty() && !resident && !pluginWindowsOpen) requestShutdown();
         else {
+            // The next terminal window's timing says how long this process sat without one.
+            if (windows.isEmpty()) trace.windowsClosed();
             updateBuddyActions();
             updateDock();
         }
@@ -1161,7 +1608,6 @@ public final class JasperApplication {
             : windows.isEmpty() ? null : windows.iterator().next();
         if (target != null) target.toFront();
     }
-
     /**
      * Brings a terminal window to the front for a click on an OS notification: the notification's own window while it
      * is open, else the one used last, and with none open a new one. Names the window; empty while Jasper quits.
@@ -1267,6 +1713,34 @@ public final class JasperApplication {
 
     Incidents incidents() { return incidents; }
 
+    /** Asks {@code question} with a kit sheet over {@code surface}, the Settings dialog; its yes runs at most once. */
+    /** A notice sheet over the Settings dialog's {@code surface}; nothing while that dialog is closed. */
+    private void informOver(dev.jasper.app.windows.AuxiliarySurface surface, dev.jasper.app.settingsui.ThemeImports.Notice notice) {
+        if (surface == null || auxiliary == null) return;
+        var dialog = auxiliary.dialog(notice.title(), true, surface);
+        var view = dev.jasper.app.pluginmanager.ConfirmView.notice(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+            notice.title(), notice.message(), dialog::close);
+        dialog.onClosed(view::close);
+        dialog.setContent(view.view());
+        dialog.show();
+    }
+
+    private void confirmOver(dev.jasper.app.windows.AuxiliarySurface surface, dev.jasper.app.settingsui.ThemeImports.Question question) {
+        if (surface == null || auxiliary == null) return;
+        var dialog = auxiliary.dialog(question.title(), true, surface);
+        boolean[] answered = {false};
+        var view = new dev.jasper.app.pluginmanager.ConfirmView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+            question.question(), question.consequence(), question.yes(), () -> {
+                if (answered[0]) return;
+                answered[0] = true;
+                dialog.close();
+                question.onYes().run();
+            }, dialog::close);
+        dialog.onClosed(view::close);
+        dialog.setContent(view.view());
+        dialog.show();
+    }
+
     /** The Plugins page's controller, created the first time Settings builds that page. */
     private PluginManager pluginManager() {
         if (pluginManager == null) {
@@ -1277,7 +1751,7 @@ public final class JasperApplication {
             var editor = new dev.jasper.app.platform.ConfigEditor();
             pluginManager = new PluginManager(plugins, auxiliary, new PluginManager.Hooks(
                 surface -> shells.chooseFile(surface, "Install Plugin", ".zip"), flow, this::quit, residentControl, standaloneNotice, worker,
-                editor::open, editor::reveal, this::browse));
+                this::openForEditing, editor::reveal, this::browse));
         }
         return pluginManager;
     }
@@ -1409,6 +1883,7 @@ public final class JasperApplication {
 
     /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */
     public void quitNow() {
+        presentationAttempt().orderlyQuit();
         quitting = true;
         for (TerminalWindow window : List.copyOf(windows)) window.close();
         requestShutdown();
@@ -1435,7 +1910,14 @@ public final class JasperApplication {
         shellProfiles.close();
         // Application-owned state first, so none of it depends on plugins behaving.
         history.close();
+        release("the heap watch", () -> {
+            MemoryWarnings warnings = memoryWarnings;
+            if (warnings != null) warnings.close();
+        });
+        release("the memory indicator", memoryIndicator::close);
         List<CompletableFuture<?>> pluginWork = plugins == null ? List.of() : plugins.stop();
+        // Plugins cleared their own secrets as they stopped; this clears anything still pending.
+        clipboard.quit();
         // Plugins closed their own windows while stopping; this is the safety net, and the state's last write.
         if (auxiliary != null) auxiliary.close();
         uiState.save();
@@ -1443,6 +1925,9 @@ public final class JasperApplication {
         notifications.close();
         if (activityNotifier != null) activityNotifier.close();
         buddyAppearance.close();
+        systemAppearanceListening.run();
+        systemAppearance.close();
+        themes.close();
         buddy.close();
         incidentNotices.close();
         notificationViews.close();
@@ -1450,6 +1935,7 @@ public final class JasperApplication {
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
         if (preferencesHandlerInstalled) { Desktop.getDesktop().setPreferencesHandler(null); preferencesHandlerInstalled = false; }
+        if (aboutHandlerInstalled) { Desktop.getDesktop().setAboutHandler(null); aboutHandlerInstalled = false; }
         if (reopenListener != null) { Desktop.getDesktop().removeAppEventListener(reopenListener); reopenListener = null; }
         // Cross-process locks and socket probes must not hold up Swing or the exit deadline.
         List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());
@@ -1462,6 +1948,15 @@ public final class JasperApplication {
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
         pending.add(history.closedFuture());
         shutdown.await(pending);
+    }
+
+    /** Closes one child whose failure must not hold up the rest of the shutdown. */
+    private static void release(String what, Runnable close) {
+        try {
+            close.run();
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not close " + what, failure);
+        }
     }
 
     private static CompletableFuture<Void> processCleanup(Runnable action) {
