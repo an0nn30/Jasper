@@ -283,6 +283,26 @@ class EditorWindowTest {
         a.close(); old.run().run(); assertThat(window.selected()).containsSame(second);
     }
 
+    @Test void replaceAndGoToLineRevealSourceWithoutSavingModePreferences() throws Exception {
+        var tab=opened(file("reveal.md", "# One\n\n# Two\n"));
+        var writes=new ArrayList<dev.jasper.editor.markdown.MarkdownMode>();
+        var preferences=new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.PREVIEW, mode -> {writes.add(mode);return CompletableFuture.completedFuture(null);});
+        tab.markdownPreferences(preferences);
+        tab.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW,false);
+        var handle=host.contentTabs().getLast();
+        host.contentCommands(handle).stream().filter(command -> command.id().equals("replace")).findFirst().orElseThrow().run().run();
+        assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        assertThat(tab.focusedContent()).isSameAs(tab.area());
+        Kits.type(tab.view(),FindBar.FIND,"One");Kits.type(tab.view(),FindBar.REPLACE,"Changed");Kits.press(tab.view(),FindBar.ALL);
+        assertThat(tab.area().getText()).contains("Changed");
+        Kits.press(tab.view(),FindBar.CLOSE);
+        tab.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW,false);
+        window.goToLine();
+        assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        Kits.escape(host.windowView("dev.jasper.editor","Go to Line").orElseThrow());
+        assertThat(writes).isEmpty();assertThat(preferences.current()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
+    }
+
     @Test void openingAFileThatIsStillLoadingSelectsItsTab() throws Exception {
         Path file = file("config.toml", "a = 1\n");
         window.openLocal(file);

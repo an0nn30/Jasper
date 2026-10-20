@@ -174,6 +174,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        area.putClientProperty("jasper.editor.closed", Boolean.TRUE);
         scrollLink.close();
         preview.close();
         removeHierarchyListener(hierarchy);

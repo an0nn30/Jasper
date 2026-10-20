@@ -36,6 +36,11 @@ final class PreviewPane implements AutoCloseable {
     private PreviewKit kit;
     private long generation;
     private boolean closed;
+    private final List<Runnable> installedListeners = new ArrayList<>();
+    boolean closed() { return closed; }
+    void onInstalled(Runnable listener) { installedListeners.add(listener); }
+    void removeInstalled(Runnable listener) { installedListeners.remove(listener); }
+
     private WorkspacePalette palette;
     private TerminalTypography typography;
     private SyntaxPalette syntax;
@@ -48,11 +53,52 @@ final class PreviewPane implements AutoCloseable {
         editor.addComponentListener(new java.awt.event.ComponentAdapter(){
             @Override public void componentResized(java.awt.event.ComponentEvent event){if(!closed){if(kit!=null)kit.imagesChanged();geometryChanged.run();}}
         });
+        editor.setFocusTraversalKeysEnabled(false);
+        bind("TAB", "preview.next-link", () -> nextLink(true));
+        bind("shift TAB", "preview.previous-link", () -> nextLink(false));
+        bind("ENTER", "preview.activate-link", this::activateSelectedLink);
         editor.addHyperlinkListener(event -> {
-            if(event.getEventType()!=HyperlinkEvent.EventType.ACTIVATED || installed==null)return;
-            int id=resourceId(event.getDescription(),"jasper-link:");
-            if(installed.links().stream().anyMatch(link -> link.id()==id))this.activateLink.accept(id);
+            if(event.getEventType()==HyperlinkEvent.EventType.ACTIVATED) activate(event.getDescription());
         });
+    }
+    private void bind(String stroke, String id, Runnable action) {
+        editor.getInputMap().put(KeyStroke.getKeyStroke(stroke), id);
+        editor.getActionMap().put(id, new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) { action.run(); }
+        });
+    }
+    private void activate(String description) {
+        if (closed || installed == null) return;
+        int id = resourceId(description, "jasper-link:");
+        if (installed.links().stream().anyMatch(link -> link.id() == id)) activateLink.accept(id);
+    }
+    private List<Element> linkElements() {
+        var found = new ArrayList<Element>();
+        if (!(editor.getDocument() instanceof HTMLDocument document)) return found;
+        var iterator = new ElementIterator(document);
+        for (Element e=iterator.first();e!=null;e=iterator.next())
+            if (e.isLeaf() && e.getAttributes().getAttribute(HTML.Tag.A) instanceof AttributeSet attrs
+                && resourceId((String)attrs.getAttribute(HTML.Attribute.HREF), "jasper-link:") >= 0) found.add(e);
+        return found;
+    }
+    void nextLink(boolean forward) {
+        var links = linkElements();
+        if (links.isEmpty()) return;
+        Element selected = null;
+        if (forward) {
+            for (var e : links) if (e.getStartOffset() >= editor.getSelectionEnd()) { selected=e;break; }
+            if (selected == null) selected=links.getFirst();
+        } else {
+            for (var e : links) if (e.getEndOffset() <= editor.getSelectionStart()) selected=e;
+            if (selected == null) selected=links.getLast();
+        }
+        editor.select(selected.getStartOffset(),Math.min(editor.getDocument().getLength(),selected.getEndOffset()));
+    }
+    void activateSelectedLink() {
+        for (var e : linkElements()) if (editor.getSelectionStart() >= e.getStartOffset() && editor.getSelectionStart() < e.getEndOffset()) {
+            var attrs=(AttributeSet)e.getAttributes().getAttribute(HTML.Tag.A);
+            activate((String)attrs.getAttribute(HTML.Attribute.HREF));return;
+        }
     }
     JEditorPane editor() { return editor; }
     OptionalInt anchor(String name) { edt();Integer offset=anchors.get(name);return offset==null?OptionalInt.empty():OptionalInt.of(offset); }
@@ -184,6 +230,7 @@ final class PreviewPane implements AutoCloseable {
                 editor.setForeground(palette.text());editor.setSelectionColor(palette.selection());editor.setSelectedTextColor(palette.selectionText());editor.setCaretColor(palette.text());
                 editor.setFont(nextFont);anchors=nextAnchors;
                 editor.setCaretPosition(0);editor.revalidate();editor.repaint();
+                List.copyOf(installedListeners).forEach(Runnable::run);
             } catch(BadLocationException | RuntimeException failure){
                 if(closed || token!=generation)return;
                 pending=null;pendingStyle=null;installFailure=failure instanceof RuntimeException runtime?runtime:new IllegalStateException("Could not install prepared Markdown",failure);
@@ -224,7 +271,7 @@ final class PreviewPane implements AutoCloseable {
         try {int value=Integer.parseInt(text.substring(prefix.length()));return value<0?-1:value;}catch(NumberFormatException e){return -1;}
     }
     private static void edt(){if(!SwingUtilities.isEventDispatchThread())throw new IllegalStateException("Preview requires EDT");}
-    @Override public void close(){edt();if(closed)return;cancelInstall();closed=true;imageNotificationGeneration++;changedImages.clear();imageIds=Set.of();images.clear();imageReasons.clear();anchors=Map.of();installed=null;kit=null;editor.setEditorKit(new DefaultEditorKit());}
+    @Override public void close(){edt();if(closed)return;cancelInstall();closed=true;installedListeners.clear();imageNotificationGeneration++;changedImages.clear();imageIds=Set.of();images.clear();imageReasons.clear();anchors=Map.of();installed=null;kit=null;editor.setEditorKit(new DefaultEditorKit());}
     private final class Surface extends JEditorPane {
         @Override public boolean getScrollableTracksViewportWidth(){return getParent() instanceof JViewport view && getMinimumSize().width<=view.getWidth();}
         @Override protected void paintComponent(Graphics graphics) {

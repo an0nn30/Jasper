@@ -8,10 +8,50 @@ import static org.assertj.core.api.Assertions.assertThat;
 @org.junit.jupiter.api.extension.ExtendWith(dev.jasper.editor.testsupport.EdtTests.class)
 class FindBarTest {
     private final RSyntaxTextArea area = new RSyntaxTextArea("foo bar Foo foo\n");
-    private final FindBar bar = new FindBar(() -> Optional.of(area), () -> { }, id -> { });
+    private final FindBar bar = new FindBar(() -> Optional.of(new FindTarget.Source(area)), () -> { }, id -> { });
 
     private void type(String id, String text) { bar.event(new dev.jasper.sdk.ui.UiEvent.Edited(id, text)); }
     private void press(String id) { bar.event(new dev.jasper.sdk.ui.UiEvent.Action(id)); }
+
+    @Test void targetIsCapturedUntilClosedEvenWhenTheSupplierChanges() {
+        var other = new RSyntaxTextArea("other");
+        var current = new java.util.concurrent.atomic.AtomicReference<FindTarget>(new FindTarget.Source(area));
+        var stable = new FindBar(() -> Optional.of(current.get()), () -> {}, id -> {});
+        stable.open(false);
+        current.set(new FindTarget.Source(other));
+        stable.event(new dev.jasper.sdk.ui.UiEvent.Edited(FindBar.FIND, "foo"));
+        assertThat(stable.status()).isEqualTo("3 matches");
+        stable.next();
+        assertThat(area.getSelectedText()).isEqualTo("foo");
+        stable.close();
+        stable.open(false);
+        stable.event(new dev.jasper.sdk.ui.UiEvent.Edited(FindBar.FIND, "other"));
+        assertThat(stable.status()).isEqualTo("1 match");
+    }
+
+    @Test void closeRestoresCapturedContentEvenWhenTheSupplierNowNamesAnotherPane() {
+        class FocusArea extends RSyntaxTextArea {
+            int focused;
+            @Override public boolean requestFocusInWindow() { focused++;return true; }
+        }
+        var original=new FocusArea();var other=new FocusArea();
+        var current=new java.util.concurrent.atomic.AtomicReference<FindTarget>(new FindTarget.Source(original));
+        var stable=new FindBar(() -> Optional.of(current.get()), () -> {}, id -> {});
+        stable.open(false);current.set(new FindTarget.Source(other));stable.close();
+        assertThat(original.focused).isEqualTo(1);assertThat(other.focused).isZero();
+    }
+
+    @Test void closedCapturedTargetRestoresTheCurrentValidContentSafely() {
+        class FocusArea extends RSyntaxTextArea {
+            int focused;
+            @Override public boolean requestFocusInWindow() { focused++;return true; }
+        }
+        var original=new FocusArea();var fallback=new FocusArea();
+        var current=new java.util.concurrent.atomic.AtomicReference<FindTarget>(new FindTarget.Source(original));
+        var stable=new FindBar(() -> Optional.of(current.get()), () -> {}, id -> {});
+        stable.open(false);original.putClientProperty("jasper.editor.closed",true);current.set(new FindTarget.Source(fallback));
+        stable.close();assertThat(original.focused).isZero();assertThat(fallback.focused).isEqualTo(1);
+    }
 
     @Test void countsMatchesAndHonoursTheToggles() {
         assertThat(bar.isVisible()).isFalse();

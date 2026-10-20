@@ -36,6 +36,17 @@ public final class EditorTab {
         @Override public void changedUpdate(DocumentEvent event) { }
     };
     private boolean replacing, closed, focusPending;
+    private String navigationNotice = "";
+    private Runnable noticeChanged = () -> {};
+    boolean closed() { return closed; }
+    Optional<String> navigationNotice() { return navigationNotice.isEmpty() ? Optional.empty() : Optional.of(navigationNotice); }
+    void navigationNotice(String value) { navigationNotice = value; noticeChanged.run(); }
+    void noticeChanged(Runnable value) { noticeChanged = value; }
+    Optional<FindTarget> findTarget() {
+        if (closed || !showingText()) return Optional.empty();
+        return Optional.of(focusedContent() == area() ? new FindTarget.Source(area()) : new FindTarget.Preview(document.preview()));
+    }
+
     private Runnable focusArea = () -> area().requestFocusInWindow();
     private VimEditor vim;
     private final VimBar vimBar = new VimBar(this::render, this::reveal);

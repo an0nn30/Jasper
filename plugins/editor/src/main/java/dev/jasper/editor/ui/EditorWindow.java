@@ -69,6 +69,7 @@ public final class EditorWindow {
     private final Function<Question, String> ask;
     private final BiFunction<String, CompletableFuture<Boolean>, Boolean> await;
     private final FindBar findBar;
+    private final MarkdownNavigation navigation;
     private final StatusLine status;
     private final List<Command> commands;
     private final LocalWatcher watcher;
@@ -158,7 +159,8 @@ public final class EditorWindow {
         serverIcon = "server";
         ask = question -> environment.askers().apply(owner()).apply(question);
         await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
-        findBar = new FindBar(() -> selected().map(EditorTab::area), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }));
+        navigation = new MarkdownNavigation(this, context.platform()::browse);
+        findBar = new FindBar(() -> selected().flatMap(EditorTab::findTarget), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }));
         status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim);
         commands = List.of(
             command("save", "Save", KeyEvent.VK_S, 0, this::save),
@@ -184,7 +186,7 @@ public final class EditorWindow {
         vim = new Vim(new VimHost(SystemClipboard::read, SystemClipboard::write, documents(), actions()));
         watcher = new LocalWatcher(context.background(), environment.ui(), model::sessions);
         ticker = new Timer(2000, event -> watcher.tick());
-        noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> tab.session().clearNotice()));
+        noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> {tab.navigationNotice("");tab.session().clearNotice();}));
         noticeTimer.setRepeats(false);
         closeRegistration = context.windows().onTabsClosing((handles, batch) -> {
             var closing = hosted.entrySet().stream().filter(e -> handles.contains(e.getValue())).map(java.util.Map.Entry::getKey).toList();
@@ -211,6 +213,12 @@ public final class EditorWindow {
         });
         if (existing.isPresent() && session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
         select(session);
+    }
+
+    EditorTab openLinked(EditorTab originTab, EditorDocument document) {
+        open(document, hosted.get(originTab));
+        var session = model.find(document.key()).orElseThrow();
+        return hosted.keySet().stream().filter(tab -> tab.session() == session).findFirst().orElseThrow();
     }
 
     /** Reports a new tab's document the first time it becomes ready: a failed read reports nothing, a successful retry does. */
@@ -782,6 +790,14 @@ public final class EditorWindow {
             if (!disposed) context.notifications().group().error("Could not save the Markdown default view", failed);
         }));
         tab.modeChanged(() -> activate(tab));
+        tab.noticeChanged(this::refreshStatus);
+        tab.surface().previewCallbacks(id -> {
+            // Resolve IDs only against the currently installed, generation-validated controller result.
+            if (tab.markdown() == null || tab.closed()) return;
+            tab.markdown().currentResult().stream().flatMap(result -> result.links().stream())
+                .filter(link -> link.id() == id).findFirst()
+                .ifPresent(link -> navigation.follow(tab, dev.jasper.editor.markdown.resources.Destinations.parse(link.destination())));
+        }, () -> {});
         tab.appearance(context.appearance());
         tab.settings(settings);
         tab.typography(environment.typography());
@@ -894,7 +910,7 @@ public final class EditorWindow {
                     activate(tab); item.run().run();
                 })).toList());
         }
-        if (environment.timers() && selected().flatMap(tab -> tab.session().notice()).isPresent()) noticeTimer.restart();
+        if (environment.timers() && selected().flatMap(tab -> tab.navigationNotice().or(() -> tab.session().notice())).isPresent()) noticeTimer.restart();
     }
 
     private static Command command(String id, String title, int keyCode, int extraModifiers, Runnable run) {

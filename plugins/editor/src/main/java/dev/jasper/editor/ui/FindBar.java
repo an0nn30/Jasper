@@ -10,32 +10,54 @@ import java.util.regex.PatternSyntaxException;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rtextarea.SearchContext;
 import org.fife.ui.rtextarea.SearchEngine;
-import org.fife.ui.rtextarea.SearchResult;
 
 /** Shared find/replace model. The active document tab renders its descriptor subtree. */
 public final class FindBar {
     static final String ROOT="find.bar", FIND="find.query", REPLACE="find.replacement", CASE="find.case", WORD="find.word", REGEX="find.regex";
     static final String NEXT="find.next", PREVIOUS="find.previous", ONE="find.one", ALL="find.all", CLOSE="find.close";
     static final String ROW="find.row", REPLACE_ROW="find.replace.row", STATUS="find.status";
-    private final Supplier<Optional<RSyntaxTextArea>> target;
+    private final Supplier<Optional<FindTarget>> target;
     private final Runnable changed;
     private final Consumer<String> focus;
+    private FindTarget captured;
+    private PreviewSearch previewSearch;
+    private final Runnable previewChanged = this::update;
     private String find="", replace="", status="";
     private boolean matchCase, wholeWord, regex, visible, withReplace;
 
-    public FindBar(Supplier<Optional<RSyntaxTextArea>> target, Runnable changed, Consumer<String> focus) {
+    public FindBar(Supplier<Optional<FindTarget>> target, Runnable changed, Consumer<String> focus) {
         this.target=target; this.changed=changed; this.focus=focus;
     }
     public void open(boolean withReplace) {
-        target.get().ifPresent(area -> {
-            String selected=area.getSelectedText();
+        detachPreview();
+        captured = target.get().filter(FindTarget::available).orElse(null);
+        if (captured instanceof FindTarget.Preview preview) {
+            previewSearch = new PreviewSearch(preview.pane());
+            preview.pane().onInstalled(previewChanged);
+        }
+        if (captured != null) {
+            String selected=captured.content().getSelectedText();
             if (selected!=null && !selected.isEmpty() && !selected.contains("\n")) find=selected;
-        });
+        }
         this.withReplace=withReplace; visible=true; update(); focus.accept(FIND);
     }
     public void close() {
-        visible=false; changed.run();
-        target.get().ifPresent(area -> { area.clearMarkAllHighlights(); area.requestFocusInWindow(); });
+        var restore = activeTarget();
+        visible=false;
+        restore.ifPresent(value -> { if (value instanceof FindTarget.Source source) source.area().clearMarkAllHighlights(); });
+        detachPreview(); captured=null; changed.run();
+        restore.or(() -> target.get().filter(FindTarget::available)).ifPresent(value -> value.content().requestFocusInWindow());
+    }
+    private void detachPreview() {
+        if (captured instanceof FindTarget.Source source) source.area().clearMarkAllHighlights();
+        if (previewSearch != null) { previewSearch.clear(); previewSearch=null; }
+        if (captured instanceof FindTarget.Preview preview) preview.pane().removeInstalled(previewChanged);
+    }
+    private Optional<FindTarget> activeTarget() {
+        return (visible ? Optional.ofNullable(captured) : target.get()).filter(FindTarget::available);
+    }
+    private Optional<RSyntaxTextArea> source() {
+        return activeTarget().filter(FindTarget.Source.class::isInstance).map(value -> ((FindTarget.Source)value).area());
     }
     boolean isVisible() { return visible; }
     boolean replaceVisible() { return withReplace; }
@@ -85,7 +107,7 @@ public final class FindBar {
     public void previous() { search(false); }
 
     public void replaceOne() {
-        target.get().ifPresent(area -> guarded(() -> {
+        source().ifPresent(area -> guarded(() -> {
             SearchContext context = context(true);
             context.setReplaceWith(replace);
             if (SearchEngine.replace(area, context).wasFound()) update();
@@ -94,7 +116,7 @@ public final class FindBar {
     }
 
     public void replaceAll() {
-        target.get().ifPresent(area -> guarded(() -> {
+        source().ifPresent(area -> guarded(() -> {
             SearchContext context = context(true);
             context.setReplaceWith(replace);
             status("Replaced " + SearchEngine.replaceAll(area, context).getCount());
@@ -102,23 +124,32 @@ public final class FindBar {
     }
 
     private void update() {
-        Optional<RSyntaxTextArea> area = target.get();
-        if (area.isEmpty() || find.isEmpty()) {
-            area.ifPresent(RSyntaxTextArea::clearMarkAllHighlights);
-            status("");
-            return;
+        var value = activeTarget();
+        if (value.isEmpty() || find.isEmpty()) {
+            source().ifPresent(RSyntaxTextArea::clearMarkAllHighlights);
+            if (previewSearch != null) previewSearch.clear();
+            status(""); return;
         }
+        // Clear old ranges even when the new expression is invalid.
+        source().ifPresent(RSyntaxTextArea::clearMarkAllHighlights);
+        if (previewSearch != null) previewSearch.clear();
         guarded(() -> {
-            int count = SearchEngine.markAll(area.get(), context(true)).getMarkedCount();
+            int count = switch (value.get()) {
+                case FindTarget.Source source -> SearchEngine.markAll(source.area(), context(true)).getMarkedCount();
+                case FindTarget.Preview preview -> previewSearch.markAll(context(true));
+            };
             status(count == 0 ? "No matches" : count == 1 ? "1 match" : count + " matches");
         });
     }
 
     private void search(boolean forward) {
         if (find.isEmpty()) return;
-        target.get().ifPresent(area -> guarded(() -> {
-            SearchResult result = SearchEngine.find(area, context(forward));
-            if (!result.wasFound()) status("No matches");
+        activeTarget().ifPresent(value -> guarded(() -> {
+            boolean found = switch (value) {
+                case FindTarget.Source source -> SearchEngine.find(source.area(), context(forward)).wasFound();
+                case FindTarget.Preview preview -> (previewSearch != null ? previewSearch : new PreviewSearch(preview.pane())).find(context(forward));
+            };
+            if (!found) status("No matches");
         }));
     }
 

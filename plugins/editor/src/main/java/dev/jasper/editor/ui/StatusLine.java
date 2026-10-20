@@ -25,7 +25,7 @@ public final class StatusLine {
         ready=tab.isPresent()&&tab.get().session().state()==DocumentSession.State.READY;
         if(tab.isEmpty()){notice="";return;}
         var session=tab.get().session();var area=tab.get().area();
-        notice=session.saving()?"Saving…":session.notice().orElse("");
+        notice=session.saving()?"Saving…":tab.get().navigationNotice().or(() -> session.notice()).orElse("");
         if(!ready)return;
         int line=area.getCaretLineNumber(),start;
         try{start=area.getLineStartOffset(line);}catch(BadLocationException impossible){start=0;}
