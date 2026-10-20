@@ -262,11 +262,54 @@ class EditorPluginTest {
         }
     }
 
+    @Test void savedTerminalTypographyFollowsAcrossTabsWithoutSavingIndependentSettingsAndStopsOnShutdown() throws Exception {
+        try (var host = host()) {
+            var reads = new java.util.concurrent.atomic.AtomicInteger();
+            var plugin = new EditorPlugin(Runnable::run, (context, settings) -> new EditorEnvironment(context, Runnable::run,
+                owner -> Question::dismissed, owner -> (message, saves) -> saves.getNow(false),
+                () -> { reads.incrementAndGet(); return settings.current(); }, settings::saveVim, false));
+            host.setSetting("dev.jasper.editor", "font_size", 13.5);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            host.invoke("dev.jasper.editor.new", host.addTerminalWindow(), null);
+            var field = EditorPlugin.class.getDeclaredField("window"); field.setAccessible(true);
+            var window = (EditorWindow) field.get(plugin);
+            var first = window.selected().orElseThrow().area();
+            assertThat(first.getFont().getSize2D()).isEqualTo(13.5f);
+            var terminal = new dev.jasper.sdk.ui.TerminalTypography("DialogInput", 19.5, List.of("Dialog"), true, 1.6);
+            host.setTerminalTypography(terminal);
+            host.flush();
+            assertThat(first.getFont().getSize2D()).isEqualTo(13.5f);
+            host.setSetting("dev.jasper.editor", "follow_terminal_font", true);
+            host.invoke("dev.jasper.editor.new", host.addTerminalWindow(), null);
+            var second = window.selected().orElseThrow().area();
+            first.append("keep undo");
+            var document = first.getDocument();
+            assertThat(first.getFont().getSize2D()).isEqualTo(19.5f);
+            assertThat(second.getFont().getSize2D()).isEqualTo(19.5f);
+            var saved = host.savedSettings("dev.jasper.editor");
+            host.setTerminalTypography(new dev.jasper.sdk.ui.TerminalTypography("Dialog", 20.5, List.of(), false, 1.2));
+            host.flush();
+            assertThat(first.getFont().getSize2D()).isEqualTo(20.5f);
+            assertThat(second.getFont().getSize2D()).isEqualTo(20.5f);
+            assertThat(first.getDocument()).isSameAs(document);
+            assertThat(first.canUndo()).isTrue();
+            assertThat(host.savedSettings("dev.jasper.editor")).isEqualTo(saved);
+            host.setSetting("dev.jasper.editor", "follow_terminal_font", false);
+            assertThat(first.getFont().getSize2D()).isEqualTo(13.5f);
+            host.setSetting("dev.jasper.editor", "follow_terminal_font", true);
+            plugin.stop();
+            int before = reads.get();
+            host.setTerminalTypography(terminal);
+            host.flush();
+            assertThat(reads.get()).as("stop explicitly closes the font subscription").isEqualTo(before);
+        }
+    }
+
     @Test void badSettingsAreReportedAtStartAndOnEveryChange() {
         try (var host = host()) {
             host.setSetting("dev.jasper.editor", "font_size", 99L);
             host.start(INFO, Set.of(), Set.of(), plugin());
-            assertThat(host.settingsReports("dev.jasper.editor")).containsExactly("font_size: Use a whole number from 8\u201348.");
+            assertThat(host.settingsReports("dev.jasper.editor")).containsExactly("font_size: Use a number from 6\u201372.");
             host.setSetting("dev.jasper.editor", "tab_size", 0L);
             assertThat(host.settingsReports("dev.jasper.editor")).contains("tab_size: Use a whole number from 1\u201316.");
         }

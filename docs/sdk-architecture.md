@@ -432,6 +432,12 @@ and gutter colors from the workspace. SDK 0.12.0 adds `WorkspacePalette`, `Synta
 `onWorkspaceChanged` compares the complete workspace generated value, skips initial replay, contains handler failures,
 and removes registrations on disposal or stop. Chrome `variant` and `onChanged` retain their existing meaning.
 
+SDK 0.18.3 adds `Appearance.terminalTypography()` and `onTerminalTypographyChanged`: `HostedTypography` publishes
+an immutable saved-config value, readable on any thread, before EDT notifications. Equal values are skipped, initial
+state is read explicitly, and subscriptions close with the plugin. `JasperApplication` supplies `FontConfig` through
+`PluginRuntime`; conversion remains in `app.plugins`. The testkit mirrors publication and disposal. Temporary pane
+zoom does not publish a new value.
+
 SDK 0.18.2 adds `Appearance.presentation()`: `HostedPresentation` builds one `Presentation` per run from the
 `PluginLook` projection, the installed kit and the look's `DefaultSource`, and
 `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)` hands all three to the host before plugins start. It is an

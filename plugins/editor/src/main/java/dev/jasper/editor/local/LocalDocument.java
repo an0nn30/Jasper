@@ -2,6 +2,7 @@ package dev.jasper.editor.local;
 
 import dev.jasper.editor.api.Content;
 import dev.jasper.editor.api.EditorDocument;
+import dev.jasper.editor.api.RelativePaths;
 import dev.jasper.editor.api.Revision;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -32,6 +33,13 @@ public final class LocalDocument implements EditorDocument {
 
     /** @return the absolute, normalized file */
     public Path file() { return file; }
+
+    @Override public Optional<EditorDocument> resolveRelative(String path) {
+        RelativePaths.requireValid(path);
+        Path parent = file.getParent();
+        if (parent == null) parent = file;
+        return Optional.of(new LocalDocument(parent.resolve(path), background));
+    }
 
     @Override public String key() { return key(file); }
     @Override public String name() { Path name = file.getFileName(); return name == null ? file.toString() : name.toString(); }

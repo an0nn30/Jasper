@@ -175,7 +175,7 @@ class EditorDocumentPreservationTest {
                 assertThat(area.getFont().getSize()).isEqualTo(size);
                 assertThat(java.nio.file.Files.exists(editor.host.environment.settingsFiles().file("dev.jasper.editor"))).isFalse();
                 var reopened=(PluginPanelPage)editor.host.settingsPages(pageContext).getFirst();
-                assertThat(named(reopened.component(),"settings:font_size.input",JTextComponent.class).getText()).isEqualTo(Integer.toString(size));
+                assertThat(Double.parseDouble(named(reopened.component(),"settings:font_size.input",JTextComponent.class).getText())).isEqualTo((double)size);
                 assertThat(reopened.modified()).isFalse();reopened.dispose();
                 editor.contentTab().close();
             });

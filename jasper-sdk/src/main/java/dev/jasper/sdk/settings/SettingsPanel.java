@@ -34,6 +34,15 @@ public interface SettingsPanel {
     default void highlight(String query) { }
 
     /**
+     * A standard row processed an edit, list action or Reset. Its pending value and validation are available through
+     * the host before this callback runs; rebuild dependent descriptors here. Invalid edits can leave the pending
+     * value unchanged. Calling {@link SettingsPanelHost#stage} from plugin code does not trigger this callback.
+     * Runs on the UI thread while the page is mounted.
+     * @since 0.18.3
+     */
+    default void pendingChanged() { }
+
+    /**
      * Whether state of the plugin's own, beyond its declared settings, has unsaved changes.
      *
      * @return true when Apply would save something of the plugin's own

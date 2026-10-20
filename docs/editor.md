@@ -1,6 +1,6 @@
 # Editor
 
-The bundled Editor plugin (`dev.jasper.editor`) edits local and remote text files in tabs in one Editor window,
+The bundled Editor plugin (`dev.jasper.editor`) edits local and remote text files in workspace tabs,
 with syntax highlighting from RSyntaxTextArea. The [design](superpowers/specs/2026-09-27-jasper-editor-plugin-design.md)
 is the binding reference.
 
@@ -97,7 +97,12 @@ plain text. TOML uses the Editor's own lexer.
 | Key | Default | Meaning |
 |---|---|---|
 | `font_family` | first installed of JetBrains Mono, Menlo, Consolas, DejaVu Sans Mono, else Monospaced; IBM Plex Mono under the Enterprise look | editor font |
-| `font_size` | 13 | points, 8–48 |
+| `font_size` | 13 | finite fractional points, 6–72 |
+| `font_fallback` | `[]` | ordered installed fallback families |
+| `font_ligatures` | false | shaped font ligatures |
+| `font_line_height` | 1.0 | natural line height multiplied by 0.5–3.0 |
+| `follow_terminal_font` | false | follow saved terminal typography across windows |
+| `markdown_view_mode` | `"source"` | default for newly eligible Markdown tabs: `source`, `split`, `preview` |
 | `tab_size` | 4 | columns, 1–16 |
 | `soft_wrap` | false | wrapping for new tabs |
 | `max_file_mib` | 10 | larger files are refused, 1–256 |
@@ -108,7 +113,40 @@ plain text. TOML uses the Editor's own lexer.
 | `custom_in_terminal` | true | for `custom`: run it in a terminal tab |
 | `keep_environment_editor` | true | when Jasper's own environment has `EDITOR` or `VISUAL`, its shells keep both |
 
-A bad value is reported and its default used.
+A bad value is reported and its default used. Follow terminal font settings displays the saved terminal family,
+size, fallback order, ligatures and line height and disables the independent controls. Turning it off restores the
+Editor values, including look defaults. Temporary terminal zoom stays local to the terminal pane. Tight line heights
+can overlap tall glyphs.
+
+## Markdown preview
+
+For Markdown, the document toolbar offers Source, Source and preview, and Preview. Split places the source on the left;
+its divider ratio stays with the tab when it moves. Explicit mode choices save the default for future Markdown tabs;
+existing tabs keep their own modes. The Synchronize scrolling toggle links corresponding source passages in both
+directions and stays local to the tab. Changing the language away from Markdown releases preview work.
+
+Preview renders unsaved text after a 250 ms pause. Source and preview share the same document session and undo history.
+Find searches the pane last focused; preview search includes rendered code and excludes mapping markers. The Find bar
+closes when its tab changes or its pane is hidden. Replace and Go to Line reveal Source in Split without changing the
+saved default. Tab/Shift+Tab select preview links and leave the pane at either end; Enter activates a selected link.
+Save, Save As and close use the existing file and dirty-prompt flow.
+
+Headings, lists, quotes, tables, task marks, strikethrough and syntax-colored fenced code use a native Swing view.
+Raw HTML is escaped and comments are omitted. Body text follows the host UI family at the effective Editor size;
+code follows Editor typography. Theme, selection, glass and line spacing update live. Long code and tables scroll
+horizontally; PNG, JPEG and the first GIF frame scale down to fit.
+
+Relative images and file links resolve through the open document's provider, preserving an SFTP connection's exact
+route and login. Relative Markdown links reuse already-open dirty tabs; fragments navigate to headings. Web links
+open through the host on activation. Web images require **Load external images** for that document and tab lifetime;
+consent survives reload and moves and resets on Save As or close. Failed images retain their alt text and a reason,
+with Retry available. A failed preview retains the previous rendering with an out-of-date label and Retry/Source actions.
+Untitled documents must be saved before relative resources can resolve.
+
+Preview limits are 2,097,152 UTF-16 units, 16 MiB of generated UTF-8 HTML and 50,000 mapped blocks. Exceeding a limit
+shows a Source action. Each image is limited to 8 MiB encoded and 16 million pixels; four loads and 64 MiB of retained
+plus in-flight decoded pixels are shared across the plugin. Hidden tabs cancel preview and image work. See
+[verification](editor-verification.md#fonts-and-markdown-preview) for automated evidence and pending native checks.
 
 ## Default editor
 

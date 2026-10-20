@@ -7,6 +7,10 @@ dependencies {
     compileOnly(project(":jasper-sdk"))
     implementation("com.fifesoft:rsyntaxtextarea:3.6.0")
     implementation("org.tomlj:tomlj:1.1.1")
+    implementation("org.commonmark:commonmark:0.30.0")
+    implementation("org.commonmark:commonmark-ext-gfm-tables:0.30.0")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0")
+    implementation("org.commonmark:commonmark-ext-task-list-items:0.30.0")
     testImplementation(project(":jasper-sdk"))
     testImplementation(project(":jasper-sdk-testkit"))
     // Headless baseline evidence only; never shipped with the plugin.

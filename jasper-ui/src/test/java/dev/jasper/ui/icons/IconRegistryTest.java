@@ -110,7 +110,9 @@ class IconRegistryTest {
         try (var registry = new IconRegistry()) {
             assertThat(registry.names()).contains("none", "add", "more", "collapse", "search", "lock", "edit", "delete", "copy", "reveal",
                 "refresh", "upload", "back", "forward", "folder", "file", "server", "key", "login", "note", "tunnel", "terminal",
-                "play", "warning", "info", "check", "close", "chevron.down", "chevron.up", "sparkle");
+                "play", "warning", "info", "check", "close", "chevron.down", "chevron.up", "sparkle",
+                "editor.source", "editor.split", "editor.preview", "editor.scroll-sync",
+                "editor.source.classic", "editor.split.classic", "editor.preview.classic", "editor.scroll-sync.classic");
             for (var name : registry.names()) for (int size : new int[]{12, 14, 16, 20, 24})
                 for (var theme : java.util.List.of(KitFixtures.light(), KitFixtures.dark())) {
                     assertThat(pixels(registry.icon(name, theme.semantic(), Nodes.Hue.NONE, size))).isPositive();

@@ -154,10 +154,10 @@ class SettingsPagesMockTest {
         tight(vault, "first row rule", "second row rule");
         face(vault, "second row rule", "box bottom");
         half(vault, 1, "second row rule", "box bottom");
-        PROBES.put(editor, List.of(probe("first row rule", 700, 110, "border.row"), probe("General box bottom", 700, 164, "window rule"), probe("second box top", 700, 185, "window rule")));
+        PROBES.put(editor, List.of(probe("first row rule", 700, 110, "border.row"), probe("Font box bottom", 700, 164, "window rule"), probe("second box top", 700, 185, "window rule")));
         tight(editor, "first row rule");
-        face(editor, "General box bottom", "second box top");
-        half(editor, 1, "General box bottom", "second box top");
+        face(editor, "Font box bottom", "second box top");
+        half(editor, 1, "Font box bottom", "second box top");
         PROBES.put(files, List.of(probe("first row rule", 700, 110, "border.row"), probe("box bottom", 700, 227, "window rule"), probe("port range field left edge", 791, 190, "border.input")));
         tight(files, "first row rule");
         face(files, "box bottom");
@@ -275,12 +275,26 @@ class SettingsPagesMockTest {
         for (String id : ids) {
             var page = page(id);
             var render = new BufferedImage[1];
-            SwingUtilities.invokeAndWait(() -> render[0] = settings.render(id, 1040, page.height()));
+            var positions = new LinkedHashMap<String, java.awt.Point>();
+            SwingUtilities.invokeAndWait(() -> {
+                render[0] = settings.render(id, 1040, page.height());
+                if (id.equals(dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.editor"))) {
+                    // The approved Editor font controls expand the first section. Preserve the original
+                    // colour probes and share threshold while following the two section edges.
+                    var root = settings.content();
+                    var font = KitTestSupport.require(root, "editor.settings.font", javax.swing.JComponent.class);
+                    var editing = KitTestSupport.require(root, "editor.settings.editing", javax.swing.JComponent.class);
+                    var fontBounds = SwingUtilities.convertRectangle(font.getParent(), font.getBounds(), root);
+                    var editingBounds = SwingUtilities.convertRectangle(editing.getParent(), editing.getBounds(), root);
+                    positions.put("Font box bottom", new java.awt.Point(700, fontBounds.y + fontBounds.height - 1));
+                    positions.put("second box top", new java.awt.Point(700, editingBounds.y + editing.getComponent(0).getHeight() / 2));
+                }
+            });
             var out = Files.createDirectories(EnterpriseSettings.OUT.resolve("pages"));
             String number = page.mock().substring(9, 11);
             ImageIO.write(render[0], "png", out.resolve(number + ".png").toFile());
             var mock = SettingsChromeMockTest.content(page);
-            failures.addAll(probes(id, render[0], mock));
+            failures.addAll(probes(id, render[0], mock, positions));
             failures.addAll(inks(id, render[0], mock));
             failures.addAll(share(id, number, page, render[0], mock, shares));
         }

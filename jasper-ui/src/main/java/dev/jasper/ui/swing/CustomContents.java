@@ -15,7 +15,7 @@ final class CustomContents {
   private JComponent content;
   CustomControl(KitView view,Nodes.Custom node){super(view,node,new JPanel(new BorderLayout()));component.setOpaque(false);refresh();}
   void register(JComponent content,AutoCloseable lifetime){if(this.content!=null)throw new IllegalArgumentException("Content already registered");if(content.getParent()!=null)throw new IllegalArgumentException("Content is already mounted");validate(((Nodes.Custom)node).kind(),content);this.content=content;component.add(content,BorderLayout.CENTER);own(lifetime);refresh();component.revalidate();}
-  @Override void refresh(){state();component.getAccessibleContext().setAccessibleName(((Nodes.Custom)node).accessibleName());}
+  @Override void refresh(){state();if(content!=null)content.setFont(ThemePainting.font(context(),dev.jasper.ui.metrics.Typography.Role.BODY));component.getAccessibleContext().setAccessibleName(((Nodes.Custom)node).accessibleName());}
   @Override JComponent focusTarget(){return content==null?component:content;}
   @Override public void close(){if(closed)return;super.close();component.removeAll();content=null;}
  }

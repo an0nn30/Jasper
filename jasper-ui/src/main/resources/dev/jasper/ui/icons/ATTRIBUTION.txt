@@ -5,6 +5,8 @@ New UI icons: https://github.com/JetBrains/intellij-community at commit 60b8fbad
 files from platform/icons/src/expui/ and plugins/terminal/resources/icons/expui/.
 Classic icons: https://github.com/JetBrains/intellij-community at tag idea/2026.2.3 (commit
 8062c061ff33e22041d9f1844db5b8b8a6b5e4d7), files from platform/icons/src/.
+Editor document actions: the same idea/2026.2.3 commit, files from platform/icons/src/ and
+platform/icons/src/expui/, recorded in assets-editor.tsv.
 The files are unmodified; each keeps the JetBrains copyright notice upstream gives it (classic
 toolwindows/toolWindowServer.svg and toolWindowServer_dark.svg ship without one, under the same Apache-2.0).
 

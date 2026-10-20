@@ -30,7 +30,7 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
             check(process.waitFor() == 0) { output }; return output
         }
         val checker = file("gradle/architecture/PluginPresentationCheck.java").absolutePath
-        tool("java", listOf(checker, "--self-test", layout.buildDirectory.dir("presentation-check-fixtures").get().asFile.absolutePath))
+        tool("java", listOf("--class-path", verificationClasspaths.getValue(":jasper-plugin-editor").asPath, checker, "--self-test", layout.buildDirectory.dir("presentation-check-fixtures").get().asFile.absolutePath))
         fun jdk(name: String) = name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.") || name.startsWith("com.sun.net.httpserver.")
         val edge = Regex("^\\s*(\\S+)\\s+->\\s+(\\S+)\\s*(.*)$")
         for ((path, imports) in pluginImports) {

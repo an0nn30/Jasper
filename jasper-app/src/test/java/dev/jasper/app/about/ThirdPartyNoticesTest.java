@@ -19,6 +19,16 @@ class ThirdPartyNoticesTest {
         }
     }
 
+    @Test void commonMarkIncludesEveryPinnedModuleAndItsUpstreamBsdLicense() {
+        var component = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().equals("CommonMark Java")).findFirst().orElseThrow();
+        assertThat(component.modules()).containsExactlyInAnyOrder("org.commonmark:commonmark:0.30.0",
+            "org.commonmark:commonmark-ext-gfm-tables:0.30.0", "org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0",
+            "org.commonmark:commonmark-ext-task-list-items:0.30.0");
+        assertThat(component.licenseName()).isEqualTo("BSD 2-Clause License");
+        assertThat(ThirdPartyNotices.read(component.text())).contains("Copyright (c) 2015, Atlassian Pty Ltd",
+            "Redistribution and use in source and binary forms", "THIS SOFTWARE IS PROVIDED");
+    }
+
     @Test void jasperComesFirstThenTheRestByNameIgnoringCase() {
         var listed = ThirdPartyNotices.listed("1.2.0 + 14 commits");
         assertThat(listed.getFirst().title()).isEqualTo("Jasper 1.2.0 + 14 commits");

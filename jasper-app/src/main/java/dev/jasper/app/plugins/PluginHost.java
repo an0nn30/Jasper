@@ -111,6 +111,7 @@ final class PluginHost {
     /** The clipboard every plugin's Platform writes to; the application shares it with its own copies. */
     dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
     final Environment environment;
+    final HostedTypography typography;
     /** Runs cancellation handlers and connection closes off the EDT; outlives every plugin's own executor. */
     final CleanupWorker cleanup = new CleanupWorker();
     private final dev.jasper.app.lifecycle.Subscription terminalBridge;
@@ -130,7 +131,10 @@ final class PluginHost {
     private final Map<String, HostedContext> contexts = new LinkedHashMap<>();
     private final Map<String, PluginStatus.State> notRunning = new HashMap<>();
 
-    PluginHost(Environment environment) {
+    PluginHost(Environment environment) { this(environment, new HostedTypography()); }
+
+    PluginHost(Environment environment, HostedTypography typography) {
+        this.typography = Objects.requireNonNull(typography, "typography");
         this.environment = Objects.requireNonNull(environment);
         this.containment = new Containment(environment.onUi(), environment.failures());
         this.commands = new PluginCommands(environment.ui(), containment);

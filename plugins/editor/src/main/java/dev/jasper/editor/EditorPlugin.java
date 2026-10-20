@@ -51,6 +51,8 @@ public final class EditorPlugin implements Plugin {
     private final BiFunction<System.Logger, NotificationGroup, DefaultEditor.Launcher> launchers;
     private EditorEnvironment environment;
     private EditorWindow window;
+    private dev.jasper.editor.markdown.resources.ImageLoader imageLoader;
+    private Subscription typography = () -> { };
     private RecentFiles recent;
     private Openers openers;
     private final Locations locations = new Locations();
@@ -77,6 +79,7 @@ public final class EditorPlugin implements Plugin {
 
     @Override public void start(PluginContext context) {
         Languages.register();
+        imageLoader = new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(64L * 1024 * 1024));
         // Set.copyOf tolerates a platform that lists a family twice; Set.of would throw.
         Set<String> fonts = Set.copyOf(Arrays.asList(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()));
         EditorSettings.Declared settings = new EditorSettings.Declared(context.settings(), fonts);
@@ -90,6 +93,9 @@ public final class EditorPlugin implements Plugin {
         context.settings().onChanged(() -> ui.execute(() -> { if (window != null) window.apply(); }));
         context.settings().onChanged(() -> ui.execute(() -> { recent.prune(Instant.now()); scope.changed(); }));
         context.appearance().onWorkspaceChanged(variant -> ui.execute(() -> { if (window != null) window.apply(); }));
+        typography = context.appearance().onTerminalTypographyChanged(value -> {
+            if (window != null && environment.settings().get().followTerminalFont()) window.typography();
+        });
         context.services().publish(Editor.class, new Editor() {
             @Override public void open(Path file) { window().openLocal(file); }
             @Override public void open(EditorDocument document) { window().open(document); }
@@ -124,7 +130,7 @@ public final class EditorPlugin implements Plugin {
             context.log().log(System.Logger.Level.INFO, "Another plugin provides the editor Jasper opens files with, so the default "
                 + "editor setting does not choose it: " + provided.getMessage());
         }
-        context.settings().page(new EditorSettingsPanel(context.kit(), settings, defaults, System.getenv()));
+        context.settings().page(new EditorSettingsPanel(context.kit(), context.appearance(), settings, defaults, System.getenv()));
         context.palette().register(scope);
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);
@@ -132,11 +138,14 @@ public final class EditorPlugin implements Plugin {
     }
 
     @Override public void stop() {
+        typography.close();
+        typography = () -> { };
         if (window != null) window.dispose();
+        if (imageLoader != null) imageLoader.close();
     }
 
     private EditorWindow window() {
-        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle, locations);
+        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle, locations, imageLoader);
         return window;
     }
 }

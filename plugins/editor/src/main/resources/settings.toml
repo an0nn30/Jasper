@@ -4,8 +4,19 @@
 # JetBrains Mono, Menlo, Consolas and DejaVu Sans Mono, else Monospaced.
 # font_family = "JetBrains Mono"
 
-# Font size in points, 8 to 48.
+# Font size in finite fractional points, 6 to 72.
 # font_size = 13
+
+# Ordered fallback families, shaped ligatures, and natural line-height multiplier (0.5 to 3.0).
+# font_fallback = []
+# font_ligatures = false
+# font_line_height = 1.0
+
+# Follow saved terminal typography across windows, preserving the independent values above.
+# follow_terminal_font = false
+
+# Initial mode for new Markdown tabs: source, split, preview. Explicit toolbar choices update this value.
+# markdown_view_mode = "source"
 
 # Columns per tab stop, 1 to 16.
 # tab_size = 4
