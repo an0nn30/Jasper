@@ -60,7 +60,7 @@ final class HomepageRemoteHost implements AutoCloseable {
     final WindowContent window;
     final Plugin plugin;
 
-    HomepageRemoteHost(Path data, boolean dark, WorkspaceAppearanceFixture appearance) throws Exception {
+    HomepageRemoteHost(Path data, boolean dark, WorkspaceAppearanceFixture appearance, dev.jasper.app.appearance.ThemeController controller) throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve(REMOTE.id());
         ssh = Files.createDirectories(data.resolve("ssh"));
         contributions = onEdtValue(Contributions::new);
@@ -76,7 +76,7 @@ final class HomepageRemoteHost implements AutoCloseable {
         onEdt(() -> host.start(new HostedPlugin(REMOTE, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), Set.of("dev.jasper.remote.api"),
             loader, () -> plugin)));
         window = onEdtValue(() -> {
-            var content = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            var content = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), controller);
             // A terminal window of the registry, so Remote's dialogs may name it as their owner.
             content.connectTerminals(terminals.registry, () -> { });
             content.connectContributions(contributions);

@@ -24,28 +24,72 @@ class HomepageCaptureTest {
         var library = dev.jasper.app.appearance.ThemeLibrary.bundledOnly();
         assertThat(library.problems()).isEmpty();
         var selection = dev.jasper.app.appearance.ThemeSelection.of(library, "slate-cobalt", "jasper-meadow", dev.jasper.app.config.TerminalSchemeChoice.MATCH, (key,message) -> { throw new AssertionError(message); });
-        onEdt(() -> controller.configure(false, selection, dev.jasper.app.config.UiFontConfig.defaults()));
+        onEdt(() -> controller.configure(false, selection, new dev.jasper.app.config.UiFontConfig("system", 18)));
         try {
-            try (var remote = new HomepageRemoteHost(home.resolve("remote"), false, onEdtValue(() -> new WorkspaceAppearanceFixture(controller.current())))) {
+            Path demo = home.resolve("remote");
+            Path data = HomepageRemoteHost.data(demo);
+            Files.createDirectories(data);
+            String gateway = "00000000-0000-4000-8000-000000000001";
+            Files.writeString(data.resolve("hosts.toml"), """
+                [[host]]
+                id = "00000000-0000-4000-8000-000000000001"
+                name = "Staging gateway"
+                hostname = "gateway.example.test"
+                username = "operator"
+                group = "Staging"
+                favorite = true
+                [[host]]
+                name = "App workers"
+                hostname = "workers.example.test"
+                username = "operator"
+                group = "Staging"
+                [[host]]
+                name = "Metrics"
+                hostname = "metrics.example.test"
+                username = "operator"
+                group = "Staging"
+                """);
+            Files.writeString(data.resolve("tunnels.toml"), """
+                [[tunnel]]
+                name = "Staging database"
+                host = "%s"
+                bind_address = "localhost"
+                bind_port = 15432
+                target_host = "localhost"
+                target_port = 5432
+                [[tunnel]]
+                name = "Metrics dashboard"
+                host = "%s"
+                bind_address = "localhost"
+                bind_port = 13000
+                target_host = "localhost"
+                target_port = 3000
+                """.formatted(gateway, gateway));
+            try (var remote = new HomepageRemoteHost(home.resolve("remote"), false, onEdtValue(() -> new WorkspaceAppearanceFixture(controller.current())), controller)) {
+                remote.openSessions();
+                StagedVaultHost.await(() -> HomepageRemoteHost.labels(remote.header()).contains("3"), "three demo hosts loaded");
+                onEdt(() -> save("sessions", remote.sessions(), 620, 400));
+                remote.openTunnels();
+                StagedVaultHost.await(() -> HomepageRemoteHost.labels(remote.tunnelsHeader()).contains("2"), "two demo tunnels loaded");
+                onEdt(() -> save("tunnels", remote.tunnels(), 620, 250));
                 remote.openSftp(); remote.quietTransfers();
                 onEdt(() -> {
                     long modified = java.time.Instant.parse("2026-10-19T10:30:00Z").toEpochMilli();
                     remote.sftpListing("Staging gateway", "/srv/gateway", List.of(
                         remote.fileEntry("config", "DIRECTORY", 0, modified),
                         remote.fileEntry("logs", "DIRECTORY", 0, modified),
-                        remote.fileEntry("releases", "DIRECTORY", 0, modified),
                         remote.fileEntry("deployment.yaml", "FILE", 2840, modified),
-                        remote.fileEntry("nginx.conf", "FILE", 1720, modified),
-                        remote.fileEntry("README.md", "FILE", 4350, modified)));
+                        remote.fileEntry("nginx.conf", "FILE", 1720, modified)));
                     remote.transferRows(List.<Object[]>of(new Object[]{UUID.randomUUID(), "gateway-release.tar.gz", "18.4 MB / 32 MB", 0.575, false}));
                 });
                 StagedVaultHost.settle();
                 onEdt(() -> {
-                    save("sftp", remote.sftp(), 560, 420);
+                    save("sftp", remote.sftp(), 580, 480);
                     assertThat(HomepageRemoteHost.labels(remote.sftp())).contains("deployment.yaml", "nginx.conf");
                 });
                 assertThat(remote.problems).isEmpty();
             }
+            onEdt(() -> controller.configure(false, selection, new dev.jasper.app.config.UiFontConfig("system", 16)));
             var appearance = onEdtValue(() -> new WorkspaceAppearanceFixture(controller.current()));
             try (var vault = new StagedVaultHost(home.resolve("vault"), false, appearance)) {
                 vault.createVault("local-synthetic-demo-only");
@@ -59,7 +103,7 @@ class HomepageCaptureTest {
                     var rows = (dev.jasper.ui.model.Nodes.ItemList) StagedVaultHost.node(manager,"rows");
                     assertThat(rows.items()).hasSize(3);
                     assertThat(rows.selectedIds()).containsExactly(ids.getFirst().toString());
-                    save("vault", manager.holder(), 900, 300);
+                    save("vault", manager.holder(), 1200, 380);
                 });
                 assertThat(vault.problems).isEmpty();
             }
@@ -70,9 +114,9 @@ class HomepageCaptureTest {
         try {
             root.setSize(width, height);
             for (int i=0;i<4;i++) layout(root);
-            var image = new BufferedImage(width*2,height*2,BufferedImage.TYPE_INT_ARGB);
+            var image = new BufferedImage(width*3,height*3,BufferedImage.TYPE_INT_ARGB);
             var g=image.createGraphics();
-            try { g.scale(2,2); root.printAll(g); } finally { g.dispose(); }
+            try { g.scale(3,3); root.printAll(g); } finally { g.dispose(); }
             Path output=Path.of("build/homepage-demo"); Files.createDirectories(output);
             ImageIO.write(image,"png",output.resolve(name+".png").toFile());
         } catch(java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }

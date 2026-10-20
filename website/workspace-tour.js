@@ -14,7 +14,7 @@
     terminal: ['Type a command. See the result. Your sessions stay close by.', 'Jasper terminal showing sample infrastructure output beside saved demo sessions'],
     focus: ['A little more room. Tuck a panel away, then bring it back.', 'Jasper terminal expanded across the workspace, with Sessions available from the left rail']
   };
-  const capture = name => `assets/workspace-typing/${name}.webp`;
+  const capture = name => `assets/workspace-typing/${name}.webp?v=hires-2`;
   const defaults = {editor: 'editor-base', terminal: 'terminal-result', focus: 'focus'};
   let current = 'editor', currentFrame = '', elapsed = 0, last = 0, raf = 0, visible = false;
   let paused = reduced.matches, ready = false, loading = false, swapping = 0, generation = 0;
@@ -41,9 +41,9 @@
   // Character frames are real captures, shown without crossfading so text stays crisp.
   const typedFrame = (prefix, index) => `${prefix}-${String(index).padStart(2, '0')}`;
   const duration = 28000;
-  const points = [[0,80,37],[900,80,37],[2100,50,39],[6000,50,39],
-    [7100,50,39],[7800,50,3.5],[8600,50,3.5],[9200,49,70],
-    [15500,49,70],[17500,2.2,5],[19200,2.2,5],[20000,65,60],
+  const points = [[0,80,37],[900,80,37],[2100,38,13],[6000,38,13],
+    [7100,38,13],[7800,50,3.5],[8600,50,3.5],[9200,39,82],
+    [15500,39,82],[17500,2.2,5],[19200,2.2,5],[20000,65,60],
     [20900,65,60],[21800,2.2,5],[22800,2.2,5],[23800,80,3.5],
     [25300,80,3.5],[26600,80,37],[28000,80,37]];
   function tick(now) {
