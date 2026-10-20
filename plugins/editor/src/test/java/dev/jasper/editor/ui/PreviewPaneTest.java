@@ -137,6 +137,34 @@ class PreviewPaneTest {
             pane.close();
         });
     }
+    @Test void highlightedTabsShareLineStopsForPaintingCaretsAndPointerHits() throws Exception {
+        var pane=install(prepare("```java\nint\tfoo;\nif\tfoo;\nx\tfoo;\nreturn\tfoo;\nint x=1+2+3;\tfoo;\n```"));
+        SwingUtilities.invokeAndWait(() -> {
+            var editor=pane.editor();editor.setSize(500,260);
+            var image=new BufferedImage(500,260,BufferedImage.TYPE_INT_ARGB);var graphics=image.createGraphics();editor.paint(graphics);graphics.dispose();
+            var fonts=new dev.jasper.editor.textview.EditorFonts(TYPE,new java.awt.font.FontRenderContext(null,true,true));
+            try {
+                var directory=java.nio.file.Path.of("build/preview-matrix");java.nio.file.Files.createDirectories(directory);
+                javax.imageio.ImageIO.write(image,"png",directory.resolve("highlighted-tabs.png").toFile());
+                String text=editor.getDocument().getText(0,editor.getDocument().getLength());
+                for(String prefix:List.of("int","if","x","return","int x=1+2+3;")) {
+                    int start=text.indexOf(prefix+"\t"),target=start+prefix.length()+1;
+                    var beginning=editor.modelToView2D(start);var caret=editor.modelToView2D(target);
+                    float expected=fonts.spaceAdvance()*((prefix.length()/4+1)*4);
+                    assertThat(caret.getX()-beginning.getX()).as("tab after %s",prefix).isCloseTo(expected,within(1.5));
+                    int hit=editor.viewToModel2D(new java.awt.geom.Point2D.Double(caret.getX()+.1,caret.getCenterY()));
+                    assertThat(hit).as("pointer at foo after %s",prefix).isEqualTo(target);
+                    var glyph=allViews(editor.getUI().getRootView(editor)).stream().filter(javax.swing.text.GlyphView.class::isInstance)
+                        .map(javax.swing.text.GlyphView.class::cast).filter(v -> v.getStartOffset()<=target&&v.getEndOffset()>target).findFirst().orElseThrow();
+                    int minInkX=image.getWidth();
+                    for(int y=(int)caret.getY();y<Math.min(image.getHeight(),(int)caret.getMaxY());y++)
+                        for(int x=(int)caret.getX();x<Math.min(image.getWidth(),(int)caret.getX()+16);x++)
+                            if((image.getRGB(x,y)&0xffffff)==(glyph.getForeground().getRGB()&0xffffff))minInkX=Math.min(minInkX,x);
+                    assertThat(minInkX).as("painted foo after %s",prefix).isBetween((int)caret.getX(),(int)caret.getX()+8);
+                }
+            }catch(Exception failure){throw new AssertionError(failure);}finally{pane.close();}
+        });
+    }
     @Test void codeLineHeightAppliesTheEffectiveMultiplierOnce() throws Exception {
         var pane=install(prepare("```\none\ntwo\n```"));
         SwingUtilities.invokeAndWait(() -> {

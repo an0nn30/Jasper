@@ -24,11 +24,15 @@ final class PreviewKit extends HTMLEditorKit {
     private Font body;
     private final Map<Integer,BufferedImage> images;
     private final List<PreviewImageView> imageViews=new ArrayList<>();
+    private final Map<Element,Map<Element,CodeRun>> codeLines=new java.util.IdentityHashMap<>();
+    private record CodeRun(LineLayout.Row row,float origin) {
+        float originAt(int offset){return origin+(offset==row.start()?0:(float)LineLayout.caret(row,offset).getBounds2D().getX());}
+    }
     PreviewKit(TerminalTypography typography,WorkspacePalette palette,Font body,Map<Integer,BufferedImage> images){
         this.images=images;configure(typography,palette,body);
     }
     private void configure(TerminalTypography typography,WorkspacePalette palette,Font body){this.typography=typography;this.palette=palette;this.body=body;
-        fonts=new EditorFonts(typography,new FontRenderContext(null,true,true));}
+        fonts=new EditorFonts(typography,new FontRenderContext(null,true,true));codeLines.clear();}
     @Override public Document createDefaultDocument(){var doc=new PreviewDocument(styles());doc.setAsynchronousLoadPriority(-1);doc.setTokenThreshold(128);return doc;}
     private static final class PreviewDocument extends HTMLDocument {
         PreviewDocument(StyleSheet styles){super(styles);}
@@ -96,9 +100,38 @@ final class PreviewKit extends HTMLEditorKit {
     }
     private final class Code extends InlineView {
         Code(Element element){super(element);setGlyphPainter(new ShapedPainter());}
+        @Override public float getPreferredSpan(int axis) {
+            float span=super.getPreferredSpan(axis);
+            if(axis==X_AXIS&&ancestor(getElement(),HTML.Tag.PRE)) {
+                var run=codeLines.computeIfAbsent(getElement().getParentElement(),line -> shapeCodeLine(line,getParent())).get(getElement());
+                float origin=run.originAt(getStartOffset());
+                // Swing allocates integer child spans. Round cumulative edges, not every run's width, so
+                // highlighting cannot accumulate truncation drift or change the next logical tab column.
+                return Math.round(origin+span)-Math.round(origin);
+            }
+            return span;
+        }
         @Override public float getMinimumSpan(int axis){return ancestor(getElement(),HTML.Tag.PRE)&&axis==X_AXIS?getPreferredSpan(axis):super.getMinimumSpan(axis);}
         @Override public int getBreakWeight(int axis,float pos,float len){return ancestor(getElement(),HTML.Tag.PRE)&&axis==X_AXIS?BadBreakWeight:super.getBreakWeight(axis,pos,len);}
         @Override public Font getFont(){return fonts.primary().deriveFont(super.getFont().getStyle());}
+    }
+    /** Each preformatted paragraph is one logical line; syntax leaves share its tab origin. */
+    private Map<Element,CodeRun> shapeCodeLine(Element line,View parent) {
+        var runs=new java.util.IdentityHashMap<Element,CodeRun>();float origin=0;
+        for(int i=0;i<line.getElementCount();i++) {
+            Element element=line.getElement(i);int start=element.getStartOffset(),end=Math.min(element.getEndOffset(),element.getDocument().getLength());
+            // HTMLReader stores inline font/weight/color styles on these leaf elements. Resolve them exactly as
+            // the visible InlineView does, without building a second component or painting the whole line per token.
+            var style=new InlineView(element);style.setParent(parent);
+            try {
+                String text=element.getDocument().getText(start,Math.max(0,end-start)).replace('\n',' ');
+                var row=LineLayout.layout(text,start,List.of(new LineLayout.Span(start,end,style.getFont().getStyle(),style.getForeground())),
+                    fonts,Float.MAX_VALUE,false,false,4,origin).getFirst();
+                runs.put(element,new CodeRun(row,origin));
+                origin+=row.width();
+            }catch(BadLocationException failure){throw new IllegalStateException(failure);}
+        }
+        return runs;
     }
     /** One shared TextLayout geometry for code painting, selection edges and pointer hit testing. */
     private final class ShapedPainter extends GlyphView.GlyphPainter {
@@ -106,9 +139,15 @@ final class PreviewKit extends HTMLEditorKit {
         private LineLayout.Row row(GlyphView view){
             if(cachedView==view&&start==view.getStartOffset()&&end==view.getEndOffset()&&cachedFonts==fonts)return cached;
             cachedView=view;start=view.getStartOffset();end=Math.min(view.getEndOffset(),view.getDocument().getLength());cachedFonts=fonts;
+            float origin=0;
+            if(ancestor(view.getElement(),HTML.Tag.PRE)) {
+                var run=codeLines.computeIfAbsent(view.getElement().getParentElement(),line -> shapeCodeLine(line,view.getParent())).get(view.getElement());
+                if(start==run.row().start()&&end==run.row().end()){cached=run.row();return cached;}
+                origin=run.originAt(start);
+            }
             try {String text=view.getDocument().getText(start,Math.max(0,end-start)).replace('\n',' ');
                 int style=(view.getFont().isBold()?Font.BOLD:0)|(view.getFont().isItalic()?Font.ITALIC:0);
-                cached=LineLayout.layout(text,start,List.of(new LineLayout.Span(start,end,style,view.getForeground())),fonts,Float.MAX_VALUE,false,false,4).getFirst();return cached;
+                cached=LineLayout.layout(text,start,List.of(new LineLayout.Span(start,end,style,view.getForeground())),fonts,Float.MAX_VALUE,false,false,4,origin).getFirst();return cached;
             }catch(BadLocationException e){throw new IllegalStateException(e);}
         }
         @Override public GlyphView.GlyphPainter getPainter(GlyphView v,int p0,int p1){return new ShapedPainter();}
@@ -119,7 +158,12 @@ final class PreviewKit extends HTMLEditorKit {
         @Override public void paint(GlyphView view,Graphics graphics,Shape allocation,int p0,int p1){var row=row(view);
             if(!graphics.getColor().equals(view.getForeground())) {
                 try {String text=view.getDocument().getText(row.start(),row.end()-row.start()).replace('\n',' ');
-                    row=LineLayout.layout(text,row.start(),List.of(new LineLayout.Span(row.start(),row.end(),view.getFont().getStyle(),graphics.getColor())),fonts,Float.MAX_VALUE,false,false,4).getFirst();
+                    float origin=0;
+                    if(ancestor(view.getElement(),HTML.Tag.PRE)) {
+                        var run=codeLines.get(view.getElement().getParentElement()).get(view.getElement());
+                        origin=run.originAt(row.start());
+                    }
+                    row=LineLayout.layout(text,row.start(),List.of(new LineLayout.Span(row.start(),row.end(),view.getFont().getStyle(),graphics.getColor())),fonts,Float.MAX_VALUE,false,false,4,origin).getFirst();
                 }catch(BadLocationException failure){throw new IllegalStateException(failure);}
             }
             var bounds=allocation.getBounds();var g=(Graphics2D)graphics.create();

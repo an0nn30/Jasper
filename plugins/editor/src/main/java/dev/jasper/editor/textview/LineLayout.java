@@ -54,6 +54,14 @@ public final class LineLayout {
     /** Shapes a logical line, retaining whitespace and every source offset. */
     public static List<Row> layout(String text, int startOffset, List<Span> styles, EditorFonts fonts,
                                    float width, boolean wrap, boolean wordWrap, int tabSize) {
+        return layout(text,startOffset,styles,fonts,width,wrap,wordWrap,tabSize,0);
+    }
+    /**
+     * Shapes a run following {@code initialX} logical pixels on the same line. Returned coordinates stay local to
+     * this run; tab stops use the shared line origin. A wrapped continuation starts a new line at origin zero.
+     */
+    public static List<Row> layout(String text, int startOffset, List<Span> styles, EditorFonts fonts,
+                                   float width, boolean wrap, boolean wordWrap, int tabSize, float initialX) {
         // Token producers are ordered; sorting also admits callers with unordered, disjoint spans.
         styles=styles.stream().sorted(java.util.Comparator.comparingInt(Span::start)).toList();
         var boundaries=new ArrayList<Integer>(); boundaries.add(startOffset);
@@ -94,15 +102,15 @@ public final class LineLayout {
         float limit=wrap?Math.max(1,width):Float.MAX_VALUE;
         float stop=Math.max(1,tabSize)*fonts.spaceAdvance();
         var rows=new ArrayList<Row>();
-        int p=0, rowStart=0; float x=0;
+        int p=0, rowStart=0; float x=0, rowOrigin=initialX;
         var segments=new ArrayList<Segment>();
         LineBreakMeasurer breaker=null; int breakerEnd=-1;
         while(p<text.length()) {
             if(text.charAt(p)=='\t') {
-                float next=((float)Math.floor(x/stop)+1)*stop;
+                float next=((float)Math.floor((x+rowOrigin)/stop)+1)*stop-rowOrigin;
                 if(wrap && x>0 && next>limit) {
                     rows.add(new Row(startOffset+rowStart,startOffset+p,segments,x,fonts,boundaries));
-                    segments=new ArrayList<>(); rowStart=p; x=0; continue;
+                    segments=new ArrayList<>(); rowStart=p; x=0; rowOrigin=0; continue;
                 }
                 segments.add(new Segment(startOffset+p,startOffset+p+1,x,null)); x=next; p++;
             } else {
@@ -118,7 +126,7 @@ public final class LineLayout {
                 int safe=boundaries.get(boundary)-startOffset;
                 if(safe==p && x>0) {
                     rows.add(new Row(startOffset+rowStart,startOffset+p,segments,x,fonts,boundaries));
-                    segments=new ArrayList<>(); rowStart=p; x=0; continue;
+                    segments=new ArrayList<>(); rowStart=p; x=0; rowOrigin=0; continue;
                 }
                 if(safe==p) safe=boundaries.get(java.util.Collections.binarySearch(boundaries,startOffset+p)+1)-startOffset;
                 var layout=new TextLayout(attributed.getIterator(null,p,safe),fonts.context());
@@ -126,7 +134,7 @@ public final class LineLayout {
                 breaker.setPosition(p);
                 if(p<end) {
                     rows.add(new Row(startOffset+rowStart,startOffset+p,segments,x,fonts,boundaries));
-                    segments=new ArrayList<>(); rowStart=p; x=0;
+                    segments=new ArrayList<>(); rowStart=p; x=0; rowOrigin=0;
                 }
             }
         }
