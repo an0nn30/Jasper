@@ -1,7 +1,6 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ResolvedTheme;
-import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.layout.Child;
 import dev.jasper.app.layout.Group;
@@ -17,26 +16,24 @@ import java.awt.Component;
 import java.awt.KeyboardFocusManager;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
 /**
- * One parent tab's workspace (workspace tabs spec 10; parent tabs spec 4), under the parent tab's id: its
- * {@link Layout} and the tabs the layout places, drawn as {@link SplitContainer}s over {@link GroupView}s, or the
- * maximized group alone. Every change is a layout operation; the view renders the selection, the active group and the
- * maximize the layout holds and never picks them itself. It rebuilds its splits only when the layout's shape changes
- * (orientation, children, groups, maximize); otherwise it moves tab components between group views, shows selections
- * and passes divider weights on. It never creates or disposes a tab: its window attaches and detaches them. Its layout
- * accessor is {@code model()}: a {@code JPanel} cannot declare a {@code layout()} that returns a value, because
- * {@code java.awt.Container} has a {@code void layout()}. EDT only.
+ * One tab's workspace (tabs and panes spec 4), under the tab's id: its {@link Layout} and the items the layout places,
+ * drawn as {@link SplitContainer}s over {@link GroupView}s, one pane each, or the maximized pane alone. Every change is a
+ * layout operation; the view renders the active pane and the maximize the layout holds and never picks them itself. It
+ * rebuilds its splits only when the layout's shape changes (orientation, children, panes, maximize); otherwise it moves
+ * items' components between pane views and passes divider weights on. It never creates or disposes an item: its window
+ * attaches and detaches them. Its layout accessor is {@code model()}: a {@code JPanel} cannot declare a {@code layout()}
+ * that returns a value, because {@code java.awt.Container} has a {@code void layout()}. The code calls a tab a parent
+ * tab, a pane a group and an item a tab (workspace plan 8a Rulings 1). EDT only.
  */
 final class WorkspaceView extends JPanel {
     private final WindowContent owner;
@@ -44,8 +41,6 @@ final class WorkspaceView extends JPanel {
     private final Map<GroupId, GroupView> groups = new LinkedHashMap<>();
     private final Map<TabId, Tab> tabs = new HashMap<>();
     private final Map<List<Integer>, SplitContainer> splits = new HashMap<>();
-    /** The tabs that came into their group by a move, which the strips show at once, without motion (Rulings 27). */
-    private final Set<TabId> moved = new HashSet<>();
     private Layout layout = Layout.empty();
     private Object shape;
     /** The shape of the main window's empty workspace, which shows {@link #empty} (workspace tabs spec 10). */
@@ -64,16 +59,16 @@ final class WorkspaceView extends JPanel {
 
     /** The layout this view renders. */
     Layout model() { return layout; }
-    /** The parent tab this workspace is. */
+    /** The tab this workspace is. */
     ParentTabId id() { return id; }
-    /** The parent tab takes a new id ({@link ParentTabsView#reid}); its layout and tabs stay. */
+    /** The tab takes a new id ({@link ParentTabsView#reid}); its layout and items stay. */
     void id(ParentTabId value) { id = Objects.requireNonNull(value, "value"); }
     boolean isEmpty() { return layout.isEmpty(); }
     boolean contains(Tab tab) { return tab != null && tabs.get(tab.id()) == tab; }
-    /** Every tab in workspace order: the groups in tree order, each group's tabs in strip order. */
+    /** Every item in workspace order: the panes' items in tree order. */
     List<Tab> tabs() { return layout.tabs().stream().map(tabs::get).toList(); }
     int tabCount() { return tabs.size(); }
-    /** The active group's selected tab; null in the empty workspace. */
+    /** The active pane's item; null in the empty workspace. */
     Tab selected() { return layout.activeTab().map(tabs::get).orElse(null); }
     Optional<Tab> tab(TabId id) { return Optional.ofNullable(tabs.get(id)); }
     List<GroupView> groupViews() { return List.copyOf(groups.values()); }
@@ -82,14 +77,10 @@ final class WorkspaceView extends JPanel {
     /** The split at {@code path}, while the layout has one there and shows it; null otherwise. */
     SplitContainer split(List<Integer> path) { return splits.get(path); }
 
-    /** Opens {@code tab} at the end of the active group, selected; a tab arriving from another window counts as moved. */
-    void open(Tab tab) {
-        if (tab.moving()) moved.add(tab.id());
-        Group active = layout.group(layout.activeGroup()).orElseThrow();
-        place(tab, layout.open(tab.id(), active.id(), active.tabs().size()));
-    }
+    /** Puts {@code tab} into the empty workspace's pane, as a new tab's first item. */
+    void open(Tab tab) { place(tab, layout.open(tab.id())); }
 
-    /** Opens {@code tab} in a new group on {@code side} of {@code group}; the empty workspace opens it in its group. */
+    /** Opens {@code tab} in a new pane on {@code side} of {@code group}; the empty workspace takes it in its pane. */
     void openBeside(Tab tab, GroupId group, Side side) {
         if (layout.isEmpty()) open(tab);
         else place(tab, layout.split(tab.id(), group, side));
@@ -100,51 +91,35 @@ final class WorkspaceView extends JPanel {
         apply(next);
     }
 
-    /** Takes {@code tab} out of the layout; its component leaves its group view. */
+    /** Takes {@code tab} out of the layout; its component leaves its pane, and its pane goes with it. */
     void remove(Tab tab) {
         if (!contains(tab)) return;
         Layout next = layout.remove(tab.id());
         tabs.remove(tab.id());
-        moved.remove(tab.id());
         apply(next);
     }
 
     void select(Tab tab) { if (contains(tab)) apply(layout.select(tab.id())); }
 
     /**
-     * Focus went into {@code tab}: it becomes the active tab without being focused again, so focus stays where it went
-     * (Rulings 26); nothing changes while it already is the active tab, so no focus request loops back here.
+     * Focus went into {@code tab}: it becomes the active item without being focused again, so focus stays where it went
+     * (Rulings 26); nothing changes while it already is the active item, so no focus request loops back here.
      */
     void focused(Tab tab) { if (contains(tab) && selected() != tab) apply(layout.select(tab.id()), false); }
     void activate(GroupId group) { apply(layout.activate(group)); }
-    /** Moves {@code tab} to {@code index} of {@code group}, which may be another group. */
-    void moveTab(Tab tab, GroupId group, int index) {
-        if (!contains(tab)) return;
-        moved.add(tab.id());
-        apply(layout.move(tab.id(), group, index));
-    }
 
-    /** Moves {@code tab} to {@code index} of {@code group}, its own, keeping the tab that group showed. */
-    void reorder(Tab tab, GroupId group, int index) {
-        if (!contains(tab)) return;
-        Optional<TabId> shown = layout.group(group).flatMap(Group::selected);
-        Layout next = layout.move(tab.id(), group, index);
-        if (shown.isPresent() && !shown.get().equals(tab.id())) next = next.select(shown.get());
-        apply(next);
-    }
-
+    /** Moves {@code tab}'s pane to {@code side} of {@code group}, another pane of this workspace (plan 8c's pane moves). */
     void moveToNewGroup(Tab tab, GroupId group, Side side) {
         if (!contains(tab)) return;
-        moved.add(tab.id());
         apply(layout.moveToNewGroup(tab.id(), group, side));
     }
+
     /**
-     * Gives this workspace {@code arranged}: its own tabs in another arrangement, as panes come back or a parent tab moves
-     * between windows (workspace plan 7b Rulings 6). Tabs {@code arranged} names that this workspace does not hold leave it
-     * first, and a tab it holds that {@code arranged} lacks, such as one a listener opened here meanwhile, joins the end of
-     * its active pane, so no tab is lost and {@code arranged}'s active tab still shows. Nothing changes when
-     * {@code arranged} names none of this workspace's tabs. Every tab takes its place at once, without the open motion, as
-     * a moved tab does.
+     * Gives this workspace {@code arranged}: its own items in another arrangement, as a tab moves between windows
+     * (workspace plan 7b Rulings 6). Items {@code arranged} names that this workspace does not hold leave it first, and an
+     * item it holds that {@code arranged} lacks, such as one a listener opened here meanwhile, joins in a new pane to the
+     * right of the active one, so no item is lost and {@code arranged}'s active item still shows. Nothing changes when
+     * {@code arranged} names none of this workspace's items.
      */
     void rearrange(Layout arranged) {
         Layout next = arranged;
@@ -154,31 +129,25 @@ final class WorkspaceView extends JPanel {
         boolean joined = false;
         for (TabId tab : layout.tabs()) {
             if (next.contains(tab)) continue;
-            Group active = next.group(next.activeGroup()).orElseThrow();
-            next = next.open(tab, active.id(), active.tabs().size());
+            next = next.split(tab, next.activeGroup(), Side.RIGHT);
             joined = true;
         }
         if (joined && shown.isPresent()) next = next.select(shown.get());
-        moved.addAll(tabs.keySet());
         apply(next);
     }
 
     void resizeSplit(List<Integer> path, List<Double> weights) { apply(layout.resize(path, weights)); }
     void toggleMaximize() { apply(layout.toggleMaximize(layout.activeGroup())); }
-    /** Ends a maximize, as a tab moving in or out of the window does (spec 15). */
+    /** Ends a maximize, as an item moving in or out of the window does (spec 15). */
     void unmaximize() { if (layout.maximized().isPresent()) apply(layout.unmaximize()); }
-    /** Whether {@code tab} came into its group by a move rather than by opening (Rulings 27). */
-    boolean moved(Tab tab) { return moved.contains(tab.id()); }
-    /** The group in {@code direction} from the active one, by the layout's geometry. */
+    /** The pane in {@code direction} from the active one, by the layout's geometry. */
     Optional<GroupId> neighbour(Side direction) { return layout.neighbour(layout.activeGroup(), direction); }
 
     private void apply(Layout next) { apply(next, true); }
 
     /**
-     * Renders {@code next}; with {@code refocus} the active tab takes focus when it, its group or the shape changed
-     * (Rulings 10), provided the workspace held focus when the change began. The active tab changes group only when it
-     * moves to another group: its component then leaves one card area for another, which takes the
-     * focus from it, and AWT hands the focus on to the next component, which may be another tab's and would select it.
+     * Renders {@code next}; with {@code refocus} the active item takes focus when it, its pane or the shape changed
+     * (Rulings 10), provided the workspace held focus when the change began.
      */
     private void apply(Layout next, boolean refocus) {
         if (closed) return;
@@ -195,10 +164,10 @@ final class WorkspaceView extends JPanel {
     private boolean holdsFocus() { return holdsFocus(owner, this); }
 
     /**
-     * Whether focus may follow a change of {@code area}, a workspace or a window's parent tabs: the palette's card does not
-     * hold the window's input, and the permanent focus owner is in {@code area} or nowhere a person sees it (a closed
-     * terminal, or the palette that just closed to run a command). Focus in the open palette, the Run window or a tool
-     * window stays there.
+     * Whether focus may follow a change of {@code area}, a workspace or a window's tabs: the palette's card does not hold
+     * the window's input, and the permanent focus owner is in {@code area} or nowhere a person sees it (a closed terminal,
+     * or the palette that just closed to run a command). Focus in the open palette, the Run window or a tool window stays
+     * there.
      */
     static boolean holdsFocus(WindowContent owner, Component area) {
         if (owner.commandPalette() != null && owner.commandPalette().blocksActions()) return false;
@@ -210,17 +179,14 @@ final class WorkspaceView extends JPanel {
         var live = new LinkedHashMap<GroupId, GroupView>();
         for (Group group : layout.groups()) {
             GroupView view = groups.remove(group.id());
-            live.put(group.id(), view != null ? view : new GroupView(owner, this, group.id()));
+            live.put(group.id(), view != null ? view : new GroupView(group.id()));
         }
         for (GroupView gone : groups.values()) gone.close();
         groups.clear();
         groups.putAll(live);
-        // Every change to a pane's tab count renders here, so its strip follows it in the same turn (parent tabs spec 7).
-        for (Group group : layout.groups())
-            groups.get(group.id()).display(group.tabs().stream().map(tabs::get).toList(), group.selected().map(tabs::get).orElse(null),
-                owner.look().showsStrip(group.tabs().size()));
+        for (Group group : layout.groups()) groups.get(group.id()).display(group.selected().map(tabs::get).orElse(null));
         Node shown = layout.maximized().<Node>map(id -> layout.group(id).orElseThrow()).orElse(layout.root());
-        // The main window's empty workspace shows New Terminal Tab and Open File in place of its empty group (spec 10).
+        // The main window's empty workspace shows New Terminal Tab and Open File in place of its empty pane (spec 10).
         boolean showEmpty = layout.isEmpty() && owner.isMain();
         Object next = showEmpty ? EMPTY : shape(shown);
         if (!next.equals(shape)) {
@@ -282,30 +248,26 @@ final class WorkspaceView extends JPanel {
         return ((Split) node).children().stream().map(Child::weight).toList();
     }
 
-    /** Refreshes every group's strip: its tabs, titles, selection and activity. */
+    /** Refreshes the empty state while it shows. */
     void refresh() {
         if (closed) return;
-        for (GroupView group : groups.values()) group.refresh();
         if (empty != null) empty.refresh();
     }
 
     /**
-     * Takes the theme: backgrounds, the strips' and the empty state's zones, and the delegates of a group the maximize
-     * keeps out of the tree and of the empty state while a tab hides it.
+     * Takes the theme: backgrounds, the empty state's zone, and the delegates of a pane the maximize keeps out of the tree
+     * and of the empty state while an item hides it.
      */
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         setBackground(theme.surface());
         for (SplitContainer split : splits.values()) split.setBackground(theme.surface());
-        for (GroupView group : groups.values()) {
+        for (GroupView group : groups.values())
             if (updateDelegates && !SwingUtilities.isDescendingFrom(group, this)) SwingUtilities.updateComponentTreeUI(group);
-            WorkspaceTheme.apply(group.strip().component(), theme);
-            group.refresh();
-        }
         if (updateDelegates && empty != null && !SwingUtilities.isDescendingFrom(empty, this)) SwingUtilities.updateComponentTreeUI(empty);
         if (empty != null) WorkspaceTheme.apply(empty, theme);
     }
 
-    /** Below opacity 1 the workspace and its splits paint nothing behind the tabs; dividers stay solid. */
+    /** Below opacity 1 the workspace and its splits paint nothing behind the items; dividers stay solid. */
     void setGlass(boolean value) {
         glass = value;
         setOpaque(!value);
@@ -313,9 +275,7 @@ final class WorkspaceView extends JPanel {
         repaint();
     }
 
-    void setAnimations(AnimationSettings settings) { for (GroupView group : groups.values()) group.strip().setAnimations(settings); }
-
-    /** The window closed, or this parent tab went: every strip is released; the tabs are its registry's to close. */
+    /** The window closed, or this tab went: every pane is released; the items are its registry's to close. */
     void close() {
         if (closed) return;
         closed = true;

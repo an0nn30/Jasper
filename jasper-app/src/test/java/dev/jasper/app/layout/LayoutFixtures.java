@@ -1,6 +1,5 @@
 package dev.jasper.app.layout;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,14 +16,14 @@ final class LayoutFixtures {
         return new GroupId(new UUID(1, n));
     }
 
-    /** Group {@code id} holding the one tab of the same number. */
+    /** Pane {@code id} holding the one tab of the same number. */
     static Group group(int id) {
-        return group(id, id, id);
+        return group(id, id);
     }
 
-    /** Group {@code id} holding {@code tabs} in order, showing {@code selected}. */
-    static Group group(int id, int selected, int... tabs) {
-        return new Group(groupId(id), Arrays.stream(tabs).mapToObj(LayoutFixtures::tab).toList(), Optional.of(tab(selected)));
+    /** Pane {@code id} holding tab {@code n}, its one tab (workspace plan 8a Rulings 2). */
+    static Group group(int id, int n) {
+        return new Group(groupId(id), List.of(tab(n)), Optional.of(tab(n)));
     }
 
     static Child child(Node node, double weight) {

@@ -62,9 +62,9 @@ class TabDragTest {
             owner = content(idleLauncher(pending));
             owner.setAnimations(new AnimationSettings(false, 0, 0, 0));
             owner.currentTerminal().rename("first");
-            owner.newParentTab(HOME);
+            owner.newTab(HOME);
             owner.currentTerminal().rename("second");
-            owner.newParentTab(HOME);
+            owner.newTab(HOME);
             owner.currentTerminal().rename("third");
             a = owner.tabs().get(0);
             b = owner.tabs().get(1);
@@ -162,7 +162,7 @@ class TabDragTest {
             owner.selectTab(a);
             owner.setAnimations(AnimationSettings.defaults());
             relayout(frame);
-            var strip = (WindowTabs) owner.parentTabBar();
+            var strip = (WindowTabs) owner.tabBar();
             Point pastThird = onEntry(owner, c, 0.75);
             Component source = start(owner, a, pastThird);
             TabDrag drag = owner.tabDrag();
@@ -385,7 +385,7 @@ class TabDragTest {
     /** The equal tabs report each entry's rectangle left to right inside their strip, which the drag drops between. */
     @Test void theEqualTabsReportTheirEntriesLeftToRightInsideTheStrip() throws Exception {
         edt(() -> {
-            TabStrip strip = owner.parentTabBar();
+            TabStrip strip = owner.tabBar();
             List<Rectangle> entries = strip.tabBounds();
             assertThat(entries).hasSize(3);
             for (int i = 0; i < entries.size(); i++) {
@@ -397,24 +397,23 @@ class TabDragTest {
         });
     }
 
-    /** Tabs and panes spec 4 and this plan's Rulings 18: a pane's strip starts no drag, under the classic tabs where it shows. */
-    @Test void aPanesStripStartsNoDrag() throws Exception {
+    /** Tabs and panes spec 5 and 6: Enterprise's strip shows with one tab too, and a press on its entry starts the tab drag. */
+    @Test void enterprisesStripAlwaysShowsAndStartsTheTabDrag() throws Exception {
         edt(() -> {
             ThemeController themes = EnterpriseLook.controller(false);
             WindowContent classic = null;
             try {
                 classic = DesktopTestSupport.content(idleLauncher(pending), themes, ClassicTabsTest.classic());
-                frame(classic, 100, 50, 1208, 760);
+                JPanel shown = frame(classic, 100, 50, 1208, 760);
                 var strip = (ClassicTabs) classic.tabBar();
-                assertThat(strip.component().isVisible()).as("the pane's classic strip shows").isTrue();
-                Component entry = strip.entries().getFirst();
-                Point press = middle(entry), away = new Point(press.x + 40, press.y + 20);
-                mouse(entry, MouseEvent.MOUSE_PRESSED, press);
-                mouse(entry, MouseEvent.MOUSE_DRAGGED, away);
-                assertThat(classic.tabDrag().active()).as("past the threshold, still no drag").isFalse();
-                assertThat(classic.tabDrag().label().showing()).isFalse();
-                mouse(entry, MouseEvent.MOUSE_RELEASED, away);
-                assertThat(classic.tabCount()).isEqualTo(1);
+                assertThat(strip.component().isVisible()).as("one tab: the strip shows").isTrue();
+                assertThat(strip.component().getHeight()).as("and takes its row").isEqualTo(classic.tabHeight());
+                Tab only = classic.selectedTab();
+                classic.newTab(HOME);
+                relayout(shown);
+                start(classic, only, onEntry(classic, classic.selectedTab(), 0.75));
+                assertThat(classic.tabDrag().active()).as("a press on its entry starts the tab drag").isTrue();
+                assertThat(classic.tabDrag().draggedParentTab()).isEqualTo(classic.parentTabOf(only).orElseThrow());
             } finally {
                 if (classic != null) classic.tabDrag().cancel();
                 DesktopTestSupport.closeOwnersNow();
@@ -424,23 +423,30 @@ class TabDragTest {
         });
     }
 
-    /**
-     * The user's decision of 2026-10-20 (one row under Enterprise, until this plan's Task 4): Enterprise shows no
-     * parent-tab bar, so no press starts a drag from it.
-     */
-    @Test void enterprisesBarNeverShowsSoNoTabDragStartsFromIt() throws Exception {
+    /** Tabs and panes spec 6: a press on the × of an entry of Enterprise's strip starts no tab drag, past the threshold too. */
+    @Test void aPressOnAnEntrysCloseStartsNoTabDrag() throws Exception {
         edt(() -> {
             ThemeController themes = EnterpriseLook.controller(false);
             WindowContent classic = null;
             try {
                 classic = DesktopTestSupport.content(idleLauncher(pending), themes, ClassicTabsTest.classic());
-                classic.newParentTab(HOME);
-                assertThat(classic.parentTabCount()).isEqualTo(2);
-                frame(classic, 100, 50, 1208, 760);
-                assertThat(classic.parentTabBar()).isInstanceOf(ClassicTabs.class);
-                assertThat(classic.parentTabBar().component().isVisible()).as("no bar to press").isFalse();
-                assertThat(classic.parentTabBar().component().getHeight()).as("and it takes no row").isZero();
-                assertThat(classic.tabDrag().active()).isFalse();
+                JPanel shown = frame(classic, 100, 50, 1208, 760);
+                Tab only = classic.selectedTab();
+                classic.newTab(HOME);
+                Tab added = classic.selectedTab();
+                relayout(shown);
+                var order = classic.windowLayout().parentTabs().stream().map(ParentTab::id).toList();
+                var entry = ((ClassicTabs) classic.tabBar()).entries().get(1);
+                Rectangle close = onScreen(entry, entry.closeBounds());
+                Point press = new Point((int) close.getCenterX(), (int) close.getCenterY());
+                mouse(entry, MouseEvent.MOUSE_PRESSED, press);
+                mouse(entry, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y + 12));
+                mouse(entry, MouseEvent.MOUSE_DRAGGED, onEntry(classic, only, 0.25));
+                assertThat(classic.tabDrag().active()).as("a press on the x starts no drag").isFalse();
+                mouse(entry, MouseEvent.MOUSE_RELEASED, onEntry(classic, only, 0.25));
+                assertThat(classic.windowLayout().parentTabs()).extracting(ParentTab::id).as("both tabs, in their order")
+                    .isEqualTo(order);
+                assertThat(classic.parentTabs().bar().tabs()).containsExactly(only, added);
             } finally {
                 if (classic != null) classic.tabDrag().cancel();
                 DesktopTestSupport.closeOwnersNow();

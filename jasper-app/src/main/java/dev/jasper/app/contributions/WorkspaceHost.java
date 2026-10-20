@@ -13,7 +13,7 @@ import java.util.function.Function;
  * One window's workspace as the tab registry sees it (workspace tabs spec 9.1). EDT only.
  *
  * @param id the window's id
- * @param attach shows a tab the registry placed in this window, at the end of its active group
+ * @param attach shows a tab the registry placed in this window, in a new tab of its own (tabs and panes spec 13)
  * @param detach takes a tab out of this window's layout, once the tab has closed (the registry disposes it first), as
  *     it moves to another window, or when the registry takes back an attach that failed
  * @param select shows a tab of this window and activates its group
@@ -23,14 +23,14 @@ import java.util.function.Function;
  */
 public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach, Consumer<Tab> select,
                             Runnable toFront, Function<TabId, Optional<GroupId>> groupOf, Beside attachBeside) {
-    /** Shows a tab in a new group beside a group of the window (workspace tabs spec 14's split placements; plan 5's drops). */
+    /** Shows a tab in a new pane beside a pane of the window (workspace tabs spec 14's split placements). */
     @FunctionalInterface
     public interface Beside {
         /**
          * Shows {@code tab} in a new group on {@code side} of {@code group}.
          *
          * @param tab a tab the registry placed in this window
-         * @param group a group of this window; null for its active group
+         * @param group a pane of this window; null for its focused pane
          * @param side where the new group goes
          */
         void attach(Tab tab, GroupId group, Side side);
@@ -44,7 +44,7 @@ public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach,
     }
 
     /**
-     * A workspace that places every tab at the end of its active group, as a fake window in a test does.
+     * A workspace that attaches a tab placed beside a pane as it attaches any other, as a fake window in a test does.
      *
      * @param id the window's id
      * @param attach shows a tab the registry placed in this window

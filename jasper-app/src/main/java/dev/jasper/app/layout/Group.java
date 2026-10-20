@@ -3,26 +3,25 @@ package dev.jasper.app.layout;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 /**
- * A tab group, a leaf of the tree: its tabs in strip order and the one it shows (spec 7.1).
+ * A pane, a leaf of the tree (tabs and panes spec 4): the one tab it holds and shows, or none in the empty workspace.
+ * The record keeps a list and a selection, the shape {@code workspace.toml} saves (workspace plan 8a Rulings 2).
  *
- * @param id the group's id
- * @param tabs its tabs in order, none twice
- * @param selected the tab it shows, one of {@code tabs}; empty exactly when there are none, which only the empty
- *     workspace's group may be
+ * @param id the pane's id
+ * @param tabs its one tab, or none in the empty workspace's pane
+ * @param selected the tab it shows, {@code tabs}' one; empty exactly when there is none
  */
 public record Group(GroupId id, List<TabId> tabs, Optional<TabId> selected) implements Node {
-    /** Copies the tabs and checks the selection. */
+    /** Copies the tab list and checks that it holds at most one tab, the one selected. */
     public Group {
         Objects.requireNonNull(id, "id");
         tabs = List.copyOf(tabs);
         Objects.requireNonNull(selected, "selected");
-        if (Set.copyOf(tabs).size() != tabs.size()) throw new IllegalArgumentException("Group " + id + " lists a tab twice");
+        if (tabs.size() > 1) throw new IllegalArgumentException("Pane " + id + " holds more than one tab");
         if (tabs.isEmpty() != selected.isEmpty())
-            throw new IllegalArgumentException(tabs.isEmpty() ? "The empty group " + id + " selects nothing" : "Group " + id + " selects one of its tabs");
+            throw new IllegalArgumentException(tabs.isEmpty() ? "The empty pane " + id + " selects nothing" : "Pane " + id + " selects its tab");
         if (selected.isPresent() && !tabs.contains(selected.get()))
-            throw new IllegalArgumentException("Group " + id + " does not hold its selected tab " + selected.get());
+            throw new IllegalArgumentException("Pane " + id + " does not hold its selected tab " + selected.get());
     }
 }

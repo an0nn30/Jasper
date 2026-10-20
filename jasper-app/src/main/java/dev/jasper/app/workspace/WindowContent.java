@@ -1146,28 +1146,29 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * The registry-facing side of this window's workspace (workspace tabs spec 9.1): its groups are every parent tab's, so
-     * a tab placed beside a group lands in that group's parent tab (workspace plan 7a Rulings 8).
+     * The registry-facing side of this window's workspace (workspace tabs spec 9.1): its panes are every tab's, so an item
+     * placed beside a pane lands in that pane's tab (workspace plan 7a Rulings 8), and one placed without a pane opens as
+     * a new tab (plan 8a Rulings 3).
      */
     private WorkspaceHost workspaceHost() {
         return new WorkspaceHost(id, this::attach, this::detach, this::selectTab, () -> bringToFront.run(),
             parentTabs::groupOf,
-            (tab, group, side) -> attach(tab, false, group != null ? group : workspace().model().activeGroup(), side, false));
+            (tab, group, side) -> attach(tab, false, group != null ? group : workspace().model().activeGroup(), side));
     }
 
     /**
-     * Shows a tab in this window, at the end of the shown parent tab's active group and selected: one the registry
-     * placed here, or one this window opened. A failure leaves nothing mounted, takes back what the terminal registry
-     * heard, and propagates.
+     * Shows an item in this window, in a new tab at the end of the strip and shown, which the main window's empty
+     * workspace takes in its place (tabs and panes spec 13; workspace plan 8a Rulings 3): one the registry placed here, or
+     * one this window opened. A failure leaves nothing mounted, takes back what the terminal registry heard, and
+     * propagates.
      */
-    private void attach(Tab tab) { attach(tab, false, null, null, false); }
+    private void attach(Tab tab) { attach(tab, false, null, null); }
 
     /**
-     * As {@link #attach(Tab)}; with {@code opened} a new terminal tab's pane is announced as opened, with {@code beside}
-     * the tab opens in a new group on {@code side} of that group, in the parent tab holding it, and with
-     * {@code parentTab} it opens in a new parent tab of its own (parent tabs spec 8).
+     * As {@link #attach(Tab)}; with {@code opened} a new terminal's pane is announced as opened, and with {@code beside}
+     * the item opens in a new pane on {@code side} of that pane, in the tab holding it.
      */
-    private void attach(Tab tab, boolean opened, GroupId beside, Side side, boolean parentTab) {
+    private void attach(Tab tab, boolean opened, GroupId beside, Side side) {
         JComponent component = tab.component();
         boolean announced = false;
         try {
@@ -1175,10 +1176,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             tabListeners.put(tab, tab.onChanged(this::update));
             if (terminals != null) { terminals.tabArrived(tab, tab.movingFrom()); announced = true; }
             tabHost.attach(tab, opened);
-            if (parentTab) parentTabs.openParentTab(tab);
-            // A tab a move between windows brings in lands in the parent tab chosen for it (workspace plan 7b Rulings 6).
-            else if (beside == null && landing != null && tab.moving()) parentTabs.land(tab, landing.parentTab(), landing.index());
-            else if (beside == null) workspace().open(tab);
+            // An item a move between windows brings in lands in the tab chosen for it (workspace plan 7b Rulings 6).
+            if (beside == null && landing != null && tab.moving()) parentTabs.land(tab, landing.parentTab(), landing.index());
+            // Whatever opens without a pane opens as a new tab; the main window's empty workspace takes it in its place.
+            else if (beside == null && parentTabs.isEmpty()) workspace().open(tab);
+            else if (beside == null) parentTabs.openParentTab(tab);
             else parentTabs.holding(beside).orElseThrow(() -> new IllegalArgumentException("Group " + beside + " is not in this window"))
                 .openBeside(tab, beside, side);
             // A tab that moves in ends its parent tab's maximize; one that opens here does not (spec 15).
@@ -1247,9 +1249,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /** The selected plugin tab; null while a terminal tab is selected or the window is empty. */
     public Tab selectedContent() { Tab tab = selectedTab(); return tab != null && tab.kind() == Tab.Kind.HOSTED ? tab : null; }
-    /** The shown parent tab's active group's selected tab; null in an empty workspace. */
+    /** The shown tab's active pane's item; null in an empty workspace. */
     Tab selectedTab() { return parentTabs.active().selected(); }
-    /** This window's tabs: its parent tabs in bar order, each one's tabs in workspace order. */
+    /** This window's items: its tabs in strip order, each one's items pane by pane. */
     java.util.List<Tab> tabs() { return parentTabs.tabs(); }
     int tabCount() { return parentTabs.tabCount(); }
     /** The tab showing {@code component}; null when none of this window's does. */
@@ -1342,8 +1344,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         WindowManager.rethrow(failure);
         return arrived;
     }
-    /** The parent-tab bar's strip (parent tabs spec 7). */
-    TabStrip parentTabBar() { return parentTabs.bar().strip(); }
     TabRegistry tabRegistry() { return registry; }
     boolean windowActive() { return active; }
     dev.jasper.app.config.AnimationSettings animations() { return animations; }
@@ -1505,10 +1505,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     JToolBar toolbar() { return chrome.toolbar(); }
     WindowStatusBar status() { return chrome.status(); }
     JMenuBar menuBar() { return chrome.menuBar(); }
-    /** The active group's equal tabs; the default look's tests read them. */
+    /** The window's equal tabs; the default look's tests read them. */
     WindowTabs windowTabs() { return (WindowTabs) tabBar(); }
-    /** The active group's strip. */
-    TabStrip tabBar() { return workspace().activeGroupView().strip(); }
+    /** The window's one tab strip (tabs and panes spec 5). */
+    TabStrip tabBar() { return parentTabs.bar().strip(); }
     private void refreshTabs() { parentTabs.refresh(); }
 
     /** The active tab's terminal; null while a plugin's tab is active or the workspace is empty. */
@@ -1523,21 +1523,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      */
     Path directory() { return currentPane() == null ? null : currentPane().inheritableDirectory(); }
 
-    /** A tab whose shell starts in {@code directory}; null means where a new shell starts (the user's home). */
-    public void newTab(Path directory) { openTab(directory); }
-
     /**
-     * New Tab (parent tabs spec 8): a terminal in a new parent tab at the end of the bar, shown, starting in
-     * {@code directory}. The main window's empty workspace takes it in its only parent tab, the one parent tab that may be
-     * empty (workspace plan 7a Rulings 7).
+     * New Tab (tabs and panes spec 10): a terminal in a new tab at the end of the strip, shown, starting in
+     * {@code directory}. The main window's empty workspace takes it in its only tab, the one tab that may be empty
+     * (workspace plan 7a Rulings 7).
      *
      * @param directory where its shell starts; null means where a new shell starts
-     * @return the terminal tab; null once the window has closed
+     * @return the terminal; null once the window has closed
      */
-    public TerminalContent newParentTab(Path directory) {
-        return parentTabs.isEmpty() ? openTab(directory)
-            : openTerminal(directory, null, Optional.empty(), Optional.empty(), null, null, true);
-    }
+    public TerminalContent newTab(Path directory) { return openTab(directory); }
 
     /** Shows the parent tab {@code id} and focuses its active tab (workspace plan 7a Rulings 10); nothing for another window's. */
     void selectParentTab(ParentTabId id) {
@@ -1588,24 +1582,22 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /** As above; {@code program} runs in the local first pane instead of its shell. */
     TerminalContent openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile, Optional<java.util.List<String>> program) {
-        return openTerminal(directory, requestOrNull, profile, program, null, null, false);
+        return openTerminal(directory, requestOrNull, profile, program, null, null);
     }
 
     /**
-     * A terminal tab starting in {@code directory} (null: where a new shell starts), in the active group, in a new group
-     * on {@code side} of {@code beside} when that is given, or in a new parent tab of its own when {@code parentTab}.
-     * Null once the window has closed.
+     * A terminal starting in {@code directory} (null: where a new shell starts), in a new tab of its own, or in a new
+     * pane on {@code side} of {@code beside} when that is given. Null once the window has closed.
      */
     private TerminalContent openTerminal(Path directory, SessionRequest requestOrNull, Optional<String> profile,
-                                         Optional<java.util.List<String>> program, GroupId beside, Side side,
-                                         boolean parentTab) {
+                                         Optional<java.util.List<String>> program, GroupId beside, Side side) {
         if (closed) return null;
         TabId tabId = TabId.random();
         TerminalContent terminal = new TerminalContent(tabId, directory, launcher, requestOrNull, profile, program);
         Tab tab = registry.add(tabId, Tab.Kind.TERMINAL, terminal, id);
         tab.focusTarget(terminal::focusTerminal);
         try {
-            attach(tab, true, beside, side, parentTab);
+            attach(tab, true, beside, side);
         } catch (RuntimeException | Error failure) {
             // attach mounted nothing; the registered tab and its pane go with the failure (workspace plan 3a Rulings 28).
             try { tab.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
@@ -1625,7 +1617,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         TerminalContent target = currentTerminal();
         if (target != null && target.pane().running())
             return openBeside(target, side, null, null, target.pane().profile(), Optional.empty());
-        return openTerminal(directory(), null, Optional.empty(), Optional.empty(), workspace().model().activeGroup(), side, false);
+        return openTerminal(directory(), null, Optional.empty(), Optional.empty(), workspace().model().activeGroup(), side);
     }
 
     /**
@@ -1639,7 +1631,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || beside == null || !target.pane().running()) return null;
         GroupId group = parentTabs.groupOf(beside.id()).orElseThrow();
         Path directory = directoryOrNull == null ? target.pane().inheritableDirectory() : directoryOrNull;
-        return openTerminal(directory, requestOrNull, profile, program, group, side, false);
+        return openTerminal(directory, requestOrNull, profile, program, group, side);
     }
 
     /** Maximize Pane: the active pane fills the workspace, or the splits come back. */

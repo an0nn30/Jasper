@@ -166,27 +166,23 @@ class TabMoveTest {
         });
     }
 
-    @Test void aMoveEndsTheMaximizeOnBothSidesAndClosingATabKeepsIt() throws Exception {
-        edt(() -> { source.newTab(HOME); source.newTab(HOME); target.newTab(HOME); });
+    /** Spec 15: an item moving out ends its tab's maximize; closing another pane keeps it while the maximized one stands. */
+    @Test void aMoveOutEndsTheMaximizeAndClosingAPaneKeepsIt() throws Exception {
+        edt(() -> { source.split(Side.RIGHT); source.split(Side.RIGHT); });
         while (!pending.isEmpty()) pending.remove().run();
         edt(() -> {
-            var from = source.workspace(); var to = target.workspace();
-            var moving = source.tabs();
-            from.moveToNewGroup(moving.get(3), from.model().activeGroup(), Side.RIGHT);
-            source.selectTab(moving.get(0));
+            var from = source.workspace();
+            var panes = from.tabs();
+            source.selectTab(panes.get(0));
             from.toggleMaximize();
             var maximized = from.model().maximized();
-            assertThat(maximized).contains(from.model().groupOf(moving.get(0).id()).orElseThrow());
-            source.closeTab(moving.get(0));
-            assertThat(from.model().maximized()).as("closing one of its tabs keeps the maximize").isEqualTo(maximized);
-            var staying = target.tabs();
-            to.moveToNewGroup(staying.get(1), to.model().activeGroup(), Side.RIGHT);
-            to.toggleMaximize();
-            assertThat(to.model().maximized()).isPresent();
-            model.tabs().move(moving.get(1), target.id());
-            assertThat(from.model().maximized()).as("its group lost a tab by a move").isEmpty();
-            assertThat(to.model().maximized()).as("the active group gained one").isEmpty();
-            assertThat(target.selectedTab()).isSameAs(moving.get(1));
+            assertThat(maximized).contains(from.model().groupOf(panes.get(0).id()).orElseThrow());
+            source.closeTab(panes.get(2));
+            assertThat(from.model().maximized()).as("closing another pane keeps the maximize").isEqualTo(maximized);
+            model.tabs().move(panes.get(1), target.id());
+            assertThat(from.model().maximized()).as("a pane leaving by a move ends it").isEmpty();
+            assertThat(target.selectedTab()).as("in a new tab of the target").isSameAs(panes.get(1));
+            assertThat(target.workspace().model().maximized()).isEmpty();
         });
     }
 
@@ -212,13 +208,20 @@ class TabMoveTest {
         });
     }
 
-    @Test void aTabThatArrivesByAMoveIsShownWithoutTheOpenMotion() throws Exception {
+    /** Tabs and panes spec 5 and workspace plan 8a Rulings 20: a tab that arrives by a move takes its place at once. */
+    @Test void aTabThatArrivesByAMoveTakesItsPlaceInTheStripAtOnce() throws Exception {
         edt(() -> {
-            Tab tab = source.selectedTab();
-            assertThat(source.workspace().moved(tab)).as("it opened here").isFalse();
-            model.tabs().move(tab, target.id());
-            assertThat(target.workspace().moved(tab)).as("it arrived by a move (Rulings 27)").isTrue();
-            assertThat(source.workspace().moved(tab)).isFalse();
+            target.newTab(HOME);
+            target.setSize(1000, 700);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(target);
+            var strip = target.windowTabs();
+            assertThat(strip.isVisible()).as("two tabs").isTrue();
+            assertThat(strip.motionRunning()).isFalse();
+            model.tabs().move(source.selectedTab(), target.id());
+            assertThat(target.parentTabCount()).isEqualTo(3);
+            assertThat(strip.motionRunning()).as("a tab that arrives by a move").isFalse();
+            target.newTab(HOME);
+            assertThat(strip.motionRunning()).as("a new tab opens with the motion").isTrue();
         });
     }
 }

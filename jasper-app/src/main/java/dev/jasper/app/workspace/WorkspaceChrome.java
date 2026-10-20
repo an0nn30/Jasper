@@ -22,7 +22,7 @@ public final class WorkspaceChrome {
     private final TitleFormat title;
     /** The header's composition, made for each window by {@link #header()}. */
     private final WorkspaceLook.Header header;
-    /** The editor tabs, made for each tab group and each window's parent-tab bar by {@link #tabs(StripSource)}. */
+    /** The editor tabs, made for each window's tab strip by {@link #tabs(ParentTabBar)}. */
     private final WorkspaceLook.Tabs tabs;
     /** The status bar's layout, and whether it leads with the run item: made for each window by {@link #statusBar}. */
     private final WorkspaceLook.Status status;
@@ -104,34 +104,22 @@ public final class WorkspaceChrome {
         };
     }
 
-    /** One tab group's strip, or a window's parent-tab bar (spec 10.5; workspace tabs spec 10; parent tabs spec 7). */
-    TabStrip tabs(StripSource source) {
+    /** A window's tab strip (spec 10.5; tabs and panes spec 5). */
+    TabStrip tabs(ParentTabBar bar) {
         return switch (tabs) {
-            case EQUAL -> new WindowTabs(source);
-            case CLASSIC -> new ClassicTabs(source);
+            case EQUAL -> new WindowTabs(bar);
+            case CLASSIC -> new ClassicTabs(bar);
         };
     }
 
     /**
-     * Whether a pane holding {@code count} tabs shows its strip (parent tabs spec 7): the classic tabs always show; the
-     * equal tabs show unless the pane holds a single tab.
+     * Whether a window holding {@code count} tabs shows its tab strip (tabs and panes spec 5): the equal tabs from two
+     * tabs; the classic tabs (Enterprise) always, over the main window's empty workspace too.
      */
-    boolean showsStrip(int count) {
-        return switch (tabs) {
-            case EQUAL -> count != 1;
-            case CLASSIC -> true;
-        };
-    }
-
-    /**
-     * Whether a window holding {@code count} parent tabs shows its parent-tab bar (parent tabs spec 7): the equal tabs
-     * from two parent tabs; the classic tabs (Enterprise) never, as each pane's strip is the window's only tab row (the
-     * user's decision of 2026-10-20).
-     */
-    boolean showsParentTabBar(int count) {
+    boolean showsTabStrip(int count) {
         return switch (tabs) {
             case EQUAL -> count > 1;
-            case CLASSIC -> false;
+            case CLASSIC -> true;
         };
     }
 

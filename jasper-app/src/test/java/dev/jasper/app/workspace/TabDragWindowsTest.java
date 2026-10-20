@@ -120,7 +120,7 @@ class TabDragWindowsTest {
 
     /** A new tab in {@code window}, shown and laid out, so its strip shows: its id. Its shell starts at the next launch. */
     private ParentTabId secondTab(JasperWindow window) {
-        window.content().newParentTab(HOME);
+        window.content().newTab(HOME);
         relayout(frameOf(window));
         return window.content().activeParentTab();
     }
@@ -138,7 +138,7 @@ class TabDragWindowsTest {
     /** The band at the top of {@code window}'s tabs where its strip shows, on the pretend screen. */
     private static Rectangle band(WindowContent window) {
         var parents = window.parentTabs();
-        int height = window.parentTabBar().component().getPreferredSize().height;
+        int height = window.tabBar().component().getPreferredSize().height;
         return onScreen(parents, new Rectangle(0, 0, parents.getWidth(), height));
     }
 
@@ -216,7 +216,7 @@ class TabDragWindowsTest {
             assertThat(to.parentTabs().view(moving).orElseThrow().model()).as("whole, with its id and layout").isEqualTo(layout);
             assertThat(to.activeParentTab()).isEqualTo(moving);
             assertThat(tabIds(from)).hasSize(1);
-            assertThat(from.parentTabBar().component().isVisible()).as("one tab left: its strip hides").isFalse();
+            assertThat(from.tabBar().component().isVisible()).as("one tab left: its strip hides").isFalse();
             assertThat(moves()).as("one move per item, reported where it arrives").containsExactlyElementsOf(tabs.stream()
                 .map(tab -> (TerminalEvent) new TerminalEvent.TabMoved(tab.id().value(), main.id(), child.id())).toList());
             assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
@@ -263,7 +263,7 @@ class TabDragWindowsTest {
         launch();
         edt(() -> {
             WindowContent from = main.content(), to = child.content();
-            assertThat(to.parentTabBar().component().isVisible()).as("one tab").isFalse();
+            assertThat(to.tabBar().component().isVisible()).as("one tab").isFalse();
             Tab moving = entryOf(from, ids[1]);
             Point panes = inside(pane(to, activeGroup(child)), 0.5, 0.5);
             Component source = start(from, moving, panes);
@@ -280,9 +280,9 @@ class TabDragWindowsTest {
             assertThat(manager.tabDrag().overlay().placeholder()).isNull();
             mouse(source, MouseEvent.MOUSE_RELEASED, top);
             assertThat(tabIds(to)).containsExactly(ids[0], ids[1]);
-            assertThat(to.parentTabBar().component().isVisible()).as("two tabs: its strip shows").isTrue();
+            assertThat(to.tabBar().component().isVisible()).as("two tabs: its strip shows").isTrue();
             assertThat(moving.window()).isEqualTo(child.id());
-            assertThat(from.parentTabBar().component().isVisible()).isFalse();
+            assertThat(from.tabBar().component().isVisible()).isFalse();
         });
     }
 
@@ -296,14 +296,14 @@ class TabDragWindowsTest {
             for (Tab open : List.copyOf(to.tabs())) to.closeTab(open);
             relayout(frameOf(main));
             assertThat(to.tabs()).isEmpty();
-            assertThat(to.parentTabBar().component().isVisible()).as("the empty workspace shows no strip").isFalse();
+            assertThat(to.tabBar().component().isVisible()).as("the empty workspace shows no strip").isFalse();
             Tab moving = entryOf(from, id[0]);
             Point top = inside(band(to), 0.5, 0.5);
             Component source = start(from, moving, top);
             assertThat(manager.tabDrag().target()).as("its strip has no entry").contains(new TabDrag.Target.Bar(to, 0));
             mouse(source, MouseEvent.MOUSE_RELEASED, top);
             assertThat(tabIds(to)).as("in the empty workspace's place").containsExactly(id[0]);
-            assertThat(to.parentTabBar().component().isVisible()).as("one tab: still no strip").isFalse();
+            assertThat(to.tabBar().component().isVisible()).as("one tab: still no strip").isFalse();
             assertThat(moving.window()).isEqualTo(main.id());
             assertThat(tabIds(from)).hasSize(1);
         });
@@ -350,7 +350,7 @@ class TabDragWindowsTest {
             Layout layout = workspace.model();
             Tab moving = entryOf(from, id[0]);
             Object session = session(moving);
-            TabStrip strip = from.parentTabBar();
+            TabStrip strip = from.tabBar();
             Rectangle home = onScreen(strip.component(), strip.tabBounds().get(1));
             Point press = middle(entry(from, moving));
             Point outside = new Point(2600, 900);
@@ -385,7 +385,7 @@ class TabDragWindowsTest {
             WindowContent from = child.content(), to = main.content();
             ParentTabId only = from.activeParentTab();
             Tab moving = entryOf(from, only);
-            assertThat(from.parentTabBar().component().isVisible()).as("no strip over it to drag it from").isFalse();
+            assertThat(from.tabBar().component().isVisible()).as("no strip over it to drag it from").isFalse();
             assertThat(from.mayMoveTabToNewWindow(only)).as("a full window's only tab stays in its window").isFalse();
             List<ParentTabId> before = tabIds(to);
             facts.clear();

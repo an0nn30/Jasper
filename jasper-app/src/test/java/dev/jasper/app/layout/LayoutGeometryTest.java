@@ -78,17 +78,17 @@ class LayoutGeometryTest {
         assertThatNullPointerException().isThrownBy(() -> pair.split(tab(9), groupId(1), null));
     }
 
-    @Test void moveToNewGroupMovesAnExistingTabBesideAGroup() {
-        Layout pair = layout(h(child(group(1, 1, 1, 2), 0.5), child(group(2, 3, 3), 0.5)), 1);
-        Layout below = pair.moveToNewGroup(tab(2), groupId(2), Side.DOWN);
-        assertThat(below.root()).isEqualTo(h(child(group(1, 1, 1), 0.5), child(v(child(group(2, 3, 3), 0.5), child(fresh(below, 2), 0.5)), 0.5)));
-        assertThat(below.activeGroup()).isEqualTo(below.groupOf(tab(2)).orElseThrow());
-        Layout own = pair.moveToNewGroup(tab(1), groupId(1), Side.RIGHT);
-        assertThat(own.root()).as("out of its own group")
-            .isEqualTo(h(child(group(1, 2, 2), 0.25), child(fresh(own, 1), 0.25), child(group(2, 3, 3), 0.5)));
-        Layout emptied = pair.moveToNewGroup(tab(3), groupId(1), Side.LEFT);
-        assertThat(emptied.root()).as("its emptied group goes first").isEqualTo(h(child(fresh(emptied, 3), 0.5), child(group(1, 1, 1, 2), 0.5)));
-        assertThatIllegalArgumentException().as("a group's only tab").isThrownBy(() -> pair.moveToNewGroup(tab(3), groupId(2), Side.RIGHT));
+    /** Plan 8c's pane moves: a tab's pane goes beside another pane, its own pane's space going first. */
+    @Test void moveToNewGroupMovesATabsPaneBesideAnotherPane() {
+        Layout pair = layout(h(child(group(1), 0.5), child(group(2, 3), 0.5)), 1);
+        Layout below = pair.moveToNewGroup(tab(1), groupId(2), Side.DOWN);
+        assertThat(below.root()).as("its own pane goes; the other splits").isEqualTo(v(child(group(2, 3), 0.5), child(fresh(below, 1), 0.5)));
+        assertThat(below.activeGroup()).isEqualTo(below.groupOf(tab(1)).orElseThrow());
+        Layout three = layout(h(child(group(1), 0.25), child(group(2), 0.25), child(group(3), 0.5)), 1);
+        Layout left = three.moveToNewGroup(tab(3), groupId(1), Side.LEFT);
+        assertThat(left.root()).as("its emptied pane's space goes first")
+            .isEqualTo(h(child(fresh(left, 3), 0.125), child(group(1), 0.125), child(group(2), 0.75)));
+        assertThatIllegalArgumentException().as("beside its own pane").isThrownBy(() -> pair.moveToNewGroup(tab(3), groupId(2), Side.RIGHT));
         assertThatIllegalArgumentException().isThrownBy(() -> pair.moveToNewGroup(tab(9), groupId(1), Side.RIGHT));
         assertThatIllegalArgumentException().isThrownBy(() -> pair.moveToNewGroup(tab(1), groupId(9), Side.RIGHT));
     }
@@ -130,7 +130,7 @@ class LayoutGeometryTest {
     }
 
     @Test void newGroupsClearTheMaximizeAndResizingKeepsIt() {
-        Layout max = layout(h(child(group(1, 1, 1, 2), 0.5), child(group(2, 3, 3), 0.5)), 1).toggleMaximize(groupId(2));
+        Layout max = layout(h(child(group(1), 0.5), child(v(child(group(2, 3), 0.5), child(group(4, 2), 0.5)), 0.5)), 1).toggleMaximize(groupId(2));
         assertThat(max.split(tab(9), groupId(2), Side.RIGHT).maximized()).isEmpty();
         assertThat(max.moveToNewGroup(tab(2), groupId(1), Side.DOWN).maximized()).isEmpty();
         assertThat(max.resize(List.of(), List.of(1.0, 3.0)).maximized()).contains(groupId(2));

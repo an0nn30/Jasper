@@ -14,8 +14,9 @@ import javax.swing.Icon;
 import javax.swing.JComponent;
 
 /**
- * One tab of any window (workspace tabs spec 9.1): its id and kind, its content, its presentation (title, detail, icon,
- * unsaved marker, location, host, status items), its commands and focus target, and the window that holds it. Moving the
+ * One item of any window, the one a pane shows (workspace tabs spec 9.1; tabs and panes spec 3; the code calls an item
+ * a tab): its id and kind, its content, its presentation (title, detail, icon, unsaved marker, location, host, status
+ * items), its commands and focus target, and the window that holds it. Moving the
  * tab between windows never replaces this object or its content; only {@link TabRegistry#remove(Tab)} disposes it. EDT
  * only.
  */

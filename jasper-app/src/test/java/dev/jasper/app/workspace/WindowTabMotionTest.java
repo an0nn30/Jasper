@@ -136,7 +136,7 @@ class WindowTabMotionTest {
                 var owner = content(launcher(new ArrayDeque<>()), themes.get());
                 owner.setAnimations(AnimationSettings.defaults());
                 owner.currentTerminal().rename("first"); owner.update();
-                var clock = new AtomicLong(); var strip = new WindowTabs(owner.workspace().activeGroupView(), clock::get);
+                var clock = new AtomicLong(); var strip = new WindowTabs(owner.parentTabs().bar(), clock::get);
                 strips.add(strip); strip.refresh(); strip.setSize(800, 30); strip.doLayout();
                 var f = new Fixture(owner, strip, clock);
                 f.add("second");
@@ -149,52 +149,61 @@ class WindowTabMotionTest {
         }
     }
 
-    /** Spec 4: a tab that joins or leaves a group by a move, or is reordered, takes its place at once (Rulings 27). */
-    @Test void movesAndReordersTakeTheirPlaceAtOnce() throws Exception {
+    /**
+     * Tabs and panes spec 5 and workspace plan 8a Rulings 20: a reorder takes its place at once, and a tab's entry
+     * keeps its place while the tab splits, shows another pane or closes one.
+     */
+    @Test void reordersAndPanesTakeTheirPlaceAtOnce() throws Exception {
         edt(() -> {
             var f = fixture(); f.add("second"); f.add("third"); f.advance(1000);
-            var workspace = f.owner.workspace();
-            var group = workspace.model().activeGroup();
-            var third = f.owner.selectedTab();
-            workspace.moveToNewGroup(third, group, dev.jasper.app.layout.Side.RIGHT); f.strip.refresh();
-            assertThat(f.strip.motionRunning()).as("a tab leaving by a move").isFalse();
-            assertThat(f.entry("first").getBounds()).isEqualTo(new Rectangle(0, 0, 400, 30));
-            workspace.moveTab(third, group, 1); f.strip.refresh();
-            assertThat(f.strip.motionRunning()).as("a tab joining by a move").isFalse();
-            assertThat(f.entry("third").getBounds()).isEqualTo(new Rectangle(267, 0, 266, 30));
-            workspace.reorder(third, group, 0); f.strip.refresh();
+            f.owner.reorderParentTab(f.owner.activeParentTab(), 0); f.strip.refresh();
             assertThat(f.strip.motionRunning()).as("a reorder").isFalse();
             assertThat(f.entry("third").getBounds()).isEqualTo(new Rectangle(0, 0, 267, 30));
+            f.owner.split(dev.jasper.app.layout.Side.RIGHT); f.owner.currentTerminal().rename("beside"); f.strip.refresh();
+            assertThat(f.strip.motionRunning()).as("a split shows its new pane in the tab's entry").isFalse();
+            assertThat(f.entry("beside").getBounds()).isEqualTo(new Rectangle(0, 0, 267, 30));
+            f.owner.focusGroup(dev.jasper.app.layout.Side.LEFT); f.strip.refresh();
+            assertThat(f.strip.motionRunning()).as("another pane focused").isFalse();
+            assertThat(f.entry("third").getBounds()).isEqualTo(new Rectangle(0, 0, 267, 30));
+            f.owner.closeTab(f.owner.currentTerminal()); f.strip.refresh();
+            assertThat(f.strip.motionRunning()).as("a pane of a split tab closed").isFalse();
+            assertThat(f.entry("beside").getBounds()).isEqualTo(new Rectangle(0, 0, 267, 30));
             f.add("fourth");
             assertThat(f.strip.motionRunning()).as("an open still moves").isTrue();
         });
     }
 
-    /** Workspace plan 7a: a strip in a hidden parent tab takes a closed tab at once; once it shows, a close moves. */
-    @Test void aStripInAHiddenParentTabTakesAClosedTabAtOnce() throws Exception {
+    /** Workspace plan 8a Rulings 20: a tab under a new id keeps its entry, settled as it shows another pane. */
+    @Test void aTabUnderANewIdKeepsItsEntrySettled() throws Exception {
+        edt(() -> {
+            var f = fixture(); f.add("second"); f.add("third"); f.advance(1000);
+            var entry = f.entry("third");
+            f.owner.parentTabs().reid(f.owner.activeParentTab(), dev.jasper.app.layout.ParentTabId.random()); f.strip.refresh();
+            f.owner.split(dev.jasper.app.layout.Side.RIGHT); f.owner.currentTerminal().rename("beside"); f.strip.refresh();
+            assertThat(f.strip.motionRunning()).as("the new pane shows in the tab's entry, settled").isFalse();
+            assertThat(f.entry("beside")).as("the same entry").isSameAs(entry);
+            assertThat(f.entry("beside").getBounds()).isEqualTo(new Rectangle(533, 0, 267, 30));
+        });
+    }
+
+    /** Tabs and panes spec 5: closing down to one tab hides the strip at once, its motion settled. */
+    @Test void theStripHidesSettledWithOneTabLeft() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
-            for (int i = 0; i < 3; i++) owner.newTab(HOME);
-            owner.setSize(1208, 700);
-            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
-            WorkspaceView hidden = owner.workspace();
-            var strip = (WindowTabs) hidden.activeGroupView().strip();
-            var tabs = hidden.tabs();
-            owner.newParentTab(HOME);
-            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
-            owner.closeTab(tabs.get(3));
-            assertThat(strip.isVisible()).as("the strip itself is visible").isTrue();
-            assertThat(strip.motionRunning()).as("its parent tab is not").isFalse();
-            owner.selectParentTab(hidden.id());
-            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
-            owner.closeTab(tabs.get(2));
-            assertThat(strip.motionRunning()).as("once it shows, a close moves").isTrue();
+            owner.newTab(HOME); owner.newTab(HOME);
+            owner.setSize(800, 500); WindowTabsTest.layoutTree(owner);
+            var strip = owner.windowTabs();
+            owner.closeTab(owner.currentTerminal());
+            assertThat(strip.motionRunning()).as("two tabs left: the close moves").isTrue();
+            owner.closeTab(owner.currentTerminal());
+            assertThat(strip.isVisible()).as("one tab: no strip").isFalse();
+            assertThat(strip.motionRunning()).as("it hides settled").isFalse();
         });
     }
 
     private Fixture fixture() {
         var owner = content(launcher(new ArrayDeque<>())); owner.currentTerminal().rename("first"); owner.update();
-        var clock = new AtomicLong(); var strip = new WindowTabs(owner.workspace().activeGroupView(), clock::get);
+        var clock = new AtomicLong(); var strip = new WindowTabs(owner.parentTabs().bar(), clock::get);
         strips.add(strip); strip.refresh(); strip.setSize(800, 30); strip.doLayout();
         return new Fixture(owner, strip, clock);
     }

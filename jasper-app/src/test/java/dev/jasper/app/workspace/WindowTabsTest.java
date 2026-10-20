@@ -156,7 +156,7 @@ class WindowTabsTest {
             var first = owner.currentTerminal(); first.rename("first"); owner.update();
             JComponent control = named(strip, "select:first");
             owner.newTab(HOME); var second = owner.currentTerminal();
-            owner.workspace().reorder(owner.tabs().get(1), owner.workspace().model().activeGroup(), 0);
+            owner.reorderParentTab(owner.parentTabOf(owner.tabs().get(1)).orElseThrow(), 0);
             assertThat(owner.currentTerminal()).isSameAs(second);
             first.rename("<html>literal title"); owner.update();
             owner.selectVariant(false);
@@ -193,8 +193,8 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            JComponent strip = owner.parentTabBar().component();
-            var first = owner.currentTerminal(); first.rename("first"); owner.newParentTab(HOME);
+            JComponent strip = owner.tabBar().component();
+            var first = owner.currentTerminal(); first.rename("first"); owner.newTab(HOME);
             var second = owner.currentTerminal(); second.rename("second"); owner.update();
             // The whole window lays out, so the tab drag finds the strip inside it (workspace tabs spec 12).
             layout(owner, 800, 600);

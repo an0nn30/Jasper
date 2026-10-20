@@ -17,7 +17,7 @@ public interface Terminals {
     Optional<WindowHandle> activeWindow();
 
     /**
-     * The pane of the active window's active tab (the selected tab of its active group), when that tab is a terminal tab.
+     * The pane of the active window's active tab (the focused pane's, in its shown tab), when that tab is a terminal tab.
      *
      * @return the pane, or empty while a content tab is active or there is no active window ({@link #activeWindow()})
      */
@@ -55,7 +55,7 @@ public interface Terminals {
     Optional<WindowHandle> window(UUID id);
 
     /**
-     * Opens a terminal tab in the active group of the window's shown parent tab and selects it. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
+     * Opens a terminal in a new tab of the window, at the end of its tab strip, and shows it. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
      * A request with a command ({@link LocalSpec#command()}) runs that program instead of the shell, with the shell's
      * environment, and its pane closes when the program exits with status 0.
      *
@@ -66,14 +66,13 @@ public interface Terminals {
     Optional<PaneHandle> openTab(WindowHandle window, OpenRequest request);
 
     /**
-     * Opens a terminal tab in a new tab group beside the target pane's group and selects it: Jasper splits a window's
-     * workspace, never a tab. A local request needs {@code terminal.open}; one naming a profile the host does not list
-     * opens nothing.
+     * Opens a terminal in a new pane beside the target pane, in the target's tab, and selects it. A local request needs
+     * {@code terminal.open}; one naming a profile the host does not list opens nothing.
      * A request with a command ({@link LocalSpec#command()}) runs that program instead of the shell, with the shell's
      * environment, and its pane closes when the program exits with status 0.
      *
-     * @param target the pane whose group the new group goes beside
-     * @param direction which side of the target's group the new group takes
+     * @param target the pane the new pane goes beside
+     * @param direction which side of the target pane the new pane takes
      * @param request what to run
      * @return the new tab's pane, or empty when the target is gone, its session has ended or the profile is unknown
      */

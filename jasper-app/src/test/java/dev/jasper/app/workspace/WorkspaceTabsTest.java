@@ -43,10 +43,10 @@ class WorkspaceTabsTest {
 
     private void launch() { while (!pending.isEmpty()) pending.remove().run(); }
 
-    /** A window of {@code count} running terminal tabs in one group. */
+    /** A window of one tab holding {@code count} running terminals in panes side by side, the last one active. */
     private WindowContent window(int count) throws Exception {
         WindowContent[] owner = new WindowContent[1];
-        edt(() -> { owner[0] = content(idleLauncher(pending)); for (int i = 1; i < count; i++) owner[0].newTab(HOME); });
+        edt(() -> { owner[0] = content(idleLauncher(pending)); for (int i = 1; i < count; i++) owner[0].split(Side.RIGHT); });
         launch();
         edt(() -> { });
         return owner[0];
@@ -97,7 +97,6 @@ class WorkspaceTabsTest {
         TerminalContent[] split = new TerminalContent[1];
         edt(() -> {
             var workspace = window.workspace();
-            workspace.moveToNewGroup(window.tabs().get(1), workspace.model().activeGroup(), Side.RIGHT);
             workspace.resizeSplit(List.of(), List.of(0.7, 0.3));
             window.selectTab(window.tabs().get(0));
             original[0] = window.currentPane();
@@ -125,7 +124,6 @@ class WorkspaceTabsTest {
         var window = window(2);
         edt(() -> {
             var workspace = window.workspace();
-            workspace.moveToNewGroup(window.tabs().get(1), workspace.model().activeGroup(), Side.RIGHT);
             var left = window.terminalTabs().get(0).pane(); var right = window.terminalTabs().get(1).pane();
             try {
                 assertThat(dim(right)).as("the active group").isZero();
@@ -140,11 +138,11 @@ class WorkspaceTabsTest {
     }
 
     @Test void maximizeTogglesTheActiveGroupAndNeedsTwoGroups() throws Exception {
-        var window = window(2);
+        var window = window(1);
         edt(() -> {
             window.updateActions();
             assertThat(window.action(ActionId.MAXIMIZE_PANE).isEnabled()).as("one group already fills the workspace").isFalse();
-            window.workspace().moveToNewGroup(window.tabs().get(1), window.workspace().model().activeGroup(), Side.DOWN);
+            window.split(Side.DOWN);
             window.updateActions();
             assertThat(window.action(ActionId.MAXIMIZE_PANE).isEnabled()).isTrue();
             window.invoke(ActionId.MAXIMIZE_PANE);
@@ -156,12 +154,11 @@ class WorkspaceTabsTest {
     }
 
     @Test void focusMovesToTheNeighbouringGroupAndStopsAtTheEdge() throws Exception {
-        var window = window(3);
+        var window = window(1);
         edt(() -> {
-            var workspace = window.workspace();
+            window.split(Side.RIGHT);
+            window.split(Side.DOWN);
             var a = window.tabs().get(0); var b = window.tabs().get(1); var c = window.tabs().get(2);
-            workspace.moveToNewGroup(b, workspace.model().activeGroup(), Side.RIGHT);
-            workspace.moveToNewGroup(c, workspace.model().groupOf(b.id()).orElseThrow(), Side.DOWN);
             assertThat(window.selectedTab()).isSameAs(c);
             window.invoke(ActionId.FOCUS_PANE_UP);
             assertThat(window.selectedTab()).isSameAs(b);
@@ -215,7 +212,7 @@ class WorkspaceTabsTest {
             assertThat(owner[0].action(ActionId.SPLIT_RIGHT).isEnabled()).as("beside a plugin view").isTrue();
             owner[0].invoke(ActionId.SPLIT_RIGHT);
             var layout = owner[0].workspace().model();
-            assertThat(layout.groups()).hasSize(3);
+            assertThat(layout.groups()).as("the view's tab and the pane beside it").hasSize(2);
             assertThat(layout.groupOf(owner[0].selectedTab().id())).isNotEqualTo(layout.groupOf(opened.id()));
         });
         launch();
@@ -227,7 +224,6 @@ class WorkspaceTabsTest {
         edt(() -> {
             var workspace = window.workspace();
             var left = window.tabs().get(0); var right = window.tabs().get(1);
-            workspace.moveToNewGroup(right, workspace.model().activeGroup(), Side.RIGHT);
             assertThat(window.selectedTab()).isSameAs(right);
             var pane = ((TerminalContent) left.content()).pane();
             var gained = new FocusEvent(pane.view(), FocusEvent.FOCUS_GAINED);
@@ -261,8 +257,8 @@ class WorkspaceTabsTest {
                 window.connectContributions(model);
                 var field = new JTextField();
                 var panel = new JPanel(); panel.add(field);
-                var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), panel);
-                window.workspace().moveToNewGroup(view, window.workspace().model().activeGroup(), Side.RIGHT);
+                var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), panel,
+                    dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT);
                 var terminal = window.tabs().get(0);
                 window.selectTab(terminal);
                 assertThat(window.selectedTab()).isSameAs(terminal);
@@ -282,19 +278,26 @@ class WorkspaceTabsTest {
         edt(() -> KeyboardFocusManager.setCurrentKeyboardFocusManager(focus));
         var outside = new JPanel();
         try {
-            var window = window(5);
+            var window = window(1);
+            var model = new Contributions();
+            var inside = new JTextField();
+            dev.jasper.app.contributions.Tab[] opened = new dev.jasper.app.contributions.Tab[1];
             edt(() -> {
-                var model = new Contributions();
                 window.connectContributions(model);
-                var workspace = window.workspace();
-                var background = window.tabs().subList(1, 5);
-                workspace.moveToNewGroup(background.get(0), workspace.model().activeGroup(), Side.RIGHT);
-                for (int i = 1; i < background.size(); i++)
-                    workspace.moveToNewGroup(background.get(i), workspace.model().groupOf(background.get(i - 1).id()).orElseThrow(), Side.DOWN);
-                window.selectTab(window.tabs().get(0));
-                var inside = new JTextField();
                 var panel = new JPanel(); panel.add(inside);
-                var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), panel);
+                var terminal = window.selectedTab();
+                // The plugin's view alone on the left, four terminals one above another on the right.
+                opened[0] = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), panel,
+                    dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT);
+                window.closeTab(terminal);
+                window.split(Side.RIGHT);
+                for (int i = 0; i < 3; i++) window.split(Side.DOWN);
+            });
+            launch();
+            edt(() -> {
+                var view = opened[0];
+                var background = window.tabs().subList(1, 5);
+                window.selectTab(view);
                 int[] focused = {0};
                 view.focusTarget(() -> focused[0]++);
                 // A field the person sees, outside the workspace: the palette's query, the Run window, a tool window.
@@ -347,7 +350,8 @@ class WorkspaceTabsTest {
             assertThat(first.active()).isTrue();
             assertThat(second.active()).isFalse();
             assertThat(heard).containsExactly(true);
-            var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel(),
+                dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT);
             assertThat(view.active()).isTrue();
             assertThat(first.active()).isFalse();
             window.setActive(false);

@@ -36,21 +36,20 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
 /**
- * Classic editor tabs of one tab group (spec 10.5; the Workstation mocks): always visible, content-sized, each with a
- * status dot for a terminal tab, its label and a persistent ×, a "+" after the last one (at the trailing edge, over the
- * tabs a crowded strip clips) that opens a new tab (New Tab);
- * the active tab on {@code surface.card} with a 2 px {@code tab.indicator} underline; 1 px {@code border.window}
- * dividers and the strip's rule on {@code surface.tabstrip}. Never moves. It shows a window's parent tabs too, each as
- * its active tab (parent tabs spec 7).
+ * The classic tabs (spec 10.5; the Workstation mocks): a window's tab strip under Enterprise (tabs and panes spec 5),
+ * always visible, content-sized, each entry a tab shown as its active pane's item, with a status dot for a terminal, its
+ * label and a persistent ×, and a "+" after the last one (at the trailing edge, over the tabs a crowded strip clips)
+ * that opens a new tab (New Tab); the active tab on {@code surface.card} with a 2 px {@code tab.indicator} underline;
+ * 1 px {@code border.window} dividers and the strip's rule on {@code surface.tabstrip}. Never moves.
  */
 final class ClassicTabs extends JPanel implements TabStrip {
-    private final StripSource source;
+    private final ParentTabBar source;
     private final List<Entry> entries = new ArrayList<>();
     private final Add add = new Add();
     private Tab selected;
     private boolean active = true, disposed;
 
-    ClassicTabs(StripSource source) {
+    ClassicTabs(ParentTabBar source) {
         super(null);
         this.source = source;
         // The "+" says what it opens: New Tab.
@@ -212,7 +211,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
 
         /**
          * A page tab, selected while it is; its first action selects it, its second is the ×, named by the source's
-         * {@link StripSource#closeName}.
+         * {@link ParentTabBar#closeName}.
          */
         private final class AccessibleEntry extends AccessibleJComponent implements AccessibleAction {
             @Override public AccessibleRole getAccessibleRole() { return AccessibleRole.PAGE_TAB; }
@@ -312,7 +311,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
         }
     }
 
-    /** The "+" after the last tab: a flat, unfocusable button that runs its source's {@link StripSource#newTab} on a release. */
+    /** The "+" after the last tab: a flat, unfocusable button that runs its source's {@link ParentTabBar#newTab} on a release. */
     final class Add extends JButton {
         /** Whether the + stands over clipped tabs; it then hides them under the strip's fill and a divider before it. */
         private boolean covering;

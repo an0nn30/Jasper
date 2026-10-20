@@ -324,26 +324,27 @@ class WindowManagerTest {
         launch();
     }
 
-    /** Parent tabs spec 8 and 10: a plugin's tab goes to the main window's shown parent tab; new windows are full windows. */
-    @Test void aPluginsTabLandsInTheShownParentTabAndNewWindowsTakeParentTabs() throws Exception {
+    /** Tabs and panes spec 13: a plugin's tab with no window opens as a new tab of the main window; new windows are full. */
+    @Test void aPluginsTabOpensANewTabOfTheMainWindowAndNewWindowsAreFullWindows() throws Exception {
         edt(() -> {
             MainWindow main = manager.ensureMain("cold", null).orElseThrow();
             var content = main.content();
             ParentTabId first = content.activeParentTab();
-            content.newParentTab(HOME);
+            content.newTab(HOME);
             content.selectParentTab(first);
             Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
-            assertThat(content.parentTabOf(notes)).as("a plugin's tab with no window: the main window's shown parent tab")
-                .contains(first);
+            assertThat(content.parentTabCount()).as("a new tab of the main window").isEqualTo(3);
+            assertThat(content.activeParentTab()).as("at the end of its strip, shown").isEqualTo(content.parentTabOf(notes).orElseThrow())
+                .isEqualTo(content.windowLayout().parentTabs().getLast().id());
             Tab away = model.tabs().open("dev.example.editor", "away", "away.txt", null, new JPanel(), TabRegistry.Placement.NEW_WINDOW);
             ChildWindow child = manager.children().getFirst();
             assertThat(child.content().windowLayout()).as("TabPlacement.NEW_WINDOW opens a full window").isInstanceOf(ParentTabs.class);
             assertThat(child.content().parentTabOf(away)).isPresent();
-            child.content().newParentTab(HOME);
+            child.content().newTab(HOME);
             assertThat(child.content().parentTabCount()).as("which opens parent tabs of its own").isEqualTo(2);
             ChildWindow terminal = manager.openTerminalWindow(null).orElseThrow();
             assertThat(terminal.content().windowLayout()).as("New Terminal Window too").isInstanceOf(ParentTabs.class);
-            assertThat(content.parentTabCount()).as("the main window is not touched").isEqualTo(2);
+            assertThat(content.parentTabCount()).as("the main window is not touched").isEqualTo(3);
         });
         launch();
     }
@@ -363,7 +364,7 @@ class WindowManagerTest {
             ChildWindow child = manager.children().getFirst();
             child.content().invoke(ActionId.CLOSE_WINDOW);
             assertThat(child.closed()).as("Close Window").isTrue();
-            main[0].content().newParentTab(directory);
+            main[0].content().newTab(directory);
             ParentTabId moving = main[0].content().activeParentTab();
             main[0].content().invoke(ActionId.MOVE_TAB_TO_NEW_WINDOW);
             ChildWindow moved = manager.children().getFirst();
@@ -495,7 +496,7 @@ class WindowManagerTest {
     @Test void aTornOutTabsWindowOpensAtItsBoundsAndTheWindowsListTheLastActiveFirst() throws Exception {
         edt(() -> {
             MainWindow main = manager.ensureMain("cold", null).orElseThrow();
-            main.content().newParentTab(HOME);
+            main.content().newTab(HOME);
             events.clear();
             ChildWindow child = manager.moveTabToNewWindow(main.content(), main.content().activeParentTab(),
                 new java.awt.Rectangle(40, 50, 600, 400), new java.awt.Point(90, 60)).orElseThrow();

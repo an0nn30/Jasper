@@ -163,7 +163,7 @@ public final class TerminalEvents {
     public static final Topic<TabEvent> TAB_OPENED = Topic.of(PREFIX + "tab_opened", TabEvent.class);
     /** A tab closed; a tab that moved to another window reports {@link #TAB_MOVED} instead. */
     public static final Topic<TabEvent> TAB_CLOSED = Topic.of(PREFIX + "tab_closed", TabEvent.class);
-    /** A window's active tab, the selected tab of its active group, changed. */
+    /** A window's active tab, the focused pane's item in its shown tab, changed. */
     public static final Topic<TabEvent> TAB_SELECTED = Topic.of(PREFIX + "tab_selected", TabEvent.class);
     /** A tab moved to another window; see {@link TabMoved}. @since 0.19.0 */
     public static final Topic<TabMoved> TAB_MOVED = Topic.of(PREFIX + "tab_moved", TabMoved.class);

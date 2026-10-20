@@ -8,7 +8,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A window's parent tabs (parent tabs spec 4), as the main window and full windows hold them: the parent tabs in bar
+ * A window's tabs (tabs and panes spec 4; the code calls them parent tabs), as the main window and full windows hold
+ * them: the parent tabs in strip
  * order, the one that shows and their order of use. Immutable: each operation returns new parent tabs and rejects
  * arguments that would break an invariant with an {@link IllegalArgumentException}: a window holds at least one parent
  * tab, parent tab, group and tab ids are unique across its parent tabs, and only a window's only parent tab may be

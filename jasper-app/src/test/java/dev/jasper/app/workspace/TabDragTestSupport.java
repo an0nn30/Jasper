@@ -87,7 +87,7 @@ final class TabDragTestSupport {
 
     /** A point in the strip's entry of {@code tab}, {@code across} of its width from its left, on the pretend screen. */
     static Point onEntry(WindowContent window, Tab tab, double across) {
-        TabStrip strip = window.parentTabBar();
+        TabStrip strip = window.tabBar();
         Rectangle entry = strip.tabBounds().get(window.parentTabs().bar().tabs().indexOf(tab));
         return inside(onScreen(strip.component(), entry), across, 0.5);
     }
@@ -98,7 +98,7 @@ final class TabDragTestSupport {
      * parent-tabs view's coordinates, {@code TAB_INDICATOR} wide.
      */
     static Rectangle marker(WindowContent window, Tab dragged, int index) {
-        TabStrip strip = window.parentTabBar();
+        TabStrip strip = window.tabBar();
         ParentTabsView parents = window.parentTabs();
         List<Tab> listed = parents.bar().tabs();
         List<Rectangle> bounds = strip.tabBounds();
@@ -112,7 +112,7 @@ final class TabDragTestSupport {
 
     /** The component a press on the strip's entry of {@code tab} reaches: the equal tabs' title button, or a classic tab. */
     static Component entry(WindowContent window, Tab tab) {
-        TabStrip strip = window.parentTabBar();
+        TabStrip strip = window.tabBar();
         Rectangle bounds = strip.tabBounds().get(window.parentTabs().bar().tabs().indexOf(tab));
         return SwingUtilities.getDeepestComponentAt(strip.component(), (int) bounds.getCenterX(), (int) bounds.getCenterY());
     }

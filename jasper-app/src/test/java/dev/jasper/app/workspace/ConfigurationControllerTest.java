@@ -315,7 +315,7 @@ class ConfigurationControllerTest {
         edt(() -> { owner.toggleMaximize(); owner.newTab(HOME); });
         reload("[terminal.font]\nsize=20\n[keybindings]\nnew_tab='Ctrl+F12'\n"); launchAll();
         edt(() -> {
-            assertThat(owner.workspace().model().maximized()).isPresent();
+            assertThat(owner.parentTabs().views().getFirst().model().maximized()).as("the first tab's maximize").isPresent();
             assertThat(retained.view().selectedText()).contains("alpha");
             assertThat(retained.view().fontSize()).isEqualTo(20);
             assertThat(sibling.view().fontSize()).isEqualTo(20);
@@ -339,7 +339,7 @@ class ConfigurationControllerTest {
         reload(liveSettings(18));
         launchAll();
         edt(() -> {
-            assertThat(first.workspace().model().maximized()).isPresent();
+            assertThat(first.parentTabs().views().getFirst().model().maximized()).as("the first tab's maximize").isPresent();
             assertThat(retained.session()).isSameAs(session);
             for (var pane : List.of(retained, sibling, first.currentPane(), owners.get(1).currentPane())) {
                 var options = pane.view().options();

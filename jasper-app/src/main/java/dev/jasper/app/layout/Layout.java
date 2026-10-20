@@ -2,7 +2,6 @@ package dev.jasper.app.layout;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -13,24 +12,21 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * One workspace's layout (spec 7): a tree of splits whose leaves are tab groups, the active group, the maximized group
- * if any, the groups' order of use and each group's tab order of use. Immutable: each operation returns a new layout and
+ * One tab's layout (spec 7; tabs and panes spec 4): a tree of splits whose leaves are panes, each holding one tab, the
+ * active pane, the maximized pane if any and the panes' order of use. Immutable: each operation returns a new layout and
  * rejects arguments that would break an invariant of spec 7.2 with an {@link IllegalArgumentException}. Equality covers
- * the tree, the active group and the maximized group; the orders of use only decide focus and selection after a removal
- * and are not saved.
+ * the tree, the active pane and the maximized pane; the order of use only decides focus after a removal and is not
+ * saved. The code calls a pane a group (workspace plan 8a Rulings 1).
  */
 public final class Layout {
     private final Node root;
     private final GroupId activeGroup;
     private final Optional<GroupId> maximized;
     private final List<GroupId> recent;
-    private final Map<GroupId, List<TabId>> tabOrders;
     private final List<Group> groups;
 
     /**
-     * A layout over {@code root}. Its order of use starts with {@code activeGroup}, then the other groups in tree order;
-     * each group's tab order of use starts with its selected tab, then the tabs after it, then those before it, nearest
-     * first (workspace plan 2, Rulings 7).
+     * A layout over {@code root}. Its order of use starts with {@code activeGroup}, then the other groups in tree order.
      *
      * @param root the tree: no group or tab twice, and no empty group unless it is the root (the empty workspace)
      * @param activeGroup a group of the tree
@@ -38,11 +34,10 @@ public final class Layout {
      * @throws IllegalArgumentException when an invariant does not hold
      */
     public Layout(Node root, GroupId activeGroup, Optional<GroupId> maximized) {
-        this(root, activeGroup, maximized, List.of(), Map.of());
+        this(root, activeGroup, maximized, List.of());
     }
 
-    private Layout(Node root, GroupId activeGroup, Optional<GroupId> maximized, List<GroupId> recent,
-            Map<GroupId, List<TabId>> tabOrders) {
+    private Layout(Node root, GroupId activeGroup, Optional<GroupId> maximized, List<GroupId> recent) {
         this.root = Objects.requireNonNull(root, "root");
         this.activeGroup = Objects.requireNonNull(activeGroup, "activeGroup");
         this.maximized = Objects.requireNonNull(maximized, "maximized");
@@ -68,9 +63,6 @@ public final class Layout {
         for (GroupId id : recent) if (groupIds.contains(id)) order.add(id);
         for (Group group : found) order.add(group.id());
         this.recent = List.copyOf(order);
-        var orders = new HashMap<GroupId, List<TabId>>();
-        for (Group group : found) orders.put(group.id(), tabOrder(group, tabOrders.getOrDefault(group.id(), List.of())));
-        this.tabOrders = Map.copyOf(orders);
         this.groups = List.copyOf(found);
     }
 
@@ -154,7 +146,7 @@ public final class Layout {
     }
 
     /**
-     * Every tab in workspace order: the groups in tree order, each group's tabs in strip order.
+     * Every tab in workspace order: the panes' tabs in tree order.
      *
      * @return the tabs
      */
@@ -205,22 +197,17 @@ public final class Layout {
     }
 
     /**
-     * Inserts {@code tab} into {@code group} at {@code index}, selects it and activates the group.
+     * Puts {@code tab} into the empty workspace's pane, selected (tabs and panes spec 4: a pane holds one tab, so a tab
+     * joins a layout that holds one by {@link #split} alone).
      *
-     * @param tab a tab not in the layout
-     * @param group a group of the layout
-     * @param index 0 to the group's tab count
+     * @param tab a tab
      * @return the new layout
-     * @throws IllegalArgumentException when the tab is in the layout, the group is not, or the index is outside the group
+     * @throws IllegalArgumentException when this is not the empty workspace
      */
-    public Layout open(TabId tab, GroupId group, int index) {
+    public Layout open(TabId tab) {
         Objects.requireNonNull(tab, "tab");
-        if (contains(tab)) throw new IllegalArgumentException("Tab " + tab + " is already in the layout");
-        Group target = requireGroup(group);
-        checkIndex(index, target.tabs().size());
-        var tabs = new ArrayList<>(target.tabs());
-        tabs.add(index, tab);
-        return activated(replace(root, group, found -> new Group(found.id(), tabs, Optional.of(tab))), group, false);
+        if (!isEmpty()) throw new IllegalArgumentException("Only the empty workspace's pane takes a tab, not " + tab);
+        return new Layout(new Group(activeGroup, List.of(tab), Optional.of(tab)), activeGroup, Optional.empty(), recent);
     }
 
     /**
@@ -248,38 +235,10 @@ public final class Layout {
     }
 
     /**
-     * Moves {@code tab} into {@code group} at {@code index}, counted without the tab, selects it and activates the group.
-     * A source group left empty is removed as {@link #remove(TabId)} removes it.
-     *
-     * @param tab a tab of the layout
-     * @param group a group of the layout, the tab's own or another
-     * @param index 0 to the group's tab count without the tab
-     * @return the new layout
-     * @throws IllegalArgumentException when the tab or the group is not in the layout, or the index is outside the group
-     */
-    public Layout move(TabId tab, GroupId group, int index) {
-        GroupId source = requireGroupOf(tab);
-        Group target = requireGroup(group);
-        var tabs = new ArrayList<>(target.tabs());
-        if (source.equals(group)) {
-            tabs.remove(tab);
-            checkIndex(index, tabs.size());
-            tabs.add(index, tab);
-            return activated(replace(root, group, found -> new Group(found.id(), tabs, Optional.of(tab))), group, false);
-        }
-        checkIndex(index, tabs.size());
-        tabs.add(index, tab);
-        Layout rest = remove(tab);
-        return rest.activated(replace(rest.root, group, found -> new Group(found.id(), tabs, Optional.of(tab))), group, true);
-    }
-
-    /**
-     * Removes {@code tab}, closing it or moving it out. When it was its group's selected tab, the group's most recently
-     * shown remaining tab is selected (workspace plan 2, Rulings 7). A group left empty is removed: its weight goes to the
-     * sibling before it (after it when it was first), a split left with one child collapses into that child and nesting
-     * is flattened again, and the active group becomes the most recently used remaining group. The maximize stays while
-     * the maximized group stays and two groups remain (Rulings 5). Removing the last tab leaves the empty workspace,
-     * keeping its group.
+     * Removes {@code tab}, closing it or moving it out, and its pane with it: the pane's weight goes to the sibling before
+     * it (after it when it was first), a split left with one child collapses into that child and nesting is flattened
+     * again, and the active pane becomes the most recently used remaining pane. The maximize stays while the maximized
+     * pane stays and two panes remain (Rulings 5). Removing the last tab leaves the empty workspace, keeping its pane.
      *
      * @param tab a tab of the layout
      * @return the new layout
@@ -287,20 +246,11 @@ public final class Layout {
      */
     public Layout remove(TabId tab) {
         GroupId id = requireGroupOf(tab);
-        Group holder = group(id).orElseThrow();
-        if (holder.tabs().size() > 1) {
-            var tabs = new ArrayList<>(holder.tabs());
-            tabs.remove(tab);
-            TabId shown = holder.selected().orElseThrow();
-            TabId selected = shown.equals(tab) ? tabOrders.get(id).get(1) : shown;
-            Node next = replace(root, id, found -> new Group(found.id(), tabs, Optional.of(selected)));
-            return new Layout(next, activeGroup, maximized, recent, tabOrders);
-        }
-        if (root instanceof Group) return new Layout(new Group(id, List.of(), Optional.empty()), id, Optional.empty(), recent, tabOrders);
+        if (root instanceof Group) return new Layout(new Group(id, List.of(), Optional.empty()), id, Optional.empty(), recent);
         GroupId heir = recent.stream().filter(other -> !other.equals(id)).findFirst().orElseThrow();
         Node next = without(root, id).orElseThrow();
         Optional<GroupId> kept = maximized.filter(max -> !max.equals(id) && next instanceof Split);
-        return new Layout(next, heir, kept, recent, tabOrders);
+        return new Layout(next, heir, kept, recent);
     }
 
     /**
@@ -323,21 +273,20 @@ public final class Layout {
     }
 
     /**
-     * Moves {@code tab} into a new group on {@code side} of {@code group}, as {@link #split(TabId, GroupId, Side)} opens
-     * one; a source group left empty is removed first, as {@link #remove(TabId)} removes it.
+     * Moves {@code tab}'s pane to {@code side} of {@code group}, as {@link #split(TabId, GroupId, Side)} opens one; its own
+     * pane goes first, as {@link #remove(TabId)} removes it (plan 8c's pane moves).
      *
      * @param tab a tab of the layout
-     * @param group a group of the layout; the tab's own only when it holds other tabs
-     * @param side where the new group goes
+     * @param group another pane of the layout
+     * @param side where the pane goes
      * @return the new layout
-     * @throws IllegalArgumentException when the tab or the group is not in the layout, or the tab is the group's only tab
+     * @throws IllegalArgumentException when the tab or the group is not in the layout, or the group is the tab's own
      */
     public Layout moveToNewGroup(TabId tab, GroupId group, Side side) {
         Objects.requireNonNull(side, "side");
         GroupId source = requireGroupOf(tab);
-        Group target = requireGroup(group);
-        if (source.equals(group) && target.tabs().size() == 1)
-            throw new IllegalArgumentException("Tab " + tab + " is the only tab of group " + group + " and cannot split it");
+        requireGroup(group);
+        if (source.equals(group)) throw new IllegalArgumentException("Tab " + tab + " cannot move beside its own pane " + group);
         return remove(tab).beside(tab, group, side);
     }
 
@@ -350,7 +299,7 @@ public final class Layout {
      * @throws IllegalArgumentException when no split is at the path or the weights do not fit it
      */
     public Layout resize(List<Integer> path, List<Double> weights) {
-        return new Layout(resized(root, List.copyOf(path), 0, List.copyOf(weights)), activeGroup, maximized, recent, tabOrders);
+        return new Layout(resized(root, List.copyOf(path), 0, List.copyOf(weights)), activeGroup, maximized, recent);
     }
 
     /**
@@ -365,7 +314,7 @@ public final class Layout {
         requireGroup(group);
         if (root instanceof Group) return this;
         if (maximized.filter(group::equals).isPresent()) return unmaximize();
-        return new Layout(root, group, Optional.of(group), recent, tabOrders);
+        return new Layout(root, group, Optional.of(group), recent);
     }
 
     /**
@@ -375,7 +324,7 @@ public final class Layout {
      * @return the new layout, or this one when no group is maximized
      */
     public Layout unmaximize() {
-        return maximized.isEmpty() ? this : new Layout(root, activeGroup, Optional.empty(), recent, tabOrders);
+        return maximized.isEmpty() ? this : new Layout(root, activeGroup, Optional.empty(), recent);
     }
 
     /**
@@ -440,7 +389,7 @@ public final class Layout {
      * maximize, anything else moves it to {@code group} (workspace plan 2, Rulings 5).
      */
     private Layout activated(Node next, GroupId group, boolean structural) {
-        return new Layout(next, group, structural ? Optional.empty() : maximized.map(ignored -> group), recent, tabOrders);
+        return new Layout(next, group, structural ? Optional.empty() : maximized.map(ignored -> group), recent);
     }
 
     private Group requireGroup(GroupId id) {
@@ -451,10 +400,6 @@ public final class Layout {
     private GroupId requireGroupOf(TabId tab) {
         Objects.requireNonNull(tab, "tab");
         return groupOf(tab).orElseThrow(() -> new IllegalArgumentException("Tab " + tab + " is not in the layout"));
-    }
-
-    private static void checkIndex(int index, int size) {
-        if (index < 0 || index > size) throw new IllegalArgumentException("Index " + index + " is outside 0 to " + size);
     }
 
     /** {@code node} with the group {@code id} replaced by what {@code change} makes of it; Split flattens the result. */
@@ -597,20 +542,5 @@ public final class Layout {
             case Group group -> into.add(group);
             case Split split -> split.children().forEach(child -> collect(child.node(), into));
         }
-    }
-
-    /**
-     * A group's tabs in order of use (workspace plan 2, Rulings 7): its selected tab, then the others in
-     * {@code previous}'s order, then any tab {@code previous} lacks: those after the selected tab in strip order, then
-     * those before it, nearest first, so that closing tabs never shown behaves as {@code JTabbedPane.removeTabAt}.
-     */
-    private static List<TabId> tabOrder(Group group, List<TabId> previous) {
-        var order = new LinkedHashSet<TabId>();
-        group.selected().ifPresent(order::add);
-        for (TabId tab : previous) if (group.tabs().contains(tab)) order.add(tab);
-        int at = group.selected().map(group.tabs()::indexOf).orElse(0);
-        for (int i = at + 1; i < group.tabs().size(); i++) order.add(group.tabs().get(i));
-        for (int i = at - 1; i >= 0; i--) order.add(group.tabs().get(i));
-        return List.copyOf(order);
     }
 }

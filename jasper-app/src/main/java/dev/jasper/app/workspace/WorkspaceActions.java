@@ -49,7 +49,7 @@ final class WorkspaceActions {
         TerminalView view = pane == null ? null : pane.view();
         switch (id) {
             case COMMAND_PALETTE -> owner.commandPalette().open(PaletteScope.ALL_ID);
-            case NEW_TAB -> owner.newParentTab(owner.directory());
+            case NEW_TAB -> owner.newTab(owner.directory());
             case CLOSE_TAB -> owner.closeParentTab(owner.activeParentTab());
             case NEXT_TAB -> owner.selectParentTabRelative(1);
             case PREVIOUS_TAB -> owner.selectParentTabRelative(-1);

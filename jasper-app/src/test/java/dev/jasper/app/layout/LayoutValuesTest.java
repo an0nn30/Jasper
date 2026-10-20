@@ -37,15 +37,18 @@ class LayoutValuesTest {
         assertThatNullPointerException().isThrownBy(() -> GroupId.parse(null));
     }
 
-    @Test void aGroupSelectsOneOfItsTabsAndAnEmptyGroupSelectsNothing() {
-        assertThat(group(1, 2, 1, 2).selected()).contains(tab(2));
+    /** Workspace plan 8a Rulings 2: a pane holds one tab and shows it, and the empty workspace's pane holds none. */
+    @Test void aPaneHoldsOneTabAndShowsItAndAnEmptyPaneShowsNothing() {
+        assertThat(group(1, 2).selected()).contains(tab(2));
         assertThat(new Group(groupId(1), List.of(), Optional.empty()).tabs()).isEmpty();
-        assertThatIllegalArgumentException().as("a tab it does not hold").isThrownBy(() -> group(1, 3, 1, 2));
-        assertThatIllegalArgumentException().as("an empty group selects nothing")
+        assertThatIllegalArgumentException().as("two tabs")
+            .isThrownBy(() -> new Group(groupId(1), List.of(tab(1), tab(2)), Optional.of(tab(1)))).withMessageContaining("more than one tab");
+        assertThatIllegalArgumentException().as("a tab it does not hold")
+            .isThrownBy(() -> new Group(groupId(1), List.of(tab(1)), Optional.of(tab(3))));
+        assertThatIllegalArgumentException().as("an empty pane selects nothing")
             .isThrownBy(() -> new Group(groupId(1), List.of(), Optional.of(tab(1))));
-        assertThatIllegalArgumentException().as("a group with tabs selects one")
+        assertThatIllegalArgumentException().as("a pane with a tab shows it")
             .isThrownBy(() -> new Group(groupId(1), List.of(tab(1)), Optional.empty()));
-        assertThatIllegalArgumentException().as("a tab twice").isThrownBy(() -> group(1, 1, 1, 1));
         assertThatNullPointerException().isThrownBy(() -> new Group(null, List.of(), Optional.empty()));
         var tabs = new ArrayList<>(List.of(tab(1)));
         Group copied = new Group(groupId(1), tabs, Optional.of(tab(1)));

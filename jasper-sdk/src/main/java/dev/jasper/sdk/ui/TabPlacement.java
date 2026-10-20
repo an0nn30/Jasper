@@ -8,13 +8,14 @@ package dev.jasper.sdk.ui;
  */
 public enum TabPlacement {
     /**
-     * At the end of the active group of the owner's window's shown parent tab, or of the main window's when there is
-     * no owner.
+     * In a new tab of the owner's window, or of the main window when there is no owner: at the end of its tab strip and
+     * shown, the main window's empty workspace taking it in its place. A content tab is an item, and each pane of a tab
+     * holds one.
      */
     ACTIVE_GROUP,
-    /** In a new group to the right of the group {@link #ACTIVE_GROUP} names. */
+    /** In a new pane to the right of the focused pane of that window's shown tab. */
     SPLIT_RIGHT,
-    /** In a new group below the group {@link #ACTIVE_GROUP} names. */
+    /** In a new pane below the focused pane of that window's shown tab. */
     SPLIT_DOWN,
     /**
      * In a new child window of its own, opened for it; the owner's window is not touched. The topics report

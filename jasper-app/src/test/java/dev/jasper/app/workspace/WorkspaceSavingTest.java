@@ -110,19 +110,20 @@ class WorkspaceSavingTest {
             assertThat(due).as("changes within the second join one save").hasSize(1);
             second();
             ParentTabId shown = main.content().activeParentTab();
-            main.content().newParentTab(folder);
+            int count = main.content().parentTabCount();
+            main.content().newTab(folder);
             second();
-            assertThat(((ParentTabs) saved().main().layout()).parentTabs()).as("a parent tab opening").hasSize(2);
+            assertThat(saved().main().layout().parentTabs()).as("a tab opening").hasSize(count + 1);
             main.content().selectParentTab(shown);
             second();
-            assertThat(((ParentTabs) saved().main().layout()).active()).as("a parent tab showing").isEqualTo(shown);
-            ParentTabId opened = ((ParentTabs) saved().main().layout()).parentTabs().get(1).id();
-            main.content().parentTabs().reorder(shown, 1);
+            assertThat(saved().main().layout().active()).as("a tab showing").isEqualTo(shown);
+            ParentTabId opened = saved().main().layout().parentTabs().getLast().id();
+            main.content().parentTabs().reorder(shown, count);
             second();
-            assertThat(((ParentTabs) saved().main().layout()).parentTabs().get(1).id()).as("a parent tab moving along its bar").isEqualTo(shown);
+            assertThat(saved().main().layout().parentTabs().get(count).id()).as("a tab moving along its strip").isEqualTo(shown);
             main.content().closeParentTab(opened);
             second();
-            assertThat(((ParentTabs) saved().main().layout()).parentTabs()).as("a parent tab closing").hasSize(1);
+            assertThat(saved().main().layout().parentTabs()).as("a tab closing").hasSize(count);
             ChildWindow full = windows.manager.moveToNewWindow(main.content().selectedTab()).orElseThrow();
             second();
             assertThat(saved().children()).as("an item moving into a window of its own").singleElement()
@@ -271,8 +272,8 @@ class WorkspaceSavingTest {
             edt(() -> {
                 MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
                 ChildWindow full = windows.manager.openTerminalWindow(folder).orElseThrow();
-                main.content().newParentTab(folder);
                 main.content().newTab(folder);
+                main.content().split(Side.RIGHT);
                 ParentTabId moving = main.content().activeParentTab();
                 Tab last = main.content().selectedTab();
                 second();

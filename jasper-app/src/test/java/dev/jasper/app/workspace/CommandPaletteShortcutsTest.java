@@ -45,7 +45,7 @@ class CommandPaletteShortcutsTest {
             try (var owner = owner(mac)) {
                 var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
                 // The digits select parent tabs (parent tabs spec 8): the second terminal is a parent tab of its own.
-                var first = owner.currentTerminal(); owner.newParentTab(HOME); var second = owner.currentTerminal();
+                var first = owner.currentTerminal(); owner.newTab(HOME); var second = owner.currentTerminal();
                 int primary = primary(mac);
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, primary | InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isTrue();

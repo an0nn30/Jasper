@@ -26,7 +26,7 @@ class HostedContentTest {
             assertThat(owner.action(ActionId.SPLIT_RIGHT).isEnabled()).as("a split beside a plugin view (Rulings 11)").isTrue();
             int[] find={0};entry.commands(List.of(new ContentCommand("find","Find",KeyStroke.getKeyStroke("meta F"),true,()->find[0]++)));
             owner.invoke(ActionId.FIND);assertThat(find[0]).isEqualTo(1);
-            owner.workspace().reorder(owner.tabs().get(1), owner.workspace().model().activeGroup(), 0);assertThat(owner.selectedContent()).isSameAs(entry);
+            owner.reorderParentTab(owner.parentTabOf(owner.tabs().get(1)).orElseThrow(), 0);assertThat(owner.selectedContent()).isSameAs(entry);
             owner.selectTab(terminal);assertThat(owner.currentPane()).isNotNull();
             entry.select();assertThat(owner.selectedContent()).isSameAs(entry);
             entry.requestClose();assertThat(owner.currentTerminal()).isSameAs(terminal);

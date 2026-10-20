@@ -44,11 +44,11 @@ public final class TabRegistry {
 
     /** Where {@link #open} puts a new plugin's tab: the app's twin of the SDK's {@code TabPlacement} (workspace tabs spec 14). */
     public enum Placement {
-        /** At the end of the window's active group. */
-        ACTIVE_GROUP,
-        /** In a new group to the right of the active group. */
+        /** In a new tab of the window, at the end of its strip and shown (tabs and panes spec 13). */
+        NEW_TAB,
+        /** In a new pane to the right of the window's focused pane. */
         SPLIT_RIGHT,
-        /** In a new group below the active group. */
+        /** In a new pane below the window's focused pane. */
         SPLIT_DOWN,
         /** In a new child window of its own, opened empty for it: the owner's window is not touched. */
         NEW_WINDOW
@@ -65,7 +65,7 @@ public final class TabRegistry {
      *     failed to show: the window manager closes a child window left empty now, never in the middle of the move
      * @param emptyWindow opens an empty child window for a tab placed in a new window and gives its id; null when none
      *     opens (the main window is being composed, or a test plays the windows), and the tab then opens where an
-     *     {@link Placement#ACTIVE_GROUP} one would
+     *     {@link Placement#NEW_TAB} one would
      */
     public record Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow, Consumer<UUID> movedOut,
                           Supplier<UUID> emptyWindow) {
@@ -88,7 +88,7 @@ public final class TabRegistry {
 
         /**
          * Windows as a test plays them, where no window opens for a tab placed in a new window: it opens where an
-         * {@link Placement#ACTIVE_GROUP} one would.
+         * {@link Placement#NEW_TAB} one would.
          *
          * @param main the main window's id
          * @param isMain whether a window is the main window
@@ -199,20 +199,20 @@ public final class TabRegistry {
     }
 
     /**
-     * Opens a plugin's view as a tab at the end of the active group of {@code owner}'s window, or the main window when
-     * {@code owner} is null or not registered, and selects it. A (plugin, key) already open is selected again, and
+     * Opens a plugin's view in a new tab of {@code owner}'s window, or of the main window when {@code owner} is null or
+     * not registered, and shows it (tabs and panes spec 13). A (plugin, key) already open is selected again, and
      * attached to a window again when it lost its own. While the main window is being composed, a tab for it waits
      * ({@link #mainOpened}, {@link #mainFailed}).
      */
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component) {
-        return open(plugin, key, title, owner, component, Placement.ACTIVE_GROUP);
+        return open(plugin, key, title, owner, component, Placement.NEW_TAB);
     }
 
     /**
-     * As {@link #open(String, String, String, UUID, JComponent)}, the new tab where {@code placement} puts it: in that
-     * window's active group or a new group beside it, or in a new child window of its own (workspace tabs spec 14). A
-     * (plugin, key) already open is selected where it is. One asked for while the main window is being composed waits
-     * for it and opens at the end of its active group, whatever its placement.
+     * As {@link #open(String, String, String, UUID, JComponent)}, the new tab where {@code placement} puts it: in a new
+     * tab of that window or a new pane beside its focused pane, or in a new child window of its own (workspace tabs spec
+     * 14). A (plugin, key) already open is selected where it is. One asked for while the main window is being composed
+     * waits for it and opens in a new tab of it, whatever its placement.
      */
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component, Placement placement) {
         requireEdt();
@@ -246,7 +246,7 @@ public final class TabRegistry {
             switch (placement) {
                 case SPLIT_RIGHT -> host.attachBeside().attach(tab, null, Side.RIGHT);
                 case SPLIT_DOWN -> host.attachBeside().attach(tab, null, Side.DOWN);
-                case ACTIVE_GROUP, NEW_WINDOW -> host.attach().accept(tab);
+                case NEW_TAB, NEW_WINDOW -> host.attach().accept(tab);
             }
         }
         catch (RuntimeException | Error failure) {
@@ -385,7 +385,7 @@ public final class TabRegistry {
     }
 
     /**
-     * Moves a tab of any kind to {@code window}, at the end of that window's active group, and selects it there; its
+     * Moves a tab of any kind to {@code window}, in a new tab of that window, and selects it there; its
      * content and session are untouched. A pinned tab, one being closed or one already there stays.
      *
      * @param tab the tab

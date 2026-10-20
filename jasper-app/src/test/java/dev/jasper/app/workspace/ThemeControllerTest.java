@@ -144,7 +144,7 @@ class ThemeControllerTest {
             assertThat(first[0].findBar().isVisible()).isTrue();
             assertThat(first[0].findBar().queryField().getText()).isEqualTo("[");
             assertThat(first[0].findBar().result().error()).isNotNull();
-            assertThat(owners[0].workspace().model().maximized()).isPresent();
+            assertThat(owners[0].parentTabs().views().getFirst().model().maximized()).as("the first tab keeps its maximize").isPresent();
             assertThat(javax.swing.SwingUtilities.isDescendingFrom(first[0], owners[0].workspace())).as("the maximize hides its group").isFalse();
             assertThat(retained[0].title()).isEqualTo("retained");
             assertThat(owners[0].currentTerminal()).isNotSameAs(retained[0]);

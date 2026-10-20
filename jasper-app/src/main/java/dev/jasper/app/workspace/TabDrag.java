@@ -295,7 +295,7 @@ final class TabDrag {
      * it, in its place. Empty off the strip, and for the place the tab has.
      */
     private Optional<Target> onBar(WindowContent window, Point at) {
-        boolean shows = window.parentTabBar().component().isVisible();
+        boolean shows = window.tabBar().component().isVisible();
         if (window == from && !shows) return Optional.empty();
         Point local = new Point(at);
         SwingUtilities.convertPointFromScreen(local, window.parentTabs());
@@ -318,7 +318,7 @@ final class TabDrag {
      * top that it takes when it shows.
      */
     private static Rectangle barArea(WindowContent window) {
-        Component bar = window.parentTabBar().component();
+        Component bar = window.tabBar().component();
         if (bar.isVisible()) return bar.getBounds();
         return new Rectangle(0, 0, window.parentTabs().getWidth(), bar.getPreferredSize().height);
     }
@@ -337,7 +337,7 @@ final class TabDrag {
 
     /** The strip's entries in {@code window}'s parent-tabs view's coordinates, in strip order, without the dragged one's own. */
     private List<Rectangle> barEntries(WindowContent window) {
-        TabStrip bar = window.parentTabBar();
+        TabStrip bar = window.tabBar();
         List<Tab> listed = window.parentTabs().bar().tabs();
         List<Rectangle> bounds = bar.tabBounds();
         var entries = new ArrayList<Rectangle>();
@@ -371,7 +371,7 @@ final class TabDrag {
         if (parents.isEmpty())
             highlight = SwingUtilities.convertRectangle(parents, new Rectangle(parents.getSize()), layers);
         // A strip that hides takes the tab at its end: its band shows (workspace plan 7c Rulings 5).
-        else if (!window.parentTabBar().component().isVisible())
+        else if (!window.tabBar().component().isVisible())
             highlight = SwingUtilities.convertRectangle(parents, barArea(window), layers);
         else placeholder = SwingUtilities.convertRectangle(parents,
             WorkspaceDropResolver.marker(barArea(window), barEntries(window), bar.index(), marker), layers);

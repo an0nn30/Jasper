@@ -15,8 +15,7 @@ public interface WindowHandle extends WindowOwner {
     UUID id();
 
     /**
-     * The window's tabs, terminal and content: parent tab by parent tab in bar order, then group by group, each group's
-     * tabs in strip order;
+     * The window's tabs, terminal and content, each the item of one pane: tab by tab in strip order, then pane by pane;
      * empty once the window is closed.
      *
      * @return the tabs
@@ -24,7 +23,7 @@ public interface WindowHandle extends WindowOwner {
     List<TabHandle> tabs();
 
     /**
-     * The active tab: the selected tab of the active group of the window's shown parent tab, terminal or content.
+     * The active tab: the focused pane's item in the window's shown tab, terminal or content.
      *
      * @return the tab, or empty in an empty workspace and once the window is closed
      */

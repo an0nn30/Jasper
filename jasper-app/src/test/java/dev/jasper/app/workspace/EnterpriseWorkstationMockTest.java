@@ -157,12 +157,12 @@ class EnterpriseWorkstationMockTest {
         var render = mounted.image();
         assertThat(mounted.firstTab().isEmpty()).as(what + "classic tabs").isFalse();
         int left = 2 * mounted.firstTab().x;
-        // The pane's strip sits right under the toolbar again, the one row of tabs the mocks draw: Enterprise shows no
-        // parent-tab bar (the user's decision of 2026-10-20), so the strip's top is the toolbar's rule's bottom.
+        // The window's tab strip sits right under the toolbar, the one row of tabs the mocks draw (tabs and panes spec 5
+        // and 13): its top is the toolbar's rule's bottom.
         // The underline row: mock y 233 (the indicator 232-235 above the rule at 236); the render's strip is 2 px taller.
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
         int strip = 25 + TOOLBAR + 1;
-        assertThat(mounted.firstTab().y).as(what + "the strip under the toolbar, with no parent-tab bar between").isEqualTo(strip);
+        assertThat(mounted.firstTab().y).as(what + "the window's strip under the toolbar").isEqualTo(strip);
         int underline = 2 * (strip + 29) - 3;
         var expected = MockProfile.solid(MockProfile.row(mock, 233, 650, 1100), 4);
         var actual = MockProfile.solid(MockProfile.row(render, underline, left, left + 450), 4);

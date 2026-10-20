@@ -96,8 +96,8 @@ class WorkspaceFileReadTest {
      * by side, each holding the tab of its number.
      */
     static WindowRecord window(Role role, int first, int second) {
-        ParentTabs layout = one(first, new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(group(first, first, first), 0.5),
-            new Child(group(second, second, second), 0.5))), groupId(first), Optional.empty()));
+        ParentTabs layout = one(first, new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(group(first, first), 0.5),
+            new Child(group(second, second), 0.5))), groupId(first), Optional.empty()));
         return new WindowRecord(role, Optional.of(BOUNDS), 0, layout, terminals(layout));
     }
 
@@ -125,9 +125,9 @@ class WorkspaceFileReadTest {
     }
 
     @Test void rewritingAReadFileWritesTheSameText() throws Exception {
-        Layout drifting = new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 1, 1), 1), new Child(group(2, 2, 2), 1),
-            new Child(new Split(Orientation.VERTICAL, List.of(new Child(group(3, 3, 3), 0.1), new Child(group(4, 4, 4), 0.2),
-                new Child(group(5, 5, 5), 0.7))), 1))), groupId(1), Optional.empty());
+        Layout drifting = new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 1), 1), new Child(group(2, 2), 1),
+            new Child(new Split(Orientation.VERTICAL, List.of(new Child(group(3, 3), 0.1), new Child(group(4, 4), 0.2),
+                new Child(group(5, 5), 0.7))), 1))), groupId(1), Optional.empty());
         var saved = new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 0, one(1, drifting), terminals(one(1, drifting)))));
         WorkspaceFile.write(file(), saved);
         String first = Files.readString(file());
@@ -158,10 +158,8 @@ class WorkspaceFileReadTest {
             .isEqualTo(clean(withMain(main.bounds(), 6, new Layout(layout.root(), groupId(1), Optional.empty()), main.tabs())));
         assertThat(read(replaceOnce(text, "maximized = \"" + g2 + "\"", "maximized = \"" + g1 + "\""))).as("a maximize of a group that is not active")
             .isEqualTo(clean(withMain(main.bounds(), 6, new Layout(layout.root(), groupId(2), Optional.empty()), main.tabs())));
-        Split root = (Split) layout.root();
-        var firstTab = new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 1, 1, 2), 0.5), root.children().get(1)));
-        assertThat(read(replaceOnce(text, "selected = \"" + id(tab(2)) + "\"", "selected = \"" + id(tab(9)) + "\""))).as("the first tab")
-            .isEqualTo(clean(withMain(main.bounds(), 6, new Layout(firstTab, groupId(2), Optional.of(groupId(2))), main.tabs())));
+        assertThat(read(replaceOnce(text, "selected = \"" + id(tab(2)) + "\"", "selected = \"" + id(tab(9)) + "\""))).as("the pane's one tab")
+            .isEqualTo(clean(snapshot()));
     }
 
     @Test void aBadTabEntryIsDroppedAlone() throws Exception {
@@ -194,7 +192,8 @@ class WorkspaceFileReadTest {
     @Test void aGroupEmptiedByADroppedTabGoesAsRemoveWould() throws Exception {
         WindowRecord main = snapshot().main();
         Layout expected = shown(main).remove(tab(3));
-        assertThat(expected.root()).isEqualTo(new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 2, 1, 2), 0.5), new Child(group(3, 4, 4), 0.5))));
+        Split left = new Split(Orientation.VERTICAL, List.of(new Child(group(1, 1), 0.5), new Child(group(5, 2), 0.5)));
+        assertThat(expected.root()).isEqualTo(new Split(Orientation.HORIZONTAL, List.of(new Child(left, 0.5), new Child(group(3, 4), 0.5))));
         assertThat(expected.activeGroup()).isEqualTo(groupId(1));
         assertThat(expected.maximized()).isEmpty();
         String t3 = "id = \"" + id(tab(3)) + "\"\n";
@@ -205,7 +204,8 @@ class WorkspaceFileReadTest {
     @Test void aTabWithoutAnEntryIsDroppedAndAnEntryNoGroupListsIsIgnored() throws Exception {
         WindowRecord main = snapshot().main();
         Layout expected = shown(main).remove(tab(4));
-        assertThat(expected.root()).isEqualTo(new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 2, 1, 2), 0.5), new Child(group(2, 3, 3), 0.5))));
+        Split left = new Split(Orientation.VERTICAL, List.of(new Child(group(1, 1), 0.5), new Child(group(5, 2), 0.5)));
+        assertThat(expected.root()).isEqualTo(new Split(Orientation.HORIZONTAL, List.of(new Child(left, 0.5), new Child(group(2, 3), 0.5))));
         assertThat(read(replaceOnce(WorkspaceFile.encode(snapshot()), "id = \"" + id(tab(4)) + "\"\n", "id = \"" + id(tab(9)) + "\"\n")))
             .isEqualTo(keptAside(withMain(main.bounds(), 6, expected, without(main.tabs(), tab(4)))));
     }
@@ -349,12 +349,12 @@ class WorkspaceFileReadTest {
     }
 
     @Test void parentTabsWithSplitsWeightsAndAMaximizeReadBackAndRewriteTheSameText() throws Exception {
-        Layout columns = new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 2, 1, 2), 0.3),
-            new Child(new Split(Orientation.VERTICAL, List.of(new Child(group(2, 3, 3), 0.6), new Child(group(3, 4, 4), 0.4))), 0.7))),
+        Layout columns = new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 2), 0.3),
+            new Child(new Split(Orientation.VERTICAL, List.of(new Child(group(2, 3), 0.6), new Child(group(3, 4), 0.4))), 0.7))),
             groupId(3), Optional.of(groupId(3)));
         var main = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(5)), new ParentTab(parentTabId(2), columns),
             new ParentTab(parentTabId(3), single(6))), parentTabId(2));
-        Layout rows = new Layout(new Split(Orientation.VERTICAL, List.of(new Child(group(7, 7, 7), 0.25), new Child(group(8, 9, 8, 9), 0.75))),
+        Layout rows = new Layout(new Split(Orientation.VERTICAL, List.of(new Child(group(7, 7), 0.25), new Child(group(8, 9), 0.75))),
             groupId(8), Optional.empty());
         var full = new ParentTabs(List.of(new ParentTab(parentTabId(4), single(10)), new ParentTab(parentTabId(5), rows)), parentTabId(5));
         var saved = new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 6, main, terminals(main)),
@@ -403,6 +403,19 @@ class WorkspaceFileReadTest {
         for (var change : cases.entrySet())
             assertThat(read(change.getValue())).as("the main window keeps its first parent tab when its second repeats %s", change.getKey())
                 .isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(1), single(1))))));
+    }
+
+    /**
+     * Review Focus 4 (workspace plan 8a Rulings 2): a pane holds one tab, so a parent tab whose pane lists two is a bad
+     * entry, dropped alone, and the original is kept aside.
+     */
+    @Test void aPaneListingTwoTabsDropsItsParentTabAlone() throws Exception {
+        String text = WorkspaceFile.encode(parentTabs());
+        String t2 = id(tab(2));
+        String twoTabs = replaceOnce(text, "tabs = [\"" + t2 + "\"]", "tabs = [\"" + t2 + "\", \"" + id(tab(9)) + "\"]");
+        assertThat(read(twoTabs)).as("the main window keeps its first parent tab, which shows")
+            .isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(1), single(1))))));
+        assertThat(Files.readString(bad())).isEqualTo(twoTabs);
     }
 
     @Test void aWindowHoldingAParentTabAnEarlierWindowHoldsIsDropped() throws Exception {

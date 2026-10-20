@@ -29,8 +29,8 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     void moveToNewWindow();
     /**
-     * Move to Main Window: the end of the active group of the main window's shown parent tab takes the tab and its
-     * content, the main window restored first when none is open. A tab the main window holds, a tab with a modal prompt
+     * Move to Main Window: a new tab of the main window, at the end of its tab strip, takes the tab and its content, the
+     * main window restored first when none is open. A tab the main window holds, a tab with a modal prompt
      * open and a tab being closed stay where they are.
      *
      * @since 0.20.0

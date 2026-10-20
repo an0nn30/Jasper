@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * A tab group's identity, unique in the application and kept in {@code workspace.toml}.
+ * A pane's identity (the code calls a pane a group), unique in the application and kept in {@code workspace.toml}.
  *
  * @param value the UUID
  */

@@ -49,14 +49,14 @@ class WorkspaceFileTest {
         return ParentTabId.parse("00000000-0000-4000-a000-%012d".formatted(n));
     }
 
-    /** Group {@code id} holding {@code tabs} in order, showing {@code selected}. */
-    static Group group(int id, int selected, int... tabs) {
-        return new Group(groupId(id), Arrays.stream(tabs).mapToObj(WorkspaceFileTest::tab).toList(), Optional.of(tab(selected)));
+    /** Pane {@code id} holding tab {@code n}, its one tab (workspace plan 8a Rulings 2). */
+    static Group group(int id, int n) {
+        return new Group(groupId(id), List.of(tab(n)), Optional.of(tab(n)));
     }
 
     /** Group {@code n} alone, holding tab {@code n}. */
     static Layout single(int n) {
-        return new Layout(group(n, n, n), groupId(n), Optional.empty());
+        return new Layout(group(n, n), groupId(n), Optional.empty());
     }
 
     /** A main or full window's only parent tab, {@code id}, holding {@code layout}. */
@@ -72,18 +72,20 @@ class WorkspaceFileTest {
     }
 
     /**
-     * Spec 8's example as the main window's one parent tab: two columns, the right one in two rows, its lower right group
-     * maximized; and a full window without bounds. Listed full window first: the snapshot puts the main window first.
+     * Spec 8's example as the main window's one parent tab: two columns, each in two rows, the right column's upper pane
+     * active and maximized; and a full window without bounds. Listed full window first: the snapshot puts the main
+     * window first.
      */
     static Snapshot snapshot() {
-        Node root = new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 2, 1, 2), 0.5),
-            new Child(new Split(Orientation.VERTICAL, List.of(new Child(group(2, 3, 3), 0.75), new Child(group(3, 4, 4), 0.25))), 0.5)));
+        Node left = new Split(Orientation.VERTICAL, List.of(new Child(group(1, 1), 0.5), new Child(group(5, 2), 0.5)));
+        Node root = new Split(Orientation.HORIZONTAL, List.of(new Child(left, 0.5),
+            new Child(new Split(Orientation.VERTICAL, List.of(new Child(group(2, 3), 0.75), new Child(group(3, 4), 0.25))), 0.5)));
         var main = new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 6, one(1, new Layout(root, groupId(2), Optional.of(groupId(2)))), Map.of(
             tab(1), new TabRecord.Terminal("build", "/Users/me/src/jasper", "zsh"),
             tab(2), new TabRecord.Content("README.md", "dev.jasper.editor", "document", Map.of("path", "/Users/me/src/jasper/README.md")),
             tab(3), new TabRecord.Terminal("", "C:\\work", ""),
             tab(4), new TabRecord.Content("Files \"prod\"", "dev.jasper.remote", "sftp", Map.of("remote path", "/srv/a", "host", "example"))));
-        var full = new WindowRecord(Role.CHILD, Optional.empty(), 0, one(5, new Layout(group(4, 5, 5), groupId(4), Optional.empty())),
+        var full = new WindowRecord(Role.CHILD, Optional.empty(), 0, one(5, new Layout(group(4, 5), groupId(4), Optional.empty())),
             Map.of(tab(5), new TabRecord.Terminal("", "/tmp", "")));
         return new Snapshot(List.of(full, main));
     }
@@ -124,11 +126,26 @@ class WorkspaceFileTest {
             weight = 1.0
 
             [[windows.parent_tabs.nodes]]
-            id = "00000000-0000-4000-9000-000000000001"
-            kind = "group"
+            id = "92cc2645-e802-3d4b-aa67-3432c68ad0b2"
+            kind = "split"
+            orientation = "vertical"
             parent = "e8b5eccb-037b-3d65-a6c6-5e4889602b31"
             weight = 0.5
-            tabs = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"]
+
+            [[windows.parent_tabs.nodes]]
+            id = "00000000-0000-4000-9000-000000000001"
+            kind = "group"
+            parent = "92cc2645-e802-3d4b-aa67-3432c68ad0b2"
+            weight = 0.5
+            tabs = ["00000000-0000-4000-8000-000000000001"]
+            selected = "00000000-0000-4000-8000-000000000001"
+
+            [[windows.parent_tabs.nodes]]
+            id = "00000000-0000-4000-9000-000000000005"
+            kind = "group"
+            parent = "92cc2645-e802-3d4b-aa67-3432c68ad0b2"
+            weight = 0.5
+            tabs = ["00000000-0000-4000-8000-000000000002"]
             selected = "00000000-0000-4000-8000-000000000002"
 
             [[windows.parent_tabs.nodes]]

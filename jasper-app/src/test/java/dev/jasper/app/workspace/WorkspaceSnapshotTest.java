@@ -46,12 +46,12 @@ class WorkspaceSnapshotTest {
         edt(() -> {
             MainWindow main = windows.manager.ensureMain("cold", work).orElseThrow();
             Tab first = main.content().selectedTab();
+            ParentTabId firstParent = main.content().activeParentTab();
             main.content().openTab(logs, null, Optional.of("zsh"));
             Tab tail = main.content().selectedTab();
             ((TerminalContent) tail.content()).rename("tail");
             main.content().split(Side.RIGHT);
-            ParentTabId firstParent = main.content().activeParentTab();
-            main.content().newParentTab(work);
+            main.content().newTab(work);
             main.placed(new JasperWindow.Placement(Optional.of(new UiState.Bounds(40, 60, 1400, 900)), 6));
             ChildWindow full = windows.manager.openTerminalWindow(work).orElseThrow();
             ChildWindow moved = windows.manager.moveToNewWindow(tail).orElseThrow();
@@ -88,11 +88,11 @@ class WorkspaceSnapshotTest {
             Tab errors = windows.model.tabs().open(TabRegistry.APP_OWNER, "errors", "Errors", main.id(), new javax.swing.JPanel());
             errors.moveToNewWindow();
             assertThat(windows.manager.children()).hasSize(1);
-            main.content().newParentTab(folder);
+            main.content().newTab(folder);
             Tab other = main.content().selectedTab();
             Tab away = windows.model.tabs().open("dev.example.notes", "away", "Away", main.id(), new javax.swing.JPanel());
             main.content().closeTab(other);
-            assertThat(main.content().parentTabCount()).as("the parent tab that shows holds a plugin's tab alone").isEqualTo(2);
+            assertThat(main.content().parentTabCount()).as("the terminal's tab, and each plugin's item in a tab of its own").isEqualTo(3);
             WorkspaceFile.Snapshot snapshot = windows.manager.snapshot().orElseThrow();
             var saved = (ParentTabs) snapshot.main().layout();
             assertThat(saved.parentTabs()).as("a parent tab holding only such tabs is left out").extracting(ParentTab::id).containsExactly(first);

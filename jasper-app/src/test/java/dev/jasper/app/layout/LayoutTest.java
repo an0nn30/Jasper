@@ -48,7 +48,7 @@ class LayoutTest {
         assertThatIllegalArgumentException().as("a group twice")
             .isThrownBy(() -> new Layout(h(child(a, 0.5), child(a, 0.5)), groupId(1), Optional.empty()));
         assertThatIllegalArgumentException().as("a tab in two groups")
-            .isThrownBy(() -> new Layout(h(child(a, 0.5), child(group(2, 1, 1), 0.5)), groupId(1), Optional.empty()));
+            .isThrownBy(() -> new Layout(h(child(a, 0.5), child(group(2, 1), 0.5)), groupId(1), Optional.empty()));
         assertThatIllegalArgumentException().as("an empty group beside another")
             .isThrownBy(() -> new Layout(h(child(a, 0.5), child(new Group(groupId(2), List.of(), Optional.empty()), 0.5)), groupId(1), Optional.empty()));
         assertThatIllegalArgumentException().as("an active group outside the tree")
@@ -68,10 +68,10 @@ class LayoutTest {
     }
 
     @Test void queriesListGroupsAndTabsInWorkspaceOrder() {
-        Group a = group(1, 2, 1, 2), b = group(2, 3, 3), c = group(3, 4, 4);
+        Group a = group(1, 2), b = group(2, 3), c = group(3, 4);
         Layout grid = layout(h(child(a, 0.5), child(v(child(b, 0.5), child(c, 0.5)), 0.5)), 3);
         assertThat(grid.groups()).containsExactly(a, b, c);
-        assertThat(grid.tabs()).containsExactly(tab(1), tab(2), tab(3), tab(4));
+        assertThat(grid.tabs()).containsExactly(tab(2), tab(3), tab(4));
         assertThat(grid.group(groupId(2))).contains(b);
         assertThat(grid.group(groupId(9))).isEmpty();
         assertThat(grid.groupOf(tab(4))).contains(groupId(3));

@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.config.AnimationSettings;
@@ -20,15 +21,15 @@ import java.util.function.LongSupplier;
 import javax.swing.*;
 
 /**
- * Equal-width, centered tabs of one tab group (workspace tabs spec 10), hidden by their group view while their pane
- * holds a single tab (parent tabs spec 7). A tab that opens or closes moves into or out of its place; one that joins or
- * leaves the group by a move, or is reordered, or arrives while the strip is hidden, takes its place at once (spec 4,
- * Rulings 27). It shows a window's parent tabs too, each as its active tab, and those never move (parent tabs spec 7).
- * EDT only.
+ * The equal tabs (workspace tabs spec 10): a window's tab strip in the standard look (tabs and panes spec 5), equal
+ * cells with centred titles, each entry a tab shown as its active pane's item; hidden while the window holds one tab. A
+ * tab that opens or closes moves into or out of its place where the look has motion (spec 5; workspace plan 8a Rulings
+ * 20). A tab that arrives or leaves by a move, is reordered, or arrives while the strip is hidden takes its place at
+ * once, and an entry keeps its place while its tab shows another of its panes. EDT only.
  */
 final class WindowTabs extends JPanel implements TabStrip {
     static final int TITLE_LIMIT = 200;
-    private final StripSource source;
+    private final ParentTabBar source;
     private final LongSupplier clock;
     private final List<Slot> slots = new ArrayList<>();
     private final IdentityHashMap<Tab, Entry> entries = new IdentityHashMap<>();
@@ -40,8 +41,8 @@ final class WindowTabs extends JPanel implements TabStrip {
     private int layoutWidth = -1, layoutHeight = -1;
     private boolean active = true, disposed;
 
-    WindowTabs(StripSource source) { this(source, System::nanoTime); }
-    WindowTabs(StripSource source, LongSupplier clock) {
+    WindowTabs(ParentTabBar source) { this(source, System::nanoTime); }
+    WindowTabs(ParentTabBar source, LongSupplier clock) {
         super(null);
         this.source = source; this.clock = clock;
         setName("windowTabs"); setOpaque(false);
@@ -54,11 +55,25 @@ final class WindowTabs extends JPanel implements TabStrip {
         if (disposed) return;
         long now = clock.getAsLong(); sample(now);
         var updated = new ArrayList<>(source.tabs());
+        // A tab whose entry shows another of its panes (a split, a focus change, a pane closing) keeps its entry and
+        // its place: only what the entry shows changes (workspace plan 8a Rulings 20).
+        for (Tab tab : List.copyOf(order)) {
+            if (updated.contains(tab)) continue;
+            Entry entry = entries.get(tab);
+            for (Tab next : updated)
+                if (!entries.containsKey(next) && entry.parent != null && entry.parent.equals(source.id(next))) {
+                    entries.remove(tab); entry.tab = next; entries.put(next, entry);
+                    order.set(order.indexOf(tab), next);
+                    break;
+                }
+        }
+        // An entry follows its tab's id, which ParentTabsView.reid and renew change.
+        for (Tab tab : order) { Entry entry = entries.get(tab); if (entry != null) entry.parent = source.id(tab); }
         boolean changed = !updated.equals(order);
         boolean added = updated.stream().anyMatch(tab -> !entries.containsKey(tab));
         boolean removed = order.stream().anyMatch(tab -> !updated.contains(tab));
-        // Only an open or a close moves: a tab that arrives or leaves by a move does not (Rulings 27).
-        boolean opened = updated.stream().anyMatch(tab -> !entries.containsKey(tab) && !source.moved(tab));
+        // Only an open or a close moves: a tab that arrives or leaves by a move does not.
+        boolean opened = updated.stream().anyMatch(tab -> !entries.containsKey(tab) && !tab.moving());
         boolean closing = order.stream().anyMatch(tab -> !updated.contains(tab) && tab.closed());
         if (changed) {
             for (Tab tab : List.copyOf(order)) if (!updated.contains(tab)) {
@@ -79,8 +94,7 @@ final class WindowTabs extends JPanel implements TabStrip {
             }
             Curve curve = added ? Curve.OPEN : Curve.CLOSE;
             int millis = added ? animations.tabOpenMillis() : animations.tabCloseMillis();
-            // A strip that does not show, hidden itself or in a hidden parent tab, takes its tabs at once, so it shows and
-            // hides settled.
+            // A strip that does not show takes its tabs at once, so it shows and hides settled.
             if (order.size() <= 1 || !opened && !closing || !shown() || !animations.enabled() || !source.animates()
                 || layoutWidth <= 0) millis = 0;
             for (Slot slot : slots) slot.width.target(slot.entry == null ? 0 : 1.0 / order.size(), now, millis, curve);
@@ -256,7 +270,10 @@ final class WindowTabs extends JPanel implements TabStrip {
         button.setContentAreaFilled(false); button.setFocusable(false);
     }
     private final class Entry extends JPanel {
-        private final Tab tab;
+        /** What the entry shows: its tab's active pane's item, which changes as the tab shows another pane. */
+        private Tab tab;
+        /** The tab the entry is; it follows the tab's id, which a move between windows can change. */
+        private ParentTabId parent;
         private final Slot slot;
         private final JButton close = new JButton();
         private final JButton select = new JButton() {
@@ -266,8 +283,8 @@ final class WindowTabs extends JPanel implements TabStrip {
         };
         private boolean hovered;
 
-        Entry(Tab tab) {
-            super(null); this.tab = tab; slot = new Slot(this); setOpaque(false);
+        Entry(Tab first) {
+            super(null); tab = first; parent = source.id(first); slot = new Slot(this); setOpaque(false);
             flat(select); flat(close); select.setHorizontalAlignment(SwingConstants.CENTER);
             select.addActionListener(event -> { if (!disposed) source.select(tab); });
             close.setRolloverEnabled(true); close.setToolTipText(source.closeName());
@@ -285,7 +302,7 @@ final class WindowTabs extends JPanel implements TabStrip {
                     if (SwingUtilities.isMiddleMouseButton(event)) { source.close(tab); return; }
                     if (SwingUtilities.isLeftMouseButton(event) && event.getComponent() != close) {
                         source.select(tab);
-                        // The tab drag may start here (workspace tabs spec 12).
+                        // The tab drag may start here (tabs and panes spec 6).
                         source.pressed(tab, event);
                     }
                 }

@@ -107,20 +107,20 @@ class JasperApplicationWindowsTest {
             .anyMatch(site -> site.matches("dev/jasper/app/application/JasperApplication\\.(rehearsalWindow|lambda\\$rehearsalWindow\\$\\d+)"));
     }
 
-    /** Parent tabs spec 11: a request opens in the main window's shown parent tab, and no parent tab opens for it. */
-    @Test void aRequestOpensInTheMainWindowsShownParentTab() throws Exception {
+    /** Tabs and panes spec 13: a request's folder opens as a new tab of the main window, at the end of its strip, shown. */
+    @Test void aRequestOpensANewTabInTheMainWindow() throws Exception {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
                 application.residency(true);
                 application.open(List.of(), JasperApplication.HANDOFF);
                 var main = application.windows().main().orElseThrow().content();
-                main.newParentTab(HOME);
+                main.newTab(HOME);
                 application.open(List.of(HOME), JasperApplication.HANDOFF);
-                var parents = (ParentTabs) main.windowLayout();
-                assertThat(parents.parentTabs()).hasSize(2);
-                assertThat(parents.activeParentTab().layout().tabs()).as("the folder's tab joins the shown parent tab").hasSize(2);
-                assertThat(parents.parentTabs().getFirst().layout().tabs()).hasSize(1);
+                ParentTabs parents = main.windowLayout();
+                assertThat(parents.parentTabs()).hasSize(3);
+                assertThat(parents.active()).as("the last, shown").isEqualTo(parents.parentTabs().getLast().id());
+                assertThat(parents.parentTabs()).as("each holding one terminal").allSatisfy(parent -> assertThat(parent.layout().tabs()).hasSize(1));
             });
         } finally {
             edt(application::quitNow);

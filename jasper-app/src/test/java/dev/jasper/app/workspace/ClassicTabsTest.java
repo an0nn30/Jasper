@@ -46,15 +46,18 @@ class ClassicTabsTest {
         return strip;
     }
 
-    /** Parent tabs spec 7: the classic tabs show every pane's strip, a pane of one tab's too. */
-    @Test void everyPaneShowsItsClassicTabs() throws Exception {
+    /** Tabs and panes spec 5: no pane shows a strip, and the window's classic strip lists a split tab once. */
+    @Test void aSplitTabIsOneEntryOfTheWindowsStrip() throws Exception {
         edt(() -> {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
-                owner.split(dev.jasper.app.layout.Side.RIGHT);
-                assertThat(owner.workspace().groupViews()).hasSize(2)
-                    .allSatisfy(group -> assertThat(group.strip().component().isVisible()).isTrue());
+                owner.split(Side.RIGHT);
+                assertThat(owner.workspace().groupViews()).hasSize(2);
+                var strip = (ClassicTabs) owner.tabBar();
+                assertThat(strip.isVisible()).isTrue();
+                assertThat(strip.entries()).as("one tab, two panes: one entry").hasSize(1);
+                assertThat(WindowTabsTest.named(owner.workspace(), "classicTabs")).as("no pane shows a strip").isNull();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -234,7 +237,7 @@ class ClassicTabsTest {
                 owner.update();
                 var action = strip.entries().get(0).getAccessibleContext().getAccessibleAction();
                 assertThat(action.getAccessibleActionCount()).isEqualTo(2);
-                assertThat(action.getAccessibleActionDescription(1)).isEqualTo("Close tab");
+                assertThat(action.getAccessibleActionDescription(1)).isEqualTo("Close Tab");
                 assertThat(action.doAccessibleAction(0)).isTrue();
                 assertThat(owner.selectedTab()).as("the first action selects the tab").isSameAs(owner.tabs().get(0));
                 assertThat(action.doAccessibleAction(1)).isTrue();

@@ -9,11 +9,9 @@ import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.testsupport.IdleTerminalSession;
 import dev.jasper.app.testsupport.LayoutTestSupport;
-import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
 import java.util.List;
-import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -23,20 +21,19 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
-/** Workspace tabs spec 10: a window's layout as groups in splits, each with its own strip (workspace plan 3a). */
+/** Tabs and panes spec 4 and 5: a tab's layout as panes in splits, each pane holding one item and none a strip. */
 class WorkspaceViewTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    /** A window holding {@code count} terminal tabs in one group, sized and laid out. */
-    private static WindowContent window(int count) {
+    /** A window of one tab, sized and laid out. */
+    private static WindowContent window() {
         var owner = content(idleLauncher(new ArrayDeque<>()));
-        for (int i = 1; i < count; i++) owner.newTab(HOME);
         owner.setSize(1208, 700);
-        LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner);
+        layout(owner);
         return owner;
     }
 
-    /** A window whose {@code count} terminal tabs run real in-process sessions, which a launch delivers on the next EDT turn. */
+    /** A window whose {@code count} tabs run real in-process sessions, which a launch delivers on the next EDT turn. */
     private static WindowContent runningWindow(int count) throws Exception {
         var launcher = new ShellLauncher(Runnable::run, directory -> IdleTerminalSession.start(), "idle-test-session");
         var window = new WindowContent[1];
@@ -56,20 +53,18 @@ class WorkspaceViewTest {
 
     private static void layout(WindowContent owner) { LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner); }
 
-    @Test void aWindowsOnlyTabFillsTheWorkspaceWithNoStrip() throws Exception {
+    @Test void aWindowsOnlyTabFillsTheWorkspaceWithOnePane() throws Exception {
         edt(() -> {
-            var owner = window(1);
+            var owner = window();
             var workspace = owner.workspace();
             assertThat(workspace.groupViews()).hasSize(1);
             var group = workspace.activeGroupView();
-            assertThat(workspace.getComponent(0)).as("one group fills the workspace").isSameAs(group);
-            assertThat(group.strip().component().isVisible()).as("the standard look: a window's only tab shows no strip").isFalse();
+            assertThat(workspace.getComponent(0)).as("one pane fills the workspace").isSameAs(group);
             assertThat(group.getHeight()).as("laid out").isPositive();
-            assertThat(group.contentBounds(group)).as("the card area fills the group").isEqualTo(new Rectangle(group.getSize()));
             var tab = owner.selectedTab();
-            assertThat(group.tabs()).containsExactly(tab);
-            assertThat(group.selected()).isSameAs(tab);
-            assertThat(SwingUtilities.isDescendingFrom(tab.component(), group)).isTrue();
+            assertThat(group.tab()).isSameAs(tab);
+            assertThat(tab.component().getParent()).as("the item fills its pane").isSameAs(group);
+            assertThat(tab.component().getBounds()).isEqualTo(new java.awt.Rectangle(group.getSize()));
             assertThat(tab.component().isVisible()).isTrue();
             assertThat(owner.tabRegistry().inWindow(owner.id())).as("the window's terminal tab is a registry tab").containsExactly(tab);
             assertThat(tab.kind()).isEqualTo(Tab.Kind.TERMINAL);
@@ -77,61 +72,15 @@ class WorkspaceViewTest {
         });
     }
 
-    /** The strip follows its pane's tab count in the same EDT turn, shown and hidden at once, without motion. */
-    @Test void theStripShowsWithASecondTabAndHidesWithTheLastButOne() throws Exception {
+    /** Spec 5: no pane shows a strip; each holds its own item. */
+    @Test void aSplitRendersTwoPanesEachHoldingItsItem() throws Exception {
         edt(() -> {
-            var owner = window(2);
-            var group = owner.workspace().activeGroupView();
-            var strip = (WindowTabs) group.strip();
-            assertThat(strip.isVisible()).as("two tabs show the strip").isTrue();
-            assertThat(strip.getWidth()).as("laid out, so a change could move").isPositive();
-            owner.closeTab(owner.tabs().get(1));
-            assertThat(strip.isVisible()).as("one tab: the strip hides at once").isFalse();
-            assertThat(strip.motionRunning()).as("without the close motion").isFalse();
-            layout(owner);
-            assertThat(group.contentBounds(group)).as("the card area fills the group").isEqualTo(new Rectangle(group.getSize()));
-            owner.newTab(HOME);
-            assertThat(strip.isVisible()).as("a second tab shows the strip at once").isTrue();
-            assertThat(strip.motionRunning()).as("its tabs settled: the new tab has no open motion").isFalse();
-            layout(owner);
-            Rectangle bar = group.stripBounds(group);
-            assertThat(bar.height).isEqualTo(owner.tabHeight());
-            assertThat(group.contentBounds(group).y).as("the cards start under the strip").isEqualTo(bar.height);
-            List<Rectangle> places = group.tabBounds(group);
-            assertThat(places).hasSize(2);
-            assertThat(places).as("each tab in its place").allSatisfy(place -> assertThat(place.width).isCloseTo(bar.width / 2, within(1)));
-            owner.closeTab(owner.tabs().get(0));
-            assertThat(strip.isVisible()).as("one tab again: the strip hides again").isFalse();
-            assertThat(strip.motionRunning()).isFalse();
-        });
-    }
-
-    /** Parent tabs spec 7: under the equal tabs a pane shows its strip from two tabs, whatever the other panes hold. */
-    @Test void aPaneShowsItsStripFromTwoTabsWhateverTheOtherPanesHold() throws Exception {
-        edt(() -> {
-            var owner = window(3);
+            var owner = window();
             var workspace = owner.workspace();
-            var tabs = owner.tabs();
+            Tab first = owner.selectedTab();
             var left = workspace.model().activeGroup();
-            workspace.moveToNewGroup(tabs.get(2), left, Side.RIGHT);
-            var right = workspace.model().activeGroup();
-            assertThat(workspace.groupView(left).strip().component().isVisible()).as("two tabs").isTrue();
-            assertThat(workspace.groupView(right).strip().component().isVisible()).as("one tab, though the window holds three")
-                .isFalse();
-            workspace.moveTab(tabs.get(1), right, 1);
-            assertThat(workspace.groupView(left).strip().component().isVisible()).as("one tab left").isFalse();
-            assertThat(workspace.groupView(right).strip().component().isVisible()).as("two tabs now").isTrue();
-            assertThat(((WindowTabs) workspace.groupView(right).strip()).motionRunning()).as("shown settled").isFalse();
-        });
-    }
-
-    @Test void twoOneTabPanesRenderASplitWithNoStrip() throws Exception {
-        edt(() -> {
-            var owner = window(2);
-            var workspace = owner.workspace();
-            var first = owner.tabs().get(0); var second = owner.tabs().get(1);
-            var left = workspace.model().activeGroup();
-            workspace.moveToNewGroup(second, left, Side.RIGHT);
+            owner.split(Side.RIGHT);
+            Tab second = owner.selectedTab();
             layout(owner);
             assertThat(workspace.model().root()).isInstanceOf(Split.class);
             var split = workspace.split(List.of());
@@ -139,45 +88,22 @@ class WorkspaceViewTest {
             assertThat(split.orientation()).isEqualTo(Orientation.HORIZONTAL);
             var right = workspace.model().groupOf(second.id()).orElseThrow();
             assertThat(split.children()).containsExactly(workspace.groupView(left), workspace.groupView(right));
-            assertThat(workspace.groupViews()).as("each pane holds one tab: no pane shows its strip (parent tabs spec 7)")
-                .allSatisfy(view -> assertThat(view.strip().component().isVisible()).isFalse());
-            assertThat(workspace.groupView(left).tabs()).containsExactly(first);
-            assertThat(workspace.groupView(right).tabs()).containsExactly(second);
-            assertThat(SwingUtilities.isDescendingFrom(second.component(), workspace.groupView(right)))
-                .as("the moved tab's component left one group view for the other").isTrue();
-            assertThat(first.component().isVisible()).as("each group shows its selected tab").isTrue();
+            assertThat(workspace.groupView(left).tab()).isSameAs(first);
+            assertThat(workspace.groupView(right).tab()).isSameAs(second);
+            assertThat(SwingUtilities.isDescendingFrom(second.component(), workspace.groupView(right))).isTrue();
+            assertThat(WindowTabsTest.named(workspace, "windowTabs")).as("no pane shows a strip").isNull();
+            assertThat(first.component().isVisible()).as("each pane shows its item").isTrue();
             assertThat(owner.selectedTab()).isSameAs(second);
-            assertThat(((WindowTabs) workspace.groupView(right).strip()).active()).as("the active group's strip").isTrue();
-            assertThat(((WindowTabs) workspace.groupView(left).strip()).active()).as("another group's strip").isFalse();
             owner.selectTab(first);
             assertThat(workspace.model().activeGroup()).isEqualTo(left);
-            assertThat(((WindowTabs) workspace.groupView(left).strip()).active()).isTrue();
-            owner.setActive(false);
-            assertThat(((WindowTabs) workspace.groupView(left).strip()).active()).as("an inactive window's strips").isFalse();
-        });
-    }
-
-    @Test void onlyTheActiveGroupsTabsShowTheirSelectTabShortcut() throws Exception {
-        edt(() -> {
-            var owner = window(2);
-            var workspace = owner.workspace();
-            var left = workspace.model().activeGroup();
-            workspace.moveToNewGroup(owner.tabs().get(1), left, Side.RIGHT);
-            var right = workspace.model().activeGroup();
-            // Select Tab 1 has no default since the digits select parent tabs (parent tabs spec 8): give it one.
-            owner.setBindings(dev.jasper.app.config.KeyBindings.withOverrides(System.getProperty("os.name").startsWith("Mac"),
-                java.util.Map.of("select_tab_1", "alt+1")));
-            assertThat(owner.tabShortcut(0)).as("Select Tab 1 has a shortcut").isNotEmpty();
-            assertThat(workspace.groupView(right).shortcut(0)).as("the active group's first tab").isEqualTo(owner.tabShortcut(0));
-            assertThat(workspace.groupView(left).shortcut(0)).as("Select Tab acts in the active group only").isEmpty();
         });
     }
 
     @Test void aDividerDragWritesTheLayoutsWeights() throws Exception {
         edt(() -> {
-            var owner = window(2);
+            var owner = window();
             var workspace = owner.workspace();
-            workspace.moveToNewGroup(owner.tabs().get(1), workspace.model().activeGroup(), Side.RIGHT);
+            owner.split(Side.RIGHT);
             layout(owner);
             var split = workspace.split(List.of());
             var divider = split.divider(0);
@@ -195,11 +121,10 @@ class WorkspaceViewTest {
 
     @Test void aThemeChangeKeepsTheDividers() throws Exception {
         edt(() -> {
-            var owner = window(3);
+            var owner = window();
             var workspace = owner.workspace();
-            var group = workspace.model().activeGroup();
-            workspace.moveToNewGroup(owner.tabs().get(1), group, Side.RIGHT);
-            workspace.moveToNewGroup(owner.tabs().get(0), workspace.model().activeGroup(), Side.DOWN);
+            owner.split(Side.RIGHT);
+            owner.split(Side.DOWN);
             workspace.resizeSplit(List.of(), List.of(0.63, 0.37));
             layout(owner);
             var split = workspace.split(List.of());
@@ -213,16 +138,17 @@ class WorkspaceViewTest {
         });
     }
 
-    @Test void closingTheLastTabOfAGroupCollapsesItAndRestoresTheSizes() throws Exception {
+    @Test void closingAPanesItemCollapsesItAndRestoresTheSizes() throws Exception {
         edt(() -> {
-            var owner = window(3);
+            var owner = window();
             var workspace = owner.workspace();
             var a = workspace.model().activeGroup();
-            var second = owner.tabs().get(1); var third = owner.tabs().get(2);
-            workspace.moveToNewGroup(second, a, Side.RIGHT);
+            owner.split(Side.RIGHT);
+            Tab second = owner.selectedTab();
             workspace.resizeSplit(List.of(), List.of(0.7, 0.3));
             var b = workspace.model().groupOf(second.id()).orElseThrow();
-            workspace.moveToNewGroup(third, b, Side.RIGHT);
+            owner.split(Side.RIGHT);
+            Tab third = owner.selectedTab();
             layout(owner);
             assertThat(workspace.split(List.of()).children()).hasSize(3);
             owner.closeTab(third);
@@ -232,49 +158,29 @@ class WorkspaceViewTest {
             assertThat(workspace.split(List.of()).weights().get(1)).isCloseTo(0.3, within(1e-9));
             owner.closeTab(second);
             layout(owner);
-            assertThat(workspace.getComponent(0)).as("one group fills the workspace again").isSameAs(workspace.groupView(a));
+            assertThat(workspace.getComponent(0)).as("one pane fills the workspace again").isSameAs(workspace.groupView(a));
             assertThat(workspace.split(List.of())).isNull();
         });
     }
 
-    @Test void maximizeShowsTheActiveGroupAloneAndKeepsTheOthersTabs() throws Exception {
+    @Test void maximizeShowsTheActivePaneAloneAndKeepsTheOthersItems() throws Exception {
         edt(() -> {
-            var owner = window(2);
+            var owner = window();
             var workspace = owner.workspace();
-            var first = owner.tabs().get(0); var second = owner.tabs().get(1);
-            workspace.moveToNewGroup(second, workspace.model().activeGroup(), Side.DOWN);
+            Tab first = owner.selectedTab();
+            owner.split(Side.DOWN);
             var hidden = workspace.groupView(workspace.model().groupOf(first.id()).orElseThrow());
             workspace.toggleMaximize();
             layout(owner);
             var shown = workspace.activeGroupView();
             assertThat(workspace.getComponent(0)).isSameAs(shown);
-            assertThat(SwingUtilities.isDescendingFrom(hidden, workspace)).as("the other group is out of the tree").isFalse();
-            assertThat(SwingUtilities.isDescendingFrom(first.component(), hidden)).as("and keeps its tab").isTrue();
+            assertThat(SwingUtilities.isDescendingFrom(hidden, workspace)).as("the other pane is out of the tree").isFalse();
+            assertThat(SwingUtilities.isDescendingFrom(first.component(), hidden)).as("and keeps its item").isTrue();
             assertThat(owner.tabCount()).isEqualTo(2);
             workspace.toggleMaximize();
             layout(owner);
             assertThat(SwingUtilities.isDescendingFrom(hidden, workspace)).isTrue();
             assertThat(workspace.split(List.of()).orientation()).isEqualTo(Orientation.VERTICAL);
-        });
-    }
-
-    @Test void groupsReportTheirStripAndCardRectangles() throws Exception {
-        edt(() -> {
-            var owner = window(4);
-            var workspace = owner.workspace();
-            var tabs = owner.tabs();
-            workspace.moveToNewGroup(tabs.get(2), workspace.model().activeGroup(), Side.RIGHT);
-            // Two tabs in each pane, so each shows its strip (parent tabs spec 7).
-            workspace.moveTab(tabs.get(3), workspace.model().activeGroup(), 1);
-            layout(owner);
-            for (GroupView group : workspace.groupViews()) {
-                Rectangle strip = group.stripBounds(workspace), cards = group.contentBounds(workspace);
-                Rectangle whole = SwingUtilities.convertRectangle(group.getParent(), group.getBounds(), workspace);
-                assertThat(strip.height).isEqualTo(owner.tabHeight());
-                assertThat(strip.y).isEqualTo(whole.y);
-                assertThat(cards.y).as("the cards start under the strip").isEqualTo(strip.y + strip.height);
-                assertThat(strip.union(cards)).isEqualTo(whole);
-            }
         });
     }
 
@@ -290,7 +196,7 @@ class WorkspaceViewTest {
             assertThatThrownBy(() -> owner.closeTab(tab)).isInstanceOf(IllegalStateException.class).hasMessage("listener failed");
             assertThat(owner.tabs()).doesNotContain(tab);
             assertThat(owner.tabRegistry().tabs()).doesNotContain(tab);
-            assertThat(owner.workspace().activeGroupView().tabs()).as("the group's tabs").hasSize(1).doesNotContain(tab);
+            assertThat(owner.workspace().activeGroupView().tab()).as("the tab left shows").isSameAs(owner.tabs().get(0));
             assertThat(owner.windowTabs().tabList().getComponentCount()).as("the strip lists the tab left").isEqualTo(1);
         });
         until(() -> shells[0].exitFuture().isDone());
@@ -307,20 +213,22 @@ class WorkspaceViewTest {
             assertThat(owner.tabRegistry().tabs()).isEmpty();
             assertThatCode(() -> owner.tabRegistry().addHost(new WorkspaceHost(owner.id(), tab -> { }, tab -> { }, tab -> { }, () -> { })))
                 .as("the window's host is unregistered").doesNotThrowAnyException();
-            assertThat(owner.windowTabs().isVisible()).as("the rest of the close ran: the strips are released").isFalse();
+            assertThat(owner.windowTabs().isVisible()).as("the rest of the close ran: the strip is released").isFalse();
         });
         until(() -> shells.stream().allMatch(shell -> shell.exitFuture().isDone()));
     }
 
-    @Test void stripsReorderWithinTheirGroupAndKeepTheSelection() throws Exception {
+    @Test void theStripReordersTabsAndKeepsTheShownOne() throws Exception {
         edt(() -> {
-            var owner = window(3);
+            var owner = window();
+            owner.newTab(HOME);
+            owner.newTab(HOME);
             var tabs = owner.tabs();
             owner.selectTab(tabs.get(0));
-            owner.workspace().reorder(tabs.get(2), owner.workspace().model().activeGroup(), 0);
+            owner.reorderParentTab(owner.parentTabOf(tabs.get(2)).orElseThrow(), 0);
             assertThat(owner.tabs()).containsExactly(tabs.get(2), tabs.get(0), tabs.get(1));
-            assertThat(owner.selectedTab()).as("reordering keeps the selection").isSameAs(tabs.get(0));
-            assertThat(owner.workspace().activeGroupView().tabs()).isEqualTo(owner.tabs());
+            assertThat(owner.selectedTab()).as("reordering keeps the one that shows").isSameAs(tabs.get(0));
+            assertThat(owner.parentTabs().bar().tabs()).isEqualTo(owner.tabs());
         });
     }
 }

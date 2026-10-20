@@ -7,6 +7,7 @@ import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import java.awt.Component;
 import java.awt.Container;
@@ -24,7 +25,7 @@ import javax.swing.JPanel;
 /**
  * A window's parent tabs (parent tabs spec 4 and 7): a {@link WorkspaceView} for each, and the {@link ParentTabs} they
  * make up, which every layout change keeps current. It stands where the terminal column stood, in the dock's centre,
- * with the parent-tab bar ({@link ParentTabBar}) on top, and paints nothing itself. Only the shown parent tab's
+ * with the window's tab strip ({@link ParentTabBar}) on top, and paints nothing itself. Only the shown parent tab's
  * workspace is visible; the others stay in the tree, hidden, with their groups, tabs and sessions as they were, so a
  * switch restarts nothing. A parent tab joins holding its first tab and leaves with its last one, except the window's
  * only parent tab, which the main window keeps as its empty workspace. EDT only.
@@ -33,7 +34,7 @@ final class ParentTabsView extends JPanel {
     private final WindowContent owner;
     /** Each parent tab's workspace; the model gives their order. */
     private final Map<ParentTabId, WorkspaceView> views = new HashMap<>();
-    /** The bar over the parent tabs (parent tabs spec 7), the view's last child (workspace plan 7a Rulings 19). */
+    /** The window's tab strip (tabs and panes spec 5), the view's last child (workspace plan 7a Rulings 19). */
     private final ParentTabBar bar;
     private ParentTabs model;
     private boolean closed;
@@ -53,7 +54,7 @@ final class ParentTabsView extends JPanel {
 
     /** The parent tabs in bar order with their layouts, and the one that shows. */
     ParentTabs model() { return model; }
-    /** The parent-tab bar. */
+    /** The window's tab strip. */
     ParentTabBar bar() { return bar; }
     /** The shown parent tab's workspace. */
     WorkspaceView active() { return views.get(model.active()); }
@@ -143,12 +144,13 @@ final class ParentTabsView extends JPanel {
     }
 
     /**
-     * Puts {@code tab}, moving in, in the active pane of the parent tab {@code id}; a parent tab the window lacks opens
-     * under that id at {@code index} of the bar ({@link #openParentTab(Tab, ParentTabId, int)}). Workspace plan 7b's moves.
+     * Puts {@code tab}, moving in, in a new pane to the right of the active pane of the tab {@code id}, whose layout the
+     * move gives it afterwards ({@link WorkspaceView#rearrange}); a tab the window lacks opens under that id at
+     * {@code index} of the strip ({@link #openParentTab(Tab, ParentTabId, int)}). Workspace plan 7b's moves.
      */
     void land(Tab tab, ParentTabId id, int index) {
         WorkspaceView view = views.get(id);
-        if (view != null) view.open(tab);
+        if (view != null) view.openBeside(tab, view.model().activeGroup(), Side.RIGHT);
         else openParentTab(tab, id, index);
     }
 
@@ -261,7 +263,7 @@ final class ParentTabsView extends JPanel {
         repaint();
     }
 
-    /** Refreshes the bar and every parent tab's strips. */
+    /** Refreshes the strip and every tab's empty state. */
     void refresh() {
         if (closed) return;
         bar.refresh();
@@ -280,23 +282,16 @@ final class ParentTabsView extends JPanel {
         repaint();
     }
 
-    void setAnimations(AnimationSettings settings) {
-        for (WorkspaceView view : views.values()) view.setAnimations(settings);
-        bar.strip().setAnimations(settings);
-    }
+    /** The strip takes the configured motion (tabs and panes spec 5; workspace plan 8a Rulings 20). */
+    void setAnimations(AnimationSettings settings) { bar.strip().setAnimations(settings); }
 
-    /** Every strip, the bar's too, takes a new tab height. */
+    /** The strip takes a new tab height. */
     void revalidateStrips() {
         bar.strip().component().revalidate();
         bar.strip().component().repaint();
-        for (WorkspaceView view : views.values())
-            for (GroupView group : view.groupViews()) {
-                group.strip().component().revalidate();
-                group.strip().component().repaint();
-            }
     }
 
-    /** The window closed: the bar and every parent tab's strips are released; the tabs are its registry's to close. */
+    /** The window closed: the strip and every tab's panes are released; the items are its registry's to close. */
     void close() {
         if (closed) return;
         closed = true;

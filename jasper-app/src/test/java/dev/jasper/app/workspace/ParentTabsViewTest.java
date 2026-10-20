@@ -42,7 +42,7 @@ class ParentTabsViewTest {
 
     /** New Tab in {@code owner}: the tab of its new parent tab. */
     private static Tab open(WindowContent owner) {
-        owner.newParentTab(HOME);
+        owner.newTab(HOME);
         return owner.selectedTab();
     }
 
@@ -55,7 +55,7 @@ class ParentTabsViewTest {
             var owner = content(idleLauncher(pending));
             Tab first = owner.selectedTab();
             WorkspaceView before = owner.workspace();
-            TerminalContent opened = owner.newParentTab(HOME);
+            TerminalContent opened = owner.newTab(HOME);
             Tab second = owner.selectedTab();
             assertThat(second.content()).isSameAs(opened);
             assertThat(owner.parentTabCount()).isEqualTo(2);
@@ -82,8 +82,8 @@ class ParentTabsViewTest {
         WindowContent[] owner = new WindowContent[1];
         edt(() -> {
             owner[0] = content(launcher);
+            owner[0].split(Side.RIGHT);
             owner[0].newTab(HOME);
-            owner[0].newParentTab(HOME);
             owner[0].setSize(1208, 700);
             LayoutTestSupport.layoutTree(owner[0]);
         });
@@ -134,7 +134,7 @@ class ParentTabsViewTest {
             assertThat(owner.parentTabCount()).as("the main window keeps its only parent tab").isEqualTo(1);
             assertThat(owner.windowLayout().tabs()).isEmpty();
             assertThat(owner.workspace().emptyWorkspace()).as("as its empty workspace").isNotNull();
-            owner.newParentTab(HOME);
+            owner.newTab(HOME);
             assertThat(owner.parentTabCount()).as("New Tab fills it rather than opening a second, empty one beside it")
                 .isEqualTo(1);
             assertThat(owner.tabs()).hasSize(1);
@@ -163,7 +163,8 @@ class ParentTabsViewTest {
             Tab terminal = owner.selectedTab();
             ParentTabId first = owner.activeParentTab();
             owner.split(Side.RIGHT);
-            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", owner.id(), new JPanel());
+            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", owner.id(), new JPanel(),
+                TabRegistry.Placement.SPLIT_RIGHT);
             Tab other = open(owner);
             boolean[] allow = {false};
             var asked = new ArrayList<List<Tab>>();
@@ -184,25 +185,31 @@ class ParentTabsViewTest {
         });
     }
 
-    @Test void whatOpensLandsInTheShownParentTabsActivePane() throws Exception {
+    /**
+     * Review Focus 1 (tabs and panes spec 13; workspace plan 8a Rulings 3): whatever opens without a pane opens as a new
+     * tab at the end of the strip, shown, and the main window's empty workspace takes the first in its place.
+     */
+    @Test void whatOpensWithoutAPaneOpensAsATabAndTheEmptyWorkspaceTakesTheFirst() throws Exception {
         edt(() -> {
-            var owner = content(idleLauncher(pending));
+            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, true, () -> { });
             var model = new Contributions();
-            owner.connectContributions(model);
-            open(owner);
-            ParentTabId shown = owner.activeParentTab();
-            GroupId pane = owner.workspace().model().activeGroup();
-            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", owner.id(), new JPanel());
-            assertThat(owner.parentTabOf(notes)).as("TabPlacement.ACTIVE_GROUP: the shown parent tab's active pane").contains(shown);
-            assertThat(notes.group()).contains(pane);
-            Tab beside = model.tabs().open("dev.example.editor", "beside", "beside.txt", owner.id(), new JPanel(),
+            main.connectContributions(model);
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());
+            assertThat(main.parentTabCount()).as("the empty workspace takes it: no empty tab is left beside it").isEqualTo(1);
+            assertThat(main.selectedTab()).isSameAs(notes);
+            assertThat(main.workspace().model().groups()).as("in one pane").hasSize(1);
+            TerminalContent terminal = main.newTab(HOME);
+            assertThat(main.parentTabCount()).as("New Tab, a request's folder, Terminals.openTab: a new tab").isEqualTo(2);
+            assertThat(main.selectedTab().content()).isSameAs(terminal);
+            assertThat(main.workspace().tabs()).containsExactly(main.selectedTab());
+            Tab second = model.tabs().open("dev.example.editor", "second", "second.txt", main.id(), new JPanel());
+            assertThat(main.parentTabCount()).as("a plugin's view placed without a pane").isEqualTo(3);
+            assertThat(main.windowLayout().parentTabs().getLast().layout().tabs()).as("at the end of the strip").containsExactly(second.id());
+            assertThat(main.activeParentTab()).as("shown").isEqualTo(main.parentTabOf(second).orElseThrow());
+            Tab beside = model.tabs().open("dev.example.editor", "beside", "beside.txt", main.id(), new JPanel(),
                 TabRegistry.Placement.SPLIT_RIGHT);
-            assertThat(owner.parentTabOf(beside)).contains(shown);
-            assertThat(owner.workspace().model().groups()).as("a new pane of the shown parent tab").hasSize(2);
-            owner.newTab(HOME);
-            assertThat(owner.parentTabOf(owner.selectedTab())).as("a request's folder (single instance), Terminals.openTab")
-                .contains(shown);
-            assertThat(owner.parentTabCount()).isEqualTo(2);
+            assertThat(main.parentTabOf(beside)).as("a split placement: a new pane of the shown tab").isEqualTo(main.parentTabOf(second));
+            assertThat(main.workspace().model().groups()).hasSize(2);
         });
     }
 
@@ -353,7 +360,7 @@ class ParentTabsViewTest {
         edt(() -> {
             owner[0] = content(launcher);
             owner[0].connectTerminals(registry, () -> { });
-            owner[0].newParentTab(HOME);
+            owner[0].newTab(HOME);
         });
         edt(() -> { });
         edt(() -> {

@@ -52,7 +52,7 @@ class MoveTabsTest {
             List<Tab> moving = content.tabs();
             var sessions = moving.stream().map(MovesFixture::session).toList();
             Tab active = content.selectedTab();
-            content.newParentTab(HOME);
+            content.newTab(HOME);
             ParentTabId second = content.activeParentTab();
             int[] focused = {0};
             active.focusTarget(() -> focused[0]++);
@@ -89,13 +89,13 @@ class MoveTabsTest {
         edt(() -> {
             var main = windows.main().content();
             ParentTabId m1 = main.activeParentTab();
-            main.newParentTab(HOME);
+            main.newTab(HOME);
             ParentTabId m2 = main.activeParentTab();
             main.selectParentTab(m1);
             ChildWindow full = windows.manager.openTerminalWindow(null).orElseThrow();
             var content = full.content();
             ParentTabId p1 = content.activeParentTab();
-            content.newParentTab(HOME);
+            content.newTab(HOME);
             content.split(Side.RIGHT);
             ParentTabId p2 = content.activeParentTab();
             var layouts = content.windowLayout().parentTabs();
@@ -139,7 +139,7 @@ class MoveTabsTest {
             var content = windows.main().content();
             ParentTabId first = content.activeParentTab();
             content.split(Side.RIGHT);
-            content.newParentTab(HOME);
+            content.newTab(HOME);
             ChildWindow full = windows.manager.openTerminalWindow(null).orElseThrow();
             Subscription held = content.tabs().getFirst().pin();
             windows.facts.clear();
@@ -158,7 +158,7 @@ class MoveTabsTest {
         edt(() -> {
             var content = windows.main().content();
             ParentTabId first = content.activeParentTab();
-            content.newParentTab(HOME);
+            content.newTab(HOME);
             windows.facts.clear();
             assertThat(windows.manager.moveParentTab(content, first, content, 0)).isFalse();
             assertThat(windows.tabFacts()).isEmpty();
@@ -176,7 +176,7 @@ class MoveTabsTest {
             content.toggleMaximize();
             Layout before = content.workspace().model();
             GroupId maximized = before.maximized().orElseThrow();
-            content.newParentTab(HOME);
+            content.newTab(HOME);
             ChildWindow full = windows.manager.moveTabToNewWindow(content, first).orElseThrow();
             assertThat(full.content().workspace().model().maximized()).as("on the same pane").contains(maximized);
             assertThat(full.content().workspace().model()).isEqualTo(before);
@@ -218,7 +218,7 @@ class MoveTabsTest {
             ParentTabId first = content.activeParentTab();
             List<Tab> moving = content.workspace().tabs();
             GroupId stays = moving.get(1).group().orElseThrow();
-            content.newParentTab(HOME);
+            content.newTab(HOME);
             Subscription[] pin = MovesFixture.pinWhenItLeaves(moving.get(0), moving.get(1));
             ChildWindow full = windows.manager.moveTabToNewWindow(content, first).orElseThrow();
             assertThat(full.content().tabs()).as("what arrived").containsExactly(moving.get(0));
@@ -239,7 +239,7 @@ class MoveTabsTest {
             content.split(Side.RIGHT);
             ParentTabId first = content.activeParentTab();
             List<Tab> moving = content.workspace().tabs();
-            content.newParentTab(HOME);
+            content.newTab(HOME);
             var refusal = MovesFixture.refuseItsMove(moving.get(1));
             assertThatThrownBy(() -> windows.manager.moveTabToNewWindow(content, first)).isSameAs(refusal);
             assertThat(windows.manager.children()).singleElement().satisfies(full -> {
@@ -265,7 +265,7 @@ class MoveTabsTest {
             content.split(Side.RIGHT);
             ParentTabId p1 = content.activeParentTab();
             List<Tab> split = content.workspace().tabs();
-            content.newParentTab(HOME);
+            content.newTab(HOME);
             ParentTabId p2 = content.activeParentTab();
             content.selectParentTab(p1);
             Subscription[] pin = MovesFixture.pinWhenItLeaves(split.get(0), split.get(1));
@@ -295,10 +295,14 @@ class MoveTabsTest {
             Tab extra = content.selectedTab();
             workspace.rearrange(plan);
             Layout layout = workspace.model();
-            assertThat(layout.root()).isInstanceOfSatisfying(Split.class, split ->
-                assertThat(split.children()).extracting(Child::weight).as("the plan landed").containsExactly(0.3, 0.7));
-            assertThat(layout.group(plan.activeGroup()).orElseThrow().tabs()).as("in its active pane")
-                .containsExactly(planned.id(), extra.id());
+            assertThat(layout.root()).isInstanceOfSatisfying(Split.class, split -> assertThat(split.children())
+                .extracting(Child::weight).as("the plan landed, its active pane split for the item it lacks").satisfiesExactly(
+                    weight -> assertThat(weight).isCloseTo(0.3, org.assertj.core.api.Assertions.within(1e-9)),
+                    weight -> assertThat(weight).isCloseTo(0.35, org.assertj.core.api.Assertions.within(1e-9)),
+                    weight -> assertThat(weight).isCloseTo(0.35, org.assertj.core.api.Assertions.within(1e-9))));
+            assertThat(layout.groupOf(extra.id())).as("in a pane of its own, beside the plan's active one").isPresent()
+                .isNotEqualTo(layout.groupOf(planned.id()));
+            assertThat(layout.activeGroup()).isEqualTo(plan.activeGroup());
             assertThat(content.selectedTab()).as("the plan's active item").isSameAs(planned);
             assertThat(content.tabs()).hasSize(3).contains(extra);
         });

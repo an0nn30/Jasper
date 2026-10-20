@@ -9,10 +9,10 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class ParentTabsTest {
     private static final TabId A = TabId.random(), B = TabId.random(), C = TabId.random(), D = TabId.random();
 
-    /** A parent tab of its own id holding {@code tabs} in one group, the first selected. */
+    /** A parent tab of its own id holding {@code tabs} in panes side by side, the first selected. */
     private static ParentTab parent(TabId... tabs) {
         Layout layout = Layout.of(tabs[0]);
-        for (int i = 1; i < tabs.length; i++) layout = layout.open(tabs[i], layout.activeGroup(), i);
+        for (int i = 1; i < tabs.length; i++) layout = layout.split(tabs[i], layout.activeGroup(), Side.RIGHT);
         return new ParentTab(ParentTabId.random(), layout.select(tabs[0]));
     }
 

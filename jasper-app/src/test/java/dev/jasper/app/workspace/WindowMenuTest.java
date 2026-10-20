@@ -49,7 +49,7 @@ class WindowMenuTest {
             assertThat(texts(main.windowMenu())).containsExactly("Move Tab to New Window");
             main.updateActions();
             assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("the main window's only tab stays").isFalse();
-            main.newParentTab(HOME);
+            main.newTab(HOME);
             main.updateActions();
             assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("from two tabs").isTrue();
             assertThat(main.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isFalse();
@@ -59,7 +59,7 @@ class WindowMenuTest {
             full.updateActions();
             assertThat(full.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("a full window's only tab stays").isFalse();
             assertThat(full.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isTrue();
-            full.newParentTab(HOME);
+            full.newTab(HOME);
             full.updateActions();
             assertThat(full.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).isTrue();
         });
@@ -70,9 +70,9 @@ class WindowMenuTest {
     @Test void aPinnedItemDisablesTheCommandsThatWouldMoveIt() throws Exception {
         edt(() -> {
             var main = windows.main().content();
-            main.newParentTab(HOME);
+            main.newTab(HOME);
             var full = windows.manager.openTerminalWindow(null).orElseThrow().content();
-            full.newParentTab(HOME);
+            full.newTab(HOME);
             Tab inMain = main.selectedTab();
             Tab inFull = full.selectedTab();
             List<Subscription> held = List.of(inMain.pin(), inFull.pin());
@@ -96,9 +96,9 @@ class WindowMenuTest {
     @Test void aWindowWithoutAManagerDisablesItsWindowMenuEntries() throws Exception {
         edt(() -> {
             var main = content(launcher(new ArrayDeque<>()));
-            main.newParentTab(HOME);
+            main.newTab(HOME);
             var full = content(launcher(new ArrayDeque<>()), WindowRole.CHILD, HOME, false, () -> { });
-            full.newParentTab(HOME);
+            full.newTab(HOME);
             full.split(Side.RIGHT);
             assertThat(full.windowMenuItems()).containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TO_MAIN_WINDOW);
             for (var window : List.of(main, full)) {
@@ -128,7 +128,7 @@ class WindowMenuTest {
     @Test void theActionsMoveATabToANewWindowAndBack() throws Exception {
         edt(() -> {
             var main = windows.main().content();
-            main.newParentTab(HOME);
+            main.newTab(HOME);
             ParentTabId moving = main.activeParentTab();
             main.invoke(ActionId.MOVE_TAB_TO_NEW_WINDOW);
             ChildWindow full = windows.manager.children().getLast();
@@ -148,7 +148,7 @@ class WindowMenuTest {
             var main = windows.main().content();
             ParentTabId first = main.activeParentTab();
             Tab left = main.selectedTab();
-            main.newParentTab(HOME);
+            main.newTab(HOME);
             var menu = main.tabMenu(left);
             assertThat(texts(menu)).containsExactly("Rename Tab", "Move Tab to New Window", "---", "Close Tab");
             item(menu, "Move Tab to New Window").doClick();

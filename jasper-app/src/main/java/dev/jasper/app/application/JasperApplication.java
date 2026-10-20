@@ -925,7 +925,7 @@ public final class JasperApplication {
      * Every outside request to show Jasper ends here: a second launch's handoff, the {@code jasper} command, the macOS
      * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3, 5.4 and 6.4). The main window is restored
      * first when none is open (until workspace-tabs plan 6, a new main window opens, in the first directory the request
-     * names when there is one), else raised; each other directory opens as a terminal tab in its active group and each
+     * names when there is one), else raised; each other directory opens as a new terminal tab and each
      * file in the editor a plugin provides, else revealed ({@code openRequestedFile}) ({@code OpenPlan}). {@code trigger}
      * names the caller for start-up timing. EDT.
      *
