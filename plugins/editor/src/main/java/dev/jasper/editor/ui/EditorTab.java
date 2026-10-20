@@ -81,6 +81,7 @@ public final class EditorTab {
         document.settings(settings);
         if (vim != null) vim.editorDefaults(defaults());
     }
+    void typography(TerminalTypography value) { if (!closed) document.typography(value); }
     void find(FindBar value) { if (closed) return; find = value; render(); }
     void render() { if (!closed) view.update(spec()); }
     private void reveal(String id) { if (!closed) view.reveal(id); }

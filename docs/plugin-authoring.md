@@ -689,7 +689,9 @@ heading wherever `section` changes (the page's name heads rows before the first 
 empty for none) shows after the value of either, on generated pages and in `host.row` rows alike, and so do `EditorHint.font` (the font family picker), `EditorHint.file` (a path with Browse…) and `EditorHint.technical()` (SDK 0.18: a text field in the data face). A `stringList` is an ordered list with an entry
 below it that adds a value, on generated pages and in `host.row` rows alike. To build the page yourself, call `context.settings().page(panel)` during `start` with a
 `SettingsPanel`: `create(host)` builds an owned `UiView`, `host.row(setting)` gives you the standard `Nodes.Node` row for a declared
-setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
+setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply.
+`pendingChanged()` (SDK 0.18.3) lets you rebuild dependent descriptors after a standard row edit or Reset; read its
+current draft through `host.pending(setting)`. Plugin calls to `host.stage` leave refreshing to the plugin. Use
 `modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel
 lives as long as your plugin, so Settings calls `reset` before `dispose` whenever it closes a page it showed without a
 successful Apply, as on Cancel; drop unapplied state of your own there. Compose the page as the generated ones are: a

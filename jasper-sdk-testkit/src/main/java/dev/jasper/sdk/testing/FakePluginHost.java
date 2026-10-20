@@ -473,7 +473,12 @@ public final class FakePluginHost implements AutoCloseable {
             try {
             var owned=java.util.Objects.requireNonNull(panel.create(rows),"Settings view");
             var view=context.kit().requireOwned(owned);view.mount(rows);rows.view=view;view.hostSpec=rows::descriptor;
-            view.hostEvents=rows::event;
+            view.hostEvents = event -> {
+                if (rows.closed) return false;
+                boolean handled = rows.event(event);
+                if (handled) panel.pendingChanged();
+                return handled;
+            };
             rows.component=view.component;return rows.component;
             }catch(Throwable failure){recordFailure("Settings callback failed");rows.component=new javax.swing.JLabel("This page could not be shown.");return rows.component;}
         });

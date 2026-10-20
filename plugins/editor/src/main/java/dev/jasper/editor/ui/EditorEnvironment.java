@@ -23,6 +23,11 @@ import java.util.function.Supplier;
 public record EditorEnvironment(PluginContext context, Executor ui, Function<WindowOwner, Function<Question, String>> askers,
                                 Function<WindowOwner, BiFunction<String, CompletableFuture<Boolean>, Boolean>> waits,
                                 Supplier<EditorSettings> settings, Function<Boolean, CompletableFuture<Void>> saveVim, boolean timers) {
+    /** @return the typography to display, leaving the declared independent values intact */
+    public dev.jasper.sdk.ui.TerminalTypography typography() {
+        return EditorTypography.effective(settings.get(), context.appearance().terminalTypography());
+    }
+
     /**
      * @param context the plugin's context
      * @param ui the UI thread

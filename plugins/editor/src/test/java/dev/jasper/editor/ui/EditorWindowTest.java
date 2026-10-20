@@ -46,7 +46,7 @@ class EditorWindowTest {
     private PluginContext context;
     private final Deque<String> answers = new ArrayDeque<>();
     private final List<Question> asked = new ArrayList<>();
-    private final AtomicReference<EditorSettings> settings = new AtomicReference<>(new EditorSettings("Monospaced", 13, 4, false, 1, false));
+    private final AtomicReference<EditorSettings> settings = new AtomicReference<>(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, false));
     private EditorWindow window;
     private boolean windowClosed;
     private Runnable duringWait = () -> { };
@@ -447,7 +447,7 @@ class EditorWindowTest {
 
     @Test void settingsApplyToOpenTabs() throws Exception {
         EditorTab tab = opened(file("a.json", "{}\n"));
-        settings.set(new EditorSettings("Monospaced", 18, 2, false, 1, false));
+        settings.set(new EditorSettings("Monospaced", 18, java.util.List.of(), false, 1.0, false, 2, false, 1, false));
         window.apply();
         assertThat(tab.area().getFont().getSize()).isEqualTo(18);
         assertThat(tab.area().getTabSize()).isEqualTo(2);
@@ -465,7 +465,7 @@ class EditorWindowTest {
         var item = host.contentStatus(host.contentTabs().getLast()).stream().filter(status -> status.text().startsWith("Vim:")).findFirst().orElseThrow();
         assertThat(item.text()).isEqualTo("Vim: On");
         assertThat(opened(file("three.txt", "three\n")).vimEditor()).as("a new tab follows").isPresent();
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         window.apply();
         assertThat(window.vimOn()).isTrue();
         item.run().run();
@@ -483,7 +483,7 @@ class EditorWindowTest {
     }
 
     @Test void vimKeysEditTheDocumentAndUndoItsChange() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab tab = opened(file("vim.txt", "one two\n"));
         var vim = tab.vimEditor().orElseThrow();
         for (var key : dev.jasper.editor.vim.KeyInput.parse("dw")) vim.feed(key);
@@ -550,7 +550,7 @@ class EditorWindowTest {
 
     @Test void aVimrcThatCannotBeReadIsReported() throws Exception {
         Files.createDirectories(window.vimrcFile());
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         opened(file("rc.txt", "one\n"));
         assertThat(host.notifications().lines()).singleElement().asString()
             .startsWith("dev.jasper.editor|WARNING|Could not read the vimrc|" + window.vimrcFile() + ": ")
@@ -558,7 +558,7 @@ class EditorWindowTest {
     }
 
     @Test void theOpenCommandHasNoKeyButVimStillRunsIt() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab tab = opened(file("from.txt", "one\n"));
         assertThat(tab.area().getInputMap(javax.swing.JComponent.WHEN_FOCUSED).get(KeyNames.stroke(java.awt.event.KeyEvent.VK_O, 0)))
             .as("Cmd/Ctrl+O is left to the Keymap's Open in Editor\u2026").isNotEqualTo("open");
@@ -570,7 +570,7 @@ class EditorWindowTest {
     }
 
     @Test void vimActionsAreTheEditorsCommands() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab tab = opened(file("act.txt", "one\n"));
         vimKeys(tab, ":actionlist vim<CR>");
         assertThat(tab.vimEditor().orElseThrow().output()).extracting(dev.jasper.editor.vim.VimEditor.OutputLine::text)
@@ -583,7 +583,7 @@ class EditorWindowTest {
     }
 
     @Test void vimWritesOpensListsSelectsAndClosesTabs() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         Path one = file("one.txt", "one\n");
         file("two.txt", "two\n");
         EditorTab first = opened(one);
@@ -615,7 +615,7 @@ class EditorWindowTest {
     }
 
     @Test void vimOpensANewFileThatItsFirstWriteCreates() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab first = opened(file("one.txt", "one\n"));
         vimKeys(first, ":e new.txt<CR>");
         EditorTab created = window.selected().orElseThrow();
@@ -632,7 +632,7 @@ class EditorWindowTest {
     }
 
     @Test void anUppercaseMarkSelectsItsTab() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab first = opened(file("one.txt", "one\n"));
         EditorTab second = opened(file("two.txt", "a\n  b\nc\n"));
         vimKeys(second, "jlmAgg");

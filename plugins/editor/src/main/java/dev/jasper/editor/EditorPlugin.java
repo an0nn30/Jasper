@@ -51,6 +51,7 @@ public final class EditorPlugin implements Plugin {
     private final BiFunction<System.Logger, NotificationGroup, DefaultEditor.Launcher> launchers;
     private EditorEnvironment environment;
     private EditorWindow window;
+    private Subscription typography = () -> { };
     private RecentFiles recent;
     private Openers openers;
     private final Locations locations = new Locations();
@@ -90,6 +91,9 @@ public final class EditorPlugin implements Plugin {
         context.settings().onChanged(() -> ui.execute(() -> { if (window != null) window.apply(); }));
         context.settings().onChanged(() -> ui.execute(() -> { recent.prune(Instant.now()); scope.changed(); }));
         context.appearance().onWorkspaceChanged(variant -> ui.execute(() -> { if (window != null) window.apply(); }));
+        typography = context.appearance().onTerminalTypographyChanged(value -> {
+            if (window != null && environment.settings().get().followTerminalFont()) window.typography();
+        });
         context.services().publish(Editor.class, new Editor() {
             @Override public void open(Path file) { window().openLocal(file); }
             @Override public void open(EditorDocument document) { window().open(document); }
@@ -124,7 +128,7 @@ public final class EditorPlugin implements Plugin {
             context.log().log(System.Logger.Level.INFO, "Another plugin provides the editor Jasper opens files with, so the default "
                 + "editor setting does not choose it: " + provided.getMessage());
         }
-        context.settings().page(new EditorSettingsPanel(context.kit(), settings, defaults, System.getenv()));
+        context.settings().page(new EditorSettingsPanel(context.kit(), context.appearance(), settings, defaults, System.getenv()));
         context.palette().register(scope);
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);
@@ -132,6 +136,8 @@ public final class EditorPlugin implements Plugin {
     }
 
     @Override public void stop() {
+        typography.close();
+        typography = () -> { };
         if (window != null) window.dispose();
     }
 

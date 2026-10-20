@@ -12,6 +12,8 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.EditorPalette;
 import dev.jasper.sdk.ui.SyntaxPalette;
+import dev.jasper.sdk.ui.TerminalTypography;
+import java.awt.Font;
 import java.util.List;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
@@ -31,6 +33,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private Appearance appearance;
     private Subscription changes;
     private EditorSettings settings;
+    private TerminalTypography typography;
     private final EditorTheme theme = new EditorTheme();
     private boolean closed;
     private double opacity = 1;
@@ -66,6 +69,18 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         refreshAppearance();
     }
 
+    void typography(TerminalTypography value) {
+        if (closed) return;
+        typography = value;
+        if (appearance != null && settings != null) refreshAppearance();
+        else applyFont(new Font(value.family(), Font.PLAIN, 1).deriveFont((float) value.size()));
+    }
+
+    private void applyFont(Font font) {
+        area.setFont(font);
+        scroll.getGutter().setLineNumberFont(font);
+    }
+
     private void refreshAppearance() {
         if (!closed && appearance != null && settings != null)
             apply(settings, theme, appearance.editorPalette(), appearance.syntaxPalette(), appearance.workspaceOpacity(this));
@@ -73,9 +88,9 @@ final class DocumentArea extends JComponent implements AutoCloseable {
 
     void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax, double opacity) {
         if (closed) return;
-        area.setFont(settings.font());
+        applyFont(typography == null ? settings.font()
+            : new Font(typography.family(), Font.PLAIN, 1).deriveFont((float) typography.size()));
         theme.apply(area, scroll, editor, syntax, opacity);
-        scroll.getGutter().setLineNumberFont(settings.font());
         area.setTabSize(settings.tabSize());
         glass(opacity, editor.background(), editor.gutter());
     }

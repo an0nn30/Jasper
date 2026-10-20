@@ -327,10 +327,18 @@ public final class EditorWindow {
         if (vimToggled != null && vimToggled == settings.vim()) vimToggled = null;
         for (EditorTab tab : editorTabs()) {
             tab.settings(settings);
+            tab.typography(environment.typography());
             tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         }
         readVimrcOnce();
         refreshStatus();
+    }
+
+    /** Reapplies effective typography to every tab after saved terminal typography changes. */
+    public void typography() {
+        if (disposed) return;
+        var font = environment.typography();
+        for (EditorTab tab : editorTabs()) tab.typography(font);
     }
 
     /** @return whether Vim mode is on: as toggled here, or as the settings say */
@@ -745,6 +753,7 @@ public final class EditorWindow {
         var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
         tab.appearance(context.appearance());
         tab.settings(settings);
+        tab.typography(environment.typography());
         tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         var tabCommands = commands.stream().map(command -> new Command(command.id(), command.title(), command.stroke(), command.bound(),
             () -> { activate(tab); command.run().run(); })).toList();

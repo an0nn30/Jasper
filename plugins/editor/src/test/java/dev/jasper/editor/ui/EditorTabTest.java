@@ -57,7 +57,7 @@ class EditorTabTest {
     @Test void translucentWorkspaceLetsTheGlassSurfaceFillTextAndGutterOnceAtTheWorkspaceOpacity() throws Exception {
         dev.jasper.editor.testsupport.Kits.edt(() -> {
             var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
-            var settings = new EditorSettings("Monospaced", 17, 2, false, 10, false);
+            var settings = new EditorSettings("Monospaced", 17, java.util.List.of(), false, 1.0, false, 2, false, 10, false);
             var syntax = EditorThemeTest.syntax(0x223300);
             tab.apply(settings, new EditorTheme(), EditorThemeTest.EDITOR, syntax, 0.5);
             tab.surface().setSize(600, 400);
@@ -98,7 +98,7 @@ class EditorTabTest {
     @Test void theDocumentsMinimumHeightDoesNotGrowWithItsText() throws Exception {
         dev.jasper.editor.testsupport.Kits.edt(() -> {
             var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
-            tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(), EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300), 1.0);
+            tab.apply(new EditorSettings("Monospaced", 17, java.util.List.of(), false, 1.0, false, 2, false, 10, false), new EditorTheme(), EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300), 1.0);
             measure(tab);
             int empty = tab.surface().getMinimumSize().height;
             tab.area().setText(String.join("\n", java.util.Collections.nCopies(400, "a long document line")));
@@ -277,7 +277,7 @@ class EditorTabTest {
 
     @Test void settingsApplyTheFontAndTabSize() {
         var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
-        tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(),
+        tab.apply(new EditorSettings("Monospaced", 17, java.util.List.of(), false, 1.0, false, 2, false, 10, false), new EditorTheme(),
             EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300));
         assertThat(tab.area().getFont().getSize()).isEqualTo(17);
         assertThat(tab.area().getTabSize()).isEqualTo(2);
@@ -286,13 +286,13 @@ class EditorTabTest {
     @Test void workspaceAndFontChangesKeepDirtyDocumentAndUpdateStyledTokenFonts() throws Exception {
         var tab = open(Files.writeString(folder.resolve("colors.txt"), "original\n"));
         drain();
-        var first = new EditorSettings("Monospaced", 17, 2, false, 10, false);
+        var first = new EditorSettings("Monospaced", 17, java.util.List.of(), false, 1.0, false, 2, false, 10, false);
         var syntax = EditorThemeTest.syntax(0x223300);
         tab.apply(first, new EditorTheme(), EditorThemeTest.EDITOR, syntax);
         tab.area().append("changed");
         tab.area().select(2, 5);
         var document = tab.area().getDocument();
-        var second = new EditorSettings("Monospaced", 22, 4, false, 10, false);
+        var second = new EditorSettings("Monospaced", 22, java.util.List.of(), false, 1.0, false, 4, false, 10, false);
         var next = EditorThemeTest.syntax(0x334400);
         tab.apply(second, new EditorTheme(), EditorThemeTest.EDITOR, next);
         assertThat(tab.area().getDocument()).isSameAs(document);
