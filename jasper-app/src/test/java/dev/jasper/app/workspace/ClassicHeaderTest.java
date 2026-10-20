@@ -230,7 +230,7 @@ class ClassicHeaderTest {
             window.width(1440);
             var split = labelled(bar, "Split");
             assertThat(split.getPreferredSize()).isEqualTo(new Dimension(scale(22), scale(22)));
-            assertThat(split.getToolTipText()).isEqualTo("Split pane right or down");
+            assertThat(split.getToolTipText()).isEqualTo("Split right or down");
             split.setSize(split.getPreferredSize());
             var corner = new Rectangle(scale(22) - scale(7), scale(22) - scale(5), scale(5), scale(3));
             assertThat(alphaIn(split, corner)).as("Split's corner ▼").isPositive();

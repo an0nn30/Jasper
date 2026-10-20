@@ -35,7 +35,7 @@ class ClassicMacTitleTest {
         return WindowLook.of(Projections.of(EnterpriseLook.titled(EnterpriseLook.CHROME, ChromeSpec.TitleBar.CLASSIC), true, true, "dev.jasper.enterprise", MAC));
     }
 
-    /** A macOS window under the classic title, mounted as TerminalWindow mounts it, its menu bar out of the window as AppKit takes it. */
+    /** A macOS window under the classic title, mounted as the main window's frame mounts it, its menu bar out of the window as AppKit takes it. */
     static JRootPane mounted(ThemeController themes, java.util.function.Consumer<WindowContent> before, WindowContent[] owner) {
         owner[0] = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look().chrome(), true);
         before.accept(owner[0]);
