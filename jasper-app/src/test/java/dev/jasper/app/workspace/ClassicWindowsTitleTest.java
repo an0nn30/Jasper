@@ -1,0 +1,182 @@
+package dev.jasper.app.workspace;
+
+import static dev.jasper.app.workspace.DesktopTestSupport.edt;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.formdev.flatlaf.FlatClientProperties;
+import com.formdev.flatlaf.ui.FlatTitlePane;
+import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.app.platform.TitleInset;
+import dev.jasper.app.presentation.ChromeSpec;
+import dev.jasper.app.presentation.Projections;
+import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.LayoutTestSupport;
+import dev.jasper.app.testsupport.MockProfile;
+import dev.jasper.ui.swing.FlatLafInstaller;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
+import java.awt.Component;
+import java.awt.Container;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import javax.swing.JButton;
+import javax.swing.JMenu;
+import javax.swing.JRootPane;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+
+/** The Windows classic title (Enterprise plan 14): FlatLaf's title pane in the toolbar's colour, with the menus then the title. */
+class ClassicWindowsTitleTest {
+    static final Projections.Host WINDOWS = new Projections.Host(Projections.Platform.WINDOWS, false);
+    @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
+
+    static WindowLook look() {
+        return WindowLook.of(Projections.of(EnterpriseLook.titled(EnterpriseLook.CHROME, ChromeSpec.TitleBar.CLASSIC), true, true, "dev.jasper.enterprise", WINDOWS));
+    }
+
+    record Mounted(WindowContent owner, JRootPane root, String[] frameTitle) { }
+
+    /** A Windows window under the classic title; {@code decorated} as FlatLaf decorates a Windows 10 or 11 frame. */
+    static Mounted mount(ThemeController themes, boolean decorated, int width) {
+        var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look().chrome(), false);
+        owner.connectContributions(EnterpriseMenuRowMockTest.workstation());
+        owner.setActive(true);
+        var root = new JRootPane();
+        if (decorated) { root.setWindowDecorationStyle(JRootPane.FRAME); root.updateUI(); }
+        var frameTitle = new String[1];
+        assertThat(WindowContent.mount(root, owner, look(), value -> frameTitle[0] = value)).isNull();
+        owner.update();
+        root.setSize(width, 800);
+        for (int i = 0; i < 3; i++) LayoutTestSupport.layoutTree(root);
+        return new Mounted(owner, root, frameTitle);
+    }
+
+    /**
+     * FlatLaf's window buttons, by accessible name, in its title pane (the toolbar has a "Maximize" too); headless, only
+     * Close shows (the others need a Frame, FlatTitlePane.createButtons).
+     */
+    static List<JButton> windowButtons(JRootPane root) {
+        var names = Set.of("Iconify", "Maximize", "Restore", "Close");
+        var found = new ArrayList<JButton>();
+        var pending = new ArrayDeque<Component>();
+        for (var child : root.getLayeredPane().getComponents()) if (child instanceof FlatTitlePane) pending.add(child);
+        while (!pending.isEmpty()) {
+            var next = pending.pop();
+            if (next instanceof JButton button && button.isVisible() && names.contains(button.getAccessibleContext().getAccessibleName())) found.add(button);
+            if (next instanceof Container container) pending.addAll(List.of(container.getComponents()));
+        }
+        return found;
+    }
+
+    /** W1: the default look's window buttons, never squeezed by the menus and the title. */
+    static void assertFullWindowButtons(JRootPane root, int width) {
+        var buttons = windowButtons(root);
+        assertThat(buttons).as("%d px: Close at least", width).extracting(button -> button.getAccessibleContext().getAccessibleName()).contains("Close");
+        for (var button : buttons)
+            assertThat(button.getWidth()).as("%d px: %s keeps its 44 px", width, button.getAccessibleContext().getAccessibleName())
+                .isEqualTo(button.getPreferredSize().width).isEqualTo(UIScale.scale(44));
+    }
+
+    @Test void theTitleBarIsTheToolbarsColourWithTheMenusThenTheTitle() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var m = mount(themes, true, 1440);
+                var owner = m.owner(); var root = m.root();
+                var menus = owner.chrome().menuBar();
+                var header = owner.chrome().header();
+                assertThat(menus.getParent()).isSameAs(root.getLayeredPane());
+                assertThat(header.getParent()).as("the toolbar stays a row of the window, under the title bar").isSameAs(owner);
+                int top = root.getContentPane().getY();
+                assertThat(top).as("the title bar, 28 and its rule").isEqualTo(UIScale.scale(ClassicWindowTitle.BAR_HEIGHT) + UIScale.scale(1));
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_SHOW_TITLE)).isEqualTo(false);
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_HEIGHT)).isEqualTo(ClassicWindowTitle.BAR_HEIGHT);
+                var toolbar = ThemeZone.color(header, SemanticColor.SURFACE_APP);
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_BACKGROUND)).isEqualTo(toolbar);
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_FOREGROUND)).as("the default look's window buttons")
+                    .isEqualTo(ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
+                var title = owner.classicWindowTitle();
+                assertThat(title.getParent()).isSameAs(menus);
+                assertThat(title.getText()).as("the frame's title").isEqualTo(m.frameTitle()[0]);
+                assertThat(title.getHorizontalAlignment()).isEqualTo(SwingConstants.LEADING);
+                JMenu last = null;
+                for (var menu : menus.menus()) if (menu.isVisible()) last = menu;
+                assertThat(title.getX()).as("22 after the last menu").isEqualTo(last.getX() + last.getWidth() + UIScale.scale(ClassicWindowTitle.GAP));
+                assertThat(title.getMouseListeners()).as("caption: the title drags the window").isEmpty();
+                assertThat(title.getMouseMotionListeners()).isEmpty();
+                var installed = FlatLafInstaller.installedTheme();
+                assertThat(title.getForeground()).isEqualTo(SurfaceContrast.painted(installed, WindowPairs.TITLE));
+                owner.setActive(false);
+                assertThat(title.getForeground()).as("dimmed while inactive").isEqualTo(SurfaceContrast.painted(installed, WindowPairs.INACTIVE_TITLE))
+                    .isNotEqualTo(SurfaceContrast.painted(installed, WindowPairs.TITLE));
+                owner.setActive(true);
+                var image = MockProfile.print(root, 1440, 800);
+                // The device row above the content pane, in the root: FlatLaf's window border puts the layered pane 1 px in.
+                int ruleRow = 2 * SwingUtilities.convertPoint(root.getContentPane(), 0, 0, root).y - 1;
+                var rule = MockProfile.at(image, 2 * 100, ruleRow);
+                assertThat(MockProfile.at(image, 2 * 1300, ruleRow)).as("the rule runs under the whole title bar").isEqualTo(rule);
+                // FlatTitlePaneBorder, not the menu bar's own Matte rule: also under the window buttons and the app icon.
+                assertThat(MockProfile.at(image, 2 * (1440 - 20), ruleRow)).as("the rule under the window buttons").isEqualTo(rule);
+                assertThat(MockProfile.at(image, 2 * 8, ruleRow)).as("the rule under the app icon").isEqualTo(rule);
+                assertThat(rule).isNotEqualTo(toolbar);
+                assertThat(MockProfile.at(image, 2 * 1300, ruleRow - 5)).as("the bar is the toolbar's colour").isEqualTo(toolbar);
+                assertThat(TitleInset.of(root)).isEqualTo(top);
+                assertFullWindowButtons(root, 1440);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    @Test void aNarrowWindowFoldsTheMenusAndClipsTheTitle() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var m = mount(themes, true, 480);
+                var menus = m.owner().chrome().menuBar();
+                assertThat(menus.fold()).isNotEqualTo(CollapsingMenuBar.Fold.NONE);
+                var title = m.owner().classicWindowTitle();
+                assertThat(title.getWidth()).isNotNegative();
+                assertThat(title.getX() + title.getWidth()).as("inside the bar, clear of the window buttons")
+                    .isLessThanOrEqualTo(menus.getWidth() - menus.getInsets().right);
+                assertFullWindowButtons(m.root(), 480);
+                var wider = mount(themes, true, 800);
+                assertThat(wider.owner().classicWindowTitle().getWidth()).isNotNegative();
+                assertFullWindowButtons(wider.root(), 800);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** Rulings 17: with window.native_decorations FlatLaf never decorates, so the window is Linux's. */
+    @Test void withoutDecorationsTheMenusStayARowOfTheWindow() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var m = mount(themes, false, 1440);
+                assertThat(m.owner().classicWindowTitle()).isNull();
+                assertThat(m.root().getJMenuBar()).isSameAs(m.owner().menuBar());
+                assertThat(SwingUtilities.convertPoint(m.owner(), 0, 0, m.root()).y).isEqualTo(m.root().getJMenuBar().getHeight());
+                assertThat(TitleInset.of(m.root())).isZero();
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** Windows 10 and 11 decorate a frame when its peer exists: the classic title arrives then, once. */
+    @Test void decorationsThatArriveLaterStillGetTheClassicTitleOnce() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var m = mount(themes, false, 1440);
+                m.root().setWindowDecorationStyle(JRootPane.FRAME);
+                assertThat(m.owner().classicWindowTitle()).isNotNull();
+                m.root().setWindowDecorationStyle(JRootPane.NONE);
+                m.root().setWindowDecorationStyle(JRootPane.FRAME);
+                assertThat(m.owner().menuBar().getComponents()).filteredOn(child -> child instanceof ClassicWindowTitle).hasSize(1);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+}
