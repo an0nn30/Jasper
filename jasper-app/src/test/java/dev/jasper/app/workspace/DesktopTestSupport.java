@@ -85,6 +85,13 @@ public final class DesktopTestSupport {
         OWNERS.add(owner);
         return owner;
     }
+    /** As above, in {@code role}. */
+    public static WindowContent content(ShellLauncher launcher, ThemeController themes, WorkspaceChrome look, boolean macOs, WindowRole role) {
+        WindowContent owner = new WindowContent(role, launcher, HOME, false, path -> {}, () -> {}, () -> {}, themes,
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs, look);
+        OWNERS.add(owner);
+        return owner;
+    }
     /**
      * A window in {@code role} with this host's keymap: its first tab starts in {@code directory} (null: where a new shell
      * starts) unless it is {@code empty}, and {@code emptied} runs when its last tab has closed or moved out.

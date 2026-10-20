@@ -247,4 +247,31 @@ class ClassicWindowsTitleTest {
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
+
+    /**
+     * Workspace tabs spec 6.3 under the classic title: a child window's FlatLaf title pane is 28 px in the toolbar's
+     * colour and holds the title alone, with no menu row, and in-window dialogs start below it.
+     */
+    @Test void aChildWindowsTitlePaneIsTwentyEightInTheToolbarsColour() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var child = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look().chrome(), false,
+                    WindowRole.CHILD);
+                var root = new JRootPane();
+                root.setWindowDecorationStyle(JRootPane.FRAME); root.updateUI();
+                assertThat(WindowContent.mountChild(root, child, look(), false, title -> { })).isNull();
+                root.setSize(1000, 600);
+                for (int i = 0; i < 3; i++) LayoutTestSupport.layoutTree(root);
+                assertThat(root.getJMenuBar()).as("no menu row in a child window").isNull();
+                assertThat(child.classicWindowTitle()).as("FlatLaf's own title").isNull();
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_HEIGHT)).isEqualTo(ClassicWindowTitle.BAR_HEIGHT);
+                assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_BACKGROUND)).isEqualTo(ThemeZone.color(null, SemanticColor.SURFACE_APP));
+                int top = root.getContentPane().getY();
+                assertThat(top).as("the 28 px title bar").isBetween(UIScale.scale(ClassicWindowTitle.BAR_HEIGHT),
+                    UIScale.scale(ClassicWindowTitle.BAR_HEIGHT) + UIScale.scale(1));
+                assertThat(TitleInset.of(root)).isEqualTo(top);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
 }
