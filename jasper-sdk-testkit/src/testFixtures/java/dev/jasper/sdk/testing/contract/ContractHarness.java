@@ -211,6 +211,18 @@ public interface ContractHarness extends AutoCloseable {
     /** The problems reported for a plugin's settings file and not yet cleared, as {@code key: message}. */
     List<String> settingsReports(String pluginId);
 
+    /**
+     * Gives a plugin's setting a look default, as a kit's {@code [defaults."<plugin id>"]} table would; called before
+     * any plugin starts. Raw values are what TOML reads: String, Long, Double, Boolean or List of String.
+     */
+    void setKitDefault(String pluginId, String key, Object rawValue);
+
+    /**
+     * The look defaults a plugin could not use, in the order reported: a value its declared kind rejects, or a key it
+     * never declares. Each line starts with the plugin's id and a colon.
+     */
+    List<String> lookDefaultProblems(String pluginId);
+
     @Override void close();
 
         /** Contributed scopes as {@code id|label|verbIds}, in registration order. */

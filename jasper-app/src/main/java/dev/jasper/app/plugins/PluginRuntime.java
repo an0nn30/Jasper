@@ -695,6 +695,7 @@ public final class PluginRuntime {
             var chosen = given;
             created.kit = chosen::kit;
             created.presentation = HostedPresentation.of(chosen.look(), chosen.kit(), chosen.defaults());
+            created.defaults = chosen.defaults();
         }
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;

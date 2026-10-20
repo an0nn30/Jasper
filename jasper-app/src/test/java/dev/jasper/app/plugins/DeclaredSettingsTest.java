@@ -5,6 +5,7 @@ import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.app.config.ConfigDiagnostic;
+import dev.jasper.app.config.DefaultSource;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.settings.TomlDocument;
 import dev.jasper.app.terminals.TerminalRegistry;
@@ -51,7 +52,15 @@ class DeclaredSettingsTest {
         java.util.concurrent.CompletableFuture.allOf(pending.get().toArray(java.util.concurrent.CompletableFuture[]::new)).join();
     }
 
+    private final List<String> lookProblems = new CopyOnWriteArrayList<>();
+
     private Path file() { return data.resolve(ID).resolve(ID + ".toml"); }
+
+    /** The look gives this plugin {@code table} as its defaults (a kit's {@code [defaults."test.declared"]}). */
+    private void look(Map<String, Object> table) {
+        host.defaults = new DefaultSource(Map.of(), Map.of(ID, table));
+        host.lookDefaultProblem = lookProblems::add;
+    }
 
     private void write(String text) throws Exception {
         Files.createDirectories(file().getParent());
@@ -135,6 +144,57 @@ class DeclaredSettingsTest {
         assertThat(name.get().get()).isEqualTo("ok");
         assertThat(reports()).containsExactly("ERROR name 1 Bad name.");
         assertThat(host.failures(ID)).isPositive();
+    }
+
+    /** Plan 15a (spec 5.8): saved, then the look's, then the plugin's own default. */
+    @Test void aLooksKitDefaultReplacesTheDeclaredDefaultAndASavedValueStillWins() throws Exception {
+        look(Map.of("font_family", "IBM Plex Mono"));
+        var family = new AtomicReference<Setting<String>>();
+        start(settings -> family.set(settings.declare(SettingSpec.of("font_family", SettingKind.text(), "JetBrains Mono").label("Font"))));
+        assertThat(family.get().get()).isEqualTo("IBM Plex Mono");
+        write("font_family = \"Menlo\"\n");
+        reload();
+        assertThat(family.get().get()).isEqualTo("Menlo");
+        write("");
+        reload();
+        assertThat(family.get().get()).as("with nothing saved, the look's default again").isEqualTo("IBM Plex Mono");
+        assertThat(lookProblems).isEmpty();
+        assertThat(reports()).isEmpty();
+    }
+
+    @Test void aKitDefaultTheKindRejectsLeavesThePluginsDefaultAndIsReported() {
+        look(Map.of("size", "big", "name", "x"));
+        var size = new AtomicReference<Setting<Integer>>();
+        var name = new AtomicReference<Setting<String>>();
+        start(settings -> {
+            size.set(settings.declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+            name.set(settings.declare(SettingSpec.of("name",
+                SettingKind.text(text -> { if (text.equals("x")) throw new IllegalStateException("boom"); return true; }, "Bad name."), "ok").label("Name")));
+        });
+        assertThat(size.get().get()).isEqualTo(13);
+        assertThat(name.get().get()).isEqualTo("ok");
+        assertThat(lookProblems).containsExactly(
+            ID + ": the look's default for size is not used: Expected an integer; configuration was not applied.",
+            ID + ": the look's default for name is not used: Bad name.");
+        assertThat(host.failures(ID)).as("the plugin's rule ran contained").isPositive();
+        assertThat(reports()).as("a look default is not the settings file").isEmpty();
+    }
+
+    @Test void aKitKeyThePluginNeverDeclaresIsReportedOnce() throws Exception {
+        look(Map.of("missing", true, "size", 20L));
+        start(settings -> settings.declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+        reload();
+        write("size = 14\n");
+        reload();
+        assertThat(lookProblems).containsExactly(ID + ": the look gives a default for missing, which the plugin does not declare");
+    }
+
+    @Test void aStringListKitDefaultIsReadAsTheFileWouldBe() {
+        look(Map.of("names", org.tomlj.Toml.parse("names = [\"a\", \"b\"]\n").getArray("names")));
+        var names = new AtomicReference<Setting<List<String>>>();
+        start(settings -> names.set(settings.declare(SettingSpec.of("names", SettingKind.stringList(), List.of()).label("Names"))));
+        assertThat(names.get().get()).containsExactly("a", "b");
+        assertThat(lookProblems).isEmpty();
     }
 
     @Test void declarationsCloseWhenStartReturnsAndKeysAreUnique() {

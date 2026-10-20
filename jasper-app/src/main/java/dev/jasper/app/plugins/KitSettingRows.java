@@ -11,6 +11,8 @@ final class KitSettingRows {
     private final SettingsPanelHost host;
     private final java.util.function.Consumer<Setting<?>> unset;
     private final Function<Setting<?>, SettingSpec<?>> specs;
+    /** Each setting's effective default in the plugin's terms: the look's or the declared one (spec 5.8). */
+    private final Function<Setting<?>, Object> defaults;
     private final Map<String, Setting<?>> controls = new LinkedHashMap<>();
     private final Map<String, String> errors = new HashMap<>(), edits = new HashMap<>(), entries = new HashMap<>();
     /** Each ordered list's selected row index: its rows are keyed by position. */
@@ -26,12 +28,14 @@ final class KitSettingRows {
     /** Each host row's Reset state at its last build, for its menu: the SDK's rows have no menu of their own. */
     private final Map<String, Boolean> resettable = new HashMap<>();
     /**
+     * @param defaults each setting's effective default, which a row's Reset returns to
      * @param chooseFile asks for an existing file, as the generated page's Browse does: title and initial path in, choice out
      * @param inlineReset the look's {@code SettingsChrome.inlineReset()}
      */
-    KitSettingRows(SettingsPanelHost host, Function<Setting<?>, SettingSpec<?>> specs, java.util.function.Consumer<Setting<?>> unset,
+    KitSettingRows(SettingsPanelHost host, Function<Setting<?>, SettingSpec<?>> specs, Function<Setting<?>, Object> defaults,
+                   java.util.function.Consumer<Setting<?>> unset,
                    java.util.function.BiFunction<String,Optional<java.nio.file.Path>,Optional<java.nio.file.Path>> chooseFile, boolean inlineReset) {
-        this.host=host;this.specs=specs;this.unset=unset;this.chooseFile=chooseFile;this.inlineReset=inlineReset;
+        this.host=host;this.specs=specs;this.defaults=defaults;this.unset=unset;this.chooseFile=chooseFile;this.inlineReset=inlineReset;
     }
     boolean valid(){return errors.isEmpty();}
     void staged(Setting<?> setting){String id="settings:"+setting.key();errors.remove(id);edits.remove(id);}
@@ -64,7 +68,7 @@ final class KitSettingRows {
                 spec.kind() instanceof SettingKind.IntegerRange?Nodes.FieldPresentation.STEPPER
                     :kind==Nodes.FieldKind.TEXT&&PluginSettingsPage.Hint.of(spec)==PluginSettingsPage.Hint.TECHNICAL?Nodes.FieldPresentation.TECHNICAL:Nodes.FieldPresentation.STANDARD);
         }
-        boolean resettable=!sameValue(value,spec.defaultValue())||edits.containsKey(id)||errors.containsKey(id);
+        boolean resettable=!sameValue(value,defaults.apply(setting))||edits.containsKey(id)||errors.containsKey(id);
         this.resettable.put(id,resettable);
         return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),inlineReset?trailing(id,spec,resettable,control)
             :new Nodes.Stack(id+":controls",ControlState.READY,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(control)),false);

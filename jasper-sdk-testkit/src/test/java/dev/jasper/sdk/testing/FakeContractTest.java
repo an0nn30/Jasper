@@ -20,6 +20,8 @@ class FakeContractTest extends PluginContractTest {
                 return java.util.Optional.ofNullable(host.savedSettings(pluginId).get(key));
             }
             @Override public List<String> settingsReports(String pluginId) { return host.settingsReports(pluginId); }
+            @Override public void setKitDefault(String pluginId, String key, Object rawValue) { host.setKitDefault(pluginId, key, rawValue); }
+            @Override public List<String> lookDefaultProblems(String pluginId) { return host.lookDefaultProblems(pluginId); }
             @Override public void start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
                 ui(() -> host.start(info, requires, optional, plugin));
             }

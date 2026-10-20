@@ -92,6 +92,9 @@ public final class FakePluginHost implements AutoCloseable {
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<String, List<String>> settingsReports = new java.util.concurrent.ConcurrentHashMap<>();
+    /** The look's defaults for plugins' settings, by plugin id and then dotted key, as a kit's tables give them. */
+    private final Map<String, Map<String, Object>> kitDefaults = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, List<String>> lookDefaultProblems = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<UUID, FakeUi.FakeWindow> overlays = new HashMap<>();
     private Path dataRoot;
     private final boolean ownsRoot;
@@ -264,6 +267,49 @@ public final class FakePluginHost implements AutoCloseable {
         Objects.requireNonNull(presentation, "presentation");
         if (started) throw new IllegalStateException("Plugins have already started");
         this.presentation = presentation;
+    }
+
+    /**
+     * Gives a plugin's setting a look default, as a kit's {@code [defaults."<plugin id>"]} table does in the
+     * application: when the plugin declares the key, a value its kind accepts replaces the declared default, and a
+     * saved value still wins. A value the kind rejects, and a key the plugin never declares, leave the plugin's own
+     * default and are reported in {@link #lookDefaultProblems}.
+     *
+     * @param pluginId the plugin
+     * @param key the dotted setting key
+     * @param rawValue a String, Long, Double, Boolean or List of String, as TOML reads them
+     * @throws IllegalStateException once any plugin has started, even if it has stopped since
+     * @since 0.18.2
+     */
+    public void setKitDefault(String pluginId, String key, Object rawValue) {
+        Objects.requireNonNull(pluginId, "pluginId");
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(rawValue, "rawValue");
+        if (!(rawValue instanceof String || rawValue instanceof Long || rawValue instanceof Double || rawValue instanceof Boolean
+                || rawValue instanceof List<?> items && items.stream().allMatch(String.class::isInstance)))
+            throw new IllegalArgumentException("Not a raw TOML value: " + rawValue);
+        if (started) throw new IllegalStateException("Plugins have already started");
+        kitDefaults.computeIfAbsent(pluginId, id -> new java.util.LinkedHashMap<>())
+            .put(key, rawValue instanceof List<?> items ? List.copyOf(items) : rawValue);
+    }
+
+    /**
+     * The look defaults a plugin could not use, in the order reported. A rejected value reads
+     * {@code <plugin id>: the look's default for <key> is not used: <reason>}, and a key the plugin never declares
+     * {@code <plugin id>: the look gives a default for <key>, which the plugin does not declare}; the reason's wording
+     * may differ from the application's.
+     *
+     * @param pluginId the plugin
+     * @return the problems, empty when there are none
+     * @since 0.18.2
+     */
+    public List<String> lookDefaultProblems(String pluginId) { return List.copyOf(lookDefaultProblems.getOrDefault(pluginId, List.of())); }
+
+    /** One plugin's look defaults by dotted key; empty when the look gives none. */
+    Map<String, Object> kitDefaults(String pluginId) { return kitDefaults.getOrDefault(pluginId, Map.of()); }
+
+    void lookDefaultProblem(String pluginId, String message) {
+        lookDefaultProblems.computeIfAbsent(pluginId, id -> new CopyOnWriteArrayList<>()).add(pluginId + ": " + message);
     }
 
     /**

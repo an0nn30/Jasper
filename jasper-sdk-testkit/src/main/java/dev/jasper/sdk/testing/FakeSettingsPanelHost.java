@@ -49,7 +49,7 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         guard();
         var handle = settings.handle(setting);
         var row = rows.computeIfAbsent("settings:" + handle.key(), ignored -> new Row(handle));
-        return KitSettingRows.row(handle.spec(), pending(handle), row.invalidText, row.error, row.entry);
+        return KitSettingRows.row(handle.spec(), handle.defaultValue(), pending(handle), row.invalidText, row.error, row.entry);
     }
 
     @SuppressWarnings("unchecked")
@@ -57,14 +57,14 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         guard();
         var handle = settings.handle(setting);
         var edit = draft.get(handle);
-        return edit == null ? setting.get() : (T) edit.orElse(handle.spec().defaultValue());
+        return edit == null ? setting.get() : (T) edit.orElse(handle.defaultValue());
     }
 
     @Override public <T> void stage(Setting<T> setting, T value) {
         guard();
         var handle = settings.handle(setting);
         Object checked = handle.checked(value);
-        Optional<Object> edit = checked.equals(handle.spec().defaultValue()) && !settings.raw().containsKey(handle.key())
+        Optional<Object> edit = checked.equals(handle.defaultValue()) && !settings.raw().containsKey(handle.key())
             ? Optional.empty() : Optional.of(checked);
         draft.put(handle, edit);
         var row = rows.get("settings:" + handle.key());
@@ -195,7 +195,7 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
 
     Map<String, Object> pendingValues() {
         var result = new LinkedHashMap<String, Object>();
-        draft.forEach((setting, value) -> result.put(setting.key(), value.orElse(setting.spec().defaultValue())));
+        draft.forEach((setting, value) -> result.put(setting.key(), value.orElse(setting.defaultValue())));
         return Map.copyOf(result);
     }
 

@@ -95,6 +95,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CopyOnWriteArrayList;
+import dev.jasper.sdk.settings.Choice;
 import dev.jasper.sdk.settings.SettingSpec;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.Setting;
@@ -2151,6 +2152,43 @@ public abstract class PluginContractTest {
         assertThat(size.get().get()).isEqualTo(13);
         assertThat(tab.get().get()).isEqualTo(6);
         assertThat(h.settingsReports("test.settings")).singleElement().asString().startsWith("font_size: ");
+    }
+
+    /** Plan 15a (spec 5.8): saved, then the look's, then the plugin's own default. */
+    @Test void aKitDefaultReplacesTheDeclaredDefaultAndASavedValueWins() {
+        h.setKitDefault("test.kitdefault", "size", 15L);
+        var size = new AtomicReference<Setting<Integer>>();
+        h.start(new PluginInfo("test.kitdefault", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context ->
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size"))));
+        assertThat(size.get().get()).isEqualTo(15);
+        h.setSetting("test.kitdefault", "size", 13L);
+        assertThat(size.get().get()).as("a saved value equal to the plugin's own default still wins").isEqualTo(13);
+        assertThat(h.lookDefaultProblems("test.kitdefault")).isEmpty();
+    }
+
+    @Test void aKitDefaultTheKindRejectsLeavesThePluginsDefaultAndIsReported() {
+        h.setKitDefault("test.kitbad", "size", 99L);
+        h.setKitDefault("test.kitbad", "mode", "sideways");
+        var size = new AtomicReference<Setting<Integer>>(); var mode = new AtomicReference<Setting<String>>();
+        h.start(new PluginInfo("test.kitbad", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context -> {
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+            mode.set(context.settings().declare(SettingSpec.of("mode", SettingKind.choice(List.of(Choice.of("up", "Up", "up"), Choice.of("down", "Down", "down"))), "up").label("Mode")));
+        });
+        assertThat(h.active("test.kitbad")).isTrue();
+        assertThat(size.get().get()).isEqualTo(13);
+        assertThat(mode.get().get()).isEqualTo("up");
+        assertThat(h.lookDefaultProblems("test.kitbad")).hasSize(2).allSatisfy(line -> assertThat(line).startsWith("test.kitbad: the look's default for "))
+            .anySatisfy(line -> assertThat(line).startsWith("test.kitbad: the look's default for size is not used: "));
+    }
+
+    @Test void aKitDefaultForAnUndeclaredKeyIsReportedAndAnotherPluginsTableIsIgnored() {
+        h.setKitDefault("test.kitextra", "missing", true);
+        h.setKitDefault("test.notrunning", "size", 9L);
+        h.start(new PluginInfo("test.kitextra", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context ->
+            context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+        assertThat(h.lookDefaultProblems("test.kitextra"))
+            .containsExactly("test.kitextra: the look gives a default for missing, which the plugin does not declare");
+        assertThat(h.lookDefaultProblems("test.notrunning")).isEmpty();
     }
 
     @Test void settingsAreDeclaredOnlyWhileStartingWithUniqueLabelledKeys() {
