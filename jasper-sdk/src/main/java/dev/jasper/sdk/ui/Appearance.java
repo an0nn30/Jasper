@@ -80,4 +80,18 @@ public interface Appearance {
      */
     Presentation presentation();
 
+    /** Saved terminal typography shared across windows; safe from any thread.
+     * @return the current saved font settings, independent of temporary pane zoom
+     * @since 0.18.3
+     */
+    TerminalTypography terminalTypography();
+
+    /** Registers on the UI thread for saved terminal typography changes. The getter exposes the new value before
+     * handlers run on the UI thread. Equal values emit no notification; registration does not emit an initial value.
+     * @param handler receives the newly published typography
+     * @return registration removed when closed or the plugin stops; safe to close from any thread
+     * @since 0.18.3
+     */
+    Subscription onTerminalTypographyChanged(Consumer<TerminalTypography> handler);
+
 }

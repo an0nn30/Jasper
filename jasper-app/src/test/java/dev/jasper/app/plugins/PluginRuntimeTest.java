@@ -121,6 +121,49 @@ class PluginRuntimeTest {
         return directory;
     }
 
+    @Test void savedTerminalTypographySeedsPluginsAndUpdatesBeforeConfigurationNotifications() throws Exception {
+        Path dev = root.resolve("dev/dev.example.font");
+        String source = """
+            package fix.font;
+            import dev.jasper.sdk.plugin.Plugin;
+            import dev.jasper.sdk.plugin.PluginContext;
+            import dev.jasper.sdk.events.AppEvents;
+            import java.nio.file.Files;
+            public final class Main implements Plugin {
+                private void note(PluginContext context, String file) {
+                    var font = context.appearance().terminalTypography();
+                    try { Files.writeString(context.dataDirectory().resolve(file),
+                        font.family() + "|" + font.size() + "|" + font.fallback() + "|" + font.ligatures() + "|" + font.lineHeight()); }
+                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                }
+                public void start(PluginContext context) {
+                    note(context, "initial");
+                    context.appearance().onTerminalTypographyChanged(value -> note(context, "changed"));
+                    context.events().subscribe(AppEvents.CONFIG_RELOADED, event -> note(context, "reloaded"));
+                }
+            }
+            """;
+        PluginJars.build(dev, "font.jar", PluginJars.descriptor("dev.example.font", "1.0.0", "fix.font.Main"),
+            Map.of("fix.font.Main", source), List.of());
+        var runtime = runtime(null, root.resolve("user"), dev, false, new ArrayList<>());
+        var data = root.resolve("user/dev.example.font/data");
+        try {
+            onEdt(() -> {
+                runtime.terminalTypography(new dev.jasper.app.config.FontConfig("DialogInput", 13.5f,
+                    List.of("Monospaced"), true, 1.25f));
+                runtime.start(Map.of(), true);
+            });
+            assertThat(Files.readString(data.resolve("initial"))).isEqualTo("DialogInput|13.5|[Monospaced]|true|1.25");
+            onEdt(() -> {
+                runtime.terminalTypography(new dev.jasper.sdk.ui.TerminalTypography("Monospaced", 15.25, List.of(), false, 1.5));
+                runtime.configurationChanged(Map.of());
+            });
+            settle();
+            assertThat(Files.readString(data.resolve("changed"))).isEqualTo("Monospaced|15.25|[]|false|1.5");
+            assertThat(Files.readString(data.resolve("reloaded"))).isEqualTo("Monospaced|15.25|[]|false|1.5");
+        } finally { stopAndWait(runtime); }
+    }
+
     @Test void shutdownKeepsPluginClassesAvailableUntilWorkerCleanupFinishes() throws Exception {
         assertShutdownKeepsCleanupClasses(false);
     }

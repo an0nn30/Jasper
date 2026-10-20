@@ -303,6 +303,8 @@ final class ViewReconciler implements AutoCloseable {
             var control = next.get(child.id());
             if (control instanceof TextFields.FieldControl field && child instanceof Nodes.Field value && value.kind() != Nodes.FieldKind.TEXTAREA) field.panelSearch = true;
             if (control instanceof Buttons.ButtonControl button) { button.button.panel = true; button.button.documentBar = true; }
+            if (control instanceof Labels.TextControl text && child instanceof Nodes.Text caption
+                && caption.role() == Nodes.TextRole.CAPTION && caption.text().isEmpty()) text.component.setFocusable(false);
             // A bar's menu button stands as its buttons do, as a panel header's menus do (plan 10b, the Vault's + New).
             if (control instanceof Menus.MenuControl menu) { menu.main.panel = true; menu.arrow.panel = true; menu.main.documentBar = true; menu.arrow.documentBar = true; }
             // A caption right after a button is that action's shortcut, in the face's shortcut colour where it has one.

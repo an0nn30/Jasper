@@ -204,6 +204,12 @@ final class ViewCommands {
         Pos p = c.cursor();
         String text = c.buffer.line(p.line);
         int ts = c.tabstop();
+        if(v.physical() && c.options.flag("wrap")) {
+            Pos at=c.buffer.pos(v.rowPosition(c.buffer.offset(p),0,which));
+            int col=at.col;
+            if(which=='^') while(col<text.length() && Block.white(text.charAt(col)) && col+1<text.length()) col=Text.next(text,col);
+            return Target.exclusive(new Pos(at.line,col));
+        }
         int i;
         if (c.options.flag("wrap")) {
             int width1 = v.width(), width2 = v.width();
@@ -236,7 +242,11 @@ final class ViewCommands {
         String text;
         int ts = c.tabstop();
         Pos to;
-        if (c.options.flag("wrap")) {
+        if (v.physical() && c.options.flag("wrap")) {
+            to=c.buffer.pos(v.rowPosition(c.buffer.offset(original),c.count-1,'$'));
+            text=c.buffer.line(to.line);
+            c.editor.curswant(Text.virtcol(text,to.col,ts));
+        } else if (c.options.flag("wrap")) {
             if (c.count == 1) {
                 text = c.buffer.line(original.line);
                 int width1 = v.width(), width2 = v.width();

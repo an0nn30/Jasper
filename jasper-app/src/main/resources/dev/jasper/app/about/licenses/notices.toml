@@ -63,6 +63,15 @@ modules = ["org.checkerframework:checker-qual:3.21.2"]
 text = "checker-qual.LICENSE.txt"
 
 [[component]]
+name = "CommonMark Java"
+version = "0.30.0"
+license = "BSD-2-Clause"
+homepage = "https://github.com/commonmark/commonmark-java"
+modules = ["org.commonmark:commonmark:0.30.0", "org.commonmark:commonmark-ext-gfm-tables:0.30.0",
+  "org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0", "org.commonmark:commonmark-ext-task-list-items:0.30.0"]
+text = "commonmark.LICENSE.txt"
+
+[[component]]
 name = "Cousine"
 version = "1.241"
 license = "OFL-1.1"

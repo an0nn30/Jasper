@@ -981,7 +981,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             var move = new JMenuItem(entry.detached() ? "Move to Main Window" : "Open in Separate Window");
             move.addActionListener(event -> entry.move(!entry.detached())); menu.add(move);
             for (var command : entry.commands()) { var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
-                item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut()); item.addActionListener(event -> command.run().run()); menu.add(item); }
+                item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut()); item.addActionListener(event -> {
+                    var current = selectedContent();
+                    if (current == null) return;
+                    current.commands().stream().filter(value -> value.id().equals(command.id()) && value.enabled())
+                        .findFirst().ifPresent(value -> value.run().run());
+                }); menu.add(item); }
         }
         var close = new JMenuItem("Close Tab"); close.setAccelerator(bindings().strokeFor(ActionId.CLOSE_TAB).orElse(null)); close.addActionListener(event -> closeTab(component)); menu.add(close); dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
     }

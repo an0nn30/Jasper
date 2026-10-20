@@ -431,6 +431,7 @@ class AppContractTest extends PluginContractTest {
                 dark.set(variant == dev.jasper.sdk.Variant.DARK);
                 host.bus.publish(EventBus.APP, dev.jasper.sdk.events.AppEvents.THEME_CHANGED, new dev.jasper.sdk.events.AppEvents.ThemeChanged(variant));
             }
+            @Override public void setTerminalTypography(dev.jasper.sdk.ui.TerminalTypography typography) { onEdt(() -> host.typography.publish(typography)); }
             @Override public void setPresentation(dev.jasper.sdk.ui.Presentation presentation) { onEdt(() -> host.presentation = presentation); }
             @Override public void stopAll() {
                 var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());

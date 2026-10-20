@@ -12,6 +12,22 @@ final class BuiltInArtwork {
     static final Set<String> IDENTITIES = Set.of("network", "tunnel", "more.vertical");
     /** The names {@link ClassicHolder} has, declared outside it so asking never decodes its files. */
     static final Set<String> CLASSIC_NAMES = Set.of("add", "split", "zoom", "settings", "window.add", "search");
+    /** Document action names are available without decoding their separate lazy catalog. */
+    static final Set<String> EDITOR_NAMES = Set.of("editor.source", "editor.split", "editor.preview", "editor.scroll-sync",
+        "editor.source.classic", "editor.split.classic", "editor.preview.classic", "editor.scroll-sync.classic");
+    private static final class EditorHolder {
+        private static final Map<String, String> HASHES = Hashes.hashes("assets-editor.tsv", 16);
+        static final Map<String, Pair> EDITOR = Map.ofEntries(
+            Map.entry("editor.source", pair("editor/modern/general/editorOnly", HASHES)),
+            Map.entry("editor.split", pair("editor/modern/general/editorPreview", HASHES)),
+            Map.entry("editor.preview", pair("editor/modern/general/previewOnly", HASHES)),
+            Map.entry("editor.scroll-sync", pair("editor/modern/actions/synchronizeScrolling", HASHES)),
+            Map.entry("editor.source.classic", pair("editor/classic/general/layoutEditorOnly", HASHES)),
+            Map.entry("editor.split.classic", pair("editor/classic/general/layoutEditorPreview", HASHES)),
+            Map.entry("editor.preview.classic", pair("editor/classic/general/layoutPreviewOnly", HASHES)),
+            Map.entry("editor.scroll-sync.classic", pair("editor/classic/actions/synchronizeScrolling", HASHES)));
+    }
+    static Pair editor(String name) { return EDITOR_NAMES.contains(name) ? EditorHolder.EDITOR.get(name) : null; }
     private static final class Holder {
         static final Map<String, Pair> CATALOG = Map.of(
             "settings", pair("general/settings", Hashes.SELECTED), "network", pair("toolwindows/web", Hashes.SELECTED),

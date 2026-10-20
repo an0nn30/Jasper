@@ -20,7 +20,7 @@ class ThemeMigrationEvidenceTest {
             var kit = new FakeKit("dev.jasper.editor");
             var environment = new dev.jasper.editor.session.SessionEnvironment(Runnable::run, Runnable::run, Question::dismissed, () -> 1 << 20);
             var tab = new EditorTab(kit, dev.jasper.editor.session.DocumentSession.untitled("Fixture document", environment), closed -> { }, false);
-            var find = new FindBar(() -> Optional.of(tab.area()), tab::render, id -> { tab.view().focus(id); tab.view().selectAll(id); });
+            var find = new FindBar(() -> Optional.of(new FindTarget.Source(tab.area())), tab::render, id -> { tab.view().focus(id); tab.view().selectAll(id); });
             tab.find(find);
             try {
                 tab.area().setText("example one\nexample two\n");

@@ -93,6 +93,39 @@ class PluginPanelPageTest {
         });
     }
 
+    @Test void standardDraftEventsNotifyThePageAfterPublishingPendingValues() throws Exception {
+        var view = new AtomicReference<HostedKitView>();
+        var rows = new AtomicReference<SettingsPanelHost>();
+        var wrap = new AtomicReference<Setting<Boolean>>();
+        var observed = new ArrayList<Boolean>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
+            getClass().getClassLoader(), () -> plugin -> {
+                wrap.set(plugin.settings().declare(SettingSpec.of("wrap", SettingKind.bool(), false).label("Wrap lines")));
+                plugin.settings().page(new SettingsPanel() {
+                    @Override public dev.jasper.sdk.ui.UiView create(SettingsPanelHost h) {
+                        rows.set(h);
+                        var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(h.row(wrap.get())), e -> { });
+                        view.set(made);
+                        return made;
+                    }
+                    @Override public void pendingChanged() { observed.add(rows.get().pending(wrap.get())); }
+                });
+            })));
+        var page = onEdtValue(() -> (PluginPanelPage) host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            rows.get().stage(wrap.get(), true);
+            assertThat(observed).as("plugin staging does not recurse").isEmpty();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Toggled("settings:wrap", false));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Toggled("settings:wrap", true));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:wrap:reset"));
+            assertThat(observed).containsExactly(false, true, false);
+            page.dispose();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Toggled("settings:wrap", true));
+            assertThat(observed).containsExactly(false, true, false);
+        });
+    }
+
     @Test void kitResetRemovesSavedOverrideAndReloadRebasesCleanAndPendingRows() throws Exception {
         var view=new AtomicReference<HostedKitView>();var rows=new AtomicReference<SettingsPanelHost>();
         var size=new AtomicReference<Setting<Integer>>();
