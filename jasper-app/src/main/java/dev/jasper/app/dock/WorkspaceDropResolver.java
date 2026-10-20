@@ -176,7 +176,7 @@ public final class WorkspaceDropResolver {
      * @param areas the groups it was resolved over
      * @param bar the strip marker's width
      * @return the rectangle, in the areas' coordinates
-     * @throws IllegalArgumentException when no area is the drop's group
+     * @throws IllegalArgumentException when no area is the drop's group, or a strip drop's place is past its tabs
      */
     public static Rectangle landing(Drop drop, List<Area> areas, int bar) {
         Area area = areas.stream().filter(candidate -> candidate.group.equals(drop.group())).findFirst()
@@ -203,8 +203,11 @@ public final class WorkspaceDropResolver {
      * @param index the place, 0 to the number of entries
      * @param width the marker's width
      * @return the marker, in the strip's coordinates
+     * @throws IllegalArgumentException when the index is outside 0 to the number of entries
      */
     public static Rectangle marker(Rectangle strip, List<Rectangle> entries, int index, int width) {
+        if (index < 0 || index > entries.size())
+            throw new IllegalArgumentException("Index " + index + " is outside 0 to " + entries.size());
         int x;
         if (entries.isEmpty()) x = strip.x;
         else if (index == 0) x = entries.getFirst().x;

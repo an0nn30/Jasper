@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
@@ -380,7 +381,8 @@ class TabDragWindowsTest {
             assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.Bar(to, 1));
             assertThat(manager.tabDrag().overlay().getParent()).as("the landing shows in the target window")
                 .isSameAs(SwingUtilities.getRootPane(to).getLayeredPane());
-            assertThat(manager.tabDrag().overlay().placeholder()).as("a bar between its entries").isNotNull();
+            assertThat(manager.tabDrag().overlay().placeholder()).as("a bar between its entries")
+                .isEqualTo(barMarker(to, entryOf(from, moving), 1));
             mouse(source, MouseEvent.MOUSE_RELEASED, between);
             assertThat(parentTabIds(to)).containsExactly(left, moving, right);
             assertThat(to.parentTabs().view(moving).orElseThrow().model()).as("whole, with its id and layout").isEqualTo(layout);
@@ -392,6 +394,35 @@ class TabDragWindowsTest {
             assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
             for (int i = 0; i < tabs.size(); i++) assertThat(session(tabs.get(i))).as("the same session").isSameAs(sessions.get(i));
         });
+    }
+
+    /**
+     * Workspace plan 7c Rulings 3: a parent tab dragged along its bar moves no tab, so no TAB_MOVED is reported, and
+     * the focus stays where it was.
+     */
+    @Test void aParentTabDraggedAlongItsBarReportsNoMoveAndLeavesTheFocus() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            ids[0] = main.content().activeParentTab();
+            ids[1] = secondParentTab(main);
+        });
+        launch();
+        edt(() -> recordingKeys(keys -> {
+            WindowContent from = main.content();
+            Tab moving = entryOf(from, ids[0]);
+            Point past = onParentTab(from, entryOf(from, ids[1]), 0.75);
+            facts.clear();
+            Component source = startParentTab(from, moving, past);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.Bar(from, 1));
+            keys.own(moving.component());
+            int[] focused = {0};
+            moving.focusTarget(() -> focused[0]++);
+            mouse(source, MouseEvent.MOUSE_RELEASED, past);
+            assertThat(parentTabIds(from)).containsExactly(ids[1], ids[0]);
+            assertThat(keys.getPermanentFocusOwner()).as("the focus stays where it was").isSameAs(moving.component());
+            assertThat(focused[0]).as("and no tab takes it").isZero();
+            assertThat(moves()).as("no tab moved").isEmpty();
+        }));
     }
 
     /**
@@ -451,6 +482,36 @@ class TabDragWindowsTest {
             mouse(source, MouseEvent.MOUSE_RELEASED, top);
             assertThat(parentTabIds(to)).as("in the empty workspace's place").containsExactly(id[0]);
             assertThat(to.parentTabBar().component().isVisible()).as("one parent tab: still no bar").isFalse();
+            assertThat(moving.window()).isEqualTo(main.id());
+            assertThat(parentTabIds(from)).hasSize(1);
+        });
+    }
+
+    /**
+     * Workspace plan 7c's final review: the main window's empty workspace has no panes, so it takes a parent tab
+     * dragged anywhere over it in its place, as it takes a tab, and the whole of it is the landing.
+     */
+    @Test void theEmptyMainWorkspaceTakesAParentTabAnywhereOverIt() throws Exception {
+        ParentTabId[] id = new ParentTabId[1];
+        edt(() -> id[0] = secondParentTab(child));
+        launch();
+        edt(() -> {
+            WindowContent from = child.content(), to = main.content();
+            for (Tab open : List.copyOf(to.tabs())) to.closeTab(open);
+            relayout(frameOf(main));
+            ParentTabId empty = to.activeParentTab();
+            Tab moving = entryOf(from, id[0]);
+            Point centre = middle(to.workspace());
+            Component source = startParentTab(from, moving, centre);
+            assertThat(manager.tabDrag().target()).as("in its middle").contains(new TabDrag.Target.Bar(to, 0));
+            ParentTabsView parents = to.parentTabs();
+            assertThat(manager.tabDrag().overlay().highlight()).as("all of it")
+                .isEqualTo(SwingUtilities.convertRectangle(parents, new Rectangle(parents.getSize()),
+                    SwingUtilities.getRootPane(to).getLayeredPane()));
+            assertThat(manager.tabDrag().overlay().placeholder()).isNull();
+            mouse(source, MouseEvent.MOUSE_RELEASED, centre);
+            assertThat(parentTabIds(to)).as("in the empty workspace's place").containsExactly(id[0]);
+            assertThat(to.parentTabs().view(empty)).isEmpty();
             assertThat(moving.window()).isEqualTo(main.id());
             assertThat(parentTabIds(from)).hasSize(1);
         });
@@ -523,6 +584,28 @@ class TabDragWindowsTest {
             int closed = facts.indexOf(new TerminalEvent.WindowClosed(child.id()));
             assertThat(moved).as("TAB_MOVED").isNotNegative();
             assertThat(closed).as("then WINDOW_CLOSED").isGreaterThan(moved);
+        });
+    }
+
+    /**
+     * Workspace plan 7c Rulings 4 (plan 7b Rulings 10): the move a drop on another window's bar makes, taking the main
+     * window's only parent tab, leaves the main window its empty workspace under a new id, so no id is in two windows.
+     */
+    @Test void aMoveThatEmptiesTheMainWindowGivesItsEmptyWorkspaceANewId() throws Exception {
+        edt(() -> secondParentTab(child));
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            ParentTabId only = from.activeParentTab();
+            List<ParentTabId> before = parentTabIds(to);
+            assertThat(manager.moveParentTab(from, only, to, 2)).isTrue();
+            assertThat(parentTabIds(to)).as("at the end of its bar").containsExactly(before.get(0), before.get(1), only);
+            assertThat(main.closed()).as("the main window stays").isFalse();
+            assertThat(from.tabs()).isEmpty();
+            ParentTabId empty = from.activeParentTab();
+            assertThat(parentTabIds(from)).containsExactly(empty);
+            assertThat(empty).as("its empty workspace's id is new").isNotEqualTo(only);
+            assertThat(parentTabIds(to)).as("so no id is in two windows").doesNotContain(empty);
         });
     }
 
@@ -653,6 +736,27 @@ class TabDragWindowsTest {
         });
     }
 
+    /** Workspace plan 7c Rulings 11: a tab dragged over another window's parent-tab bar has no target there. */
+    @Test void aTabDraggedOverAnotherWindowsParentTabBarDropsNothing() throws Exception {
+        edt(() -> secondParentTab(child));
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            List<ParentTabId> before = parentTabIds(to);
+            Tab tab = from.tabs().get(0);
+            Point bar = onParentTab(to, to.parentTabs().bar().tabs().getFirst(), 0.5);
+            facts.clear();
+            Component source = start(from, tab, bar);
+            assertThat(manager.tabDrag().active()).isTrue();
+            assertThat(manager.tabDrag().target()).as("a tab makes no parent tab").isEmpty();
+            assertThat(manager.tabDrag().overlay().getParent()).as("no landing shows").isNull();
+            mouse(source, MouseEvent.MOUSE_RELEASED, bar);
+            assertThat(tab.window()).isEqualTo(main.id());
+            assertThat(parentTabIds(to)).isEqualTo(before);
+            assertThat(moves()).isEmpty();
+        });
+    }
+
     @Test void whereWindowsOverlapTheMostRecentlyActiveOneTakesTheDrop() throws Exception {
         edt(() -> {
             place(frameOf(child), 300, 200, 800, 500);
@@ -693,6 +797,41 @@ class TabDragWindowsTest {
             } finally {
                 pin.close();
             }
+        });
+    }
+
+    /**
+     * Workspace plan 7c's final review: a tab whose close waits for its guard stays in its window, as a pinned tab does
+     * and as a parent tab holding it does: no other window shows a landing, and it tears nothing out.
+     */
+    @Test void aTabBeingClosedMovesOnlyWithinItsWindow() throws Exception {
+        edt(() -> {
+            WindowContent from = main.content();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());
+            relayout(frameOf(main));
+            var answer = new CompletableFuture<Boolean>();
+            model.tabs().guard("dev.example.editor", (tabs, batch) -> answer);
+            var closing = notes.requestClose();
+            try {
+                assertThat(closing).as("the guard has not answered").isNotDone();
+                facts.clear();
+                Point there = onTab(child.content(), child.content().tabs().get(0), 0.25);
+                Component source = start(from, notes, there);
+                assertThat(manager.tabDrag().active()).isTrue();
+                assertThat(manager.tabDrag().target()).as("another window takes no tab being closed").isEmpty();
+                assertThat(manager.tabDrag().overlay().getParent()).as("no landing shows").isNull();
+                mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(2600, 900));
+                assertThat(manager.tabDrag().target()).as("nor does it tear out").isEmpty();
+                mouse(source, MouseEvent.MOUSE_DRAGGED, onTab(from, from.tabs().get(0), 0.25));
+                assertThat(manager.tabDrag().target()).as("its own window still takes it").isPresent();
+                mouse(source, MouseEvent.MOUSE_RELEASED, there);
+                assertThat(notes.window()).isEqualTo(main.id());
+                assertThat(manager.children()).containsExactly(child);
+                assertThat(moves()).isEmpty();
+            } finally {
+                answer.complete(false);
+            }
+            assertThat(closing).isCompletedWithValue(false);
         });
     }
 

@@ -117,6 +117,8 @@ class WorkspaceDropResolverTest {
         Rectangle bar = new Rectangle(0, 0, 600, 28);
         List<Rectangle> entries = List.of(new Rectangle(0, 0, 200, 28), new Rectangle(400, 0, 200, 28));
         assertThat(WorkspaceDropResolver.place(new Point(10, 10), bar, entries)).hasValue(0);
+        assertThat(WorkspaceDropResolver.place(new Point(0, 0), bar, entries)).as("the bar's left and top edges are inside")
+            .hasValue(0);
         assertThat(WorkspaceDropResolver.place(new Point(100, 10), bar, entries)).as("on a middle: still before that entry")
             .hasValue(0);
         assertThat(WorkspaceDropResolver.place(new Point(101, 10), bar, entries)).hasValue(1);
@@ -130,6 +132,18 @@ class WorkspaceDropResolverTest {
             .isEqualTo(new Rectangle(598, 0, 2, 28));
         assertThat(WorkspaceDropResolver.marker(bar, List.of(), 0, 2)).as("no other entry: the bar's start")
             .isEqualTo(new Rectangle(0, 0, 2, 28));
+    }
+
+    /** A marker's place is 0 to the number of entries; any other is refused. */
+    @Test void aMarkerOutsideItsEntriesIsRefused() {
+        Rectangle bar = new Rectangle(0, 0, 600, 28);
+        List<Rectangle> entries = List.of(new Rectangle(0, 0, 200, 28), new Rectangle(400, 0, 200, 28));
+        assertThatIllegalArgumentException().isThrownBy(() -> WorkspaceDropResolver.marker(bar, entries, -1, 2))
+            .withMessage("Index -1 is outside 0 to 2");
+        assertThatIllegalArgumentException().isThrownBy(() -> WorkspaceDropResolver.marker(bar, entries, 3, 2))
+            .withMessage("Index 3 is outside 0 to 2");
+        assertThatIllegalArgumentException().isThrownBy(() -> WorkspaceDropResolver.marker(bar, List.of(), 1, 2))
+            .withMessage("Index 1 is outside 0 to 0");
     }
 
     @Test void whereWindowsOverlapTheFirstListedTakesTheDrop() {

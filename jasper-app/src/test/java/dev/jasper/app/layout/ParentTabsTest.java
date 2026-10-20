@@ -126,6 +126,9 @@ class ParentTabsTest {
         assertThat(moved.recent()).as("and so does the order of use").isEqualTo(tabs.recent());
         assertThat(moved.move(a.id(), 0).parentTabs()).containsExactly(a, b, c);
         assertThat(tabs.move(b.id(), 1)).as("its own place").isEqualTo(tabs);
+        assertThat(tabs.move(b.id(), 1).recent()).as("keeps the order of use").isEqualTo(tabs.recent());
+        ParentTabs one = ParentTabs.of(a);
+        assertThat(one.move(a.id(), 0)).as("a window's only parent tab, in its one place").isEqualTo(one);
         assertThatIllegalArgumentException().isThrownBy(() -> tabs.move(a.id(), 3)).withMessageContaining("Index 3");
         assertThatIllegalArgumentException().isThrownBy(() -> tabs.move(a.id(), -1)).withMessageContaining("Index -1");
         assertThatIllegalArgumentException().isThrownBy(() -> tabs.move(ParentTabId.random(), 0))

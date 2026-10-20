@@ -370,7 +370,8 @@ class TabDragTest {
             assertThat(drag.target()).contains(new TabDrag.Target.Bar(owner, 2));
             assertThat(drag.label().text()).isEqualTo("first");
             assertThat(drag.overlay().getParent()).isSameAs(SwingUtilities.getRootPane(owner).getLayeredPane());
-            assertThat(drag.overlay().placeholder()).as("a bar in the parent-tab bar").isNotNull();
+            assertThat(drag.overlay().placeholder()).as("a bar in the parent-tab bar, after the third entry")
+                .isEqualTo(barMarker(owner, shown, 2));
             assertThat(drag.overlay().highlight()).isNull();
             assertThat(owner.parentTabs().model().parentTabs()).extracting(ParentTab::id).as("nothing moves before the release")
                 .containsExactly(first, middle, last);
@@ -453,6 +454,84 @@ class TabDragTest {
             assertThat(owner.tabDrag().overlay().getParent()).isNull();
             assertThat(keys.dispatchers).isEmpty();
             mouse(source, MouseEvent.MOUSE_RELEASED, pastOther);
+            assertThat(owner.parentTabs().model().parentTabs()).extracting(ParentTab::id).containsExactly(first, second);
+        });
+    }
+
+    /**
+     * Workspace plan 7c Rulings 11: a tab dragged over the parent-tab bar has no target there, and its release changes
+     * nothing.
+     */
+    @Test void aTabDraggedOverTheParentTabBarDropsNothing() throws Exception {
+        edt(() -> {
+            ParentTabId first = owner.activeParentTab();
+            owner.newParentTab(HOME);
+            Tab other = owner.selectedTab();
+            ParentTabId second = owner.activeParentTab();
+            owner.selectParentTab(first);
+            relayout(frame);
+            assertThat(owner.parentTabBar().component().isVisible()).isTrue();
+            Point bar = onParentTab(owner, other, 0.5);
+            Component source = start(owner, a, bar);
+            TabDrag drag = owner.tabDrag();
+            assertThat(drag.active()).isTrue();
+            assertThat(drag.target()).as("a tab makes no parent tab").isEmpty();
+            assertThat(drag.overlay().getParent()).as("no landing shows").isNull();
+            mouse(source, MouseEvent.MOUSE_RELEASED, bar);
+            assertThat(owner.parentTabs().model().parentTabs()).extracting(ParentTab::id).as("nothing changes")
+                .containsExactly(first, second);
+            assertThat(owner.parentTabs().view(first).orElseThrow().tabs()).containsExactly(a, b, c);
+        });
+    }
+
+    /** Workspace plan 7c Rulings 1: a press on a bar entry that moves no farther than the threshold is a click. */
+    @Test void aBarPressThatMovesNoFartherThanTheThresholdIsAClick() throws Exception {
+        edt(() -> {
+            ParentTabId first = owner.activeParentTab();
+            owner.newParentTab(HOME);
+            ParentTabId second = owner.activeParentTab();
+            relayout(frame);
+            Component source = barEntry(owner, owner.parentTabs().bar().tabs().getFirst());
+            Point press = middle(source);
+            mouse(source, MouseEvent.MOUSE_PRESSED, press);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x + 3, press.y + 3));
+            assertThat(owner.tabDrag().active()).as("4.2 px is within the threshold").isFalse();
+            mouse(source, MouseEvent.MOUSE_RELEASED, new Point(press.x + 3, press.y + 3));
+            assertThat(owner.parentTabs().model().parentTabs()).extracting(ParentTab::id).containsExactly(first, second);
+            assertThat(owner.activeParentTab()).as("the press showed it").isEqualTo(first);
+            assertThat(owner.tabDrag().label().showing()).isFalse();
+            assertThat(keys.dispatchers).isEmpty();
+        });
+    }
+
+    /**
+     * Workspace plan 7c Rulings 1: only a left press on a bar entry drags its parent tab. The bar hands the drag no
+     * other press, and a press of another button handed to it is no drag's press, whatever moves after it.
+     */
+    @Test void aBarPressOfAnotherButtonStartsNoDrag() throws Exception {
+        edt(() -> {
+            ParentTabId first = owner.activeParentTab();
+            owner.newParentTab(HOME);
+            Tab other = owner.selectedTab();
+            ParentTabId second = owner.activeParentTab();
+            relayout(frame);
+            Tab shown = owner.parentTabs().bar().tabs().getFirst();
+            Component source = barEntry(owner, shown);
+            Point press = middle(source), past = onParentTab(owner, other, 0.75);
+            right(source, MouseEvent.MOUSE_PRESSED, press);
+            right(source, MouseEvent.MOUSE_DRAGGED, past);
+            assertThat(owner.tabDrag().active()).as("through the bar").isFalse();
+            right(source, MouseEvent.MOUSE_RELEASED, past);
+            Point at = new Point(press);
+            SwingUtilities.convertPointFromScreen(at, source);
+            owner.tabDrag().pressed(owner.parentTabs().bar(), shown, new MouseEvent(source, MouseEvent.MOUSE_PRESSED,
+                System.currentTimeMillis(), InputEvent.BUTTON3_DOWN_MASK, at.x, at.y, 1, false, MouseEvent.BUTTON3));
+            mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y + 12));
+            mouse(source, MouseEvent.MOUSE_DRAGGED, past);
+            assertThat(owner.tabDrag().active()).as("handed to the drag").isFalse();
+            assertThat(owner.tabDrag().label().showing()).isFalse();
+            assertThat(keys.dispatchers).isEmpty();
+            mouse(source, MouseEvent.MOUSE_RELEASED, past);
             assertThat(owner.parentTabs().model().parentTabs()).extracting(ParentTab::id).containsExactly(first, second);
         });
     }

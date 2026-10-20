@@ -1,8 +1,11 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.dock.WorkspaceDropResolver;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.testsupport.LayoutTestSupport;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeStyles;
 import java.awt.AWTEvent;
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -11,6 +14,8 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import javax.swing.JRootPane;
@@ -103,6 +108,24 @@ final class TabDragTestSupport {
         TabStrip bar = window.parentTabBar();
         Rectangle entry = bar.tabBounds().get(window.parentTabs().bar().tabs().indexOf(tab));
         return inside(onScreen(bar.component(), entry), across, 0.5);
+    }
+
+    /**
+     * The landing of a parent tab dropped at {@code index} of {@code window}'s shown bar, in its layered pane, as the
+     * drag shows it: {@code WorkspaceDropResolver.marker} over the bar and its entries but {@code dragged}'s own, in
+     * its parent-tabs view's coordinates, {@code TAB_INDICATOR} wide.
+     */
+    static Rectangle barMarker(WindowContent window, Tab dragged, int index) {
+        TabStrip bar = window.parentTabBar();
+        ParentTabsView parents = window.parentTabs();
+        List<Tab> listed = parents.bar().tabs();
+        List<Rectangle> bounds = bar.tabBounds();
+        var entries = new ArrayList<Rectangle>();
+        for (int i = 0; i < listed.size(); i++)
+            if (listed.get(i) != dragged) entries.add(SwingUtilities.convertRectangle(bar.component(), bounds.get(i), parents));
+        int width = NativeStyles.installed().metric(DesignMetrics.Role.TAB_INDICATOR);
+        Rectangle marker = WorkspaceDropResolver.marker(bar.component().getBounds(), entries, index, width);
+        return SwingUtilities.convertRectangle(parents, marker, SwingUtilities.getRootPane(window).getLayeredPane());
     }
 
     /** The component a press on the parent-tab bar's entry that shows {@code tab} reaches. */

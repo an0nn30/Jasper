@@ -2,7 +2,7 @@
 
 **Workspace tabs, plan 7c: dragging parent tabs — 2026-10-20** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `c789f0ec7`, `16a458a03` and `537db9b06` (plan 7b's final fix wave lies between the
-first two), then this documentation commit;
+first two), then this documentation commit, then its final fix wave ("Parent tab drag: final review fixes");
 [plan](superpowers/plans/2026-10-19-workspace-7c-parent-tab-drag.md),
 [spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md)). A parent tab drags as a tab does: a press on its
 bar entry (`ParentTabBar.pressed`) hands plan 5's `TabDrag` the whole parent tab (`pressed(ParentTabBar, Tab,
@@ -28,12 +28,17 @@ drag reaches the window manager through its window, a window no manager opened m
 Deviations: Tasks 1 and 2 none, no pre-flight anchor needed refreshing; Task 3 removed
 `PopOutTest.plan5sTearOutOpensAFullWindow`, which pinned 7b's Rulings 19 that this plan ends (the pane-window tear-out
 is pinned in `TabDragWindowsTest` and `WindowManagerTest`), made the drop ignore the managers' results (the drag has already ended, and
-the managers refuse again on their own), and gave a window with no manager no parent-tab tear-out. Comments that
+the managers refuse again on their own), and gave a window with no manager no parent-tab tear-out. The final fix wave
+lets the main window's empty workspace take a parent tab anywhere over it, in its place, all of it the landing, where
+Rulings 5 gave it the band at its top (a tab already lands anywhere on it, and with no panes there spec 13 does not
+apply); gives a tab being closed targets in its own window only, as a pinned tab (`TabRegistry.movable`, as for a
+parent tab); and makes the public `WorkspaceDropResolver.marker` refuse a place outside 0 to its entries. Comments that
 still say "a torn-out tab's window (plan 5)" (`WindowFrame`, `WindowShell`, `WindowManager`) remain true. Left for
 plans 6a and 6b: `WindowManager.moveToNewWindow` is gone in every form (plan 7b removed the one-argument form, this
 plan the three-argument one), so the 6b re-plan pops a tab out with `popOutTab`; plan 5's hand-off stands
 (`Opening.bounds` and `WindowShell.place` are a tear-out's workspace bounds, for pane and full windows alike).
-`./gradlew check --continue`: **12,050 tests, 0 failures, 0 errors, 25 skipped** (`jasper-app` 4,078 with 19 skipped). GUI checks for the user:
+`./gradlew check --continue` after the final fix wave: **12,059 tests, 0 failures, 0 errors, 25 skipped**
+(`jasper-app` 4,087 with 19 skipped). GUI checks for the user:
 - a parent tab dragged along its bar, in both looks: the landing bar, then the entries in their new places at once,
   with no slide;
 - a parent tab dropped on another window's bar between its entries, and on the top of a standard window with one
@@ -42,6 +47,7 @@ plan the three-argument one), so the 6b re-plan pops a tab out with `popOutTab`;
   drop;
 - a parent tab dragged along the top of the main window's empty workspace (all its tabs closed): it takes the empty
   workspace's place, and no bar shows;
+- a parent tab dropped in the middle of an empty main window: the whole workspace highlights, and it lands there;
 - a parent tab released outside every window: a full window under the cursor, on that display, its workspace the
   parent tab's size (under Enterprise its bar sits above the workspace);
 - where an Enterprise full window lands when torn out;
