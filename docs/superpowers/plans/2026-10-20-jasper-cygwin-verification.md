@@ -25,3 +25,5 @@ Actual disconnected Gradle lifecycle passes fresh installation, update, uninstal
 ## Outstanding acceptance
 
 Native x64 Windows remains outstanding; x64 emulation is not native x64 evidence. Interactive app validation remains outstanding on both architectures: Cygwin selection in tabs/splits/settings, Manage Cygwin packages in Settings/palette, interactive Setup changes, Ctrl+C/resize/Unicode, native programs, prompt navigation and cwd inheritance. `validation.json` retains these release gates.
+
+Integration into current local `main` passed the full parallel headless check with Python 3.13: 11,878 tests, zero failures/errors and 29 skips (1,106 XML reports), plus native, architecture, packaging and Cygwin standalone checks. The earlier branch-baseline editor failures are superseded by this green combined result. Native x64 and interactive-app release gates remain outstanding.
