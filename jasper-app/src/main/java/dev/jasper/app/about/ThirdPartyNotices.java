@@ -25,6 +25,7 @@ public final class ThirdPartyNotices {
         "PolyForm-Noncommercial-1.0.0", "PolyForm Noncommercial 1.0.0",
         "Apache-2.0", "Apache License 2.0",
         "MIT", "MIT License",
+        "BSD-2-Clause", "BSD 2-Clause License",
         "BSD-3-Clause", "BSD 3-Clause License",
         "EPL-1.0", "Eclipse Public License 1.0",
         "OFL-1.1", "SIL Open Font License 1.1",

@@ -1,5 +1,6 @@
 package dev.jasper.editor.ui;
 
+import dev.jasper.editor.syntax.TokenRoles;
 import dev.jasper.sdk.ui.EditorPalette;
 import dev.jasper.sdk.ui.SyntaxPalette;
 import dev.jasper.sdk.ui.SyntaxRole;
@@ -38,7 +39,7 @@ public final class EditorTheme {
         for (int token = 0; token < TokenTypes.DEFAULT_NUM_TOKEN_TYPES; token++) {
             Style current = scheme.getStyle(token);
             Style style = current == null ? new Style() : (Style) current.clone();
-            SyntaxRole role = role(token);
+            SyntaxRole role = TokenRoles.role(token);
             if (role == null) {
                 style.foreground = fixed(editor.foreground());
                 style.font = font.deriveFont(Font.PLAIN);
@@ -98,30 +99,6 @@ public final class EditorTheme {
 
     // UIResource colors are delegate defaults: a chrome LAF refresh may replace them without a workspace event.
     private static Color fixed(Color color) { return new Color(color.getRGB(), true); }
-
-    private static SyntaxRole role(int token) {
-        return switch (token) {
-            case TokenTypes.RESERVED_WORD, TokenTypes.RESERVED_WORD_2, TokenTypes.PREPROCESSOR -> SyntaxRole.KEYWORD;
-            case TokenTypes.DATA_TYPE -> SyntaxRole.TYPE;
-            case TokenTypes.FUNCTION -> SyntaxRole.FUNCTION;
-            case TokenTypes.VARIABLE -> SyntaxRole.VARIABLE;
-            case TokenTypes.LITERAL_BOOLEAN -> SyntaxRole.CONSTANT;
-            case TokenTypes.LITERAL_NUMBER_DECIMAL_INT, TokenTypes.LITERAL_NUMBER_FLOAT,
-                TokenTypes.LITERAL_NUMBER_HEXADECIMAL -> SyntaxRole.NUMBER;
-            case TokenTypes.LITERAL_STRING_DOUBLE_QUOTE, TokenTypes.LITERAL_CHAR, TokenTypes.LITERAL_BACKQUOTE -> SyntaxRole.STRING;
-            case TokenTypes.COMMENT_EOL, TokenTypes.COMMENT_MULTILINE -> SyntaxRole.COMMENT;
-            case TokenTypes.COMMENT_DOCUMENTATION, TokenTypes.COMMENT_KEYWORD, TokenTypes.COMMENT_MARKUP -> SyntaxRole.DOC_COMMENT;
-            case TokenTypes.ANNOTATION -> SyntaxRole.ANNOTATION;
-            case TokenTypes.OPERATOR -> SyntaxRole.OPERATOR;
-            case TokenTypes.SEPARATOR -> SyntaxRole.PUNCTUATION;
-            case TokenTypes.MARKUP_TAG_DELIMITER, TokenTypes.MARKUP_TAG_NAME -> SyntaxRole.TAG;
-            case TokenTypes.MARKUP_TAG_ATTRIBUTE, TokenTypes.MARKUP_TAG_ATTRIBUTE_VALUE -> SyntaxRole.ATTRIBUTE;
-            case TokenTypes.REGEX -> SyntaxRole.REGEX;
-            case TokenTypes.ERROR_IDENTIFIER, TokenTypes.ERROR_NUMBER_FORMAT,
-                TokenTypes.ERROR_STRING_DOUBLE, TokenTypes.ERROR_CHAR -> SyntaxRole.ERROR;
-            default -> null;
-        };
-    }
 
     /** Returns a linear blend of two colors. */
     public static Color blend(Color base, Color toward, double amount) {
