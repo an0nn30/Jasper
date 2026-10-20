@@ -1,5 +1,19 @@
 # Jasper — Status and Handoff
 
+**Windows user install from IntelliJ — 2026-10-20** (`codex/windows-user-install`):
+`installWindowsUser` builds a separate standard-JBR app image and installs it in
+`%APPDATA%\JasperApp` with a Start Menu shortcut; `uninstallWindowsUser` removes the
+owned installation, shortcut and matching login entry, preserving user data.
+The user approved omitting custom VM options, native startup recovery and the native CLI.
+The install graph excludes native compilation, installer generation and AOT training.
+Full parallel headless `check` passed on merged main on macOS: 11,618 Java tests, zero failures/errors,
+25 expected skips, plus native, architecture and 71 theme tests. Used `-Pjasper.python`
+with installed Python 3.13: the unchanged deeply nested JSON theme test fails on 3.14.
+Install dry-run and independent review passed; graph verification uses resolved task
+data to avoid cross-project state locks during parallel checks.
+Windows lifecycle tests cover updates, rollback, ownership, junctions and data preservation;
+native Windows execution and desktop/daemon acceptance remain pending. No GUI launched.
+
 **Jasper Meadow Light — 2026-10-20**: The default light theme uses warm cream surfaces and moss #52643F accents for buttons, selections and focus. Existing saved theme choices, Enterprise defaults and the Slate Cobalt dark default are retained. Select Light appearance and Jasper Meadow Light in Settings to try it with an existing profile. After merging the current remote main, full headless `check` passed: 11,618 Java tests, zero failures/errors, 25 existing platform skips, plus theme-tool, native and architecture checks.
 
 **Enterprise presentation, plan 15b: look polish at the user's direction — 2026-10-20** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, after plan 15a; [plan](superpowers/plans/2026-10-19-enterprise-15b-look-polish.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))

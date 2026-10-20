@@ -91,6 +91,24 @@ Run this **on Linux x64 or aarch64**, with a JBR SDK 25 of the same architecture
 
 This produces `jasper-app/build/packaging/dist/Jasper-<version>-linux-<amd64|arm64>.deb` and `Jasper-<version>-linux-<x86_64|aarch64>.rpm` for the build machine's architecture. Both install to `/opt/jasper` with a desktop menu entry. The [`linux-packages` workflow](.github/workflows/linux-packages.yml) builds all four on native x64 and arm64 runners and test-installs them on Debian, Ubuntu, Fedora and openSUSE. See [Linux packages](docs/packaging.md#linux-packages).
 
+## Install from IntelliJ on Windows without MSVC
+
+Run `jasper-app` → `distribution` → `installWindowsUser` in IntelliJ's Gradle panel,
+or `.\gradlew.bat :jasper-app:installWindowsUser`. This builds the Java application and
+bundled plugins with JBR SDK 25, creates a standard jpackage app image, and installs it
+in `%APPDATA%\JasperApp` with a Start Menu shortcut. It requires no MSVC, WiX, installer,
+or administrator rights. Windows must permit running the generated executable and the
+PowerShell installation script.
+
+Exit Jasper, including its background process, before installing an update or running
+`.\gradlew.bat :jasper-app:uninstallWindowsUser`. Uninstall removes this installation,
+its shortcut and its matching login entry, preserving settings and data in
+`%APPDATA%\jasper`. Launch Jasper from the Start Menu after installation; its existing
+background setting controls residency and login startup.
+
+This local installation uses the standard JBR launcher: custom `jasper.vmoptions`,
+native startup recovery and the native `jasper` command are unavailable.
+
 ## Build a Windows portable ZIP
 
 For a setup wizard with per-user installation, shortcut choices, upgrades, and
