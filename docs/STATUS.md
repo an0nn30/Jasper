@@ -162,7 +162,7 @@ fixes add `PresentationReachTest.theApplicationHandsTheLooksPluginDefaultsToTheP
 plugin defaults to a started plugin) and `PluginSettingsPageTest.stagingThePluginsOwnDefaultUnderAKitDefaultSavesItAndResetReturnsToTheKits`,
 so the suite holds 11,569 tests (only the touched classes were re-run); a `[defaults]` table named without a dot now
 also says to quote a dotted setting key, and a rejected look default's report no longer ends "configuration was not
-applied". Not merged, not pushed.
+applied". Merged to local main, not pushed.
 
 **Enterprise presentation, plan 14: IntelliJ Classic's title bar at the user's direction — 2026-10-19** (`claude/enterprise-title-bar`, worktree `.claude/worktrees/enterprise-14`, from `main` at `3a36993ba`; [plan](superpowers/plans/2026-10-19-enterprise-14-title-bar.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
 Commits `200367316..98dedc443`, then this documentation commit; spec 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1
