@@ -162,18 +162,22 @@ final class WindowChrome {
         toolbar.add(split);
     }
 
+    /** The classic row's ⋮ in {@code into} ({@link #classicWindowMenu(WindowContent)}). */
+    void classicWindowMenu(WindowToolbar into) { into.add(classicWindowMenu(owner)); }
+
     /**
-     * The classic row's ⋮ (parent tabs spec 6; workspace plan 7b Rulings 16): a 22 px classic icon button in {@code into}
-     * that opens the window menu, with no label in any toolbar mode and no overflow entry.
+     * The classic ⋮ (parent tabs spec 6; workspace plan 7b Rulings 16): a 22 px classic icon button that opens
+     * {@code owner}'s window menu, with no label in any toolbar mode and no overflow entry. The classic row ends with it,
+     * and so does a child window's title row under a classic title.
      */
-    void classicWindowMenu(WindowToolbar into) {
+    static ClassicToolbarButton classicWindowMenu(WindowContent owner) {
         var button = new ClassicToolbarButton(null, WindowMenuButton.LABEL, false, AppIcons.semantic("more.vertical"));
         button.setName(WindowMenuButton.NAME);
         button.putClientProperty("keepLabel", false);
         button.setText(null);
         WindowToolbar.pin(button);
         button.addActionListener(event -> owner.showWindowMenu(button));
-        into.add(button);
+        return button;
     }
 
     /** A toolbar rule; a classic one is a 1 px {@code border.window} line. */

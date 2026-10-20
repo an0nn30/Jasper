@@ -57,6 +57,15 @@ final class ClassicToolbarButton extends JButton {
         return new Dimension(width, side());
     }
 
+    /**
+     * An icon button keeps its 22 px in a layout that reads minimum sizes, as a child window's title row does for its ⋮
+     * (workspace plan 7b's final review); a toolbar places its buttons by their preferred sizes.
+     */
+    @Override public Dimension getMinimumSize() { return getText() == null ? getPreferredSize() : super.getMinimumSize(); }
+
+    /** As {@link #getMinimumSize()}: a title row's layout neither shrinks nor stretches an icon button. */
+    @Override public Dimension getMaximumSize() { return getText() == null ? getPreferredSize() : super.getMaximumSize(); }
+
     @Override protected void paintComponent(Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {

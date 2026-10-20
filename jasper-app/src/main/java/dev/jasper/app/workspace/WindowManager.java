@@ -266,7 +266,7 @@ public final class WindowManager {
      *
      * @param window the window holding the pane
      * @param pane the pane
-     * @return the new pane window; empty when the pane stayed
+     * @return the new pane window, holding what arrived; empty when no tab did
      */
     public Optional<ChildWindow> popOutPane(WindowContent window, GroupId pane) {
         requireEdt();
@@ -287,7 +287,9 @@ public final class WindowManager {
                 failure = keep(failure, thrown);
             }
         }
-        // The pane window shows the tab the pane showed.
+        // A listener may pin a later tab mid-move, or one tab's move may fail: the pane then stays split across the two
+        // windows, each window's ids still unique (parent tabs spec 4), and settle gives the pane window while a tab
+        // arrived. The pane window shows the tab the pane showed.
         if (shown != null && child.content().parentTabs().contains(shown)) {
             try {
                 model.tabs().select(shown);
@@ -341,13 +343,15 @@ public final class WindowManager {
      * {@code TAB_MOVED} per tab, every session untouched. It shows there, raised, and a full window it empties closes; the
      * main window it empties shows an empty workspace under a new id. Both windows are main or full windows; a parent tab
      * holding a tab that is pinned or being closed stays. It keeps its maximize too: spec 15 ends a maximize for a tab
-     * that joins a layout, and a parent tab moving whole brings its own (Rulings 10).
+     * that joins a layout, and a parent tab moving whole brings its own (Rulings 10). When part of it stays behind (a
+     * listener pinned a tab mid-move, or a tab's move failed), the part that arrived takes a new id and keeps the panes it
+     * landed in, so no id is in two windows (spec 4); a failure propagates afterwards.
      *
      * @param from the window holding the parent tab
      * @param parentTab the parent tab
      * @param to another main or full window
      * @param index where it goes in {@code to}'s bar
-     * @return whether it moved
+     * @return whether any of its tabs arrived
      */
     public boolean moveParentTab(WindowContent from, ParentTabId parentTab, WindowContent to, int index) {
         requireEdt();
@@ -355,9 +359,25 @@ public final class WindowManager {
             return false;
         WorkspaceView view = from.parentTabs().view(parentTab).orElse(null);
         if (view == null || view.isEmpty() || !view.tabs().stream().allMatch(model.tabs()::movable)) return false;
-        boolean moved = to.receive(view.tabs(), parentTab, index, view.model());
-        // The window's only parent tab is the other window's now: the empty workspace it leaves takes a new id (Rulings 10).
-        if (moved && !from.closed()) from.parentTabs().renew(parentTab);
+        List<Tab> moving = view.tabs();
+        Throwable failure = null;
+        try {
+            to.receive(moving, parentTab, index, view.model());
+        } catch (RuntimeException | Error thrown) {
+            failure = thrown;
+        }
+        // A listener may pin a later tab mid-move, or one tab's move may fail, so only part of the parent tab arrives.
+        boolean moved = !to.closed()
+            && to.parentTabs().view(parentTab).filter(arrived -> moving.stream().anyMatch(arrived::contains)).isPresent();
+        if (moved && !from.closed()) {
+            // The rest stays under its id, so the part that arrived takes a new one: no id is in two windows (spec 4).
+            if (from.parentTabs().view(parentTab).filter(left -> !left.isEmpty()).isPresent())
+                to.parentTabs().reid(parentTab, ParentTabId.random());
+            // The window's only parent tab is the other window's now: the empty workspace it leaves takes a new id
+            // (Rulings 10).
+            else from.parentTabs().renew(parentTab);
+        }
+        rethrow(failure);
         return moved;
     }
 
@@ -370,7 +390,7 @@ public final class WindowManager {
      * pane window closes with its last tab. While one of its tabs is pinned or being closed, nothing moves.
      *
      * @param window a pane window
-     * @return the window the panes went to; empty when they stayed
+     * @return the window the panes went to; empty when none arrived
      */
     public Optional<JasperWindow> bringBack(WindowContent window) {
         requireEdt();
@@ -387,8 +407,10 @@ public final class WindowManager {
         }
         Layout before = target.content().parentTabs().view(parentTab).orElseThrow().model();
         GroupId beside = before.group(origin.pane()).isPresent() ? origin.pane() : before.activeGroup();
-        target.content().receive(moving, parentTab, 0, before.graft(panes, beside, origin.side(), origin.share()));
-        return Optional.of(target);
+        // A listener may pin a later tab mid-move, or one tab's move may fail: the rest then stays in the pane window, which
+        // stays open, and what arrived keeps to the parent tab's own panes (receive), so no id is in two windows (spec 4).
+        Layout arranged = before.graft(panes, beside, origin.side(), origin.share());
+        return target.content().receive(moving, parentTab, 0, arranged) ? Optional.of(target) : Optional.empty();
     }
 
     /**
@@ -398,7 +420,7 @@ public final class WindowManager {
      * its tabs is pinned or being closed, nothing moves.
      *
      * @param window a full window
-     * @return the main window; empty when nothing moved
+     * @return the main window; empty when nothing arrived
      */
     public Optional<MainWindow> moveToMainWindow(WindowContent window) {
         requireEdt();
@@ -409,20 +431,28 @@ public final class WindowManager {
         ParentTabId shown = window.activeParentTab();
         List<ParentTabId> moving = window.parentTabs().model().parentTabs().stream().map(ParentTab::id).toList();
         int at = target.parentTabs().model().indexOf(target.activeParentTab()) + 1;
+        ParentTabId shownThere = null;
+        boolean arrived = false;
         Throwable failure = null;
         for (ParentTabId parentTab : moving) {
+            List<Tab> tabs = window.parentTabs().view(parentTab).map(WorkspaceView::tabs).orElse(List.of());
             try {
                 moveParentTab(window, parentTab, target, at);
             } catch (RuntimeException | Error thrown) {
                 failure = keep(failure, thrown);
             }
-            int placed = target.parentTabs().model().indexOf(parentTab);
-            if (placed >= 0) at = placed + 1;
+            // Where it landed: under its id, or under a new one when a listener or a failure left part of it in the full
+            // window, which then stays open (moveParentTab).
+            Optional<ParentTabId> landed = tabs.stream().map(target::parentTabOf).flatMap(Optional::stream).findFirst();
+            if (landed.isEmpty()) continue;
+            arrived = true;
+            at = target.parentTabs().model().indexOf(landed.get()) + 1;
+            if (parentTab.equals(shown)) shownThere = landed.get();
         }
-        target.selectParentTab(shown);
-        main.get().toFront();
+        if (shownThere != null) target.selectParentTab(shownThere);
+        if (arrived) main.get().toFront();
         rethrow(failure);
-        return main;
+        return arrived ? main : Optional.empty();
     }
 
     /**

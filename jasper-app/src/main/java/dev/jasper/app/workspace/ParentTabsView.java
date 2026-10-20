@@ -203,6 +203,23 @@ final class ParentTabsView extends JPanel {
     }
 
     /**
+     * The parent tab {@code old} takes the id {@code fresh}, in its place, with its layout, tabs and selection, as the one
+     * that shows if it did (parent tabs spec 4: ids are unique across windows). The window manager's
+     * {@code moveParentTab} calls it for a parent tab that moved here in part while the rest stayed under {@code old} in
+     * the window it came from. It does nothing for a parent tab the window lacks, for an id it has, or once the window
+     * closed.
+     */
+    void reid(ParentTabId old, ParentTabId fresh) {
+        WorkspaceView view = views.get(old);
+        if (closed || view == null || views.containsKey(fresh)) return;
+        model = model.reid(old, fresh);
+        views.remove(old);
+        view.id(fresh);
+        views.put(fresh, view);
+        owner.workspaceChanged(view, false);
+    }
+
+    /**
      * A new parent tab's workspace under {@code id}, with the window's theme and glass, so the splits it builds take them
      * too.
      */

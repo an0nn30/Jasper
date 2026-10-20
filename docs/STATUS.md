@@ -2,7 +2,8 @@
 
 **Workspace tabs, plan 7b: Pop Out, Bring Back and the window menu — 2026-10-20** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `e80f2c322..66be37837` (plan 6b's re-planned document lies between), then this
-documentation commit; [plan](superpowers/plans/2026-10-19-workspace-7b-pop-out.md),
+documentation commit, then its final fix wave ("Pane windows: final review fixes", after plan 7c's first commit);
+[plan](superpowers/plans/2026-10-19-workspace-7b-pop-out.md),
 [spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md)). Tabs, panes and parent tabs leave their window and
 pane windows come back. The model gains `layout.Origin` (parent tab, pane, side, share), `Layout.origin` and
 `Layout.graft`, and `PaneLayout` carries its origin. A pane window is a child window whose `WindowContent` the window
@@ -20,8 +21,9 @@ and `move_tab_to_main_window`; the registry's `moveToNewWindow` (and so `Content
 plan 5's tear-out still opens a full window. Each window's ⋮ (`WindowMenuButton`; the classic row's icon button) opens
 its window menu. A toolbar pins it (`WindowToolbar.pin`), and the overflow, now `IconRegistry`'s horizontal ellipsis
 `more`, sits before it. The menu has Pop Out Pane and Pop Out Parent Tab in the main window, plus Move to Main Window in
-a full window, Bring Back and Pop Out Pane in a pane window. A tab's menu, a terminal's context menu and the parent-tab
-bar's menu offer the same commands for what they were opened on.
+a full window, Bring Back and Pop Out Pane in a pane window; a full window's Pop Out Parent Tab and a pane window's Pop
+Out Pane appear only while it has two parent tabs or two panes. A tab's menu, a terminal's context menu and the
+parent-tab bar's menu offer the same commands for what they were opened on.
 Rulings (plan, "Rulings"): (1) `Origin(parentTab, pane, side, share)` in `layout` and `PaneLayout(Layout, Origin)`, the
 window being the one holding the parent tab when Bring Back runs; (2) `Layout.origin` records the group across a pane's
 edge within the sibling its space goes to, the side it is on and its share of the two weights (a layout's only group
@@ -50,9 +52,12 @@ trailing end of its title row in each platform's title and shows under Compact t
 Enterprise mock and classic header tests measure "Settings…" and the search field 30 px left of the mocks, the standard
 toolbar's tests count one more button, and `WindowToolbarTest` reads the horizontal ellipsis and a pinned control after
 it; (21) new files take ledger rows `nonvisual-helper,none,none`. Spec issues: 1 (the origin records the parent tab, not
-the window) and 2 (the ⋮ moves "Settings…" and the search field 30 px left of the Workstation mocks) are open for the
-user; 3 (the overflow shows a horizontal ellipsis and sits before the ⋮, so two ⋮ never sit side by side) was ruled by
-the controller. Deviations: 7b's `openParentTab(Tab, ParentTabId, int)` was refreshed before execution to keep 7a's
+the window) and 2 (the ⋮ moves "Settings…" and the search field 30 px left of the Workstation mocks) were decided by the
+controller, for the user to confirm; 3 (the overflow shows a horizontal ellipsis and sits before the ⋮, so two ⋮ never
+sit side by side) was ruled by the controller. The plan says a window id "never decides where the panes go"; it would in
+one case: a pane popped out of a full window whose parent tab then closes comes back to the main window, not to the full
+window that is still open.
+Deviations: 7b's `openParentTab(Tab, ParentTabId, int)` was refreshed before execution to keep 7a's
 executed theme and glass and its bar-order insert; the origin names a pane, so a pane whose sibling was a subtree comes
 back beside one group of it (documented and pinned), and `Layout.origin` clamps its share into [0.01, 0.99]; the plan's
 `OptionalAssert.doesNotContain` does not exist, so `TabDragWindowsTest` uses `.isPresent().get().isNotEqualTo(pane)`;
@@ -63,7 +68,11 @@ moves; `rearrange` keeps held tabs the plan lacks and does nothing when the plan
 `WindowMenuButton` calls `setText(null)` (`JButton(Icon)` leaves ""); `WindowPanelsTest` hides the toolbar, because the
 pinned ⋮ widens the main window's minimum by about 56 px (the centred header's minimum is twice its wider side); Pop Out
 Tab's enablement adds `registry.movable(tab)` (`mayPopOutTab(Tab)`) on every surface, and the `may*` checks are false
-without a manager. Left for plan 7c:
+without a manager; the final fix wave keeps every id in one window when a move of several tabs leaves one behind (a
+listener pins it, or its move fails): `receive` then skips `rearrange`, and `moveParentTab` gives the part that arrived a
+new id (`ParentTabsView.reid`), while Pop Out Pane's tabs stay split across the two windows; and `bringBack`,
+`moveToMainWindow`, `popOutPane` and `moveParentTab` report what arrived, empty or false when nothing did. Left for plan
+7c:
 - a drag onto another window's bar is `WindowManager.moveParentTab(from, id, to, index)`;
 - a parent tab dragged outside every window is `popOutParentTab(window, id, bounds, cursor)`;
 - an item torn out to a pane window is `popOutTab(tab, bounds, cursor)`, in place of `moveToNewWindow(Tab, Rectangle,
@@ -71,8 +80,8 @@ without a manager. Left for plan 7c:
 
 For plans 6a and 6b: `windowLayout()` is a `PaneLayout` with its `Origin` for a pane window, and a restored pane
 window becomes one through `WindowContent.paneWindow(Origin)` while it is empty, as `WindowManager.openChild` does.
-`./gradlew check --continue`:
-**BUILD SUCCESSFUL, 12,021 tests, 0 failures, 0 errors, 25 skipped (app 4,049 with 19 skipped, terminal 459 with 5, ui 930, buddy 151, sdk 94, sdk-testkit 205, editor 4,913, enterprise 3, fileserver 285, history 41, indexer 99, remote 544, sample 14, snippets 13, vault 221 with 1)**. GUI checks for the user:
+`./gradlew check --continue` after the final fix wave:
+**BUILD SUCCESSFUL, 12,039 tests, 0 failures, 0 errors, 25 skipped (app 4,067 with 19 skipped, terminal 459 with 5, ui 930, buddy 151, sdk 94, sdk-testkit 205, editor 4,913, enterprise 3, fileserver 285, history 41, indexer 99, remote 544, sample 14, snippets 13, vault 221 with 1)**. GUI checks for the user:
 - the ⋮ at the end of the main window's toolbar, in the standard look (after Settings) and under Enterprise (after
   Settings…), and its menu;
 - on a narrow standard window, the overflow's horizontal ellipsis ("More actions") just before the ⋮ (Spec issues 3);
@@ -86,7 +95,11 @@ window becomes one through `WindowContent.paneWindow(Origin)` while it is empty,
 - Pop Out Parent Tab and Move to Main Window keeping every shell running (a `top` stays current);
 - the strip's tab menu, a terminal's context menu (on a pane showing no strip) and the parent-tab bar's menu acting on
   the tab they were opened on;
-- a modal prompt in a tab blocking its pane's or parent tab's move.
+- a modal prompt in a tab blocking its pane's or parent tab's move;
+- an Enterprise child window in macOS full screen: the band hides, so it has no ⋮, and Bring Back stays in a terminal's
+  context menu and the palette;
+- a long native title in the band, which can run under the ⋮;
+- under Enterprise, a child window's ⋮ is the classic icon button the main window's row ends with.
 
 Not merged, not pushed.
 

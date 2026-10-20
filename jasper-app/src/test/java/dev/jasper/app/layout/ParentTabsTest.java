@@ -147,6 +147,24 @@ class ParentTabsTest {
             .withMessageContaining("not in the window");
     }
 
+    /** Parent tabs spec 4 and 7b's final review: a parent tab that moved in part takes a new id in its new window. */
+    @Test void reidGivesAParentTabANewIdInItsPlace() {
+        ParentTab a = parent(A), b = parent(B), c = parent(C);
+        ParentTabs tabs = new ParentTabs(List.of(a, b, c), c.id()).select(b.id());
+        ParentTabId fresh = ParentTabId.random();
+        ParentTabs next = tabs.reid(b.id(), fresh);
+        assertThat(next.parentTabs()).containsExactly(a, new ParentTab(fresh, b.layout()), c);
+        assertThat(next.active()).as("it still shows").isEqualTo(fresh);
+        assertThat(next.recent()).as("and keeps its place in the order of use").containsExactly(fresh, c.id(), a.id());
+        assertThat(next.holding(B)).contains(fresh);
+        ParentTabs other = tabs.reid(a.id(), fresh);
+        assertThat(other.active()).as("the shown one stays").isEqualTo(b.id());
+        assertThat(other.recent()).containsExactly(b.id(), c.id(), fresh);
+        assertThatIllegalArgumentException().isThrownBy(() -> tabs.reid(a.id(), c.id())).withMessageContaining("twice");
+        assertThatIllegalArgumentException().isThrownBy(() -> tabs.reid(ParentTabId.random(), fresh))
+            .withMessageContaining("not in the window");
+    }
+
     @Test void equalityIgnoresTheOrderOfUse() {
         ParentTab a = parent(A), b = parent(B);
         ParentTabs plain = new ParentTabs(List.of(a, b), a.id());

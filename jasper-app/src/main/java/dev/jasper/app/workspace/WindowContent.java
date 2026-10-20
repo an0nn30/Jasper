@@ -466,7 +466,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         content.onThemeChanged.accept(content.theme());
         content.followsThemeAppearance = bar == null && look.followThemeAppearance() && content.macOs;
         if (screenMenuBar) root.setJMenuBar(content.menuBar());
-        content.mountWindowMenu(root, bar);
+        content.mountWindowMenu(root, bar, look.classicTitle());
         MacTitleBar titled = bar;
         content.onTitle = title -> {
             nativeTitle.accept(title);
@@ -483,10 +483,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * Puts a child window's ⋮, its compact toolbar (parent tabs spec 6; workspace plan 7b Rulings 17), at the trailing end
      * of its title row: the unified macOS bar's, or IntelliJ Classic's band on macOS. On Windows and Linux it ends a menu
      * bar of its own after a glue, which FlatLaf's title pane embeds with the title in the glue, and which is a row under
-     * the system's title bar otherwise. On macOS under the system's title bar it ends a row at the top of the window.
+     * the system's title bar otherwise. On macOS under the system's title bar it ends a row at the top of the window, 8 px
+     * from its edge as in the other title rows. Under a {@code classic} title it is the classic ⋮ the main window's classic
+     * row ends with ({@link WindowChrome#classicWindowMenu(WindowContent)}).
      */
-    private void mountWindowMenu(JRootPane root, MacTitleBar bar) {
-        var button = new WindowMenuButton(this);
+    private void mountWindowMenu(JRootPane root, MacTitleBar bar, boolean classic) {
+        JComponent button = classic ? WindowChrome.classicWindowMenu(this) : new WindowMenuButton(this);
         if (bar != null) bar.setTrailing(button);
         else if (titleBand != null) titleBand.setTrailing(button);
         else if (!macOs) {
@@ -499,15 +501,23 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             var row = new JPanel(new BorderLayout());
             row.setName("windowBar");
             row.setOpaque(false);
+            row.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, com.formdev.flatlaf.util.UIScale.scale(8)));
             row.add(button, BorderLayout.EAST);
             add(row, BorderLayout.NORTH);
         }
     }
 
+    /**
+     * How {@link #showWindowMenu} shows the menu it is given: under the ⋮, while the ⋮ shows. A headless test, where
+     * nothing shows, records what a click would show instead.
+     */
+    BiConsumer<JComponent, java.util.function.Supplier<JPopupMenu>> windowMenuPopup = (invoker, menu) -> {
+        if (invoker.isShowing()) menu.get().show(invoker, 0, invoker.getHeight());
+    };
+
     /** Opens {@link #windowMenu()} under {@code invoker}, a ⋮, while it shows (parent tabs spec 6). */
     void showWindowMenu(JComponent invoker) {
-        if (closed || !invoker.isShowing()) return;
-        windowMenu().show(invoker, 0, invoker.getHeight());
+        if (!closed) windowMenuPopup.accept(invoker, this::windowMenu);
     }
 
     /**
@@ -1389,7 +1399,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * place of the window's empty workspace (the main window's, or a new full window's). That parent tab then takes
      * {@code arranged} ({@link WorkspaceView#rearrange}) and shows, and {@code arranged}'s active tab is selected, focused
      * and raised. A tab the registry does not move stays where it was; the first failure propagates once the others have
-     * moved. A receive that runs within another one, from a listener say, leaves the outer one's landing as it was.
+     * moved. While such a tab stays in its window (a listener pinned it mid-move, or its move failed), the tabs that
+     * arrived keep the places they landed in, in that parent tab's own panes, and {@code arranged}, whose ids that window
+     * still holds, is not applied: no pane is in two windows (parent tabs spec 4). A receive that runs within another
+     * one, from a listener say, leaves the outer one's landing as it was.
      *
      * @param moving the tabs, in the order they move
      * @param parentTab the parent tab they land in
@@ -1415,8 +1428,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         }
         WorkspaceView view = closed ? null : parentTabs.view(parentTab).orElse(null);
         boolean arrived = view != null && moving.stream().anyMatch(view::contains);
+        boolean leftBehind = moving.stream().anyMatch(tab -> !tab.closed() && (view == null || !view.contains(tab)));
         if (arrived) {
-            view.rearrange(arranged);
+            if (!leftBehind) view.rearrange(arranged);
             Tab shown = view.selected();
             if (shown != null) {
                 try {

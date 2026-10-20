@@ -114,7 +114,6 @@ class PopOutCommandsTest {
         windows.launch();
     }
 
-    /** Spec 5: the actions pop out the active tab, pane and parent tab, and bring back or move a whole window. */
     /** Workspace plan 7b Rulings 7: a pinned tab cannot move, so Pop Out Tab is disabled for it, as a command and in its menu. */
     @Test void aPinnedTabDisablesPopOutTab() throws Exception {
         edt(() -> {
@@ -159,6 +158,20 @@ class PopOutCommandsTest {
         });
     }
 
+    /** Spec 6 and workspace plan 7b Rulings 14: in the main window's empty workspace every window menu entry shows disabled. */
+    @Test void theMainWindowsEmptyWorkspaceShowsEveryWindowMenuEntryDisabled() throws Exception {
+        edt(() -> {
+            var main = windows.main().content();
+            main.closeTab(main.selectedTab());
+            assertThat(main.workspace().emptyWorkspace()).as("the empty workspace").isNotNull();
+            assertThat(texts(main.windowMenu())).containsExactly("Pop Out Pane", "Pop Out Parent Tab");
+            assertThat(main.windowMenu().getComponents()).noneMatch(java.awt.Component::isEnabled);
+            for (ActionId id : main.windowMenuItems()) assertThat(main.action(id).isEnabled()).as("%s", id).isFalse();
+        });
+        windows.launch();
+    }
+
+    /** Spec 5: the actions pop out the active tab, pane and parent tab, and bring back or move a whole window. */
     @Test void theActionsPopOutBringBackAndMove() throws Exception {
         edt(() -> {
             var main = windows.main().content();
@@ -219,6 +232,28 @@ class PopOutCommandsTest {
             main.newTab(HOME);
             var pane = windows.manager.popOutTab(main.selectedTab()).orElseThrow().content();
             assertThat(texts(pane.chrome().contextMenu())).endsWith("---", "Pop Out Tab", "Bring Back");
+        });
+        windows.launch();
+    }
+
+    /**
+     * Review Focus 4: a terminal's context menu pops out the pane of the terminal it was opened on, though another pane
+     * was the active one: {@code TabHost}'s context-menu handler selects the terminal's tab before it builds the menu.
+     */
+    @Test void aTerminalsContextMenuPopsOutThePaneItWasOpenedOn() throws Exception {
+        edt(() -> {
+            var main = windows.main().content();
+            Tab left = main.selectedTab();
+            main.split(Side.RIGHT);
+            Tab right = main.selectedTab();
+            GroupId opened = left.group().orElseThrow();
+            assertThat(main.workspace().model().activeGroup()).as("the other pane is the active one").isNotEqualTo(opened);
+            // As TabHost.bind's handler does on a right-click in the left terminal, before the menu shows.
+            main.selectTab(left);
+            item(main.chrome().contextMenu(), "Pop Out Pane").doClick();
+            ChildWindow pane = windows.manager.children().getFirst();
+            assertThat(pane.content().tabs()).as("the pane of the terminal the menu was opened on").containsExactly(left);
+            assertThat(main.tabs()).containsExactly(right);
         });
         windows.launch();
     }

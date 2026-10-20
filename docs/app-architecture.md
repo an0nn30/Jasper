@@ -101,7 +101,7 @@ empty workspace when its last tab closes; a child window (`WindowRole.CHILD` con
 workspace and closes with its last tab. A child window is a full window, with parent tabs, or a pane window, whose
 content has one layout and an `Origin` (layout). `WindowManager` pops tabs, panes and parent tabs out, brings a pane window
 back and moves a full window's parent tabs to the main window: `WindowContent.receive` lands each tab through the tab
-registry, then `WorkspaceView.rearrange` gives the parent tab its planned layout. Every outside request, a plugin's tab
+registry, then, when every tab arrived, `WorkspaceView.rearrange` gives the parent tab its planned layout. Every outside request, a plugin's tab
 with no window and the menu bar item
 restore the main window first; closing the main window, Quit and going to the background close the child windows, then
 the main window. `MainWindow`'s constructor has one call site, `WindowManager.ensureMain`, which
@@ -249,7 +249,7 @@ The Enterprise presentation's classic title (`title_bar = "classic"`) is Intelli
   auxiliary frame keeps its system title bar and shows the minimal File menu there.
 - On Windows, FlatLaf's title pane embeds `CollapsingMenuBar` and `ClassicWindowTitle`, the window title left-aligned
   after the menus, over a 1 px rule. A child window's title pane is 28 px in the toolbar's colour and holds FlatLaf's
-  title alone, dimmed while the window is inactive.
+  title and the window's ⋮, dimmed while the window is inactive.
 - On Linux it is the system title bar.
 
 `TitleInset` keeps classic in-window dialogs and overlays below either, and below the FlatLaf title pane of a Windows

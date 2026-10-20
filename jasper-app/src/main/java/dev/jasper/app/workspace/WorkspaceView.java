@@ -43,7 +43,7 @@ import javax.swing.SwingUtilities;
  */
 final class WorkspaceView extends JPanel {
     private final WindowContent owner;
-    private final ParentTabId id;
+    private ParentTabId id;
     private final Map<GroupId, GroupView> groups = new LinkedHashMap<>();
     private final Map<TabId, Tab> tabs = new HashMap<>();
     private final Map<List<Integer>, SplitContainer> splits = new HashMap<>();
@@ -69,6 +69,8 @@ final class WorkspaceView extends JPanel {
     Layout model() { return layout; }
     /** The parent tab this workspace is. */
     ParentTabId id() { return id; }
+    /** The parent tab takes a new id ({@link ParentTabsView#reid}); its layout and tabs stay. */
+    void id(ParentTabId value) { id = Objects.requireNonNull(value, "value"); }
     boolean isEmpty() { return layout.isEmpty(); }
     boolean contains(Tab tab) { return tab != null && tabs.get(tab.id()) == tab; }
     /** Every tab in workspace order: the groups in tree order, each group's tabs in strip order. */

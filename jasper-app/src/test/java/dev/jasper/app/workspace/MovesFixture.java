@@ -1,11 +1,20 @@
 package dev.jasper.app.workspace;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.PaneLayout;
+import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.ParentTabs;
+import dev.jasper.app.layout.TabId;
+import dev.jasper.app.layout.WindowLayout;
+import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.IdleTerminalSession;
@@ -71,6 +80,54 @@ final class MovesFixture implements AutoCloseable {
 
     /** A terminal tab's session. */
     static TerminalSession session(Tab tab) { return ((TerminalContent) tab.content()).pane().session(); }
+
+    /**
+     * Pins {@code later} once {@code first} has left the window it is in now: a listener opening a modal prompt in a tab
+     * while a move of several tabs runs. The pin is in the array once taken.
+     */
+    static Subscription[] pinWhenItLeaves(Tab first, Tab later) {
+        UUID from = first.window();
+        Subscription[] pin = new Subscription[1];
+        first.onChanged(() -> { if (pin[0] == null && !from.equals(first.window())) pin[0] = later.pin(); });
+        return pin;
+    }
+
+    /** Refuses {@code tab}'s next move as it starts: a change listener that throws once the tab names another window. */
+    static IllegalStateException refuseItsMove(Tab tab) {
+        UUID from = tab.window();
+        var refusal = new IllegalStateException("A listener refused the move");
+        boolean[] thrown = {false};
+        tab.onChanged(() -> {
+            if (thrown[0] || from.equals(tab.window())) return;
+            thrown[0] = true;
+            throw refusal;
+        });
+        return refusal;
+    }
+
+    /**
+     * Parent tabs spec 4 across these windows: no parent tab id and no pane id is held by two windows, as each window's
+     * {@code windowLayout()} gives them, no tab is in two windows, and each of {@code tabs} is in one.
+     */
+    void assertNoIdInTwoWindows(List<Tab> tabs) {
+        var parentTabs = new ArrayList<ParentTabId>();
+        var panes = new ArrayList<GroupId>();
+        var held = new ArrayList<TabId>();
+        for (JasperWindow window : manager.windows()) {
+            WindowLayout layout = window.content().windowLayout();
+            held.addAll(layout.tabs());
+            switch (layout) {
+                case ParentTabs parents -> parents.parentTabs().forEach(parent -> {
+                    parentTabs.add(parent.id());
+                    parent.layout().groups().forEach(group -> panes.add(group.id()));
+                });
+                case PaneLayout pane -> pane.layout().groups().forEach(group -> panes.add(group.id()));
+            }
+        }
+        assertThat(parentTabs).as("parent tab ids").doesNotHaveDuplicates();
+        assertThat(panes).as("pane ids").doesNotHaveDuplicates();
+        assertThat(held).as("tabs").doesNotHaveDuplicates().containsAll(tabs.stream().map(Tab::id).toList());
+    }
 
     /** Closes every window, as Quit does. */
     @Override public void close() { manager.closeAll(); }

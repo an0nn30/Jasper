@@ -4,12 +4,15 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static dev.jasper.app.workspace.MovesFixture.moved;
 import static dev.jasper.app.workspace.MovesFixture.session;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.layout.Child;
 import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Layout;
+import dev.jasper.app.layout.Node;
 import dev.jasper.app.layout.Orientation;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
@@ -70,6 +73,48 @@ class BringBackTest {
             assertThat(windows.tabFacts()).isEqualTo(moved(moving, pane[0].id(), main[0].id()));
             for (int i = 0; i < moving.size(); i++) assertThat(session(moving.get(i))).isSameAs(sessions.get(i));
         });
+    }
+
+    /**
+     * Spec 5 and 11, workspace plan 7b Rulings 2: a pane popped out and brought back, twice, leaves its parent tab's layout
+     * as it was, its shape and its weights; only the pane's id is the one its pane window gave it.
+     */
+    @Test void twoRoundTripsLeaveTheLayoutAsItWas() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            content.split(Side.RIGHT);
+            content.workspace().resizeSplit(List.of(), List.of(0.3, 0.7));
+            content.split(Side.DOWN);
+            content.workspace().resizeSplit(List.of(1), List.of(0.6, 0.4));
+            Layout original = content.workspace().model();
+            Tab moving = content.selectedTab();
+            for (int round = 1; round <= 2; round++) {
+                ChildWindow pane = windows.manager.popOutPane(content, moving.group().orElseThrow()).orElseThrow();
+                assertThat(content.workspace().model().groups()).as("round %d: out", round).hasSize(2);
+                assertThat(windows.manager.bringBack(pane.content())).as("round %d: back", round).containsSame(windows.main());
+                assertThat(pane.closed()).isTrue();
+            }
+            assertSameShape(content.workspace().model().root(), original.root());
+        });
+        windows.launch();
+    }
+
+    /** The same orientations, weights (to rounding) and tabs, pane by pane; pane ids may differ. */
+    private static void assertSameShape(Node actual, Node expected) {
+        switch (expected) {
+            case Group group -> assertThat(actual).isInstanceOfSatisfying(Group.class, found -> {
+                assertThat(found.tabs()).isEqualTo(group.tabs());
+                assertThat(found.selected()).isEqualTo(group.selected());
+            });
+            case Split split -> assertThat(actual).isInstanceOfSatisfying(Split.class, found -> {
+                assertThat(found.orientation()).isEqualTo(split.orientation());
+                assertThat(found.children()).hasSameSizeAs(split.children());
+                for (int i = 0; i < split.children().size(); i++) {
+                    assertThat(found.children().get(i).weight()).isCloseTo(split.children().get(i).weight(), within(1e-9));
+                    assertSameShape(found.children().get(i).node(), split.children().get(i).node());
+                }
+            });
+        }
     }
 
     /** Spec 11: Bring Back into a maximized parent tab ends the maximize. */
@@ -374,6 +419,126 @@ class BringBackTest {
             assertThat(split).as("a split it builds later").isNotNull();
             assertThat(split.isOpaque()).isFalse();
             assertThat(split.getBackground()).isEqualTo(content.theme().surface());
+        });
+        windows.launch();
+    }
+
+    /**
+     * Parent tabs spec 4 (7b's final review): a listener pins the parent tab's second tab as its first moves. What arrived
+     * takes a new parent tab id and keeps to the full window's own pane; what stayed keeps its ids; and Pop Out Parent Tab
+     * gives the full window holding what arrived.
+     */
+    @Test void aParentTabThatPopsOutInPartLeavesNoIdInTwoWindows() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            content.newTab(HOME);
+            ParentTabId first = content.activeParentTab();
+            GroupId pane = content.workspace().model().activeGroup();
+            List<Tab> moving = content.workspace().tabs();
+            content.newParentTab(HOME);
+            Subscription[] pin = MovesFixture.pinWhenItLeaves(moving.get(0), moving.get(1));
+            ChildWindow full = windows.manager.popOutParentTab(content, first).orElseThrow();
+            assertThat(full.content().tabs()).as("what arrived").containsExactly(moving.get(0));
+            assertThat(full.content().activeParentTab()).as("under a new id").isNotEqualTo(first);
+            assertThat(content.parentTabOf(moving.get(1))).as("what stayed keeps its parent tab").contains(first);
+            assertThat(content.parentTabs().view(first).orElseThrow().model().groups()).extracting(Group::id).containsExactly(pane);
+            windows.assertNoIdInTwoWindows(content.tabs());
+            windows.assertNoIdInTwoWindows(moving);
+            pin[0].close();
+        });
+        windows.launch();
+    }
+
+    /** As above, the second tab's move failing: the failure propagates, and what arrived stays in the full window. */
+    @Test void aParentTabWhoseSecondTabFailsToMoveLeavesNoIdInTwoWindows() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            content.newTab(HOME);
+            ParentTabId first = content.activeParentTab();
+            List<Tab> moving = content.workspace().tabs();
+            content.newParentTab(HOME);
+            var refusal = MovesFixture.refuseItsMove(moving.get(1));
+            assertThatThrownBy(() -> windows.manager.popOutParentTab(content, first)).isSameAs(refusal);
+            assertThat(windows.manager.children()).singleElement().satisfies(full -> {
+                assertThat(full.content().tabs()).containsExactly(moving.get(0));
+                assertThat(full.content().activeParentTab()).isNotEqualTo(first);
+            });
+            assertThat(content.parentTabOf(moving.get(1))).contains(first);
+            windows.assertNoIdInTwoWindows(moving);
+        });
+        windows.launch();
+    }
+
+    /**
+     * Parent tabs spec 4 (7b's final review): a listener pins the pane window's second tab as its first comes back. What
+     * arrived keeps to the parent tab's own pane, the pane window keeps the rest and stays open, and Bring Back gives the
+     * window that took what arrived.
+     */
+    @Test void panesThatComeBackInPartLeaveNoIdInTwoWindows() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            GroupId left = content.workspace().model().activeGroup();
+            content.split(Side.RIGHT);
+            content.newTab(HOME);
+            ChildWindow pane = windows.manager.popOutPane(content, content.workspace().model().activeGroup()).orElseThrow();
+            List<Tab> moving = pane.content().tabs();
+            assertThat(moving).hasSize(2);
+            Subscription[] pin = MovesFixture.pinWhenItLeaves(moving.get(0), moving.get(1));
+            assertThat(windows.manager.bringBack(pane.content())).as("what arrived").containsSame(windows.main());
+            assertThat(content.workspace().model().groups()).extracting(Group::id).as("in the parent tab's own pane").containsExactly(left);
+            assertThat(content.tabs()).contains(moving.get(0)).doesNotContain(moving.get(1));
+            assertThat(pane.closed()).isFalse();
+            assertThat(pane.content().tabs()).containsExactly(moving.get(1));
+            windows.assertNoIdInTwoWindows(moving);
+            pin[0].close();
+        });
+        windows.launch();
+    }
+
+    /** As above, the second tab's move failing: the failure propagates, and the pane window keeps that tab. */
+    @Test void panesWhoseSecondTabFailsToComeBackLeaveNoIdInTwoWindows() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            content.split(Side.RIGHT);
+            content.newTab(HOME);
+            ChildWindow pane = windows.manager.popOutPane(content, content.workspace().model().activeGroup()).orElseThrow();
+            List<Tab> moving = pane.content().tabs();
+            var refusal = MovesFixture.refuseItsMove(moving.get(1));
+            assertThatThrownBy(() -> windows.manager.bringBack(pane.content())).isSameAs(refusal);
+            assertThat(content.tabs()).contains(moving.get(0));
+            assertThat(pane.content().tabs()).containsExactly(moving.get(1));
+            windows.assertNoIdInTwoWindows(moving);
+        });
+        windows.launch();
+    }
+
+    /**
+     * Parent tabs spec 4 (7b's final review): Move to Main Window with the shown parent tab moving in part. Its part that
+     * arrived joins the bar under a new id, shows, and the next parent tab follows it; the full window keeps the rest.
+     */
+    @Test void parentTabsThatMoveToTheMainWindowInPartLeaveNoIdInTwoWindows() throws Exception {
+        edt(() -> {
+            var main = windows.main().content();
+            ParentTabId m1 = main.activeParentTab();
+            ChildWindow full = windows.manager.openTerminalWindow(null).orElseThrow();
+            var content = full.content();
+            content.newTab(HOME);
+            ParentTabId p1 = content.activeParentTab();
+            List<Tab> split = content.workspace().tabs();
+            content.newParentTab(HOME);
+            ParentTabId p2 = content.activeParentTab();
+            content.selectParentTab(p1);
+            Subscription[] pin = MovesFixture.pinWhenItLeaves(split.get(0), split.get(1));
+            assertThat(windows.manager.moveToMainWindow(content)).containsSame(windows.main());
+            ParentTabId arrived = main.parentTabOf(split.get(0)).orElseThrow();
+            assertThat(arrived).as("a new id").isNotEqualTo(p1);
+            assertThat(((ParentTabs) main.windowLayout()).parentTabs()).extracting(ParentTab::id).containsExactly(m1, arrived, p2);
+            assertThat(main.activeParentTab()).as("what arrived of the parent tab the full window showed").isEqualTo(arrived);
+            assertThat(full.closed()).isFalse();
+            assertThat(content.tabs()).containsExactly(split.get(1));
+            windows.assertNoIdInTwoWindows(main.tabs());
+            windows.assertNoIdInTwoWindows(split);
+            pin[0].close();
         });
         windows.launch();
     }

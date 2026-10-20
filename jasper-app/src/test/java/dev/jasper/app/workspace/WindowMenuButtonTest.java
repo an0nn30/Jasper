@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.ToolbarMode;
+import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.testsupport.EnterpriseLook;
@@ -13,9 +14,15 @@ import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import javax.swing.AbstractButton;
 import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
 import javax.swing.JRootPane;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +32,32 @@ class WindowMenuButtonTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
     private static JComponent menuIn(Container parent) { return WindowTabsTest.named(parent, WindowMenuButton.NAME); }
+
+    /** The ⋮ at the trailing end of the row at the top of a child window's content (macOS under the system's title bar). */
+    private static JComponent rowMenu(WindowContent child) {
+        var row = (JComponent) ((BorderLayout) child.getLayout()).getLayoutComponent(BorderLayout.NORTH);
+        assertThat(row.getName()).isEqualTo("windowBar");
+        return (JComponent) ((BorderLayout) row.getLayout()).getLayoutComponent(BorderLayout.EAST);
+    }
+
+    /** What a click on a ⋮ asked its window to show: the menu, under the ⋮. */
+    private record Shown(JComponent invoker, JPopupMenu menu) { }
+
+    /** A menu's entries by their text. */
+    private static List<String> texts(JPopupMenu menu) {
+        return Arrays.stream(menu.getComponents()).map(item -> ((JMenuItem) item).getText()).toList();
+    }
+
+    /** A click on {@code button} opens {@code window}'s window menu at the button; headless, the window records it. */
+    private static void assertAClickOpensTheWindowMenu(WindowContent window, JComponent button, String... entries) {
+        var shown = new ArrayList<Shown>();
+        window.windowMenuPopup = (invoker, menu) -> shown.add(new Shown(invoker, menu.get()));
+        ((AbstractButton) button).doClick();
+        assertThat(shown).as("one menu").singleElement().satisfies(menu -> {
+            assertThat(menu.invoker()).as("at the ⋮").isSameAs(button);
+            assertThat(texts(menu.menu())).as("that window's menu").containsExactly(entries).isEqualTo(texts(window.windowMenu()));
+        });
+    }
 
     /**
      * Workspace plan 7b Rulings 16: the standard toolbar ends with the ⋮, after Settings, and it never gives way; on a
@@ -55,8 +88,8 @@ class WindowMenuButtonTest {
                 if (child != overflow)
                     assertThat(child.getX() + child.getWidth()).as("the overflow right before it").isLessThanOrEqualTo(overflow.getX());
             }
-            menu.doClick();
-            assertThat(menu.isShowing()).as("off screen, a click opens nothing").isFalse();
+            assertThat(menu.getAccessibleContext().getAccessibleName()).isEqualTo("View Options");
+            assertAClickOpensTheWindowMenu(owner, menu, "Pop Out Pane", "Pop Out Parent Tab");
         });
     }
 
@@ -72,8 +105,10 @@ class WindowMenuButtonTest {
                 assertThat(menu.getName()).isEqualTo("windowMenu");
                 assertThat(menu.getText()).as("an icon button").isNull();
                 assertThat(menu.getToolTipText()).isEqualTo("View Options");
+                assertThat(menu.getAccessibleContext().getAccessibleName()).isEqualTo("View Options");
                 owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
                 assertThat(menu.getText()).as("labels never reach it").isNull();
+                assertAClickOpensTheWindowMenu(owner, menu, "Pop Out Pane", "Pop Out Parent Tab");
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -91,11 +126,15 @@ class WindowMenuButtonTest {
                 LayoutTestSupport.layoutTree(root);
                 assertThat(menu.getX() + menu.getWidth()).as("8 from the window's edge").isEqualTo(bar.getWidth() - 8);
                 assertThat(root.getJMenuBar()).as("the screen menu bar's menus").isSameAs(child.menuBar());
+                assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
             }
         });
     }
 
-    /** Workspace plan 7b Rulings 17: under the classic title on macOS a child window's band ends with its ⋮. */
+    /**
+     * Workspace plan 7b Rulings 17 and 7b's final review: under the classic title on macOS a child window's band ends with
+     * its ⋮, the classic icon button the main window's classic row ends with.
+     */
     @Test void aChildWindowsMenuEndsTheClassicMacOsBand() throws Exception {
         edt(() -> {
             ThemeController themes = EnterpriseLook.controller(false);
@@ -105,11 +144,14 @@ class WindowMenuButtonTest {
                 var root = new JRootPane();
                 assertThat(WindowContent.mountChild(root, child, ClassicMacTitleTest.look(), true, title -> { })).isNull();
                 var menu = menuIn(child.titleBand());
-                assertThat(menu).isInstanceOf(WindowMenuButton.class);
+                assertThat(menu).isInstanceOf(ClassicToolbarButton.class);
+                assertThat(((JButton) menu).getText()).as("an icon button").isNull();
+                assertThat(menu.getAccessibleContext().getAccessibleName()).isEqualTo("View Options");
                 root.setSize(800, 500);
                 LayoutTestSupport.layoutTree(root);
                 assertThat(menu.getX() + menu.getWidth()).isEqualTo(800 - 8);
                 assertThat(menu.getY() * 2 + menu.getHeight()).as("centred on the band").isEqualTo(MacTitleBand.HEIGHT);
+                assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -128,6 +170,49 @@ class WindowMenuButtonTest {
             assertThat(row.getComponent(0)).as("the glue FlatLaf's title pane puts the title in").isInstanceOf(Box.Filler.class);
             assertThat(row.getComponent(1)).isInstanceOf(WindowMenuButton.class);
             assertThat(root.getContentPane()).as("its workspace alone").isSameAs(child);
+            assertAClickOpensTheWindowMenu(child, (JComponent) row.getComponent(1), "Pop Out Pane", "Move to Main Window");
+        });
+    }
+
+    /** 7b's final review: under the classic title on Windows a child window's title pane ends with the classic ⋮. */
+    @Test void underTheClassicTitleOnWindowsAChildWindowsMenuIsTheClassicButton() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var child = DesktopTestSupport.content(launcher(new ArrayDeque<>()), themes, ClassicWindowsTitleTest.look().chrome(), false,
+                    WindowRole.CHILD);
+                var root = new JRootPane();
+                root.setWindowDecorationStyle(JRootPane.FRAME); root.updateUI();
+                assertThat(WindowContent.mountChild(root, child, ClassicWindowsTitleTest.look(), false, title -> { })).isNull();
+                root.setSize(1000, 600);
+                for (int i = 0; i < 3; i++) LayoutTestSupport.layoutTree(root);
+                var row = root.getJMenuBar();
+                assertThat(row.getName()).isEqualTo("windowBar");
+                var menu = (JComponent) row.getComponent(1);
+                assertThat(menu).isInstanceOf(ClassicToolbarButton.class);
+                assertThat(menu.getName()).isEqualTo("windowMenu");
+                assertThat(menu.getSize()).as("IntelliJ's icon button, neither squashed nor stretched by the row")
+                    .isEqualTo(menu.getPreferredSize());
+                assertThat(menu.getAccessibleContext().getAccessibleName()).isEqualTo("View Options");
+                assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** Workspace plan 7b Rulings 17: under Compact a child window keeps its ⋮, a row of its own, on every platform. */
+    @Test void aChildWindowUnderCompactHasItsWindowMenu() throws Exception {
+        edt(() -> {
+            for (boolean macOs : new boolean[]{true, false}) {
+                var child = DesktopTestSupport.content(launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD,
+                    macOs, WindowRole.CHILD);
+                child.initializeViewMode(ViewMode.COMPACT);
+                var root = new JRootPane();
+                assertThat(WindowContent.mountChild(root, child, new WindowLook(WorkspaceChrome.STANDARD, macOs, false), macOs, title -> { }))
+                    .as("the system's title bar").isNull();
+                var menu = macOs ? rowMenu(child) : (JComponent) root.getJMenuBar().getComponent(1);
+                assertThat(menu).as("macOS %s", macOs).isInstanceOf(WindowMenuButton.class);
+                assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
+            }
         });
     }
 
@@ -142,7 +227,13 @@ class WindowMenuButtonTest {
             assertThat(root.getJMenuBar()).as("the screen menu bar's menus").isSameAs(child.menuBar());
             var row = (JComponent) ((BorderLayout) child.getLayout()).getLayoutComponent(BorderLayout.NORTH);
             assertThat(row.getName()).isEqualTo("windowBar");
-            assertThat(((BorderLayout) row.getLayout()).getLayoutComponent(BorderLayout.EAST)).isInstanceOf(WindowMenuButton.class);
+            var menu = (JComponent) ((BorderLayout) row.getLayout()).getLayoutComponent(BorderLayout.EAST);
+            assertThat(menu).isInstanceOf(WindowMenuButton.class);
+            root.setSize(800, 500);
+            LayoutTestSupport.layoutTree(root);
+            assertThat(menu.getX() + menu.getWidth()).as("8 from the window's edge, as every other placement")
+                .isEqualTo(row.getWidth() - 8);
+            assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
         });
     }
 }

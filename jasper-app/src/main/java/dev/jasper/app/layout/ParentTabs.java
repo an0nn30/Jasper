@@ -214,6 +214,25 @@ public final class ParentTabs implements WindowLayout {
     }
 
     /**
+     * Gives a parent tab a new id, in its place, with its layout, keeping the one that shows and the order of use: a
+     * parent tab that moved to another window in part takes a new id there, so no id is in two windows (parent tabs spec
+     * 4).
+     *
+     * @param id a parent tab of the window
+     * @param fresh its new id, one the window does not have
+     * @return the new parent tabs
+     * @throws IllegalArgumentException when the window does not have {@code id}, or has {@code fresh} already
+     */
+    public ParentTabs reid(ParentTabId id, ParentTabId fresh) {
+        Objects.requireNonNull(fresh, "fresh");
+        int at = requireParentTab(id);
+        var next = new ArrayList<>(parentTabs);
+        next.set(at, new ParentTab(fresh, parentTabs.get(at).layout()));
+        return new ParentTabs(next, active.equals(id) ? fresh : active,
+            recent.stream().map(used -> used.equals(id) ? fresh : used).toList());
+    }
+
+    /**
      * Removes a parent tab. When it showed, the one used most recently before it shows (Rulings 2 of plan 7a).
      *
      * @param id a parent tab of the window, not its only one
