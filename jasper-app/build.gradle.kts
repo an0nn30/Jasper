@@ -281,3 +281,5 @@ tasks.register<JavaExec>("pluginManagerStatesPreview") {
     args(layout.buildDirectory.dir("theme-surfaces9b/plugin-states").get().asFile.absolutePath)
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
 }
+
+apply(from = rootProject.file("gradle/cygwin.gradle"))

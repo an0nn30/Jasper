@@ -1,0 +1,56 @@
+// Opt-in Windows probes; the portable evidence checks are part of headless check.
+def probeClasses = layout.buildDirectory.dir('cygwin-probes/classes')
+def probeCompiler = tasks.register('compileCygwinProbes', JavaCompile) {
+    source(rootProject.fileTree('packaging/windows/cygwin/probe') { include('*.java') })
+    classpath = configurations.runtimeClasspath
+    destinationDirectory = probeClasses
+    javaCompiler = javaToolchains.compilerFor(java.toolchain)
+}
+def verify = tasks.register('verifyCygwinProbes', JavaExec) {
+    group = 'verification'
+    dependsOn(probeCompiler)
+    classpath = files(probeClasses, configurations.runtimeClasspath)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'ProbeAssertionsTest'
+    jvmArgs('-ea', '-Djava.awt.headless=true')
+}
+tasks.named('check') { dependsOn(verify) }
+
+def probeJar = tasks.register('cygwinProbeJar', Jar) {
+    dependsOn(probeCompiler)
+    from(probeClasses)
+    archiveFileName = 'probe.jar'
+    destinationDirectory = layout.buildDirectory.dir('cygwin-probes')
+}
+['Installer', 'Terminal'].each { kind ->
+    tasks.register("probeCygwin${kind}", JavaExec) {
+        group = 'verification'
+        description = "Runs the opt-in Windows Cygwin ${kind.toLowerCase()} probe in a NEW scratch directory."
+        dependsOn(probeJar)
+        classpath = files(probeClasses, configurations.runtimeClasspath)
+        javaLauncher = javaToolchains.launcherFor(java.toolchain)
+        mainClass = kind == 'Installer' ? 'InstallerProbe' : 'ConPtyProbe'
+        jvmArgs('-ea', '-Djava.awt.headless=true', '--enable-native-access=ALL-UNNAMED')
+        doFirst {
+            if (!System.getProperty('os.name').startsWith('Windows'))
+                throw new GradleException("Cygwin ${kind.toLowerCase()} probe requires Windows")
+            String root = providers.gradleProperty('jasper.cygwinProbeRoot').orNull
+            if (!root) throw new GradleException('Set -Pjasper.cygwinProbeRoot to an absolute, nonexistent scratch directory')
+            String input = kind == 'Installer' ? probeJar.get().archiveFile.get().asFile.absolutePath :
+                providers.gradleProperty('jasper.cygwinProbePayload').orNull
+            if (!input) throw new GradleException('Set -Pjasper.cygwinProbePayload to a verified offline payload directory')
+            setArgs([root, input, layout.buildDirectory.dir('cygwin-probes/reports').get().asFile.absolutePath])
+        }
+    }
+}
+
+tasks.register('verifyCygwinProbeRuntime', JavaExec) {
+    group = 'verification'
+    dependsOn(probeCompiler)
+    classpath = files(probeClasses, configurations.runtimeClasspath)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'ProbeAssertionsTest'
+    args('runtime')
+ }
+
+tasks.named('check') { dependsOn('verifyCygwinProbeRuntime') }
