@@ -223,11 +223,11 @@ public final class CoreSettings {
             SettingKind.string(CoreSettings::fontName, FONT_NAME), UiFontConfig.defaults().family())
         .label("UI font").keywords("font", "interface", "chrome", "typeface")
         .description("UI font for app chrome and plugin controls; updates live, independently of the terminal font.\n"
-            + "\"system\" uses the look's interface font: the platform's font, or a look's own face such as IBM Plex Sans\n"
-            + "under Enterprise. A missing named font falls back to that font.").build();
+            + "\"system\" uses the look's interface font: the platform's font, or a face the look brings, such as IBM Plex\n"
+            + "Sans. A missing named font falls back to that font.").build();
     public static final Setting<Float> UI_FONT_SIZE = Setting.of("ui.font.size", SettingKind.number(8, 32), UiFontConfig.defaults().size())
         .example(14f).label("UI font size").keywords("font", "interface", "size", "points")
-        .description("Omit size to keep the look's size: the platform's, or a look's own such as 12 under Enterprise.\n"
+        .description("Omit size to keep the look's size: the platform's, or one the look sets, such as 12.\n"
             + "Use 8-32 points, including fractions, when set.").build();
     public static final Setting<AppearanceMode> UI_APPEARANCE = Setting.of("ui.appearance", SettingKind.choice(List.of(
             Map.entry("system", AppearanceMode.SYSTEM), Map.entry("dark", AppearanceMode.DARK), Map.entry("light", AppearanceMode.LIGHT))),
@@ -241,15 +241,15 @@ public final class CoreSettings {
             SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
         .label("Dark theme").keywords("theme", "dark", "appearance", "slate cobalt", "imported")
         .description("The theme the Dark appearance shows: \"slate-cobalt\" (the default unless the look sets its own), the\n"
-            + "built-in \"ubuntu-yaru\" or a Catppuccin flavour such as \"catppuccin-mocha\", a plugin's theme such as \"enterprise\",\n"
-            + "or an imported theme's id, its file name in the themes folder without .json. A theme without a Dark variant is\n"
+            + "built-in \"ubuntu-yaru\" or a Catppuccin flavour such as \"catppuccin-mocha\", a theme a plugin ships, or an\n"
+            + "imported theme's id, its file name in the themes folder without .json. A theme without a Dark variant is\n"
             + "reported and Slate Cobalt is used. Switches live.").build();
     public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
             SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID)
         .label("Light theme").keywords("theme", "light", "appearance", "jasper meadow", "slate cobalt", "imported")
         .description("The theme the Light appearance shows: \"jasper-meadow\" (the default unless the look sets its own), the\n"
-            + "built-in \"slate-cobalt\", \"ubuntu-yaru\" or \"catppuccin-latte\", a plugin's theme such as \"enterprise\", or an\n"
-            + "imported theme's id, its file name in the themes folder without .json. A theme without a Light variant is\n"
+            + "built-in \"slate-cobalt\", \"ubuntu-yaru\" or \"catppuccin-latte\", a theme a plugin ships, or an imported\n"
+            + "theme's id, its file name in the themes folder without .json. A theme without a Light variant is\n"
             + "reported and Jasper Meadow Light is used. Switches live.").build();
     static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.";
     public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",
