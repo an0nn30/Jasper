@@ -31,6 +31,11 @@ class EnterpriseWorkstationMockTest {
     // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
     /** The device pixels by which the mocks' 34 px toolbar row is taller than the 28 px one. */
     static final int SHORTER = 2 * (34 - 28);
+    /**
+     * The device pixels the window's ⋮ (a 22 px icon button) and its 8 px gap take after Settings…, which the mocks predate
+     * (workspace plan 7b Rulings 20).
+     */
+    static final int WINDOW_MENU = 2 * (22 + 8);
 
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
@@ -124,7 +129,8 @@ class EnterpriseWorkstationMockTest {
         var field = mounted.field();
         // The field ends 6 before Settings…, whose label follows the face.
         // The user's 2026-10-18 direction: classic icon then label (Settings… gains its 16 px icon and 6 px gap).
-        MockProfile.fonts(what + "search field left", 2 * field.x + X, 2116 - 2 * (16 + 6), 4);
+        // Workspace plan 7b Rulings 20: the window's ⋮ after Settings… moves it and the field left of the mocks'.
+        MockProfile.fonts(what + "search field left", 2 * field.x + X, 2116 - 2 * (16 + 6) - WINDOW_MENU, 4);
         assertThat(2 * field.width).as(what + "search field width").isCloseTo(600, within(2));
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
         assertThat(2 * field.y + Y).as(what + "search field top").isCloseTo(122 - SHORTER / 2, within(2));
@@ -135,12 +141,12 @@ class EnterpriseWorkstationMockTest {
         // is disabled here (no settings opener), so its grey icon, faded at 0.42, lies about ΔE 19 from the row: the
         // render's crop reads ink from ΔE 12.
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
-        var rendered = MockProfile.inks(render, new Rectangle(2722 - 44 - X, 112 - Y, 160 + 44, 64 - SHORTER), 12, 12);
+        var rendered = MockProfile.inks(render, new Rectangle(2722 - 44 - WINDOW_MENU - X, 112 - Y, 160 + 44, 64 - SHORTER), 12, 12);
         assertThat(settings).as("the mock's Settings…").hasSize(1);
         // The user's 2026-10-18 direction: classic icon then label.
         assertThat(rendered).as(what + "Settings…'s icon, then its label").hasSize(2);
-        MockProfile.fonts(what + "Settings… starts", rendered.getLast().start() + X, settings.getFirst().start(), 4);
-        assertThat(rendered.getLast().end() + X).as(what + "Settings… ends").isCloseTo(settings.getFirst().end(), within(4));
+        MockProfile.fonts(what + "Settings… starts", rendered.getLast().start() + X + WINDOW_MENU, settings.getFirst().start(), 4);
+        assertThat(rendered.getLast().end() + X + WINDOW_MENU).as(what + "Settings… ends").isCloseTo(settings.getFirst().end(), within(4));
     }
 
     @ParameterizedTest @ValueSource(booleans = {false, true})

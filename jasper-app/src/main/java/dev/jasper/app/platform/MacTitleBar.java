@@ -41,6 +41,8 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     };
     private final PropertyChangeListener boundsChanged;
     private JComponent header;
+    /** The control at the row's trailing end; null while it has none. */
+    private JComponent trailing;
     private java.util.List<JComponent> dragSurfaces = java.util.List.of();
     private MouseAdapter nativeDrag;
     private final PropertyChangeListener headerChanged = event -> {
@@ -163,6 +165,19 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
             graphics.setColor(ThemeZone.color(component, role));
             graphics.fillRect(x, y, side(), side());
         }
+    }
+
+    /**
+     * A control at the trailing end of a title row without a header, such as a child window's ⋮ (parent tabs spec 6):
+     * centred on the row, clear of the window's edge, while the title stays centred on the window. Once only.
+     *
+     * @param component the control
+     */
+    public void setTrailing(JComponent component) {
+        if (closed || header != null || trailing != null) return;
+        trailing = java.util.Objects.requireNonNull(component, "component");
+        add(component);
+        revalidate(); repaint();
     }
 
     /** How this title row looks; a workspace header keeps its own. */
@@ -291,6 +306,13 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         int inset = Math.max(Math.min(safeInset(), getWidth()), right);
         int height = Math.min(title.getPreferredSize().height, getHeight());
         title.setBounds(inset, Math.max(0, Math.min(getHeight() - height, center - height / 2)), Math.max(0, getWidth() - 2 * inset), height);
+        // The trailing control fits within the title's inset, which is at least 120 px.
+        if (trailing != null) {
+            Dimension size = trailing.getPreferredSize();
+            int high = Math.min(size.height, getHeight());
+            trailing.setBounds(Math.max(0, getWidth() - right - size.width), Math.max(0, Math.min(getHeight() - high, center - high / 2)),
+                size.width, high);
+        }
     }
 
     public void setLight(boolean light) {

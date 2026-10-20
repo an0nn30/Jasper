@@ -250,7 +250,8 @@ class ClassicWindowsTitleTest {
 
     /**
      * Workspace tabs spec 6.3 under the classic title: a child window's FlatLaf title pane is 28 px in the toolbar's
-     * colour and holds the title alone, with no menu row, and in-window dialogs start below it.
+     * colour and holds the title and the window's ⋮ (parent tabs spec 6), with no menu row, and in-window dialogs start
+     * below it.
      */
     @Test void aChildWindowsTitlePaneIsTwentyEightInTheToolbarsColour() throws Exception {
         edt(() -> {
@@ -263,7 +264,8 @@ class ClassicWindowsTitleTest {
                 assertThat(WindowContent.mountChild(root, child, look(), false, title -> { })).isNull();
                 root.setSize(1000, 600);
                 for (int i = 0; i < 3; i++) LayoutTestSupport.layoutTree(root);
-                assertThat(root.getJMenuBar()).as("no menu row in a child window").isNull();
+                assertThat(root.getJMenuBar().getName()).as("no menu row: the title pane embeds the window's ⋮ alone (workspace plan 7b)")
+                    .isEqualTo("windowBar");
                 assertThat(child.classicWindowTitle()).as("FlatLaf's own title").isNull();
                 assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_HEIGHT)).isEqualTo(ClassicWindowTitle.BAR_HEIGHT);
                 assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_BACKGROUND)).isEqualTo(ThemeZone.color(null, SemanticColor.SURFACE_APP));

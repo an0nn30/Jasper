@@ -1089,6 +1089,9 @@ class WindowPanelsTest {
             var model = new Contributions();
             WindowContent owner = window();
             owner.connectContributions(model, UiState.inMemory());
+            // The window's ⋮ never gives way (workspace plan 7b Rulings 16 and 20), so the toolbar's side of the centred
+            // header outgrows the bare workspace; without the toolbar the workspace decides the window's minimum width.
+            owner.setToolbarMode(dev.jasper.app.config.ToolbarMode.HIDDEN);
             // The stripes show without any dock sync (a panel is only registered, none shows), so only their own
             // appearing can tell the window what its minimum is with them.
             List<Boolean> stripes = new ArrayList<>();

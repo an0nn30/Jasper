@@ -418,7 +418,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * macOS and a 28 px FlatLaf title pane in the toolbar's colour on Windows) showing the active tab's title, and no
      * header, toolbar or status bar. On macOS the screen menu bar shows the same menus as the main window's, built from
      * the same menu model, while the look keeps menus there ({@code screenMenuBar}); a child window never shows a menu
-     * row, and on Windows and Linux the title pane holds the title alone. Returns the unified bar, or null.
+     * row, and its title row ends with its ⋮ ({@code mountWindowMenu}): on Windows and Linux the title pane holds the
+     * title and the ⋮. Returns the unified bar, or null.
      */
     static MacTitleBar mountChild(JRootPane root, WindowContent content, WindowLook look, boolean screenMenuBar,
                                   Consumer<String> nativeTitle) {
@@ -443,9 +444,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         } else if (content.macOs && (compact || look.followThemeAppearance())) {
             content.onThemeChanged = theme -> dev.jasper.app.platform.MacAppearance.follow(root, theme.chrome().dark());
         } else if (!content.macOs) {
-            // FlatLaf's title pane holds the title alone, in the chrome's colours, as the main window's does; under a
-            // classic title it is 28 px, as the main window's (plan 14 Rulings 13), and in-window dialogs and overlays
-            // start below it (Rulings 19).
+            // FlatLaf's title pane holds the title and the window's ⋮ (mountWindowMenu), in the chrome's colours, as
+            // the main window's holds its title; under a classic title it is 28 px, as the main window's (plan 14
+            // Rulings 13), and in-window dialogs and overlays start below it (Rulings 19).
             if (classic) {
                 root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, ClassicWindowTitle.BAR_HEIGHT);
                 dev.jasper.app.platform.TitleInset.publish(root, () -> root.getContentPane() == null ? 0 : root.getContentPane().getY());
@@ -465,6 +466,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         content.onThemeChanged.accept(content.theme());
         content.followsThemeAppearance = bar == null && look.followThemeAppearance() && content.macOs;
         if (screenMenuBar) root.setJMenuBar(content.menuBar());
+        content.mountWindowMenu(root, bar);
         MacTitleBar titled = bar;
         content.onTitle = title -> {
             nativeTitle.accept(title);
@@ -475,6 +477,37 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             () -> new java.awt.Rectangle(0, 0, content.getWidth(), content.getHeight()));
         content.update();
         return bar;
+    }
+
+    /**
+     * Puts a child window's ⋮, its compact toolbar (parent tabs spec 6; workspace plan 7b Rulings 17), at the trailing end
+     * of its title row: the unified macOS bar's, or IntelliJ Classic's band on macOS. On Windows and Linux it ends a menu
+     * bar of its own after a glue, which FlatLaf's title pane embeds with the title in the glue, and which is a row under
+     * the system's title bar otherwise. On macOS under the system's title bar it ends a row at the top of the window.
+     */
+    private void mountWindowMenu(JRootPane root, MacTitleBar bar) {
+        var button = new WindowMenuButton(this);
+        if (bar != null) bar.setTrailing(button);
+        else if (titleBand != null) titleBand.setTrailing(button);
+        else if (!macOs) {
+            var row = new JMenuBar();
+            row.setName("windowBar");
+            row.add(Box.createHorizontalGlue());
+            row.add(button);
+            root.setJMenuBar(row);
+        } else {
+            var row = new JPanel(new BorderLayout());
+            row.setName("windowBar");
+            row.setOpaque(false);
+            row.add(button, BorderLayout.EAST);
+            add(row, BorderLayout.NORTH);
+        }
+    }
+
+    /** Opens {@link #windowMenu()} under {@code invoker}, a ⋮, while it shows (parent tabs spec 6). */
+    void showWindowMenu(JComponent invoker) {
+        if (closed || !invoker.isShowing()) return;
+        windowMenu().show(invoker, 0, invoker.getHeight());
     }
 
     /**
@@ -1302,11 +1335,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
+     * Whether Pop Out Tab may take {@code tab}: one the registry would move ({@code TabRegistry.movable}), in the main
+     * window or in a child window that has another tab (workspace plan 7b Rulings 7 and 8).
+     */
+    boolean mayPopOutTab(Tab tab) { return tab != null && (isMain() || tabCount() > 1) && registry.movable(tab); }
+
+    /**
      * Whether Pop Out Pane may take {@code pane}: one of this window's, holding tabs that may all move, in the main window
-     * or in a child window that has another pane (workspace plan 7b Rulings 7 and 8).
+     * or in a child window that has another pane (workspace plan 7b Rulings 7 and 8). A window no window manager opened
+     * moves nothing, so this and the other window menu checks are false there.
      */
     boolean mayPopOutPane(GroupId pane) {
-        if (closed || pane == null) return false;
+        if (closed || manager == null || pane == null) return false;
         WorkspaceView view = parentTabs.holding(pane).orElse(null);
         if (view == null || !(isMain() || paneCount() > 1)) return false;
         java.util.List<Tab> held = new ArrayList<>();
@@ -1321,20 +1361,26 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Whether Pop Out Parent Tab may take {@code parentTab}: one of this window's, holding tabs that may all move, in the
-     * main window or in a full window that has another parent tab; never a pane window's (parent tabs spec 5; workspace
-     * plan 7b Rulings 7 and 8).
+     * main window or in a full window that has another parent tab; never a pane window's, nor without a window manager
+     * (parent tabs spec 5; workspace plan 7b Rulings 7 and 8).
      */
     boolean mayPopOutParentTab(ParentTabId parentTab) {
-        if (closed || parentTab == null || origin != null) return false;
+        if (closed || manager == null || parentTab == null || origin != null) return false;
         Optional<WorkspaceView> view = parentTabs.view(parentTab);
         return view.isPresent() && (isMain() || parentTabs.count() > 1) && movable(view.get().tabs());
     }
 
-    /** Whether Bring Back may take this window's tabs: a pane window's, every one of which may move (Rulings 7). */
-    boolean mayBringBack() { return !closed && origin != null && movable(tabs()); }
+    /**
+     * Whether Bring Back may take this window's tabs: a pane window's that the window manager opened, every one of which
+     * may move (Rulings 7).
+     */
+    boolean mayBringBack() { return !closed && manager != null && origin != null && movable(tabs()); }
 
-    /** Whether Move to Main Window may take this window's tabs: a full window's, every one of which may move (Rulings 7). */
-    boolean mayMoveToMainWindow() { return !closed && !isMain() && origin == null && movable(tabs()); }
+    /**
+     * Whether Move to Main Window may take this window's tabs: a full window's that the window manager opened, every one
+     * of which may move (Rulings 7).
+     */
+    boolean mayMoveToMainWindow() { return !closed && manager != null && !isMain() && origin == null && movable(tabs()); }
 
     /**
      * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
@@ -1408,8 +1454,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (tab.kind() == Tab.Kind.TERMINAL)
             menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(tab); invoke(ActionId.RENAME_TAB); }));
         var popOut = tabMenuItem("Pop Out Tab", ActionId.POP_OUT_TAB, () -> popOutTab(tab));
-        // A child window's only tab stays: that window already is its own (workspace plan 7b Rulings 8).
-        popOut.setEnabled(isMain() || tabCount() > 1);
+        // A child window's only tab stays: that window already is its own (workspace plan 7b Rulings 8); so does a tab
+        // that cannot move (Rulings 7).
+        popOut.setEnabled(mayPopOutTab(tab));
         menu.add(popOut);
         for (ActionId id : windowMenuItems()) menu.add(windowItem(id, tab));
         menu.addSeparator();

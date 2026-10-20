@@ -127,6 +127,8 @@ final class WindowChrome {
         toolbar.add(new ToolbarSeparator());
         addButton(ActionId.FIND, "search");
         addButton(ActionId.OPEN_SETTINGS, "settings");
+        // The window's ⋮ ends the toolbar and never gives way to its overflow menu (parent tabs spec 6).
+        toolbar.add(new WindowMenuButton(owner));
         toolbar.finish();
     }
 
@@ -158,6 +160,20 @@ final class WindowChrome {
             if (event.getPropertyName().equals("enabled")) split.setEnabled(owner.action(ActionId.SPLIT_RIGHT).isEnabled());
         });
         toolbar.add(split);
+    }
+
+    /**
+     * The classic row's ⋮ (parent tabs spec 6; workspace plan 7b Rulings 16): a 22 px classic icon button in {@code into}
+     * that opens the window menu, with no label in any toolbar mode and no overflow entry.
+     */
+    void classicWindowMenu(WindowToolbar into) {
+        var button = new ClassicToolbarButton(null, WindowMenuButton.LABEL, false, AppIcons.semantic("more.vertical"));
+        button.setName(WindowMenuButton.NAME);
+        button.putClientProperty("keepLabel", false);
+        button.setText(null);
+        WindowToolbar.pin(button);
+        button.addActionListener(event -> owner.showWindowMenu(button));
+        into.add(button);
     }
 
     /** A toolbar rule; a classic one is a 1 px {@code border.window} line. */

@@ -5,8 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Origin;
+import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.lifecycle.Subscription;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.Action;
@@ -111,6 +115,50 @@ class PopOutCommandsTest {
     }
 
     /** Spec 5: the actions pop out the active tab, pane and parent tab, and bring back or move a whole window. */
+    /** Workspace plan 7b Rulings 7: a pinned tab cannot move, so Pop Out Tab is disabled for it, as a command and in its menu. */
+    @Test void aPinnedTabDisablesPopOutTab() throws Exception {
+        edt(() -> {
+            var main = windows.main().content();
+            Tab tab = main.selectedTab();
+            Subscription pin = tab.pin();
+            main.updateActions();
+            assertThat(main.action(ActionId.POP_OUT_TAB).isEnabled()).isFalse();
+            assertThat(main.commands().find("pop_out_tab").orElseThrow().action().isEnabled()).as("in the palette").isFalse();
+            assertThat(item(main.tabMenu(tab), "Pop Out Tab").isEnabled()).as("in its menu").isFalse();
+            pin.close();
+            main.updateActions();
+            assertThat(main.action(ActionId.POP_OUT_TAB).isEnabled()).isTrue();
+            assertThat(item(main.tabMenu(tab), "Pop Out Tab").isEnabled()).isTrue();
+        });
+        windows.launch();
+    }
+
+    /** A window no window manager opened cannot pop out, bring back or move, so every entry of its menus shows disabled. */
+    @Test void aWindowWithoutAManagerDisablesItsWindowMenuEntries() throws Exception {
+        edt(() -> {
+            var main = content(launcher(new ArrayDeque<>()));
+            main.split(Side.RIGHT);
+            var full = content(launcher(new ArrayDeque<>()), WindowRole.CHILD, HOME, false, () -> { });
+            full.newParentTab(HOME);
+            full.split(Side.RIGHT);
+            var pane = content(launcher(new ArrayDeque<>()), WindowRole.CHILD, null, true, () -> { });
+            pane.paneWindow(new Origin(ParentTabId.random(), GroupId.random(), Side.RIGHT, 0.5));
+            pane.newTab(HOME);
+            pane.split(Side.RIGHT);
+            assertThat(full.windowMenuItems())
+                .containsExactly(ActionId.POP_OUT_PANE, ActionId.POP_OUT_PARENT_TAB, ActionId.MOVE_TO_MAIN_WINDOW);
+            assertThat(pane.windowMenuItems()).containsExactly(ActionId.BRING_BACK, ActionId.POP_OUT_PANE);
+            for (var window : List.of(main, full, pane)) {
+                window.updateActions();
+                for (ActionId id : window.windowMenuItems()) assertThat(window.action(id).isEnabled()).as("%s", id).isFalse();
+                assertThat(window.windowMenu().getComponents()).as("the window menu").noneMatch(java.awt.Component::isEnabled);
+                var menu = window.tabMenu(window.selectedTab());
+                for (ActionId id : window.windowMenuItems()) assertThat(item(menu, id.label()).isEnabled()).as("its tab's %s", id).isFalse();
+            }
+            assertThat(item(full.parentTabMenu(full.selectedTab()), "Move to Main Window").isEnabled()).isFalse();
+        });
+    }
+
     @Test void theActionsPopOutBringBackAndMove() throws Exception {
         edt(() -> {
             var main = windows.main().content();

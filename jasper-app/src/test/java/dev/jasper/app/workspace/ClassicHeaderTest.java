@@ -107,7 +107,11 @@ class ClassicHeaderTest {
                 var classic = (ClassicHeader) window.owner().chrome().composition();
                 var settings = (ClassicToolbarButton) classic.trailing().getComponent(0);
                 int settingsRight = classic.trailing().getX() + settings.getX() + settings.getWidth();
-                assertThat(settingsRight).as("8 from the content edge").isEqualTo(1440 - 8);
+                // Workspace plan 7b Rulings 20: the window's ⋮, a 22 px icon button 8 after Settings…, ends the row.
+                var windowMenu = (ClassicToolbarButton) classic.trailing().getComponent(1);
+                assertThat(classic.trailing().getX() + windowMenu.getX() + windowMenu.getWidth()).as("8 from the content edge")
+                    .isEqualTo(1440 - 8);
+                assertThat(settingsRight).as("Settings… 8 before the ⋮").isEqualTo(1440 - 8 - 22 - 8);
                 var field = header.field();
                 assertThat(field.getSize()).isEqualTo(new Dimension(300, 22));
                 assertThat(field.getX() + field.getWidth()).as("6 before Settings…").isEqualTo(classic.trailing().getX() + settings.getX() - 6);

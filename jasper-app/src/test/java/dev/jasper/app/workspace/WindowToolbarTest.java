@@ -171,7 +171,32 @@ class WindowToolbarTest {
         }
         bar.setSize(bar.fullWidth(), 30); bar.doLayout();
         assertThat(bar.overflowButton().isVisible()).as("the full width shows everything").isFalse();
-        assertThat(bar.overflowButton().getIcon()).isSameAs(dev.jasper.app.platform.AppIcons.semantic("more.vertical"));
+        // Workspace plan 7b Spec issues 3: a horizontal ellipsis, so it never looks like a window's ⋮.
+        assertThat(bar.overflowButton().getIcon()).isSameAs(dev.jasper.app.platform.AppIcons.semantic("more"));
+    }
+
+    /** Workspace plan 7b Rulings 16: a pinned control ends the row, and the overflow button sits right before it. */
+    @Test void aPinnedControlEndsTheRowAfterTheOverflowButton() {
+        var bar = new WindowToolbar(() -> {});
+        var calls = new AtomicInteger();
+        for (int i = 0; i < 6; i++) button(bar, action("Plugin " + i, calls), i);
+        var pinned = new JButton("P");
+        pinned.setPreferredSize(new Dimension(24, 24));
+        WindowToolbar.pin(pinned);
+        bar.add(pinned);
+        bar.finish();
+        for (int width : new int[] {1000, 200, 120}) {
+            bar.setSize(width, 30); bar.doLayout();
+            var overflow = bar.overflowButton();
+            assertThat(overflow.isVisible()).as("overflowing at %d", width).isEqualTo(width < 1000);
+            assertThat(pinned.isVisible()).isTrue();
+            assertThat(pinned.getX() + pinned.getWidth()).as("the row's end at %d", width).isEqualTo(width - 8);
+            if (overflow.isVisible()) assertThat(overflow.getX() + overflow.getWidth() + 4).as("right before it").isEqualTo(pinned.getX());
+            for (var child : bar.getComponents())
+                if (child != pinned && child != overflow && child.isVisible() && child instanceof JButton)
+                    assertThat(child.getX() + child.getWidth()).isLessThanOrEqualTo(overflow.isVisible() ? overflow.getX() : pinned.getX());
+        }
+        assertThat(bar.overflowMenu().getComponentCount()).as("it never moves into the overflow menu").isEqualTo(6);
     }
 
     @Test void labelsGiveWayBeforeAnyControlOverflowsAndComeBackWithRoom() {

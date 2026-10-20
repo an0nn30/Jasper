@@ -130,7 +130,7 @@ final class WorkspaceActions {
                          SPLIT_DOWN -> true;
                     // A child window's only tab, pane and parent tab stay: that window already is its own (workspace
                     // plan 7b Rulings 8).
-                    case POP_OUT_TAB -> owner.selectedTab() != null && (owner.isMain() || owner.tabCount() > 1);
+                    case POP_OUT_TAB -> owner.mayPopOutTab(owner.selectedTab());
                     case POP_OUT_PANE -> owner.selectedTab() != null && owner.mayPopOutPane(owner.workspace().model().activeGroup());
                     case POP_OUT_PARENT_TAB -> owner.mayPopOutParentTab(owner.activeParentTab());
                     // A pane, a parent tab or a window moves whole or not at all (workspace plan 7b Rulings 7).

@@ -48,6 +48,21 @@ class MacTitleBandTest {
         assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameVibrantLight");
     }
 
+    /** Parent tabs spec 6: a child window's ⋮ sits at the band's trailing end, centred on it, and only one does. */
+    @Test void aTrailingControlSitsAtTheBandsTrailingEnd() {
+        var content = new JPanel();
+        var root = root(content);
+        var band = MacTitleBand.install(root, () -> FILL, () -> MacTitleDoubleClick.Action.ZOOM);
+        var control = new JPanel();
+        control.setPreferredSize(new java.awt.Dimension(22, 22));
+        band.setTrailing(control);
+        band.setTrailing(new JPanel());
+        assertThat(band.getComponents()).as("once only").containsExactly(control);
+        root.setSize(800, 600); layout(root);
+        assertThat(control.getBounds()).isEqualTo(new Rectangle(800 - 8 - 22, 3, 22, 22));
+        assertThat(band.getBounds()).isEqualTo(new Rectangle(0, 0, 800, MacTitleBand.HEIGHT));
+    }
+
     @Test void fullScreenRemovesTheBandAndLeavingRestoresIt() {
         var content = new JPanel();
         var root = root(content);

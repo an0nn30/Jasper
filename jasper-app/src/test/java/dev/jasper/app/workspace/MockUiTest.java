@@ -131,7 +131,8 @@ class MockUiTest {
             var owner = content(launcher(pending)); owner.setSize(400, 500); layoutTree(owner);
             var buttons = java.util.Arrays.stream(owner.toolbar().getComponents()).filter(JButton.class::isInstance)
                 .map(JButton.class::cast).toList();
-            assertThat(buttons).hasSize(7);
+            // Six buttons, the window's ⋮ (workspace plan 7b Rulings 20) and the overflow button.
+            assertThat(buttons).hasSize(8);
             assertThat(buttons.stream().filter(java.awt.Component::isVisible)).allSatisfy(button -> {
                 assertThat(button.getWidth()).isGreaterThanOrEqualTo(16);
                 assertThat(button.getX() + button.getWidth()).isLessThanOrEqualTo(400);

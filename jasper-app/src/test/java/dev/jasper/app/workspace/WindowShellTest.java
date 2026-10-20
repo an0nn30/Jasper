@@ -85,8 +85,11 @@ class WindowShellTest {
         });
     }
 
-    /** Workspace tabs spec 6.3: a title bar over the workspace alone; its menus only where macOS's screen menu bar shows them. */
-    @Test void aChildWindowMountsItsWorkspaceUnderItsTabsTitleAndNoMenuRow() throws Exception {
+    /**
+     * Workspace tabs spec 6.3 and parent tabs spec 6: a title bar ending in the window's ⋮ over the workspace alone; its
+     * menus only where macOS's screen menu bar shows them.
+     */
+    @Test void aChildWindowMountsItsWorkspaceUnderItsTabsTitleWithItsWindowMenuAndNoMenuRow() throws Exception {
         edt(() -> {
             var child = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), WindowRole.CHILD,
                 DesktopTestSupport.HOME, false, () -> { });
@@ -106,7 +109,9 @@ class WindowShellTest {
             var plain = new JRootPane();
             assertThat(WindowContent.mountChild(plain, other, new WindowLook(WorkspaceChrome.STANDARD, false, false), false, value -> { }))
                 .as("the system's title bar").isNull();
-            assertThat(plain.getJMenuBar()).as("no menu row in a child window").isNull();
+            // Workspace plan 7b Rulings 17: off macOS the root's menu bar is the window's ⋮ alone, after a glue.
+            if (System.getProperty("os.name").startsWith("Mac")) assertThat(plain.getJMenuBar()).as("no menu row in a child window").isNull();
+            else assertThat(plain.getJMenuBar().getName()).as("no menu row: the window's ⋮ alone").isEqualTo("windowBar");
             assertThat(plain.getContentPane()).as("its workspace alone").isSameAs(other);
             var compact = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), WindowRole.CHILD,
                 DesktopTestSupport.HOME, false, () -> { });

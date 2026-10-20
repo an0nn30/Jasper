@@ -25,15 +25,16 @@ import javax.swing.JButton;
 
 /**
  * The classic toolbar row (spec 10.3; the Workstation mocks): left-packed "New Session", "Split ▾" and "Maximize" in
- * separated groups, the plugin group, then "Search everywhere" with the palette's keycap and "Settings…" at the trailing
- * edge, over a 1 px {@code border.window} rule. The row is window chrome under a native title, not a title-bar zone.
+ * separated groups, the plugin group, then "Search everywhere" with the palette's keycap, "Settings…" and the window's ⋮
+ * at the trailing edge, over a 1 px {@code border.window} rule. The row is window chrome under a native title, not a
+ * title-bar zone.
  */
 final class ClassicHeader implements HeaderComposition {
     private final WindowToolbar trailing = new WindowToolbar(() -> { });
 
     private static int metric(DesignMetrics.Role role) { return UIScale.scale(FlatLafInstaller.installedKit().metrics().value(role)); }
 
-    /** The trailing group: "Settings…". */
+    /** The trailing group: "Settings…", then the window's ⋮ (parent tabs spec 6). */
     WindowToolbar trailing() { return trailing; }
 
     @Override public void build(WindowChrome chrome) {
@@ -51,6 +52,7 @@ final class ClassicHeader implements HeaderComposition {
         trailing.setOpaque(false);
         trailing.packLeading(new WindowToolbar.Leading(0, spacing.gap(), spacing.separatorGap(), spacing.separatorInset(), spacing.side()));
         chrome.classicButton(trailing, ActionId.OPEN_SETTINGS, "Settings…", "settings", 100);
+        chrome.classicWindowMenu(trailing);
         trailing.finish();
         chrome.header().add(trailing);
         refreshTheme(chrome.header());

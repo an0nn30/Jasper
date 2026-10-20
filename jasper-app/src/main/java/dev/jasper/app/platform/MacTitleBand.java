@@ -23,18 +23,23 @@ import javax.swing.SwingUtilities;
  * IntelliJ Classic's macOS title row (its {@code ToolbarServiceImpl} {@code setTransparentTitleBar}): the root takes
  * full-window content under a transparent title bar, and this band, in the toolbar's colour, sits above the content,
  * so macOS draws the traffic lights and the frame's own title over it. It is never a title-bar zone: it paints the
- * fill it is given, with no rule, no children and no text. Full screen removes it, so the content meets the screen's
+ * fill it is given, with no rule and no text, and holds no control but a child window's ⋮ at its trailing end (parent
+ * tabs spec 6). Full screen removes it, so the content meets the screen's
  * top edge, and leaving full screen restores it. A double-click acts as the system setting says
  * ({@link MacTitleDoubleClick}). EDT.
  */
 public final class MacTitleBand extends JComponent implements AutoCloseable {
     /** The band's height in points, unscaled because the native title bar does not scale. */
     public static final int HEIGHT = 28;
+    /** The trailing control's distance from the window's edge, in points, unscaled as the band is. */
+    private static final int TRAILING_GAP = 8;
 
     private final JRootPane root;
     private final Supplier<Color> fill;
     private final PropertyChangeListener fullScreenChanged;
     private boolean closed;
+    /** The control at the band's trailing end; null while it has none. */
+    private JComponent trailing;
 
     /**
      * Gives {@code root} the band above its current content pane, before the window is shown. On macOS it also
@@ -115,6 +120,27 @@ public final class MacTitleBand extends JComponent implements AutoCloseable {
             case MINIMIZE -> state | Frame.ICONIFIED;
             case NONE -> state;
         };
+    }
+
+    /**
+     * A control at the band's trailing end, such as a child window's ⋮ (parent tabs spec 6), centred on the band and
+     * 8 pt from the window's edge. Once only.
+     *
+     * @param component the control
+     */
+    public void setTrailing(JComponent component) {
+        if (closed || trailing != null) return;
+        trailing = Objects.requireNonNull(component, "component");
+        add(component);
+        revalidate();
+        repaint();
+    }
+
+    @Override public void doLayout() {
+        if (trailing == null) return;
+        Dimension size = trailing.getPreferredSize();
+        int height = Math.min(size.height, getHeight());
+        trailing.setBounds(Math.max(0, getWidth() - TRAILING_GAP - size.width), (getHeight() - height) / 2, size.width, height);
     }
 
     @Override public Dimension getPreferredSize() { return new Dimension(0, HEIGHT); }
