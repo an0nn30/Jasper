@@ -25,10 +25,10 @@
 **Spec:** [`docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md`](../specs/2026-10-15-jasper-enterprise-presentation-design.md).
 - Read its header amendment lines, including plan 15a's, and sections 3 (principle 3), 5.2, 5.3, 5.9, 9.1, 10.3, 10.7, 16.1, 16.2 and 19.1.
 - Plan 12's Rulings 3, 4 and 18 (`2026-10-18-enterprise-12-intellij-classic.md:134-196`) are what this plan revisits: the classic set, toolbar views drawing no chrome art, and activation not following a plugin's toggle.
-- Plan 15a (`2026-10-19-enterprise-15a-look-query.md`) is assumed merged. Its `PluginLook`, `HostedPresentation`, `FakePresentations` and SDK 0.18.2 are in place.
+- Plan 15a (`2026-10-19-enterprise-15a-look-query.md`) is complete on this branch (`f78bb0385..e858a4ecb`). Its `PluginLook` (with `Search`), `HostedPresentation`, `FakePresentations` and SDK 0.18.2 (with `Presentation.ToolbarSearch`) are in place.
 - Audit: `kit.md`, `surface.md`, `plugins.md` and `critic.md` under `/private/tmp/claude-501/-Users-RQ7RQVF-projects-moray/819d407c-0391-424d-8db0-7177b2d3e0e0/scratchpad/look-audit/` (`critic.md` items 3, 6 and 8).
 
-**Workspace:** the plan-15 worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-15`, branch `claude/enterprise-look-query`, at plan 15a's last commit. If the user asks for a separate branch, branch it from the commit that holds 15a. Run every command from the worktree root. Line numbers below are from `f78bb0385`, before 15a. 15a touched none of these files except `Projections.java`, `HostedUi.java` and the testkit's `FakePresentations.java`, so re-find those anchors; never edit around a missing anchor.
+**Workspace:** the plan-15 worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-15`, branch `claude/enterprise-look-query`, at plan 15a's last commit (`e858a4ecb`; `main` is still `f78bb0385`, so no merge is needed). If the user asks for a separate branch, branch it from the commit that holds 15a. Run every command from the worktree root. Line numbers below were re-verified at `e858a4ecb` (Execution notes, 2026-10-20). Of this plan's files, plan 15a touched `HostedUi.java`, `KitParser.java` (`CHROME` moved to `:63-64`), `Projections.java`, `KitParserTest.java`, `ProjectionsTest.java`, `ProjectionReadTest.java`, `PresentationConformanceTest.java`, `HostedPresentationTest.java`, the testkit's `FakePresentations.java`, the SDK's `Presentation.java` (new), `enterprise.kit.toml`, `migration.csv`, the spec, `docs/plugin-authoring.md`, `docs/plugin-ui.md` and `docs/STATUS.md`; the anchors below are its. Re-find every anchor by its quoted text before editing; never edit around a missing anchor.
 
 ## Before you start (refresh)
 
@@ -38,6 +38,7 @@ Do not rebase, merge or push. Never run bare `git stash`, and never run `./gradl
 grep -c 'public record Presentation(' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Presentation.java                   # 1: plan 15a is in
 grep -c 'record PluginLook(' jasper-app/src/main/java/dev/jasper/app/presentation/PluginLook.java                    # 1
 grep -c 'ACTIVATING_TOGGLE' jasper-app/src/main/java/dev/jasper/app/plugins/HostedUi.java                            # 0: Task 1 adds it
+grep -c 'ACTIVATING_SHOW' jasper-app/src/main/java/dev/jasper/app/contributions/Contributions.java                  # 0: Task 1 adds it
 grep -c 'toolbar_search' jasper-app/src/main/java/dev/jasper/app/presentation/KitParser.java                         # 0: Task 3 adds it
 ls /private/tmp/claude-501/-Users-RQ7RQVF-projects-moray/819d407c-0391-424d-8db0-7177b2d3e0e0/scratchpad/plan15-baseline/app | wc -l   # 11
 ```
@@ -62,7 +63,7 @@ If the baseline is missing, make it as plan 15a Task 1 Step 0 does, from `f78bb0
 
 **Code rules**
 - Javadoc doclint on jasper-ui, jasper-app and the testkit: every `{@link}` resolves, no raw `<`, `>`, `&` or `->` in comments, and new public members carry `@param` and `@return`.
-- `docs/design/theme-engine/migration.csv`: a new or edited `.java` file that `ThemeMigrationCoverageTest.CANDIDATE` matches gets a row in the same commit, its disposition beginning `New in Enterprise plan 15b Task N;`. Run `./gradlew :jasper-app:test --tests '*ThemeMigrationCoverageTest'` in each task that touches Java files.
+- `docs/design/theme-engine/migration.csv`: a new or renamed `.java` file under the scanned roots (`jasper-app`, `jasper-sdk`, `jasper-sdk-testkit`, `plugins`; not jasper-ui, fact 15) that `ThemeMigrationCoverageTest.CANDIDATE` matches gets a row in the same commit, its disposition beginning `New in Enterprise plan 15b Task N;`. Edited files already have their rows, which the test checks only for presence (Execution notes X10). The only expected new row is `LookIdentityTest`'s (Task 5). Run `./gradlew :jasper-app:test --tests '*ThemeMigrationCoverageTest'` in each task that touches Java files.
 - `ColourLiteralScanTest` stays green: colours come from roles. Source hygiene as AGENTS.md says.
 - Spec 3's strategies rule: `WorkspaceLook.Search` is read only by `WorkspaceChrome` (a `ProjectionReadTest` pattern), and `PluginLook.Search` only by `HostedPresentation` (plan 15a's pattern already covers it).
 - MVP rule: two convenience constructors are added on purpose, each meaning "the value every look but one has":
@@ -77,7 +78,7 @@ If the baseline is missing, make it as plan 15a Task 1 Step 0 does, from `f78bb0
 ## Review Focus
 
 1. **A plugin toggle action that hides its panel, or toggles it in another window, and a toggle action that shows through `PanelHost.show()`.** Hiding activates nothing and hands the focus back as a plain toggle does. A toggle or show for another panel, or one made later from `invokeLater`, a background executor or another action, stays plain. A `show()` inside the panel's own toggle action activates, as Transfers' does after its first open.
-   - Tests: Task 1 `HostedUiTest.aPanelsOwnToggleActionActivatesAndAnythingElseToggles`, `HostedUiTest.aShowInsideThePanelsOwnToggleActionActivates`, `WindowContributionsTest.anActivatingToggleThatHidesThePanelActivatesNothing` and `anActivatingShowUnderFlushFramesActivatesThePanel`.
+   - Tests: Task 1 `HostedUiTest.aPanelsOwnToggleActionActivatesAndAnythingElseToggles`, `HostedUiTest.aShowInsideThePanelsOwnToggleActionActivates`, `WindowPanelsTest.anActivatingToggleThatHidesThePanelActivatesNothing` and `anActivatingShowUnderFlushFramesActivatesThePanel` (Execution notes X1).
 2. **A narrow Enterprise window.** The search button stays in the trailing group beside Settings… while the leading toolbar gives way; it is never hidden by the field's collapse rule and never overlaps Settings….
    - Test: Task 4 `ClassicHeaderTest.underTheSearchIconANarrowWindowKeepsTheButtonBesideSettings`.
 3. **`window.toolbar = "icons_and_labels"` and `hidden` under the search icon.** Under labels the button stays icon-only, as IntelliJ's. Under `hidden` it goes with the row, and ⇧⌘P still opens the Run window.
@@ -89,49 +90,59 @@ If the baseline is missing, make it as plan 15a Task 1 Step 0 does, from `f78bb0
 
 ## Verified facts
 
-At `f78bb0385` unless stated. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unless they start with a module.
+Re-verified at `e858a4ecb` (plan 15a's tip) on 2026-10-20. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unless they start with a module.
 
 **Activation**
-1. `Contributions.PanelRequest.Op` has `SHOW, HIDE, TOGGLE, ACTIVATING_TOGGLE` (`contributions/Contributions.java:55-60`). Only the host-made `<id>.toggle` (`:158-160`) and Event Log (`application/NotificationsFeature.java:63-64`) send `ACTIVATING_TOGGLE`. `HostedUi`'s `PanelHost.show()` calls `PanelSite.show()` (`plugins/HostedUi.java:448`), whose runnable is `WindowContributions.showPanel(id)`, a plain `dock.show` (`workspace/WindowContributions.java:327`, `:210`).
-2. `HostedUi`'s action handler runs `handler.accept(new Context(...))` inside `containment.run(pluginId, "action " + spec.id(), …)` (`plugins/HostedUi.java:200-203`). `Panels.toggle` sends `Op.TOGGLE` (`:426-432`). `HostedUi` runs on the UI thread, and registration needs it (`guard`).
+1. `Contributions.PanelRequest.Op` has `SHOW, HIDE, TOGGLE, ACTIVATING_TOGGLE` (`contributions/Contributions.java:55-60`). Only the host-made `<id>.toggle` (`:158-160`) and Event Log (`application/NotificationsFeature.java:63-64`) send `ACTIVATING_TOGGLE`. `HostedUi`'s `PanelHost.show()` calls `PanelSite.show()` (`plugins/HostedUi.java:452`, in `host(site)` at `:440`), whose runnable is `WindowContributions.showPanel(id)`, a plain `dock.show` (`workspace/WindowContributions.java:327`, `:210`). `PanelEntry` has `toggleActionId()` (the declared action, or the host-made `<id>.toggle`) and `namedToggle()` (whether the plugin declared it; `contributions/PanelEntry.java:36-39`).
+2. `HostedUi`'s action handler runs `handler.accept(new Context(...))` inside `containment.run(pluginId, "action " + spec.id(), …)` (`plugins/HostedUi.java:206-207`, in `actions()` at `:196-216`). `Panels.toggle` sends `Op.TOGGLE` (`:430-436`, in `panels()` at `:413-438`); `register` requires a declared toggle action to be registered already (`requireOwn`, `:419`, `:160-163`). `HostedUi` runs on the UI thread, and registration needs it (`guard`).
 3. `WindowContributions.requested` maps `ACTIVATING_TOGGLE` to `toggleAndActivate` (`workspace/WindowContributions.java:183-191`). That method activates only when `dock.visible(id)` after the toggle, and sets `activating` only under flush frames (`:196-201`). `ToolWindowArea.activate` returns at once when not flush (`workspace/ToolWindowArea.java:491-492`).
-4. The bundled toggle actions that call `Panels.toggle`: `RemotePlugin.java:684`, `SftpUi.java:121`, `TunnelsUi.java:118`, `TransfersPanels.java:40` and `FileServerPlugin.java:158` (plan 12 STATUS, `docs/STATUS.md:224-227`). Transfers' is a show, not a toggle: `TransferUi.SHOW` (⌘⌥3, `TransferUi.java:43-45`) runs `TransfersPanels.show` (`RemotePlugin.java:181`), which calls `Panels.toggle` only while the window has no `PanelHost` yet and `host.show()` after that (`TransfersPanels.java:38-41`), so a second press keeps the panel open. `HostedUiTest.panelsAndRailReachTheModelWithContainedFactories` asserts a plain toggle's request (`jasper-app/src/test/java/dev/jasper/app/plugins/HostedUiTest.java:396-399`).
+4. The bundled toggle actions that call `Panels.toggle`: `RemotePlugin.java:684`, `SftpUi.java:121`, `TunnelsUi.java:118`, `TransfersPanels.java:40` and `FileServerPlugin.java:158` (plan 12 STATUS, `docs/STATUS.md:224-227`). Transfers' is a show, not a toggle: `TransferUi.SHOW` (⌘⌥3, `TransferUi.java:43-45`) runs `TransfersPanels.show` (`RemotePlugin.java:181`), which calls `Panels.toggle` only while the window has no `PanelHost` yet and `host.show()` after that (`TransfersPanels.java:38-41`), so a second press keeps the panel open. `HostedUiTest.panelsAndRailReachTheModelWithContainedFactories` asserts a plain toggle's request (`jasper-app/src/test/java/dev/jasper/app/plugins/HostedUiTest.java:396-399`), and builds a panel instance with a `PanelSite` over a random window id (`:381-384`).
+4a. Plan 12's window-level activation tests are in `WindowPanelsTest`, not `WindowContributionsTest` (which has no flush-framed fixture): `underFlushFramesTheViewToggleActivatesThePanelAndAPluginsToggleDoesNot` (`jasper-app/src/test/java/dev/jasper/app/workspace/WindowPanelsTest.java:124-141`) makes a flush window with `DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true), DockChromeTest.classicDock())`, connects a `Contributions`, and reads `owner.area().focusedSlot()` and `owner.area().content(slot)`; its `toggle(model, owner, id)` helper (`:47-49`) sends a plain `TOGGLE`. Its second test (`:147-172`) shows that a plain toggle still hands focus back.
 
 **Icons**
-5. The classic set is `BuiltInArtwork.ClassicHolder.CLASSIC`'s six names (`jasper-ui/src/main/java/dev/jasper/ui/icons/BuiltInArtwork.java:41-45`). `IconRegistry.chromeIcon(name, size, CLASSIC)` returns them, else the New UI chrome original, else the catalog (`IconRegistry.java:94-101,117-125`). So a full `CLASSIC` receiver would change the other names' art too.
+5. The classic set is `BuiltInArtwork.ClassicHolder.CLASSIC`'s six names (`jasper-ui/src/main/java/dev/jasper/ui/icons/BuiltInArtwork.java:40-45`; `classicChrome()` at `:57`). The holder decodes its SVGs when first touched (`pair` reads both files, `:64-66`), and its javadoc promises the start-up prewarm never decodes it. `IconRegistry.chromeIcon(name, size, CLASSIC)` (`IconRegistry.java:99-101`) returns them, else the New UI chrome original, else the catalog (`prepared`, `:117-133`); `chromeIcon(name, size)` is `:93` and `stripeIcon` `:108`. So a full `CLASSIC` receiver would change the other names' art too.
 6. Receivers today:
-   - `AppIcons.chromeReceiver` marks the window header (`workspace/WindowChrome.java:74`) and the status bar (`workspace/WorkspaceChrome.java:122`).
-   - `NativePreparation.paint` draws a built-in `PresentationIcon` by the nearest receiver's artwork, and outside every receiver by its ordinary artwork (`platform/AppIcons.java:251-268`).
+   - `AppIcons.chromeReceiver` marks the window header (`workspace/WindowChrome.java:74`, after `WindowHeader.java:40`'s NEW_UI mark), the stripes (`ToolStripe.java:96`, NEW_UI) and the status bar (`workspace/WorkspaceChrome.java:122`).
+   - `NativePreparation.paint` draws a built-in `PresentationIcon` or `SemanticIcon` by the nearest receiver's artwork, and outside every receiver by its ordinary artwork (`platform/AppIcons.java:247-272`, `paint` at `:258-266`).
    - The tool-window area is in no receiver.
-7. `ToolWindowHeader` shows each contributed action's `action.icon()`, under flush frames through `stripGlyph` (`workspace/ToolWindowHeader.java:219-235`, `:155-158`). Its constructors are at `:84` and `:95`. `ToolWindowArea` makes it at `:666`, and its constructors are at `:297` and `:307`. `WindowContent` makes the area at `:283` and knows `look().chromeArtwork()` (`:280`).
+   - `AppIcons.kitName(Icon)` (`:61-66`) and `stripeIcon` (`:105-121`) read a built-in name; a built-in `PresentationIcon` has a null `pathData()`.
+7. `ToolWindowHeader` shows each contributed action's `action.icon()`, under flush frames through `stripGlyph` (`workspace/ToolWindowHeader.java:219-236`, the icon at `:232`; `stripGlyph` at `:156-158`). Its constructors are the three-argument one at `:84` and the five-argument one at `:95`. `ToolWindowArea` makes it in `header(id, title)` at `:665-671`, and its constructors are the two-argument one at `:297` and the four-argument one at `:307`. `WindowContent` makes the area at `:283` and knows `look().chromeArtwork()` (`:280`; `look()` is the window's `WorkspaceChrome`).
 8. Kit-drawn icons:
-   - A borrowed kit header's host actions carry `PanelHostHeader.Artwork(name, pathData)`; a null path means canonical art (`jasper-ui/src/main/java/dev/jasper/ui/swing/PanelHostHeader.java:44-60`). `Buttons.HostArtwork.icon` paints them with `icons.panel(name, …)` (`Buttons.java:35-41`).
-   - The panel's own header controls have `button.panel = true` (`PanelHeaders.java:254,260,306`).
-   - A button's named icon is chosen in `ButtonControl.refresh` (`Buttons.java:84-92`). `KitView.toolbarStrip(boolean)` (`KitView.java:411-418`) marks a toolbar view, and `WindowChrome` sets it when it mounts one (`workspace/WindowChrome.java:328-331`).
+   - A borrowed kit header's host actions carry `PanelHostHeader.Artwork(name, pathData)`; a null path means canonical art (`jasper-ui/src/main/java/dev/jasper/ui/swing/PanelHostHeader.java:44-47`, `Action` at `:57`). `ToolWindowArea.hostHeader` gives a built-in `PresentationIcon` `Artwork(name, null)` in every frame and an app `SemanticIcon` one only on a header strip (`ToolWindowArea.java:627-634`). `Buttons.HostArtwork.icon` paints them with `icons.panel(name, …)` (`Buttons.java:17-43`, `icon` at `:37-42`), and `ButtonControl.refresh` sets it at `:84`.
+   - `ToolWindowArea.mountHeader` calls `view.setPanelHostActions` at `:586` (Options `more`, Hide `remove` or `collapse`) and clears it on release at `:612`.
+   - The panel's own header controls have `button.panel = true` (`PanelHeaders.java:254,260,306`; a header `MenuControl`'s `main.panel` at `:308`). **`button.panel` is also set on a document bar's buttons and menus in a panel body** (`ViewReconciler.java:305,307`, with `documentBar = true`), so "in the panel header" is `panel && !documentBar`.
+   - A button's named icon is chosen in `ButtonControl.refresh` (`Buttons.java:74-100`, the named branch at `:85-92`). `KitView.toolbarStrip(boolean)` (`KitView.java:406-418`) marks a toolbar view, and `WindowChrome` sets it when it mounts one (`workspace/WindowChrome.java:328-331`). A `MenuButton` sets its icon in `Menus.MenuControl` (`Menus.java:216-228`).
    - `IconRegistry.PreparedIcon.icon(GeneratedTheme, SemanticColor)` exists (`IconRegistry.java:147`).
-9. `ClassicHeaderTest.assertPaintsClassicAdd` compares a button's centre with `new IconRegistry().chromeIcon("add", size, CLASSIC).icon(theme, TEXT_PRIMARY)` pixel for pixel (`jasper-app/src/test/java/dev/jasper/app/workspace/ClassicHeaderTest.java:289-311`). It is the model for every icon test here.
+   - The jasper-ui swing tests build a view with `dev.jasper.ui.testsupport.KitFixtures.context()`, `KitFixtures.render(view, w, h, 1)` and `Edt.run`, as `KitViewToolbarStripTest` does (`jasper-ui/src/test/java/dev/jasper/ui/swing/KitViewToolbarStripTest.java:21-27`).
+9. `ClassicHeaderTest.assertPaintsClassicAdd` compares a button's centre with `new IconRegistry().chromeIcon("add", size, CLASSIC).icon(theme, TEXT_PRIMARY)` pixel for pixel (`jasper-app/src/test/java/dev/jasper/app/workspace/ClassicHeaderTest.java:289-311`). It is the model for every icon test here. `enterprisesDefaultToolbarIsClassicIconSquares` (`:316-337`) mounts a plain `JPanel` toolbar view; the model for mounting a real `KitView` toolbar view is `WindowToolbarViewsTest.aKitViewIsPresentedAsAToolbarStrip` (`jasper-app/src/test/java/dev/jasper/app/workspace/WindowToolbarViewsTest.java:195-210`).
 
 **The search field**
 10. The classic header:
-    - `ClassicHeader.build` fills the leading toolbar and puts "Settings…" (`ActionId.OPEN_SETTINGS`, icon `settings`, priority 100) in its trailing `WindowToolbar` (`workspace/ClassicHeader.java:39-56`).
-    - `layout` places the trailing group at the right, the field before it, and the toolbar before the field; the field collapses below `searchMinimum` (`:64-88`).
+    - `ClassicHeader` has no declared constructor. `build` fills the leading toolbar and puts "Settings…" (`ActionId.OPEN_SETTINGS`, icon `settings`, priority 100) in its trailing `WindowToolbar` (`workspace/ClassicHeader.java:39-57`, Settings… at `:53`).
+    - `layout` places the trailing group at the right, the field before it, and the toolbar before the field; the field collapses below `searchMinimum` (`:68-88`).
     - The field's text is the mocks' "Search everywhere" (`:99`).
-    - `WindowChrome.classicButton(into, id, label, icon, priority)` makes a `ClassicToolbarButton` (`workspace/WindowChrome.java:136-141`).
+    - `WindowChrome.classicButton(into, id, label, icon, priority)` makes a `ClassicToolbarButton` (`workspace/WindowChrome.java:136-141`), and `WindowChrome.composition()` returns the header composition (`:176`).
     - `AppIcons.icon("search")` is the `SEARCH` meaning (`platform/AppIcons.java:25`), which a `CLASSIC` receiver draws as IntelliJ's classic find icon (fact 5).
     - The field runs `owner.action(ActionId.COMMAND_PALETTE)` (`WindowChrome.java:70-72`).
-11. `WindowToolbar.applyLabels` sets a button's text to its `label` property, or null, unless `keepLabel` is `FALSE` (`workspace/WindowToolbar.java:199-210`). A `ClassicToolbarButton` whose text is null is a 22 px icon square (`ClassicToolbarButton.java:52-53`). Its tooltip is its label (`:40`). `TitleSearchField` computes its tooltip on demand with `composition.searchTooltip(…, shortcutText())` (`TitleSearchField.java:93`). `WindowContent.paletteShortcut()` is at `:808`.
+    - `WorkspaceChrome.header()` makes `new ClassicHeader()` at `workspace/WorkspaceChrome.java:103`; its private constructor is `:39-54`, `STANDARD` `:17-19`, `of` `:74-87`, `equals` and `hashCode` `:130-136`. The only other construction is `WindowPairsTest.java:93`.
+11. `WindowToolbar.applyLabels` sets a button's text to its `label` property, or null, unless `keepLabel` is `FALSE` (`workspace/WindowToolbar.java:200-211`). A `ClassicToolbarButton` whose text is null is a 22 px icon square (`ClassicToolbarButton.java:53-54`). Its tooltip is its label (`:39`). `TitleSearchField` computes its tooltip on demand with `composition.searchTooltip(…, shortcutText())` (`TitleSearchField.java:93`). `WindowContent.paletteShortcut()` is at `:808`.
 12. The model:
-    - `ChromeSpec` is a ten-component record (`presentation/ChromeSpec.java:21-22`), and its constraint is at `:63-64`. `new ChromeSpec(` appears in `ChromeSpec.java` (2), `KitParser.java:309`, `KitParserTest`, `ProjectionsTest` (2), `testsupport/EnterpriseLook.java` (2) and `ChromeRenderTest.java:72`.
-    - `KitParser.CHROME` lists the keys (`presentation/KitParser.java:51-52`), and the parser's constraint is at `:307-308`.
-    - `WorkspaceLook` has eight components (`presentation/WorkspaceLook.java:18-19`) and about 12 test constructions.
-    - `chrome-covering-array.tsv` has nine columns and holds `icons` at `classic` (`ChromeRenderTest.java:64-77`).
-    - `PresentationConformanceTest.KEYS` lists `chrome/...` (`jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java:30-31`).
+    - `ChromeSpec` is a ten-component record (`presentation/ChromeSpec.java:21-22`; its javadoc says "The ten chrome variant points … eight two-valued points", `:6`), and its constraint is at `:63-64`. `new ChromeSpec(` appears in `ChromeSpec.java` (2, `:46`, `:52`), `KitParser.java:321`, `KitParserTest.java:157`, `ProjectionsTest.java:119,168`, `testsupport/EnterpriseLook.java:22,37` and `ChromeRenderTest.java:70`.
+    - `KitParser.CHROME` lists the keys (`presentation/KitParser.java:63-64`); `chrome(table, base)` is `:306-322`, its `menu_bar` constraint `:319-320`.
+    - `KitParserTest.everyChromeAndControlPointTakesBothItsValues` (`:206-231`) loops over the control points only; its chrome lines name `title_bar` and `menu_bar`. `everyInvalidKitGivesOneMessageNamingTheKey` is `:249`.
+    - `WorkspaceLook` has eight components (`presentation/WorkspaceLook.java:17-18`) and 12 test constructions; `Projections.of` builds it at `:99-106` and `PluginLook` at `:115-118` (with `PluginLook.Search.FIELD`); `Projections.fallback` builds both at `:150-159`.
+    - `ProjectionsTest.thePluginLookIsTheLookOnEachPlatform` (`:218-232`) expects `PluginLook.Search.FIELD` for `EnterpriseLook.CHROME` on macOS, Windows and Linux.
+    - `chrome-covering-array.tsv` has nine columns and holds `icons` at `classic` (`ChromeRenderTest.java:63-77`, `Icons.CLASSIC` at `:74`).
+    - `PresentationConformanceTest.KEYS` lists `chrome/...` (`jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java:29-31`).
+    - `HostedPresentationTest.enterpriseIsReportedFromItsKitAndItsDefaults` expects `Presentation.ToolbarSearch.FIELD` (`:25-31`). `FakePresentations.CLASSIC` takes `ToolbarSearch.FIELD` and its javadoc already says "Enterprise's on Linux" (`jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakePresentations.java:16-19`); no plugin test reads its `toolbarSearch`.
 13. The mocks:
-    - `EnterpriseWorkstationMockTest` asserts the field (x 2116-2715 and y 122-165 in the mock; `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseWorkstationMockTest.java:123-131`).
-    - `tools/visual/pairs.json`'s `chrome-toolbar-light` and `chrome-toolbar-dark` (`:893-940`) crop the toolbar row, field included, at a 0.30 floor (measured 0.581 and 0.577 at plan 14).
+    - `EnterpriseWorkstationMockTest.theToolbarRowIsTheMocks` asserts the field (x 2116-2715 and y 122-165 in the mock; `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseWorkstationMockTest.java:123-131`) and then crops Settings… from 44 mock px left of x 2722 (`:132-143`). The field's bounds come from `EnterpriseMenuRowMockTest.Mounted.field`, read before the window closes (`EnterpriseMenuRowMockTest.java:61`, `:83-87`).
+    - `tools/visual/pairs.json`'s `chrome-toolbar-light` and `chrome-toolbar-dark` (`:893-938`) crop the toolbar row, field included, at a 0.30 floor (0.581 and 0.577 in `plan15-baseline/pairs.txt`).
+    - The worktree's `jasper-ui/build/gallery` holds only `dark-1x` and `light-1x` now: the seven `enterprise-light-2x` pairs need `:jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryScale=2` before `check_pairs.py`.
 
 **Identity**
-14. No production class in jasper-app or jasper-ui names Enterprise outside comments (critic.md "OK"). The architecture tests read the app and ui jars through `System.getProperty("jasper.appJar")` and `"jasper.uiJar"` with `StaticDefaultTest.classFiles(Path, int)` (`architecture/VariantReadTest.java:37-41`, `StaticDefaultTest.java:160-166`). The staged plugins are under `System.getProperty("jasper.stagedPlugins")/<id>/`, one folder per plugin, each holding its own jar and its bundled libraries (`jasper-app/build.gradle.kts:91`).
+14. No production class in jasper-app, jasper-ui or a bundled plugin other than Enterprise names Enterprise outside comments (checked at `e858a4ecb`: every mention in their `src/main/java` is a comment). The architecture tests read the app and ui jars through `System.getProperty("jasper.appJar")` and `"jasper.uiJar"` with `StaticDefaultTest.classFiles(Path, int)` (`architecture/VariantReadTest.java:37-38`, `StaticDefaultTest.java:160-167`, package-private in `architecture`). `ProjectionReadTest.Scanned` (`:53-59`) is package-private in `architecture` too. `ManagedVaultLoadingTest.jars(Path)` (`plugins/ManagedVaultLoadingTest.java:109`) is package-private in `plugins`. The staged plugins are under `System.getProperty("jasper.stagedPlugins")/<id>/`, one folder per plugin id (`dev.jasper.enterprise`, `dev.jasper.remote`, …), each holding its own jar and its bundled libraries (`jasper-app/build.gradle.kts:91`).
+15. `ThemeMigrationCoverageTest` scans `jasper-app/src`, `jasper-sdk/src`, `jasper-sdk-testkit/src` and every `plugins/*/src`, not jasper-ui (`appearance/ThemeMigrationCoverageTest.java:64-66`). Its `CANDIDATE` matches `new ArrayList` (`new [A-Z]\w*List\b`), so a new test that builds an `ArrayList` needs a row.
 
 ## Rulings
 
@@ -170,20 +181,20 @@ Each ruling is what was decided, why, and the cost if it is wrong.
 
 **Files:**
 - Modify:
-  - `jasper-app/src/main/java/dev/jasper/app/plugins/HostedUi.java:193-212,415-450`
+  - `jasper-app/src/main/java/dev/jasper/app/plugins/HostedUi.java:196-216,413-462` (`actions()`, `panels()` and `host(site)`)
   - `jasper-app/src/main/java/dev/jasper/app/contributions/Contributions.java:55-60`
   - `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContributions.java:183-210`
   - `jasper-app/src/test/java/dev/jasper/app/plugins/HostedUiTest.java`
-  - `jasper-app/src/test/java/dev/jasper/app/workspace/WindowContributionsTest.java`
-  - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Panels.java:20-30`
-  - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelSpec.java:15-17`
+  - `jasper-app/src/test/java/dev/jasper/app/workspace/WindowPanelsTest.java` (beside plan 12's activation tests, `:124-172`; Execution notes X1)
+  - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Panels.java:19-28`
+  - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelSpec.java:16-18`
   - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelHost.java:23`
 
 **Interfaces:**
 - Produces:
-  - in `HostedUi`, a private `String running` field (the id of this plugin's action whose handler is running on the UI thread, or null). The action handler sets it before `handler.accept` and restores the previous value in `finally`. `Panels.toggle` sends `Op.ACTIVATING_TOGGLE` when `running` equals the toggled panel's `PanelEntry.toggleActionId()`, else `Op.TOGGLE`.
+  - in `HostedUi`, a private `String running` field (the id of this plugin's action whose handler is running on the UI thread, or null). The action handler sets it before `handler.accept` and restores the previous value in `finally`. `Panels.toggle` sends `Op.ACTIVATING_TOGGLE` when the toggled panel's `PanelEntry.namedToggle()` is true and `running` equals its `toggleActionId()`, else `Op.TOGGLE` (Execution notes X2).
   - `Contributions.PanelRequest.Op.ACTIVATING_SHOW`, javadoc "A show by the panel's own toggle action: the panel becomes the active tool window under flush frames (plan 15b Rulings 1)."
-  - `HostedUi.host(site)` becomes `host(site, spec)`, called from the panel factory where the `PanelSpec` is known. Its `show()` sends `model.requestPanel(new Contributions.PanelRequest(site.windowId(), spec.id(), Op.ACTIVATING_SHOW))` when the host is not closed and `running` equals `spec.toggleActionId().orElse(null)`; otherwise it calls `site.show()` as today.
+  - `HostedUi.host(site)` becomes `host(site, spec)`, called from the panel factory where the `PanelSpec` is known. Its `show()` keeps `requireUi("show")`, then sends `model.requestPanel(new Contributions.PanelRequest(site.windowId(), spec.id(), Op.ACTIVATING_SHOW))` when the host is not closed and `spec.toggleActionId()` is present and equal to `running`; otherwise it calls `site.show()` as today.
   - `WindowContributions.requested` maps `ACTIVATING_SHOW` to a private `showAndActivate(id)`: like `toggleAndActivate`, it sets `activating` only under flush frames around `dock.show(id)`, then calls `owner.area().activate(id)` when `dock.visible(id)`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -210,25 +221,25 @@ In `HostedUiTest`:
 
 Qualify `PanelSpec`, `Anchor` and `WindowHandle` as the file does.
 
-Also add `aShowInsideThePanelsOwnToggleActionActivates`: register a panel `dev.x.tool.queue` with `withToggleActionId("dev.x.tool.queue.show")` whose factory keeps its `PanelHost`; build it in a window, as the file's existing panel-host tests do; register `dev.x.tool.queue.show`, whose handler calls the kept host's `show()`, and `dev.x.tool.queue.other`, whose handler does the same. Invoking the first records one request with `Op.ACTIVATING_SHOW` for that window and panel. Invoking the second, and calling `show()` outside any action, record no request: they go straight to the site, as today.
+Also add `aShowInsideThePanelsOwnToggleActionActivates`: first register `dev.x.tool.queue.show` and `dev.x.tool.queue.other`, each of whose handlers calls `hosts[0].show()` on a one-element `PanelHost[] hosts` (`register` refuses a toggle action that is not registered yet, fact 2); then register a panel `dev.x.tool.queue` with `withToggleActionId("dev.x.tool.queue.show")` whose factory stores its `PanelHost` in `hosts[0]`; build it in a window with `entry.factory().apply(site)` over a `PanelSite` that records its `show` runnable, as `panelsAndRailReachTheModelWithContainedFactories` does (fact 4). Invoking the first records one request with `Op.ACTIVATING_SHOW` for that window and panel. Invoking the second, and calling `show()` outside any action, record no request: they go straight to the site, as today.
 
-In `WindowContributionsTest`, using the file's window fixture:
+In `WindowPanelsTest`, using plan 12's flush fixture (fact 4a: `DockChromeTest.classicDock()` for flush frames, the default `DesktopTestSupport.content(launcher)` for standard ones), sending each request with `model.requestPanel(new Contributions.PanelRequest(owner.id(), id, op))`:
 - `aPanelsActivatingToggleUnderFlushFramesActivatesIt`: a flush-framed window gets `ACTIVATING_TOGGLE` for a hidden panel. The panel shows, and the area marks it focused; read `ToolWindowArea`'s focused slot as the plan-12 activation tests do.
 - `anActivatingToggleThatHidesThePanelActivatesNothing`: the same request for a showing panel hides it, and no slot is focused.
 - `underStandardFramesAnActivatingToggleIsAPlainToggle`: under standard frames the request toggles, and nothing is focused.
 - `anActivatingShowUnderFlushFramesActivatesThePanel`: `ACTIVATING_SHOW` for a hidden panel shows and focuses it; sent again while it shows, it stays shown and focused (a show never hides).
 - `underStandardFramesAnActivatingShowIsAPlainShow`: the panel shows, and nothing is focused.
 
-Copy the plan-12 tests' way of reading the focused slot.
+Copy the plan-12 tests' way of reading the focused slot (`owner.area().focusedSlot()`, and `owner.area().focusMoved(null)` to clear it between steps).
 
-Run: `./gradlew :jasper-app:test --tests '*HostedUiTest' --tests '*WindowContributionsTest'`
-Expected: FAIL to compile (`Op.ACTIVATING_SHOW` does not exist). With the constant alone, `aPanelsOwnToggleActionActivatesAndAnythingElseToggles` would fail on `TOGGLE` first, and the three `ACTIVATING_TOGGLE` cases in `WindowContributionsTest` pass already, since the window handles that op; keep them as the guard.
+Run: `./gradlew :jasper-app:test --tests '*HostedUiTest' --tests '*WindowPanelsTest'`
+Expected: FAIL to compile (`Op.ACTIVATING_SHOW` does not exist). With the constant alone, `aPanelsOwnToggleActionActivatesAndAnythingElseToggles` would fail on `TOGGLE` first, and the three `ACTIVATING_TOGGLE` cases in `WindowPanelsTest` pass already, since the window handles that op; keep them as the guard.
 
 - [ ] **Step 2: Implement**
 
 `HostedUi`:
 - the action handler becomes `containment.run(pluginId, "action " + spec.id(), () -> { String previous = running; running = spec.id(); try { handler.accept(...); } finally { running = previous; } })`;
-- `toggle` keeps the `PanelEntry` its existing `noneMatch` check finds, and sends `ACTIVATING_TOGGLE` when `running` equals that entry's `toggleActionId()`, else `TOGGLE`.
+- `toggle` keeps the `PanelEntry` its existing `noneMatch` check finds (as a `filter(...).findFirst()`), and sends `ACTIVATING_TOGGLE` when that entry's `namedToggle()` is true and `running` equals its `toggleActionId()`, else `TOGGLE`.
 - `host(site, spec)` and its `show()` as in Interfaces.
 
 `Contributions.PanelRequest.Op.ACTIVATING_SHOW` and `WindowContributions.showAndActivate` as in Interfaces; `ACTIVATING_TOGGLE`'s javadoc stays.
@@ -238,7 +249,7 @@ Docs in the same commit:
 - `PanelSpec`'s `@param toggleActionId` gains: "; under a look with flush tool windows its toggle or show also activates the panel".
 - `PanelHost.show()`'s javadoc gains: "Called from the panel's own toggle action as its handler runs, it also makes the panel the active tool window under a look with flush tool windows (since 0.18.2)."
 
-Run: `./gradlew :jasper-app:test --tests '*HostedUiTest' --tests '*WindowContributionsTest' --tests '*AppContractTest' && ./gradlew :jasper-sdk:javadoc`
+Run: `./gradlew :jasper-app:test --tests '*HostedUiTest' --tests '*WindowPanelsTest' --tests '*WindowContributionsTest' --tests '*PanelContributionsTest' --tests '*NotificationsFeatureTest' --tests '*AppContractTest' && ./gradlew :jasper-sdk:javadoc`
 Expected: PASS.
 
 - [ ] **Step 3: Commit**
@@ -259,56 +270,60 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 **Files:**
 - Modify (jasper-ui):
-  - `jasper-ui/src/main/java/dev/jasper/ui/icons/IconRegistry.java:94-101`
-  - `jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java:411-418`
-  - `jasper-ui/src/main/java/dev/jasper/ui/swing/Buttons.java:17-41,84-92`
+  - `jasper-ui/src/main/java/dev/jasper/ui/icons/BuiltInArtwork.java:35-57` (a `CLASSIC_NAMES` constant outside the holder; Execution notes X4)
+  - `jasper-ui/src/main/java/dev/jasper/ui/icons/IconRegistry.java:86-108` (beside `chromeIcon` and `stripeIcon`)
+  - `jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java:406-418`
+  - `jasper-ui/src/main/java/dev/jasper/ui/swing/Buttons.java:17-43,74-92`
+  - `jasper-ui/src/main/java/dev/jasper/ui/swing/Menus.java:216-228`
 - Modify (app):
-  - `jasper-app/src/main/java/dev/jasper/app/platform/AppIcons.java`
-  - `workspace/ToolWindowHeader.java:84-100,219-235`
-  - `workspace/ToolWindowArea.java:297-315,580-590,666`
+  - `jasper-app/src/main/java/dev/jasper/app/platform/AppIcons.java` (beside `stripeIcon`, `:96-121`)
+  - `workspace/ToolWindowHeader.java:84-105,219-236`
+  - `workspace/ToolWindowArea.java:297-318,578-614,665-671`
   - `workspace/WindowContent.java:283`
   - `workspace/WindowChrome.java:328-331`
 - Create:
-  - `jasper-ui/src/test/java/dev/jasper/ui/swing/KitClassicChromeIconsTest.java`
+  - `jasper-ui/src/test/java/dev/jasper/ui/swing/KitClassicChromeIconsTest.java` (jasper-ui is outside `ThemeMigrationCoverageTest`'s scan, fact 15: no row)
 - Modify (tests):
+  - `jasper-ui/src/test/java/dev/jasper/ui/icons/BuiltInArtworkTest.java`
   - `jasper-app/src/test/java/dev/jasper/app/workspace/ToolWindowHeaderTest.java`
   - `ClassicHeaderTest.java`
-  - `docs/design/theme-engine/migration.csv`
+  - `docs/design/theme-engine/migration.csv` only if `ThemeMigrationCoverageTest` reports a missing row (none is expected: no new app source)
 
 **Interfaces:**
 - Produces:
   - jasper-ui `IconRegistry`:
     - `public java.util.Optional<PreparedIcon> classicChromeIcon(String name, int logicalSize)`, which returns `chromeIcon(name, logicalSize, ChromeArtwork.CLASSIC)` for one of the six classic names, else empty;
-    - `public static java.util.Set<String> classicChromeNames()`, the six names (`BuiltInArtwork.classicChrome().keySet()`).
+    - `public static java.util.Set<String> classicChromeNames()`, the six names, from a `BuiltInArtwork.CLASSIC_NAMES` `Set.of(...)` constant declared outside `ClassicHolder`, so asking never decodes the classic files (fact 5). `BuiltInArtworkTest` (same package, which already reads `classicChrome()`) gains `theClassicNamesAreTheClassicHoldersKeys`, asserting `IconRegistry.classicChromeNames()` equals `BuiltInArtwork.classicChrome().keySet()` (Execution notes X4); add it to this task's Files and run it with `KitClassicChromeIconsTest`.
   - `KitView`:
     - `public void classicChromeIcons(boolean value)`, which refreshes and repaints on change, as `toolbarStrip` does;
     - `public boolean classicChromeIcons()`.
 
-    While set, a `Button` or `MenuButton` in a toolbar strip or in the panel header (`button.panel`), and a host header action with canonical artwork, draw a classic name's `classicChromeIcon` art, tinted `TEXT_PRIMARY` like the window header. In a header strip the art stays authored: the strip ink is not applied. Every other icon is unchanged.
+    While set, a `Button` or `MenuButton` in a toolbar strip or in the panel header (`button.panel && !button.documentBar`, `main.panel && !main.documentBar` for a menu: a document bar in a panel body also sets `panel`, fact 8), and a host header action with canonical artwork, draw a classic name's `classicChromeIcon` art, tinted `TEXT_PRIMARY` like the window header. In a header strip the art stays authored: the strip ink is not applied. Every other icon is unchanged. Each check reads the flag first, so a view without it never asks for a classic name (Execution notes X3).
   - App `AppIcons`: `public static java.util.Optional<Icon> classicChromeIcon(Icon icon)`. For a built-in `PresentationIcon` or `SemanticIcon` whose kit name is one of the six (`kitName`, as `stripeIcon` reads it), it returns an `Icon` of the same size. That icon paints `NAMED.classicChromeIcon(name, size)` in the receiving component's theme, prepared on first paint at the device size. Any other icon gives empty.
   - `ToolWindowHeader(String text, Supplier<JPopupMenu> menu, Runnable onHide, Kit kit, boolean flush, ChromeArtwork artwork)`. The five-argument form means `NEW_UI`. Under `CLASSIC` a contributed action whose `AppIcons.classicChromeIcon` is present shows that icon, in place of `stripGlyph` or the action's icon.
-  - `ToolWindowArea(JComponent, DockState, Kit, boolean flush, ChromeArtwork artwork)`. The four-argument form means `NEW_UI`. Under `CLASSIC` it passes the artwork to each header and calls `view.classicChromeIcons(true)` on a borrowed kit view beside `setPanelHostActions` (`:586`).
-  - `WindowContent:283` passes `look().chromeArtwork()`. `WindowChrome:329` adds `kit.classicChromeIcons(owner.look().chromeArtwork() == ChromeArtwork.CLASSIC);`.
+  - `ToolWindowArea(JComponent, DockState, Kit, boolean flush, ChromeArtwork artwork)`. The two- and four-argument forms mean `NEW_UI`. Under `CLASSIC` it passes the artwork to each header (`header(id, title)`, `:665-671`) and calls `view.classicChromeIcons(true)` on a borrowed kit view in `mountHeader` just before `setPanelHostActions` (`:586`); the release path (`:609-613`) leaves the flag, since the view lives only in this window's area. Under `NEW_UI` it never calls it.
+  - `WindowContent:283` passes `look().chromeArtwork()` (`look()` is the window's `WorkspaceChrome`). `WindowChrome:329` adds `kit.classicChromeIcons(owner.look().chromeArtwork() == ChromeArtwork.CLASSIC);` after `kit.toolbarStrip(true);`.
 
 - [ ] **Step 1: Write the failing jasper-ui test**
 
-`KitClassicChromeIconsTest`. Use the jasper-ui swing tests' `KitContext` fixture, as the `Buttons` tests do. Render a `KitView` of an INLINE stack of icon-only GHOST buttons named `search`, `add`, `folder` and `more`, with `toolbarStrip(true)`.
+`KitClassicChromeIconsTest`. Use `dev.jasper.ui.testsupport.KitFixtures.context()`, `KitFixtures.render(view, w, h, 1)` and `Edt.run`, closing the context's binding and icons after, as `KitViewToolbarStripTest.pixels` does (fact 8). Render a `KitView` of an INLINE stack of icon-only GHOST buttons named `search`, `add`, `folder` and `more`, with `toolbarStrip(true)`.
 - `theSixNamesInAToolbarStripDrawIntelliJsClassicArt`: with `classicChromeIcons(true)`, the `search` and `add` buttons' centres equal `context.icons().classicChromeIcon(name, size).orElseThrow().icon(theme, SemanticColor.TEXT_PRIMARY)` pixel for pixel, as `ClassicHeaderTest.assertPaintsClassicAdd` checks.
 - `onlyTheSixNamesInHeadersAndToolbarStripsChange`:
   - with the flag, `folder` and `more` paint exactly what they paint without it;
   - the same `add` button in a panel body, a VERTICAL stack outside any header, paints exactly what it paints without the flag;
-  - in a `Nodes.Panel` header, an `add` header control and a host action set through `setPanelHostActions` with `PanelHostHeader.Artwork("add", null)` paint the classic art.
+  - in a `Nodes.Panel` header, an `add` header control and a host action with `PanelHostHeader.Artwork("add", null)` paint the classic art: host actions with artwork reach the view through `setPanelHostHeader(panel, new PanelHostHeader(detail, active, List.of(new PanelHostHeader.Action(label, icon, run, new PanelHostHeader.Artwork("add", null))), frame))`, as `ToolWindowArea.hostHeader` builds them (`PanelHostHeaderTest` has the fixture); `setPanelHostActions` takes plain `Nodes.Button`s;
+  - an `add` button in a document bar inside the panel body (`button.panel` and `documentBar`, fact 8) paints exactly what it paints without the flag.
 - `withoutTheFlagNothingChanges`: every button paints the same with the flag off as a view that never had it.
 
-Run: `./gradlew :jasper-ui:test --tests '*KitClassicChromeIconsTest'`
+Run: `./gradlew :jasper-ui:test --tests '*KitClassicChromeIconsTest' --tests '*BuiltInArtworkTest'`
 Expected: FAIL to compile (`classicChromeIcons` does not exist).
 
 - [ ] **Step 2: Implement jasper-ui**
 
 - `IconRegistry.classicChromeIcon` and `classicChromeNames`.
 - `KitView`'s flag.
-- `ButtonControl.refresh`: when `view.classicChromeIcons()` and (`button.toolbarStrip` or `button.panel`) and the icon name is one of the six, use the classic art at the extent it computes. In `HostArtwork.icon`, do the same when the semantic artwork has a null path and its name is one of the six. Pass the view's flag in from the caller that has it, and leave the method's signature otherwise alone.
-- The `MenuButton` path in `Menus.java` gets the same check where it sets its icon.
+- `ButtonControl.refresh`: when `view.classicChromeIcons()` and (`button.toolbarStrip` or (`button.panel` and not `button.documentBar`)) and the icon name is one of the six, use the classic art at the extent it computes. In the `hostArtwork != null` branch (`:84`), do the same when `hostArtwork.semantic` is non-null with a null `pathData()` and its name is one of the six; `HostArtwork.icon`'s callers keep their signatures (add an overload taking the flag if that is simpler).
+- The `MenuButton` path, `Menus.MenuControl`'s `main.setIcon(` (`Menus.java:216`), gets the same check (`view.toolbarStrip()` or (`main.panel` and not `main.documentBar`)).
 
 Run: `./gradlew :jasper-ui:test`
 Expected: PASS. The gallery is unchanged: no gallery view sets the flag.
@@ -320,19 +335,19 @@ Expected: PASS. The gallery is unchanged: no gallery view sets the flag.
 - `otherNamesKeepTheirGlyphUnderClassicIcons`: an action iconed `folder`, and one with a plugin path icon, paint the same under `CLASSIC` as under `NEW_UI`.
 - `underNewUiNothingChanges`: the six-argument constructor with `NEW_UI` paints the add action exactly as the five-argument one does.
 
-In `ClassicHeaderTest`, add `aToolbarViewUnderClassicIconsIsMarkedAndUnderNewUiIsNot`: a `KitView` toolbar entry is mounted with `classicChromeIcons()` true under `WorkspaceLook.Icons.CLASSIC` and false under `NEW_UI`. Mount a real `KitView` through the window's `Contributions` as `enterprisesDefaultToolbarIsClassicIconSquares` does.
+In `ClassicHeaderTest`, add `aToolbarViewUnderClassicIconsIsMarkedAndUnderNewUiIsNot`: a `KitView` toolbar entry is mounted with `classicChromeIcons()` true under `WorkspaceLook.Icons.CLASSIC` and false under `NEW_UI`. Build the window with `classic(icons)` as `window(themes, view, icons)` does, and make and mount the real `KitView` as `WindowToolbarViewsTest.aKitViewIsPresentedAsAToolbarStrip` does (`KitContext.of(...)`, `model.addToolbar(new ToolbarEntry.View(window -> Optional.of(new ToolbarEntry.Mounted(view, view::close))))`, after `connectTerminals`; fact 9), closing its binding and icons after.
 
 Run: `./gradlew :jasper-app:test --tests '*ToolWindowHeaderTest' --tests '*ClassicHeaderTest'`
 Expected: FAIL to compile.
 
 - [ ] **Step 4: Implement the app side**
 
-Implement as in Interfaces, and add the migration rows the test reports.
+Implement as in Interfaces. Add a migration row only if `ThemeMigrationCoverageTest` reports one (none is expected).
 
 Run: `./gradlew :jasper-app:test --tests '*ToolWindowHeaderTest' --tests '*ClassicHeaderTest' --tests '*DockMockTest' --tests '*ClassicCompositionRenderTest' --tests '*ClassicVaultRenderTest' --tests '*EnterpriseWorkstationMockTest' --tests '*DefaultDockPixelsTest' --tests '*ChromeRenderTest' --tests '*ThemeMigrationCoverageTest' --tests '*ProjectionReadTest' --tests '*VariantReadTest'`
 Expected: PASS.
 - `DefaultDockPixelsTest` and the default `ChromeRenderTest` images are unchanged.
-- Where an Enterprise mock test's probe falls on a classic `add` in Sessions' or Tunnels' header, update the probe to the classic art and note the user's 2026-10-19 direction in a comment.
+- Where an Enterprise mock test's probe falls on a classic name (`add`, `settings`, `search`, …) in Sessions', Tunnels' or another tool window's header, update the probe to the classic art and note the user's 2026-10-19 direction in a comment. A document bar's `add` in a panel body (the Vault manager's) must not move; if it does, the `documentBar` exclusion is wrong.
 - List every such change for Task 6's STATUS entry.
 
 - [ ] **Step 5: Commit**
@@ -352,16 +367,17 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 **Files:**
 - Modify:
-  - `presentation/ChromeSpec.java`
-  - `presentation/KitParser.java:51-52,296-310`
+  - `presentation/ChromeSpec.java` (javadoc `:5-20`, record `:21-22`, constants `:46-53`, constructor `:56-65`)
+  - `presentation/KitParser.java:63-64,306-322`
   - `presentation/WorkspaceLook.java`
-  - `presentation/Projections.java` (`of`: `WorkspaceLook` and `PluginLook.search`)
-  - `workspace/WorkspaceChrome.java:20-68,128-136`
-  - `jasper-app/src/test/java/dev/jasper/app/presentation/KitParserTest.java`
-  - `ProjectionsTest.java`
-  - `architecture/ProjectionReadTest.java:24-27,96-108`
-  - `testsupport/EnterpriseLook.java:22-41`
-  - `workspace/ChromeRenderTest.java:72-75`
+  - `presentation/Projections.java:99-106,115-118` (`of`: `WorkspaceLook` and `PluginLook.search`; `fallback` at `:150-159` keeps `FIELD` through the eight-argument form)
+  - `workspace/WorkspaceChrome.java:17-54,74-87,100-105,130-136`
+  - `workspace/ClassicHeader.java` (the two constructors only)
+  - `jasper-app/src/test/java/dev/jasper/app/presentation/KitParserTest.java` (`:157`, `:249-270`)
+  - `ProjectionsTest.java` (`:119`, `:168`)
+  - `architecture/ProjectionReadTest.java:25,104-118`
+  - `testsupport/EnterpriseLook.java:22-39`
+  - `workspace/ChromeRenderTest.java:70-74`
 
 **Interfaces:**
 - Produces:
@@ -369,16 +385,17 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     - `public enum ToolbarSearch { FIELD, ICON }`, javadoc "The toolbar's Search Everywhere field, or IntelliJ Classic's icon button.";
     - the record's last component `ToolbarSearch toolbarSearch`;
     - `DEFAULT` and `CLASSIC` take `FIELD`;
+    - the class javadoc's "The ten chrome variant points … eight two-valued points" becomes "The eleven chrome variant points … nine two-valued points", and it gains `@param toolbarSearch {@code toolbar_search}; {@code icon} needs the Run window and a native or classic title bar`;
     - the compact constructor refuses `ICON` unless `palette == RUN_WINDOW && titleBar != UNIFIED`, with `IllegalArgumentException("toolbar_search = icon needs palette = run_window and title_bar = native or classic")`.
   - `KitParser.CHROME` gains `"toolbar_search"`, parsed by `point`. After the `menu_bar` check, the parser refuses `ICON` with `[chrome].toolbar_search: "icon" needs [chrome].palette = "run_window" and [chrome].title_bar = "native" or "classic"`.
   - `WorkspaceLook`:
     - `public enum Search { FIELD, ICON }`, javadoc "The classic toolbar's search field, or its icon button.";
-    - a ninth component `Search search`;
-    - the eight-argument constructor means `Search.FIELD`.
+    - a ninth component `Search search` with `@param search how the classic toolbar offers Search Everywhere`, required non-null;
+    - the eight-argument constructor means `Search.FIELD`. Under `Header.UNIFIED` the search is ignored (a parsed kit never pairs them, fact 12).
   - `Projections.of`: `WorkspaceLook.search` is `ICON` when `chrome.toolbarSearch() == ICON` (the constraint guarantees a classic header), and `PluginLook`'s `search` is the same.
   - `WorkspaceChrome`:
-    - a `boolean iconSearch` read once in `of` from `look.search()`;
-    - `header()` returns `new ClassicHeader(iconSearch)` for `CLASSIC`. Until Task 4, `ClassicHeader` takes and ignores the flag, through a one-line constructor storing it. Its no-argument constructor stays and means the field (`WindowPairsTest.java:93` uses it);
+    - a `boolean iconSearch` read once in `of` from `look.search()` (a `switch`, as `look.icons()` is read), passed to the private constructor as its last argument; `STANDARD` passes `false`;
+    - `header()` returns `new ClassicHeader(iconSearch)` for `CLASSIC`. Until Task 4, `ClassicHeader` takes and ignores the flag, through a one-line constructor storing it in a `private final boolean iconSearch`. `ClassicHeader` declares no constructor today, so Task 3 adds `ClassicHeader() { this(false); }` explicitly; it means the field (`WindowPairsTest.java:93` uses it);
     - `equals` and `hashCode` include `iconSearch`.
   - Test-only `EnterpriseLook.titled` copies `toolbarSearch`. `EnterpriseLook.CHROME` stays `FIELD` until Task 4, when the shipped kit names `icon`.
 
@@ -390,7 +407,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     - `head + "[chrome]\ntoolbar_search = \"icon\"\n"` on a default base gives `[chrome].toolbar_search: "icon" needs [chrome].palette = "run_window" and [chrome].title_bar = "native" or "classic"`;
     - `"kit = 1\nbase = \"classic\"\n[chrome]\ntoolbar_search = \"icon\"\npalette = \"anchored\"\n"` gives the same message;
     - `toolbar_search = "box"` gives `[chrome].toolbar_search: "box" is not one of field, icon`.
-  - In `everyChromeAndControlPointTakesBothItsValues`, give `toolbar_search = "icon"` a classic base, so the constraint holds.
+  - `everyChromeAndControlPointTakesBothItsValues` is unchanged: it loops over the control points only (fact 12), and the new test above gives both values (Execution notes X6).
 - `ProjectionsTest.theToolbarSearchReachesTheWorkspaceAndPlugins`: a classic-base `ChromeSpec` with `ICON` gives `workspace().search() == ICON` and `plugins().search() == ICON` on each host. `ChromeSpec.DEFAULT` gives `FIELD` for both.
 - `ProjectionReadTest`: the `WorkspaceLook` pattern's alternation gains `Search`. In `aLookReadElsewhereIsReported`, add a `WorkspaceLook$Search` probe reported on its own, as the `Icons` one is.
 
@@ -399,7 +416,7 @@ Expected: FAIL to compile.
 
 - [ ] **Step 2: Implement**
 
-Implement as in Interfaces. Update every `new ChromeSpec(` of fact 12 with `ChromeSpec.ToolbarSearch.FIELD`. `ChromeRenderTest.covering()` passes `FIELD` (Rulings 8); add a comment beside the `Icons.CLASSIC` it already passes.
+Implement as in Interfaces. Update every `new ChromeSpec(` of fact 12 with `ChromeSpec.ToolbarSearch.FIELD`, except `EnterpriseLook.titled`, which passes `spec.toolbarSearch()`. `ChromeRenderTest.covering()` passes `FIELD` (Rulings 8); add a comment beside the `Icons.CLASSIC` it already passes.
 
 Run: `./gradlew :jasper-app:test --tests '*KitParserTest' --tests '*ProjectionsTest' --tests '*ProjectionReadTest' --tests '*ChromeRenderTest' --tests '*EnterpriseFixtureTest' --tests '*HostedPresentationTest' --tests '*ClassicHeaderTest'`
 Expected: PASS. Every render is unchanged: nothing names `icon` yet.
@@ -421,17 +438,19 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 **Files:**
 - Modify:
-  - `workspace/ClassicHeader.java`
-  - `workspace/ClassicToolbarButton.java:31-42`
-  - `workspace/WindowChrome.java` (a `paletteShortcut()` accessor)
-  - `plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml:5-14`
-  - `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java:22-25`
-  - `jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java:30-31`
-  - `jasper-app/src/test/java/dev/jasper/app/plugins/HostedPresentationTest.java`
+  - `workspace/ClassicHeader.java` (javadoc `:26-30`, `trailing()` `:36-37`, `build` `:39-57`, `layout` `:68-88`)
+  - `workspace/ClassicToolbarButton.java:31-43`
+  - `workspace/WindowChrome.java` (a `paletteShortcut()` accessor, beside `composition()` at `:176`)
+  - `plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml:4-14`
+  - `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java:18-25`
+  - `jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java:29-31`
+  - `jasper-app/src/test/java/dev/jasper/app/plugins/HostedPresentationTest.java:25-31`
+  - `jasper-app/src/test/java/dev/jasper/app/presentation/ProjectionsTest.java:218-232` (Execution notes X8)
   - `jasper-app/src/test/java/dev/jasper/app/workspace/ClassicHeaderTest.java`
-  - `EnterpriseWorkstationMockTest.java:120-135`
-  - `tools/visual/pairs.json` (the two `chrome-toolbar-*` entries)
-  - `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakePresentations.java`
+  - `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseMenuRowMockTest.java:55-88` (`Mounted` gains the search button's bounds; Execution notes X9)
+  - `EnterpriseWorkstationMockTest.java:99-144`
+  - `tools/visual/pairs.json` (the two `chrome-toolbar-*` entries, `:893-938`)
+  - `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakePresentations.java:16-19`
 
 **Interfaces:**
 - Consumes: `WorkspaceChrome.header()` giving `new ClassicHeader(iconSearch)` (Task 3).
@@ -443,12 +462,14 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     - The search button's text is set to null, `keepLabel` to `false`, and its tooltip to `() -> chrome.paletteShortcut().isBlank() ? "Search Everywhere" : "Search Everywhere (" + chrome.paletteShortcut() + ")"`.
     - `layout` gives the field zero bounds and hides it, so the toolbar runs up to the trailing group.
     - The field path is unchanged when `iconSearch` is false.
-    - A package-private `JButton searchButton()` returns the button, or null, for tests.
+    - A package-private `JButton searchButton()` returns the button, or null, for tests; tests reach the composition through `owner.chrome().composition()` (fact 10).
+    - `trailing()`'s javadoc "The trailing group: "Settings…"." becomes "The trailing group: "Search Everywhere" under the icon, then "Settings…".".
 
 - [ ] **Step 1: Write the failing tests**
 
 In `ClassicHeaderTest`:
-- Give `classic(...)` and `window(...)` an overload taking `WorkspaceLook.Search`, keeping today's overloads at `FIELD`.
+- Give `classic(...)` and `window(...)` an overload taking `WorkspaceLook.Search`, keeping today's overloads at `FIELD`; Task 2's `aToolbarViewUnderClassicIconsIsMarkedAndUnderNewUiIsNot` keeps using today's.
+- Generalise `assertPaintsClassicAdd(button)` (`:289-311`) into `assertPaintsClassic(button, name)`, with `assertPaintsClassicAdd(button)` delegating with `"add"`, so its existing callers and Task 2's stay.
 - Add, under `WorkspaceLook.Icons.CLASSIC` and `Search.ICON`:
   - `underTheSearchIconTheFieldIsAClassicMagnifierBeforeSettings`:
     - the field is invisible with zero width;
@@ -463,9 +484,10 @@ In `ClassicHeaderTest`:
   - `underTheSearchIconANarrowWindowKeepsTheButtonBesideSettings`: at widths 1440, 700 and 420, the search button stays visible, with its right edge at or left of Settings…'s left edge, and no overlap.
   - `theFieldIsUnchangedUnderSearchField`: with `FIELD` the existing field assertions hold, and the trailing group is `["Settings…"]`.
 - `HostedPresentationTest.enterpriseIsReportedFromItsKitAndItsDefaults`: expect `Presentation.ToolbarSearch.ICON`.
+- `ProjectionsTest.thePluginLookIsTheLookOnEachPlatform`: its three `EnterpriseLook.CHROME` expectations (macOS, Windows, Linux) take `PluginLook.Search.ICON`; the default-look and fallback expectations stay `FIELD`.
 - `PresentationConformanceTest.KEYS` gains `"chrome/toolbar_search"`.
 
-Run: `./gradlew :jasper-app:test --tests '*ClassicHeaderTest' --tests '*HostedPresentationTest' --tests '*PresentationConformanceTest'`
+Run: `./gradlew :jasper-app:test --tests '*ClassicHeaderTest' --tests '*HostedPresentationTest' --tests '*PresentationConformanceTest' --tests '*ProjectionsTest'`
 Expected: FAIL.
 
 - [ ] **Step 2: Implement and name it in Enterprise's kit**
@@ -473,25 +495,26 @@ Expected: FAIL.
 - `ClassicHeader`, `ClassicToolbarButton.tooltip` and `WindowChrome.paletteShortcut` as in Interfaces. The class javadoc gains: "Under `toolbar_search = "icon"` (the user, 2026-10-19), an icon-only "Search Everywhere" button with IntelliJ's classic magnifier leads the trailing group in place of the field."
 - `enterprise.kit.toml`: after `icons = "classic"` add `toolbar_search = "icon"`.
 - `EnterpriseLook.CHROME` gains `ChromeSpec.ToolbarSearch.ICON` (`EnterpriseFixtureTest` holds it equal to the shipped table).
-- `FakePresentations.CLASSIC` takes `ToolbarSearch.ICON`, and its javadoc says "Enterprise's on Linux" (Rulings 11).
+- `FakePresentations.CLASSIC` takes `ToolbarSearch.ICON`; its javadoc already says "Enterprise's on Linux" (Rulings 11), so only the value changes.
 
-Run: `./gradlew :jasper-app:test --tests '*ClassicHeaderTest' --tests '*HostedPresentationTest' --tests '*PresentationConformanceTest' --tests '*EnterpriseFixtureTest' && ./gradlew :jasper-sdk-testkit:test`
+Run: `./gradlew :jasper-app:test --tests '*ClassicHeaderTest' --tests '*HostedPresentationTest' --tests '*PresentationConformanceTest' --tests '*ProjectionsTest' --tests '*EnterpriseFixtureTest' && ./gradlew :jasper-sdk-testkit:test`
 Expected: PASS.
 
 - [ ] **Step 3: Re-measure the Enterprise mock expectations**
 
 Run: `./gradlew :jasper-app:test --tests '*EnterpriseWorkstationMockTest' --tests '*EnterpriseMenuRowMockTest' --tests '*WindowHeaderTest' --tests '*CollapsingMenuBarTest' --tests '*RunWindowModelessTest' --tests '*ChromeRenderTest' --tests '*EnterpriseFirstWindowTest' --tests '*EnterpriseHomeTest'`
 
-Expected: `EnterpriseWorkstationMockTest`'s search-field assertions (`:123-131`) FAIL, since the field is gone. Replace them:
-- assert the search button's right edge is 6 px (12 mock px) before Settings…'s left, the trailing group's gap;
+Expected: `EnterpriseWorkstationMockTest`'s search-field assertions (`:123-131`) FAIL, since the field is gone. First give `EnterpriseMenuRowMockTest.Mounted` a `Rectangle search` component (the search button's bounds in the root, read beside `fieldAt` from `((ClassicHeader) owner.chrome().composition()).searchButton()`, or an empty `Rectangle` when there is none), with its `@param`. Then replace the field assertions:
+- assert the search button's right edge is 6 px (12 mock px) before Settings…'s left, the trailing group's gap (`ClassicHeaderTest`'s "6 before Settings…", `:113`);
 - assert its top and size match the other 22 px icon squares, as the toolbar's icon run is asserted;
 - comment: "The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field (x 2116-2715)."
 
-Fix any other failure the same way, each with that note. Do not move an expectation that is not about the field or the new button.
+Fix any other failure the same way, each with that note. Do not move an expectation that is not about the field or the new button. The Settings… crop (`:132-143`) starts 44 mock px left of x 2722 and may now take the magnifier's ink as a third run: if so, start the render crop at the search button's right edge instead, with the note.
 
-Then the pairs:
+Then the pairs. The worktree has no Enterprise gallery (fact 13), so render it first; the other pairs read whatever renders `build/` holds, so only the two `chrome-toolbar-*` lines count here, and Task 6 Step 5 gives the full verdict:
 
 ```bash
+for theme in light dark; do ./gradlew :jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryTheme=$theme -Pjasper.galleryScale=2; done
 python3 -I tools/visual/check_pairs.py "$(mktemp -d)" | grep 'chrome-toolbar'
 ```
 
@@ -502,6 +525,8 @@ Record both `chrome-toolbar-*` agreements.
 
 Run: `./gradlew :jasper-app:test --tests '*EnterpriseWorkstationMockTest' --tests '*ChromeRenderTest' && python3 -I tools/visual/check_pairs.py "$(mktemp -d)" > /dev/null; echo "exit $?"`
 Expected: PASS and `exit 0`.
+
+Then, since `EnterpriseLook.CHROME` and the shipped kit now name the icon for every Enterprise test, run the whole module once: `./gradlew :jasper-app:test`. Expected: PASS; fix any Enterprise expectation about the field as above (Execution notes X8). A timing-sensitive test (`StagedTransferLifecycleTest`, `StartupStepsApplicationTest`'s `@TempDir` clean-up) may flake once: re-run it alone before treating it as a failure.
 
 - [ ] **Step 4: Commit**
 
@@ -520,7 +545,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 **Files:**
 - Create: `jasper-app/src/test/java/dev/jasper/app/architecture/LookIdentityTest.java`
-- Modify: `docs/design/theme-engine/migration.csv` (only if the test matches `CANDIDATE`)
+- Modify: `docs/design/theme-engine/migration.csv`: the test builds `new ArrayList`, which `CANDIDATE` matches (fact 15), so it gets the row `jasper-app/src/test/java/dev/jasper/app/architecture/LookIdentityTest.java,app.architecture,LookIdentityTest,nonvisual-helper,none,none,jasper-app/src/test/java/dev/jasper/app/architecture/LookIdentityTest.java,New in Enterprise plan 15b Task 5; Test/fixture ownership; no production class names the Enterprise plugin` (Execution notes X10)
 
 **Interfaces:**
 - Produces: `static List<String> LookIdentityTest.mentions(List<byte[]> classes)`, which returns "internal name: string" for each class whose constant pool holds a UTF-8 entry containing `enterprise`, ignoring case.
@@ -538,7 +563,7 @@ class LookIdentityTest {
         var classes = new ArrayList<byte[]>();
         try (var plugins = Files.list(Path.of(System.getProperty("jasper.stagedPlugins")))) {
             for (Path plugin : plugins.filter(Files::isDirectory).filter(p -> !p.getFileName().toString().equals("dev.jasper.enterprise")).toList())
-                for (Path jar : ManagedVaultLoadingTest.jars(plugin))
+                for (Path jar : jars(plugin))
                     for (byte[] bytes : StaticDefaultTest.classFiles(jar, 0))
                         if (ProjectionReadTest.Scanned.of(bytes).name().startsWith("dev/jasper/")) classes.add(bytes);
         }
@@ -564,10 +589,10 @@ class LookIdentityTest {
 }
 ```
 
-The two `{ ... }` bodies are the obvious loops. `ManagedVaultLoadingTest.jars` and `StaticDefaultTest.classFiles` are package-private in other test packages. If a helper is not visible, copy its two lines in, noting the original.
+The `{ ... }` body is the obvious loop. `StaticDefaultTest.classFiles` and `ProjectionReadTest.Scanned` are package-private in `architecture`, this test's package, so they are used as they are. `ManagedVaultLoadingTest.jars(Path)` is package-private in `plugins` (fact 14), so copy its one line in as a private `static List<Path> jars(Path directory)`, with a comment naming the original. Imports: `java.lang.classfile.ClassFile`, `java.lang.constant.ClassDesc`, `ConstantDescs`, `MethodTypeDesc`, `java.nio.file.Files`, `Path`, `java.util.ArrayList`, `List`, JUnit's `Test` and AssertJ's `assertThat`. Add the migration row above.
 
-Run: `./gradlew :jasper-app:test --tests '*LookIdentityTest'`
-Expected: PASS at once: plan 15a removed the last references. If it fails, the report names the class. Fix that class (a look decision belongs in the kit), not the test.
+Run: `./gradlew :jasper-app:test --tests '*LookIdentityTest' --tests '*ThemeMigrationCoverageTest'`
+Expected: PASS at once: plan 15a removed the last references (fact 14), and Tasks 1 to 4 add none outside comments (Execution notes X11). If it fails, the report names the class. Fix that class (a look decision belongs in the kit), not the test.
 
 - [ ] **Step 2: Commit**
 
@@ -586,17 +611,17 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 **Files:**
 - Modify:
-  - `docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md`
+  - `docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md` (header `:23`, 5.1 `:505`, 5.2 `:603`, 5.3 `:643`, 5.9 `:775`, 9.1 `:1161`, 10.3 `:1284`, 10.7 `:1338`, 16.1 `:1766`, 16.2 `:1859`; line numbers before this task's edits)
   - `docs/sdk-icons.md:21-24`
-  - `docs/plugin-authoring.md:196-224`
-  - `docs/plugin-ui.md:61-65`
-  - `docs/command-palette.md:44`
+  - `docs/plugin-authoring.md:199-230` (15a moved it: the stripes sentence is `:200-201`, "registers no `<panel id>.toggle`." `:211`, the rail paragraph `:227-230`)
+  - `docs/plugin-ui.md:64-65`
+  - `docs/command-palette.md:43-44`
   - `docs/app-architecture.md:242-243`
   - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java:16-19`
-  - `PanelSpec.java:8,13`
-  - `Panels.java:6`
+  - `PanelSpec.java:8,13` (Task 1 edited `:16-18` of the same file)
+  - `Panels.java:6` (Task 1 edited the `toggle` javadoc below it)
   - `Rail.java:5`
-  - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Presentation.java` (the `toolbarSearch` javadoc)
+  - `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Presentation.java:17` (the `toolbarSearch` `@param`)
   - `docs/STATUS.md`
   - this plan's status banner
 
@@ -608,19 +633,20 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - "Twenty-four points: 10 chrome points" becomes "Twenty-five points: 11 chrome points".
   - In the chrome table, after `icons`, add: `` | `toolbar_search` | `field` | `icon` | IntelliJ Classic's Search Everywhere: an icon-only button with the classic magnifier, before Settings…, in place of the "Search everywhere" field (10.3) | ``.
   - The `icons` row's last cell gains ", and for the six classic names in tool-window headers and toolbar views (10.3, 10.7)".
-- **5.3:** append "`toolbar_search = "icon"` requires `palette = "run_window"` and `title_bar = "native"` or `"classic"`: the anchored card's home is the field, and the unified header holds it."
+- **5.3:** "It is the only cross-field constraint." becomes "`toolbar_search = "icon"` requires `palette = "run_window"` and `title_bar = "native"` or `"classic"`: the anchored card's home is the field, and the unified header holds it. These are the only cross-field constraints." (Execution notes X12: the old sentence would be false.)
 - **5.9:** "- `menu_bar = "window"` with `title_bar = "unified"`;" gains a following bullet: "- `toolbar_search = "icon"` without `palette = "run_window"` and a native or classic title bar;".
 - **9.1:**
   - the `WorkspaceLook` consumer row's fields gain "search (FIELD, ICON)";
-  - the field table gains `` | `WorkspaceLook.search`, `PluginLook.search` | ICON when `toolbar_search = "icon"` | FIELD | ``.
+  - the field table gains, after the `WorkspaceLook.icons` row, `` | `WorkspaceLook.search` | ICON when `toolbar_search = "icon"` | FIELD | ``;
+  - in the `PluginLook` field row, "`search` FIELD" becomes "`search` ICON when `toolbar_search = "icon"`, else FIELD" (Execution notes X12: one row per field, and the row's old value would be false).
 - **10.3:**
   - After "then, trailing, the title search field reading "Search everywhere" with the COMMAND_PALETTE keycap, and "Settings…"." add: "Under `toolbar_search = "icon"` (the user, 2026-10-19; Enterprise) the field is IntelliJ Classic's Search Everywhere icon: an icon-only 22 px button with the classic magnifier, tooltip "Search Everywhere" and the palette's shortcut, leading the trailing group before Settings… and doing what the field does; it stays icon-only under `icons_and_labels`."
   - After "The icons are the look's `[chrome] icons` set (5.2), IntelliJ's classic icons under Enterprise." add: "Tool-window headers and toolbar views draw the same classic art for those six names; every other name, and every panel body, keeps its catalog art."
-- **10.7:** after the sentence on activation ("…a View toggle the host declares (`PanelRequest.Op.ACTIVATING_TOGGLE`)…"), add: "A plugin's toggle or `PanelHost.show()` made while the panel's own declared toggle action runs (`PanelSpec.withToggleActionId`) is activating too (`PanelRequest.Op.ACTIVATING_SHOW` for the show; the user, 2026-10-19; plan 15), so View › Tool Windows and the stripe-number shortcuts activate the bundled tool windows, as IntelliJ's ⌘1 does."
+- **10.7:** the Frames bullet's activation sentence ends "…dragging a divider keeps it, and a plugin's own toggle opens a frame without activating it." (spec `:1367-1368`; the spec has no `ACTIVATING_TOGGLE` sentence, Execution notes X13). Replace its last clause, from "and a plugin's own toggle opens", with: "and a plugin's toggle or `PanelHost.show()` activates the frame only when made while the panel's own declared toggle action runs (`PanelSpec.withToggleActionId`; `PanelRequest.Op.ACTIVATING_TOGGLE`, and `ACTIVATING_SHOW` for the show; the user, 2026-10-19; plan 15), so View › Tool Windows and the stripe-number shortcuts activate the bundled tool windows, as IntelliJ's ⌘1 does; any other plugin toggle opens a frame without activating it."
 - **16.1:**
-  - item 4: "across 9 of the ten chrome points" becomes "across 9 of the eleven chrome points", and after "`icons` is held at `classic` in every row" insert "and `toolbar_search` at `field`";
+  - item 4: "across 9 of the ten chrome points" becomes "across 9 of the eleven chrome points", and "`icons` is held at `classic` in every row and covered by `ChromeArtworkTest`, `ZoneIconsTest`, `StripeIconTest` and `StripeIconsTest`)" becomes "`icons` is held at `classic` in every row and covered by `ChromeArtworkTest`, `ZoneIconsTest`, `StripeIconTest` and `StripeIconsTest`, and `toolbar_search` at `field` and covered by `ClassicHeaderTest`)" (Execution notes X14);
   - item 7: add the bullet "- `LookIdentityTest`: no production class of the app, jasper-ui or a bundled plugin other than Enterprise names "enterprise" (plan 15).".
-- **16.2:** add "Enterprise's Search Everywhere icon (its tooltip, the Run window it opens, a narrow window); ⌘⌥1 to ⌘⌥3 activating the bundled tool windows; the classic `add` icon in Sessions' and Tunnels' headers;" after "the Run window's drag, …".
+- **16.2:** add "Enterprise's Search Everywhere icon (its tooltip, the Run window it opens, a narrow window); ⌘⌥1 to ⌘⌥3 activating the bundled tool windows; the classic `add` icon in Sessions' and Tunnels' headers;" after "the Run window's drag, attach to home, saved place, focus hand-back and modeless behaviour;".
 
 Check:
 
@@ -629,27 +655,30 @@ spec=docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md
 python3 -I - "$spec" <<'PY'
 import re, sys
 text = re.sub(r"\s+", " ", open(sys.argv[1], encoding="utf-8").read())
-for phrase in ("Twenty-four points",):
+for phrase in ("Twenty-four points", "It is the only cross-field constraint", "a plugin's own toggle opens a frame without activating",
+               "`search` FIELD |", "9 of the ten chrome points"):
     print(text.count(phrase), "(want 0)", phrase)
 for phrase in ("Twenty-five points: 11 chrome points", "| `toolbar_search` | `field` | `icon` |", "`toolbar_search = \"icon\"` requires",
-               "IntelliJ Classic's Search Everywhere icon", "`LookIdentityTest`", "a panel's own toggle action activates its tool window",
-               "is activating too (`PanelRequest.Op.ACTIVATING_SHOW` for the show; the user, 2026-10-19; plan 15)"):
+               "These are the only cross-field constraints", "| `WorkspaceLook.search` | ICON when", "IntelliJ Classic's Search Everywhere icon",
+               "`LookIdentityTest`", "a panel's own toggle action activates its tool window",
+               "`ACTIVATING_SHOW` for the show; the user, 2026-10-19; plan 15)", "any other plugin toggle opens a frame without activating it",
+               "9 of the eleven chrome points", "`toolbar_search` at `field` and covered by `ClassicHeaderTest`"):
     print(text.count(phrase), "(want at least 1)", phrase)
 PY
 ```
 
-Expected: one `0` line, and every other count at least `1`.
+Expected: five `0` lines, and every other count at least `1`.
 
 - [ ] **Step 2: The guides and the SDK javadoc**
 
 - `docs/sdk-icons.md`: after the stripe paragraph (`:21-24`), add: "Under the Enterprise look IntelliJ's classic icons also draw `"add"`, `"split"`, `"zoom"`, `"settings"`, `"window.add"` and `"search"` in the toolbar (actions and toolbar views), the status bar and tool-window headers (your `PanelHeader` actions and your panel's header controls); in a panel's or window's body these names keep their ordinary art."
 - `docs/plugin-authoring.md`:
-  - `:196`'s "stripes of icons on the window's left and right edges" becomes "stripes on the window's left and right edges: icons, or under a classic look such as Enterprise labelled buttons that start with the icon and read the panel's title".
-  - After "and Jasper registers no `<panel id>.toggle`." (`:206`) insert: "Under a look with flush tool windows (Enterprise), when your action shows the panel (through `Panels.toggle` or `PanelHost.show()`) it also makes it the active tool window, as a stripe click does; a toggle or show from anything else does not."
-  - `:222-224`: "A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are its job; the content is yours." becomes "A rail button, on the left stripe after the panel icons (a labelled entry under a classic look), runs one of your actions. A plugin window is a frame Jasper builds: icon, title bar, menus (in the window, or under the Enterprise look in the screen menu bar on macOS and none on Windows and Linux), theme tracking and remembered bounds are its job; the content is yours."
+  - `:201`'s "stripes of icons on the window's left and right edges" becomes "stripes on the window's left and right edges: icons, or under a classic look such as Enterprise labelled buttons that start with the icon and read the panel's title".
+  - After "and Jasper registers no `<panel id>.toggle`." (`:211`) insert: "Under a look with flush tool windows (Enterprise), when your action shows the panel (through `Panels.toggle` or `PanelHost.show()`) it also makes it the active tool window, as a stripe click does; a toggle or show from anything else does not."
+  - `:227-229`: "A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are its job; the content is yours." becomes "A rail button, on the left stripe after the panel icons (a labelled entry under a classic look), runs one of your actions. A plugin window is a frame Jasper builds: icon, title bar, menus (in the window, or under the Enterprise look in the screen menu bar on macOS and none on Windows and Linux), theme tracking and remembered bounds are its job; the content is yours."
 - `docs/command-palette.md:44`: "the toolbar's Search everywhere field open it" becomes "the toolbar's Search Everywhere icon open it".
 - `docs/app-architecture.md:242`: "a toolbar row of left-packed buttons with the search field and Settings… trailing" becomes "a toolbar row of left-packed buttons with the search field, or under `toolbar_search = "icon"` a Search Everywhere button, and Settings… trailing".
-- `docs/plugin-ui.md:61-65`: after "a panel's stripe label starts with its icon" and the plugin-icons link that follows it, add ", and the six classic icon names draw IntelliJ's classic art in headers and toolbar views".
+- `docs/plugin-ui.md:64-65`: after "a panel's stripe label starts with its icon" and the plugin-icons link that follows it, add ", and the six classic icon names draw IntelliJ's classic art in headers and toolbar views".
 - `StandardMenu.java:16-19`: "after Tab, Session and Transfer and before plugins' own menus" becomes "after Tab, Session and Transfer and before plugins' own menus, or after plugins' menus in a classic menu bar".
 - `PanelSpec.java:8`: "A panel as the stripes show it: an icon on a tool window stripe and, while it shows, a tool window with a header." becomes "A panel as the stripes show it: an icon on a tool window stripe (under a classic look a labelled button starting with the icon) and, while it shows, a tool window with a header." `:13`'s `@param title` gains "and, under a classic look, the stripe button's label".
 - `Panels.java:6`: "Each registered panel gets a stripe icon in every window." becomes "Each registered panel gets a stripe button in every window."
@@ -661,7 +690,7 @@ Expected: PASS.
 
 - [ ] **Step 3: Prove the default look unchanged**
 
-Run plan 15a Task 9 Step 3's block unchanged; it compares against `plan15-baseline`.
+Run plan 15a Task 9 Step 3's block (`2026-10-19-enterprise-15a-look-query.md:1154-1170`), with one change, as plan 15a ran it: `out` is the fixed folder `/private/tmp/claude-501/-Users-RQ7RQVF-projects-moray/819d407c-0391-424d-8db0-7177b2d3e0e0/scratchpad/plan15b-check`, emptied first (`rm -rf "$out"; mkdir -p "$out"`), in place of `$(mktemp -d)`, so Step 5 writes beside it (Execution notes X15). It compares against `plan15-baseline`, which exists (11 files under `app`, 161 under each gallery, and `pairs.txt`).
 Expected: `dark: identical (161 files)`, `light: identical (161 files)` and `jasper-app default look: identical (11 files)`, with no `diff` output.
 
 - [ ] **Step 4: Run the whole build and count**
@@ -673,7 +702,8 @@ Expected: BUILD SUCCESSFUL, 0 failures and 0 errors. Record the counts against p
 
 ```bash
 base=/private/tmp/claude-501/-Users-RQ7RQVF-projects-moray/819d407c-0391-424d-8db0-7177b2d3e0e0/scratchpad/plan15-baseline
-out=$(mktemp -d)
+out=/private/tmp/claude-501/-Users-RQ7RQVF-projects-moray/819d407c-0391-424d-8db0-7177b2d3e0e0/scratchpad/plan15b-check
+mkdir -p "$out"
 for theme in light dark; do ./gradlew :jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryTheme=$theme -Pjasper.galleryScale=2; done
 python3 -I tools/visual/check_pairs.py "$(mktemp -d)" > "$out/pairs.txt"; echo "exit $?"
 diff <(sed 's/ agreement=.*//' "$base/pairs.txt") <(sed 's/ agreement=.*//' "$out/pairs.txt") && echo "same verdicts"
@@ -682,16 +712,19 @@ diff "$base/pairs.txt" "$out/pairs.txt"
 
 Expected:
 - `exit 0` and `same verdicts` (101 of 101 PASS);
-- the last `diff` shows only the two `chrome-toolbar-*` lines and any pair whose crop holds a header `add` icon (Task 2).
+- the last `diff` shows only:
+  - the two `chrome-toolbar-*` lines;
+  - any pair whose crop holds a tool-window header's classic name, or a toolbar view's (Task 2);
+  - the two lines plan 15a already recorded against this baseline: `enterprise-settings-13` (15a's kit default, 0.723 then 0.722) and `composition-light-vault-manager`, whose status bar prints a fresh JUnit temporary path on every run (Execution notes X16).
 
-Record each changed line.
+Record each changed line. Any other changed line: find its cause before going on.
 
 - [ ] **Step 6: Write `docs/STATUS.md`'s new top entry and this plan's banner**
 
 The entry goes above plan 15a's and starts as below. The template stays fenced, as in plan 15a.
 
 ```markdown
-**Enterprise presentation, plan 15b: look polish at the user's direction — 2026-10-19** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, after plan 15a; [plan](superpowers/plans/2026-10-19-enterprise-15b-look-polish.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+**Enterprise presentation, plan 15b: look polish at the user's direction — 2026-10-20** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, after plan 15a; [plan](superpowers/plans/2026-10-19-enterprise-15b-look-polish.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
 ```
 
 Then give, in the series' style:
@@ -722,7 +755,7 @@ Then give, in the series' style:
   5. The default look: the title field, the rails, the headers and the shortcuts as before (a toggle shortcut opens without the tint).
 - the merge state: "Not merged, not pushed."
 
-Then this plan's status banner: "> **Status (2026-10-19): executed on `claude/enterprise-look-query` (`<first>..<last>`, then the Task 6 documentation commit).** Deviations from this plan's text: …".
+Then this plan's status banner (Execution notes X17: the execution date): "> **Status (2026-10-20): executed on `claude/enterprise-look-query` (`<first>..<last>`, then the Task 6 documentation commit).** Deviations from this plan's text: …".
 
 Run: `./gradlew :jasper-app:test --tests '*AppDocumentationTest'`
 Expected: PASS.
@@ -737,3 +770,61 @@ git commit -m "Docs: Enterprise plan 15b, look polish, at the user's direction
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
+
+---
+
+## Execution notes (2026-10-20)
+
+Refreshed before execution, at the branch tip `e858a4ecb` (plan 15a complete; `main` still `f78bb0385`). Every anchor, quoted text, path, signature and line number above was re-found in the current code and corrected where it had moved; the facts section now says what was found. Plan 15a's "Plan 15a is assumed merged" holds on this branch: SDK 0.18.2's `Presentation` (with `ToolbarSearch`), `PluginLook.Search`, `HostedPresentation`, `FakePresentations` and `plan15-baseline` are all in place. The rulings below are the refresh's, made on the user's behalf under their overnight instruction ("make decisions on my behalf"); each reads "what — why — cost if wrong".
+
+### Pre-flight scan
+
+One row per pair of tasks that share a file or an interface, then one row per task.
+
+| Scope | Shared file or interface | Finding | Verdict |
+|---|---|---|---|
+| Task 1 × Task 6 | `PanelSpec.java`, `Panels.java`; spec 10.7 | Task 1 edits `toggle`'s javadoc and `@param toggleActionId`; Task 6 edits `Panels.java:6`, `PanelSpec.java:8,13` and the spec's activation clause. Disjoint lines, but Task 1 shifts the files. | Consistent; Task 6 re-finds by quoted text (X19) |
+| Task 1 × Task 2 | `ToolWindowArea` | Task 1's window tests build areas through `DesktopTestSupport`, which uses the constructors Task 2 keeps as `NEW_UI`. | No conflict |
+| Task 2 × Task 3 | `ChromeRenderTest`, `ProjectionReadTest` | Task 2 runs both; Task 3 edits both. Either order compiles. | No conflict |
+| Task 2 × Task 4 | `ClassicHeaderTest.java`, `WindowChrome.java`, the Enterprise mock probes, the STATUS deviation list | Task 2 adds a toolbar-view test; Task 4 adds `Search` overloads and generalises `assertPaintsClassicAdd`. Task 2 edits `WindowChrome:329`; Task 4 adds an accessor. Both may move Enterprise mock expectations. | Needed a ruling (X5) |
+| Task 2 × Task 6 | `docs/sdk-icons.md`, spec 5.2 and 10.3, the pairs diff | The docs say a panel's body keeps its art; that holds only with X3's document-bar exclusion. Step 5's expected diff names Task 2's header icons. | Consistent with X3 |
+| Task 3 × Task 4 | `ClassicHeader(boolean)`, `EnterpriseLook`, `ChromeSpec.ToolbarSearch`, `HostedPresentationTest`, `ProjectionsTest` | Task 3 stores the flag and keeps `CHROME` at `FIELD`; Task 4 implements it and moves `CHROME` and the kit to `ICON`, which flips `ProjectionsTest`'s Enterprise plugin looks too (the plan had missed them). | Needed rulings (X7, X8) |
+| Task 3 × Task 6 | spec 5.2, 5.3, 5.9, 9.1; the parser's message | The constraint's message matches 5.9's new bullet. 5.3 says the `menu_bar` rule is "the only cross-field constraint"; 9.1's `PluginLook` row says "`search` FIELD". | Needed a ruling (X12) |
+| Task 4 × Task 6 | STATUS deviations, `pairs.json`, `docs/command-palette.md`, spec 10.3, `FakePresentations` | Task 4 records measured agreements; Task 6 Step 5 diffs against `plan15-baseline`, which already differs from 15a's tip in two lines. | Needed a ruling (X16) |
+| Task 4 × Task 5 | `migration.csv` | Task 4's `git add` names it; only Task 5 adds a row. | No conflict |
+| Task 5 × Tasks 1-4 | every production class those tasks touch | `LookIdentityTest` fails on any non-comment "enterprise" in app, jasper-ui or non-Enterprise plugin classes. | Needed a ruling (X11) |
+| Task 5 × Task 6 | spec 16.1 item 7 | Task 6 adds the `LookIdentityTest` bullet. | Consistent |
+| Task 1 alone | `WindowContributionsTest`; `PanelEntry.toggleActionId()`; `aShowInsideThePanelsOwnToggleActionActivates` | `WindowContributionsTest` has no flush fixture and no plan-12 activation test. `toggleActionId()` is the host-made `<id>.toggle` for an undeclared panel. The show test registered the panel before its toggle action, which `register` refuses. | Fixed in text (X1, X2, X21) |
+| Task 2 alone | `button.panel`; `classicChromeNames()`; the jasper-ui fixture; host actions with artwork; the `KitView` toolbar mount | `panel` is also set on document bars in panel bodies. Reading the holder's keys decodes the classic SVGs. The fixture is `KitFixtures`, not a "`KitContext` fixture". `setPanelHostActions` takes plain buttons; artwork comes through `setPanelHostHeader`. `enterprisesDefaultToolbarIsClassicIconSquares` mounts a `JPanel`, not a `KitView`. No migration row is due. | Fixed in text (X3, X4, X20) |
+| Task 3 alone | `everyChromeAndControlPointTakesBothItsValues`; `ClassicHeader`'s constructor; `ChromeSpec`'s javadoc; `WorkspaceChrome.STANDARD` | The test has no chrome loop to extend. `ClassicHeader` declares no constructor, so a declared one would remove the no-argument one. The javadoc counts ten points. `STANDARD` calls the private constructor. | Fixed in text (X6, X7) |
+| Task 4 alone | `EnterpriseMenuRowMockTest.Mounted`; the Settings… crop; the gallery; the whole module | The field's bounds are read before the window closes, so the button's must be too. The Settings… crop's left margin may now take the magnifier. The worktree has no Enterprise gallery for `check_pairs.py`. `CHROME` moving to `ICON` reaches every Enterprise test. `FakePresentations`' javadoc already says "Enterprise's on Linux". | Fixed in text (X8, X9, X18, X22) |
+| Task 5 alone | the helpers; the `{ ... }` count; `CANDIDATE` | `ManagedVaultLoadingTest.jars` is in `plugins`, not visible; `classFiles` and `Scanned` are. The text said "two" bodies where there is one. `new ArrayList` matches `CANDIDATE`. | Fixed in text (X10) |
+| Task 6 alone | spec 5.3, 9.1, 10.7, 16.1 item 4; the check script; `plugin-authoring.md` lines; Step 3's and Step 5's folders; dates | 5.3 and 9.1 as above. 10.7's quoted `ACTIVATING_TOGGLE` sentence does not exist, and its real clause ("a plugin's own toggle opens a frame without activating it") would become false. Item 4's insertion point split a parenthesis. 15a moved the guide's lines by 5. 15a ran Steps 3 and 5 in a fixed folder. The plan executes on 2026-10-20. | Fixed in text (X12 to X17) |
+
+### Rulings
+
+- **X1. Task 1's window-level tests go in `WindowPanelsTest`, beside plan 12's.** What: the five `WindowContributionsTest` cases become `WindowPanelsTest` cases with its flush fixture (`DockChromeTest.classicDock()`), `focusedSlot()` and `focusMoved(null)`; the Review Focus names follow. Why: that file holds plan 12's activation tests and the only flush-framed window fixture; `WindowContributionsTest` has neither, and the plan says to copy plan 12's way. Cost if wrong: none; the tests are found by name.
+- **X2. An activating toggle also needs `PanelEntry.namedToggle()`.** What: `ACTIVATING_TOGGLE` when the panel declared its toggle and `running` equals it; the show path tests `spec.toggleActionId()` is present. Why: `toggleActionId()` is the host-made `<id>.toggle` for an undeclared panel, and Rulings 1 is about the panel's own declared action. Cost if wrong: none; the case is unreachable for a well-formed plugin.
+- **X3. "In the panel header" is `panel && !documentBar`, and every check reads the flag first.** What: the classic art applies to toolbar strips, header controls and host actions; a document bar's buttons and menus in a panel body keep the catalog, with a new `KitClassicChromeIconsTest` case. Why: `ViewReconciler.java:305,307` sets `panel` on document bars (the Vault's + New), and Rulings 3 keeps bodies on the catalog; reading the flag first keeps the default look from asking. Cost if wrong: a header control also marked `documentBar` would keep its catalog art; none exists.
+- **X4. `classicChromeNames()` comes from a `Set.of` constant outside `ClassicHolder`.** What: `BuiltInArtwork.CLASSIC_NAMES`, held equal to `classicChrome().keySet()` by `BuiltInArtworkTest.theClassicNamesAreTheClassicHoldersKeys`. Why: touching the holder decodes its SVGs (`pair`), and its contract is that the default look never decodes them; the default look must stay byte-identical and its start-up unchanged. Cost if wrong: two lists to keep in step, held by one test.
+- **X5. `ClassicHeaderTest` is shared by Tasks 2 and 4 without conflict.** What: Task 2's new test uses today's `window(themes, view, icons)`; Task 4 adds `Search` overloads and turns `assertPaintsClassicAdd` into a delegate of `assertPaintsClassic(button, name)`. `WindowChrome` edits are disjoint (Task 2 `:329`, Task 4 a new accessor). Each task lists the Enterprise mock expectations it moves, and Task 6's STATUS entry takes both lists. Why: either order of review keeps both tasks green. Cost if wrong: none.
+- **X6. `everyChromeAndControlPointTakesBothItsValues` is unchanged.** What: the bullet asking to give it a classic base is dropped. Why: it loops over control points only; the new `theToolbarSearchPointDefaultsToTheFieldAndTakesTheIcon` gives both values. Cost if wrong: none.
+- **X7. Task 3 declares both `ClassicHeader` constructors.** What: `ClassicHeader() { this(false); }` and `ClassicHeader(boolean iconSearch)`; `WorkspaceChrome.STANDARD` passes `false`; `ChromeSpec`'s javadoc says eleven points. Why: the class has only the implicit constructor today, which a declared one removes (`WindowPairsTest:93` uses it). Cost if wrong: none.
+- **X8. Task 4 flips `ProjectionsTest`'s Enterprise plugin looks and runs the whole app module once.** What: `thePluginLookIsTheLookOnEachPlatform`'s three `EnterpriseLook.CHROME` expectations take `Search.ICON`; Step 3 ends with `./gradlew :jasper-app:test`. Why: those read `CHROME`, which Task 4 moves; the plan's run lists missed them, and any other Enterprise test that reads the field shows up only in a full run. Cost if wrong: one module run's time.
+- **X9. `EnterpriseMenuRowMockTest.Mounted` gains the search button's bounds.** What: a `Rectangle search` component read beside `fieldAt` through `owner.chrome().composition()`. Why: the window closes before the assertions run (its Execution notes R35), so the bounds must be captured like the field's. Cost if wrong: one more record component and one constructor call.
+- **X10. Migration rows are for new candidate files only; `LookIdentityTest` gets one.** What: the row is given in Task 5; jasper-ui's `KitClassicChromeIconsTest` needs none; edited files keep their rows. Why: `ThemeMigrationCoverageTest` scans app, SDK, testkit and plugin sources only and checks presence, and `new ArrayList` matches `CANDIDATE`. Cost if wrong: a coverage failure in Task 5, which its run catches.
+- **X11. Tasks 1 to 4 add no identifier or string containing "enterprise" to production code.** What: comments may name Enterprise; fields, locals, parameters, strings and class names may not. Why: `LookIdentityTest` reads constant pools, and Gradle compiles with debug information, so local variable names count. Cost if wrong: Task 5 fails and names the class; rename it there.
+- **X12. Spec 5.3 and 9.1 are corrected, not just extended.** What: 5.3's "It is the only cross-field constraint." becomes the new constraint plus "These are the only cross-field constraints."; 9.1 gains a `WorkspaceLook.search` row, and the `PluginLook` row's "`search` FIELD" becomes "ICON when `toolbar_search = "icon"`, else FIELD". The check script asserts both. Why: appending would leave a false sentence and two rows for one field. Cost if wrong: none.
+- **X13. Spec 10.7's edit replaces the clause that would become false.** What: "and a plugin's own toggle opens a frame without activating it" becomes the activating rule, ending "any other plugin toggle opens a frame without activating it". Why: the quoted `ACTIVATING_TOGGLE` sentence does not exist in the spec, and the real clause contradicts plan 15b. Cost if wrong: none.
+- **X14. Spec 16.1 item 4 keeps its parenthesis whole.** What: `toolbar_search` is held at `field` and "covered by `ClassicHeaderTest`" after the `icons` clause's test list. Why: inserting after "in every row" split "held at `classic` … and covered by …". Cost if wrong: none.
+- **X15. Task 6 Steps 3 and 5 share the fixed folder `scratchpad/plan15b-check`.** What: in place of `mktemp -d`, emptied at Step 3. Why: each command runs in a fresh shell, and plan 15a ran the same way, so Step 5's `pairs.txt` sits beside Step 3's renders for review. Cost if wrong: none.
+- **X16. Step 5's expected diff includes plan 15a's two drifting lines.** What: `enterprise-settings-13` (0.723, 0.722 at 15a's tip) and `composition-light-vault-manager` (a fresh JUnit path every run) may differ from `plan15-baseline/pairs.txt` without a cause to find. Why: the baseline is `f78bb0385`'s, and 15a recorded both. Cost if wrong: a real change on those two lines could pass unexamined; their crops hold no header, toolbar or search art.
+- **X17. Plan 15b's STATUS heading and banner carry 2026-10-20.** What: the day it executes; the user's direction stays dated 2026-10-19 everywhere. Why: the series dates an entry by its execution, and the spec's plan-15 header line (Rulings 13) keeps its date. Cost if wrong: one date to change.
+- **X18. Task 4 Step 3 renders the Enterprise gallery before `check_pairs.py`, and only its `chrome-toolbar-*` lines count there.** What: the two `:jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryScale=2` runs come first; Task 6 Step 5 gives the full 101-pair verdict after `check`. Why: the worktree's gallery holds only the 1x default renders now, and the other pairs read whatever `build/` holds. Cost if wrong: a pair broken by Task 2 is caught in Task 6, not Task 4.
+- **X19. Anchors in a file another task edited are found by quoted text.** What: Task 6's `Panels.java:6`, `PanelSpec.java:8,13` and the spec's sections, and every "line before this task's edits", are located by the quoted text. Why: Tasks 1 to 5 shift those lines. Cost if wrong: none.
+- **X20. Task 2's fixtures are named as the code has them.** What: `KitFixtures.context()`/`render` with `Edt.run` (as `KitViewToolbarStripTest`); a host action with artwork through `setPanelHostHeader` (as `ToolWindowArea.hostHeader` and `PanelHostHeaderTest`); a real `KitView` toolbar view mounted as `WindowToolbarViewsTest.aKitViewIsPresentedAsAToolbarStrip` does. Why: the old text named a fixture and a mount that do not exist or carry no artwork. Cost if wrong: none.
+- **X21. `aShowInsideThePanelsOwnToggleActionActivates` registers its actions before the panel.** What: the handlers call `hosts[0].show()` on a holder the factory fills. Why: `register` refuses a toggle action that is not registered yet (`requireOwn`). Cost if wrong: none.
+- **X22. The Settings… crop may start at the search button's right edge.** What: only if the magnifier's ink now falls in its 44-mock-px left margin, with the 2026-10-19 note. Why: the button sits 6 px before Settings…, inside that margin. Cost if wrong: the crop checks a little less of the gap before Settings….
+- **X23. No SDK, testkit or plugin version moves.** What: the SDK javadoc gains activation sentences marked "since 0.18.2", and `FakePresentations.CLASSIC` changes value only. Why: the API is unchanged and 0.18.2 is the version that ships with this host (Global Constraints, Rulings 2 and 9). Cost if wrong: a plugin cannot tell activation or the icon from the SDK version alone; it reads `Presentation.toolbarSearch`, and activation needs nothing from it.
+
+Orchestrator constraints that apply to every task: work only in this worktree; `./gradlew`, never `--stop`; no GUI, no AOT training (headless renders and the gallery are allowed); no push, merge or rebase; no bare `git stash`; no subagents; source hygiene by AGENTS.md's Python check; doclint-safe javadoc; the commit trailer as in Global Constraints. A timing-sensitive test (`StagedTransferLifecycleTest`, `StartupStepsApplicationTest`'s `@TempDir` clean-up) may flake once: re-run it alone before treating it as a failure.
