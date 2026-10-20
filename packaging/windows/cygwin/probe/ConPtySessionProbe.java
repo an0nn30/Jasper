@@ -36,10 +36,9 @@ public final class ConPtySessionProbe {
                 cd -- "$JASPER_PROBE_CWD" || exit 31
                 exec 2>&3 3>&-
                 probe_title() { printf '\\033]2;%s\\007' "$1"; }
-                PS1='probe> '
+                PS1='\\[\\e]2;ready:$JASPER_PROFILE_PROBE\\a\\]probe> '
                 printf '\\033]133;A\\007'
                 printf '\\033]7;%s\\007' "$JASPER_PROBE_URI"
-                probe_title "ready:$JASPER_PROFILE_PROBE"
                 """);
             var environment = new HashMap<>(System.getenv());
             environment.keySet().removeIf(key -> key.equalsIgnoreCase("PATH") || key.equalsIgnoreCase("HOME"));
@@ -64,33 +63,40 @@ public final class ConPtySessionProbe {
                         if (!command.isBlank() && status.isPresent()) commandStatus.set(status.getAsInt());
                     }
                 });
-                title(session, "ready:loaded"); result.put("startupProfile", "passed");
+                title(session, events, "ready:loaded"); result.put("startupProfile", "passed");
                 ProbeAssertions.await(session::shellIntegrationDetected, EVENT_TIMEOUT, "OSC 133 A not decoded");
                 ProbeAssertions.await(() -> session.workingDirectory().map(p -> p.normalize().equals(cwd.normalize())).orElse(false),
                     EVENT_TIMEOUT, "OSC 7 directory not decoded");
                 result.put("osc7And133", "passed");
                 session.write("printf '\\033]133;A\\007\\033]133;B\\007'; probe_title markers\r");
-                title(session, "markers");
+                title(session, events, "markers");
                 session.write("printf '\\033]133;C\\007'; false; status=$?; printf '\\033]133;D;%s\\007' \"$status\"; probe_title cycle\r");
-                title(session, "cycle");
+                title(session, events, "cycle");
                 ProbeAssertions.await(() -> commandStatus.get() == 1, EVENT_TIMEOUT, "OSC 133 command completion missing or wrong status");
                 result.put("osc133CommandCycle", "passed");
                 session.write("probe_title \"cwd:$(pwd)\"\r");
-                title(session, "cwd:" + environment.get("JASPER_PROBE_CWD")); result.put("workingDirectory", "passed");
-                session.write("probe_title '\u00e9\u6f22\ud83d\ude00'\r"); title(session, "\u00e9\u6f22\ud83d\ude00");
+                title(session, events, "cwd:" + environment.get("JASPER_PROBE_CWD")); result.put("workingDirectory", "passed");
+                session.write("probe_title '\u00e9\u6f22\ud83d\ude00'\r"); title(session, events, "\u00e9\u6f22\ud83d\ude00");
                 result.put("unicodeRoundTrip", "passed");
-                // Establish the Cygwin console before its first resize and record the baseline.
+                // Record the baseline; this query alone does not make later resize/input safe.
                 session.write("probe_title \"initial-size:$(stty size)\"\r");
-                title(session, "initial-size:" + session.rows() + " " + session.columns());
+                title(session, events, "initial-size:" + session.rows() + " " + session.columns());
                 result.put("initialSize", "passed");
-                session.resize(101, 37);
-                session.write("probe_title \"size:$(stty size)\"\r"); title(session, "size:37 101"); result.put("resize", "passed");
+                for (int iteration = 0; iteration < 20; iteration++) {
+                    int columns = 81 + iteration, rows = 25 + iteration;
+                    session.resize(columns, rows);
+                    // Immediate input catches the dropped first byte seen during Cygwin resize handling.
+                    session.write("probe_title \"size:" + iteration + ":$(stty size)\"\r");
+                    title(session, events, "size:" + iteration + ":" + rows + " " + columns);
+                    result.put("completedResizes", Integer.toString(iteration + 1));
+                }
+                result.put("resize", "passed");
                 session.write("cmd.exe /d /c exit 7; probe_title \"native:$?\"\r");
-                title(session, "native:7"); result.put("windowsProgram", "passed");
+                title(session, events, "native:7"); result.put("windowsProgram", "passed");
                 session.write("bash -c 'trap \"exit 130\" INT; printf \"\\033]2;sleeping\\007\"; read -r -t 60; exit 99'; probe_title \"interrupt:$?\"\r");
-                title(session, "sleeping"); // Child is foreground and its INT trap is installed.
+                title(session, events, "sleeping"); // Child is foreground and its INT trap is installed.
                 session.write(new byte[]{3});
-                title(session, "interrupt:130"); result.put("interrupt", "passed");
+                title(session, events, "interrupt:130"); result.put("interrupt", "passed");
                 session.write("exit\r");
                 ProbeAssertions.require(session.exitFuture().get(15, TimeUnit.SECONDS) == 0, "Bash did not exit cleanly");
             }
@@ -104,8 +110,10 @@ public final class ConPtySessionProbe {
             }
         }
     }
-    private static void title(TerminalSession session, String expected) throws Exception {
-        ProbeAssertions.await(() -> session.title().equals(expected), EVENT_TIMEOUT,
+    private static void title(TerminalSession session, List<String> events, String expected) throws Exception {
+        // A command's title precedes the next prompt. Wait for both before submitting more input.
+        ProbeAssertions.await(() -> (expected.equals("sleeping") || expected.equals("ready:loaded")) ? session.title().equals(expected) :
+                events.contains(expected) && session.title().equals("ready:loaded"), EVENT_TIMEOUT,
             "Expected title " + expected + "; terminal output/ConPTY probe");
     }
     private static String cygpath(Path bin, Path path, Path log) throws Exception {

@@ -103,11 +103,10 @@ Sources for the candidate hook and Setup flags:
 - https://cygwin.com/faq.html#faq.setup.cli
 - https://sourceware.org/pipermail/cygwin-announce/2024-February/011525.html
 
-Native testing found that direct Bash/SSH preflight commands can affect later
-ConPTY behavior in the same JVM. Provisioning and terminal checks now use separate
-processes, matching the planned helper/app boundary. An initial `stty size` query
-establishes and checks the Cygwin console before resizing; the failure observed
-when resizing before that query remains a production launch constraint. See
+The terminal probe uses a separate JVM, checks initial dimensions, and waits for
+both command results and the next Bash prompt. It then requires twenty immediate
+resize/write cycles. Native testing reproduces first-character input loss despite
+the initial size query; production launch remains gated. See
 [the evidence record](../../../docs/superpowers/plans/2026-10-20-jasper-cygwin-probe-results.md).
 
 The approved implementation plan requires native evidence before production

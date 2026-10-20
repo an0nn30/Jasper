@@ -20,8 +20,8 @@ Local evidence (macOS):
 - Explicit native tasks fail with `Cygwin installer probe requires Windows` and
   `Cygwin terminal probe requires Windows`, respectively.
 
-Native results below establish the MSI hook and identify a Cygwin console
-initialization constraint. Production Tasks 2–8 remain gated on completing the
+Native results below establish the MSI hook and identify a resize/input-loss
+defect in the Cygwin/ConPTY path. Production Tasks 2–8 remain gated on completing the
 launch contract and native x64 Windows coverage.
 
 Execution rulings:
@@ -105,8 +105,8 @@ Native RED/GREEN findings:
   fresh x64-emulated run passed startup, OSC 7/133, cwd, Unicode, resize, Windows
   exit status and Ctrl+C. Adding an initial `stty size` query before resizing
   passes the previously failing diagnostic. The final harness checks that
-  initial grid explicitly. Production launch must establish console readiness
-  before resize; an unconditional first resize is not validated by these results.
+  initial grid explicitly. Repeated-resize testing below supersedes the earlier
+  interpretation of this as an initialization-only problem.
 
 Final disconnected fresh-install runs **passed** with both ARM64 JBR and x64
 JBR under emulation. Parallels net0 was disconnected; the guest reported its
@@ -126,13 +126,50 @@ normalized files under `native-evidence/` and the adapter execution record in
 overrides, installer/Setup logs, package databases and terminal evidence.
 
 Task 1 remains in progress: native x64 Windows coverage and the production
-launch readiness contract are outstanding. Full-screen interactive acceptance,
+resize/input reliability are outstanding. Full-screen interactive acceptance,
 production Bash-wrapper startup, and a release payload with matching sources
-remain later implementation/release work. The probe's initial-size handshake
-must not be mistaken for validation of an unconditional first resize.
+remain later implementation/release work. The initial-size query does not resolve the resize/input defect.
 
 Scoped checks after native-driven fixes: 30 portable assertions, the real
 runtime-image check, source hygiene and diff checks pass. Independent review of
 the MSI quoting, stderr restoration, process split and initial-grid check found
 no remaining actionable issues. The three baseline full-check failures above
 remain outside this change.
+
+## Repeated-resize investigation
+
+The follow-up regression performs twenty immediate resize/write cycles and
+waits for both each command result and the subsequent Bash prompt. The original
+initial-size query is retained as a dimension assertion, not a readiness fix.
+The stronger native check fails: Jasper sends `probe_title ...` in full, but the
+returned console echo and Bash error contain `robe_title ...`. This is input
+loss, not a hung `stty` command. Headless rendering of the terminal confirms it.
+
+Temporary boundary instrumentation records complete UTF-8 writes into pty4j and
+the truncated echo coming back, with no intervening terminal-query reply.
+Cygwin strace records SIGWINCH/select processing at the failing resize. This
+localizes the loss downstream of Jasper's PTY write; an exact upstream code fix
+has not been established.
+
+Controlled scratch diagnostics reproduce the failure with Cygwin 3.6.11-1,
+3.6.9-1 and the signed upstream test runtime
+3.7.0-0.631.g7fd5f9c932c0. The older and test DLLs ran in separate scratch copies;
+the original runtime hash was unchanged. Initial `stty size`, a fresh JVM,
+prompt synchronization, ignoring WINCH in Bash, and a Cygwin `script` bridge do
+not eliminate repeated-resize loss. The system-ConPTY diagnostic also fails
+(earlier, while submitting the first command), so it is not an accepted fix.
+None of these diagnostics changes Jasper's production launch behavior.
+
+The previous disconnected single-resize results remain historical evidence for
+Setup and those individual runs; they do not clear the production terminal gate.
+Task 1 remains open. Before Tasks 2–8 can ship, either an upstream runtime fix
+must pass the regression or the launch design must be revised and validated.
+Native x64 Windows remains a separate release-validation gap.
+
+The checked-in strengthened probe fails on the first resize from fresh installs
+with both ARM64 JBR and x64 JBR under emulation (`arm64-stress-01` and
+`x64-emulated-stress-01`). Scoped verification passes 31 portable assertions
+and the runtime-image test. Independent review corrected a stale README claim
+and increased the child timeout to cover all per-event deadlines (RED/GREEN).
+The user authorized investigating a dedicated POSIX PTY relay; that experiment
+is not yet an accepted production launch mechanism.

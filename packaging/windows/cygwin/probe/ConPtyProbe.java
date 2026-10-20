@@ -5,6 +5,7 @@ import java.util.List;
 
 /** Uses only the supported terminal facade; all shells run in a newly owned scratch environment. */
 public final class ConPtyProbe {
+    static Duration sessionTimeout() { return Duration.ofMinutes(10); }
     static String quietMode() { return "hidden"; }
     public static void main(String[] args) throws Exception {
         ProbeSupport.windows("terminal");
@@ -47,7 +48,7 @@ public final class ConPtyProbe {
                 Path.of(System.getProperty("java.home"), "bin/java.exe").toString(),
                 "--enable-native-access=ALL-UNNAMED", "-Djava.awt.headless=true", "-cp",
                 System.getProperty("java.class.path"), "ConPtySessionProbe", scratch.toString()),
-                scratch.resolve("terminal-session.log"), Duration.ofMinutes(3));
+                scratch.resolve("terminal-session.log"), sessionTimeout());
             var sessionEvidence = new java.util.Properties();
             try (var in = Files.newInputStream(scratch.resolve("terminal-session.properties"))) { sessionEvidence.load(in); }
             for (String key : sessionEvidence.stringPropertyNames()) result.put(key, sessionEvidence.getProperty(key));

@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-10-20-jasper-bundled-cygwin-design.md).
 
-**Status:** Approved for execution, 2026-10-20. Task 1 harnesses and portable checks are implemented on `codex/cygwin-probes`. The authorized Windows 11 ARM64 VM passes both MSI lifecycles (ARM64 JBR and x64 JBR under emulation); disconnected fresh-install terminal probes also pass on both JVM architectures. [Evidence and rulings](2026-10-20-jasper-cygwin-probe-results.md). Tasks 2–8 remain gated on the launch contract and native x64 coverage. Deviations: decoded events replace unsupported raw-output capture; VM runs invoke the built jars directly with matching packaged dependencies; provisioning and terminal checks use separate JVMs, and terminal validation establishes the initial Cygwin console size before resize.
+**Status:** Approved for execution, 2026-10-20. Task 1 is in progress on `codex/cygwin-probes`. Both MSI lifecycles pass in the authorized Windows 11 ARM64 VM. The stronger twenty-cycle resize/input regression fails, superseding the earlier single-resize console-readiness interpretation. [Evidence and rulings](2026-10-20-jasper-cygwin-probe-results.md). Tasks 2–8 remain gated on a runtime fix or validated launch-design revision and native x64 coverage. Deviations: decoded events replace unsupported raw-output capture; VM runs invoke built jars with matching guest dependencies; terminal checks use a separate JVM and now synchronize on the Bash prompt and stress repeated resize/write cycles.
 
 ## Global Constraints
 

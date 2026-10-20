@@ -26,6 +26,11 @@ public final class ProbeAssertionsTest {
         }
         if (!ConPtyProbe.quietMode().equals("hidden")) throw new AssertionError("Setup would open its wizard");
         checks++;
+        // Each native wait may use its full 15-second allowance; 20 resize cycles plus
+        // startup, command checks, path conversion and exit must fit inside the parent deadline.
+        if (ConPtyProbe.sessionTimeout().compareTo(Duration.ofMinutes(9)) < 0)
+            throw new AssertionError("Parent deadline can kill a session whose individual waits all pass");
+        checks++;
         String template = "<Wix><Product><InstallExecuteSequence></InstallExecuteSequence></Product></Wix>";
         var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
         var doc = factory.newDocumentBuilder().parse(new java.io.ByteArrayInputStream(

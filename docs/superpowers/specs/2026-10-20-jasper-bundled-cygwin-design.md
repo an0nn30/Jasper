@@ -1,8 +1,8 @@
 # Jasper bundled Cygwin for Windows
 
 Status: approved by the user on 2026-10-20. The [implementation plan](../plans/2026-10-20-jasper-bundled-cygwin.md)
-is approved for execution. Task 1 probe harnesses are implemented; native Windows
-evidence is pending before production work begins.
+is approved for execution. Task 1 installer probes pass in the Windows VM; repeated-resize input loss
+keeps the terminal launch gate open before production work begins.
 
 ## 1. Outcome and scope
 
