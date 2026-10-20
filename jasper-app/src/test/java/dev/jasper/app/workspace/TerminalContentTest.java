@@ -43,7 +43,7 @@ class TerminalContentTest {
             TerminalContent original = owners[1].currentTerminal();
             owners[1].newTab(HOME);
             owners[1].selectTab(original);
-            owners[1].workspace().activeGroupView().reorder(owners[1].tabs().get(0), 1);
+            owners[1].workspace().reorder(owners[1].tabs().get(0), owners[1].workspace().model().activeGroup(), 1);
             assertThat(owners[1].currentTerminal()).isSameAs(original);
             owners[1].close();
         });

@@ -16,7 +16,6 @@ import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -161,7 +160,6 @@ final class ClassicTabs extends JPanel implements TabStrip {
     final class Entry extends JComponent {
         private final Tab tab;
         private boolean closeHover, closePressed;
-        private Point origin;
 
         Entry(Tab tab) {
             this.tab = tab;
@@ -174,7 +172,6 @@ final class ClassicTabs extends JPanel implements TabStrip {
                     if (over != closeHover) { closeHover = over; repaint(); }
                 }
                 @Override public void mousePressed(MouseEvent event) {
-                    origin = null;
                     if (disposed) return;
                     if (event.isPopupTrigger()) { popup(event); return; }
                     if (SwingUtilities.isMiddleMouseButton(event)) { group.close(tab); return; }
@@ -182,7 +179,8 @@ final class ClassicTabs extends JPanel implements TabStrip {
                     // A press on the × neither selects nor drags; dragging off it before the release cancels the close.
                     if (closeTarget().contains(event.getPoint())) { closePressed = true; return; }
                     group.select(tab);
-                    origin = SwingUtilities.convertPoint(Entry.this, event.getPoint(), ClassicTabs.this);
+                    // The tab drag may start here (workspace tabs spec 12).
+                    group.pressed(tab, event);
                 }
                 @Override public void mouseReleased(MouseEvent event) {
                     boolean closing = closePressed;
@@ -192,16 +190,11 @@ final class ClassicTabs extends JPanel implements TabStrip {
                         if (SwingUtilities.isLeftMouseButton(event) && closeTarget().contains(event.getPoint())) closeClicked();
                         return;
                     }
-                    Point start = origin; origin = null;
-                    if (disposed || start == null) return;
-                    Point end = SwingUtilities.convertPoint(Entry.this, event.getPoint(), ClassicTabs.this);
-                    if (start.distance(end) <= metric(DesignMetrics.Role.TAB_REORDER_THRESHOLD)) return;
-                    for (int i = 0; i < entries.size(); i++)
-                        if (entries.get(i).getBounds().contains(end)) { group.reorder(tab, i); break; }
+                    group.released(event);
                 }
                 @Override public void mouseMoved(MouseEvent event) { hover(event); }
-                // While the × is held, its hover shows whether a release would close.
-                @Override public void mouseDragged(MouseEvent event) { if (closePressed) hover(event); }
+                // While the × is held, its hover shows whether a release would close; otherwise the tab drag follows the cursor.
+                @Override public void mouseDragged(MouseEvent event) { if (closePressed) hover(event); else group.dragged(event); }
                 @Override public void mouseExited(MouseEvent event) { if (closeHover) { closeHover = false; repaint(); } }
             };
             addMouseListener(mouse); addMouseMotionListener(mouse);

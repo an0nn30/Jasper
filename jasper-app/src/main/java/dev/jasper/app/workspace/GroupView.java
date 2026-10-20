@@ -10,6 +10,7 @@ import java.awt.Dimension;
 import java.awt.Insets;
 import java.awt.LayoutManager;
 import java.awt.Rectangle;
+import java.awt.event.MouseEvent;
 import java.util.List;
 import java.util.Objects;
 import javax.swing.Icon;
@@ -19,9 +20,9 @@ import javax.swing.SwingUtilities;
 
 /**
  * One tab group of a window's workspace (workspace tabs spec 10): the look's tab strip, always shown, over a card area
- * showing the group's selected tab. The strip lists, selects, closes, reorders and opens tabs in this group only. A tab's
- * component enters and leaves the card area as the layout puts the tab in and out of the group, so a tab moved to
- * another group leaves one group view for the other with its session untouched (spec 2.3). EDT only.
+ * showing the group's selected tab. The strip lists, selects, closes and opens tabs in this group only and starts the tab
+ * drag (spec 12). A tab's component enters and leaves the card area as the layout puts the tab in and out of the group,
+ * so a tab moved to another group leaves one group view for the other with its session untouched (spec 2.3). EDT only.
  */
 final class GroupView extends JPanel {
     private final WindowContent owner;
@@ -87,8 +88,12 @@ final class GroupView extends JPanel {
     JPopupMenu menu(Tab tab) { return owner.tabMenu(tab); }
     void select(Tab tab) { owner.selectTab(tab); }
     void close(Tab tab) { owner.closeTab(tab); }
-    /** A strip drag: moves the tab to {@code index} of this group, keeping the selection. */
-    void reorder(Tab tab, int index) { workspace.reorder(tab, id, index); }
+    /** A left press on {@code tab}'s entry in the strip: the tab drag may start from it (workspace tabs spec 12). */
+    void pressed(Tab tab, MouseEvent event) { owner.tabDrag().pressed(this, tab, event); }
+    /** A drag event from the strip, which the tab drag follows. */
+    void dragged(MouseEvent event) { owner.tabDrag().dragged(event); }
+    /** A release on the strip, which ends the tab drag. */
+    void released(MouseEvent event) { owner.tabDrag().released(event); }
     /** The classic tabs' "+": a new terminal tab in this group. */
     void newTab() { workspace.activate(id); owner.invoke(ActionId.NEW_TAB); }
     /** Whether {@code tab} joined this group by a move: the strip shows it at once, without the open motion (Rulings 27). */

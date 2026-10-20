@@ -247,7 +247,6 @@ final class WindowTabs extends JPanel implements TabStrip {
             }
         };
         private boolean hovered;
-        private Point origin;
 
         Entry(Tab tab) {
             super(null); this.tab = tab; slot = new Slot(this); setOpaque(false);
@@ -263,32 +262,23 @@ final class WindowTabs extends JPanel implements TabStrip {
                     hover(contains(SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), Entry.this)));
                 }
                 @Override public void mousePressed(MouseEvent event) {
-                    origin = null;
                     if (disposed) return;
                     if (event.isPopupTrigger()) { popup(event); return; }
                     if (SwingUtilities.isMiddleMouseButton(event)) { group.close(tab); return; }
                     if (SwingUtilities.isLeftMouseButton(event) && event.getComponent() != close) {
                         group.select(tab);
-                        origin = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
+                        // The tab drag may start here (workspace tabs spec 12).
+                        group.pressed(tab, event);
                     }
                 }
+                @Override public void mouseDragged(MouseEvent event) { group.dragged(event); }
                 @Override public void mouseReleased(MouseEvent event) {
                     if (event.isPopupTrigger()) { popup(event); return; }
-                    Point start = origin; origin = null;
-                    if (disposed || start == null || !SwingUtilities.isLeftMouseButton(event)) return;
-                    Point end = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
-                    if (start.distance(end) <= NativeStyles.installed().metric(DesignMetrics.Role.TAB_REORDER_THRESHOLD)
-                        || !viewport.getBounds().contains(end)) return;
-                    settle(); doLayout();
-                    for (int i = 0; i < order.size(); i++) {
-                        Entry target = entries.get(order.get(i));
-                        if (target.isVisible() && SwingUtilities.convertRectangle(viewport, target.getBounds(), WindowTabs.this).contains(end)) {
-                            group.reorder(tab, i); break;
-                        }
-                    }
+                    group.released(event);
                 }
             };
             addMouseListener(gestures); select.addMouseListener(gestures); close.addMouseListener(gestures);
+            addMouseMotionListener(gestures); select.addMouseMotionListener(gestures); close.addMouseMotionListener(gestures);
             add(close); add(select);
         }
         private void hover(boolean value) { hovered = value; doLayout(); repaint(); }

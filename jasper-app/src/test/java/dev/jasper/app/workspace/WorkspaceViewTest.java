@@ -260,7 +260,7 @@ class WorkspaceViewTest {
             var owner = window(3);
             var tabs = owner.tabs();
             owner.selectTab(tabs.get(0));
-            owner.workspace().activeGroupView().reorder(tabs.get(2), 0);
+            owner.workspace().reorder(tabs.get(2), owner.workspace().model().activeGroup(), 0);
             assertThat(owner.tabs()).containsExactly(tabs.get(2), tabs.get(0), tabs.get(1));
             assertThat(owner.selectedTab()).as("reordering keeps the selection").isSameAs(tabs.get(0));
             assertThat(owner.workspace().activeGroupView().tabs()).isEqualTo(owner.tabs());

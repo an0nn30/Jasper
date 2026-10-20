@@ -111,6 +111,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final DockStripe leftStripe, rightStripe;
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
+    /** Drags a tab from any of this window's strips (workspace tabs spec 12). */
+    private final TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this));
     private UiState uiState = UiState.inMemory();
     private boolean railVisible = true;
     /** False once {@link #forgetLayout} ran: closing then saves nothing. */
@@ -1133,6 +1135,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The window's stripes. */
     StripeSet stripes() { return stripes; }
     DockDrag dockDrag() { return dockDrag; }
+    /** The tab drag this window's strips start. */
+    TabDrag tabDrag() { return tabDrag; }
     boolean railVisible() { return railVisible; }
 
     void setRailVisible(boolean value) {
@@ -1718,7 +1722,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void setActive(boolean value) {
         if (!value && commandPalette != null) commandPalette.windowDeactivated();
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
-        if (!value) dockDrag.cancel();
+        if (!value) { dockDrag.cancel(); tabDrag.cancelFrom(this); }
         active = value; update();
     }
     void setToolbarMode(ToolbarMode mode) {
@@ -1741,6 +1745,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
         if (bodyLease != null) { bodyLease.close(); bodyLease = null; }
         dockDrag.cancel();
+        tabDrag.cancelFrom(this);
         paletteKeys.close();
         if (contributed != null) { contributed.close(rememberLayout); contributed = null; }
         area.close();

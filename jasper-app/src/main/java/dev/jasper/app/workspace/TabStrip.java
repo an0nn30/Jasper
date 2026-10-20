@@ -8,8 +8,9 @@ import javax.swing.JPopupMenu;
 
 /**
  * One tab group's strip (workspace tabs spec 10; Enterprise presentation spec 10.5): today's equal tabs or the classic
- * tabs, always shown, even for one tab. It lists, selects, closes, reorders and opens tabs in its group view only, and
- * shows as active while that group is the active group of an active window. EDT only.
+ * tabs, always shown, even for one tab. It lists, selects, closes and opens tabs in its group view only, its presses start
+ * the tab drag (workspace tabs spec 12), and it shows as active while that group is the active group of an active window.
+ * EDT only.
  */
 sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs {
     /** The component mounted above the group's cards. */

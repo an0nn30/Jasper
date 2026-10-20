@@ -64,7 +64,9 @@ class WorkspaceMetricsTest {
         var required = Map.of("SlashSegments.java", List.of("ChromePainter.installed().statusDot"),
             "StatusProgressView.java", List.of("STATUS_PROGRESS_BAR_HEIGHT", "STATUS_PROGRESS_MIN_HEIGHT"),
             "WindowTabs.java", List.of("TAB_CLOSE_FIT_WIDTH", "TAB_CLOSE_GUTTER", "TAB_COMPACT_GUTTER",
-                "TAB_CLOSE_WIDTH", "TAB_CLOSE_TRAILING", "ChromePainter.installed().tabStrip", "TAB_REORDER_THRESHOLD"),
+                "TAB_CLOSE_WIDTH", "TAB_CLOSE_TRAILING", "ChromePainter.installed().tabStrip"),
+            // Workspace tabs plan 5: every strip's drag starts past the kit's tab drag threshold, in the one tab drag.
+            "TabDrag.java", List.of("TAB_REORDER_THRESHOLD"),
             "ToolWindowHeader.java", List.of("TOOL_HEADER_LEADING_PADDING", "TOOL_HEADER_TRAILING_PADDING",
                 "TOOL_HEADER_DETAIL_GAP", "TOOL_HEADER_ACTIVE_DOT"));
         for (var entry : required.entrySet())

@@ -155,7 +155,7 @@ class WindowTabsTest {
             var first = owner.currentTerminal(); first.rename("first"); owner.update();
             JComponent control = named(strip, "select:first");
             owner.newTab(HOME); var second = owner.currentTerminal();
-            owner.workspace().activeGroupView().reorder(owner.tabs().get(1), 0);
+            owner.workspace().reorder(owner.tabs().get(1), owner.workspace().model().activeGroup(), 0);
             assertThat(owner.currentTerminal()).isSameAs(second);
             first.rename("<html>literal title"); owner.update();
             owner.selectVariant(false);
@@ -193,10 +193,12 @@ class WindowTabsTest {
             JComponent strip = named(owner, "windowTabs");
             var first = owner.currentTerminal(); first.rename("first"); owner.newTab(HOME);
             var second = owner.currentTerminal(); second.rename("second"); owner.update();
-            layout(strip, 600, 38);
+            // The whole window lays out, so the tab drag finds the strip inside it (workspace tabs spec 12).
+            layout(owner, 800, 600);
             JComponent one = named(strip, "select:first"), two = named(strip, "select:second");
-            Point target = SwingUtilities.convertPoint(two, 10, 10, one);
+            Point target = SwingUtilities.convertPoint(two, two.getWidth() - 10, 10, one);
             mouse(one, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
+            mouse(one, MouseEvent.MOUSE_DRAGGED, target.x, target.y, MouseEvent.NOBUTTON);
             mouse(one, MouseEvent.MOUSE_RELEASED, target.x, target.y, MouseEvent.BUTTON1);
             assertThat(owner.tabs().get(1).component()).isSameAs(first);
             assertThat(owner.currentTerminal()).isSameAs(first);
