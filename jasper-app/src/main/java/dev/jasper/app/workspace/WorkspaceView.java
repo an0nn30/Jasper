@@ -193,6 +193,20 @@ final class WorkspaceView extends JPanel {
         }
     }
 
+    /**
+     * Gives this workspace {@code arranged}: its own tabs in another arrangement, as panes come back or a parent tab moves
+     * between windows (workspace plan 7b Rulings 6). Tabs {@code arranged} names that this workspace does not hold leave it
+     * first; nothing changes when it would still leave out a tab this workspace holds. Every tab takes its place at once,
+     * without the open motion, as a moved tab does.
+     */
+    void rearrange(Layout arranged) {
+        Layout next = arranged;
+        for (TabId tab : arranged.tabs()) if (!tabs.containsKey(tab)) next = next.remove(tab);
+        if (!Set.copyOf(next.tabs()).equals(tabs.keySet())) return;
+        moved.addAll(tabs.keySet());
+        apply(next);
+    }
+
     void resizeSplit(List<Integer> path, List<Double> weights) { apply(layout.resize(path, weights)); }
     void toggleMaximize() { apply(layout.toggleMaximize(layout.activeGroup())); }
     /** Ends a maximize, as a tab moving in or out of the window does (spec 15). */

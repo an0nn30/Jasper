@@ -17,9 +17,12 @@ import dev.jasper.app.layout.PaneLayout;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import javax.swing.JPanel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -198,6 +201,27 @@ class PopOutTest {
             assertThat(content.tabCount()).isEqualTo(2);
             pin.close();
             assertThat(windows.manager.popOutPane(content, content.workspace().model().activeGroup())).isPresent();
+        });
+        windows.launch();
+    }
+
+    /** Workspace plan 7b Rulings 7: a tab whose close waits for its guard stays, and no window opens for it even briefly. */
+    @Test void aTabBeingClosedOpensNoWindow() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            Tab notes = windows.model.tabs().open("dev.example.editor", "notes", "notes.txt", content.id(), new JPanel());
+            var answer = new CompletableFuture<Boolean>();
+            windows.model.tabs().guard("dev.example.editor", (tabs, batch) -> answer);
+            var closing = notes.requestClose();
+            assertThat(closing).as("the guard has not answered").isNotDone();
+            windows.facts.clear();
+            assertThat(windows.manager.popOutTab(notes)).isEmpty();
+            assertThat(windows.facts).as("no window opened and closed again").noneMatch(TerminalEvent.WindowOpened.class::isInstance);
+            assertThat(windows.manager.children()).isEmpty();
+            assertThat(content.tabs()).contains(notes);
+            answer.complete(false);
+            assertThat(closing).isCompletedWithValue(false);
+            assertThat(windows.manager.popOutTab(notes)).as("once the close is refused, it may go").isPresent();
         });
         windows.launch();
     }

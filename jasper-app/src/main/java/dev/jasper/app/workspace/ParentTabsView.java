@@ -109,25 +109,49 @@ final class ParentTabsView extends JPanel {
      * workspace takes the window's theme and glass first, so the splits it builds take them too. The tab takes the focus
      * when the window's parent tabs held it.
      */
-    WorkspaceView openParentTab(Tab tab) {
+    WorkspaceView openParentTab(Tab tab) { return openParentTab(tab, ParentTabId.random(), count()); }
+
+    /**
+     * As {@link #openParentTab(Tab)}, under {@code id} at {@code index} of the bar (its end past it): a parent tab moving
+     * in from another window keeps its id (parent tabs spec 11; workspace plan 7b Rulings 10). While the window's only
+     * parent tab is empty, the new one takes its place.
+     */
+    WorkspaceView openParentTab(Tab tab, ParentTabId id, int index) {
         boolean held = WorkspaceView.holdsFocus(owner, this);
-        var view = new WorkspaceView(owner, ParentTabId.random());
-        int index = count();
+        WorkspaceView empty = isEmpty() ? active() : null;
+        var view = new WorkspaceView(owner, id);
+        int at = empty != null ? 0 : Math.max(0, Math.min(index, count()));
         try {
             view.applyTheme(owner.theme(), false);
             view.setGlass((float) owner.backgroundOpacity() < 1f);
             view.open(tab);
-            model = model.open(new ParentTab(view.id(), view.model()), index);
+            var opened = new ParentTab(id, view.model());
+            model = empty != null ? ParentTabs.of(opened) : model.open(opened, at);
         } catch (RuntimeException | Error failure) {
             view.close();
             throw failure;
         }
+        if (empty != null) {
+            views.remove(empty.id());
+            super.remove(empty);
+            empty.close();
+        }
         views.put(view.id(), view);
         // The views keep the bar's order, ahead of any other child.
-        add(view, index);
+        add(view, at);
         reveal(view);
         owner.workspaceChanged(view, held);
         return view;
+    }
+
+    /**
+     * Puts {@code tab}, moving in, in the active pane of the parent tab {@code id}; a parent tab the window lacks opens
+     * under that id at {@code index} of the bar ({@link #openParentTab(Tab, ParentTabId, int)}). Workspace plan 7b's moves.
+     */
+    void land(Tab tab, ParentTabId id, int index) {
+        WorkspaceView view = views.get(id);
+        if (view != null) view.open(tab);
+        else openParentTab(tab, id, index);
     }
 
     /** Shows the parent tab {@code id} as it was left (spec 7); the focus stays where it is, for the caller to move. */
@@ -157,6 +181,27 @@ final class ParentTabsView extends JPanel {
         view.close();
         reveal(active());
         owner.workspaceChanged(active(), held);
+    }
+
+    /**
+     * The window's only parent tab {@code id}, which moved whole to another window and keeps its id there (parent tabs spec
+     * 11), gives way to an empty workspace under a new id, so ids stay unique across windows (spec 4; workspace plan 7b
+     * Rulings 10). The window manager's {@code moveParentTab} calls it; it does nothing unless {@code id} is this window's
+     * only parent tab and empty, and the window is open.
+     */
+    void renew(ParentTabId id) {
+        WorkspaceView emptied = views.get(id);
+        if (closed || emptied == null || count() != 1 || !emptied.isEmpty()) return;
+        boolean held = WorkspaceView.holdsFocus(owner, this);
+        var fresh = new WorkspaceView(owner, ParentTabId.random());
+        views.remove(emptied.id());
+        super.remove(emptied);
+        emptied.close();
+        views.put(fresh.id(), fresh);
+        add(fresh, 0);
+        model = ParentTabs.of(new ParentTab(fresh.id(), fresh.model()));
+        reveal(fresh);
+        owner.workspaceChanged(fresh, held);
     }
 
     /** A parent tab's layout changed: the model takes it. A workspace that is not, or no longer, a parent tab's is ignored. */

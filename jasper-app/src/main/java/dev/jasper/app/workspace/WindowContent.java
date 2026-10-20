@@ -21,6 +21,7 @@ import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.contributions.WorkspaceHost;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Origin;
 import dev.jasper.app.layout.PaneLayout;
 import dev.jasper.app.layout.WindowLayout;
@@ -84,6 +85,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final ParentTabsView parentTabs;
     /** A pane window's origin (parent tabs spec 4), which the window manager gives it once while it is empty; else null. */
     private Origin origin;
+    /** Where tabs moving in land while {@link #receive} runs: a parent tab, and its place in the bar when it is new. */
+    private record Landing(ParentTabId parentTab, int index) { }
+    private Landing landing;
     /** The configured tab motion, which strips made later take too. */
     private dev.jasper.app.config.AnimationSettings animations = dev.jasper.app.config.AnimationSettings.defaults();
     private final WorkspaceActions workspaceActions;
@@ -1130,6 +1134,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (terminals != null) { terminals.tabArrived(tab, tab.movingFrom()); announced = true; }
             tabHost.attach(tab, opened);
             if (parentTab) parentTabs.openParentTab(tab);
+            // A tab a move between windows brings in lands in the parent tab chosen for it (workspace plan 7b Rulings 6).
+            else if (beside == null && landing != null && tab.moving()) parentTabs.land(tab, landing.parentTab(), landing.index());
             else if (beside == null) workspace().open(tab);
             else parentTabs.holding(beside).orElseThrow(() -> new IllegalArgumentException("Group " + beside + " is not in this window"))
                 .openBeside(tab, beside, side);
@@ -1299,6 +1305,69 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Whether {@code moving} holds tabs and the registry would move every one ({@code TabRegistry.movable}, Rulings 7). */
     private boolean movable(java.util.List<Tab> moving) {
         return !moving.isEmpty() && moving.stream().allMatch(tab -> registry.movable(tab));
+    }
+
+    /**
+     * Whether Pop Out Parent Tab may take {@code parentTab}: one of this window's, holding tabs that may all move, in the
+     * main window or in a full window that has another parent tab; never a pane window's (parent tabs spec 5; workspace
+     * plan 7b Rulings 7 and 8).
+     */
+    boolean mayPopOutParentTab(ParentTabId parentTab) {
+        if (closed || parentTab == null || origin != null) return false;
+        Optional<WorkspaceView> view = parentTabs.view(parentTab);
+        return view.isPresent() && (isMain() || parentTabs.count() > 1) && movable(view.get().tabs());
+    }
+
+    /** Whether Bring Back may take this window's tabs: a pane window's, every one of which may move (Rulings 7). */
+    boolean mayBringBack() { return !closed && origin != null && movable(tabs()); }
+
+    /** Whether Move to Main Window may take this window's tabs: a full window's, every one of which may move (Rulings 7). */
+    boolean mayMoveToMainWindow() { return !closed && !isMain() && origin == null && movable(tabs()); }
+
+    /**
+     * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
+     * one move each, so each keeps its content and session and reports {@code TAB_MOVED} once (parent tabs spec 5;
+     * workspace plan 7b Rulings 6). A parent tab this window lacks opens under that id at {@code index} of the bar, in
+     * place of the main window's empty workspace. That parent tab then takes {@code arranged}
+     * ({@link WorkspaceView#rearrange}) and shows, and {@code arranged}'s active tab is selected, focused and raised. A tab
+     * the registry does not move stays where it was; the first failure propagates once the others have moved.
+     *
+     * @param moving the tabs, in the order they move
+     * @param parentTab the parent tab they land in
+     * @param index where a new parent tab goes in the bar
+     * @param arranged the parent tab's layout once they are all in
+     * @return whether a tab moved in
+     */
+    boolean receive(java.util.List<Tab> moving, ParentTabId parentTab, int index, Layout arranged) {
+        if (closed) return false;
+        Throwable failure = null;
+        landing = new Landing(parentTab, index);
+        try {
+            for (Tab tab : moving) {
+                try {
+                    registry.move(tab, id);
+                } catch (RuntimeException | Error thrown) {
+                    failure = WindowManager.keep(failure, thrown);
+                }
+            }
+        } finally {
+            landing = null;
+        }
+        WorkspaceView view = closed ? null : parentTabs.view(parentTab).orElse(null);
+        boolean arrived = view != null && moving.stream().anyMatch(view::contains);
+        if (arrived) {
+            view.rearrange(arranged);
+            Tab shown = view.selected();
+            if (shown != null) {
+                try {
+                    registry.select(shown);
+                } catch (RuntimeException | Error thrown) {
+                    failure = WindowManager.keep(failure, thrown);
+                }
+            }
+        }
+        WindowManager.rethrow(failure);
+        return arrived;
     }
     /** The parent-tab bar's strip (parent tabs spec 7). */
     TabStrip parentTabBar() { return parentTabs.bar().strip(); }
