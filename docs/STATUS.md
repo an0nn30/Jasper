@@ -59,7 +59,7 @@ the execution rulings E1 to E13 (anchors corrected in place, two more `ChromeSpe
 shorter ink regions, the guide's paragraph kept whole, the spec's wrapped phrases, and the relayed traffic-light request
 met by the recorded checkpoint) and the Task 7 record (the Dark tab run's shorter column, the 56-row toolbar crops);
 Task 8 appends its record to the existing "Execution notes" instead of adding the section again, and writes the spec's
-header amendment as one line, as plans 12 and 13 did. `./gradlew check --continue`: **11,536 tests, 0 failures, 0
+header amendment as one line, as plans 12 and 13 did. `./gradlew check --continue`: **11,541 tests, 0 failures, 0
 errors, 25 skipped**; `check_pairs.py` passes 101 of 101 gated pairs with the same verdicts as `3a36993ba`, only the two
 `chrome-toolbar-*` lines changed; the headless gallery is byte-identical to `3a36993ba`'s (Slate Cobalt Dark and Light,
 161 files each) and so are the 11 default-look jasper-app renders (`ChromeRenderTest`'s default, complement and fallback
