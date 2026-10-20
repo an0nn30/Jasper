@@ -106,10 +106,10 @@ final class GroupView extends JPanel implements StripSource {
     @Override public void dragged(MouseEvent event) { }
     /** A pane's strip drags nothing. */
     @Override public void released(MouseEvent event) { }
-    /** The classic tabs' "+": a new terminal tab in this group. */
-    @Override public void newTab() { workspace.activate(id); owner.invoke(ActionId.NEW_TAB_IN_PANE); }
-    /** New Tab in Pane: this pane's + stacks a tab in it. */
-    @Override public String newTabName() { return ActionId.NEW_TAB_IN_PANE.label(); }
+    /** The classic tabs' "+": New Tab, a new terminal tab (tabs and panes spec 5). */
+    @Override public void newTab() { owner.invoke(ActionId.NEW_TAB); }
+    /** New Tab: the "+" opens a tab. */
+    @Override public String newTabName() { return ActionId.NEW_TAB.label(); }
     /** An entry's × closes its tab. */
     @Override public String closeName() { return "Close tab"; }
     /** Whether {@code tab} joined this group by a move: the strip shows it at once, without the open motion (Rulings 27). */

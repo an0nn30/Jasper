@@ -40,7 +40,7 @@ final class WorkspaceActions {
         if (!action(id).isEnabled()) return;
         var content = owner.selectedContent();
         if (content != null) {
-            if (id == ActionId.CLOSE_TAB) { content.requestClose(); return; }
+            if (id == ActionId.CLOSE_PANE) { content.requestClose(); return; }
             String key = contentCommand(id);
             if (key != null) { content.commands().stream().filter(c -> c.id().equals(key) && c.enabled()).findFirst().ifPresent(c -> c.run().run()); return; }
         }
@@ -50,21 +50,19 @@ final class WorkspaceActions {
         switch (id) {
             case COMMAND_PALETTE -> owner.commandPalette().open(PaletteScope.ALL_ID);
             case NEW_TAB -> owner.newParentTab(owner.directory());
-            case NEW_TAB_IN_PANE -> owner.newTab(owner.directory());
-            case CLOSE_PARENT_TAB -> owner.closeParentTab(owner.activeParentTab());
-            case NEXT_PARENT_TAB -> owner.selectParentTabRelative(1);
-            case PREVIOUS_PARENT_TAB -> owner.selectParentTabRelative(-1);
-            case SELECT_PARENT_TAB_1, SELECT_PARENT_TAB_2, SELECT_PARENT_TAB_3, SELECT_PARENT_TAB_4, SELECT_PARENT_TAB_5,
-                 SELECT_PARENT_TAB_6, SELECT_PARENT_TAB_7, SELECT_PARENT_TAB_8, SELECT_PARENT_TAB_9 ->
-                owner.selectParentTabAt(id.ordinal() - ActionId.SELECT_PARENT_TAB_1.ordinal());
+            case CLOSE_TAB -> owner.closeParentTab(owner.activeParentTab());
+            case NEXT_TAB -> owner.selectParentTabRelative(1);
+            case PREVIOUS_TAB -> owner.selectParentTabRelative(-1);
+            case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
+                 SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
+                owner.selectParentTabAt(id.ordinal() - ActionId.SELECT_TAB_1.ordinal());
             case NEW_TERMINAL_WINDOW -> owner.requestNewTerminalWindow();
             case CLOSE_WINDOW -> owner.requestCloseWindow();
             case MOVE_TAB_TO_NEW_WINDOW -> owner.moveTabToNewWindow(owner.selectedTab());
             case MOVE_TO_MAIN_WINDOW -> owner.moveToMainWindow();
             case OPEN_FILE -> owner.openFile();
             case QUIT -> owner.requestQuit();
-            case CLOSE_TAB -> owner.closeTab(owner.selectedTab());
-            case CLOSE_PANE -> owner.closeGroup(owner.selectedTab());
+            case CLOSE_PANE -> owner.closeTab(owner.selectedTab());
             case SPLIT_RIGHT -> owner.split(Side.RIGHT);
             case SPLIT_DOWN -> owner.split(Side.DOWN);
             case MAXIMIZE_PANE -> owner.toggleMaximize();
@@ -73,11 +71,6 @@ final class WorkspaceActions {
             case FOCUS_PANE_RIGHT -> owner.focusGroup(Side.RIGHT);
             case FOCUS_PANE_UP -> owner.focusGroup(Side.UP);
             case FOCUS_PANE_DOWN -> owner.focusGroup(Side.DOWN);
-            case NEXT_TAB -> owner.selectRelative(1);
-            case PREVIOUS_TAB -> owner.selectRelative(-1);
-            case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
-                 SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
-                owner.selectInGroup(id.ordinal() - ActionId.SELECT_TAB_1.ordinal());
             case RENAME_TAB -> {
                 String name = owner.askTabName(terminal.title());
                 if (name != null) terminal.rename(name);
@@ -118,12 +111,13 @@ final class WorkspaceActions {
             boolean running = present && pane.running();
             for (ActionId id : ActionId.values()) {
                 String contentKey = contentCommand(id);
-                boolean contentEnabled = content != null && (id == ActionId.CLOSE_TAB
-                    || id == ActionId.NEXT_TAB || id == ActionId.PREVIOUS_TAB || contentKey != null && content.commands().stream().anyMatch(c -> c.id().equals(contentKey) && c.enabled()));
+                // A plugin's item closes through its own close request (workspace plan 8a Rulings 15).
+                boolean contentEnabled = content != null && (id == ActionId.CLOSE_PANE
+                    || contentKey != null && content.commands().stream().anyMatch(c -> c.id().equals(contentKey) && c.enabled()));
                 boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
-                    case COMMAND_PALETTE, NEW_TAB, NEW_TAB_IN_PANE, NEW_TERMINAL_WINDOW, CLOSE_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT,
+                    case COMMAND_PALETTE, NEW_TAB, NEW_TERMINAL_WINDOW, CLOSE_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT,
                          SPLIT_DOWN -> true;
                     // A window's only parent tab stays (workspace plan 8a Rulings 6).
                     case MOVE_TAB_TO_NEW_WINDOW -> owner.mayMoveTabToNewWindow(owner.activeParentTab());
@@ -135,14 +129,11 @@ final class WorkspaceActions {
                     case CLEAR_TERMINAL -> ready && !pane.session().usingAlternateBuffer();
                     case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
                          CLEAR_SCROLLBACK, FONT_BIGGER, FONT_SMALLER, FONT_RESET -> ready;
+                    case CLOSE_TAB -> owner.selectedTab() != null;
+                    case NEXT_TAB, PREVIOUS_TAB -> owner.parentTabCount() > 1;
                     case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
                          SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
-                        id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < owner.groupTabCount();
-                    case CLOSE_PARENT_TAB -> owner.selectedTab() != null;
-                    case NEXT_PARENT_TAB, PREVIOUS_PARENT_TAB -> owner.parentTabCount() > 1;
-                    case SELECT_PARENT_TAB_1, SELECT_PARENT_TAB_2, SELECT_PARENT_TAB_3, SELECT_PARENT_TAB_4, SELECT_PARENT_TAB_5,
-                         SELECT_PARENT_TAB_6, SELECT_PARENT_TAB_7, SELECT_PARENT_TAB_8, SELECT_PARENT_TAB_9 ->
-                        id.ordinal() - ActionId.SELECT_PARENT_TAB_1.ordinal() < owner.parentTabCount();
+                        id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < owner.parentTabCount();
                     case MAXIMIZE_PANE -> owner.workspace().model().groups().size() > 1;
                     case CLOSE_PANE -> owner.selectedTab() != null;
                     case FOCUS_PANE_LEFT -> owner.workspace().neighbour(Side.LEFT).isPresent();

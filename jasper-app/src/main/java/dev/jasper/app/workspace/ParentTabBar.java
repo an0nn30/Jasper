@@ -61,11 +61,11 @@ final class ParentTabBar implements StripSource {
     @Override public String title(Tab tab) { return owner.tabTitle(tab); }
     @Override public Icon icon(Tab tab) { return owner.tabIcon(tab); }
     @Override public String tooltip(Tab tab) { return owner.tabTooltip(tab); }
-    /** Select Parent Tab's shortcut for the entry at {@code index}. */
-    @Override public String shortcut(int index) { return owner.parentTabShortcut(index); }
+    /** Select Tab's shortcut for the entry at {@code index}. */
+    @Override public String shortcut(int index) { return owner.tabShortcut(index); }
     @Override public boolean terminal(Tab tab) { return tab.kind() == Tab.Kind.TERMINAL; }
     @Override public boolean running(Tab tab) { return owner.running(tab); }
-    @Override public JPopupMenu menu(Tab tab) { return owner.parentTabMenu(tab); }
+    @Override public JPopupMenu menu(Tab tab) { return owner.tabMenu(tab); }
     @Override public void select(Tab tab) { owner.parentTabOf(tab).ifPresent(owner::selectParentTab); }
     @Override public void close(Tab tab) { owner.parentTabOf(tab).ifPresent(owner::closeParentTab); }
     /**
@@ -84,8 +84,8 @@ final class ParentTabBar implements StripSource {
     @Override public void newTab() { owner.invoke(ActionId.NEW_TAB); }
     /** New Tab: the bar's "+" opens a parent tab. */
     @Override public String newTabName() { return ActionId.NEW_TAB.label(); }
-    /** Close Parent Tab: an entry's × closes every tab of its parent tab. */
-    @Override public String closeName() { return ActionId.CLOSE_PARENT_TAB.label(); }
+    /** Close Tab: an entry's × closes every pane of its tab. */
+    @Override public String closeName() { return ActionId.CLOSE_TAB.label(); }
     /** The bar's entries take their places at once. */
     @Override public boolean moved(Tab tab) { return true; }
     @Override public boolean animates() { return false; }

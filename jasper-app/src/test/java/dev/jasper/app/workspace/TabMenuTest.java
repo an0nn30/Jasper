@@ -5,6 +5,8 @@ import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.contributions.ContentCommand;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.contributions.TabRegistry;
+import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.Side;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -19,23 +21,29 @@ import org.junit.jupiter.api.Test;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Workspace tabs spec 11: the tab menu, Close Others, Close Pane and the menus (workspace plan 3a Task 6). */
+/** Tabs and panes spec 6 and 10: a tab's menu, Close Tab and Close Pane, and the menus that name them. */
 class TabMenuTest {
     private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
     private final Contributions model = new Contributions();
 
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    /** A connected window under the standard chrome with {@code count} running terminal tabs in one group. */
+    /** A connected window under the standard chrome with {@code count} tabs, each holding one running terminal. */
     private WindowContent window(int count) throws Exception {
         WindowContent[] owner = new WindowContent[1];
         edt(() -> {
             owner[0] = content(idleLauncher(pending), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             owner[0].connectContributions(model);
-            for (int i = 1; i < count; i++) owner[0].newTab(HOME);
+            for (int i = 1; i < count; i++) owner[0].invoke(ActionId.NEW_TAB);
         });
         while (!pending.isEmpty()) pending.remove().run();
         return owner[0];
+    }
+
+    /** A plugin's item in a new pane to the right of {@code window}'s focused pane, in its shown tab. */
+    private Tab beside(WindowContent window, String key) {
+        return model.tabs().open("dev.example.editor", key, key + ".txt", window.id(), new JPanel(),
+            TabRegistry.Placement.SPLIT_RIGHT);
     }
 
     private static List<String> titles(JPopupMenu menu) {
@@ -63,70 +71,57 @@ class TabMenuTest {
         throw new AssertionError("no " + title + " menu");
     }
 
-    @Test void aTerminalTabsMenuRenamesAndClosesAndAPluginTabsMenuMovesThenListsItsCommands() throws Exception {
+    /** Workspace plan 8a Rulings 8: Rename Tab for a terminal, Move Tab to New Window, Close Tab, the item's commands. */
+    @Test void aTabsMenuRenamesMovesAndClosesItThenListsItsItemsCommands() throws Exception {
         var window = window(1);
         edt(() -> {
             var keys = window.bindings();
             var menu = window.tabMenu(window.selectedTab());
-            assertThat(titles(menu)).containsExactly("Rename Tab", "Move Tab to New Window", "Close Tab", "Close Others", "Close Pane");
+            assertThat(titles(menu)).containsExactly("Rename Tab", "Move Tab to New Window", "Close Tab");
             assertThat(item(menu, "Rename Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.RENAME_TAB).orElseThrow());
             assertThat(item(menu, "Close Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_TAB).orElseThrow());
-            assertThat(item(menu, "Close Pane").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_PANE).orElseThrow());
-            assertThat(item(menu, "Close Others").isEnabled()).as("the group has no other tab").isFalse();
-            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            Tab view = beside(window, "notes");
             int[] saved = {0};
             view.commands(List.of(new ContentCommand("save", "Save", null, true, () -> saved[0]++)));
             var hosted = window.tabMenu(view);
-            assertThat(titles(hosted)).containsExactly("Move Tab to New Window", "Close Tab", "Close Others", "Close Pane", "Save");
-            assertThat(item(hosted, "Close Others").isEnabled()).as("the terminal tab shares its group").isTrue();
+            assertThat(titles(hosted)).as("a plugin's item has no Rename Tab").containsExactly("Move Tab to New Window",
+                "Close Tab", "Save");
             item(hosted, "Save").doClick();
             assertThat(saved[0]).isEqualTo(1);
+            var full = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { });
+            assertThat(full.windowMenuItems()).as("a full window's window menu").contains(ActionId.MOVE_TO_MAIN_WINDOW);
+            assertThat(titles(full.tabMenu(full.selectedTab()))).as("Move to Main Window moves the whole window: not here")
+                .containsExactly("Rename Tab", "Move Tab to New Window", "Close Tab");
         });
     }
 
-    @Test void closeOthersClosesTheRestOfItsGroupAndLeavesTheOtherGroups() throws Exception {
-        var window = window(4);
-        edt(() -> {
-            var workspace = window.workspace();
-            var b1 = window.tabs().get(3);
-            workspace.moveToNewGroup(b1, workspace.model().activeGroup(), Side.RIGHT);
-            var a1 = window.tabs().get(0); var a2 = window.tabs().get(1); var a3 = window.tabs().get(2);
-            item(window.tabMenu(a2), "Close Others").doClick();
-            assertThat(window.tabs()).containsExactly(a2, b1);
-            assertThat(a1.closed()).isTrue();
-            assertThat(a3.closed()).isTrue();
-            assertThat(workspace.model().groups()).hasSize(2);
-            assertThat(((TerminalContent) b1.content()).pane().running()).isTrue();
-        });
-    }
-
-    @Test void closeGroupAsksTheGuardsFirstAndARefusalClosesNothing() throws Exception {
+    /** Review Focus 2: Close Tab asks the guards of the tab's plugin items once, and a refusal closes nothing. */
+    @Test void closeTabAsksTheGuardsFirstAndARefusalClosesNothing() throws Exception {
         var window = window(2);
         edt(() -> {
-            var workspace = window.workspace();
-            var other = window.tabs().get(1);
-            workspace.moveToNewGroup(other, workspace.model().activeGroup(), Side.RIGHT);
-            var terminal = window.tabs().get(0);
-            window.selectTab(terminal);
-            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
-            assertThat(workspace.model().groupOf(view.id())).isEqualTo(workspace.model().groupOf(terminal.id()));
+            ParentTabId second = window.activeParentTab();
+            Tab other = window.selectedTab();
+            window.invoke(ActionId.SELECT_TAB_1);
+            Tab terminal = window.selectedTab();
+            Tab view = beside(window, "notes");
+            assertThat(window.parentTabOf(view)).as("one tab holds both").isEqualTo(window.parentTabOf(terminal));
             var asked = new ArrayList<List<Tab>>();
             boolean[] allow = {false};
             model.tabs().guard("dev.example.editor", (tabs, batch) -> {
                 asked.add(tabs);
                 return CompletableFuture.completedFuture(allow[0]);
             });
-            window.invoke(ActionId.CLOSE_PANE);
+            window.invoke(ActionId.CLOSE_TAB);
             assertThat(asked).containsExactly(List.of(view));
-            assertThat(terminal.closed()).as("a refusal closes nothing").isFalse();
+            assertThat(terminal.closed()).as("a refusal closes nothing, terminals included").isFalse();
             assertThat(window.tabs()).containsExactly(terminal, view, other);
             allow[0] = true;
-            window.invoke(ActionId.CLOSE_PANE);
+            item(window.tabMenu(terminal), "Close Tab").doClick();
             assertThat(asked).hasSize(2);
             assertThat(terminal.closed()).isTrue();
             assertThat(view.closed()).isTrue();
             assertThat(window.tabs()).containsExactly(other);
-            assertThat(workspace.model().groups()).as("the group went with its tabs").hasSize(1);
+            assertThat(window.activeParentTab()).as("the tab went with its panes").isEqualTo(second);
         });
     }
 
@@ -147,23 +142,23 @@ class TabMenuTest {
         return records;
     }
 
-    @Test void closeGroupClosesEveryTabWhenOneTabsCloseListenerThrows() throws Exception {
+    @Test void closeTabClosesEveryPaneWhenOneItemsCloseListenerThrows() throws Exception {
         var window = window(2);
         edt(() -> {
-            var workspace = window.workspace();
-            var terminal = window.tabs().get(0); var other = window.tabs().get(1);
-            workspace.moveToNewGroup(other, workspace.model().activeGroup(), Side.RIGHT);
-            Tab elsewhere = model.tabs().open("dev.example.editor", "elsewhere", "elsewhere.txt", window.id(), new JPanel());
-            window.selectTab(terminal);
-            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            Tab other = window.selectedTab();
+            window.invoke(ActionId.SELECT_TAB_1);
+            ParentTabId first = window.activeParentTab();
+            Tab terminal = window.selectedTab();
+            Tab view = beside(window, "notes");
             model.tabs().guard("dev.example.editor", (tabs, batch) -> CompletableFuture.completedFuture(true));
             terminal.onClosed(() -> { throw new IllegalStateException("close failed"); });
-            var logged = registryLog(() -> window.closeGroup(terminal));
+            var logged = registryLog(() -> window.closeParentTab(first));
             assertThat(terminal.closed()).isTrue();
-            assertThat(view.closed()).as("the tab after the failing one closed too").isTrue();
-            assertThat(window.tabs()).containsExactly(other, elsewhere);
+            assertThat(view.closed()).as("the item after the failing one closed too").isTrue();
+            assertThat(window.tabs()).containsExactly(other);
             assertThat(logged).as("the failure is logged").singleElement()
                 .satisfies(record -> assertThat(record.getThrown()).hasMessage("close failed"));
+            Tab elsewhere = beside(window, "elsewhere");
             assertThat(elsewhere.requestClose()).as("a later close still runs").isCompletedWithValue(true);
             assertThat(elsewhere.closed()).isTrue();
         });
@@ -185,10 +180,10 @@ class TabMenuTest {
         edt(() -> {
             var window = owners[0];
             var terminal = window.tabs().get(0);
-            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
-            Tab elsewhere = model.tabs().open("dev.example.editor", "elsewhere", "elsewhere.txt", owners[1].id(), new JPanel());
+            Tab view = beside(window, "notes");
+            Tab elsewhere = beside(owners[1], "elsewhere");
             model.tabs().guard("dev.example.editor", (tabs, batch) -> CompletableFuture.completedFuture(true));
-            var logged = registryLog(() -> window.closeGroup(terminal));
+            var logged = registryLog(() -> window.closeParentTab(window.activeParentTab()));
             assertThat(emptied).as("the window's empty handling ran").containsExactly("empty");
             assertThat(terminal.closed()).isTrue();
             assertThat(view.closed()).isTrue();
@@ -198,19 +193,22 @@ class TabMenuTest {
         });
     }
 
-    @Test void aTerminalOnlyCloseGroupClosesWhileAnApprovalIsPendingElsewhere() throws Exception {
-        var window = window(3);
+    @Test void aTerminalOnlyCloseTabClosesWhileAnApprovalIsPendingElsewhere() throws Exception {
+        var window = window(2);
         edt(() -> {
-            var workspace = window.workspace();
-            var a1 = window.tabs().get(0); var a2 = window.tabs().get(1); var b1 = window.tabs().get(2);
-            workspace.moveToNewGroup(b1, workspace.model().activeGroup(), Side.RIGHT);
-            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            Tab b1 = window.selectedTab();
+            Tab view = beside(window, "notes");
+            window.invoke(ActionId.SELECT_TAB_1);
+            ParentTabId first = window.activeParentTab();
+            Tab a1 = window.selectedTab();
+            window.split(Side.RIGHT);
+            Tab a2 = window.selectedTab();
             var answer = new CompletableFuture<Boolean>();
             model.tabs().guard("dev.example.editor", (tabs, batch) -> answer);
             var asking = view.requestClose();
             assertThat(asking).as("the guard has not answered").isNotDone();
-            window.closeGroup(a1);
-            assertThat(a1.closed()).as("terminal tabs need no approval").isTrue();
+            window.closeParentTab(first);
+            assertThat(a1.closed()).as("terminals need no approval").isTrue();
             assertThat(a2.closed()).isTrue();
             assertThat(window.tabs()).containsExactly(b1, view);
             answer.complete(false);
@@ -219,33 +217,41 @@ class TabMenuTest {
         });
     }
 
-    @Test void closeTabAndCloseGroupRunFromTheirShortcuts() throws Exception {
-        var window = window(3);
+    @Test void closePaneAndCloseTabRunFromTheirShortcuts() throws Exception {
+        var window = window(2);
+        Tab[] tabs = new Tab[3];
         edt(() -> {
-            var workspace = window.workspace();
-            var b1 = window.tabs().get(2);
-            workspace.moveToNewGroup(b1, workspace.model().activeGroup(), Side.RIGHT);
-            var a1 = window.tabs().get(0); var a2 = window.tabs().get(1);
+            tabs[0] = window.selectedTab();
+            window.invoke(ActionId.SELECT_TAB_1);
+            tabs[1] = window.selectedTab();
+            window.split(Side.RIGHT);
+            tabs[2] = window.selectedTab();
+        });
+        while (!pending.isEmpty()) pending.remove().run();
+        edt(() -> {
+            Tab b1 = tabs[0], a1 = tabs[1], a2 = tabs[2];
             window.selectTab(a1);
-            assertThat(window.dispatchShortcut(window.bindings().strokeFor(ActionId.CLOSE_TAB).orElseThrow(), window.currentPane())).isTrue();
-            assertThat(window.tabs()).containsExactly(a2, b1);
-            window.selectTab(a2);
             assertThat(window.dispatchShortcut(window.bindings().strokeFor(ActionId.CLOSE_PANE).orElseThrow(), window.currentPane())).isTrue();
-            assertThat(window.tabs()).containsExactly(b1);
+            assertThat(window.tabs()).as("Close Pane closes the focused pane").containsExactly(a2, b1);
+            window.split(Side.DOWN);
+            Tab a3 = window.selectedTab();
+            assertThat(window.dispatchShortcut(window.bindings().strokeFor(ActionId.CLOSE_TAB).orElseThrow(), window.currentPane())).isTrue();
+            assertThat(window.tabs()).as("Close Tab closes every pane of the tab").containsExactly(b1);
+            assertThat(a3.closed()).isTrue();
         });
     }
 
-    @Test void theFileViewAndTabMenusNameTabsPanesAndParentTabs() throws Exception {
+    /** Workspace plan 8a Rulings 17. */
+    @Test void theFileViewAndTabMenusNameTabsAndPanes() throws Exception {
         var window = window(1);
         edt(() -> {
-            assertThat(items(window, "File")).containsSubsequence("New Tab", "New Terminal Window", "Open File…", "Close Tab", "Close Pane",
-                "Close Parent Tab", "Close Window");
+            assertThat(items(window, "File")).containsSubsequence("New Tab", "New Terminal Window", "Open File…", "Close Pane",
+                "Close Tab", "Close Window").doesNotContain("Close Parent Tab");
             assertThat(items(window, "View")).contains("Maximize Pane");
             assertThat(items(window, "Tab")).containsExactly("Split Right", "Split Down", "Focus Pane Left", "Focus Pane Right",
-                "Focus Pane Up", "Focus Pane Down", "Previous Prompt", "Next Prompt", "New Tab in Pane", "Next Tab", "Previous Tab",
-                "Rename Tab", "Next Parent Tab", "Previous Parent Tab", "Select Parent Tab 1", "Select Parent Tab 2",
-                "Select Parent Tab 3", "Select Parent Tab 4", "Select Parent Tab 5", "Select Parent Tab 6", "Select Parent Tab 7",
-                "Select Parent Tab 8", "Select Parent Tab 9");
+                "Focus Pane Up", "Focus Pane Down", "Previous Prompt", "Next Prompt", "Rename Tab", "Next Tab", "Previous Tab",
+                "Select Tab 1", "Select Tab 2", "Select Tab 3", "Select Tab 4", "Select Tab 5", "Select Tab 6", "Select Tab 7",
+                "Select Tab 8", "Select Tab 9");
         });
     }
 }

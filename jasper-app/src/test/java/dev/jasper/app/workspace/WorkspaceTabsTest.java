@@ -206,12 +206,10 @@ class WorkspaceTabsTest {
         launch();
         assertThat(starts.getLast()).as("where a new tab from there starts").isEqualTo(folder);
         assertThat(profiles.getLast()).as("with the default profile").isEmpty();
-        Object[] view = new Object[1];
         edt(() -> {
             var model = new Contributions();
             owner[0].connectContributions(model);
             var opened = model.tabs().open("dev.example.editor", "notes", "notes.txt", owner[0].id(), new JPanel());
-            view[0] = opened;
             assertThat(owner[0].selectedContent()).isSameAs(opened);
             owner[0].updateActions();
             assertThat(owner[0].action(ActionId.SPLIT_RIGHT).isEnabled()).as("beside a plugin view").isTrue();
@@ -222,15 +220,6 @@ class WorkspaceTabsTest {
         });
         launch();
         assertThat(profiles.getLast()).as("beside a plugin view, the default profile").isEmpty();
-        edt(() -> {
-            var opened = (dev.jasper.app.contributions.Tab) view[0];
-            owner[0].selectTab(opened);
-            owner[0].invoke(ActionId.NEW_TAB_IN_PANE);
-            var layout = owner[0].workspace().model();
-            assertThat(layout.groupOf(owner[0].selectedTab().id())).as("New Tab in Pane opens in the plugin view's group")
-                .isEqualTo(layout.groupOf(opened.id()));
-        });
-        launch();
     }
 
     @Test void focusGoingIntoAnotherGroupsTerminalMakesItsTabActive() throws Exception {
@@ -249,8 +238,8 @@ class WorkspaceTabsTest {
                 assertThat(dim(pane)).as("undimmed").isZero();
                 assertThat(dim(((TerminalContent) right.content()).pane())).isPositive();
             } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
-            assertThat(window.dispatchShortcut(window.bindings().strokeFor(ActionId.CLOSE_TAB).orElseThrow(), pane.view())).isTrue();
-            assertThat(left.closed()).as("the shortcut closed the focused tab").isTrue();
+            assertThat(window.dispatchShortcut(window.bindings().strokeFor(ActionId.CLOSE_PANE).orElseThrow(), pane.view())).isTrue();
+            assertThat(left.closed()).as("the shortcut closed the focused pane").isTrue();
             assertThat(window.tabs()).containsExactly(right);
         });
     }
@@ -459,27 +448,6 @@ class WorkspaceTabsTest {
             for (var state : states) if (state.state() == WorkspaceActivity.State.OPENED)
                 assertThat(states).contains(new WorkspaceActivity.PaneState(state.id(), WorkspaceActivity.State.CLOSED));
             assertThat(registry.tab(opened.getFirst().tabId())).isEmpty();
-        });
-    }
-
-    @Test void nextPreviousAndSelectTabActWithinTheActiveGroup() throws Exception {
-        var window = window(3);
-        edt(() -> {
-            var workspace = window.workspace();
-            var a1 = window.tabs().get(0); var a2 = window.tabs().get(1); var b1 = window.tabs().get(2);
-            workspace.moveToNewGroup(b1, workspace.model().activeGroup(), Side.RIGHT);
-            window.selectTab(a1);
-            window.invoke(ActionId.SELECT_TAB_2);
-            assertThat(window.selectedTab()).isSameAs(a2);
-            window.invoke(ActionId.NEXT_TAB);
-            assertThat(window.selectedTab()).as("wraps within the group").isSameAs(a1);
-            window.invoke(ActionId.PREVIOUS_TAB);
-            assertThat(window.selectedTab()).isSameAs(a2);
-            window.selectTab(b1);
-            window.updateActions();
-            assertThat(window.action(ActionId.SELECT_TAB_2).isEnabled()).as("the active group has one tab").isFalse();
-            window.invoke(ActionId.NEXT_TAB);
-            assertThat(window.selectedTab()).isSameAs(b1);
         });
     }
 }

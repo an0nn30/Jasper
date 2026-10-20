@@ -81,13 +81,13 @@ class WindowMenuTest {
             assertThat(main.commands().find("move_tab_to_new_window").orElseThrow().action().isEnabled()).as("in the palette").isFalse();
             assertThat(full.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isFalse();
             assertThat(main.windowMenu().getComponents()).as("the window menu").noneMatch(java.awt.Component::isEnabled);
-            assertThat(item(main.parentTabMenu(inMain), "Move Tab to New Window").isEnabled()).isFalse();
-            assertThat(item(full.parentTabMenu(inFull), "Move to Main Window").isEnabled()).isFalse();
+            assertThat(item(main.tabMenu(inMain), "Move Tab to New Window").isEnabled()).isFalse();
+            assertThat(item(full.tabMenu(inFull), "Move Tab to New Window").isEnabled()).isFalse();
             held.forEach(Subscription::close);
             for (var window : List.of(main, full)) window.updateActions();
             assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).isTrue();
             assertThat(full.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isTrue();
-            assertThat(item(full.parentTabMenu(inFull), "Move to Main Window").isEnabled()).isTrue();
+            assertThat(item(full.tabMenu(inFull), "Move Tab to New Window").isEnabled()).isTrue();
         });
         windows.launch();
     }
@@ -105,8 +105,8 @@ class WindowMenuTest {
                 window.updateActions();
                 for (ActionId id : window.windowMenuItems()) assertThat(window.action(id).isEnabled()).as("%s", id).isFalse();
                 assertThat(window.windowMenu().getComponents()).as("the window menu").noneMatch(java.awt.Component::isEnabled);
-                var menu = window.parentTabMenu(window.selectedTab());
-                for (ActionId id : window.windowMenuItems()) assertThat(item(menu, id.label()).isEnabled()).as("its tab's %s", id).isFalse();
+                var menu = window.tabMenu(window.selectedTab());
+                assertThat(item(menu, ActionId.MOVE_TAB_TO_NEW_WINDOW.label()).isEnabled()).as("its tab's Move Tab to New Window").isFalse();
             }
         });
     }
@@ -149,8 +149,8 @@ class WindowMenuTest {
             ParentTabId first = main.activeParentTab();
             Tab left = main.selectedTab();
             main.newParentTab(HOME);
-            var menu = main.parentTabMenu(left);
-            assertThat(texts(menu)).containsExactly("Move Tab to New Window", "---", "Close Parent Tab");
+            var menu = main.tabMenu(left);
+            assertThat(texts(menu)).containsExactly("Rename Tab", "Move Tab to New Window", "---", "Close Tab");
             item(menu, "Move Tab to New Window").doClick();
             ChildWindow full = windows.manager.children().getLast();
             assertThat(full.content().activeParentTab()).as("the tab the entry stands for").isEqualTo(first);

@@ -66,8 +66,8 @@ class ConfigLoaderTest {
             [keybindings]
             "copy" = "cmd+v"
             paste = "cmd+c"
-            next_parent_tab = "cmd+}"
-            previous_parent_tab = "cmd+{"
+            next_tab = "cmd+}"
+            previous_tab = "cmd+{"
             new_tab = "none"
             """);
         assertThat(result.rejected()).isFalse();
@@ -82,7 +82,7 @@ class ConfigLoaderTest {
             .contains(ActionId.COPY);
         assertThat(state.bindings(true).strokeFor(ActionId.NEW_TAB)).isEmpty();
         assertThat(state.bindings(true).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,
-            InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).contains(ActionId.NEXT_PARENT_TAB);
+            InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).contains(ActionId.NEXT_TAB);
     }
 
     @Test void acceptsNumericBoundariesAndEveryToolbarChoice() {
@@ -257,9 +257,11 @@ class ConfigLoaderTest {
         assertThat(result.diagnostics()).singleElement().satisfies(d -> assertThat(d.message()).contains("Unknown action"));
     }
 
-    /** Tabs and panes spec 10: the pane-window and Pop Out ids are a clean break, so each is an unknown action. */
-    @Test void aRemovedMoveIdIsReportedAsAnUnknownAction() {
-        for (String id : new String[] {"pop_out_tab", "pop_out_pane", "pop_out_parent_tab", "bring_back", "move_tab_to_main_window"}) {
+    /** Tabs and panes spec 10: the removed ids are a clean break, so each is an unknown action. */
+    @Test void aRemovedIdIsReportedAsAnUnknownAction() {
+        for (String id : new String[] {"pop_out_tab", "pop_out_pane", "pop_out_parent_tab", "bring_back", "move_tab_to_main_window",
+                "new_tab_in_pane", "close_parent_tab", "next_parent_tab", "previous_parent_tab", "select_parent_tab_1",
+                "select_parent_tab_9"}) {
             var result = parse("[keybindings]\n" + id + " = \"cmd+w\"");
             assertThat(result.rejected()).isFalse();
             assertThat(result.snapshot().keybindings()).doesNotContainKey(id);

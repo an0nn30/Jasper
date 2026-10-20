@@ -716,10 +716,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Runs a root-bound shortcut whose key is also one of the focus owner's focus-traversal keys before focus traversal
-     * takes it, such as Ctrl+Tab and Ctrl+Shift+Tab in a text area, a table or a field, and Next and Previous Parent Tab
-     * before the focus owner's own bindings, such as a scroll pane's Ctrl+PageUp and Ctrl+PageDown (workspace plan 7a
-     * Rulings 14); it swallows that key's typed and released tail wherever focus went. Plain Tab is no Keymap binding, so
-     * it still traverses.
+     * takes it, such as a Ctrl+Tab binding in a text area, a table or a field, and Next and Previous Tab before the focus
+     * owner's own bindings, such as a scroll pane's Ctrl+PageUp and Ctrl+PageDown (workspace plan 8a Rulings 16); it
+     * swallows that key's typed and released tail wherever focus went. Plain Tab is no Keymap binding, so it still
+     * traverses.
      */
     private boolean traversalShortcut(KeyEvent event) {
         switch (event.getID()) {
@@ -729,7 +729,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 traversalTyped = false;
                 Component focus = event.getComponent();
                 KeyStroke stroke = KeyStroke.getKeyStrokeForEvent(event);
-                if (!ownsKeySource(focus) || !(traversalKey(focus, event) || parentTabKey(stroke))
+                if (!ownsKeySource(focus) || !(traversalKey(focus, event) || tabKey(stroke))
                     || !(rootKeys.containsKey(stroke) || contentBindings.containsKey(stroke))
                     || !claimsShortcut(stroke, focus)) return false;
                 traversalHeld.add(event.getKeyCode()); traversalTyped = true;
@@ -743,10 +743,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return true;
     }
 
-    /** Whether {@code stroke} is Next or Previous Parent Tab's, which run before the focus owner's own bindings. */
-    private boolean parentTabKey(KeyStroke stroke) {
+    /** Whether {@code stroke} is Next or Previous Tab's, which run before the focus owner's own bindings. */
+    private boolean tabKey(KeyStroke stroke) {
         String bound = rootKeys.get(stroke);
-        return ActionId.NEXT_PARENT_TAB.id().equals(bound) || ActionId.PREVIOUS_PARENT_TAB.id().equals(bound);
+        return ActionId.NEXT_TAB.id().equals(bound) || ActionId.PREVIOUS_TAB.id().equals(bound);
     }
 
     private static boolean traversalKey(Component focus, KeyEvent event) {
@@ -1005,15 +1005,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     String shortcutText(ActionId id) {
         return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
     }
+    /** Select Tab {@code index + 1}'s shortcut as this platform writes it; "" past 9 or while it has none. */
     String tabShortcut(int index) {
         if (index < 0 || index >= 9) return "";
-        ActionId id = ActionId.valueOf("SELECT_TAB_" + (index + 1));
-        return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
-    }
-    /** Select Parent Tab {@code index + 1}'s shortcut as this platform writes it; "" past 9 or while it has none. */
-    String parentTabShortcut(int index) {
-        if (index < 0 || index >= 9) return "";
-        return shortcutText(ActionId.valueOf("SELECT_PARENT_TAB_" + (index + 1)));
+        return shortcutText(ActionId.valueOf("SELECT_TAB_" + (index + 1)));
     }
     WindowCommandPalette commandPalette() { return commandPalette; }
     /** The title field's bounds in {@code target}'s coordinates while the palette can drop from it; null otherwise. */
@@ -1257,8 +1252,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** This window's tabs: its parent tabs in bar order, each one's tabs in workspace order. */
     java.util.List<Tab> tabs() { return parentTabs.tabs(); }
     int tabCount() { return parentTabs.tabCount(); }
-    /** The active group's tab count. */
-    int groupTabCount() { return workspace().activeGroupView().tabs().size(); }
     /** The tab showing {@code component}; null when none of this window's does. */
     Tab tab(Component component) {
         for (Tab tab : tabs()) if (tab.component() == component) return tab;
@@ -1365,42 +1358,29 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return tab.content() instanceof TerminalContent terminal && terminal.pane().running();
     }
     /**
-     * A tab's menu (workspace tabs spec 11; tabs and panes spec 6; workspace plan 7b Rulings 15): Rename Tab for a terminal
-     * tab, the window menu's entries for this tab's parent tab, Close Tab, Close Others and Close Pane, then the content's
-     * commands.
+     * A tab's menu, from its strip entry (tabs and panes spec 6 and 10; workspace plan 8a Rulings 8), for the tab holding
+     * {@code item}: Rename Tab while {@code item} is a terminal, Move Tab to New Window, a rule, Close Tab, then
+     * {@code item}'s own commands. Move to Main Window moves the whole window, so the window menu and the context menu
+     * offer it alone. Empty for an item this window does not hold.
+     *
+     * @param item the item the entry shows, its tab's active pane's
+     * @return the menu
      */
-    JPopupMenu tabMenu(Tab tab) {
+    JPopupMenu tabMenu(Tab item) {
         var menu = new JPopupMenu();
-        if (tab.kind() == Tab.Kind.TERMINAL)
-            menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(tab); invoke(ActionId.RENAME_TAB); }));
-        for (ActionId id : windowMenuItems()) menu.add(windowItem(id, tab));
-        menu.addSeparator();
-        menu.add(tabMenuItem("Close Tab", ActionId.CLOSE_TAB, () -> closeTab(tab)));
-        var others = tabMenuItem("Close Others", null, () -> closeOthers(tab));
-        others.setEnabled(groupTabs(tab).size() > 1);
-        menu.add(others);
-        menu.add(tabMenuItem("Close Pane", ActionId.CLOSE_PANE, () -> closeGroup(tab)));
-        if (!tab.commands().isEmpty()) menu.addSeparator();
-        for (var command : tab.commands()) {
-            var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
-            item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut());
-            item.addActionListener(event -> command.run().run());
-            menu.add(item);
-        }
-        dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
-        return menu;
-    }
-
-    /**
-     * A parent tab's menu in the bar (tabs and panes spec 6; workspace plan 7a Rulings 16, plan 7b Rulings 15): the window
-     * menu's entries, a rule, then Close Parent Tab, for the parent tab {@code tab} shows as its active tab.
-     */
-    JPopupMenu parentTabMenu(Tab tab) {
-        var menu = new JPopupMenu();
-        parentTabOf(tab).ifPresent(parent -> {
-            for (ActionId id : windowMenuItems()) menu.add(windowItem(id, tab));
-            if (menu.getComponentCount() > 0) menu.addSeparator();
-            menu.add(tabMenuItem("Close Parent Tab", ActionId.CLOSE_PARENT_TAB, () -> closeParentTab(parent)));
+        parentTabOf(item).ifPresent(parent -> {
+            if (item.kind() == Tab.Kind.TERMINAL)
+                menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(item); invoke(ActionId.RENAME_TAB); }));
+            menu.add(windowItem(ActionId.MOVE_TAB_TO_NEW_WINDOW, item));
+            menu.addSeparator();
+            menu.add(tabMenuItem(ActionId.CLOSE_TAB.label(), ActionId.CLOSE_TAB, () -> closeParentTab(parent)));
+            if (!item.commands().isEmpty()) menu.addSeparator();
+            for (var command : item.commands()) {
+                var entry = new JMenuItem(command.title()); entry.putClientProperty("html.disable", true);
+                entry.setEnabled(command.enabled()); entry.setAccelerator(command.shortcut());
+                entry.addActionListener(event -> command.run().run());
+                menu.add(entry);
+            }
         });
         dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         return menu;
@@ -1566,18 +1546,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         focusSelected();
     }
 
-    /** Select Parent Tab 1 to 9: the parent tab at {@code index} of the bar; nothing past the last. */
+    /** Select Tab 1 to 9: the tab at {@code index} of the strip; nothing past the last. */
     void selectParentTabAt(int index) {
         var all = parentTabs.model().parentTabs();
         if (index >= 0 && index < all.size()) selectParentTab(all.get(index).id());
     }
 
-    /** Next and Previous Parent Tab: the parent tab {@code delta} places along the bar, wrapping around. */
+    /** Next and Previous Tab: the tab {@code delta} places along the strip, wrapping around. */
     void selectParentTabRelative(int delta) { if (parentTabs.count() > 1) selectParentTab(parentTabs.model().step(delta)); }
 
     /**
-     * Close Parent Tab (parent tabs spec 8): every tab of the parent tab {@code id} as one gesture, after their guards; the
-     * parent tab goes with its last tab (spec 4).
+     * Close Tab (tabs and panes spec 10): the items of every pane of the tab {@code id} as one gesture, after their
+     * guards; the tab goes with its last pane (spec 4).
      */
     void closeParentTab(ParentTabId id) { parentTabs.view(id).ifPresent(view -> closeTabs(view.tabs())); }
 
@@ -1724,20 +1704,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         focusSelected();
     }
 
-    /** Selects the active group's tab at {@code index}; nothing past its last tab. */
-    void selectInGroup(int index) {
-        var group = workspace().activeGroupView().tabs();
-        if (index >= 0 && index < group.size()) selectTab(group.get(index));
-    }
-
-    /** Selects the active group's tab {@code delta} places from the selected one, wrapping around. */
-    void selectRelative(int delta) {
-        var view = workspace().activeGroupView();
-        var group = view.tabs();
-        if (group.isEmpty()) return;
-        selectTab(group.get(Math.floorMod(Math.max(0, group.indexOf(view.selected())) + delta, group.size())));
-    }
-
     /** Closes the tab holding {@code component}. */
     public void closeTab(Component component) { closeTab(tab(component)); }
 
@@ -1750,18 +1716,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (tab.kind() == Tab.Kind.HOSTED) { tab.requestClose(); return; }
         if (terminals != null) terminals.atomically(tab::close); else tab.close();
     }
-
-    /** The tabs of {@code tab}'s group, in strip order. */
-    private java.util.List<Tab> groupTabs(Tab tab) {
-        return parentTabs.holding(tab).flatMap(view -> view.model().groupOf(tab.id()).map(view::groupView))
-            .map(group -> java.util.List.copyOf(group.tabs())).orElse(java.util.List.of());
-    }
-
-    /** Closes the other tabs of {@code tab}'s group as one gesture (workspace plan 3a Rulings 14). */
-    void closeOthers(Tab tab) { closeTabs(groupTabs(tab).stream().filter(other -> other != tab).toList()); }
-
-    /** Closes every tab of {@code tab}'s group as one gesture (workspace plan 3a Rulings 14). */
-    void closeGroup(Tab tab) { if (tab != null) closeTabs(groupTabs(tab)); }
 
     /**
      * Closes {@code batch} on one decision: the plugin tabs' guards answer once and a refusal closes nothing; then every

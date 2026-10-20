@@ -107,16 +107,16 @@ class ParentTabBarTest {
             assertThat(source.tabs()).as("each parent tab's active tab, in bar order").containsExactly(right, other);
             assertThat(source.selected()).isSameAs(other);
             assertThat(WindowTabsTest.named(bar, "select:right")).isNotNull();
-            String shortcut = owner.shortcutText(ActionId.SELECT_PARENT_TAB_2);
+            String shortcut = owner.shortcutText(ActionId.SELECT_TAB_2);
             assertThat(shortcut).isNotEmpty();
-            assertThat(button(bar, "select:other").getToolTipText()).as("an entry's tip carries Select Parent Tab's shortcut")
+            assertThat(button(bar, "select:other").getToolTipText()).as("an entry's tip carries Select Tab's shortcut")
                 .isEqualTo("other (" + shortcut + ")");
             owner.selectTab(left);
             assertThat(source.tabs()).containsExactly(left, other);
             assertThat(source.selected()).isSameAs(left);
             assertThat(WindowTabsTest.named(bar, "select:left")).as("the entry follows its parent tab's active tab").isNotNull();
             assertThat(WindowTabsTest.named(bar, "select:right")).isNull();
-            assertThat(source.shortcut(0)).isEqualTo(owner.shortcutText(ActionId.SELECT_PARENT_TAB_1)).isNotEmpty();
+            assertThat(source.shortcut(0)).isEqualTo(owner.shortcutText(ActionId.SELECT_TAB_1)).isNotEmpty();
             assertThat(source.shortcut(9)).isEmpty();
         });
     }
@@ -132,8 +132,8 @@ class ParentTabBarTest {
             Tab third = open(owner, "third");
             var bar = (WindowTabs) owner.parentTabBar();
             var close = button(bar, "close:second");
-            assertThat(close.getToolTipText()).as("the bar's × closes a parent tab").isEqualTo("Close Parent Tab");
-            assertThat(close.getAccessibleContext().getAccessibleName()).isEqualTo("Close Parent Tab");
+            assertThat(close.getToolTipText()).as("the bar's × closes a tab").isEqualTo("Close Tab");
+            assertThat(close.getAccessibleContext().getAccessibleName()).isEqualTo("Close Tab");
             var paneClose = button(owner.windowTabs(), "close:third");
             assertThat(paneClose.getToolTipText()).as("a pane's × closes a tab").isEqualTo("Close tab");
             assertThat(paneClose.getAccessibleContext().getAccessibleName()).isEqualTo("Close tab");
@@ -142,10 +142,10 @@ class ParentTabBarTest {
             button(bar, "close:second").doClick();
             assertThat(second.closed()).isTrue();
             assertThat(owner.parentTabCount()).isEqualTo(2);
-            var menu = owner.parentTabMenu(third);
-            // This plan's Rulings 7: Move Tab to New Window, then a rule, before Close Parent Tab.
+            var menu = owner.tabMenu(third);
+            // Workspace plan 8a Rulings 8: Rename Tab and Move Tab to New Window, then a rule, before Close Tab.
             assertThat(Arrays.stream(menu.getComponents()).filter(JMenuItem.class::isInstance).map(item -> ((JMenuItem) item).getText()))
-                .containsExactly("Move Tab to New Window", "Close Parent Tab");
+                .containsExactly("Rename Tab", "Move Tab to New Window", "Close Tab");
             ((JMenuItem) menu.getComponent(menu.getComponentCount() - 1)).doClick();
             assertThat(third.closed()).isTrue();
             assertThat(owner.parentTabCount()).isEqualTo(1);
@@ -253,7 +253,7 @@ class ParentTabBarTest {
     /**
      * The user's decision of 2026-10-20: Enterprise never shows a parent-tab bar. Each pane's strip is the window's only
      * tab row; New Tab (Cmd+T and the toolbar's New Session) opens a parent tab, whose tabs the row then shows alone, and
-     * Select Parent Tab 1 (Cmd+1) shows the first parent tab's tab again.
+     * Select Tab 1 (Cmd+1) shows the first parent tab's tab again.
      */
     @Test void enterpriseShowsNoParentTabBarAndItsOnlyTabRowIsThePanesStrip() throws Exception {
         edt(() -> {
@@ -285,18 +285,18 @@ class ParentTabBarTest {
                 assertThat(bar.isVisible()).as("three parent tabs: still no bar").isFalse();
                 assertThat(names((ClassicTabs) owner.tabBar())).containsExactly("third");
 
-                owner.invoke(ActionId.SELECT_PARENT_TAB_1);
+                owner.invoke(ActionId.SELECT_TAB_1);
                 assertThat(owner.activeParentTab()).isEqualTo(first);
                 assertThat(bar.isVisible()).isFalse();
-                assertThat(names((ClassicTabs) owner.tabBar())).as("Select Parent Tab 1 shows the first parent tab's tab again")
+                assertThat(names((ClassicTabs) owner.tabBar())).as("Select Tab 1 shows the first parent tab's tab again")
                     .containsExactly("first");
                 assertThat(owner.tabBar().component().isVisible()).isTrue();
 
                 // No visible bar exercises the bar's two names; the source gives them.
                 assertThat(owner.parentTabs().bar().newTabName()).isEqualTo("New Tab");
-                assertThat(owner.parentTabs().bar().closeName()).isEqualTo("Close Parent Tab");
-                assertThat(((ClassicTabs) owner.tabBar()).add().getToolTipText()).as("a pane's + stacks in its pane")
-                    .isEqualTo("New Tab in Pane");
+                assertThat(owner.parentTabs().bar().closeName()).isEqualTo("Close Tab");
+                assertThat(((ClassicTabs) owner.tabBar()).add().getToolTipText()).as("a pane's + opens a tab")
+                    .isEqualTo("New Tab");
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }

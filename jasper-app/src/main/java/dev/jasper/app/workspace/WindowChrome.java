@@ -78,8 +78,8 @@ final class WindowChrome {
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.
         toolbar.putClientProperty(com.formdev.flatlaf.FlatClientProperties.COMPONENT_TITLE_BAR_CAPTION,
             (java.util.function.Function<Point, Boolean>) point -> null);
-        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_TERMINAL_WINDOW, ActionId.OPEN_FILE, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
-            ActionId.CLOSE_PARENT_TAB, ActionId.CLOSE_WINDOW, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
+        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_TERMINAL_WINDOW, ActionId.OPEN_FILE, ActionId.CLOSE_PANE, ActionId.CLOSE_TAB,
+            ActionId.CLOSE_WINDOW, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
             ActionId.FIND_PREVIOUS, ActionId.CLEAR_SCROLLBACK);
         JMenu view = menu("View", ActionId.COMMAND_PALETTE);
@@ -453,23 +453,21 @@ final class WindowChrome {
         menuBar.revalidate(); menuBar.repaint();
     }
 
-    /** The Tab menu's pane and prompt items, before its tab and parent tab items (workspace plan 3b Rulings 7). */
+    /** The Tab menu's pane and prompt items, before Rename Tab and its tab items (workspace plan 8a Rulings 17). */
     private static final ActionId[] GROUP_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
         ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
-    private static final ActionId[] TAB_ITEMS = {ActionId.NEW_TAB_IN_PANE, ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.RENAME_TAB};
-    /** The parent tab items (parent tabs spec 8): Select Parent Tab 1 to 9 hold the digits Select Tab had. */
-    private static final ActionId[] PARENT_TAB_ITEMS = {ActionId.NEXT_PARENT_TAB, ActionId.PREVIOUS_PARENT_TAB,
-        ActionId.SELECT_PARENT_TAB_1, ActionId.SELECT_PARENT_TAB_2, ActionId.SELECT_PARENT_TAB_3, ActionId.SELECT_PARENT_TAB_4,
-        ActionId.SELECT_PARENT_TAB_5, ActionId.SELECT_PARENT_TAB_6, ActionId.SELECT_PARENT_TAB_7, ActionId.SELECT_PARENT_TAB_8,
-        ActionId.SELECT_PARENT_TAB_9};
+    /** The tab items (tabs and panes spec 10): Next Tab, Previous Tab and Select Tab 1 to 9 switch the window's tabs. */
+    private static final ActionId[] TAB_ITEMS = {ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.SELECT_TAB_1,
+        ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4, ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6,
+        ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9};
 
-    /** Tab: splitting and focusing panes and moving between prompts, a rule, the tab commands, a rule, the parent tab commands. */
+    /** Tab: splitting and focusing panes and moving between prompts, a rule, Rename Tab, a rule, the tab commands. */
     private JMenu tabMenu() {
         JMenu menu = menu("Tab", GROUP_ITEMS);
         menu.addSeparator();
-        for (ActionId id : TAB_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
+        menu.add(new MenuBarItems.Item(owner.action(ActionId.RENAME_TAB)));
         menu.addSeparator();
-        for (ActionId id : PARENT_TAB_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
+        for (ActionId id : TAB_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
         return menu;
     }
 
@@ -595,7 +593,7 @@ final class WindowChrome {
         owner.updateActions();
         JPopupMenu menu = new JPopupMenu();
         for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL,
-            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE, ActionId.CLOSE_TAB}) menu.add(owner.action(id));
+            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
         // The window menu's entries, for a window whose strip hides (tabs and panes spec 6).
         menu.addSeparator();
         for (ActionId id : owner.windowMenuItems()) menu.add(owner.action(id));

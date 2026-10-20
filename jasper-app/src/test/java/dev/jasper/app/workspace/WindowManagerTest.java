@@ -381,14 +381,15 @@ class WindowManagerTest {
         });
     }
 
-    @Test void aChildWindowsTabMenuMovesToTheMainWindow() throws Exception {
+    /** Workspace plan 8a Rulings 8: a child window's entry menu leaves Move to Main Window to the ⋮. */
+    @Test void aChildWindowsTabMenuLeavesMoveToMainWindowToItsWindowMenu() throws Exception {
         edt(() -> {
             ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
             var menu = child.content().tabMenu(child.content().selectedTab());
             var titles = new ArrayList<String>();
             for (var item : menu.getComponents()) if (item instanceof javax.swing.JMenuItem entry) titles.add(entry.getText());
-            assertThat(titles).containsExactly("Rename Tab", "Move Tab to New Window", "Move to Main Window", "Close Tab",
-                "Close Others", "Close Pane");
+            assertThat(titles).containsExactly("Rename Tab", "Move Tab to New Window", "Close Tab");
+            assertThat(child.content().windowMenuItems()).contains(ActionId.MOVE_TO_MAIN_WINDOW);
         });
         launch();
     }

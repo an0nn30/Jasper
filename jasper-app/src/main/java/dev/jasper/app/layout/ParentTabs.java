@@ -272,8 +272,8 @@ public final class ParentTabs {
     }
 
     /**
-     * The parent tab {@code delta} places along the bar from the one that shows, wrapping around (Next and Previous
-     * Parent Tab).
+     * The parent tab {@code delta} places along the strip from the one that shows, wrapping around (Next and Previous
+     * Tab).
      *
      * @param delta how far, negative for back
      * @return its id
