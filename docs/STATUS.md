@@ -1,5 +1,95 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 7b: Pop Out, Bring Back and the window menu — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `e80f2c322..66be37837` (plan 6b's re-planned document lies between), then this
+documentation commit; [plan](superpowers/plans/2026-10-19-workspace-7b-pop-out.md),
+[spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md)). Tabs, panes and parent tabs leave their window and
+pane windows come back. The model gains `layout.Origin` (parent tab, pane, side, share), `Layout.origin` and
+`Layout.graft`, and `PaneLayout` carries its origin. A pane window is a child window whose `WindowContent` the window
+manager gives an origin while it is empty (`paneWindow`): one layout, no parent-tab bar in either look, New Tab stacking
+in its pane, and `windowLayout()` a `PaneLayout`. `WindowManager` gains `popOutTab`, `popOutPane`, `popOutParentTab`,
+`moveParentTab`, `bringBack` and `moveToMainWindow`. Every move goes through the tab registry one tab at a time (one
+`TAB_MOVED` each, sessions untouched): `WindowContent.receive` lands the tabs in the chosen parent tab, then
+`WorkspaceView.rearrange` gives it the planned layout. Bring Back follows the origin's parent tab into whichever window
+holds it, falls back to that parent tab's active pane and then the main window's, ends a maximize, and fills an empty
+main workspace. A window whose only parent tab moves whole to another window takes a new id for its empty workspace
+(`ParentTabsView.renew`). Pop Out Pane, Pop Out Parent Tab, Bring Back and Move to Main Window are disabled while a tab
+they would move is pinned or being closed (`mayBringBack`, `mayMoveToMainWindow`). Commands `pop_out_tab`,
+`pop_out_pane`, `pop_out_parent_tab`, `bring_back` and `move_to_main_window`, no keys, replace `move_tab_to_new_window`
+and `move_tab_to_main_window`; the registry's `moveToNewWindow` (and so `ContentTab.moveToNewWindow()`) pops a tab out;
+plan 5's tear-out still opens a full window. Each window's ⋮ (`WindowMenuButton`; the classic row's icon button) opens
+its window menu. A toolbar pins it (`WindowToolbar.pin`), and the overflow, now `IconRegistry`'s horizontal ellipsis
+`more`, sits before it. The menu has Pop Out Pane and Pop Out Parent Tab in the main window, plus Move to Main Window in
+a full window, Bring Back and Pop Out Pane in a pane window. A tab's menu, a terminal's context menu and the parent-tab
+bar's menu offer the same commands for what they were opened on.
+Rulings (plan, "Rulings"): (1) `Origin(parentTab, pane, side, share)` in `layout` and `PaneLayout(Layout, Origin)`, the
+window being the one holding the parent tab when Bring Back runs; (2) `Layout.origin` records the group across a pane's
+edge within the sibling its space goes to, the side it is on and its share of the two weights (a layout's only group
+records itself, on the right, at half); (3) Pop Out Tab's origin is its pane's when the tab is the pane's only one, else
+that pane, the right side and a half; (4) what pops out of a pane window keeps that window's origin; (5) Bring Back goes
+to the origin's parent tab in whichever main or full window holds it, beside the origin pane or else its active pane,
+and with no such window beside the main window's active pane, always on the recorded side and share, ending a maximize
+and selecting, focusing and raising the pane window's active tab; (6) every move between windows goes through the tab
+registry one tab at a time, `receive` landing the tabs and `rearrange` laying them out; (7) a pane, a parent tab or a pane
+window moves whole or not at all, so nothing moves while any of its tabs is pinned or being closed (`TabRegistry.movable`)
+and the commands are disabled wherever they are offered; (8) a child window's only tab, only pane and (full window) only
+parent tab stay, while the main window's may all pop out; (9) a pane window is a child window whose content has an origin
+(`WindowRole` stays `MAIN` or `CHILD`, no parent-tab bar, Close Parent Tab disabled); (10) a parent tab keeps its id and
+layout when it moves, and a window whose only parent tab leaves takes a new id for its empty workspace; (11) Pop Out Tab
+and Pop Out Pane open the pane window at the pane's place and size on its display, Pop Out Parent Tab where the platform
+puts a window; (12) Move to Main Window joins the parent tabs after the main window's active one in their order, the
+empty workspace giving way to the first, the shown one showing; (13) the five commands have no keys, the Keymap lists
+them by what they act on and the menu bar does not take them; (14) the window menu's entries by kind (main window: Pop
+Out Pane, Pop Out Parent Tab; full window: those two while it has two parent tabs, Move to Main Window; pane window: Bring
+Back, then Pop Out Pane while it has two panes), an entry the spec makes conditional left out and the others disabled
+while their action is; (15) a tab's menu, a terminal's context menu, the parent-tab bar's menu and the palette offer the
+same commands for what they were opened on; (16) the main window's ⋮ is named `windowMenu`, "View Options", pinned after
+Settings (Settings… under Enterprise), shows no label and hides with the toolbar; (17) a child window's ⋮ sits at the
+trailing end of its title row in each platform's title and shows under Compact too; (18) the SDK does not change
+(`moveToMainWindow()` keeps its meaning); (19) plan 5's tear-out stays a full child window until plan 7c; (20) the
+Enterprise mock and classic header tests measure "Settings…" and the search field 30 px left of the mocks, the standard
+toolbar's tests count one more button, and `WindowToolbarTest` reads the horizontal ellipsis and a pinned control after
+it; (21) new files take ledger rows `nonvisual-helper,none,none`. Spec issues: 1 (the origin records the parent tab, not
+the window) and 2 (the ⋮ moves "Settings…" and the search field 30 px left of the Workstation mocks) are open for the
+user; 3 (the overflow shows a horizontal ellipsis and sits before the ⋮, so two ⋮ never sit side by side) was ruled by
+the controller. Deviations: 7b's `openParentTab(Tab, ParentTabId, int)` was refreshed before execution to keep 7a's
+executed theme and glass and its bar-order insert; the origin names a pane, so a pane whose sibling was a subtree comes
+back beside one group of it (documented and pinned), and `Layout.origin` clamps its share into [0.01, 0.99]; the plan's
+`OptionalAssert.doesNotContain` does not exist, so `TabDragWindowsTest` uses `.isPresent().get().isNotEqualTo(pane)`;
+`WindowManager.leaving` uses `registry.movable`, so no window opens for a tab being closed; one
+`ParentTabsView.workspace(id)` gives every new workspace, a renewed one too, the window's theme and glass; a window's
+`landing` is restored rather than nulled; `holderOf` skips closing windows; a whole parent tab keeps its maximize when it
+moves; `rearrange` keeps held tabs the plan lacks and does nothing when the plan names none of the workspace's tabs;
+`WindowMenuButton` calls `setText(null)` (`JButton(Icon)` leaves ""); `WindowPanelsTest` hides the toolbar, because the
+pinned ⋮ widens the main window's minimum by about 56 px (the centred header's minimum is twice its wider side); Pop Out
+Tab's enablement adds `registry.movable(tab)` (`mayPopOutTab(Tab)`) on every surface, and the `may*` checks are false
+without a manager. Left for plan 7c:
+- a drag onto another window's bar is `WindowManager.moveParentTab(from, id, to, index)`;
+- a parent tab dragged outside every window is `popOutParentTab(window, id, bounds, cursor)`;
+- an item torn out to a pane window is `popOutTab(tab, bounds, cursor)`, in place of `moveToNewWindow(Tab, Rectangle,
+  Point)`.
+
+For plans 6a and 6b: `windowLayout()` is a `PaneLayout` with its `Origin` for a pane window, and a restored pane
+window becomes one through `WindowContent.paneWindow(Origin)` while it is empty, as `WindowManager.openChild` does.
+`./gradlew check --continue`:
+**BUILD SUCCESSFUL, 12,021 tests, 0 failures, 0 errors, 25 skipped (app 4,049 with 19 skipped, terminal 459 with 5, ui 930, buddy 151, sdk 94, sdk-testkit 205, editor 4,913, enterprise 3, fileserver 285, history 41, indexer 99, remote 544, sample 14, snippets 13, vault 221 with 1)**. GUI checks for the user:
+- the ⋮ at the end of the main window's toolbar, in the standard look (after Settings) and under Enterprise (after
+  Settings…), and its menu;
+- on a narrow standard window, the overflow's horizontal ellipsis ("More actions") just before the ⋮ (Spec issues 3);
+- the main window's minimum width with the ⋮ (about 56 px wider than before);
+- a child window's ⋮ at the end of its title row: macOS's unified bar, macOS under Enterprise's band, the Windows title
+  pane (the title in the glue) in both looks, and the row under the system title bar in Compact and on Linux;
+- Pop Out Tab and Pop Out Pane opening a pane window over the pane's place, on its display, with the focus in the tab;
+- Bring Back of a pane window split further, landing nested beside its pane with the recorded share, its active tab
+  focused;
+- Bring Back after the origin parent tab popped out to a full window, after it closed, and into an empty main window;
+- Pop Out Parent Tab and Move to Main Window keeping every shell running (a `top` stays current);
+- the strip's tab menu, a terminal's context menu (on a pane showing no strip) and the parent-tab bar's menu acting on
+  the tab they were opened on;
+- a modal prompt in a tab blocking its pane's or parent tab's move.
+
+Not merged, not pushed.
+
 **Workspace tabs, plan 7a: parent tabs — 2026-10-20** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `8e129ff34..05521e053` (the Vault dialog commits, Remote 0.15.0 and plans 7b and
 7c's documents lie between), then this documentation commit, then its final fix wave ("Parent tabs: final review fixes");

@@ -1,7 +1,17 @@
 # Workspace tabs 7b: Pop Out, Bring Back and the window menu Implementation Plan
 
-**Status: not executed.** Written on 2026-10-20 against `claude/workspace-tabs` at `bba5c472e` with plan 7a's text
-applied (see Workspace).
+**Status: executed on 2026-10-20** (`e80f2c322..66be37837`; plan 6b's re-planned document lies between); see
+`docs/STATUS.md`. Written against `claude/workspace-tabs` at `bba5c472e` with plan 7a's text applied (see Workspace).
+Deviations from the plan's text: 7b's `openParentTab(Tab, ParentTabId, int)` was refreshed before execution to keep 7a's
+executed theme and glass and its bar-order insert; the origin names a pane, so a pane whose sibling was a subtree comes
+back beside one group of it, and `Layout.origin` clamps its share into [0.01, 0.99]; `OptionalAssert.doesNotContain` does
+not exist, so `TabDragWindowsTest` uses `.isPresent().get().isNotEqualTo(pane)`; `WindowManager.leaving` uses
+`registry.movable`; one `ParentTabsView.workspace(id)` gives every new workspace, a renewed one too, the window's theme
+and glass; `landing` is restored rather than nulled; `holderOf` skips closing windows; a whole parent tab keeps its
+maximize when it moves; `rearrange` keeps held tabs the plan lacks and does nothing when the plan names none of the
+workspace's tabs; `WindowMenuButton` calls `setText(null)`; `WindowPanelsTest` hides the toolbar, because the pinned ⋮
+widens the main window's minimum by about 56 px; Pop Out Tab's enablement adds `registry.movable(tab)`
+(`mayPopOutTab(Tab)`) on every surface, and the `may*` checks are false without a manager.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

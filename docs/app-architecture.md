@@ -98,7 +98,11 @@ The process shutdown hook backs up endpoint cleanup and drains logging separatel
 Windows are one main window and any number of child windows (workspace tabs spec 6), all made and closed by the
 application's `WindowManager` (workspace): the main window has every piece of chrome around its workspace and keeps an
 empty workspace when its last tab closes; a child window (`WindowRole.CHILD` content) shows a title bar over its
-workspace and closes with its last tab. Every outside request, a plugin's tab with no window and the menu bar item
+workspace and closes with its last tab. A child window is a full window, with parent tabs, or a pane window, whose
+content has one layout and an `Origin` (layout). `WindowManager` pops tabs, panes and parent tabs out, brings a pane window
+back and moves a full window's parent tabs to the main window: `WindowContent.receive` lands each tab through the tab
+registry, then `WorkspaceView.rearrange` gives the parent tab its planned layout. Every outside request, a plugin's tab
+with no window and the menu bar item
 restore the main window first; closing the main window, Quit and going to the background close the child windows, then
 the main window. `MainWindow`'s constructor has one call site, `WindowManager.ensureMain`, which
 `verifyApplicationArchitecture` checks.
@@ -174,7 +178,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
 | `workspace` | EDT windows (`WindowManager`, `MainWindow`, `ChildWindow`, their `WindowFrame`s), their parent tabs (`ParentTabsView`, with the parent-tab bar `ParentTabBar`), each a workspace of tab groups (`WorkspaceView`, `GroupView`, `SplitContainer`), terminal tabs and panes, the tab drag (`TabDrag`, the window manager's one, shared by its windows), the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`; and the tab drag's `WorkspaceDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, and the layout's group ids and sides, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
-| `layout` | Pure workspace layout model: a window's content (`WindowLayout`: `ParentTabs`, its parent tabs with the shown one and their order of use, or a `PaneLayout`), parent tab, tab and group ids, a workspace's tab groups in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximized group and the groups' order of use, the operations that return a new layout, and each group's region of the unit square with its directional neighbours. JDK-only (nothing from Swing or AWT, enforced by `verifyApplicationArchitecture`); immutable values, safe on any thread. `persistence.WorkspaceFile` reads and writes a workspace's `Layout` as `workspace.toml`. |
+| `layout` | Pure workspace layout model: a window's content (`WindowLayout`: `ParentTabs`, its parent tabs with the shown one and their order of use, or a `PaneLayout` with its `Origin`), parent tab, tab and group ids, a workspace's tab groups in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximized group and the groups' order of use, the operations that return a new layout, and each group's region of the unit square with its directional neighbours. JDK-only (nothing from Swing or AWT, enforced by `verifyApplicationArchitecture`); immutable values, safe on any thread. `persistence.WorkspaceFile` reads and writes a workspace's `Layout` as `workspace.toml`. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the palette's two views behind `PaletteView` (the card, `CardView`, and the Run window, `RunWindowView`, built by `PaletteViews.of` from the look's `PaletteLook`) and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
 | `config` | Immutable values and pure parsing through CoreSettings.SCHEMA; ConfigService owns background watch/reload, the save transaction (settings, shortcuts) and Migrate Config, and marshals delivery to EDT. Application closes the service. |
@@ -224,11 +228,11 @@ Javadoc and copied guide examples are normal check dependencies. See the
 
 ## Window chrome
 
-The main window has a header row above its parent tabs: the parent-tab bar, then the shown parent tab's workspace of tab groups, each with its own tab strip (in the standard look, none while it holds a single tab); a child window has only its title bar above its parent tabs. `WindowHeader` (workspace) centres
+The main window has a header row above its parent tabs: the parent-tab bar, then the shown parent tab's workspace of tab groups, each with its own tab strip (in the standard look, none while it holds a single tab); a child window has only its title bar, which ends with the window's ⋮, above its parent tabs, or above the one workspace of a pane window, which has no parent-tab bar. `WindowHeader` (workspace) centres
 `TitleSearchField` on the window and packs `WindowChrome`'s IntelliJ-style toolbar (tab/window,
-pane, plugin, then Find/Settings groups; tooltips carry live shortcuts) against the trailing edge.
+pane, plugin, then Find/Settings groups, then the window's ⋮, `WindowMenuButton`; tooltips carry live shortcuts) against the trailing edge.
 The field is always centred on the window; the sides give way first (toolbar labels, then controls into
-the ⋮ menu; on Windows and Linux the menus fold into "…" and then ☰), and only then does the field shrink
+the overflow menu; on Windows and Linux the menus fold into "…" and then ☰), and only then does the field shrink
 and collapse to its magnifier. `toolbar = "hidden"` hides only the buttons. `TitleBarStyle` (platform) is
 chosen at startup: on macOS `MacTitleBar` hosts the header in the native title row and gives it insets
 that keep clear of the traffic lights; on Windows and Linux FlatLaf's title pane embeds
