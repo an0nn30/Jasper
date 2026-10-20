@@ -166,7 +166,9 @@ class RemoteDocumentTest {
 
     @Test void rejectsMalformedRelativePathsBeforeProviderWork() {
         var document = new RemoteDocument(prod, "/srv/readme.md", channels, Optional::empty);
-        for (String path : List.of("", "/root", "//host/file", "C:/file", "C:file", "file:a", "a\\b", "a?b", "a#b",
+        for (String path : List.of("", "/root", "//host/file", "C:/file", "C:file", "file:a",
+                "C:/outside/line\u2028.txt", "C:/outside/line\u2029.txt", "C:line\u2028.txt", "C:line\u2029.txt",
+                "javascript:line\u2028.txt", "javascript:line\u2029.txt", "a\\b", "a?b", "a#b",
                 "a\u0000b", "a\u001Fb", "a\u007Fb", "a\u0085b", "a\uD800b"))
             assertThatIllegalArgumentException().as(path).isThrownBy(() -> document.resolveRelative(path));
         assertThatIllegalArgumentException().isThrownBy(() -> document.resolveRelative(null));

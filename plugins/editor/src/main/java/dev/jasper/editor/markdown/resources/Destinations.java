@@ -9,6 +9,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /** Interprets authored destinations without borrowing a base URI from the process or a different provider. */
 public final class Destinations {
@@ -23,7 +24,7 @@ public final class Destinations {
         try {
             requireText(destination);
             // Classify schemes before decoding so web URLs retain their URI escapes.
-            if (destination.matches("^[A-Za-z][A-Za-z0-9+.-]*:.*")) {
+            if (Pattern.compile("[A-Za-z][A-Za-z0-9+.-]*:").matcher(destination).lookingAt()) {
                 var uri = new URI(destination);
                 if ((uri.getScheme().equalsIgnoreCase("http") || uri.getScheme().equalsIgnoreCase("https"))
                         && uri.getHost() != null && uri.getRawUserInfo() == null)

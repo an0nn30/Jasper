@@ -13,6 +13,10 @@ class DestinationsTest {
         assertThat(Destinations.parse("../caf%C3%A9/\u65e5\u672c.md#h%C3%A9+llo"))
             .isEqualTo(new Destination.Relative("../caf\u00e9/\u65e5\u672c.md", Optional.of("h\u00e9+llo")));
         assertThat(Destinations.parse("%F0%9F%8C%B2.md")).isEqualTo(new Destination.Relative("\uD83C\uDF32.md", Optional.empty()));
+        assertThat(Destinations.parse("dir/line%E2%80%A8.md"))
+            .isEqualTo(new Destination.Relative("dir/line\u2028.md", Optional.empty()));
+        assertThat(Destinations.parse("dir/line%E2%80%A9.md"))
+            .isEqualTo(new Destination.Relative("dir/line\u2029.md", Optional.empty()));
         assertThat(Destinations.parse("a b.md")).isEqualTo(new Destination.Relative("a b.md", Optional.empty()));
         assertThat(Destinations.parse("./../file.md")).isEqualTo(new Destination.Relative("./../file.md", Optional.empty()));
     }
@@ -25,6 +29,15 @@ class DestinationsTest {
     @Test void absoluteWebUrisRetainTheirEscapesAndQueries() {
         String url = "HTTPS://example.com/a%20b?q=one+two#intro";
         assertThat(Destinations.parse(url)).isEqualTo(new Destination.Web(URI.create(url)));
+    }
+
+    @Test void rejectsSchemeAndDrivePrefixesWithUnicodeLineSeparators() {
+        for (String separator : List.of("\u2028", "\u2029", "%E2%80%A8", "%E2%80%A9")) {
+            for (String prefix : List.of("C:/outside/", "C%3A/outside/", "C:", "C%3A", "javascript:", "javascript%3A")) {
+                String destination = prefix + "line" + separator + ".md";
+                assertThat(Destinations.parse(destination)).as(destination).isInstanceOf(Destination.Unsupported.class);
+            }
+        }
     }
 
     @Test void refusesUnsafeOrMalformedDestinations() {

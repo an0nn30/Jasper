@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /** One file on one connection identity, edited in the Editor. Every operation queues on {@link EditChannels}. */
@@ -104,7 +105,7 @@ public final class RemoteDocument implements EditorDocument {
         // Keep validation local: Remote also loads with Editors predating RelativePaths and this hook.
         if (relative == null || relative.isEmpty() || relative.startsWith("/") || relative.indexOf('\\') >= 0
                 || relative.indexOf('?') >= 0 || relative.indexOf('#') >= 0
-                || relative.matches("^[A-Za-z][A-Za-z0-9+.-]*:.*"))
+                || Pattern.compile("[A-Za-z][A-Za-z0-9+.-]*:").matcher(relative).lookingAt())
             throw new IllegalArgumentException("A decoded relative file path is required");
         for (int offset = 0; offset < relative.length();) {
             int codePoint = relative.codePointAt(offset);
