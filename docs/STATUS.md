@@ -1,5 +1,19 @@
 # Jasper — Status and Handoff
 
+**Windows user install from IntelliJ — 2026-10-20** (`codex/windows-user-install`):
+`installWindowsUser` builds a separate standard-JBR app image and installs it in
+`%APPDATA%\JasperApp` with a Start Menu shortcut; `uninstallWindowsUser` removes the
+owned installation, shortcut and matching login entry, preserving user data.
+The user approved omitting custom VM options, native startup recovery and the native CLI.
+The install graph excludes native compilation, installer generation and AOT training.
+Full parallel headless `check` passed on macOS: 11,503 Java tests, zero failures/errors,
+25 expected skips, plus native, architecture and 71 theme tests. Used `-Pjasper.python`
+with installed Python 3.13: the unchanged deeply nested JSON theme test fails on 3.14.
+Install dry-run and independent review passed; graph verification uses resolved task
+data to avoid cross-project state locks during parallel checks.
+Windows lifecycle tests cover updates, rollback, ownership, junctions and data preservation;
+native Windows execution and desktop/daemon acceptance remain pending. No GUI launched.
+
 **Jasper Meadow Light — 2026-10-20**: The default light theme uses warm cream surfaces and moss #52643F accents for buttons, selections and focus. Existing saved theme choices, Enterprise defaults and the Slate Cobalt dark default are retained. Select Light appearance and Jasper Meadow Light in Settings to try it with an existing profile. Full headless `check` passed: 11,503 Java tests, zero failures/errors, 25 existing platform skips, plus theme-tool, native and architecture checks.
 
 **CI runtime optimization — 2026-10-19** (PR #1): CI runs independent Gradle projects with

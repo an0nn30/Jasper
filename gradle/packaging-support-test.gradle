@@ -29,6 +29,24 @@ def verifySupport = tasks.register('verifyPackagingSupport') {
 }
 tasks.named('check') { dependsOn(verifySupport) }
 
+// Inspect only resolved graph data, never another project's mutable state under --parallel.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.hasTask("${project.path}:installWindowsUser")) {
+        assert !graph.allTasks.any { it.name in ['packageApp', 'packageDist', 'buildLauncher', 'buildWatcher',
+            'buildCommandClient', 'trainAotCache'] || it.name.startsWith('compileMac') } :
+            'Run installWindowsUser separately from native build and packaging tasks.'
+    }
+}
+verifySupport.configure {
+    doLast {
+        def dependencies = { String name -> tasks.getByName(name).taskDependencies.getDependencies(tasks.getByName(name))*.name }
+        assert dependencies('installWindowsUser') == ['packageWindowsUser']
+        assert dependencies('packageWindowsUser') == ['stageWindowsUser']
+        assert dependencies('uninstallWindowsUser').isEmpty()
+        logger.lifecycle('Verified Windows user installation task wiring')
+    }
+}
+
 verifySupport.configure {
     doLast {
         def mac = bundledNatives('macos', 'aarch64')
