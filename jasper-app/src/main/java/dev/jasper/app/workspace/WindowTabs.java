@@ -78,8 +78,9 @@ final class WindowTabs extends JPanel implements TabStrip {
             }
             Curve curve = added ? Curve.OPEN : Curve.CLOSE;
             int millis = added ? animations.tabOpenMillis() : animations.tabCloseMillis();
-            // A hidden strip takes its tabs at once, so it shows and hides settled.
-            if (order.size() <= 1 || !opened && !closing || !isVisible() || !animations.enabled() || !group.owner().lookAnimates()
+            // A strip that does not show, hidden itself or in a hidden parent tab, takes its tabs at once, so it shows and
+            // hides settled.
+            if (order.size() <= 1 || !opened && !closing || !shown() || !animations.enabled() || !group.owner().lookAnimates()
                 || layoutWidth <= 0) millis = 0;
             for (Slot slot : slots) slot.width.target(slot.entry == null ? 0 : 1.0 / order.size(), now, millis, curve);
             sample(now);
@@ -88,6 +89,16 @@ final class WindowTabs extends JPanel implements TabStrip {
         setBackground(group.owner().theme().surface());
         for (Tab tab : order) entries.get(tab).refresh();
         doLayout(); syncTimer(); revalidate(); repaint();
+    }
+
+    /**
+     * Whether the strip and every container above it are visible. It does not ask {@code isShowing()}, so a strip outside
+     * a window, which has no parent, counts as visible.
+     */
+    private boolean shown() {
+        for (Component component = this; component != null; component = component.getParent())
+            if (!component.isVisible()) return false;
+        return true;
     }
 
     @Override public void setActive(boolean active) { this.active = active; refresh(); }

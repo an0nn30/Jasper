@@ -33,13 +33,13 @@ import javax.swing.SwingUtilities;
 
 /**
  * One parent tab's workspace (workspace tabs spec 10; parent tabs spec 4), under the parent tab's id: its
- * {@link Layout} and the tabs the layout places, drawn as
- * {@link SplitContainer}s over {@link GroupView}s, or the maximized group alone. Every change is a layout operation; the
- * view renders the selection, the active group and the maximize the layout holds and never picks them itself. It
- * rebuilds its splits only when the layout's shape changes (orientation, children, groups, maximize); otherwise it moves
- * tab components between group views, shows selections and passes divider weights on. It never creates or disposes a
- * tab: its window attaches and detaches them. Its layout accessor is {@code model()}: a {@code JPanel} cannot declare a
- * {@code layout()} that returns a value, because {@code java.awt.Container} has a {@code void layout()}. EDT only.
+ * {@link Layout} and the tabs the layout places, drawn as {@link SplitContainer}s over {@link GroupView}s, or the
+ * maximized group alone. Every change is a layout operation; the view renders the selection, the active group and the
+ * maximize the layout holds and never picks them itself. It rebuilds its splits only when the layout's shape changes
+ * (orientation, children, groups, maximize); otherwise it moves tab components between group views, shows selections
+ * and passes divider weights on. It never creates or disposes a tab: its window attaches and detaches them. Its layout
+ * accessor is {@code model()}: a {@code JPanel} cannot declare a {@code layout()} that returns a value, because
+ * {@code java.awt.Container} has a {@code void layout()}. EDT only.
  */
 final class WorkspaceView extends JPanel {
     private final WindowContent owner;
@@ -345,7 +345,7 @@ final class WorkspaceView extends JPanel {
 
     void setAnimations(AnimationSettings settings) { for (GroupView group : groups.values()) group.strip().setAnimations(settings); }
 
-    /** The window closed: every strip is released; the tabs are its registry's to close. */
+    /** The window closed, or this parent tab went: every strip is released; the tabs are its registry's to close. */
     void close() {
         if (closed) return;
         closed = true;

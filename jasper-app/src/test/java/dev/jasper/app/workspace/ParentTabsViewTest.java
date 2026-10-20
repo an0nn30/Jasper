@@ -12,6 +12,8 @@ import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
+import dev.jasper.app.terminals.OpenSpec;
+import dev.jasper.app.terminals.PaneEntry;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.IdleTerminalSession;
@@ -19,6 +21,7 @@ import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.KeyboardFocusManager;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -287,5 +290,86 @@ class ParentTabsViewTest {
                 outside.removeNotify();
             });
         }
+    }
+
+    /** Workspace plan 7a Rulings 10: a person's switch focuses the shown parent tab's active tab. */
+    @Test void aSwitchFocusesTheShownParentTabsActiveTab() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(pending));
+            Tab first = owner.selectedTab();
+            ParentTabId one = owner.activeParentTab();
+            Tab second = open(owner);
+            ParentTabId two = owner.activeParentTab();
+            int[] focused = {0, 0};
+            first.focusTarget(() -> focused[0]++);
+            second.focusTarget(() -> focused[1]++);
+            owner.selectParentTab(one);
+            assertThat(focused).as("the tab of the parent tab that shows now takes the focus").containsExactly(1, 0);
+            owner.selectParentTab(two);
+            assertThat(focused).containsExactly(1, 1);
+        });
+    }
+
+    /** Workspace plan 7a Rulings 3: a new parent tab goes at the end of the bar, whichever shows; the views follow the bar. */
+    @Test void aNewParentTabGoesAtTheEndOfTheBarAndTheViewsFollowTheBar() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(pending));
+            ParentTabId first = owner.activeParentTab();
+            open(owner);
+            ParentTabId second = owner.activeParentTab();
+            owner.selectParentTab(first);
+            open(owner);
+            ParentTabId third = owner.activeParentTab();
+            var parents = owner.parentTabs();
+            assertThat(parents.model().parentTabs()).extracting(ParentTab::id).as("at the end, not after the one that showed")
+                .containsExactly(first, second, third);
+            assertThat(Arrays.stream(parents.getComponents()).filter(WorkspaceView.class::isInstance)
+                .map(view -> ((WorkspaceView) view).id()).toList()).as("the views in bar order").containsExactly(first, second, third);
+        });
+    }
+
+    /** A new parent tab's workspace takes the window's theme and glass, and so do the splits it builds later. */
+    @Test void aNewParentTabTakesTheWindowsThemeAndGlass() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(pending));
+            owner.applyBackgroundOpacity(0.5);
+            open(owner);
+            WorkspaceView view = owner.workspace();
+            assertThat(view.isOpaque()).as("under glass it paints nothing behind its tabs").isFalse();
+            assertThat(view.getBackground()).as("the theme's surface").isEqualTo(owner.theme().surface());
+            owner.split(Side.RIGHT);
+            SplitContainer split = view.split(List.of());
+            assertThat(split).as("its split").isNotNull();
+            assertThat(split.isOpaque()).isFalse();
+            assertThat(split.getBackground()).isEqualTo(owner.theme().surface());
+        });
+    }
+
+    /** Workspace plan 7a Rulings 21: PaneHandle.split beside a hidden parent tab's terminal opens there and shows nothing new. */
+    @Test void aSplitBesideAHiddenParentTabsTerminalOpensThereAndLeavesTheShownOneShown() throws Exception {
+        var launcher = new ShellLauncher(Runnable::run, directory -> IdleTerminalSession.start(), "idle-test-session");
+        var registry = new TerminalRegistry();
+        WindowContent[] owner = new WindowContent[1];
+        edt(() -> {
+            owner[0] = content(launcher);
+            owner[0].connectTerminals(registry, () -> { });
+            owner[0].newParentTab(HOME);
+        });
+        edt(() -> { });
+        edt(() -> {
+            var window = owner[0];
+            Tab hidden = window.tabs().getFirst();
+            ParentTabId behind = window.parentTabOf(hidden).orElseThrow(), shown = window.activeParentTab();
+            Tab selected = window.selectedTab();
+            assertThat(behind).isNotEqualTo(shown);
+            PaneEntry pane = registry.pane(((TerminalContent) hidden.content()).pane().id()).orElseThrow();
+            Optional<PaneEntry> split = pane.split().apply(Side.RIGHT, new OpenSpec.Local(Optional.empty()));
+            assertThat(split).as("the SDK's split").isPresent();
+            Tab opened = window.tabs().stream().filter(tab -> tab.id().value().equals(split.get().tabId())).findFirst().orElseThrow();
+            assertThat(window.parentTabOf(opened)).as("in the hidden parent tab").contains(behind);
+            assertThat(window.parentTabs().view(behind).orElseThrow().model().groups()).as("in a pane beside its terminal's").hasSize(2);
+            assertThat(window.activeParentTab()).as("the shown parent tab stays shown").isEqualTo(shown);
+            assertThat(window.selectedTab()).isSameAs(selected);
+        });
     }
 }

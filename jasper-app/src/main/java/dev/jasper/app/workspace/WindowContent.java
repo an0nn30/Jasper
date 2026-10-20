@@ -1037,7 +1037,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (role == WindowRole.MAIN) chrome.windowOpened();
     }
 
-    /** This window's terminal tabs in workspace order. */
+    /** This window's terminal tabs: every parent tab's, in bar order. */
     public java.util.List<TerminalContent> terminalTabs() {
         var result = new ArrayList<TerminalContent>();
         for (Tab tab : tabs()) if (tab.content() instanceof TerminalContent terminal) result.add(terminal);
@@ -1093,8 +1093,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Shows a tab in this window, at the end of its active group and selected: one the registry placed here, or one this
-     * window opened. A failure leaves nothing mounted, takes back what the terminal registry heard, and propagates.
+     * Shows a tab in this window, at the end of the shown parent tab's active group and selected: one the registry
+     * placed here, or one this window opened. A failure leaves nothing mounted, takes back what the terminal registry
+     * heard, and propagates.
      */
     private void attach(Tab tab) { attach(tab, false, null, null, false); }
 

@@ -170,6 +170,28 @@ class WindowTabMotionTest {
         });
     }
 
+    /** Workspace plan 7a: a strip in a hidden parent tab takes a closed tab at once; once it shows, a close moves. */
+    @Test void aStripInAHiddenParentTabTakesAClosedTabAtOnce() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            for (int i = 0; i < 3; i++) owner.newTab(HOME);
+            owner.setSize(1208, 700);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            WorkspaceView hidden = owner.workspace();
+            var strip = (WindowTabs) hidden.activeGroupView().strip();
+            var tabs = hidden.tabs();
+            owner.newParentTab(HOME);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            owner.closeTab(tabs.get(3));
+            assertThat(strip.isVisible()).as("the strip itself is visible").isTrue();
+            assertThat(strip.motionRunning()).as("its parent tab is not").isFalse();
+            owner.selectParentTab(hidden.id());
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            owner.closeTab(tabs.get(2));
+            assertThat(strip.motionRunning()).as("once it shows, a close moves").isTrue();
+        });
+    }
+
     private Fixture fixture() {
         var owner = content(launcher(new ArrayDeque<>())); owner.currentTerminal().rename("first"); owner.update();
         var clock = new AtomicLong(); var strip = new WindowTabs(owner.workspace().activeGroupView(), clock::get);

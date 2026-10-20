@@ -99,21 +99,26 @@ final class ParentTabsView extends JPanel {
 
     /**
      * A new parent tab holding {@code tab}, at the end of the bar and shown (New Tab, parent tabs spec 8; workspace plan
-     * 7a Rulings 3). The window's only parent tab must not be empty: the empty workspace takes a first tab itself. The tab
-     * takes the focus when the window's parent tabs held it.
+     * 7a Rulings 3). The window's only parent tab must not be empty: the empty workspace takes a first tab itself. Its
+     * workspace takes the window's theme and glass first, so the splits it builds take them too. The tab takes the focus
+     * when the window's parent tabs held it.
      */
     WorkspaceView openParentTab(Tab tab) {
         boolean held = WorkspaceView.holdsFocus(owner, this);
         var view = new WorkspaceView(owner, ParentTabId.random());
+        int index = count();
         try {
+            view.applyTheme(owner.theme(), false);
+            view.setGlass((float) owner.backgroundOpacity() < 1f);
             view.open(tab);
-            model = model.open(new ParentTab(view.id(), view.model()), count());
+            model = model.open(new ParentTab(view.id(), view.model()), index);
         } catch (RuntimeException | Error failure) {
             view.close();
             throw failure;
         }
         views.put(view.id(), view);
-        add(view, 0);
+        // The views keep the bar's order, ahead of any other child.
+        add(view, index);
         reveal(view);
         owner.workspaceChanged(view, held);
         return view;
