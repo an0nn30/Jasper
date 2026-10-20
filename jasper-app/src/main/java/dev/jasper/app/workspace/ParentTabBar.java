@@ -37,11 +37,10 @@ final class ParentTabBar implements StripSource {
     TabStrip strip() { return strip; }
 
     /**
-     * Takes the parent tabs and shows or hides the bar for their count at once: hidden first, shown last. A pane window has
-     * no parent tabs and shows no bar (parent tabs spec 7).
+     * Takes the parent tabs and shows or hides the bar for their count at once: hidden first, shown last.
      */
     void refresh() {
-        boolean shown = !owner.isPaneWindow() && owner.look().showsParentTabBar(parentTabs.count());
+        boolean shown = owner.look().showsParentTabBar(parentTabs.count());
         if (!shown) strip.component().setVisible(false);
         strip.setActive(owner.windowActive());
         strip.component().setVisible(shown);

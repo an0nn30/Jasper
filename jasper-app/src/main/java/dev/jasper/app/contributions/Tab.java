@@ -119,7 +119,7 @@ public final class Tab implements AutoCloseable {
     public void focus() { if (!closed) focus.run(); }
     /** Shows the tab in its window and raises the window, wherever the tab is now. */
     public void select() { registry.select(this); }
-    /** Pop Out Tab: a new pane window takes the tab (parent tabs spec 5). */
+    /** A new full window takes the tab, as {@code ContentTab.moveToNewWindow()} asks (tabs and panes spec 13). */
     public void moveToNewWindow() { registry.moveToNewWindow(this); }
     /** The main window takes the tab, as {@code ContentTab.moveToMainWindow()} asks (workspace tabs spec 6.5). */
     public void moveToMainWindow() { registry.moveToMainWindow(this); }

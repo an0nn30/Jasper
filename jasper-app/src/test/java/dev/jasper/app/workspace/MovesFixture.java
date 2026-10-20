@@ -9,11 +9,9 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.layout.GroupId;
-import dev.jasper.app.layout.PaneLayout;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.TabId;
-import dev.jasper.app.layout.WindowLayout;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
@@ -114,15 +112,12 @@ final class MovesFixture implements AutoCloseable {
         var panes = new ArrayList<GroupId>();
         var held = new ArrayList<TabId>();
         for (JasperWindow window : manager.windows()) {
-            WindowLayout layout = window.content().windowLayout();
+            ParentTabs layout = window.content().windowLayout();
             held.addAll(layout.tabs());
-            switch (layout) {
-                case ParentTabs parents -> parents.parentTabs().forEach(parent -> {
-                    parentTabs.add(parent.id());
-                    parent.layout().groups().forEach(group -> panes.add(group.id()));
-                });
-                case PaneLayout pane -> pane.layout().groups().forEach(group -> panes.add(group.id()));
-            }
+            layout.parentTabs().forEach(parent -> {
+                parentTabs.add(parent.id());
+                parent.layout().groups().forEach(group -> panes.add(group.id()));
+            });
         }
         assertThat(parentTabs).as("parent tab ids").doesNotHaveDuplicates();
         assertThat(panes).as("pane ids").doesNotHaveDuplicates();

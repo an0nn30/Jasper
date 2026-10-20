@@ -60,7 +60,7 @@ public final class TabRegistry {
      * @param main the main window's id, restored first when none is open; null while the main window is being composed,
      *     and a plugin's tab asked for then opens there once it is up
      * @param isMain whether a window is the main window
-     * @param newWindow pops a tab out into a new pane window, or leaves it where it is
+     * @param newWindow moves a tab into a new full window of its own, or leaves it where it is
      * @param movedOut a move of a tab out of this window has ended, whether or not the tab left, or a tab placed in it
      *     failed to show: the window manager closes a child window left empty now, never in the middle of the move
      * @param emptyWindow opens an empty child window for a tab placed in a new window and gives its id; null when none
@@ -80,7 +80,7 @@ public final class TabRegistry {
          *
          * @param main the main window's id
          * @param isMain whether a window is the main window
-         * @param newWindow pops a tab out into a new pane window, or leaves it where it is
+         * @param newWindow moves a tab into a new full window of its own, or leaves it where it is
          */
         public Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow) {
             this(main, isMain, newWindow, window -> { }, () -> null);
@@ -92,7 +92,7 @@ public final class TabRegistry {
          *
          * @param main the main window's id
          * @param isMain whether a window is the main window
-         * @param newWindow pops a tab out into a new pane window, or leaves it where it is
+         * @param newWindow moves a tab into a new full window of its own, or leaves it where it is
          * @param movedOut a move of a tab out of a window has ended, whether or not the tab left
          */
         public Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow, Consumer<UUID> movedOut) {
@@ -351,8 +351,8 @@ public final class TabRegistry {
     }
 
     /**
-     * Whether a move would take {@code tab}: one of this registry's, open, neither pinned nor being closed. A pane or a
-     * parent tab moves whole or not at all (workspace plan 7b Rulings 7).
+     * Whether a move would take {@code tab}: one of this registry's, open, neither pinned nor being closed. A parent tab
+     * moves whole or not at all (workspace plan 7b Rulings 7).
      *
      * @param tab the tab
      * @return whether it may move
@@ -360,8 +360,8 @@ public final class TabRegistry {
     public boolean movable(Tab tab) { return tabs.contains(tab) && !tab.closed() && !tab.pinned() && !pending.contains(tab); }
 
     /**
-     * Pop Out Tab (parent tabs spec 5): the window manager opens a pane window for the tab, or leaves it where it is (a
-     * child window's only tab). A pinned tab or one being closed stays.
+     * {@code ContentTab.moveToNewWindow()} (tabs and panes spec 13): the window manager opens a full window holding the
+     * tab, or leaves it where it is (a child window's only tab). A pinned tab or one being closed stays.
      *
      * @param tab the tab
      */

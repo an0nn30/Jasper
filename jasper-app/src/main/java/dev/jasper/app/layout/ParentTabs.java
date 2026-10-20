@@ -15,7 +15,7 @@ import java.util.Optional;
  * empty, as the main window's empty workspace is (a child window closes instead). Equality covers the parent tabs and the
  * active one; the order of use only decides which parent tab shows after the shown one closes, and is not saved.
  */
-public final class ParentTabs implements WindowLayout {
+public final class ParentTabs {
     private final List<ParentTab> parentTabs;
     private final ParentTabId active;
     private final List<ParentTabId> recent;
@@ -128,8 +128,12 @@ public final class ParentTabs implements WindowLayout {
         return -1;
     }
 
-    /** Every tab: the parent tabs in bar order, each parent tab's tabs in workspace order. */
-    @Override public List<TabId> tabs() {
+    /**
+     * Every tab: the parent tabs in bar order, each parent tab's tabs in workspace order.
+     *
+     * @return the tabs
+     */
+    public List<TabId> tabs() {
         var tabs = new ArrayList<TabId>();
         for (ParentTab parent : parentTabs) tabs.addAll(parent.layout().tabs());
         return List.copyOf(tabs);

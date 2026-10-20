@@ -3,13 +3,10 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
-import dev.jasper.app.layout.GroupId;
-import dev.jasper.app.layout.Layout;
-import dev.jasper.app.layout.Origin;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.TabId;
-import dev.jasper.app.layout.WindowLayout;
 import dev.jasper.app.persistence.WorkspaceFile;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -124,7 +121,7 @@ public final class WindowManager {
         // window a move empties closes after the move.
         model.tabs().windows(new TabRegistry.Windows(() -> openingMain ? null : ensureMain("plugin", null).map(JasperWindow::id)
             .orElseThrow(() -> new IllegalStateException("The main window is closing or Jasper is quitting")), this::isMain,
-            this::popOutTab, this::movedOut, this::emptyWindow));
+            this::moveToNewWindow, this::movedOut, this::emptyWindow));
         model.panelRoute(this::routePanel);
     }
 
@@ -243,98 +240,48 @@ public final class WindowManager {
     public Optional<ChildWindow> openTerminalWindow(Path directory) {
         requireEdt();
         if (ensureMain("menu", null).isEmpty()) return Optional.empty();
-        return openChild(false, directory, null, null, null);
+        return openChild(false, directory, null, null);
     }
 
     /**
-     * Pop Out Tab (parent tabs spec 5): a new pane window takes {@code tab}, its content and session untouched, where its
-     * pane is on screen and at the pane's size, with the origin {@code WindowContent.popOutOrigin} gives (workspace plan
-     * 7b Rulings 3, 4 and 11). A tab being closed or pinned stays, and so does a child window's only tab: that window
-     * already is its own.
+     * {@code ContentTab.moveToNewWindow()} (tabs and panes spec 13): a new full window takes {@code tab}, its content and
+     * session untouched, where the platform puts a window (workspace plan 8a Rulings 6). A tab being closed or pinned
+     * stays, and so does a child window's only tab: that window already is its own.
      *
      * @param tab a tab of one of these windows
-     * @return the new pane window; empty when the tab stayed
+     * @return the new full window; empty when the tab stayed
      */
-    public Optional<ChildWindow> popOutTab(Tab tab) {
+    public Optional<ChildWindow> moveToNewWindow(Tab tab) {
         requireEdt();
-        WindowContent from = leaving(tab);
-        Rectangle bounds = from == null ? null : tab.group().flatMap(from::paneOnScreen).orElse(null);
-        return popOutTab(tab, bounds, centre(bounds));
-    }
-
-    /**
-     * As {@link #popOutTab(Tab)}, the pane window's workspace at {@code bounds} on screen, on the display under
-     * {@code cursor}.
-     *
-     * @param tab a tab of one of these windows
-     * @param bounds where the pane window's workspace goes on screen; null for where the platform puts it
-     * @param cursor a point on the display it opens on; null exactly when {@code bounds} is
-     * @return the new pane window; empty when the tab stayed
-     */
-    public Optional<ChildWindow> popOutTab(Tab tab, Rectangle bounds, Point cursor) {
-        requireEdt();
-        WindowContent from = leaving(tab);
-        return from == null ? Optional.empty() : moveToNewChild(tab, bounds, cursor, from.popOutOrigin(tab));
-    }
-
-    /**
-     * Pop Out Pane (parent tabs spec 5): a new pane window takes every tab of {@code pane}, in their order, showing the one
-     * the pane showed, where the pane is on screen and at its size; its origin is where the pane sat
-     * ({@code WindowContent.originOf}). A child window's only pane stays, as its only tab does, and a pane holding a tab
-     * that is pinned or being closed stays whole (workspace plan 7b Rulings 7 and 8).
-     *
-     * @param window the window holding the pane
-     * @param pane the pane
-     * @return the new pane window, holding what arrived; empty when no tab did
-     */
-    public Optional<ChildWindow> popOutPane(WindowContent window, GroupId pane) {
-        requireEdt();
-        if (window == null || !window.mayPopOutPane(pane)) return Optional.empty();
-        WorkspaceView view = window.parentTabs().holding(pane).orElseThrow();
-        var group = view.model().group(pane).orElseThrow();
-        List<Tab> moving = group.tabs().stream().map(id -> view.tab(id).orElseThrow()).toList();
-        Tab shown = group.selected().flatMap(view::tab).orElse(null);
-        Rectangle bounds = window.paneOnScreen(pane).orElse(null);
-        Optional<ChildWindow> opened = openChild(true, null, bounds, centre(bounds), window.originOf(pane, true));
+        if (leaving(tab) == null) return Optional.empty();
+        Optional<ChildWindow> opened = openChild(true, null, null, null);
         if (opened.isEmpty()) return opened;
-        ChildWindow child = opened.get();
         Throwable failure = null;
-        for (Tab tab : moving) {
-            try {
-                model.tabs().move(tab, child.id());
-            } catch (RuntimeException | Error thrown) {
-                failure = keep(failure, thrown);
-            }
+        try {
+            model.tabs().move(tab, opened.get().id());
+        } catch (RuntimeException | Error thrown) {
+            failure = thrown;
         }
-        // A listener may pin a later tab mid-move, or one tab's move may fail: the pane then stays split across the two
-        // windows, each window's ids still unique (parent tabs spec 4), and settle gives the pane window while a tab
-        // arrived. The pane window shows the tab the pane showed.
-        if (shown != null && child.content().parentTabs().contains(shown)) {
-            try {
-                model.tabs().select(shown);
-            } catch (RuntimeException | Error thrown) {
-                failure = keep(failure, thrown);
-            }
-        }
-        return settle(child, failure);
+        return settle(opened.get(), failure);
     }
 
     /**
-     * Pop Out Parent Tab (parent tabs spec 5): a new full window takes the parent tab {@code parentTab} whole, with its id and
-     * layout, where the platform puts it (workspace plan 7b Rulings 10 and 11). A full window's only parent tab stays (spec
-     * 5), and so does a parent tab holding a tab that is pinned or being closed.
+     * Move Tab to New Window (tabs and panes spec 6; plan 7b's Pop Out Parent Tab): a new full window takes the parent tab
+     * {@code parentTab} whole, with its id and layout, where the platform puts it (workspace plan 7b Rulings 10 and 11).
+     * A window's only parent tab stays (workspace plan 8a Rulings 6), and so does a parent tab holding a tab that is
+     * pinned or being closed.
      *
      * @param window the main window or a full window
      * @param parentTab one of its parent tabs
      * @return the new full window; empty when the parent tab stayed
      */
-    public Optional<ChildWindow> popOutParentTab(WindowContent window, ParentTabId parentTab) {
-        return popOutParentTab(window, parentTab, null, null);
+    public Optional<ChildWindow> moveTabToNewWindow(WindowContent window, ParentTabId parentTab) {
+        return moveTabToNewWindow(window, parentTab, null, null);
     }
 
     /**
-     * As {@link #popOutParentTab(WindowContent, ParentTabId)}, the full window's workspace at {@code bounds} on screen, on the
-     * display under {@code cursor}.
+     * As {@link #moveTabToNewWindow(WindowContent, ParentTabId)}, the full window's workspace at {@code bounds} on screen,
+     * on the display under {@code cursor}: the tab drag's tear-out.
      *
      * @param window the main window or a full window
      * @param parentTab one of its parent tabs
@@ -342,10 +289,10 @@ public final class WindowManager {
      * @param cursor a point on the display it opens on; null exactly when {@code bounds} is
      * @return the new full window; empty when the parent tab stayed
      */
-    public Optional<ChildWindow> popOutParentTab(WindowContent window, ParentTabId parentTab, Rectangle bounds, Point cursor) {
+    public Optional<ChildWindow> moveTabToNewWindow(WindowContent window, ParentTabId parentTab, Rectangle bounds, Point cursor) {
         requireEdt();
-        if (window == null || !window.mayPopOutParentTab(parentTab)) return Optional.empty();
-        Optional<ChildWindow> opened = openChild(true, null, bounds, cursor, null);
+        if (window == null || !window.mayMoveTabToNewWindow(parentTab)) return Optional.empty();
+        Optional<ChildWindow> opened = openChild(true, null, bounds, cursor);
         if (opened.isEmpty()) return opened;
         Throwable failure = null;
         try {
@@ -360,8 +307,8 @@ public final class WindowManager {
      * Moves the parent tab {@code parentTab} of {@code from} to {@code index} of {@code to}'s bar, whole, with its id and
      * layout (parent tabs spec 5 and 11; workspace plan 7b Rulings 6 and 10): through the tab registry, one
      * {@code TAB_MOVED} per tab, every session untouched. It shows there, raised, and a full window it empties closes; the
-     * main window it empties shows an empty workspace under a new id. Both windows are main or full windows; a parent tab
-     * holding a tab that is pinned or being closed stays. It keeps its maximize too: spec 15 ends a maximize for a tab
+     * main window it empties shows an empty workspace under a new id. A parent tab holding a tab that is pinned or being
+     * closed stays. It keeps its maximize too: spec 15 ends a maximize for a tab
      * that joins a layout, and a parent tab moving whole brings its own (Rulings 10). When part of it stays behind (a
      * listener pinned a tab mid-move, or a tab's move failed), the part that arrived takes a new id and keeps the panes it
      * landed in, so no id is in two windows (spec 4); a failure propagates afterwards.
@@ -374,7 +321,7 @@ public final class WindowManager {
      */
     public boolean moveParentTab(WindowContent from, ParentTabId parentTab, WindowContent to, int index) {
         requireEdt();
-        if (from == null || to == null || from == to || from.closed() || to.closed() || from.isPaneWindow() || to.isPaneWindow())
+        if (from == null || to == null || from == to || from.closed() || to.closed())
             return false;
         WorkspaceView view = from.parentTabs().view(parentTab).orElse(null);
         if (view == null || view.isEmpty() || !view.tabs().stream().allMatch(model.tabs()::movable)) return false;
@@ -403,38 +350,6 @@ public final class WindowManager {
         }
         rethrow(failure);
         return moved;
-    }
-
-    /**
-     * Bring Back (parent tabs spec 5 and 11; workspace plan 7b Rulings 5): a pane window's whole layout returns as a nested
-     * split beside its origin pane, on the recorded side with the recorded share, in the parent tab the origin names,
-     * whichever main or full window holds it now. It goes beside that parent tab's active pane when the origin pane is
-     * gone, and beside the active pane of the main window's active parent tab when no window holds the parent tab. A
-     * maximize there ends; the parent tab shows with the pane window's active tab selected, focused and raised, and the
-     * pane window closes with its last tab. While one of its tabs is pinned or being closed, nothing moves.
-     *
-     * @param window a pane window
-     * @return the window the panes went to; empty when none arrived
-     */
-    public Optional<JasperWindow> bringBack(WindowContent window) {
-        requireEdt();
-        if (window == null || !window.mayBringBack()) return Optional.empty();
-        List<Tab> moving = window.tabs();
-        Origin origin = window.origin().get();
-        Layout panes = window.workspace().model();
-        JasperWindow target = holderOf(origin.parentTab()).orElse(null);
-        ParentTabId parentTab = origin.parentTab();
-        if (target == null) {
-            target = ensureMain("menu", null).orElse(null);
-            if (target == null) return Optional.empty();
-            parentTab = target.content().activeParentTab();
-        }
-        Layout before = target.content().parentTabs().view(parentTab).orElseThrow().model();
-        GroupId beside = before.group(origin.pane()).isPresent() ? origin.pane() : before.activeGroup();
-        // A listener may pin a later tab mid-move, or one tab's move may fail: the rest then stays in the pane window, which
-        // stays open, and what arrived keeps to the parent tab's own panes (receive), so no id is in two windows (spec 4).
-        Layout arranged = before.graft(panes, beside, origin.side(), origin.share());
-        return target.content().receive(moving, parentTab, 0, arranged) ? Optional.of(target) : Optional.empty();
     }
 
     /**
@@ -480,20 +395,6 @@ public final class WindowManager {
     }
 
     /**
-     * The open main or full window holding the parent tab {@code id}, which follows it between windows (parent tabs spec
-     * 11).
-     */
-    private Optional<JasperWindow> holderOf(ParentTabId id) {
-        for (JasperWindow candidate : windows()) {
-            WindowContent content = candidate.content();
-            // A window that is closing holds its parent tabs no more.
-            if (!content.closed() && !content.isPaneWindow() && content.parentTabs().view(id).isPresent())
-                return Optional.of(candidate);
-        }
-        return Optional.empty();
-    }
-
-    /**
      * The window {@code tab} may leave for a window of its own: none for a tab the registry would not move (closed, pinned
      * or being closed: {@code TabRegistry.movable}), so no window opens for it, nor for a child window's only tab, whose
      * window already is its own.
@@ -503,19 +404,6 @@ public final class WindowManager {
         Optional<JasperWindow> from = window(tab.window());
         if (from.isEmpty() || !from.get().isMain() && from.get().content().tabCount() < 2) return null;
         return from.get().content();
-    }
-
-    /** A new pane window from {@code origin} takes {@code tab}: Pop Out Tab, and a tab the drag tears out. */
-    private Optional<ChildWindow> moveToNewChild(Tab tab, Rectangle bounds, Point cursor, Origin origin) {
-        Optional<ChildWindow> opened = openChild(true, null, bounds, cursor, origin);
-        if (opened.isEmpty()) return opened;
-        Throwable failure = null;
-        try {
-            model.tabs().move(tab, opened.get().id());
-        } catch (RuntimeException | Error thrown) {
-            failure = thrown;
-        }
-        return settle(opened.get(), failure);
     }
 
     /**
@@ -532,11 +420,6 @@ public final class WindowManager {
         }
         rethrow(failure);
         return child.closed() ? Optional.empty() : Optional.of(child);
-    }
-
-    /** The middle of {@code bounds} on screen, whose display a window opening there takes; null for null. */
-    private static Point centre(Rectangle bounds) {
-        return bounds == null ? null : new Point((int) bounds.getCenterX(), (int) bounds.getCenterY());
     }
 
     /**
@@ -603,17 +486,13 @@ public final class WindowManager {
         return all;
     }
 
-    /**
-     * A child window: a pane window from {@code origin}, made one while it is empty and before its frame exists (parent tabs
-     * spec 4), or a full window when it is null.
-     */
-    private Optional<ChildWindow> openChild(boolean empty, Path directory, Rectangle bounds, Point cursor, Origin origin) {
+    /** A full child window, empty for tabs that move into it or holding a terminal tab in {@code directory}. */
+    private Optional<ChildWindow> openChild(boolean empty, Path directory, Rectangle bounds, Point cursor) {
         // A closing tab's listener asking for a window while every window closes gets none (spec 6.4).
         if (closingAll) return Optional.empty();
         ChildWindow[] made = new ChildWindow[1];
         return open(new Opening(WindowRole.CHILD, empty, directory, "menu", () -> { if (made[0] != null) made[0].emptied(); },
             Optional.ofNullable(bounds).map(Rectangle::new), Optional.ofNullable(cursor).map(Point::new)), content -> {
-            if (origin != null) content.paneWindow(origin);
             made[0] = new ChildWindow(this, content);
             children.add(made[0]);
             return made[0];
@@ -630,7 +509,7 @@ public final class WindowManager {
             if (content == null) return Optional.empty();
             // Every window drags tabs with the one drag, which reaches them all (workspace tabs spec 12).
             content.tabDrag(tabDrag);
-            // Its pop-outs, Bring Back and Move to Main Window are this manager's (parent tabs spec 5).
+            // Its moves to other windows are this manager's (tabs and panes spec 6).
             content.manager(this);
             window = make.apply(content);
             content.onLayoutChanged = this::changed;
@@ -657,9 +536,9 @@ public final class WindowManager {
     }
 
     /**
-     * What {@code workspace.toml} saves now (workspace tabs spec 8 and 13; parent tabs spec 9): the main window, its full
-     * windows and its pane windows, each with where it is, what it holds (its parent tabs and the one that shows, or a
-     * pane window's layout and origin) and what each of its tabs needs to come back. A tab that cannot come back is taken
+     * What {@code workspace.toml} saves now (workspace tabs spec 8 and 13; tabs and panes spec 12): the main window and its
+     * full windows, each with where it is, what it holds (its parent tabs and the one that shows) and what each of its
+     * tabs needs to come back. A tab that cannot come back is taken
      * out first, as closing it would take it out ({@code WorkspaceFile.keeping}): a parent tab left with none goes, a
      * child window left with none is left out (workspace plan 2 Rulings 20), and the main window may be empty. A window
      * whose content has closed holds nothing, though it is listed until its closed hook runs.
@@ -677,7 +556,7 @@ public final class WindowManager {
     private Optional<WorkspaceFile.WindowRecord> windowRecord(JasperWindow window) {
         var tabs = new HashMap<TabId, WorkspaceFile.TabRecord>();
         for (Tab tab : window.content().tabs()) tabRecord(tab).ifPresent(saved -> tabs.put(tab.id(), saved));
-        Optional<WindowLayout> kept = WorkspaceFile.keeping(window.content().windowLayout(), tabs::containsKey, window.isMain());
+        Optional<ParentTabs> kept = WorkspaceFile.keeping(window.content().windowLayout(), tabs::containsKey, window.isMain());
         if (kept.isEmpty()) return Optional.empty();
         JasperWindow.Placement placement = window.placement();
         return Optional.of(new WorkspaceFile.WindowRecord(window.isMain() ? WorkspaceFile.Role.MAIN : WorkspaceFile.Role.CHILD,
@@ -722,7 +601,7 @@ public final class WindowManager {
     private UUID emptyWindow() {
         if (openingMain) return null;
         if (ensureMain("plugin", null).isEmpty()) throw new IllegalStateException("The main window is closing or Jasper is quitting");
-        return openChild(true, null, null, null, null).map(JasperWindow::id)
+        return openChild(true, null, null, null).map(JasperWindow::id)
             .orElseThrow(() -> new IllegalStateException("The main window is closing or Jasper is quitting"));
     }
 

@@ -257,9 +257,9 @@ class ConfigLoaderTest {
         assertThat(result.diagnostics()).singleElement().satisfies(d -> assertThat(d.message()).contains("Unknown action"));
     }
 
-    /** Parent tabs spec 8: the old move ids are a clean break too, so each is an unknown action (workspace plan 7b). */
+    /** Tabs and panes spec 10: the pane-window and Pop Out ids are a clean break, so each is an unknown action. */
     @Test void aRemovedMoveIdIsReportedAsAnUnknownAction() {
-        for (String id : new String[] {"move_tab_to_new_window", "move_tab_to_main_window"}) {
+        for (String id : new String[] {"pop_out_tab", "pop_out_pane", "pop_out_parent_tab", "bring_back", "move_tab_to_main_window"}) {
             var result = parse("[keybindings]\n" + id + " = \"cmd+w\"");
             assertThat(result.rejected()).isFalse();
             assertThat(result.snapshot().keybindings()).doesNotContainKey(id);

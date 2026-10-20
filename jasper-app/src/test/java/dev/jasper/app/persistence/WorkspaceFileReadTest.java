@@ -1,7 +1,6 @@
 package dev.jasper.app.persistence;
 
 import static dev.jasper.app.persistence.WorkspaceFileTest.BOUNDS;
-import static dev.jasper.app.persistence.WorkspaceFileTest.ORIGIN;
 import static dev.jasper.app.persistence.WorkspaceFileTest.group;
 import static dev.jasper.app.persistence.WorkspaceFileTest.groupId;
 import static dev.jasper.app.persistence.WorkspaceFileTest.one;
@@ -16,13 +15,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.layout.Child;
 import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Orientation;
-import dev.jasper.app.layout.PaneLayout;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.layout.TabId;
-import dev.jasper.app.layout.WindowLayout;
 import dev.jasper.app.persistence.WorkspaceFile.Loaded;
 import dev.jasper.app.persistence.WorkspaceFile.Role;
 import dev.jasper.app.persistence.WorkspaceFile.Snapshot;
@@ -85,13 +82,8 @@ class WorkspaceFileReadTest {
         return new Snapshot(List.of(new WindowRecord(Role.MAIN, bounds, extendedState, one(1, layout), tabs), snapshot().children().getFirst()));
     }
 
-    /** The layout a window shows: a main or full window's shown parent tab's, or a pane window's. */
-    static Layout shown(WindowRecord window) {
-        return switch (window.layout()) {
-            case ParentTabs parents -> parents.activeParentTab().layout();
-            case PaneLayout pane -> pane.layout();
-        };
-    }
+    /** The layout a window shows: its shown parent tab's. */
+    static Layout shown(WindowRecord window) { return window.layout().activeParentTab().layout(); }
 
     static Map<TabId, TabRecord> without(Map<TabId, TabRecord> tabs, TabId tab) {
         var rest = new HashMap<>(tabs);
@@ -121,7 +113,7 @@ class WorkspaceFileReadTest {
     }
 
     @Test void stringsWithQuotesBackslashesNewlinesAndOddKeysRoundTrip() throws Exception {
-        WindowLayout layout = window(Role.MAIN, 1, 2).layout();
+        ParentTabs layout = window(Role.MAIN, 1, 2).layout();
         var odd = new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 0, layout, Map.of(
             tab(1), new TabRecord.Terminal("say \"hi\"\tnow\nplease", "C:\\Users\\me\\caf\u00e9", "pwsh 7"),
             tab(2), new TabRecord.Content("", "dev.jasper.sample", "about",
@@ -195,7 +187,7 @@ class WorkspaceFileReadTest {
                 {kind, "\"content:dev.jasper.editor:\""}})
             assertThat(read(replaceOnce(text, change[0], change[1]))).as(change[1]).isEqualTo(droppedContent);
         String second = "\n[[windows.tabs]]\nid = \"" + id(tab(2)) + "\"\nkind = \"terminal\"\ntitle = \"\"\ndirectory = \"\"\nprofile = \"\"\n";
-        assertThat(read(replaceOnce(text, "\n[[windows]]\nrole = \"pane\"", second + "\n[[windows]]\nrole = \"pane\"")))
+        assertThat(read(replaceOnce(text, "\n[[windows]]\nrole = \"full\"", second + "\n[[windows]]\nrole = \"full\"")))
             .as("the first entry for an id wins; the second is a dropped entry").isEqualTo(keptAside(snapshot()));
     }
 
@@ -271,9 +263,9 @@ class WorkspaceFileReadTest {
     @Test void aSecondMainWindowAnEmptiedChildAndAWindowHoldingAnotherWindowsTabAreDropped() throws Exception {
         String text = WorkspaceFile.encode(snapshot());
         var mainOnly = keptAside(new Snapshot(List.of(snapshot().main())));
-        assertThat(read(replaceOnce(text, "role = \"pane\"", "role = \"main\""))).as("a second main window").isEqualTo(mainOnly);
+        assertThat(read(replaceOnce(text, "role = \"full\"", "role = \"main\""))).as("a second main window").isEqualTo(mainOnly);
         String t5 = "id = \"" + id(tab(5)) + "\"\n";
-        assertThat(read(replaceOnce(text, t5 + "kind = \"terminal\"", t5 + "kind = \"x\""))).as("a pane window left empty").isEqualTo(mainOnly);
+        assertThat(read(replaceOnce(text, t5 + "kind = \"terminal\"", t5 + "kind = \"x\""))).as("a full window left empty").isEqualTo(mainOnly);
         assertThat(text.split(Pattern.quote(id(tab(5))), -1)).hasSize(4);
         assertThat(read(text.replace(id(tab(5)), id(tab(1))))).as("a tab the main window holds").isEqualTo(mainOnly);
     }
@@ -418,23 +410,6 @@ class WorkspaceFileReadTest {
         assertThat(read(replaceOnce(text, p3, "id = \"" + parentTabId(1).value() + "\"\n")))
             .as("parent tab ids are unique across windows (workspace plan 7b Rulings 10)")
             .isEqualTo(keptAside(new Snapshot(List.of(parentTabs().main()))));
-    }
-
-    @Test void aPaneWindowsUnreadableOriginFallsBackToOneNoWindowHolds() throws Exception {
-        String text = WorkspaceFile.encode(snapshot());
-        WindowRecord pane = snapshot().children().getFirst();
-        var fallen = new Snapshot(List.of(snapshot().main(), new WindowRecord(Role.CHILD, pane.bounds(), 0,
-            new PaneLayout(shown(pane), WorkspaceFile.NO_ORIGIN), pane.tabs())));
-        for (String[] change : new String[][] {
-                {"side = \"left\"", "side = \"aslant\""},
-                {"share = 0.25", "share = 1.5"},
-                {"pane = \"" + groupId(1).value() + "\"", "pane = \"one\""},
-                {"origin = { parent_tab = ", "origin = { tab = "}})
-            assertThat(read(replaceOnce(text, change[0], change[1]))).as(change[1]).isEqualTo(clean(fallen));
-        assertThat(WorkspaceFile.NO_ORIGIN.parentTab()).isNotEqualTo(ORIGIN.parentTab());
-        assertThat(WorkspaceFile.NO_ORIGIN.parentTab().value().version()).as("name-based, never a random id").isEqualTo(3);
-        assertThat(WorkspaceFile.NO_ORIGIN.pane()).isNotEqualTo(ORIGIN.pane());
-        assertThat(WorkspaceFile.NO_ORIGIN.pane().value().version()).as("name-based, never a random id").isEqualTo(3);
     }
 
     @Test void anAbsentFileStartsFreshAndCreatesNothing() throws Exception {

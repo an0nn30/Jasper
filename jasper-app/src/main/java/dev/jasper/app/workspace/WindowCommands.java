@@ -51,9 +51,7 @@ final class WindowCommands implements AutoCloseable {
                 case OPEN_FILE -> List.of("open", "editor", "browse");
                 case NEW_TERMINAL_WINDOW -> List.of("new window", "shell", "child window");
                 case CLOSE_WINDOW -> List.of("window", "close");
-                case POP_OUT_TAB, POP_OUT_PANE -> List.of("detach", "separate window", "pane window");
-                case POP_OUT_PARENT_TAB -> List.of("detach", "separate window", "full window");
-                case BRING_BACK -> List.of("attach", "return", "dock", "origin");
+                case MOVE_TAB_TO_NEW_WINDOW -> List.of("detach", "separate window", "new window");
                 case MOVE_TO_MAIN_WINDOW -> List.of("attach", "main window", "merge");
                 case NEW_TAB -> List.of("parent tab", "terminal");
                 case NEW_TAB_IN_PANE -> List.of("stack", "pane", "terminal");

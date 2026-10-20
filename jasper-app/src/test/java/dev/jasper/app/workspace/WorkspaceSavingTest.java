@@ -123,12 +123,12 @@ class WorkspaceSavingTest {
             main.content().closeParentTab(opened);
             second();
             assertThat(((ParentTabs) saved().main().layout()).parentTabs()).as("a parent tab closing").hasSize(1);
-            ChildWindow pane = windows.manager.popOutTab(main.content().selectedTab()).orElseThrow();
+            ChildWindow full = windows.manager.moveToNewWindow(main.content().selectedTab()).orElseThrow();
             second();
-            assertThat(saved().children()).as("a tab popping out into a pane window").singleElement()
-                .satisfies(record -> assertThat(record.layout()).isEqualTo(pane.content().windowLayout()));
-            windows.manager.bringBack(pane.content());
-            assertThat(saved().children()).as("Bring Back: its window closing is saved at once").isEmpty();
+            assertThat(saved().children()).as("an item moving into a window of its own").singleElement()
+                .satisfies(record -> assertThat(record.layout()).isEqualTo(full.content().windowLayout()));
+            windows.manager.moveToMainWindow(full.content());
+            assertThat(saved().children()).as("Move to Main Window: its window closing is saved at once").isEmpty();
             second();
             assertThat(saved().main().layout()).as("and where its tab came back, within the second").isEqualTo(main.content().windowLayout());
         });
@@ -173,10 +173,10 @@ class WorkspaceSavingTest {
             windows.manager.openTerminalWindow(folder).orElseThrow();
             main.content().newTab(folder);
             main.content().newTab(folder);
-            windows.manager.popOutTab(main.content().selectedTab()).orElseThrow();
+            windows.manager.moveToNewWindow(main.content().selectedTab()).orElseThrow();
             windows.manager.closeAll();
             assertThat(due).as("the save it waited for is done").isEmpty();
-            assertThat(saved().children()).as("the full window and the pane window, saved before they closed").hasSize(2);
+            assertThat(saved().children()).as("both child windows, saved before they closed").hasSize(2);
             assertThat(saved().main().layout().tabs()).hasSize(2);
             assertThat(store.held()).as("closing their tabs is not saved").isTrue();
         });

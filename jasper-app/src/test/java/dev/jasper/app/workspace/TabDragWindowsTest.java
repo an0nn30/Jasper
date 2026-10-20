@@ -386,7 +386,7 @@ class TabDragWindowsTest {
             ParentTabId only = from.activeParentTab();
             Tab moving = entryOf(from, only);
             assertThat(from.parentTabBar().component().isVisible()).as("no strip over it to drag it from").isFalse();
-            assertThat(from.mayPopOutParentTab(only)).as("a full window's only tab stays in its window").isFalse();
+            assertThat(from.mayMoveTabToNewWindow(only)).as("a full window's only tab stays in its window").isFalse();
             List<ParentTabId> before = tabIds(to);
             facts.clear();
             assertThat(manager.moveParentTab(from, only, to, before.size())).isTrue();
@@ -487,34 +487,6 @@ class TabDragWindowsTest {
         });
     }
 
-    /** Workspace plan 7c Rulings 9: a pane window has no tabs and takes none; nothing moves. */
-    @Test void aPaneWindowTakesNoTab() throws Exception {
-        ParentTabId[] id = new ParentTabId[1];
-        edt(() -> {
-            id[0] = secondTab(main);
-            child.content().split(Side.RIGHT);
-        });
-        launch();
-        edt(() -> {
-            ChildWindow pane = manager.popOutTab(child.content().selectedTab()).orElseThrow();
-            place(frameOf(pane), 100, 900, 800, 400);
-            assertThat(pane.content().isPaneWindow()).isTrue();
-            WindowContent from = main.content();
-            Tab moving = entryOf(from, id[0]);
-            Point top = inside(band(pane.content()), 0.5, 0.5);
-            Component source = start(from, moving, top);
-            assertThat(manager.tabDrag().target()).as("along its top").isEmpty();
-            Point middle = middle(pane.content().workspace());
-            mouse(source, MouseEvent.MOUSE_DRAGGED, middle);
-            assertThat(manager.tabDrag().target()).as("nor over its pane").isEmpty();
-            assertThat(manager.tabDrag().overlay().getParent()).isNull();
-            mouse(source, MouseEvent.MOUSE_RELEASED, middle);
-            assertThat(pane.content().tabs()).hasSize(1);
-            assertThat(from.parentTabCount()).isEqualTo(2);
-            assertThat(moving.window()).isEqualTo(main.id());
-        });
-    }
-
     /** A tab whose pane holds a plugin's view moves with the same view, shown in its new window. */
     @Test void aTabHoldingAPluginsViewMovesWithItsView() throws Exception {
         edt(() -> {
@@ -588,37 +560,6 @@ class TabDragWindowsTest {
             assertThat(manager.tabDrag().target()).as("now the main window did, whose pane takes no tab").isEmpty();
             mouse(source, MouseEvent.MOUSE_RELEASED, overlap);
             assertThat(moving.window()).isEqualTo(main.id());
-        });
-    }
-
-    /** Parent tabs spec 5 and workspace plan 7b Rulings 11: a pane window opens where its pane was, at its size. */
-    @Test void aPoppedOutTabsPaneWindowOpensAtItsPanesPlace() throws Exception {
-        edt(() -> {
-            GroupView pane = main.content().workspace().activeGroupView();
-            Rectangle expected = onScreen(pane, new Rectangle(pane.getSize()));
-            ChildWindow popped = manager.popOutTab(main.content().selectedTab()).orElseThrow();
-            assertThat(popped.content().isPaneWindow()).isTrue();
-            assertThat(placed).as("the pane's place and size").containsExactly(expected);
-            assertThat(cursors).as("on the display under its middle")
-                .containsExactly(new Point((int) expected.getCenterX(), (int) expected.getCenterY()));
-        });
-    }
-
-    /** Workspace plan 7b Rulings 11: a pane a maximize keeps out of the tree has no place on screen, so the platform places it. */
-    @Test void aPaneAMaximizeHidesPopsOutWhereThePlatformPutsIt() throws Exception {
-        edt(() -> {
-            WindowContent from = main.content();
-            Tab hidden = from.selectedTab();
-            from.split(Side.RIGHT);
-            relayout(frameOf(main));
-            from.workspace().toggleMaximize();
-            relayout(frameOf(main));
-            GroupId pane = hidden.group().orElseThrow();
-            assertThat(from.workspace().model().maximized()).isPresent().get().isNotEqualTo(pane);
-            assertThat(from.workspace().groupView(pane).getWidth()).as("its last size, out of the tree").isPositive();
-            ChildWindow popped = manager.popOutTab(hidden).orElseThrow();
-            assertThat(popped.content().isPaneWindow()).isTrue();
-            assertThat(placed).as("no place on screen").isEmpty();
         });
     }
 

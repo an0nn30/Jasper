@@ -22,9 +22,7 @@ import dev.jasper.app.contributions.WorkspaceHost;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.Layout;
-import dev.jasper.app.layout.Origin;
-import dev.jasper.app.layout.PaneLayout;
-import dev.jasper.app.layout.WindowLayout;
+import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.dock.DockState;
@@ -76,7 +74,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** This window's workspace in {@link #registry}; closing it removes the tabs the window still holds. */
     private Subscription host;
     private Runnable bringToFront = () -> {};
-    /** The window manager that opened this window, which pops out, brings back and moves (parent tabs spec 5); else null. */
+    /** The window manager that opened this window, which moves its tabs to other windows (tabs and panes spec 6); else null. */
     private WindowManager manager;
     /** The main window, with Jasper's chrome, or a child window, a workspace alone (workspace tabs spec 6). */
     private final WindowRole role;
@@ -85,8 +83,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * 10; parent tabs spec 4), where the terminal column stood.
      */
     private final ParentTabsView parentTabs;
-    /** A pane window's origin (parent tabs spec 4), which the window manager gives it once while it is empty; else null. */
-    private Origin origin;
     /** Where tabs moving in land while {@link #receive} runs: a parent tab, and its place in the bar when it is new. */
     private record Landing(ParentTabId parentTab, int index) { }
     private Landing landing;
@@ -130,7 +126,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /**
      * Drags a parent tab from the bar (tabs and panes spec 6): the window manager's, which every window it opens shares;
      * until it gives that, one of this window's own, which reorders the bar and moves nothing out of this window, as a
-     * tear-out needs a manager ({@link #mayPopOutParentTab}).
+     * tear-out needs a manager ({@link #mayMoveTabToNewWindow}).
      */
     private TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this));
     private UiState uiState = UiState.inMemory();
@@ -980,18 +976,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void requestNewTerminalWindow() { newTerminalWindow.accept(directory()); }
     /** Close Window (workspace tabs spec 6.4 and 11): this window, as its title bar's close button closes it. */
     void requestCloseWindow() { onCloseWindow.run(); }
-    /** Pop Out Tab (parent tabs spec 5): the window manager decides whether {@code tab} moves (workspace plan 7b Rulings 8). */
-    void popOutTab(Tab tab) { if (tab != null) registry.moveToNewWindow(tab); }
-    /** Pop Out Pane: {@code tab}'s pane, through the window manager; nothing in a window outside one. */
-    void popOutPane(Tab tab) {
-        if (manager != null && tab != null) parentTabs.groupOf(tab.id()).ifPresent(pane -> manager.popOutPane(this, pane));
+    /**
+     * Move Tab to New Window (tabs and panes spec 6): the parent tab holding {@code tab}, through the window manager;
+     * nothing in a window outside one.
+     */
+    void moveTabToNewWindow(Tab tab) {
+        if (manager != null && tab != null) parentTabOf(tab).ifPresent(parentTab -> manager.moveTabToNewWindow(this, parentTab));
     }
-    /** Pop Out Parent Tab: {@code tab}'s parent tab. */
-    void popOutParentTab(Tab tab) {
-        if (manager != null && tab != null) parentTabOf(tab).ifPresent(parentTab -> manager.popOutParentTab(this, parentTab));
-    }
-    /** Bring Back: this pane window's panes go back where they came from. */
-    void bringBack() { if (manager != null) manager.bringBack(this); }
     /** Move to Main Window: this full window's parent tabs join the main window's bar. */
     void moveToMainWindow() { if (manager != null) manager.moveToMainWindow(this); }
     /** File › Open File…: {@link #fileChooser} from the active pane's folder, then the route a Cmd-click takes, at no line. */
@@ -1279,97 +1270,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     ParentTabsView parentTabs() { return parentTabs; }
 
     /**
-     * What this window holds (parent tabs spec 4): its parent tabs with their layouts, and the one that shows; a pane
-     * window's one layout and its origin from its first tab on (a pane window still opening, empty, reports its empty
-     * parent tab).
+     * What this window holds (tabs and panes spec 4): its parent tabs with their layouts, and the one that shows.
      *
-     * @return the parent tabs, or the pane window's layout
+     * @return the parent tabs
      */
-    public WindowLayout windowLayout() {
-        return origin != null && !parentTabs.isEmpty() ? new PaneLayout(workspace().model(), origin) : parentTabs.model();
-    }
-
-    /**
-     * Makes this window, a child window still empty, a pane window from {@code value} (parent tabs spec 4; workspace plan
-     * 7b Rulings 9): one layout and no parent-tab bar. The window manager does it once, before the window's frame exists.
-     *
-     * @param value where its panes come from
-     * @throws IllegalStateException for the main window, a window holding a tab, or one that already is a pane window
-     */
-    void paneWindow(Origin value) {
-        if (isMain() || !parentTabs.isEmpty() || origin != null)
-            throw new IllegalStateException("Only a new, empty child window becomes a pane window");
-        origin = Objects.requireNonNull(value, "value");
-        parentTabs.refresh();
-    }
-
-    /** Whether this is a pane window (parent tabs spec 4). */
-    boolean isPaneWindow() { return origin != null; }
-
-    /** A pane window's origin; empty for the main window and a full window. */
-    Optional<Origin> origin() { return Optional.ofNullable(origin); }
-
-    /**
-     * Where a pane window made from {@code pane} comes from (parent tabs spec 4 and 5): a pane window's own origin, as its
-     * panes came from there (workspace plan 7b Rulings 4); else, when the pane goes {@code whole}, where it sits in its
-     * parent tab ({@link dev.jasper.app.layout.Layout#origin}); else the pane itself, which keeps its other tabs, with the
-     * new pane on its right at half its width (Rulings 3).
-     */
-    Origin originOf(GroupId pane, boolean whole) {
-        if (origin != null) return origin;
-        WorkspaceView view = parentTabs.holding(pane)
-            .orElseThrow(() -> new IllegalArgumentException("Pane " + pane + " is not in this window"));
-        return whole ? view.model().origin(view.id(), pane) : new Origin(view.id(), pane, Side.RIGHT, 0.5);
-    }
-
-    /** Pop Out Tab's origin for {@code tab}: its pane's, which goes with it when it is the pane's only tab (Rulings 3). */
-    Origin popOutOrigin(Tab tab) {
-        GroupId pane = parentTabs.groupOf(tab.id())
-            .orElseThrow(() -> new IllegalArgumentException("Tab " + tab.id() + " is not in this window"));
-        return originOf(pane, groupTabs(tab).size() == 1);
-    }
-
-    /**
-     * {@code pane}'s rectangle on screen while it shows in the shown parent tab and has a size; empty otherwise, as for a
-     * pane a maximize keeps out of the tree with its last size, which {@link WorkspaceView#dropAreas} skips too.
-     */
-    Optional<java.awt.Rectangle> paneOnScreen(GroupId pane) {
-        WorkspaceView shown = parentTabs.active();
-        return parentTabs.holding(pane).filter(view -> view == shown).map(view -> view.groupView(pane))
-            .filter(group -> SwingUtilities.isDescendingFrom(group, shown))
-            .filter(group -> group.getWidth() > 0 && group.getHeight() > 0).map(group -> {
-                var corner = new Point(0, 0);
-                SwingUtilities.convertPointToScreen(corner, group);
-                return new java.awt.Rectangle(corner, group.getSize());
-            });
-    }
-
-    /** How many panes this window has across its parent tabs; the main window's empty workspace counts its one. */
-    int paneCount() {
-        int count = 0;
-        for (WorkspaceView view : parentTabs.views()) count += view.model().groups().size();
-        return count;
-    }
-
-    /**
-     * Whether Pop Out Tab may take {@code tab}: one the registry would move ({@code TabRegistry.movable}), in the main
-     * window or in a child window that has another tab (workspace plan 7b Rulings 7 and 8).
-     */
-    boolean mayPopOutTab(Tab tab) { return tab != null && (isMain() || tabCount() > 1) && registry.movable(tab); }
-
-    /**
-     * Whether Pop Out Pane may take {@code pane}: one of this window's, holding tabs that may all move, in the main window
-     * or in a child window that has another pane (workspace plan 7b Rulings 7 and 8). A window no window manager opened
-     * moves nothing, so this and the other window menu checks are false there.
-     */
-    boolean mayPopOutPane(GroupId pane) {
-        if (closed || manager == null || pane == null) return false;
-        WorkspaceView view = parentTabs.holding(pane).orElse(null);
-        if (view == null || !(isMain() || paneCount() > 1)) return false;
-        java.util.List<Tab> held = new ArrayList<>();
-        for (TabId id : view.model().group(pane).orElseThrow().tabs()) view.tab(id).ifPresent(held::add);
-        return movable(held);
-    }
+    public ParentTabs windowLayout() { return parentTabs.model(); }
 
     /** Whether {@code moving} holds tabs and the registry would move every one ({@code TabRegistry.movable}, Rulings 7). */
     private boolean movable(java.util.List<Tab> moving) {
@@ -1377,27 +1282,21 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Whether Pop Out Parent Tab may take {@code parentTab}: one of this window's, holding tabs that may all move, in the
-     * main window or in a full window that has another parent tab; never a pane window's, nor without a window manager
-     * (parent tabs spec 5; workspace plan 7b Rulings 7 and 8).
+     * Whether Move Tab to New Window may take {@code parentTab}: one of this window's, beside another parent tab, holding
+     * tabs that may all move; never without a window manager (tabs and panes spec 6; workspace plan 7b Rulings 7, plan 8a
+     * Rulings 6).
      */
-    boolean mayPopOutParentTab(ParentTabId parentTab) {
-        if (closed || manager == null || parentTab == null || origin != null) return false;
+    boolean mayMoveTabToNewWindow(ParentTabId parentTab) {
+        if (closed || manager == null || parentTab == null) return false;
         Optional<WorkspaceView> view = parentTabs.view(parentTab);
-        return view.isPresent() && (isMain() || parentTabs.count() > 1) && movable(view.get().tabs());
+        return view.isPresent() && parentTabs.count() > 1 && movable(view.get().tabs());
     }
-
-    /**
-     * Whether Bring Back may take this window's tabs: a pane window's that the window manager opened, every one of which
-     * may move (Rulings 7).
-     */
-    boolean mayBringBack() { return !closed && manager != null && origin != null && movable(tabs()); }
 
     /**
      * Whether Move to Main Window may take this window's tabs: a full window's that the window manager opened, every one
      * of which may move (Rulings 7).
      */
-    boolean mayMoveToMainWindow() { return !closed && manager != null && !isMain() && origin == null && movable(tabs()); }
+    boolean mayMoveToMainWindow() { return !closed && manager != null && !isMain() && movable(tabs()); }
 
     /**
      * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
@@ -1466,19 +1365,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return tab.content() instanceof TerminalContent terminal && terminal.pane().running();
     }
     /**
-     * A tab's menu (workspace tabs spec 11; parent tabs spec 6; workspace plan 7b Rulings 15): Rename Tab for a terminal tab,
-     * Pop Out Tab and the window menu's entries for this tab's pane and parent tab, Close Tab, Close Others and Close Pane,
-     * then the content's commands.
+     * A tab's menu (workspace tabs spec 11; tabs and panes spec 6; workspace plan 7b Rulings 15): Rename Tab for a terminal
+     * tab, the window menu's entries for this tab's parent tab, Close Tab, Close Others and Close Pane, then the content's
+     * commands.
      */
     JPopupMenu tabMenu(Tab tab) {
         var menu = new JPopupMenu();
         if (tab.kind() == Tab.Kind.TERMINAL)
             menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(tab); invoke(ActionId.RENAME_TAB); }));
-        var popOut = tabMenuItem("Pop Out Tab", ActionId.POP_OUT_TAB, () -> popOutTab(tab));
-        // A child window's only tab stays: that window already is its own (workspace plan 7b Rulings 8); so does a tab
-        // that cannot move (Rulings 7).
-        popOut.setEnabled(mayPopOutTab(tab));
-        menu.add(popOut);
         for (ActionId id : windowMenuItems()) menu.add(windowItem(id, tab));
         menu.addSeparator();
         menu.add(tabMenuItem("Close Tab", ActionId.CLOSE_TAB, () -> closeTab(tab)));
@@ -1498,15 +1392,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * A parent tab's menu in the bar (parent tabs spec 6 and 8; workspace plan 7a Rulings 16, plan 7b Rulings 15): Pop Out
-     * Parent Tab and Move to Main Window where the window menu has them, a rule, then Close Parent Tab, for the parent tab
-     * {@code tab} shows as its active tab.
+     * A parent tab's menu in the bar (tabs and panes spec 6; workspace plan 7a Rulings 16, plan 7b Rulings 15): the window
+     * menu's entries, a rule, then Close Parent Tab, for the parent tab {@code tab} shows as its active tab.
      */
     JPopupMenu parentTabMenu(Tab tab) {
         var menu = new JPopupMenu();
         parentTabOf(tab).ifPresent(parent -> {
-            for (ActionId id : windowMenuItems())
-                if (id == ActionId.POP_OUT_PARENT_TAB || id == ActionId.MOVE_TO_MAIN_WINDOW) menu.add(windowItem(id, tab));
+            for (ActionId id : windowMenuItems()) menu.add(windowItem(id, tab));
             if (menu.getComponentCount() > 0) menu.addSeparator();
             menu.add(tabMenuItem("Close Parent Tab", ActionId.CLOSE_PARENT_TAB, () -> closeParentTab(parent)));
         });
@@ -1515,24 +1407,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * The window menu's entries (parent tabs spec 6; workspace plan 7b Rulings 14): Pop Out Pane and Pop Out Parent Tab in
-     * the main window; Pop Out Pane, Pop Out Parent Tab while it has another parent tab, and Move to Main Window in a full
-     * window; Bring Back, then Pop Out Pane while it has another pane, in a pane window.
+     * The window menu's entries (tabs and panes spec 6; workspace plan 8a Rulings 7): Move Tab to New Window in every
+     * window, then Move to Main Window in a full window.
      *
      * @return the entries in menu order
      */
     java.util.List<ActionId> windowMenuItems() {
-        if (origin != null) return paneCount() > 1 ? java.util.List.of(ActionId.BRING_BACK, ActionId.POP_OUT_PANE)
-            : java.util.List.of(ActionId.BRING_BACK);
-        if (isMain()) return java.util.List.of(ActionId.POP_OUT_PANE, ActionId.POP_OUT_PARENT_TAB);
-        return parentTabs.count() > 1
-            ? java.util.List.of(ActionId.POP_OUT_PANE, ActionId.POP_OUT_PARENT_TAB, ActionId.MOVE_TO_MAIN_WINDOW)
-            : java.util.List.of(ActionId.POP_OUT_PANE, ActionId.MOVE_TO_MAIN_WINDOW);
+        return isMain() ? java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW)
+            : java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TO_MAIN_WINDOW);
     }
 
     /**
-     * The ⋮'s menu (parent tabs spec 6): {@link #windowMenuItems()}, each enabled as its action is, for the active pane
-     * and parent tab.
+     * The ⋮'s menu (tabs and panes spec 6): {@link #windowMenuItems()}, each enabled as its action is, for the shown
+     * parent tab.
      *
      * @return the menu
      */
@@ -1548,21 +1435,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return menu;
     }
 
-    /** A menu entry for {@code id}, one of {@link #windowMenuItems()}, acting on {@code tab}'s pane or parent tab, or this window. */
+    /** A menu entry for {@code id}, one of {@link #windowMenuItems()}, acting on {@code tab}'s parent tab or this window. */
     private JMenuItem windowItem(ActionId id, Tab tab) {
         Runnable run = switch (id) {
-            case POP_OUT_PANE -> () -> popOutPane(tab);
-            case POP_OUT_PARENT_TAB -> () -> popOutParentTab(tab);
-            case BRING_BACK -> this::bringBack;
+            case MOVE_TAB_TO_NEW_WINDOW -> () -> moveTabToNewWindow(tab);
             case MOVE_TO_MAIN_WINDOW -> this::moveToMainWindow;
             default -> throw new IllegalArgumentException("Not a window menu entry: " + id);
         };
         var item = tabMenuItem(id.label(), id, run);
         // Enabled only while every tab the entry would move may move (workspace plan 7b Rulings 7).
         item.setEnabled(switch (id) {
-            case POP_OUT_PANE -> parentTabs.groupOf(tab.id()).map(this::mayPopOutPane).orElse(false);
-            case POP_OUT_PARENT_TAB -> parentTabOf(tab).map(this::mayPopOutParentTab).orElse(false);
-            case BRING_BACK -> mayBringBack();
+            case MOVE_TAB_TO_NEW_WINDOW -> parentTabOf(tab).map(this::mayMoveTabToNewWindow).orElse(false);
             case MOVE_TO_MAIN_WINDOW -> mayMoveToMainWindow();
             default -> false;
         });
@@ -1590,7 +1473,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     DockDrag dockDrag() { return dockDrag; }
     /** The tab drag this window's strips start. */
     TabDrag tabDrag() { return tabDrag; }
-    /** The window manager that opened this window: its pop-outs, Bring Back and Move to Main Window go through it. */
+    /** The window manager that opened this window: its moves to other windows go through it. */
     void manager(WindowManager value) { manager = Objects.requireNonNull(value, "value"); }
 
     /** The window manager that opened this window, which carries a drag out of it; empty for any other window. */
@@ -1666,14 +1549,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /**
      * New Tab (parent tabs spec 8): a terminal in a new parent tab at the end of the bar, shown, starting in
      * {@code directory}. The main window's empty workspace takes it in its only parent tab, the one parent tab that may be
-     * empty (workspace plan 7a Rulings 7). A pane window, which has no parent tabs, takes it in its active pane (workspace
-     * plan 7b Rulings 9).
+     * empty (workspace plan 7a Rulings 7).
      *
      * @param directory where its shell starts; null means where a new shell starts
      * @return the terminal tab; null once the window has closed
      */
     public TerminalContent newParentTab(Path directory) {
-        return parentTabs.isEmpty() || origin != null ? openTab(directory)
+        return parentTabs.isEmpty() ? openTab(directory)
             : openTerminal(directory, null, Optional.empty(), Optional.empty(), null, null, true);
     }
 

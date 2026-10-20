@@ -51,9 +51,9 @@ import javax.swing.SwingUtilities;
  * when it shows, and the main window's empty workspace, which has no panes, anywhere over it, in its place. Anywhere
  * else in that window (a pane, its dock, chrome or title bar), and over any other window of Jasper's (Settings, About, a
  * dialog), nothing; outside every window, a new full window the size of the tab's workspace, with the entry where the
- * cursor holds it and kept on the display under the cursor, except for a full window's only tab, whose window already
- * is its own. A tab holding an item that is pinned (a modal owner holds it in its window), or one being closed, takes
- * targets along its own strip only, and a pane window takes none. Releasing the left button carries the target out:
+ * cursor holds it and kept on the display under the cursor, except for a window's only tab (a full window's already is
+ * its own; workspace plan 8a Rulings 6). A tab holding an item that is pinned (a modal owner holds it in its window), or
+ * one being closed, takes targets along its own strip only. Releasing the left button carries the target out:
  * along its own strip as a reorder, into another window or out of every window through the window manager of the
  * drag's window, which moves the tab's items through the tab registry; none touches an item's content or session, and a
  * window no manager opened moves nothing out of itself. Releasing on no target, Esc, another press or a plain move
@@ -292,11 +292,11 @@ final class TabDrag {
      * The dragged tab's drop on {@code window}'s strip at {@code at}: before the first of the strip's other entries whose
      * middle is not left of the cursor; while another window's strip hides, at its end, over the band the strip takes
      * when it shows (workspace plan 7c Rulings 5); on the main window's empty workspace, which has no panes, anywhere over
-     * it, in its place. Empty for a pane window, which has no tabs, off the strip, and for the place the tab has.
+     * it, in its place. Empty off the strip, and for the place the tab has.
      */
     private Optional<Target> onBar(WindowContent window, Point at) {
         boolean shows = window.parentTabBar().component().isVisible();
-        if (window.isPaneWindow() || (window == from && !shows)) return Optional.empty();
+        if (window == from && !shows) return Optional.empty();
         Point local = new Point(at);
         SwingUtilities.convertPointFromScreen(local, window.parentTabs());
         Rectangle area = barArea(window);
@@ -332,8 +332,8 @@ final class TabDrag {
         return view.isPresent() && view.get().tabs().stream().allMatch(from.tabRegistry()::movable);
     }
 
-    /** Whether a release outside every window takes the tab out of its window: never a full window's only tab. */
-    private boolean tearsOut() { return from.mayPopOutParentTab(parentTab); }
+    /** Whether a release outside every window takes the tab out of its window: never a window's only tab (Rulings 6). */
+    private boolean tearsOut() { return from.mayMoveTabToNewWindow(parentTab); }
 
     /** The strip's entries in {@code window}'s parent-tabs view's coordinates, in strip order, without the dragged one's own. */
     private List<Rectangle> barEntries(WindowContent window) {
@@ -428,7 +428,7 @@ final class TabDrag {
                 // Another window's strip: the window manager moves the tab whole, through the tab registry.
                 else home.manager().ifPresent(manager -> manager.moveParentTab(home, parent, bar.window(), bar.index()));
             }
-            case Target.TearOut out -> home.manager().ifPresent(manager -> manager.popOutParentTab(home, parent, out.bounds(), out.cursor()));
+            case Target.TearOut out -> home.manager().ifPresent(manager -> manager.moveTabToNewWindow(home, parent, out.bounds(), out.cursor()));
         }
     }
 

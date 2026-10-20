@@ -89,7 +89,7 @@ class WindowMenuButtonTest {
                     assertThat(child.getX() + child.getWidth()).as("the overflow right before it").isLessThanOrEqualTo(overflow.getX());
             }
             assertThat(menu.getAccessibleContext().getAccessibleName()).isEqualTo("View Options");
-            assertAClickOpensTheWindowMenu(owner, menu, "Pop Out Pane", "Pop Out Parent Tab");
+            assertAClickOpensTheWindowMenu(owner, menu, "Move Tab to New Window");
         });
     }
 
@@ -108,7 +108,7 @@ class WindowMenuButtonTest {
                 assertThat(menu.getAccessibleContext().getAccessibleName()).isEqualTo("View Options");
                 owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
                 assertThat(menu.getText()).as("labels never reach it").isNull();
-                assertAClickOpensTheWindowMenu(owner, menu, "Pop Out Pane", "Pop Out Parent Tab");
+                assertAClickOpensTheWindowMenu(owner, menu, "Move Tab to New Window");
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -126,7 +126,7 @@ class WindowMenuButtonTest {
                 LayoutTestSupport.layoutTree(root);
                 assertThat(menu.getX() + menu.getWidth()).as("8 from the window's edge").isEqualTo(bar.getWidth() - 8);
                 assertThat(root.getJMenuBar()).as("the screen menu bar's menus").isSameAs(child.menuBar());
-                assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
+                assertAClickOpensTheWindowMenu(child, menu, "Move Tab to New Window", "Move to Main Window");
             }
         });
     }
@@ -151,7 +151,7 @@ class WindowMenuButtonTest {
                 LayoutTestSupport.layoutTree(root);
                 assertThat(menu.getX() + menu.getWidth()).isEqualTo(800 - 8);
                 assertThat(menu.getY() * 2 + menu.getHeight()).as("centred on the band").isEqualTo(MacTitleBand.HEIGHT);
-                assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
+                assertAClickOpensTheWindowMenu(child, menu, "Move Tab to New Window", "Move to Main Window");
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -170,7 +170,7 @@ class WindowMenuButtonTest {
             assertThat(row.getComponent(0)).as("the glue FlatLaf's title pane puts the title in").isInstanceOf(Box.Filler.class);
             assertThat(row.getComponent(1)).isInstanceOf(WindowMenuButton.class);
             assertThat(root.getContentPane()).as("its workspace alone").isSameAs(child);
-            assertAClickOpensTheWindowMenu(child, (JComponent) row.getComponent(1), "Pop Out Pane", "Move to Main Window");
+            assertAClickOpensTheWindowMenu(child, (JComponent) row.getComponent(1), "Move Tab to New Window", "Move to Main Window");
         });
     }
 
@@ -194,7 +194,7 @@ class WindowMenuButtonTest {
                 assertThat(menu.getSize()).as("IntelliJ's icon button, neither squashed nor stretched by the row")
                     .isEqualTo(menu.getPreferredSize());
                 assertThat(menu.getAccessibleContext().getAccessibleName()).isEqualTo("View Options");
-                assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
+                assertAClickOpensTheWindowMenu(child, menu, "Move Tab to New Window", "Move to Main Window");
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -211,7 +211,7 @@ class WindowMenuButtonTest {
                     .as("the system's title bar").isNull();
                 var menu = macOs ? rowMenu(child) : (JComponent) root.getJMenuBar().getComponent(1);
                 assertThat(menu).as("macOS %s", macOs).isInstanceOf(WindowMenuButton.class);
-                assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
+                assertAClickOpensTheWindowMenu(child, menu, "Move Tab to New Window", "Move to Main Window");
             }
         });
     }
@@ -233,7 +233,7 @@ class WindowMenuButtonTest {
             LayoutTestSupport.layoutTree(root);
             assertThat(menu.getX() + menu.getWidth()).as("8 from the window's edge, as every other placement")
                 .isEqualTo(row.getWidth() - 8);
-            assertAClickOpensTheWindowMenu(child, menu, "Pop Out Pane", "Move to Main Window");
+            assertAClickOpensTheWindowMenu(child, menu, "Move Tab to New Window", "Move to Main Window");
         });
     }
 }

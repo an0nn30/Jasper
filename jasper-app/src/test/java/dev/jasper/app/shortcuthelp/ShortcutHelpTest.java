@@ -22,13 +22,13 @@ class ShortcutHelpTest {
     /** Parent tabs spec 8: the parent-tab actions join Tabs, and the pane actions are Panes. */
     @Test void theParentTabAndPaneActionsHaveTheirCategories() {
         var rows = ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true);
-        for (String id : List.of("new_tab_in_pane", "close_parent_tab", "next_parent_tab", "select_parent_tab_1", "pop_out_tab",
-                "pop_out_parent_tab"))
+        for (String id : List.of("new_tab_in_pane", "close_parent_tab", "next_parent_tab", "select_parent_tab_1",
+                "move_tab_to_new_window"))
             assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Tabs"));
-        for (String id : List.of("close_pane", "maximize_pane", "focus_pane_left", "pop_out_pane"))
+        for (String id : List.of("close_pane", "maximize_pane", "focus_pane_left"))
             assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Panes"));
         // Workspace plan 7b Rulings 13: the window commands, with New Terminal Window and Close Window.
-        for (String id : List.of("bring_back", "move_to_main_window", "new_terminal_window"))
+        for (String id : List.of("move_to_main_window", "new_terminal_window"))
             assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Application"));
     }
 

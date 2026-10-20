@@ -177,19 +177,9 @@ class ParentTabsTest {
         assertThat(plain.select(b.id())).isNotEqualTo(plain);
     }
 
-    @Test void aWindowHoldsParentTabsOrOnePaneLayout() {
-        WindowLayout full = ParentTabs.of(parent(A, B));
-        WindowLayout pane = new PaneLayout(Layout.of(C), new Origin(ParentTabId.random(), GroupId.random(), Side.RIGHT, 0.5));
-        for (WindowLayout layout : List.of(full, pane)) {
-            List<TabId> tabs = switch (layout) {
-                case ParentTabs parents -> parents.parentTabs().getFirst().layout().tabs();
-                case PaneLayout single -> single.layout().tabs();
-            };
-            assertThat(layout.tabs()).isEqualTo(tabs);
-        }
-        assertThat(full.tabs()).containsExactly(A, B);
-        assertThatIllegalArgumentException().isThrownBy(() -> new PaneLayout(Layout.empty(),
-            new Origin(ParentTabId.random(), GroupId.random(), Side.RIGHT, 0.5))).withMessageContaining("pane window");
+    @Test void aWindowsTabsAreEachParentTabsInBarOrder() {
+        ParentTab first = parent(A, B), second = parent(C);
+        assertThat(new ParentTabs(List.of(first, second), second.id()).tabs()).containsExactly(A, B, C);
     }
 
     @Test void aParentTabIdIsAUuidThatParsesBack() {

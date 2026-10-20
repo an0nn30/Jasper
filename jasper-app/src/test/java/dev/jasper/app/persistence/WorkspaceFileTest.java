@@ -10,15 +10,12 @@ import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Node;
 import dev.jasper.app.layout.Orientation;
-import dev.jasper.app.layout.Origin;
-import dev.jasper.app.layout.PaneLayout;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.layout.TabId;
-import dev.jasper.app.layout.WindowLayout;
 import dev.jasper.app.persistence.WorkspaceFile.Role;
 import dev.jasper.app.persistence.WorkspaceFile.Snapshot;
 import dev.jasper.app.persistence.WorkspaceFile.TabRecord;
@@ -68,18 +65,15 @@ class WorkspaceFileTest {
     }
 
     /** A record of a terminal tab in /tmp for each tab of {@code layout}. */
-    static Map<TabId, TabRecord> terminals(WindowLayout layout) {
+    static Map<TabId, TabRecord> terminals(ParentTabs layout) {
         var tabs = new HashMap<TabId, TabRecord>();
         for (TabId tab : layout.tabs()) tabs.put(tab, new TabRecord.Terminal("", "/tmp", ""));
         return tabs;
     }
 
-    /** Where {@link #snapshot()}'s pane window came from: left of group 1 in parent tab 1, a quarter of their space. */
-    static final Origin ORIGIN = new Origin(parentTabId(1), groupId(1), Side.LEFT, 0.25);
-
     /**
      * Spec 8's example as the main window's one parent tab: two columns, the right one in two rows, its lower right group
-     * maximized; and a pane window without bounds. Listed pane window first: the snapshot puts the main window first.
+     * maximized; and a full window without bounds. Listed full window first: the snapshot puts the main window first.
      */
     static Snapshot snapshot() {
         Node root = new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 2, 1, 2), 0.5),
@@ -89,9 +83,9 @@ class WorkspaceFileTest {
             tab(2), new TabRecord.Content("README.md", "dev.jasper.editor", "document", Map.of("path", "/Users/me/src/jasper/README.md")),
             tab(3), new TabRecord.Terminal("", "C:\\work", ""),
             tab(4), new TabRecord.Content("Files \"prod\"", "dev.jasper.remote", "sftp", Map.of("remote path", "/srv/a", "host", "example"))));
-        var pane = new WindowRecord(Role.CHILD, Optional.empty(), 0, new PaneLayout(new Layout(group(4, 5, 5), groupId(4), Optional.empty()),
-            ORIGIN), Map.of(tab(5), new TabRecord.Terminal("", "/tmp", "")));
-        return new Snapshot(List.of(pane, main));
+        var full = new WindowRecord(Role.CHILD, Optional.empty(), 0, one(5, new Layout(group(4, 5, 5), groupId(4), Optional.empty())),
+            Map.of(tab(5), new TabRecord.Terminal("", "/tmp", "")));
+        return new Snapshot(List.of(full, main));
     }
 
     /** A main window of two parent tabs, the second showing, and a full window of two, the first showing (parent tabs spec 9). */
@@ -102,7 +96,7 @@ class WorkspaceFileTest {
             new WindowRecord(Role.CHILD, Optional.empty(), 0, full, terminals(full))));
     }
 
-    @Test void writesSpecEightsWorkspaceWithAPaneWindowExactly() throws Exception {
+    @Test void writesSpecEightsWorkspaceWithAFullWindowExactly() throws Exception {
         Path file = dir.resolve("nested/workspace.toml");
         WorkspaceFile.write(file, snapshot());
         assertThat(Files.readString(file)).isEqualTo("""
@@ -187,13 +181,16 @@ class WorkspaceFileTest {
             state = { host = "example", "remote path" = "/srv/a" }
 
             [[windows]]
-            role = "pane"
+            role = "full"
             extended_state = 0
-            origin = { parent_tab = "00000000-0000-4000-a000-000000000001", pane = "00000000-0000-4000-9000-000000000001", side = "left", share = 0.25 }
+            active_parent_tab = "00000000-0000-4000-a000-000000000005"
+
+            [[windows.parent_tabs]]
+            id = "00000000-0000-4000-a000-000000000005"
             active_group = "00000000-0000-4000-9000-000000000004"
             maximized = ""
 
-            [[windows.nodes]]
+            [[windows.parent_tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000004"
             kind = "group"
             parent = ""
@@ -359,17 +356,15 @@ class WorkspaceFileTest {
             .isThrownBy(() -> new WindowRecord(Role.MAIN, Optional.empty(), 0, one(1, Layout.empty()), record));
         assertThatIllegalArgumentException().as("an empty full window")
             .isThrownBy(() -> new WindowRecord(Role.CHILD, Optional.empty(), 0, one(2, Layout.empty()), Map.of()));
-        assertThatIllegalArgumentException().as("a main window holding a pane window's layout")
-            .isThrownBy(() -> new WindowRecord(Role.MAIN, Optional.empty(), 0, new PaneLayout(Layout.of(tab(1)), ORIGIN), record));
         assertThatIllegalArgumentException().as("minimized is not kept")
             .isThrownBy(() -> new WindowRecord(Role.MAIN, Optional.empty(), 1, held, record));
         var main = new WindowRecord(Role.MAIN, Optional.empty(), 6, held, record);
         var child = new WindowRecord(Role.CHILD, Optional.empty(), 0, one(2, Layout.of(tab(2))), Map.of(tab(2), new TabRecord.Terminal("", "", "")));
-        var pane = new WindowRecord(Role.CHILD, Optional.empty(), 0, new PaneLayout(Layout.of(tab(3)), ORIGIN),
+        var other = new WindowRecord(Role.CHILD, Optional.empty(), 0, one(3, Layout.of(tab(3))),
             Map.of(tab(3), new TabRecord.Terminal("", "", "")));
-        assertThat(new Snapshot(List.of(pane, child, main)).windows()).as("the main window first").containsExactly(main, pane, child);
+        assertThat(new Snapshot(List.of(other, child, main)).windows()).as("the main window first").containsExactly(main, other, child);
         assertThat(new Snapshot(List.of(child, main)).main()).isEqualTo(main);
-        assertThat(new Snapshot(List.of(child, main, pane)).children()).containsExactly(child, pane);
+        assertThat(new Snapshot(List.of(child, main, other)).children()).containsExactly(child, other);
         assertThatIllegalArgumentException().as("no main window").isThrownBy(() -> new Snapshot(List.of(child)));
         assertThatIllegalArgumentException().as("two main windows").isThrownBy(() -> new Snapshot(List.of(main, main)));
         assertThatIllegalArgumentException().as("a tab in two windows")
@@ -377,7 +372,7 @@ class WorkspaceFileTest {
         Layout sameGroup = new Layout(new Group(held.activeParentTab().layout().activeGroup(), List.of(tab(2)), Optional.of(tab(2))),
             held.activeParentTab().layout().activeGroup(), Optional.empty());
         assertThatIllegalArgumentException().as("a group in two windows").isThrownBy(() -> new Snapshot(List.of(main,
-            new WindowRecord(Role.CHILD, Optional.empty(), 0, new PaneLayout(sameGroup, ORIGIN), Map.of(tab(2), new TabRecord.Terminal("", "", ""))))));
+            new WindowRecord(Role.CHILD, Optional.empty(), 0, one(4, sameGroup), Map.of(tab(2), new TabRecord.Terminal("", "", ""))))));
         assertThatIllegalArgumentException().as("a parent tab in two windows (workspace plan 7b Rulings 10)").isThrownBy(() -> new Snapshot(List.of(main,
             new WindowRecord(Role.CHILD, Optional.empty(), 0, one(1, Layout.of(tab(2))), Map.of(tab(2), new TabRecord.Terminal("", "", ""))))));
         assertThatIllegalArgumentException().isThrownBy(() -> new TabRecord.Content("", "", "document", Map.of()));
@@ -397,8 +392,7 @@ class WorkspaceFileTest {
             .contains(ParentTabs.of(new ParentTab(parentTabId(2), single(2).remove(tab(2)))));
         assertThat(WorkspaceFile.keeping(window, tab -> false, false)).as("a full window keeps nothing").isEmpty();
         Layout two = single(4).split(tab(5), groupId(4), Side.RIGHT);
-        assertThat(WorkspaceFile.keeping(new PaneLayout(two, ORIGIN), tab -> !tab.equals(tab(5)), false)).as("a pane window keeps its origin")
-            .contains(new PaneLayout(two.remove(tab(5)), ORIGIN));
-        assertThat(WorkspaceFile.keeping(new PaneLayout(two, ORIGIN), tab -> false, false)).isEmpty();
+        assertThat(WorkspaceFile.keeping(one(4, two), tab -> !tab.equals(tab(5)), false)).as("a full window keeps the pane that stays")
+            .contains(one(4, two.remove(tab(5))));
     }
 }
