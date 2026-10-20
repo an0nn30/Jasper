@@ -10,7 +10,13 @@
 
 **Spec:** [Approved Editor fonts and Markdown preview design](../specs/2026-10-04-editor-markdown-preview-design.md).
 
-**Status:** Written for review; implementation has not started. Written-spec approval received October 20. Local `main` at `34aa868fe` was merged into `codex/editor-markdown-preview` as `c74465f5d` before planning. No remote-main freshness claim. One runnable deliverable, one commit per task, focused red/green checks and independent review during execution. No product code changed during planning.
+**Execution ruling (Task 3):** Task 3 uses a uniform line box from maximum natural metrics across the configured resolved font/style set, multiplied once; EditorTextView extends SyntaxView and Vim physical viewport adapters consume shared geometry. Keep stock gutter with logical-line child allocations. This replaces the plan's per-row varying height algorithm, not the approved configurable line-height behavior. Public RSTA contracts require SyntaxView and uniform gutter metrics; no vendor patch or new gutter subsystem. Cost if wrong: fallback font metrics may produce more spacing than expected, requiring tuning; physical Vim integration needs additional regression coverage.
+
+**Execution ruling (Task 2):** Task 2 adds default SettingsPanel.pendingChanged() called by real/fake hosts after standard-row draft events/reset, and Editor rerenders from it — preserves standard Reset and kit defaults without a custom follow toggle or default-query API — cost if wrong: an additive SDK callback and host ordering contract to maintain.
+
+**Execution ruling (Task 1):** JasperApplication passes FontConfig to a PluginRuntime overload; SDK conversion stays inside app.plugins to preserve the architecture gate.
+
+**Status:** Approved October 20 for subagent-driven implementation and per-task review. Tasks 1–2 implemented and independently reviewed; Task 3 in progress; tasks 4–13 pending. Written-spec approval received October 20. Local `main` at `34aa868fe` was merged into `codex/editor-markdown-preview` as `c74465f5d` before planning. No remote-main freshness claim. One runnable deliverable, one commit per task, focused red/green checks and independent review during execution. No product code changed during planning.
 
 ## Global Constraints
 
@@ -669,5 +675,4 @@ success is claimed until its actual layout/render/Vim tests pass. Execution shou
 incompatibility if the public RSTA view extension points cannot meet these contracts; do not silently drop
 fallbacks, ligatures or exact hit testing.
 
-Implementation is not authorized by this document's existence. Review the plan and select subagent-driven
-per-task implementation/review or native execution with one independent final review.
+Execution approved October 20: subagent-driven implementation, independent per-task review, then whole-branch review.

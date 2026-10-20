@@ -3622,11 +3622,10 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
 
 - **Editor fonts and Markdown preview** (2026-10-20; `codex/editor-markdown-preview`): written spec approved.
   Local main `34aa868fe` merged as `c74465f5d`; the [implementation plan](superpowers/plans/2026-10-20-editor-fonts-markdown-preview.md)
-  is written for review and execution-method selection. Thirteen tasks cover SDK typography, independent/followed
+  is approved for subagent-driven implementation and per-task review; Tasks 1–2 implemented and independently reviewed (`a82a3fdde`, `be83e3fae`); Task 3 in progress. Thirteen tasks cover SDK typography, independent/followed
   fonts and source geometry, current semantic-icon toolbar, native Markdown rendering, provider-relative resources,
   mode persistence, focus/search/navigation and linked scrolling. Refresh replaces the removed icon enums with
-  semantic names and targets SDK 0.18.3, Editor 0.11.0 and Remote 0.15.1. Product implementation and runtime tests
-  have not started; plan/spec/link/whitespace checks only. No GUI, AOT training, merge into main or push.
+  semantic names and targets SDK 0.18.3, Editor 0.11.0 and Remote 0.15.1. Headless baseline validation is running before implementation edits. No GUI, AOT training, merge into main or push.
 
 - **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
   second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.
