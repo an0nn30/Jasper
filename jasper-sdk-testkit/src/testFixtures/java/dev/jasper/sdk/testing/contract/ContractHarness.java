@@ -177,6 +177,11 @@ public interface ContractHarness extends AutoCloseable {
     /** Changes the look and announces it. */
     void setVariant(Variant variant);
 
+    /** Sets the presentation every plugin reads; called before any plugin starts.
+     * @param presentation the look the runtime runs with
+     */
+    void setPresentation(dev.jasper.sdk.ui.Presentation presentation);
+
     /** Sets independently chosen workspace values.
      * @param variant workspace variant
      * @param palette workspace controls

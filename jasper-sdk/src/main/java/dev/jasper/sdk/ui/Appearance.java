@@ -74,4 +74,10 @@ public interface Appearance {
      */
     Subscription onChanged(Consumer<Variant> handler);
 
+    /** The look Jasper runs with, chosen at start: the same value for every plugin until Jasper restarts. Safe from any thread.
+     * @return the presentation
+     * @since 0.18.2
+     */
+    Presentation presentation();
+
 }

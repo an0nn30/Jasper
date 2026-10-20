@@ -115,6 +115,7 @@ class FakeContractTest extends PluginContractTest {
                 host.commandFinished(paneId, command, java.util.OptionalInt.of(exitStatus), java.time.Duration.ofMillis(1500));
             }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) { host.setVariant(variant); }
+            @Override public void setPresentation(dev.jasper.sdk.ui.Presentation presentation) { host.setPresentation(presentation); }
             @Override public java.util.Optional<String> clipboard() { return host.clipboard().text(); }
             @Override public void userCopies(String text) { host.clipboard().setText(text); }
             @Override public void clipboardBusy(boolean busy) { host.clipboard().failWrites(busy); }

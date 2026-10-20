@@ -75,6 +75,9 @@ final class HostedUi {
 
     private HostedKit kit;
     void kit(HostedKit value) { kit = java.util.Objects.requireNonNull(value); kit.anchorHost=windows; }
+    /** Where this plugin's appearance reads the presentation, on each call and from any thread. */
+    private volatile Supplier<dev.jasper.sdk.ui.Presentation> presentation = HostedPresentation::standard;
+    void presentation(Supplier<dev.jasper.sdk.ui.Presentation> source) { presentation = java.util.Objects.requireNonNull(source, "source"); }
     private final String pluginId;
     private final Contributions model;
     private final Containment containment;
@@ -400,6 +403,7 @@ final class HostedUi {
                 var closed=new AtomicBoolean();Consumer<Variant> guarded=v -> {if(!closed.get())handler.accept(v);};themeHandlers.add(guarded);
                 var removal=tracked(() -> {closed.set(true);themeHandlers.remove(guarded);});return () -> {closed.set(true);removal.close();};
             }
+            @Override public dev.jasper.sdk.ui.Presentation presentation() { return presentation.get(); }
         };
     }
 

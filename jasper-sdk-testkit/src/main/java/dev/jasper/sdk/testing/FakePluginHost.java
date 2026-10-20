@@ -194,6 +194,9 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     private volatile Variant variant = Variant.DARK;
+    private volatile dev.jasper.sdk.ui.Presentation presentation = FakePresentations.STANDARD;
+    /** Set by the first {@link #start} and never cleared, even when every plugin has stopped since. */
+    private boolean started;
 
     /** A host whose plugins' data directories live in a temporary directory this host deletes on close. */
     public FakePluginHost() { this.ownsRoot = true; }
@@ -218,6 +221,7 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public FakePluginContext start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
         if (contexts.containsKey(info.id())) throw new IllegalArgumentException("Already started: " + info.id());
+        started = true;
         var all = new java.util.HashSet<>(requires);
         all.addAll(optional);
         var context = new FakePluginContext(this, info, Set.copyOf(all), Objects.requireNonNull(plugin));
@@ -248,6 +252,27 @@ public final class FakePluginHost implements AutoCloseable {
         }
         return context;
     }
+
+    /**
+     * Sets the presentation every plugin's appearance reports, as the application chooses its look before plugins start.
+     *
+     * @param presentation the look this host runs with
+     * @throws IllegalStateException once any plugin has started, even if it has stopped since
+     * @since 0.18.2
+     */
+    public void setPresentation(dev.jasper.sdk.ui.Presentation presentation) {
+        Objects.requireNonNull(presentation, "presentation");
+        if (started) throw new IllegalStateException("Plugins have already started");
+        this.presentation = presentation;
+    }
+
+    /**
+     * The presentation every plugin's appearance reports; safe from any thread.
+     *
+     * @return the presentation set, or {@link FakePresentations#STANDARD}
+     * @since 0.18.2
+     */
+    public dev.jasper.sdk.ui.Presentation presentation() { return presentation; }
 
     /**
      * Whether the plugin started and has not stopped.

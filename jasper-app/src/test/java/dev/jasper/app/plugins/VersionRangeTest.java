@@ -67,6 +67,7 @@ class VersionRangeTest {
         assertThat(VersionRange.parse(">=0.17.0, <0.18").contains(host)).isFalse();
         assertThat(VersionRange.parse(">=0.17.1, <0.18").contains(host)).as("the former Editor range").isFalse();
         assertThat(VersionRange.parse(">=0.18.0, <0.19").contains(host)).as("every bundled range").isTrue();
-        assertThat(VersionRange.parse(">=0.18.1, <0.19").contains(host)).as("Remote's range").isTrue();
+        assertThat(VersionRange.parse(">=0.18.1, <0.19").contains(host)).as("the former Remote range").isTrue();
+        assertThat(VersionRange.parse(">=0.18.2, <0.19").contains(host)).as("the look query's range").isTrue();
     }
 }

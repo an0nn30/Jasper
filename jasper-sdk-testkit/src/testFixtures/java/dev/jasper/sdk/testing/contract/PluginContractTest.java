@@ -28,6 +28,7 @@ import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.PluginWindow;
+import dev.jasper.sdk.ui.Presentation;
 import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
@@ -817,6 +818,22 @@ public abstract class PluginContractTest {
         h.stopAll();
         assertThat(h.actions()).isEmpty();
         assertThat(h.menu("TAB")).isEmpty();
+    }
+
+    /** SDK 0.18.2: the presentation is the host's, the same for every plugin and on any thread, and a theme change keeps it. */
+    @Test void presentationIsTheHostsForEveryPluginOnAnyThreadAndThroughThemeChanges() throws Exception {
+        var classic = new Presentation(true, Presentation.Icons.CLASSIC, Presentation.ToolWindows.STRIPES, Presentation.TitleBar.NATIVE,
+            Presentation.Menus.WINDOW, Presentation.ToolbarSearch.FIELD, Optional.of("IBM Plex Sans"), Optional.of("IBM Plex Mono"), 12, 28);
+        h.setPresentation(classic);
+        var first = new AtomicReference<PluginContext>(); var second = new AtomicReference<PluginContext>();
+        h.start(new PluginInfo("test.lookone", "One", "1.0.0", Set.of()), Set.of(), Set.of(), first::set);
+        h.start(new PluginInfo("test.looktwo", "Two", "1.0.0", Set.of()), Set.of(), Set.of(), second::set);
+        assertThat(first.get().appearance().presentation()).isEqualTo(classic);
+        assertThat(second.get().appearance().presentation()).isEqualTo(classic);
+        var offThread = CompletableFuture.supplyAsync(() -> first.get().appearance().presentation()).get(5, TimeUnit.SECONDS);
+        assertThat(offThread).isEqualTo(classic);
+        h.setVariant(Variant.LIGHT); h.flush();
+        assertThat(first.get().appearance().presentation()).isEqualTo(classic);
     }
 
     @Test void aPanelMayNameOneOfThePluginsOwnActionsAsItsToggle() {
