@@ -35,7 +35,7 @@ class VaultSheetRenderTest {
     }
     /**
      * The staged Vault's manager is a window-sized dialog: resizable, remembered under the Vault's id and its title, never
-     * re-packed, and at least 900 x 555 under the default look, whatever its content asks for.
+     * re-packed, and taller than its content asks: 555 under the default look, as wide as its content or 900.
      */
     @Test void theManagerOpensAsAResizableWindowSizedDialog() throws Exception {
         var controller = SurfaceFixtures.edt(() -> ThemeTestSupport.controller(true));
@@ -48,9 +48,11 @@ class VaultSheetRenderTest {
                 assertThat(manager.id()).isEqualTo("dev.jasper.vault|Credential Vault");
                 assertThat(NativeShells.resizable(manager)).as("the user can resize it").isTrue();
                 assertThat(NativeShells.fitted(manager)).as("its content never re-packs it").isFalse();
-                var size = NativeShells.windowSize(manager, new Dimension(0, 0), new Rectangle(0, 0, 4000, 3000));
-                assertThat(size.width).isGreaterThanOrEqualTo(900);
-                assertThat(size.height).isGreaterThanOrEqualTo(555);
+                var preferred = manager.holder().getPreferredSize();
+                assertThat(preferred.height).as("the manager's content asks for less than a window's height").isLessThan(555);
+                var chrome = new Dimension(0, 28);
+                assertThat(NativeShells.windowSize(manager, chrome, new Rectangle(0, 0, 4000, 3000)))
+                    .isEqualTo(new Dimension(Math.max(preferred.width, 900), 555 + 28));
                 return null;
             });
         } finally { SurfaceFixtures.edt(() -> { controller.close(); return null; }); }

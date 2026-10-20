@@ -20,31 +20,36 @@ band, the traffic lights, the screen menus and Compact; a child window under Ent
 pane with overlays below it, and its title and caption buttons dim when the window is inactive; View > a tool window from a child window
 activates it in the main window. Not merged, not pushed.
 
-**Credential Vault: the manager is a dialog over the main window again — 2026-10-20** (`claude/workspace-tabs`, one
-commit on `bba5c472e`). The user decided on 2026-10-19: "Make the Vault manager a separate dialog window that floats above
+**Credential Vault: the manager is a dialog over the main window again — 2026-10-20** (`claude/workspace-tabs`,
+`144ff89f1` on `bba5c472e`, then its review fix). The user decided on 2026-10-19: "Make the Vault manager a separate dialog window that floats above
 the main window. That needs no SDK change." This replaces plan 4b's tab form of the manager (`VaultManagerTab`,
 `82a4ddcbf`). `VaultManagerDialog` opens one modeless plugin dialog titled "Credential Vault", owned by the main window
-(`WindowHandle.isMain()`) whichever window asked; it is never a tab. A second request raises it (`toFront`) and, while
-the vault is locked, shows the inline unlock prompt in it; a request after its window closed opens a new one. Done and
+(`WindowHandle.isMain()`) whichever window asked; it is never a tab. A second request raises it, the main window first
+(`WindowHandle.toFront`, which restores it when minimized), and while the vault is locked shows the inline unlock prompt
+in it. Done and
 Escape close it again, which closes its sheets and cancels a live unlock prompt; ROWS keeps Lock and Add in its first
 row and CLASSIC its toolbar. A `PluginDialog` is no `WindowOwner`, so its add, edit, password and generator sheets hang
 from an anchor on its Done button; the passive Unlock asks over the main window. It is not restored on relaunch, and the
 Vault stays at 0.7.0. App rule, with no SDK API change: a modeless plugin dialog whose content is a WINDOW form becomes
 window-sized at its first show (`HostedUi`, `AuxiliarySurface.windowSized`): the user can resize it, `DialogFit` never
 re-packs it, it remembers its bounds in `ui-state.toml` under `<plugin id>|<title>` (window keys are now TOML-quoted,
-so a title fits), and with none remembered it opens at its content's preferred size but at least 900 × 555, or 820 × 571
+so a title fits; the key is cut to 255 characters, never inside a surrogate pair), and with none remembered it opens at its content's preferred size but at least 900 × 555, or 820 × 571
 under the classic mapping (`NativeShells.windowContent`), the manager window's sizes before plan 4b. Modal plugin
-dialogs and attached sheets are unchanged; `DialogSpec.Presentation.CENTERED`'s Javadoc names the exception. The
+dialogs and attached sheets are unchanged; `DialogSpec.Presentation.CENTERED`'s Javadoc names the exception. Host rule
+from the review: every plugin dialog now closes with its Jasper window, as overlays already did, so no surface outlives
+the native dialog its window took with it (Remote's modeless SFTP and Transfer dialogs too). The
 classic render is main's dialog render again (`ClassicVaultRenderTest`, every pin unchanged); `StagedVaultHost`, the
 app's Vault tests and Remote's import test went back to the pre-4b dialog lookups. `./gradlew check` passes:
-3916 app tests (four new), 221 Vault tests (four new), 544 Remote tests, 205 testkit tests and 94 SDK tests,
-0 failures (19 app, 5 terminal and 1 Vault test skipped). For the user to confirm: (1) while an Add or Edit sheet is open, document modality through the manager also
+3936 app tests (eight new across the change and its review fix), 221 Vault tests (four new), 544 Remote
+tests, 205 testkit tests and 94 SDK tests, 0 failures (19 app, 5 terminal and 1 Vault test skipped). For the user to confirm: (1) while an Add or Edit sheet is open, document modality through the manager also
 blocks the main window (before plan 4b the manager was a window of its own); (2) the sheets are owned by the anchor on
 the manager's Done button, so a change that hid or moved Done would close an open sheet. GUI check for the user: the
 manager opens as a dialog over the main window at about 900 × 555 (820 × 571 under Enterprise) and can be resized;
 after you resize and move it, closing and reopening it (and relaunching Jasper) brings those bounds back; Open Vault
 again raises the one dialog; Add, Edit, Change Master Password and Generate SSH Key sheets hang from the manager; under
-Enterprise it matches the 07 mock again (dialog ground, Done); and the main window is blocked while a sheet is open.
+Enterprise it matches the 07 mock again (dialog ground, Done); the main window is blocked while a sheet is open; Open
+Vault from a child window while the main window is minimized restores the main window with the manager over it; and the
+manager closes with the main window.
 Not merged, not pushed.
 
 **Editor: a New Editor Window toolbar button — 2026-10-19** (`claude/workspace-tabs`, one commit on `914bfc272`). The user

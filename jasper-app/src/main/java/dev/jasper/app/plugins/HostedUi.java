@@ -514,12 +514,20 @@ final class HostedUi {
          */
         @Override public void show() {
             requireUi("show");
-            if (surface.kind() == AuxiliarySurface.Kind.DIALOG && !surface.modal() && !surface.shown() && mounted != null
+            if (surface.kind() == AuxiliarySurface.Kind.DIALOG && !surface.modal() && !surface.shown() && mounted != null && !mounted.closed()
                     && mounted.component().spec().root() instanceof dev.jasper.ui.model.Nodes.Form form
                     && form.kind() == dev.jasper.ui.model.Nodes.FormKind.WINDOW)
-                surface.windowSized(pluginId + "|" + surface.title());
+                surface.windowSized(windowKey(surface.title()));
             surface.show();
         }
+    }
+
+    /** A window-sized dialog's key: this plugin's id and the title, cut to what UiState keeps, never inside a surrogate pair. */
+    private String windowKey(String title) {
+        String key = pluginId + "|" + title;
+        int length = dev.jasper.app.persistence.UiState.WINDOW_KEY_LENGTH;
+        if (key.length() <= length) return key;
+        return key.substring(0, Character.isHighSurrogate(key.charAt(length - 1)) ? length - 1 : length);
     }
 
     private final java.util.Map<dev.jasper.app.contributions.Tab, OwnedContent> ownedContent = new java.util.IdentityHashMap<>();
@@ -741,10 +749,9 @@ final class HostedUi {
                     var registration=anchor.onClosed(surface::close);surface.onClosed(registration::close);
                 } else if (owner instanceof WindowHandle jasperWindow && terminals.ownsOpenWindow(jasperWindow)) {
                     surface = overlay ? windows.modalOverlay(spec.title(), jasperWindow.id()) : windows.dialog(spec.title(), spec.modal(), jasperWindow.id());
-                    if (overlay) {
-                        var ownerClosed = terminals.onWindowClosed(jasperWindow.id(), surface::close);
-                        surface.onClosed(ownerClosed::close);
-                    }
+                    // A dialog dies with its Jasper window, as an overlay does (its native dialog already has).
+                    var ownerClosed = terminals.onWindowClosed(jasperWindow.id(), surface::close);
+                    surface.onClosed(ownerClosed::close);
                 }
                 else throw new IllegalArgumentException("A dialog's owner must be a Jasper window, a content tab or an anchor from this host");
                 surface.attachedSheet(spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET);

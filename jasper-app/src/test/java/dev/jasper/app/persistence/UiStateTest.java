@@ -358,6 +358,19 @@ class UiStateTest {
         assertThat(again.window("")).isEmpty();
     }
 
+    /** Review fix round 1 (M3): a key with half a surrogate pair, which TOML cannot write, and one past the limit are refused. */
+    @Test void aWindowKeyWithALoneSurrogateOrPastItsLengthIsRefused() throws Exception {
+        UiState state = UiState.inMemory();
+        var bounds = new UiState.Bounds(10, 20, 900, 583);
+        String lone = "dev.x|" + (char) 0xD83D, pair = "dev.x|" + new String(new char[] {(char) 0xD83D, (char) 0xDE00});
+        String longest = "d" + "x".repeat(UiState.WINDOW_KEY_LENGTH - 1);
+        for (String key : List.of(lone, pair, longest, longest + "x")) state.putWindow(key, bounds);
+        assertThat(state.window(lone)).as("a lone surrogate").isEmpty();
+        assertThat(state.window(pair)).as("a whole pair").hasValue(bounds);
+        assertThat(state.window(longest)).as("the longest key").hasValue(bounds);
+        assertThat(state.window(longest + "x")).as("one past it").isEmpty();
+    }
+
     @Test void invalidValuesAreRejectedAndInvalidFilesFallBackToDefaults() throws Exception {
         assertThatNullPointerException().isThrownBy(() -> new UiState.Panel(null, 0, true));
         assertThatIllegalArgumentException().isThrownBy(() -> new UiState.Panel(Slot.LEFT_TOP, -1, true));

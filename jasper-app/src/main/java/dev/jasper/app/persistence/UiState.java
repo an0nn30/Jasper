@@ -115,8 +115,13 @@ public final class UiState {
 
     private static final System.Logger LOG = System.getLogger(UiState.class.getName());
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
-    /** A window's key: an id, or a plugin dialog's plugin id and title ({@code dev.jasper.vault|Credential Vault}), quoted. */
-    private static final Pattern WINDOW_ID = Pattern.compile("[^\\p{Cntrl}]{1,255}");
+    /** The longest window key kept. */
+    public static final int WINDOW_KEY_LENGTH = 255;
+    /**
+     * A window's key: an id, or a plugin dialog's plugin id and title ({@code dev.jasper.vault|Credential Vault}), quoted;
+     * no control characters, nor half a surrogate pair, which TOML cannot hold.
+     */
+    private static final Pattern WINDOW_ID = Pattern.compile("[^\\p{Cntrl}\\p{Cs}]{1," + WINDOW_KEY_LENGTH + "}");
     private static final int MAX_BYTES = 256 * 1024;
     /** One look's dock: where each panel docks, and the dock's sizes and ratios. */
     private static final class Layout {

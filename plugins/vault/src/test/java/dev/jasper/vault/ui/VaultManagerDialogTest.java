@@ -38,14 +38,21 @@ class VaultManagerDialogTest {
     static final String VAULT = "dev.jasper.vault", TITLE = "Credential Vault";
     static final VaultManagerDialog.Status STATUS = new VaultManagerDialog.Status("test", "5 min", "/synthetic/vault.jv");
 
-    /** The dialogs a context's plugin asks for: each spec, and each {@code show} and {@code toFront} as {@code call|title}. */
-    record Dialogs(List<DialogSpec> specs, List<String> calls) {
-        Dialogs() { this(new ArrayList<>(), new ArrayList<>()); }
+    /**
+     * The dialogs a context's plugin asks for: each spec, and each {@code show} and {@code toFront} as {@code call|title};
+     * a title in {@code refused} is refused, as a host refuses a dialog it cannot make.
+     */
+    record Dialogs(List<DialogSpec> specs, List<String> calls, Set<String> refused) {
+        Dialogs() { this(new ArrayList<>(), new ArrayList<>(), new java.util.HashSet<>()); }
 
         /** {@code real}, whose dialogs are recorded here. */
         PluginContext record(PluginContext real) {
             Windows windows = real.windows();
             Windows recorded = proxy(Windows.class, (method, args) -> {
+                if (method.getName().equals("dialog") && refused.contains(((DialogSpec) args[0]).title())) {
+                    specs.add((DialogSpec) args[0]);
+                    throw new IllegalStateException("The host refused the dialog");
+                }
                 Object result = method.invoke(windows, args);
                 if (!method.getName().equals("dialog")) return result;
                 var spec = (DialogSpec) args[0]; specs.add(spec);
@@ -101,6 +108,8 @@ class VaultManagerDialogTest {
                 manager.show(context.terminals().window(main).orElseThrow(), Optional.of(id));
                 assertThat(dialogs.specs()).as("one dialog").hasSize(1);
                 assertThat(dialogs.calls()).as("the second request raises the open dialog").containsExactly("show|Credential Vault", "toFront|Credential Vault");
+                assertThat(host.openRequests()).as("each request first raises the main window, restoring it when minimized")
+                    .containsExactly("front|" + main, "front|" + main);
                 assertThat(manager.panel.selected()).contains(id);
                 manager.close();
                 assertThat(host.windows()).isEmpty();
@@ -183,43 +192,24 @@ class VaultManagerDialogTest {
         });
     }
 
-    /** A dialog whose window closed went with it, so a later request opens a new one instead of raising the old one. */
-    @Test void aRequestAfterItsWindowClosedOpensANewDialog() throws Exception {
+    /** A sheet the host refuses to make leaves no anchor on the manager's Done behind. */
+    @Test void aRefusedSheetClosesItsAnchor() throws Exception {
         edt(() -> {
             try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
                 var dialogs = new Dialogs();
                 var context = dialogs.record(host.start(INFO, Set.of(), Set.of(), c -> { }));
-                // With no Jasper window listed, the window that asks owns the dialog.
-                var first = window(UUID.randomUUID()); var second = window(UUID.randomUUID());
-                var service = new VaultService(f.lock, () -> Optional.of(second), p -> { }, p -> { }, p -> { }, new FakeNotifications().group(VAULT));
-                var manager = new VaultManagerDialog(context, f.lock, f.manager, service, () -> STATUS, () -> { });
-                manager.show(first, Optional.empty());
-                var old = manager.panel.view();
-                first.open[0] = false;
-                manager.show(second, Optional.empty());
-                assertThat(closed(old)).as("the old dialog closed").isTrue();
-                assertThat(dialogs.specs()).extracting(DialogSpec::owner).containsExactly(first, second);
-                assertThat(dialogs.calls()).containsExactly("show|Credential Vault", "show|Credential Vault");
+                UUID main = host.addTerminalWindow();
+                var manager = new VaultManagerDialog(context, f.lock, f.manager, service(f, context, main, p -> { }), () -> STATUS, () -> { });
+                manager.show(context.terminals().window(main).orElseThrow(), Optional.empty());
+                dialogs.refused().add("Add Login");
+                assertThatThrownBy(() -> manager.add(VaultManager.Type.LOGIN)).hasMessage("The host refused the dialog");
+                assertThat(dialogs.spec("Add Login").owner()).isInstanceOfSatisfying(UiAnchor.class,
+                    anchor -> assertThat(anchor.isOpen()).as("its anchor is closed").isFalse());
                 assertThat(host.windows()).containsExactly("dialog|Credential Vault|true");
                 manager.close();
-                assertThat(host.failures()).isEmpty();
             }
         });
     }
-
-    /** A Jasper window that the test closes by clearing {@code open}. */
-    static final class Window implements WindowHandle {
-        final UUID id; final boolean[] open = {true};
-        Window(UUID id) { this.id = id; }
-        @Override public UUID id() { return id; }
-        @Override public List<dev.jasper.sdk.terminal.TabHandle> tabs() { return List.of(); }
-        @Override public Optional<dev.jasper.sdk.terminal.TabHandle> activeTab() { return Optional.empty(); }
-        @Override public boolean isActive() { return open[0]; }
-        @Override public boolean isOpen() { return open[0]; }
-        @Override public boolean isMain() { return false; }
-        @Override public void toFront() { }
-    }
-    static Window window(UUID id) { return new Window(id); }
 
     @Test void retiredInlineUnlockClearsItsSecretWithoutCancellingTheSurvivingRequest() throws Exception {
         edt(() -> {

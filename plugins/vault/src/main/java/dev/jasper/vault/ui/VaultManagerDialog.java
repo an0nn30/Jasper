@@ -66,9 +66,7 @@ public final class VaultManagerDialog implements AutoCloseable {
      * window), or raises the open one, with {@code selection} selected.
      */
     public void show(WindowHandle requester, Optional<UUID> selection) {
-        // A dialog whose window has closed went with it: a new one opens instead of raising it.
-        if (dialog != null && !owner.isOpen()) dialog.close();
-        if (dialog != null) { changed(); selection.ifPresent(panel::select); dialog.toFront(); return; }
+        if (dialog != null) { changed(); selection.ifPresent(panel::select); raise(); return; }
         owner = context.terminals().windows().stream().filter(WindowHandle::isMain).findFirst().orElse(requester);
         var shown = new ManagerPanel(context.kit(), layout, manager::entry, this::add, this::edit, this::delete, this::copyPublic,
             grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
@@ -84,8 +82,12 @@ public final class VaultManagerDialog implements AutoCloseable {
             if (unlockPrompt != null) unlockPrompt.cancel();
             passwordPanel = null; unlockPrompt = null;
         });
-        changed(); selection.ifPresent(panel::select); opened.show();
+        changed(); selection.ifPresent(panel::select);
+        // The dialog floats over its window, so that window comes forward first, restored if it was minimized.
+        owner.toFront(); opened.show();
     }
+    /** Raises the open dialog, its window first. */
+    private void raise() { owner.toFront(); dialog.toFront(); }
     /** Refresh existing content; never opens the manager in response to an unrelated consumer unlock. */
     public void changed() {
         if (dialog == null) return;
@@ -112,7 +114,7 @@ public final class VaultManagerDialog implements AutoCloseable {
             shown.clear();
             if (unlockPrompt == prompt && passwordPanel == shown) { unlockPrompt = null; passwordPanel = null; changed(); }
         });
-        dialog.toFront(); return true;
+        raise(); return true;
     }
     /** Every form, including the generator, gets the same modal ownership and close-time wipe. */
     public void dialog(String title, Function<Runnable, ? extends EditorForm> factory) { dialog(title, Nodes.Hue.NONE, factory); }
@@ -121,7 +123,8 @@ public final class VaultManagerDialog implements AutoCloseable {
         if (dialog == null || lock.state() != LockState.UNLOCKED) return;
         // A dialog owns a sheet through an anchor on one of its controls: Done, which the manager always shows.
         var anchor = panel.view().anchor(ManagerPanel.OKAY);
-        editors.show(anchor, title, hue, factory, anchor::close);
+        try { editors.show(anchor, title, hue, factory, anchor::close); }
+        catch (RuntimeException | Error failure) { anchor.close(); throw failure; }
     }
     /** Opens the sheet for a new entry of the type over the open manager; does nothing when it is closed or locked. */
     public void add(VaultManager.Type type) {
@@ -166,7 +169,7 @@ public final class VaultManagerDialog implements AutoCloseable {
         }));
     }
     /** Shows the saved plugin grants in the open manager; does nothing when it is closed or locked. */
-    public void showGrants() { if (dialog != null) { panel.showGrants(); dialog.toFront(); } }
+    public void showGrants() { if (dialog != null) { panel.showGrants(); raise(); } }
     /** Asks for a new master password over the open manager; does nothing when it is closed or locked. */
     public void changePassword() {
         dialog("Change Master Password", close -> new ChangePasswordForm(context.kit(), lock, close, failure -> {
