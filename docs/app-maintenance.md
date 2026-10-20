@@ -688,6 +688,18 @@ disable settle, and closed content is released before its empty gap contracts. S
 The toolbar and shortcuts own new-tab actions; close is hover-only and titles retain literal,
 bounded tooltips. The fixed list/add controls and scrolling/underline motion are retired.
 
+Tab drags use plain mouse events too (`TabDrag`), never AWT drag and drop. A strip's left press hands the drag its tab
+(`GroupView.pressed`); past the kit's `TAB_REORDER_THRESHOLD` it follows the cursor in screen coordinates over the
+windows the `WindowManager` lists, most recently active first, with `TabDragLabel` beside the cursor and the landing on
+the target window's `DockDropOverlay`. Where a tab would drop is `WorkspaceDropResolver`'s job, over
+`WorkspaceView.dropAreas`: change the zones in the resolver and its tests first. A drop within a window is
+`WorkspaceView.drop`; one into another window goes through the tab registry first, and a tear-out through the window
+manager. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in full
+screen other than the drag's own takes no drop (`TabDrag.dropFrame`). Esc, a plain move or a press anywhere (a lost
+release), the source window losing the focus and the dragged tab closing or leaving its window or group end a drag.
+`TabDragTest` and `TabDragWindowsTest` drive it headlessly over stand-in frames on a pretend screen
+(`TabDragTestSupport`).
+
 
 Startup keyboard focus belongs to the active terminal. `WindowContent` provides the
 native frame's default focus traversal target: the pending `TerminalPane` until its

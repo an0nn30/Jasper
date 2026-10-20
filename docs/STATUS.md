@@ -1,5 +1,92 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 5: tear-out and drag-back — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `e2294085b..49f5b7a84` (Tasks 1 to 4, after the plan refresh), then this
+documentation commit; [plan](superpowers/plans/2026-10-18-workspace-5-tear-out.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). One tab drag (`workspace.TabDrag`, the window
+manager's, shared by every window it opens) replaces the strips' release-to-reorder: a left press on a tab of either
+strip face that moves past the kit's `TAB_REORDER_THRESHOLD` (5 px) drags it on plain mouse events in screen
+coordinates, with its label in a small undecorated window beside the cursor (`TabDragLabel`) and the landing on the
+target window's `DockDropOverlay`. `dock.WorkspaceDropResolver` (pure; `dock` may now name the layout's group ids and
+sides) maps the cursor to a drop: a place in a strip, a group's centre, a group's outer quarter on a side (the empty
+main workspace is all centre), and picks the most recently active window under the cursor; on macOS a window in full
+screen other than the drag's own takes no drop. Within a window `WorkspaceView.drop` reorders, moves or splits; into
+another window the tab registry moves the tab (TAB_MOVED, both maximizes end, an emptied child window closes after it)
+and the drop places it, an edge drop beside the target group directly (`TabRegistry.move(Tab, UUID, GroupId, Side)`);
+outside every window the tab tears out into a new child window whose workspace is its old group's size with the tab
+under the cursor, its frame grown by its own title bar (`WindowFrame` measures it) and kept on the display the workspace
+covers most (none for a child window's only tab or a pinned tab, which moves within its window only). A release over a
+window's dock, chrome or title bar or over another window of Jasper's (Settings, About), a drop that would change
+nothing, Esc, a lost release, the source window losing the focus (a modal dialog, another application) and the dragged
+tab closing or leaving its window or group do nothing. Sessions and content are never touched. `GroupView.reorder` is
+gone. Rulings (plan, "Rulings"): (1) `WorkspaceDropResolver` lives in `dock` beside `DockDropResolver`, and `dock` gains
+one allowed edge, to `layout`, for `GroupId` and `Side`; (2) over a strip the drop is the place before the first other
+tab whose middle is not left of the cursor, over a card area a side's outer quarter (the nearer side by share in a
+corner) or the centre, a strip has no edge zones, the empty main workspace is all centre and a divider is no zone; (3)
+the drag starts past `TAB_REORDER_THRESHOLD`, and `DOCK_DRAG_THRESHOLD` stays the dock's; (4) a centre drop highlights
+the whole group, an edge drop its half on that side, a strip drop a `TAB_INDICATOR`-wide bar, and the overlay draws no
+ghost; (5) a drop that would change nothing (the tab's own place, its own group's centre, an edge of the group it is
+alone in) shows no landing and does nothing; (6) the label is an undecorated, never focusable, always-on-top `JWindow` 8
+scaled px right of and below the cursor's tip, made when a drag starts and disposed when it ends, and never in a
+headless JVM; (7) a drag ends without a drop on Esc, a plain move or a press anywhere (a lost release), its source
+window losing the focus or closing, the dragged tab closing or leaving its window or group, and a release over no
+target, and the Esc dispatcher and the listener register before the label shows; (8) within a window a drop is a layout
+operation of plans 2 and 3a; (9) a window's frame is its native window's bounds, Jasper's other showing windows take no
+drop and shield no main or child window, and another application's window is invisible to Java, so a release over one
+tears out; (10) the window manager owns one `TabDrag` and gives it to every window it opens, and a window no manager
+opened keeps its own, which tears nothing out; (11) a drop on another window goes through the tab registry, an edge drop
+with `move(Tab, UUID, GroupId, Side)` and a strip or centre drop with `move(Tab, UUID)` and then the window's workspace
+places the tab, in one EDT turn; (12) a tear-out opens the child window through `moveToNewWindow(Tab, Rectangle)` with
+its workspace bounds, which its frame grows by the chrome it measures and keeps on the display; (13) a child window's
+only tab and a pinned tab have no tear-out target; (14) `GroupView.reorder` and the strips' release-to-reorder go
+outright, four tests reorder through `WorkspaceView.reorder` and `WindowTabsTest`'s drag test drags; (15) new files take
+ledger rows `nonvisual-helper,none,none`; (16) the user guide for tabs is `README.md`'s tabs paragraph, and
+`docs/keyboard-shortcuts.md`, which has no section on tabs, does not change; (17) a pinned tab is offered targets in its
+own window only; (18) on macOS a window other than the drag's own whose frame is exactly its display's bounds is in full
+screen and takes no drop, a rule that is macOS's alone. Deviations: (a) before Task 1 the plan was replayed on
+`094729d08` (28 blocks, 3 failing before the refresh, 0 after, with every proposed ruling) and refreshed in `e2294085b`,
+with rulings F1 to F9: F1 a tear-out names the new window's workspace and `WindowFrame.placeWorkspace` grows it by the
+chrome it measures in the packed frame (the title bar is inside the frame on every default), F2 no split-from group is
+kept and the left/up round-trip halving is deferred (below), F3 the tear-out test asserts no `TabOpened` or `TabClosed`,
+F4 Task 4 Steps 3 and 4 cover 4b's placement and `moveToNewWindow(tab, bounds)` hand-offs, F5 plan 3a's declined #6 is
+not needed and the plugin tear-out test asserts `view.isVisible()` twice, F6 `AppContractTest` and `FakeWorkspace` go to
+plan 6 (below), F7 executors used the pre-flight's absolute counts, F8 an in-window modal overlay opening mid-drag does
+not end the drag, as `DockDrag` behaves, F9 five anchors and seven text fixes are applied, and the File structure names
+`WindowFrame` and `WindowShell` under Task 4; (b) Task 3, controller ruling after review 1: `WorkspaceView.apply`
+refocuses when the active group changes under the workspace's `holdsFocus` rule, not `drop` at its end, so a tab dropped
+into another group keeps the focus once (a test counts `focusTarget` calls, and `RecordingFocusManager` gains
+`own(Component)`), `GroupView.pressed` cancels a dock drag whose release was lost, and the exit-path tests assert the
+Esc dispatcher and the AWT listener are gone (`f01f025cf`); (c) Task 4, controller ruling after review 1:
+`TabDrag.displayFor` picks the display the new workspace overlaps most, the default screen only when none does, in place
+of the display holding its top-left corner, so a tear-out near a monitor's edge opens where the cursor is, with two more
+tests (a drop into another window's inactive group, a refused or failed registry move) and a comment on
+`WindowContent`'s own drag (`49f5b7a84`). Left for plan 6: saving a child window's bounds, which a tear-out now chooses,
+and the layout after every drag, through the debounced save; from plan 4b, `AppContractTest`'s `emptyWindow` (it makes
+the main window when none is open) and panel routing (it bypasses `panelRoute`) before the first contract case that
+needs either, and `FakeWorkspace.closeWindow` closing and nulling `Panel.instance`, with `AppContractTest` clearing its
+panel caches, once a fake main window can close. Deferred: plan 2's Rulings 8 limit, now reachable by a drag: a tab
+dropped on a group's left or upper edge and dragged back gives the new group's space to the sibling before it, so the
+group it came from halves on each round trip. `./gradlew check --continue`: **11,752 tests, 0 failures, 0 errors, 25
+skipped** (from the XML in `*/build/test-results/test/`; `jasper-app` 3,797, `jasper-sdk` 94, `jasper-sdk-testkit` 204,
+`jasper-plugin-editor` 4,912, `WorkspaceDropResolverTest` 10, `WorkspaceDropTest` 8, `TabDragTest` 15,
+`TabDragWindowsTest` 18, `TabRegistryTest` 34, `WindowManagerTest` 33; the build passed on its first run,
+`StagedTransferLifecycleTest` included). GUI checks for the user: a tab dragged along its strip, onto another group's
+tabs and middle, and onto each outer quarter of a group, in both tab faces (equal tabs and the Enterprise look's classic
+tabs), with the landing shown and no motion, and a tab dropped into another group takes the focus (no flash of a
+neighbouring tab); a tab dragged into another Jasper window's strip, middle and edge, and a child window's last tab
+dragged into the main window (the child closes cleanly, the shell keeps running); a tab released on the desktop opens a
+child window under the cursor whose workspace is the size of its old group, the tab under the cursor and the title bar
+above it (the unified macOS bar, FlatLaf's title pane on Windows and Linux, and the system's: `placeWorkspace` sizes it
+for each), also on a second display, near a display's edge (the window opens on the display the workspace covers most,
+moved onto it) and across displays with different scales; a child window's only tab released on the desktop stays;
+releases over the dock, the toolbar, a title bar and the Settings window change nothing; Esc, Cmd+Tab (Alt+Tab) to
+another application and a modal dialog (a plugin's) during a drag end it with no label left on screen; overlapping
+windows take the drop in the most recently active one; on macOS, a Jasper window in full screen takes no drop from a
+window on the desktop, and a window on another Space (not in full screen), which Java cannot tell apart, is noted as it
+behaves; on Windows and Linux, the label window stays above other windows and takes no focus, including under a
+focus-follows-mouse window manager on Linux (the label must not take focus as the pointer crosses it). Not merged, not
+pushed.
+
 **Workspace tabs, plan 4b: plugin windows become tabs — 2026-10-19** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `da79cae7c..4576cbecf` (Tasks 1 to 7, after the plan refresh), then the
 documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-18-workspace-4b-plugin-windows.md),
