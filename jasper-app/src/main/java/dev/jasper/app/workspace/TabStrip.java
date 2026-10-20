@@ -10,9 +10,9 @@ import javax.swing.JPopupMenu;
  * One tab group's strip, or a window's parent-tab bar (workspace tabs spec 10; parent tabs spec 7; Enterprise presentation
  * spec 10.5): today's equal tabs, hidden while their pane holds a single tab or their window a single parent tab, or the
  * classic tabs, always shown in a pane and never as the bar. It lists, selects, closes and opens through its
- * {@link StripSource} only, its presses start the tab drag (workspace tabs spec 12; from the bar, of a whole parent tab:
- * parent tabs spec 5), and it shows as active while its group is the active group of an active window, or while the
- * bar's window is active. EDT only.
+ * {@link StripSource} only, a press on the bar's entries starts the tab drag of a whole parent tab (tabs and panes spec
+ * 6) while a pane's strip starts none, and it shows as active while its group is the active group of an active window,
+ * or while the bar's window is active. EDT only.
  */
 sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs {
     /** The component mounted above its source's content: a pane's cards, or the parent tabs' workspaces. */

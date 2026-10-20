@@ -128,11 +128,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
     /**
-     * Drags a tab, or a parent tab from the bar, from any of this window's strips (workspace tabs spec 12; parent tabs
-     * spec 5): the window manager's, which every window it opens shares; until it gives that, one of this window's own,
-     * which drops within this window and moves nothing out of it: outside this window it reports a TearOut target for a
-     * tab only (a parent tab's needs a manager, {@link #mayPopOutParentTab}), which a window no manager opened ignores
-     * (workspace plan 5 Rulings 10).
+     * Drags a parent tab from the bar (tabs and panes spec 6): the window manager's, which every window it opens shares;
+     * until it gives that, one of this window's own, which reorders the bar and moves nothing out of this window, as a
+     * tear-out needs a manager ({@link #mayPopOutParentTab}).
      */
     private TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this));
     private UiState uiState = UiState.inMemory();

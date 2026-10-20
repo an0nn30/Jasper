@@ -22,7 +22,8 @@ import javax.swing.SwingUtilities;
  * One tab group of a window's workspace (workspace tabs spec 10): the look's tab strip over a card area showing the
  * group's selected tab. The strip shows unless its workspace hides it (parent tabs spec 7: a pane's single tab in the
  * standard look), and the card area then fills the group. The strip lists, selects, closes and opens tabs in this group
- * only and starts the tab drag (spec 12). A tab's component enters and leaves the card area as the layout puts the tab in
+ * only and starts no drag: a tab drags from its window's parent-tab bar (tabs and panes spec 6). A tab's component
+ * enters and leaves the card area as the layout puts the tab in
  * and out of the group, so a tab moved to another group leaves one group view for the other with its session untouched
  * (spec 2.3). EDT only.
  */
@@ -97,17 +98,14 @@ final class GroupView extends JPanel implements StripSource {
     @Override public void select(Tab tab) { owner.selectTab(tab); }
     @Override public void close(Tab tab) { owner.closeTab(tab); }
     /**
-     * A left press on {@code tab}'s entry in the strip: the tab drag may start from it (workspace tabs spec 12). A dock
-     * drag still running lost its release, so it ends first.
+     * A left press on {@code tab}'s entry in the strip: a dock drag still running lost its release, so it ends. A pane's
+     * strip starts no tab drag (tabs and panes spec 6).
      */
-    @Override public void pressed(Tab tab, MouseEvent event) {
-        owner.dockDrag().cancel();
-        owner.tabDrag().pressed(this, tab, event);
-    }
-    /** A drag event from the strip, which the tab drag follows. */
-    @Override public void dragged(MouseEvent event) { owner.tabDrag().dragged(event); }
-    /** A release on the strip, which ends the tab drag. */
-    @Override public void released(MouseEvent event) { owner.tabDrag().released(event); }
+    @Override public void pressed(Tab tab, MouseEvent event) { owner.dockDrag().cancel(); }
+    /** A pane's strip drags nothing. */
+    @Override public void dragged(MouseEvent event) { }
+    /** A pane's strip drags nothing. */
+    @Override public void released(MouseEvent event) { }
     /** The classic tabs' "+": a new terminal tab in this group. */
     @Override public void newTab() { workspace.activate(id); owner.invoke(ActionId.NEW_TAB_IN_PANE); }
     /** New Tab in Pane: this pane's + stacks a tab in it. */
@@ -119,16 +117,13 @@ final class GroupView extends JPanel implements StripSource {
     /** The look's motion, which the equal tabs follow as tabs open and close. */
     @Override public boolean animates() { return owner.lookAnimates(); }
 
-    /** The strip's rectangle in {@code target}'s coordinates (workspace plan 5 resolves drops over it); empty while it is hidden. */
+    /** The strip's rectangle in {@code target}'s coordinates; empty while it is hidden. */
     Rectangle stripBounds(Component target) {
         return stripShown() ? SwingUtilities.convertRectangle(this, strip.component().getBounds(), target) : new Rectangle();
     }
     /** The card area's rectangle in {@code target}'s coordinates. */
     Rectangle contentBounds(Component target) { return SwingUtilities.convertRectangle(this, cards.getBounds(), target); }
-    /**
-     * Each tab's rectangle in the strip, in strip order, in {@code target}'s coordinates: a tab drag drops between them.
-     * None while the strip is hidden.
-     */
+    /** Each tab's rectangle in the strip, in strip order, in {@code target}'s coordinates; none while the strip is hidden. */
     List<Rectangle> tabBounds(Component target) {
         if (!stripShown()) return List.of();
         return strip.tabBounds().stream().map(bounds -> SwingUtilities.convertRectangle(strip.component(), bounds, target)).toList();

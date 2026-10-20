@@ -22,11 +22,12 @@ import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 
 /**
- * Headless tab drags (workspace tabs spec 12): windows in stand-in frames on a pretend screen, and the mouse events Swing
- * sends a drag, in that screen's coordinates. A stand-in frame is a parentless panel at a place on the pretend screen: a
- * root pane holding the window's content, under a title bar that is the panel's top inset, as a native frame's insets
- * hold its title bar. Screen conversions, the drag's window bounds, the frame's decorations and the overlay's layered
- * pane then work without a display.
+ * Headless tab drags (workspace tabs spec 12; tabs and panes spec 6): windows in stand-in frames on a pretend screen,
+ * and the mouse events Swing sends a drag, in that screen's coordinates. A stand-in frame is a parentless panel at a
+ * place on the pretend screen: a root pane holding the window's content, under a title bar that is the panel's top
+ * inset, as a native frame's insets hold its title bar. Screen conversions, the drag's window bounds, the frame's
+ * decorations and the overlay's layered pane then work without a display. A tab drags from its entry in its window's
+ * strip, which shows the item of the tab's active pane: "the entry of an item" is that entry.
  */
 final class TabDragTestSupport {
     /** The stand-in title bar's height: the frame's top inset. */
@@ -51,7 +52,7 @@ final class TabDragTestSupport {
         relayout(frame);
     }
 
-    /** Lays a stand-in frame out again, as Swing would after a drop changed its workspace. */
+    /** Lays a stand-in frame out again, as Swing would after a drop changed its strip. */
     static void relayout(JPanel frame) {
         LayoutTestSupport.layoutTree(frame);
         LayoutTestSupport.layoutTree(frame);
@@ -78,61 +79,42 @@ final class TabDragTestSupport {
         return new Point(bounds.x + (int) (bounds.width * across), bounds.y + (int) (bounds.height * down));
     }
 
-    /** The group view that holds {@code tab} in {@code window}. */
-    static GroupView groupOf(WindowContent window, Tab tab) {
-        return window.workspace().groupView(window.workspace().model().groupOf(tab.id()).orElseThrow());
+    /** The pane {@code group} of {@code window}'s shown tab, on the pretend screen. */
+    static Rectangle pane(WindowContent window, GroupId group) {
+        GroupView view = window.workspace().groupView(group);
+        return onScreen(view, new Rectangle(view.getSize()));
     }
 
-    /** A point in {@code tab}'s strip entry, {@code across} of its width from its left, on the pretend screen. */
-    static Point onTab(WindowContent window, Tab tab, double across) {
-        GroupView group = groupOf(window, tab);
-        return inside(onScreen(group, group.tabBounds(group).get(group.tabs().indexOf(tab))), across, 0.5);
-    }
-
-    /** {@code group}'s card area in {@code window}, on the pretend screen. */
-    static Rectangle cards(WindowContent window, GroupId group) {
-        WorkspaceView workspace = window.workspace();
-        return onScreen(workspace, workspace.groupView(group).contentBounds(workspace));
-    }
-
-    /** The component a press on {@code tab}'s strip entry reaches: the equal tabs' title button, or a classic tab. */
-    static Component entry(WindowContent window, Tab tab) {
-        GroupView group = groupOf(window, tab);
-        Component strip = group.strip().component();
-        Rectangle bounds = group.tabBounds(strip).get(group.tabs().indexOf(tab));
-        return SwingUtilities.getDeepestComponentAt(strip, (int) bounds.getCenterX(), (int) bounds.getCenterY());
-    }
-
-    /** A point in the bar's entry that shows {@code tab}, {@code across} of its width, on the pretend screen. */
-    static Point onParentTab(WindowContent window, Tab tab, double across) {
-        TabStrip bar = window.parentTabBar();
-        Rectangle entry = bar.tabBounds().get(window.parentTabs().bar().tabs().indexOf(tab));
-        return inside(onScreen(bar.component(), entry), across, 0.5);
+    /** A point in the strip's entry of {@code tab}, {@code across} of its width from its left, on the pretend screen. */
+    static Point onEntry(WindowContent window, Tab tab, double across) {
+        TabStrip strip = window.parentTabBar();
+        Rectangle entry = strip.tabBounds().get(window.parentTabs().bar().tabs().indexOf(tab));
+        return inside(onScreen(strip.component(), entry), across, 0.5);
     }
 
     /**
-     * The landing of a parent tab dropped at {@code index} of {@code window}'s shown bar, in its layered pane, as the
-     * drag shows it: {@code WorkspaceDropResolver.marker} over the bar and its entries but {@code dragged}'s own, in
-     * its parent-tabs view's coordinates, {@code TAB_INDICATOR} wide.
+     * The landing of a tab dropped at {@code index} of {@code window}'s shown strip, in its layered pane, as the drag
+     * shows it: {@code WorkspaceDropResolver.marker} over the strip and its entries but {@code dragged}'s own, in its
+     * parent-tabs view's coordinates, {@code TAB_INDICATOR} wide.
      */
-    static Rectangle barMarker(WindowContent window, Tab dragged, int index) {
-        TabStrip bar = window.parentTabBar();
+    static Rectangle marker(WindowContent window, Tab dragged, int index) {
+        TabStrip strip = window.parentTabBar();
         ParentTabsView parents = window.parentTabs();
         List<Tab> listed = parents.bar().tabs();
-        List<Rectangle> bounds = bar.tabBounds();
+        List<Rectangle> bounds = strip.tabBounds();
         var entries = new ArrayList<Rectangle>();
         for (int i = 0; i < listed.size(); i++)
-            if (listed.get(i) != dragged) entries.add(SwingUtilities.convertRectangle(bar.component(), bounds.get(i), parents));
+            if (listed.get(i) != dragged) entries.add(SwingUtilities.convertRectangle(strip.component(), bounds.get(i), parents));
         int width = NativeStyles.installed().metric(DesignMetrics.Role.TAB_INDICATOR);
-        Rectangle marker = WorkspaceDropResolver.marker(bar.component().getBounds(), entries, index, width);
+        Rectangle marker = WorkspaceDropResolver.marker(strip.component().getBounds(), entries, index, width);
         return SwingUtilities.convertRectangle(parents, marker, SwingUtilities.getRootPane(window).getLayeredPane());
     }
 
-    /** The component a press on the parent-tab bar's entry that shows {@code tab} reaches. */
-    static Component barEntry(WindowContent window, Tab tab) {
-        TabStrip bar = window.parentTabBar();
-        Rectangle bounds = bar.tabBounds().get(window.parentTabs().bar().tabs().indexOf(tab));
-        return SwingUtilities.getDeepestComponentAt(bar.component(), (int) bounds.getCenterX(), (int) bounds.getCenterY());
+    /** The component a press on the strip's entry of {@code tab} reaches: the equal tabs' title button, or a classic tab. */
+    static Component entry(WindowContent window, Tab tab) {
+        TabStrip strip = window.parentTabBar();
+        Rectangle bounds = strip.tabBounds().get(window.parentTabs().bar().tabs().indexOf(tab));
+        return SwingUtilities.getDeepestComponentAt(strip.component(), (int) bounds.getCenterX(), (int) bounds.getCenterY());
     }
 
     /** A left-button event at {@code screen}, sent to {@code source} as Swing sends a drag's events to the pressed component. */
@@ -145,25 +127,13 @@ final class TabDragTestSupport {
     }
 
     /**
-     * Presses in the middle of {@code tab}'s strip entry, drags 12 px down (past the 5 px threshold at any scale up to 2)
-     * and on to each point, without releasing.
+     * Presses in the middle of the strip's entry of {@code tab}, drags 12 px down (past the 5 px threshold at any scale up
+     * to 2) and on to each point, without releasing.
      *
      * @return the pressed component, which takes the drag's later events
      */
-    static Component start(WindowContent window, Tab tab, Point... path) { return startAt(entry(window, tab), path); }
-
-    /** As {@link #start}, from the parent-tab bar's entry that shows {@code tab}: the drag of its whole parent tab. */
-    static Component startParentTab(WindowContent window, Tab tab, Point... path) {
-        return startAt(barEntry(window, tab), path);
-    }
-
-    /** As {@link #startParentTab}, then releases at the last point. */
-    static void dropParentTab(WindowContent window, Tab tab, Point... path) {
-        mouse(startParentTab(window, tab, path), MouseEvent.MOUSE_RELEASED, path[path.length - 1]);
-    }
-
-    /** Presses in the middle of {@code source}, drags 12 px down and on to each point, without releasing. */
-    private static Component startAt(Component source, Point... path) {
+    static Component start(WindowContent window, Tab tab, Point... path) {
+        Component source = entry(window, tab);
         Point press = middle(source);
         mouse(source, MouseEvent.MOUSE_PRESSED, press);
         mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y + 12));

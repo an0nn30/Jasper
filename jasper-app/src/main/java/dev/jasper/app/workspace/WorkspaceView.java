@@ -3,8 +3,6 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.contributions.Tab;
-import dev.jasper.app.dock.WorkspaceDropResolver.Area;
-import dev.jasper.app.dock.WorkspaceDropResolver.Drop;
 import dev.jasper.app.layout.Child;
 import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.GroupId;
@@ -15,7 +13,6 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.layout.TabId;
 import java.awt.BorderLayout;
-import java.awt.Rectangle;
 import java.awt.Component;
 import java.awt.KeyboardFocusManager;
 import java.util.ArrayList;
@@ -141,60 +138,6 @@ final class WorkspaceView extends JPanel {
         moved.add(tab.id());
         apply(layout.moveToNewGroup(tab.id(), group, side));
     }
-    /**
-     * The groups a tab drag can drop on, in this view's coordinates (workspace tabs spec 12): each group that shows (the
-     * maximized one alone while one is), with its strip, its tabs' rectangles but {@code dragged}'s, and its card area. The
-     * empty workspace is one area, all of it its group's centre.
-     */
-    List<Area> dropAreas(Tab dragged) {
-        if (layout.isEmpty())
-            return List.of(new Area(layout.activeGroup(), new Rectangle(), List.of(), new Rectangle(0, 0, getWidth(), getHeight()), false));
-        var areas = new ArrayList<Area>();
-        for (GroupView group : groups.values()) {
-            if (!SwingUtilities.isDescendingFrom(group, this)) continue;
-            List<Tab> held = group.tabs();
-            List<Rectangle> bounds = group.tabBounds(this);
-            var others = new ArrayList<Rectangle>();
-            for (int i = 0; i < held.size() && i < bounds.size(); i++) if (held.get(i) != dragged) others.add(bounds.get(i));
-            areas.add(new Area(group.id(), group.stripBounds(this), others, group.contentBounds(this), true));
-        }
-        return areas;
-    }
-
-    /**
-     * Whether dropping {@code tab} there would change anything (spec 12: a drop that would change nothing does nothing). A
-     * tab of another window always would; one of this workspace's would unless the drop is its own place in its strip, its
-     * own group's centre, or an edge of the group it is alone in.
-     */
-    boolean changes(Tab tab, Drop drop) {
-        if (!contains(tab)) return true;
-        GroupId home = layout.groupOf(tab.id()).orElseThrow();
-        if (!drop.group().equals(home)) return true;
-        List<TabId> held = layout.group(home).orElseThrow().tabs();
-        return switch (drop) {
-            case Drop.Strip strip -> strip.index() != held.indexOf(tab.id());
-            case Drop.Centre centre -> false;
-            case Drop.Edge edge -> held.size() > 1;
-        };
-    }
-
-    /**
-     * Places {@code tab}, one of this workspace's, where a tab drag dropped it: along its own strip as a reorder, into
-     * another group's strip or after its tabs as a move, beside a group as a new group. A drop that would change nothing,
-     * or a tab this workspace does not hold, does nothing.
-     */
-    void drop(Tab tab, Drop drop) {
-        if (!contains(tab) || !changes(tab, drop)) return;
-        switch (drop) {
-            case Drop.Strip strip -> {
-                if (layout.groupOf(tab.id()).orElseThrow().equals(strip.group())) reorder(tab, strip.group(), strip.index());
-                else moveTab(tab, strip.group(), strip.index());
-            }
-            case Drop.Centre centre -> moveTab(tab, centre.group(), layout.group(centre.group()).orElseThrow().tabs().size());
-            case Drop.Edge edge -> moveToNewGroup(tab, edge.group(), edge.side());
-        }
-    }
-
     /**
      * Gives this workspace {@code arranged}: its own tabs in another arrangement, as panes come back or a parent tab moves
      * between windows (workspace plan 7b Rulings 6). Tabs {@code arranged} names that this workspace does not hold leave it

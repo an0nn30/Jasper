@@ -264,7 +264,7 @@ public final class WindowManager {
 
     /**
      * As {@link #popOutTab(Tab)}, the pane window's workspace at {@code bounds} on screen, on the display under
-     * {@code cursor}: a tab the tab drag releases outside every window too (parent tabs spec 5).
+     * {@code cursor}.
      *
      * @param tab a tab of one of these windows
      * @param bounds where the pane window's workspace goes on screen; null for where the platform puts it
