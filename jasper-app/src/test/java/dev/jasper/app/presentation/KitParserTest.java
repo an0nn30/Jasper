@@ -205,6 +205,7 @@ class KitParserTest {
 
     @Test void everyChromeAndControlPointTakesBothItsValues() throws Exception {
         assertThat(parse("kit = 1\nbase = \"default\"\n[chrome]\ntitle_bar = \"native\"\n").chrome().titleBar()).isEqualTo(ChromeSpec.TitleBar.NATIVE);
+        assertThat(parse("kit = 1\nbase = \"classic\"\n[chrome]\ntitle_bar = \"classic\"\n").chrome()).as("window menus under a classic title").isEqualTo(dev.jasper.app.testsupport.EnterpriseLook.titled(ChromeSpec.CLASSIC, ChromeSpec.TitleBar.CLASSIC));
         assertThat(parse("kit = 1\nbase = \"classic\"\n[chrome]\ntitle_bar = \"unified\"\nmenu_bar = \"system\"\n").chrome().menuBar())
             .isEqualTo(ChromeSpec.MenuBar.SYSTEM);
         String[][] controls = {{"toggle", "switch", "checkbox"}, {"exclusive", "segments", "radios"}, {"tabs", "segments", "folder"},
@@ -254,7 +255,7 @@ class KitParserTest {
         cases.put(head + "[chrome]\ntitle = \"x\"\n", "[chrome].title: unknown key");
         cases.put(head + "chrome = 1\n", "chrome: expected a table");
         cases.put(head + "[metrics]\nrow_height = \"22\"\n", "[metrics].row_height: expected an integer");
-        cases.put(head + "[chrome]\ntitle_bar = \"glass\"\n", "[chrome].title_bar: \"glass\" is not one of unified, native");
+        cases.put(head + "[chrome]\ntitle_bar = \"glass\"\n", "[chrome].title_bar: \"glass\" is not one of unified, native, classic");
         cases.put(head + "[controls]\ntoggle = 1\n", "[controls].toggle: expected a string");
         cases.put("kit = 2\nbase = \"default\"\n", "kit: 2 is not a format this Jasper reads; expected 1");
         cases.put("base = \"default\"\n", "kit: missing; a kit file begins with kit = 1");
@@ -265,7 +266,7 @@ class KitParserTest {
         cases.put(head + "[metrics]\ncontrol_height = 19\n", "[metrics].control_height: 19 is outside 20-28");
         cases.put(head + "[type]\nbase = 9\n", "[type].base: 9 is not a body size from 10 to 16");
         cases.put(head + "[type]\nbase = 12.5\n", "[type].base: expected an integer");
-        cases.put(head + "[chrome]\nmenu_bar = \"window\"\n", "[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\"");
+        cases.put(head + "[chrome]\nmenu_bar = \"window\"\n", "[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\" or \"classic\"");
         cases.put(head + "[defaults]\n\"ui.font.size\" = 12\n", "[defaults].\"ui.font.size\": not a setting a look may default; use "
             + "\"ui.theme.light\", \"ui.theme.dark\", \"palette.visible_rows\", \"window.toolbar_height\" or \"window.toolbar\"");
         cases.put(head + "[defaults]\n\"palette.visible_rows\" = 30\n", "[defaults].\"palette.visible_rows\": Use an integer from 1–20.");

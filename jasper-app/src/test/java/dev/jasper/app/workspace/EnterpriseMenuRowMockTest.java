@@ -69,7 +69,8 @@ class EnterpriseMenuRowMockTest {
     static Mounted mounted(boolean dark, String name, java.util.function.Consumer<WindowContent> fixture) {
         var themes = EnterpriseLook.controller(dark);
         try {
-            var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, false));
+            // The mocks' host: the system title bar and the in-window menu row (plan 14).
+            var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", ChromeRenderTest.LINUX);
             var look = WindowLook.of(projections);
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look.chrome());
             owner.connectContributions(workstation());

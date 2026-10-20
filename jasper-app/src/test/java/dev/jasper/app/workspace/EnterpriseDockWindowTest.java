@@ -37,7 +37,7 @@ class EnterpriseDockWindowTest {
     @Test void aWindowUnderTheShippedLookDocksTheClassicWay() throws Exception {
         var kit = EnterpriseLook.kit();
         ThemeController themes = EnterpriseLook.controller(false);
-        var look = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", new Projections.Host(false, false));
+        var look = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", ChromeRenderTest.LINUX);
         var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, WorkspaceChrome.of(look.workspace(), look.title()));
         try {
             var state = UiState.inMemory(look.dockLayout().key());

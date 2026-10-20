@@ -3,7 +3,6 @@ package dev.jasper.app.workspace;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.formdev.flatlaf.util.SystemInfo;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeSelection;
 import dev.jasper.app.config.TerminalSchemeChoice;
@@ -36,7 +35,9 @@ import org.junit.jupiter.api.Test;
  * at 2× into jasper-app/build/chrome-renders/. Plans 6b to 9 extend {@link #check}.
  */
 class ChromeRenderTest {
-    static final Projections.Host HOST = new Projections.Host(SystemInfo.isMacOS, MacTitleBar.isSupported());
+    static final Projections.Host HOST = new Projections.Host(Projections.Platform.of(System.getProperty("os.name", "")), MacTitleBar.isSupported());
+    /** The Enterprise mocks' host (plan 14 Rulings 21): the system title bar and the in-window menu row. */
+    static final Projections.Host LINUX = new Projections.Host(Projections.Platform.LINUX, false);
     static final String[] KEYS = {"title_bar", "menu_bar", "window_title", "tool_windows", "editor_tabs", "status_bar", "palette", "dialogs", "motion"};
 
     /**
@@ -77,7 +78,7 @@ class ChromeRenderTest {
         var cases = new ArrayList<Case>();
         cases.add(new Case("default", () -> slateCobalt(Kit.DEFAULT), Projections.of(ChromeSpec.DEFAULT, false, false, "", HOST)));
         cases.add(new Case("enterprise", () -> EnterpriseLook.controller(false),
-            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", HOST)));
+            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", LINUX)));
         cases.add(new Case("complement", () -> slateCobalt(KitFixtures.complement()), Projections.of(ChromeSpec.DEFAULT, true, true, "dev.example", HOST)));
         cases.add(new Case("fallback", () -> slateCobalt(Kit.DEFAULT), Projections.fallback(new DesktopFlags(false, true), HOST)));
         var rows = covering();

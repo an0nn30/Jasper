@@ -304,8 +304,8 @@ public final class KitParser {
         var dialogs = point(table, "chrome", "dialogs", ChromeSpec.DialogKind.class, base.dialogs());
         var motion = point(table, "chrome", "motion", ChromeSpec.MotionKind.class, base.motion());
         var icons = point(table, "chrome", "icons", ChromeSpec.Icons.class, base.icons());
-        if (menuBar == ChromeSpec.MenuBar.WINDOW && titleBar != ChromeSpec.TitleBar.NATIVE)
-            throw new Invalid("[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\"");
+        if (menuBar == ChromeSpec.MenuBar.WINDOW && titleBar == ChromeSpec.TitleBar.UNIFIED)
+            throw new Invalid("[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\" or \"classic\"");
         return new ChromeSpec(titleBar, menuBar, title, toolWindows, editorTabs, statusBar, palette, dialogs, motion, icons);
     }
 

@@ -23,6 +23,18 @@ public final class EnterpriseLook {
 
     private EnterpriseLook() { }
 
+    /**
+     * {@code spec} with another title bar (plan 14).
+     *
+     * @param spec the chrome to copy
+     * @param title the title bar it takes
+     * @return every point of {@code spec}, with {@code title}
+     */
+    public static ChromeSpec titled(ChromeSpec spec, ChromeSpec.TitleBar title) {
+        return new ChromeSpec(title, spec.menuBar(), spec.windowTitle(), spec.toolWindows(), spec.editorTabs(), spec.statusBar(), spec.palette(),
+            spec.dialogs(), spec.motion(), spec.icons());
+    }
+
     /** The shipped Enterprise kit; its IBM Plex files are registered first. */
     public static Kit kit() { return EnterpriseResources.kit(); }
 
