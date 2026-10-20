@@ -1915,14 +1915,19 @@ edit(W + "ParentTabsView.java", [
     ("""    WorkspaceView openParentTab(Tab tab) {
         boolean held = WorkspaceView.holdsFocus(owner, this);
         var view = new WorkspaceView(owner, ParentTabId.random());
+        int index = count();
         try {
+            view.applyTheme(owner.theme(), false);
+            view.setGlass((float) owner.backgroundOpacity() < 1f);
             view.open(tab);
-            model = model.open(new ParentTab(view.id(), view.model()), count());
+            model = model.open(new ParentTab(view.id(), view.model()), index);
         } catch (RuntimeException | Error failure) {
             view.close();
             throw failure;
         }
         views.put(view.id(), view);
+        // The views keep the bar's order, ahead of any other child.
+        add(view, index);
 """, """    WorkspaceView openParentTab(Tab tab) { return openParentTab(tab, ParentTabId.random(), count()); }
 
     /**
@@ -1934,10 +1939,13 @@ edit(W + "ParentTabsView.java", [
         boolean held = WorkspaceView.holdsFocus(owner, this);
         WorkspaceView empty = isEmpty() ? active() : null;
         var view = new WorkspaceView(owner, id);
+        int at = empty != null ? 0 : Math.max(0, Math.min(index, count()));
         try {
+            view.applyTheme(owner.theme(), false);
+            view.setGlass((float) owner.backgroundOpacity() < 1f);
             view.open(tab);
             var opened = new ParentTab(id, view.model());
-            model = empty != null ? ParentTabs.of(opened) : model.open(opened, Math.max(0, Math.min(index, count())));
+            model = empty != null ? ParentTabs.of(opened) : model.open(opened, at);
         } catch (RuntimeException | Error failure) {
             view.close();
             throw failure;
@@ -1948,6 +1956,8 @@ edit(W + "ParentTabsView.java", [
             empty.close();
         }
         views.put(view.id(), view);
+        // The views keep the bar's order, ahead of any other child.
+        add(view, at);
 """, 1),
     ("""    /** Shows the parent tab {@code id} as it was left (spec 7); the focus stays where it is, for the caller to move. */
 """, """    /**
