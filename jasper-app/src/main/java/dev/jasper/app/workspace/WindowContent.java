@@ -25,6 +25,7 @@ import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.app.palette.ScopeRegistry;
 import dev.jasper.app.palette.CommandsScope;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.config.ToolbarMode;
@@ -142,6 +143,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private boolean firstTerminalSeen;
     /** Whether this window's macOS appearance follows the theme (a native-titled look, spec 10.1); its dialogs follow too. */
     private boolean followsThemeAppearance;
+    /** IntelliJ Classic's macOS title band over the toolbar under a classic title (Enterprise plan 14), or null. */
+    private MacTitleBand titleBand;
     Consumer<JComponent> showConfigDiagnostics = control -> {
         if (!followsThemeAppearance) JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
         else showOptionDialog(new JOptionPane(control, JOptionPane.PLAIN_MESSAGE), "Configuration");
@@ -318,20 +321,40 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Mounts {@code content} in a terminal frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
-     * unified macOS bar hosting the header, or the system's title bar with the header as a row in the window. Either way
-     * the menu bar is the root's (the unified bar's {@code setMenuBar} puts it there too); on macOS the screen menu bar
+     * unified macOS bar hosting the header, the system's title bar with the header as a row in the window, or, under a
+     * classic title on macOS, IntelliJ Classic's band in the toolbar's colour above that row. Either way the menu bar is
+     * the root's (the unified bar's {@code setMenuBar} puts it there too); on macOS the screen menu bar
      * shows it while the look keeps that on, and otherwise it is a row in the window. TerminalWindow and the chrome
      * renders share this path. Returns the unified bar, or null.
      */
     static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
         MacTitleBar bar = installTitleBar(root, content, look.unifiedTitle(), look.followThemeAppearance(), nativeTitle);
-        if (bar == null) installCustomTitleBar(root, content);
+        // IntelliJ Classic's frame (plan 14): the band on macOS, FlatLaf's title pane with the menus on Windows (Task 4).
+        if (bar == null && look.classicTitle() && content.macOs) installMacTitleBand(root, content);
+        else if (bar == null) installCustomTitleBar(root, content);
         // Under a native-titled look the header is a row of window chrome, whichever composition draws it (spec 10.1,
         // and spec 9.1's fallback row); the default look keeps today's title-bar zone.
         if (bar == null && look.followThemeAppearance()) content.chrome().chromeRow();
         if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
         return bar;
     }
+
+    /**
+     * The macOS classic title (plan 14 Rulings 7 and 8): IntelliJ Classic's band above the toolbar row, filled with the
+     * header's {@code surface.app} so the band and the toolbar read as one, never the title-bar zone's colour. The window
+     * takes the vibrant appearance of the theme's darkness in place of {@link #installTitleBar}'s Aqua follower; the
+     * window's dialogs still follow through {@code followsThemeAppearance}. Compact keeps the system title bar without
+     * the band.
+     */
+    static void installMacTitleBand(JRootPane root, WindowContent content) {
+        if (content.viewMode == ViewMode.COMPACT) return;
+        content.titleBand = MacTitleBand.install(root, () -> ThemeZone.color(content.chrome().header(), SemanticColor.SURFACE_APP));
+        content.onThemeChanged = theme -> content.titleBand.setDark(theme.chrome().dark());
+        content.onThemeChanged.accept(content.theme());
+    }
+
+    /** The macOS classic title band, or null without it. */
+    MacTitleBand titleBand() { return titleBand; }
 
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
@@ -1538,6 +1561,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (terminals != null) { terminals.close(); terminals = null; }
         workspaceActions.disable();
         refreshTabs();
+        if (titleBand != null) { titleBand.close(); titleBand = null; }
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
