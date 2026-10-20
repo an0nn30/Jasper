@@ -180,9 +180,9 @@ public final class WorkspaceFile {
          * workspace.
          *
          * @param snapshot the windows to restore
-         * @param keptAside where the original file was copied ({@code workspace.toml.bad} beside it) because a window or a
-         *     tab entry was dropped, so the caller can tell the user and a later save does not lose the dropped text for
-         *     good; empty when nothing was dropped or the copy failed
+         * @param keptAside where the original file was copied ({@code workspace.toml.bad} beside it) because a window, a
+         *     parent tab or a tab entry was dropped, so the caller can tell the user and a later save does not lose the
+         *     dropped text for good; empty when nothing was dropped or the copy failed
          */
         record Restore(Snapshot snapshot, Optional<Path> keptAside) implements Loaded {
             /** Checks the values are present. */
@@ -243,7 +243,7 @@ public final class WorkspaceFile {
         return new Loaded.Restore(parsed.snapshot(), parsed.dropped() ? keepCopy(file) : Optional.empty());
     }
 
-    /** What {@link #parse} read, and whether it dropped any window or tab entry. */
+    /** What {@link #parse} read, and whether it dropped any window, parent tab or tab entry. */
     private record Parsed(Snapshot snapshot, boolean dropped) { }
 
     /** Copies the original file beside itself as {@code workspace.toml.bad}; empty, and logged, when that fails. */
@@ -263,7 +263,7 @@ public final class WorkspaceFile {
         return file.resolveSibling(file.getFileName() + ".bad");
     }
 
-    /** Records a dropped window or tab entry and logs it. */
+    /** Records a dropped window, parent tab or tab entry and logs it. */
     private static void drop(List<String> dropped, String message) {
         dropped.add(message);
         LOG.log(System.Logger.Level.WARNING, message);
@@ -343,17 +343,28 @@ public final class WorkspaceFile {
     }
 
     /**
-     * A main or full window's parent tabs in bar order, each a table with its id and its layout's keys; a bad entry, and
-     * one with no tab beside others, is dropped alone, logged and recorded in {@code dropped}. The one
-     * {@code active_parent_tab} names shows, else the first.
+     * A main or full window's parent tabs in bar order, each a table with its id and its layout's keys; a bad entry, one
+     * repeating an earlier entry's parent tab, group or tab id, and one with no tab beside others, is dropped alone,
+     * logged and recorded in {@code dropped}. The one {@code active_parent_tab} names shows, else the first.
      */
     private static ParentTabs parentTabs(TomlTable window, List<String> dropped) {
         if (!(window.get(List.of("parent_tabs")) instanceof TomlArray entries)) throw new IllegalArgumentException("a window has no parent tabs");
         var read = new ArrayList<ParentTab>();
+        var ids = new HashSet<ParentTabId>();
+        var groups = new HashSet<GroupId>();
+        var tabs = new HashSet<TabId>();
         for (int i = 0; i < entries.size(); i++) {
             try {
                 if (!(entries.get(i) instanceof TomlTable entry)) throw new IllegalArgumentException("a parent tab entry is not a table");
-                read.add(new ParentTab(ParentTabId.parse(string(entry, "id")), layout(entry)));
+                var parent = new ParentTab(ParentTabId.parse(string(entry, "id")), layout(entry));
+                // As with two windows, the later of two parent tabs whose ids clash is the one dropped (Rulings 26).
+                if (ids.contains(parent.id()) || parent.layout().groups().stream().map(Group::id).anyMatch(groups::contains)
+                        || parent.layout().tabs().stream().anyMatch(tabs::contains))
+                    throw new IllegalArgumentException("parent tab " + parent.id() + " repeats an id an earlier parent tab holds");
+                ids.add(parent.id());
+                parent.layout().groups().forEach(group -> groups.add(group.id()));
+                tabs.addAll(parent.layout().tabs());
+                read.add(parent);
             } catch (RuntimeException bad) {
                 drop(dropped, "Dropping a parent tab from the workspace state: " + bad.getMessage());
             }
@@ -437,7 +448,7 @@ public final class WorkspaceFile {
 
     /** A layout's tree from its flat nodes, with the active group and the maximize falling back alone. */
     private static Layout layout(TomlTable window) {
-        if (!(window.get(List.of("nodes")) instanceof TomlArray nodes)) throw new IllegalArgumentException("a window has no nodes");
+        if (!(window.get(List.of("nodes")) instanceof TomlArray nodes)) throw new IllegalArgumentException("a window or parent tab has no nodes");
         var byId = new HashMap<String, TomlTable>();
         var children = new HashMap<String, List<String>>();
         String root = null;
@@ -448,12 +459,12 @@ public final class WorkspaceFile {
             String parent = string(node, "parent");
             if (!parent.isEmpty()) children.computeIfAbsent(parent, ignored -> new ArrayList<>()).add(id);
             else if (root == null) root = id;
-            else throw new IllegalArgumentException("a window has two root nodes");
+            else throw new IllegalArgumentException("a window or parent tab has two root nodes");
         }
-        if (root == null) throw new IllegalArgumentException("a window has no root node");
+        if (root == null) throw new IllegalArgumentException("a window or parent tab has no root node");
         var reached = new HashSet<String>();
         Node tree = node(root, byId, children, reached, 0);
-        if (reached.size() != byId.size()) throw new IllegalArgumentException("a node is not under the window's root");
+        if (reached.size() != byId.size()) throw new IllegalArgumentException("a node is not under the root of its window or parent tab");
         Layout plain = new Layout(tree, first(tree), Optional.empty());
         Layout active = groupId(window.get(List.of("active_group"))).filter(id -> plain.group(id).isPresent()).map(plain::activate).orElse(plain);
         return groupId(window.get(List.of("maximized"))).filter(active.activeGroup()::equals).map(active::toggleMaximize).orElse(active);
@@ -461,7 +472,7 @@ public final class WorkspaceFile {
 
     /** The node {@code id} and everything under it; a split's children are the nodes naming it, in file order. */
     private static Node node(String id, Map<String, TomlTable> byId, Map<String, List<String>> children, Set<String> reached, int depth) {
-        if (depth > MAX_DEPTH) throw new IllegalArgumentException("a window's tree is deeper than " + MAX_DEPTH);
+        if (depth > MAX_DEPTH) throw new IllegalArgumentException("a window's or parent tab's tree is deeper than " + MAX_DEPTH);
         reached.add(id);
         TomlTable table = byId.get(id);
         Object kind = table.get(List.of("kind"));
@@ -569,8 +580,8 @@ public final class WorkspaceFile {
 
     private static final String CONTENT = "content:";
     /**
-     * The origin of a pane window whose saved origin cannot be read: a parent tab and a pane no window holds, as their
-     * name-based ids are never a random id's (workspace plan 6a Rulings 26).
+     * The origin of a pane window whose saved origin cannot be read: a parent tab and a pane under a name-based id, an id
+     * Jasper never writes for a parent tab or a pane, so no window holds them (workspace plan 6a Rulings 26).
      */
     static final Origin NO_ORIGIN = new Origin(new ParentTabId(UUID.nameUUIDFromBytes("jasper.origin:none".getBytes(StandardCharsets.UTF_8))),
         new GroupId(UUID.nameUUIDFromBytes("jasper.origin:none".getBytes(StandardCharsets.UTF_8))), Side.RIGHT, 0.5);

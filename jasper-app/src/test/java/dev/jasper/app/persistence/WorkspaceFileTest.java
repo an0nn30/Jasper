@@ -388,10 +388,11 @@ class WorkspaceFileTest {
 
     /** Workspace plan 6a Rulings 14: what stays of a window when only some of its tabs can stay, as closing the others would. */
     @Test void keepingLeavesWhatClosingTheOtherTabsWouldLeave() {
+        // Shown in turn 3, 1 and 2: the one used before 2 is 1, while 3 is next to 2 in the bar.
         ParentTabs window = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(2), single(2)),
-            new ParentTab(parentTabId(3), single(3))), parentTabId(1)).select(parentTabId(3)).select(parentTabId(2));
+            new ParentTab(parentTabId(3), single(3))), parentTabId(3)).select(parentTabId(1)).select(parentTabId(2));
         assertThat(WorkspaceFile.keeping(window, tab -> !tab.equals(tab(2)), false)).as("the shown one goes: the one used before it shows")
-            .contains(new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(3), single(3))), parentTabId(3)));
+            .contains(new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(3), single(3))), parentTabId(1)));
         assertThat(WorkspaceFile.keeping(window, tab -> false, true)).as("the main window keeps its shown parent tab, empty")
             .contains(ParentTabs.of(new ParentTab(parentTabId(2), single(2).remove(tab(2)))));
         assertThat(WorkspaceFile.keeping(window, tab -> false, false)).as("a full window keeps nothing").isEmpty();

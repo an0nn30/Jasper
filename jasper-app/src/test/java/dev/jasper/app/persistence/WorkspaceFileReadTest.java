@@ -10,6 +10,7 @@ import static dev.jasper.app.persistence.WorkspaceFileTest.parentTabs;
 import static dev.jasper.app.persistence.WorkspaceFileTest.snapshot;
 import static dev.jasper.app.persistence.WorkspaceFileTest.single;
 import static dev.jasper.app.persistence.WorkspaceFileTest.tab;
+import static dev.jasper.app.persistence.WorkspaceFileTest.terminals;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.layout.Child;
@@ -96,12 +97,6 @@ class WorkspaceFileReadTest {
         var rest = new HashMap<>(tabs);
         rest.remove(tab);
         return rest;
-    }
-
-    static Map<TabId, TabRecord> terminals(WindowLayout layout) {
-        var tabs = new HashMap<TabId, TabRecord>();
-        for (TabId tab : layout.tabs()) tabs.put(tab, new TabRecord.Terminal("", "/tmp", ""));
-        return tabs;
     }
 
     /**
@@ -360,6 +355,25 @@ class WorkspaceFileReadTest {
         assertThat(WorkspaceFile.read(file())).isEqualTo(clean(parentTabs()));
     }
 
+    @Test void parentTabsWithSplitsWeightsAndAMaximizeReadBackAndRewriteTheSameText() throws Exception {
+        Layout columns = new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 2, 1, 2), 0.3),
+            new Child(new Split(Orientation.VERTICAL, List.of(new Child(group(2, 3, 3), 0.6), new Child(group(3, 4, 4), 0.4))), 0.7))),
+            groupId(3), Optional.of(groupId(3)));
+        var main = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(5)), new ParentTab(parentTabId(2), columns),
+            new ParentTab(parentTabId(3), single(6))), parentTabId(2));
+        Layout rows = new Layout(new Split(Orientation.VERTICAL, List.of(new Child(group(7, 7, 7), 0.25), new Child(group(8, 9, 8, 9), 0.75))),
+            groupId(8), Optional.empty());
+        var full = new ParentTabs(List.of(new ParentTab(parentTabId(4), single(10)), new ParentTab(parentTabId(5), rows)), parentTabId(5));
+        var saved = new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 6, main, terminals(main)),
+            new WindowRecord(Role.CHILD, Optional.empty(), 0, full, terminals(full))));
+        WorkspaceFile.write(file(), saved);
+        String first = Files.readString(file());
+        var restored = WorkspaceFile.read(file());
+        assertThat(restored).isEqualTo(clean(saved));
+        WorkspaceFile.write(file(), ((Loaded.Restore) restored).snapshot());
+        assertThat(Files.readString(file())).isEqualTo(first);
+    }
+
     @Test void aBadParentTabEntryIsDroppedAloneAndAParentTabItsTabsLeaveGoes() throws Exception {
         String text = WorkspaceFile.encode(parentTabs());
         ParentTabs second = ParentTabs.of(new ParentTab(parentTabId(2), single(2)));
@@ -383,6 +397,21 @@ class WorkspaceFileReadTest {
             .as("its window keeps its other parent tab").isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(2), single(2))))));
     }
 
+    /** Workspace plan 6a Rulings 26: as with two windows, the later of two parent tabs whose ids clash is dropped alone. */
+    @Test void aParentTabRepeatingAnEarlierOnesIdsIsDroppedAlone() throws Exception {
+        String text = WorkspaceFile.encode(parentTabs());
+        String p2 = parentTabId(2).value().toString(), g2 = groupId(2).value().toString(), t2 = id(tab(2));
+        assertThat(text.split(Pattern.quote(g2), -1)).as("the second parent tab's active group and its group").hasSize(3);
+        assertThat(text.split(Pattern.quote(t2), -1)).as("its group's tabs and selection, and the tab's entry").hasSize(4);
+        var cases = new LinkedHashMap<String, String>();
+        cases.put("the first one's id", replaceOnce(text, "id = \"" + p2 + "\"\n", "id = \"" + parentTabId(1).value() + "\"\n"));
+        cases.put("the first one's group", text.replace(g2, groupId(1).value().toString()));
+        cases.put("the first one's tab", text.replace(t2, id(tab(1))));
+        for (var change : cases.entrySet())
+            assertThat(read(change.getValue())).as("the main window keeps its first parent tab when its second repeats %s", change.getKey())
+                .isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(1), single(1))))));
+    }
+
     @Test void aWindowHoldingAParentTabAnEarlierWindowHoldsIsDropped() throws Exception {
         String text = WorkspaceFile.encode(parentTabs());
         String p3 = "id = \"" + parentTabId(3).value() + "\"\n";
@@ -404,6 +433,8 @@ class WorkspaceFileReadTest {
             assertThat(read(replaceOnce(text, change[0], change[1]))).as(change[1]).isEqualTo(clean(fallen));
         assertThat(WorkspaceFile.NO_ORIGIN.parentTab()).isNotEqualTo(ORIGIN.parentTab());
         assertThat(WorkspaceFile.NO_ORIGIN.parentTab().value().version()).as("name-based, never a random id").isEqualTo(3);
+        assertThat(WorkspaceFile.NO_ORIGIN.pane()).isNotEqualTo(ORIGIN.pane());
+        assertThat(WorkspaceFile.NO_ORIGIN.pane().value().version()).as("name-based, never a random id").isEqualTo(3);
     }
 
     @Test void anAbsentFileStartsFreshAndCreatesNothing() throws Exception {
