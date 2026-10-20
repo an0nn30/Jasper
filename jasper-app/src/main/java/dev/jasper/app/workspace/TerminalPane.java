@@ -53,6 +53,10 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     private Optional<String> launchedProfile = Optional.empty();
     /** The program this local pane runs instead of the shell; such a pane closes when it exits with status 0. */
     private final Optional<java.util.List<String>> program;
+    /** A restored pane whose tab has not been shown: nothing runs until {@link #start()} (workspace tabs spec 13). */
+    private boolean waiting;
+    /** Jasper restored this pane with its tab: a saved directory gone by the time it starts starts it where a new shell starts. */
+    private boolean restored;
     private final ShellLauncher launcher;
     private final AtomicBoolean updateQueued = new AtomicBoolean();
     private volatile String shellLabel;
@@ -244,9 +248,20 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         return new Dimension(Math.max(140, layout.width), Math.max(90, layout.height));
     }
 
+    /**
+     * A pane Jasper restored with its tab (workspace tabs spec 13): it reports {@code NOT_STARTED} and runs nothing until
+     * {@link #start()}, which its window calls when the tab is first shown; a saved directory that is gone by then starts
+     * its shell where a new shell starts.
+     */
+    void restored() { waiting = true; restored = true; }
+
+    /** Whether this pane is restored and waits for its tab to be shown. */
+    boolean waiting() { return waiting; }
+
     void start() {
+        waiting = false;
         if (request != null) { connect(); return; }
-        ShellLauncher.Launch launched = launcher.launch(defaultDirectory ? Optional.empty() : Optional.of(launchDirectory),
+        ShellLauncher.Launch launched = launcher.launch(defaultDirectory ? Optional.empty() : Optional.of(launchDirectory), restored,
                 requestedProfile, program, Optional.of(id), replaced -> {
             // Detection showed the profile resolved before it completed is missing: the default starts instead.
             if (closed) return;
@@ -458,6 +473,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     /** What this pane is right now, for the terminal registry. */
     PaneSnapshot snapshot() {
         Optional<String> provider = request == null ? Optional.empty() : Optional.of(request.providerId());
+        if (waiting) return new PaneSnapshot(title(), request == null ? Optional.of(launchDirectory) : Optional.empty(), 0, 0, false,
+            PaneSnapshot.State.NOT_STARTED, OptionalInt.empty(), provider, Optional.empty(), shellLabel);
         boolean connecting = attempt != null && attempt.state() == SessionAttempt.State.PENDING;
         if (session == null || connecting) {
             boolean failedBeforeAnySession = request != null && !connecting;

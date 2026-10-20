@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.20.0, <0.21"
+sdk = ">=0.21.0, <0.22"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen, clipboard.read, terminal.environment, editor.provide, presentation.provide
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
@@ -164,7 +164,7 @@ private static void installUi(PluginContext context, long stepMillis) {
   registration. The factory also runs inside `toolbar().add(...)` while the main window is open, so finish
   initialising what it reads before you add the view; a factory that throws is not asked again for that window. Its
   root is an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER `Choice`s, at most one PRIMARY `Button`,
-  icon-only GHOST `Button`s (a blank label with an icon and a tooltip; SDK 0.18.1, declare `sdk = ">=0.20.0, <0.21"`),
+  icon-only GHOST `Button`s (a blank label with an icon and a tooltip; SDK 0.18.1, declare `sdk = ">=0.21.0, <0.22"`),
   `MenuButton`s and `Separator`s. When a window mounts the view the host refuses any other tree by logging it, naming
   the node, and closing the view, and that window shows none; `update` throws `IllegalArgumentException` naming the
   node. A view never moves into the overflow menu: it hides while the toolbar is too narrow.
@@ -216,7 +216,7 @@ Each `PanelHeader.Action(label, icon, callback)` is an icon-only header button w
 and tooltip. Keep callbacks scoped to that panel instance. Header state survives hiding and moving
 the panel, and callbacks become inert when the instance closes. It works the same for a kit `Panel` view
 registered with `register`: the detail, dot and actions join that panel's own header row. Use `PanelHeader.EMPTY` to clear it;
-do not add a duplicate action row inside the panel. Declare `sdk = ">=0.20.0, <0.21"` when using it.
+do not add a duplicate action row inside the panel. Declare `sdk = ">=0.21.0, <0.22"` when using it.
 
 A rail button, on the left stripe after the panel icons, runs one of your actions. A view of your own
 that is not a panel is a content tab (see Documents in workspace tabs): Jasper draws its tab and its window;
@@ -371,7 +371,7 @@ private static void installTerminalDemo(PluginContext context) {
   subscribe with `onProfilesChanged` and read the list again. It fires after a detection completes:
   the first one, and each later one whose result differs (a WSL distribution or PowerShell 7
   appearing or disappearing). Edits to the Custom shell settings may not be reported, so read
-  `profiles()` again when the current list matters. Declare `sdk = ">=0.20.0, <0.21"`.
+  `profiles()` again when the current list matters. Declare `sdk = ">=0.21.0, <0.22"`.
 
 ## Providing a session
 
@@ -567,7 +567,7 @@ Since SDK 0.16.1, `context.platform()` puts text on the clipboard and reads it, 
   password; Jasper logs each read with your plugin id and the number of characters, never the text.
 
 Plugin code does not use the AWT clipboard (`Toolkit.getSystemClipboard()` or `getSystemSelection()`):
-`verifyPluginArchitecture` rejects both in the bundled plugins, except for the Editor's Vim registers. Declare `sdk = ">=0.20.0, <0.21"` when you use these methods.
+`verifyPluginArchitecture` rejects both in the bundled plugins, except for the Editor's Vim registers. Declare `sdk = ">=0.21.0, <0.22"` when you use these methods.
 
 ## Command-line subcommands
 
@@ -588,11 +588,11 @@ when it ran in one. `out` and `err` write to the caller's terminal from any thre
 exits 1. `call.onCancelled` hears, on the UI thread, that the caller went away (Ctrl-C). A call still running when the
 plugin stops ends with exit code 1. When two plugins declare the same name, a bundled plugin keeps it, otherwise the
 first by plugin id, and the other gets a problem notice. In tests, `FakePluginHost.declareSubcommand` and `call` drive a
-handler. Declare `sdk = ">=0.20.0, <0.21"`.
+handler. Declare `sdk = ">=0.21.0, <0.22"`.
 
 ## Shell variables, program tabs and the file editor
 
-SDK 0.17.1 adds four hooks. Declare `sdk = ">=0.20.0, <0.21"` when you use them.
+SDK 0.17.1 adds four hooks. Declare `sdk = ">=0.21.0, <0.22"` when you use them.
 
 - `context.terminals().environment(contributor)` (needs `terminal.environment`) adds variables to each new local
   shell and program tab. The contributor runs on the UI thread, must not block or do I/O, and gets Jasper's own
@@ -1017,7 +1017,7 @@ and notification owner headers. It never recolors SVG/PNG pixels or changes thei
 An opaque authored background can cover that tile. Missing or invalid artwork keeps the generic fallback.
 Invalid decorative strings warn and fall back to neutral; nonstring values and unrelated unknown keys are rejected.
 
-Manifests using this key must declare `sdk = ">=0.20.0, <0.21"`. Older hosts reject `icon_hue` as an unknown key
+Manifests using this key must declare `sdk = ">=0.21.0, <0.22"`. Older hosts reject `icon_hue` as an unknown key
 before checking the SDK range; excluding those hosts does not change that parser ordering. To support older hosts,
 omit the key in that release's manifest. Existing manifests without the key continue to use their admitted ranges.
 The runtime checks whether the current host is admitted; it does not parse per-feature comparator policies.
@@ -1033,7 +1033,7 @@ All bundled monochrome identities opt in consistently; third-party omission rema
 
 Only the exact lowercase tokens `authored` and `foreground` are accepted. Other strings warn and
 fall back to authored; nonstrings are invalid descriptors, and unrelated unknown keys remain invalid.
-Manifests using the key must declare `sdk = ">=0.20.0, <0.21"`. Older strict parsers reject the unknown
+Manifests using the key must declare `sdk = ">=0.21.0, <0.22"`. Older strict parsers reject the unknown
 key before SDK compatibility resolution; a version floor does not make an old parser accept it.
 The host's immutable identity value includes this policy in equality and receiver aliases; same-byte
 metadata updates therefore refresh selected presentation without replacing the plugin's authored art.
@@ -1049,7 +1049,7 @@ three-argument constructor remains and supplies an empty placeholder.
 
 ### SDK 0.15.3 summary
 
-SDK 0.15.3 adds, for plugins built against it (declare `sdk = ">=0.20.0, <0.21"`): `LayoutRole.ROUTE`; a
+SDK 0.15.3 adds, for plugins built against it (declare `sdk = ">=0.21.0, <0.22"`): `LayoutRole.ROUTE`; a
 `PickerFace` on DROPDOWN choices; the free-entry `ChoiceSearch.placeholder`; `SettingSpec.unit` (shown after a
 bounded integer's Settings stepper); the `border.identity` semantic color; and the icon names `laptop`, `target`,
 `arrow.right`, `import`, `clock`, `lock.keyhole`, `match.word`, `brightness`, `reset`, `expand.all` and
@@ -1074,7 +1074,7 @@ dialog.show();
 ```
 
 `FakePluginHost.dialogPresentation(pluginId, title)` reports how an open dialog is presented. Declare
-`sdk = ">=0.20.0, <0.21"` to use it. `FakePluginHost.dialogSwatch(pluginId, title)` (SDK 0.18) reports the swatch
+`sdk = ">=0.21.0, <0.22"` to use it. `FakePluginHost.dialogSwatch(pluginId, title)` (SDK 0.18) reports the swatch
 an open dialog asked for.
 
 ### Slate Steel colours (SDK 0.15.5)
@@ -1083,21 +1083,21 @@ an open dialog asked for.
 `SURFACE_TABSTRIP`, `SURFACE_EMPTY_TILE`, `BORDER_FIELD_RAISED`, `BORDER_FIELD_RAISED_HOVER`,
 `TEXT_STRONG_SECONDARY`, `TEXT_FIELD_RAISED`, `SEGMENT_TRACK` and `BUTTON_SECONDARY_BORDER`. Read them with
 `context.appearance().color(role)` like any other role; the kit already paints its controls with them. Declare
-`sdk = ">=0.20.0, <0.21"` to use them.
+`sdk = ">=0.21.0, <0.22"` to use them.
 
 ### Menu shortcuts (SDK 0.16.0)
 
 A menu item can show the current binding of an action beside its label:
 `new MenuItem(...).withShortcut("dev.example.open")`. Name an action your plugin contributes (or an app action such as
 `new_tab`); the host shows its binding in the platform's glyphs, follows the user's rebinding, and shows nothing when
-the action is unbound. Declare `sdk = ">=0.20.0, <0.21"` to use it; every bundled manifest does.
+the action is unbound. Declare `sdk = ">=0.21.0, <0.22"` to use it; every bundled manifest does.
 
 ### Selection text colours (SDK 0.16.2)
 
 `SemanticColor` gains `TEXT_ONSELECTION` and `TEXT_ONSELECTION_SECONDARY`, the text on `SELECTION_BG` (a selected row,
 a highlighted list or menu entry, selected text). A theme may pair its selection colour and its accent with different
 text, so text on the selection uses these, and `TEXT_ONACCENT` stays for text on `ACCENT`. `WorkspacePalette.selectionText`
-is `TEXT_ONSELECTION`. Declare `sdk = ">=0.20.0, <0.21"` to read them.
+is `TEXT_ONSELECTION`. Declare `sdk = ">=0.21.0, <0.22"` to read them.
 
 ### Tab indicator colours and the hidden icon (SDK 0.17.1)
 
@@ -1105,4 +1105,4 @@ is `TEXT_ONSELECTION`. Declare `sdk = ">=0.20.0, <0.21"` to read them.
 same line while the window is not focused. `SURFACE_TITLEBAR` and `TEXT_TITLEBAR` are the window header's background
 and its text and icon colour (`SURFACE_APP` and `TEXT_PRIMARY` unless the theme gives the title bar its own). The icon
 `hidden` (an eye struck through) marks a show-hidden-items toggle.
-Declare `sdk = ">=0.20.0, <0.21"` to use them.
+Declare `sdk = ">=0.21.0, <0.22"` to use them.

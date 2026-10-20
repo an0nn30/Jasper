@@ -136,6 +136,15 @@ class HostedTerminalsTest {
         assertThat(pane.info().remoteDirectory()).isEmpty();
     }
 
+    /** Workspace tabs plan 6a: a restored terminal tab not yet shown reports that its session has not started. */
+    @Test void aPaneThatHasNotStartedSaysSo() {
+        HostedTerminals terminals = terminals(Capabilities.TERMINAL_OBSERVE);
+        UUID window = fixture.addWindow(), tab = fixture.addTab(window, "build"), pane = fixture.addPane(tab, "zsh", Path.of("/src"));
+        fixture.holdPane(pane);
+        assertThat(terminals.pane(pane).orElseThrow().info().state()).isEqualTo(SessionState.NOT_STARTED);
+        assertThat(terminals.pane(pane).orElseThrow().info().exitStatus()).isEmpty();
+    }
+
     @Test void aClosedPaneKeepsItsLastValuesAndIgnoresCommands() {
         HostedTerminals terminals = terminals(Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_INJECT, Capabilities.TERMINAL_SELECTION,
             Capabilities.TERMINAL_OPEN);

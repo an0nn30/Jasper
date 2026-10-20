@@ -137,6 +137,15 @@ public final class ShellLauncher {
      */
     public Launch launch(Optional<Path> directory, Optional<String> profile, Optional<List<String>> program, Optional<UUID> pane,
                          Consumer<Launch> replaced, BiConsumer<TerminalSession, Throwable> completion) {
+        return launch(directory, false, profile, program, pane, replaced, completion);
+    }
+
+    /**
+     * As above; with {@code anyDirectory}, a {@code directory} that is not there once the shell starts counts as empty, so
+     * the shell starts where a new shell starts instead of failing: a restored terminal tab's (workspace tabs spec 13).
+     */
+    public Launch launch(Optional<Path> directory, boolean anyDirectory, Optional<String> profile, Optional<List<String>> program,
+                         Optional<UUID> pane, Consumer<Launch> replaced, BiConsumer<TerminalSession, Throwable> completion) {
         Objects.requireNonNull(directory, "directory");
         Objects.requireNonNull(program, "program");
         Objects.requireNonNull(replaced, "replaced");
@@ -160,6 +169,7 @@ public final class ShellLauncher {
                 try {
                     if (captured == null) {
                         Path target = directory.filter(path -> !WINDOWS || !UncHosts.namesForeignHost(path.toString(), false)).orElse(home);
+                        if (anyDirectory && !Files.isDirectory(target)) target = home;
                         if (!Files.isDirectory(target)) {
                             throw new IllegalArgumentException("Directory is unavailable: " + target);
                         }
@@ -169,6 +179,8 @@ public final class ShellLauncher {
                         Launch now = launchOf(chosen, program);
                         if (!now.equals(launched)) SwingUtilities.invokeLater(() -> replaced.accept(now));
                         Optional<Path> requested = chosen.startable(directory, WINDOWS);
+                        // A WSL share is never touched here: the profile's own start decides what to do with it.
+                        if (anyDirectory) requested = requested.filter(path -> WslPaths.distroOf(path).isPresent() || Files.isDirectory(path));
                         Path where;
                         LaunchSettings resolved;
                         if (program.isPresent()) {

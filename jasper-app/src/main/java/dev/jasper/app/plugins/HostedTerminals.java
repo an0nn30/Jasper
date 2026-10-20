@@ -86,6 +86,7 @@ final class HostedTerminals implements Terminals {
 
     private static PaneInfo info(PaneSnapshot snapshot) {
         SessionState state = switch (snapshot.state()) {
+            case NOT_STARTED -> SessionState.NOT_STARTED;
             case STARTING -> SessionState.CONNECTING; case RUNNING -> SessionState.RUNNING; case EXITED -> SessionState.EXITED;
         };
         return new PaneInfo(snapshot.title(), snapshot.workingDirectory(),

@@ -1279,6 +1279,21 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public void setPaneInfo(UUID paneId, dev.jasper.sdk.terminal.PaneInfo info) { workspace.pane(paneId).ifPresent(pane -> pane.info = Objects.requireNonNull(info, "info")); }
     /**
+     * Holds a pane as Jasper holds a restored terminal tab it has not shown yet (workspace tabs spec 13): it reports
+     * {@code SessionState.NOT_STARTED} and drops what plugins send it until its tab is shown ({@link #focusTerminalPane}
+     * or its {@code TabHandle.select()}), when it starts.
+     *
+     * @param paneId the pane
+     * @since 0.21.0
+     */
+    public void holdPane(UUID paneId) {
+        workspace.pane(paneId).ifPresent(pane -> {
+            pane.held = true;
+            pane.info = FakeTerminals.withState(pane.info, dev.jasper.sdk.terminal.SessionState.NOT_STARTED, java.util.OptionalInt.empty());
+        });
+    }
+
+    /**
      * Sets the text selected in a pane.
      *
      * @param paneId the pane

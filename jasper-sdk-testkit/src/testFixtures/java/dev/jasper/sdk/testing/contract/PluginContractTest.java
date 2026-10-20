@@ -1332,6 +1332,29 @@ public abstract class PluginContractTest {
         assertThat(h.openRequests()).isEmpty();
     }
 
+    /** Workspace tabs spec 13: a restored terminal tab not yet shown has not started, drops text, and starts when shown. */
+    @Test void aRestoredPaneReportsNotStartedAndDropsText() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_INJECT), Set.of(), Set.of(), alpha::set);
+        h.holdTerminalPane(only);
+        h.ui(() -> {
+            PaneHandle pane = alpha.get().terminals().pane(only).orElseThrow();
+            assertThat(pane.info().state()).isEqualTo(SessionState.NOT_STARTED);
+            pane.sendText("dropped");
+        });
+        h.flush();
+        assertThat(h.sentToPane(only)).isEmpty();
+        h.focusTerminalPane(only);
+        h.ui(() -> {
+            PaneHandle pane = alpha.get().terminals().pane(only).orElseThrow();
+            assertThat(pane.info().state()).as("shown, it starts").isEqualTo(SessionState.RUNNING);
+            pane.sendText("kept");
+        });
+        h.flush();
+        assertThat(h.sentToPane(only)).containsExactly("write:kept");
+    }
+
     @Test void injectionArrivesInOrderFromAnyThreadAndAClosedPaneIgnoresIt() throws Exception {
         UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build");
         UUID only = h.addTerminalPane(tab, "make", Path.of("/src")), other = h.addTerminalPane(h.addTerminalTab(window, "top"), "top", Path.of("/"));

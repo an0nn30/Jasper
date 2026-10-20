@@ -128,6 +128,12 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: adds a terminal tab's one pane: running, local, 80 by 24, with shell integration. */
     java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory);
 
+    /**
+     * UI thread: the pane waits as a restored terminal tab not yet shown does (workspace tabs spec 13): not started, dropping
+     * what is sent to it, until its tab is shown.
+     */
+    void holdTerminalPane(java.util.UUID paneId);
+
     /** UI thread: the user turned to this window. */
     void activateTerminalWindow(java.util.UUID windowId);
 

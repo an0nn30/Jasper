@@ -84,7 +84,7 @@ class KitCompatibilityTest {
         rejects(reference("dev.jasper.sdk.ui.ShortcutContext","window","(Ljava/lang/String;)Ldev/jasper/sdk/ui/ShortcutContext;"),
             "dev/jasper/sdk/ui/ShortcutContext#window(Ljava/lang/String;)Ldev/jasper/sdk/ui/ShortcutContext;","0.20");
         rejects(constant("dev.jasper.sdk.ui.ShortcutContext$Kind","WINDOW"),"dev/jasper/sdk/ui/ShortcutContext$Kind#WINDOWLdev/jasper/sdk/ui/ShortcutContext$Kind;","0.20");
-        var current=candidate(">=0.20.0, <0.21",Map.of("test/kit/Probe.class",reference("dev.jasper.sdk.ui.ContentTab","moveToNewWindow","()V")),false);
+        var current=candidate(">=0.21.0, <0.22",Map.of("test/kit/Probe.class",reference("dev.jasper.sdk.ui.ContentTab","moveToNewWindow","()V")),false);
         try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the member that took its place").isNotNull();}
     }
     @Test void theNamesSdkZeroEighteenGaveThemAreAdmitted() throws Exception {
@@ -95,12 +95,12 @@ class KitCompatibilityTest {
         var own=candidate(">=0.18.0, <0.19",Map.of("test/kit/Probe.class",constant("test.kit.Mode","HERO")),false);
         try(var loader=PluginLoader.load(own,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the plugin's own constant").isNotNull();}
     }
-    /** Workspace tabs plan 4b: a manifest of the previous minor, 0.19, is skipped by its range before any class is read. */
-    @Test void aZeroNineteenRangeIsSkippedBeforeItLoads() throws Exception {
-        var candidate=candidate(">=0.19.0, <0.20",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$ChoiceKind","SEGMENTED")),false);
+    /** Workspace tabs plan 6a: a manifest of the previous minor, 0.20, is skipped by its range before any class is read. */
+    @Test void aZeroTwentyRangeIsSkippedBeforeItLoads() throws Exception {
+        var candidate=candidate(">=0.20.0, <0.21",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$ChoiceKind","SEGMENTED")),false);
         var result=PluginResolver.resolve(List.of(candidate),Map.of(),Version.parse(JasperSdk.VERSION),false);
         assertThat(result.load()).isEmpty();
-        assertThat(result.rejected()).singleElement().satisfies(value -> assertThat(value.reason()).isEqualTo("needs SDK >=0.19.0, <0.20.0; this is SDK 0.20.0"));
+        assertThat(result.rejected()).singleElement().satisfies(value -> assertThat(value.reason()).isEqualTo("needs SDK >=0.20.0, <0.21.0; this is SDK 0.21.0"));
     }
     @Test void truthfulOldRangeIsRejectedByPureResolver() throws Exception {
         var candidate=candidate(">=0.14, <0.15",Map.of(),false);

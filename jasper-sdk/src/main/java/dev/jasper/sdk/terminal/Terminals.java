@@ -55,7 +55,7 @@ public interface Terminals {
     Optional<WindowHandle> window(UUID id);
 
     /**
-     * Opens a terminal tab in the window's active group and selects it. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
+     * Opens a terminal tab in the active pane of the window's shown parent tab and selects it. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
      * A request with a command ({@link LocalSpec#command()}) runs that program instead of the shell, with the shell's
      * environment, and its pane closes when the program exits with status 0.
      *

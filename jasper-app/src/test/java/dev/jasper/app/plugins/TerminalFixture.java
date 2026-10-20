@@ -57,10 +57,13 @@ final class TerminalFixture {
     private PaneEntry entry(Pane pane) {
         return new PaneEntry(pane.id, pane.tab.id,
             () -> new PaneSnapshot(pane.title, pane.remote == null ? Optional.ofNullable(pane.directory) : Optional.empty(), 80, 24, true,
-                pane.state.equals("CONNECTING") ? PaneSnapshot.State.STARTING : pane.state.equals("EXITED") ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING,
+                pane.state.equals("NOT_STARTED") ? PaneSnapshot.State.NOT_STARTED : pane.state.equals("CONNECTING") ? PaneSnapshot.State.STARTING
+                    : pane.state.equals("EXITED") ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING,
                 OptionalInt.empty(), Optional.ofNullable(pane.request).map(SessionRequest::providerId), Optional.ofNullable(pane.remote), pane.shell),
             () -> CompletableFuture.completedFuture(Optional.of("vim")),
-            bytes -> pane.sent.add("write:" + new String(bytes, StandardCharsets.UTF_8)), text -> pane.sent.add("paste:" + text),
+            // A pane that has not started drops what is sent to it (workspace tabs spec 13).
+            bytes -> { if (!pane.state.equals("NOT_STARTED")) pane.sent.add("write:" + new String(bytes, StandardCharsets.UTF_8)); },
+            text -> { if (!pane.state.equals("NOT_STARTED")) pane.sent.add("paste:" + text); },
             () -> Optional.ofNullable(pane.selection), () -> focusPane(pane.id),
             (side, spec) -> {
                 // A split is a terminal tab of its own, in a new group beside the pane's group (spec 9.4).
@@ -248,6 +251,8 @@ final class TerminalFixture {
     void focusPane(UUID paneId) {
         Pane pane = panes.get(paneId);
         if (pane == null) return;
+        // A held pane starts when its tab is shown, as a restored terminal tab does.
+        if (pane.state.equals("NOT_STARTED")) pane.state = "";
         registry.atomically(() -> { select(pane.tab); registry.publish(new TerminalEvent.PaneFocused(pane.tab.id, pane.id)); });
     }
 
@@ -362,6 +367,9 @@ final class TerminalFixture {
             return new String(stream.readNBytes(stream.available()), StandardCharsets.UTF_8);
         } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
+
+    /** The pane waits, as a restored terminal tab not yet shown does (workspace tabs spec 13). */
+    void holdPane(UUID paneId) { panes.get(paneId).state = "NOT_STARTED"; }
 
     /** What the pane's shell reports: a local directory when {@code hostOrEmpty} is empty, a remote one otherwise. */
     void reportDirectory(UUID paneId, String hostOrEmpty, String path) {

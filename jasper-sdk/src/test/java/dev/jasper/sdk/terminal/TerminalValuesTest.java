@@ -16,6 +16,8 @@ class TerminalValuesTest {
     @Test void paneInfoRejectsImpossibleValues() {
         PaneInfo unknown = PaneInfo.unknown();
         assertThat(unknown.state()).isEqualTo(SessionState.EXITED);
+        assertThat(SessionState.values()).as("in the order of a session's life")
+            .containsExactly(SessionState.NOT_STARTED, SessionState.CONNECTING, SessionState.RUNNING, SessionState.EXITED);
         assertThat(unknown.kind()).isEqualTo(SessionKind.LOCAL);
         assertThatIllegalArgumentException().isThrownBy(() -> new PaneInfo("t", Optional.empty(), Optional.empty(), -1, 24, false,
             SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));

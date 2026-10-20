@@ -413,6 +413,7 @@ class AppContractTest extends PluginContractTest {
             @Override public UUID addTerminalPane(UUID tabId, String title, java.nio.file.Path directory) {
                 return onEdtValue(() -> terminalFixture.addPane(tabId, title, directory));
             }
+            @Override public void holdTerminalPane(UUID paneId) { onEdt(() -> terminalFixture.holdPane(paneId)); }
             @Override public void activateTerminalWindow(UUID windowId) { onEdt(() -> terminalFixture.activateWindow(windowId)); }
             @Override public void focusTerminalPane(UUID paneId) { onEdt(() -> terminalFixture.focusPane(paneId)); }
             @Override public void closeTerminalPane(UUID paneId) { onEdt(() -> terminalFixture.closePane(paneId)); }

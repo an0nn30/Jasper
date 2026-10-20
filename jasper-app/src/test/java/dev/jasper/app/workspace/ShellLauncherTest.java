@@ -125,6 +125,30 @@ class ShellLauncherTest {
         assertThat(errors.get(3)).hasMessage("start failed");
     }
 
+    /** Workspace tabs plan 6a: a restored tab's saved directory that is gone starts the shell where a new shell starts. */
+    @Test void aMissingDirectoryStartsWhereANewShellStartsOnlyWhenAnyDirectoryWillDo() throws Exception {
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var settings = LaunchSettings.resolve(ConfigSnapshot.defaults(), "Linux", Map.of(), 150, 45);
+        Queue<Path> started = new ArrayDeque<>();
+        Queue<String> errors = new ArrayDeque<>();
+        Path missing = directory.resolve("missing");
+        BiConsumer<TerminalSession, Throwable> completion = (session, error) -> errors.add(error.getMessage());
+        edt(() -> {
+            new ShellLauncher(pending::add, () -> settings, (path, launch) -> { started.add(path); throw new IllegalStateException("started"); })
+                .launch(Optional.of(missing), true, Optional.empty(), Optional.empty(), Optional.empty(), replaced -> { }, completion);
+            new ShellLauncher(pending::add, path -> { started.add(path); throw new IllegalStateException("started"); }, "sh")
+                .launch(Optional.of(missing), true, Optional.empty(), Optional.empty(), Optional.empty(), replaced -> { }, completion);
+            new ShellLauncher(pending::add, () -> settings, (path, launch) -> { throw new AssertionError(); })
+                .launch(Optional.of(missing), false, Optional.empty(), Optional.empty(), Optional.empty(), replaced -> { }, completion);
+        });
+        while (!pending.isEmpty()) pending.remove().run(); edt(() -> {});
+        assertThat(started).containsExactly(HOME, HOME);
+        assertThat(errors).hasSize(3);
+        assertThat(errors.remove()).isEqualTo("started");
+        assertThat(errors.remove()).isEqualTo("started");
+        assertThat(errors.remove()).as("any other launch still needs its directory").contains("Directory is unavailable");
+    }
+
     @Test @DisabledOnOs(OS.WINDOWS)
     void aPanesShellNamesThePaneLastOverTheConfiguredEnvironment() throws Exception {
         var configured = snapshot("/bin/sh", List.of(), Map.of("JASPER_PANE", "configured"), 12, 150, 45);

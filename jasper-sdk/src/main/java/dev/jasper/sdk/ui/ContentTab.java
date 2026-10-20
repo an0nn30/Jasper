@@ -22,14 +22,16 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
     /** Selects and raises the current host, focusing its content. */
     void select();
     /**
-     * Move Tab to New Window: a new child window takes the tab and its content. A child window's only tab, a tab with a
+     * Pop Out Tab: a new pane window takes the tab and its content, and its Bring Back returns them. A child window's
+     * only tab, a tab with a
      * modal prompt open and a tab being closed stay where they are.
      *
      * @since 0.20.0
      */
     void moveToNewWindow();
     /**
-     * Move Tab to Main Window: the end of the main window's active group takes the tab and its content, the main window
+     * Move to Main Window: the end of the active pane of the main window's shown parent tab takes the tab and its
+     * content, the main window
      * restored first when none is open. A tab the main window holds, a tab with a modal prompt open and a tab being
      * closed stay where they are.
      *

@@ -7,7 +7,10 @@ package dev.jasper.sdk.ui;
  * @since 0.20.0
  */
 public enum TabPlacement {
-    /** At the end of the active group of the owner's window, or of the main window when there is no owner. */
+    /**
+     * At the end of the active pane of the owner's window's shown parent tab, or of the main window's when there is
+     * no owner.
+     */
     ACTIVE_GROUP,
     /** In a new group to the right of that active group. */
     SPLIT_RIGHT,

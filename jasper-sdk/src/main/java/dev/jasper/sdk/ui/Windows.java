@@ -16,7 +16,7 @@ public interface Windows {
      * @param anchor attachment authority from this host @return initially hidden popup */
     PluginPopover popover(UiAnchor anchor);
     /**
-     * Opens an owned view as a content tab at the end of the active group of the owner's window
+     * Opens an owned view as a content tab at the end of the active pane of the owner's window's shown parent tab
      * ({@link TabPlacement#ACTIVE_GROUP}); moving retains it, final closure disposes it.
      *
      * @param spec the tab's key and title

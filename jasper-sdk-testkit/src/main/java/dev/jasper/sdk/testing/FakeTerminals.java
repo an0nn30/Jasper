@@ -124,7 +124,8 @@ final class FakeTerminals implements Terminals {
         private void send(String line) {
             require(Capabilities.TERMINAL_INJECT);
             if (context.state == FakePluginContext.State.CLOSED) return;
-            synchronized (workspace) { model().ifPresent(pane -> pane.sent.add(line)); }
+            // A pane that has not started drops what is sent to it, as Jasper's does (workspace tabs spec 13).
+            synchronized (workspace) { model().filter(pane -> !pane.held).ifPresent(pane -> pane.sent.add(line)); }
         }
         @Override public Optional<String> selection() {
             require(Capabilities.TERMINAL_SELECTION);
