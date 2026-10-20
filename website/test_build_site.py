@@ -21,7 +21,7 @@ class PublicBundleTest(unittest.TestCase):
         build_site.build(self.source, self.output)
         files = {str(p.relative_to(self.output)) for p in self.output.rglob('*') if p.is_file()}
         self.assertEqual({p for p in files if '/' not in p},
-                         {'index.html', 'style.css', 'script.js', 'workspace-tour.js'})
+                         {'index.html', 'style.css', 'script.js', 'workspace-tour.js', 'meadow.css', 'meadow.js'})
         self.assertIn('assets/tabler-LICENSE.txt', files)
         self.assertIn('assets/tour-vault.png', files)
         self.assertIn('assets/workspace-typing/terminal-result.webp', files)

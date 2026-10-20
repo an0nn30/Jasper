@@ -27,8 +27,33 @@ const tour = {
  vault: ['CREDENTIAL VAULT', 'Credentials have a home, too.', 'Protect saved credentials with a master password and control which plugins can use them.', 'Fictional accounts · passwords masked', 'Credential Vault with three fictional accounts and Staging gateway selected, showing demo-operator and a masked password']
 };
 const toolButtons = [...document.querySelectorAll('[data-tool]')];
-for (const button of toolButtons) button.addEventListener('click', () => {
+const tourViewport = document.querySelector('.tour-viewport');
+const tourPanel = tourViewport.querySelector('.tool-tour');
+let tourRequest = 0;
+let activeTool = 'vault';
+let finishTourMotion = () => {};
+for (const button of toolButtons) button.addEventListener('click', async () => {
+ const request = ++tourRequest;
  const key = button.dataset.tool, view = tour[key];
+ if (key === activeTool) return;
+ const source = `assets/tour-${key}.png?v=${key === 'sharing' ? 'hires-2' : 'readable-2'}`;
+ const ready = new Image();
+ ready.src = source;
+ try { await ready.decode(); } catch { return; }
+ if (request !== tourRequest) return; // A newer click owns the next panel.
+ finishTourMotion();
+ const animate = !reducedMotion.matches && typeof tourPanel.animate === 'function';
+ const previousHeight = tourPanel.getBoundingClientRect().height;
+ const previous = animate ? tourPanel.cloneNode(true) : null;
+ if (previous) {
+   previous.removeAttribute('id');
+   previous.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+   previous.querySelectorAll('[aria-live]').forEach(node => node.removeAttribute('aria-live'));
+   previous.setAttribute('aria-hidden', 'true');
+   previous.inert = true;
+   previous.classList.add('tour-outgoing');
+ }
+ activeTool = key;
  const introductions = {
   sessions: 'Start with your connections. Keep your regular hosts close at hand.',
   sftp: 'Now, bring the files along. Browse and transfer without leaving your workspace.',
@@ -39,9 +64,33 @@ for (const button of toolButtons) button.addEventListener('click', () => {
  document.querySelector('#buddy-tour-line').textContent = introductions[key];
  ['family','title','description','detail'].forEach((name, i) => document.querySelector(`#tour-${name}`).textContent = view[i]);
  const img = document.querySelector('#tour-image');
- img.src = `assets/tour-${key}.png?v=${key === 'sharing' ? 'hires-2' : 'readable-2'}`; img.alt = view[4];
+ img.src = source; img.alt = view[4];
  document.querySelector('#tour-link').href = img.src;
  for (const other of toolButtons) other.setAttribute('aria-pressed', String(other === button));
+ if (!previous) return;
+ const nextHeight = tourPanel.getBoundingClientRect().height;
+ tourViewport.append(previous);
+ const easing = 'cubic-bezier(.16, 1, .3, 1)';
+ const outgoing = previous.animate([
+   { transform: 'translateX(0)', opacity: 1 },
+   { transform: 'translateX(-72px)', opacity: 0 }
+ ], { duration: 280, easing, fill: 'forwards' });
+ const incoming = tourPanel.animate([
+   { transform: 'translateX(72px)', opacity: 0 },
+   { transform: 'translateX(0)', opacity: 1 }
+ ], { duration: 460, easing });
+ const resize = tourViewport.animate([
+   { height: `${previousHeight}px` }, { height: `${nextHeight}px` }
+ ], { duration: 460, easing });
+ let finished = false;
+ const cleanup = () => {
+   if (finished) return;
+   finished = true;
+   previous.remove();
+   outgoing.cancel(); incoming.cancel(); resize.cancel();
+ };
+ finishTourMotion = cleanup;
+ incoming.finished.then(cleanup, cleanup);
 });
 
 // Animate only while Jasper is visible, the tab is active, and motion is welcome.
@@ -62,5 +111,8 @@ new IntersectionObserver(([entry]) => {
   syncJasperMotion();
 }, { threshold: 0.25 }).observe(buddy);
 document.addEventListener('visibilitychange', syncJasperMotion);
-reducedMotion.addEventListener('change', syncJasperMotion);
+reducedMotion.addEventListener('change', () => {
+  if (reducedMotion.matches) finishTourMotion();
+  syncJasperMotion();
+});
 syncJasperMotion();

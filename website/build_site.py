@@ -7,7 +7,7 @@ from urllib.parse import unquote, urlsplit
 
 
 PUBLIC_FILES = (
-    'index.html', 'style.css', 'script.js', 'workspace-tour.js',
+    'index.html', 'style.css', 'script.js', 'workspace-tour.js', 'meadow.css', 'meadow.js',
     'assets/jasper.png', 'assets/demo-cursor.svg', 'assets/tabler-LICENSE.txt',
     'assets/buddy-dimensional-v1.png', 'assets/buddy-presenting-v1.png',
     'assets/buddy-coding-v1.png',
