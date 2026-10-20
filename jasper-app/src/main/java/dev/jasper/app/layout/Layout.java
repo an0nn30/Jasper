@@ -379,6 +379,81 @@ public final class Layout {
     }
 
     /**
+     * Where {@code group} sits (parent tabs spec 4's origin; workspace plan 7b Rulings 2): the group beside it, across its
+     * edge with the sibling its space goes to when it leaves (the one before it, or after it when it is first, as
+     * {@link #remove(TabId)} gives it); the side of that group it is on; and its weight's share of the two siblings'. Of the
+     * groups across that edge, the one {@link #neighbour} finds is beside it. A layout's only group sits on the right of
+     * itself, at half.
+     *
+     * @param parentTab the parent tab this layout is
+     * @param group a group of the layout
+     * @return the origin
+     * @throws IllegalArgumentException when the group is not in the layout
+     */
+    public Origin origin(ParentTabId parentTab, GroupId group) {
+        Objects.requireNonNull(parentTab, "parentTab");
+        requireGroup(group);
+        Optional<Parent> parent = parent(root, group);
+        if (parent.isEmpty()) return new Origin(parentTab, group, Side.RIGHT, 0.5);
+        Split split = parent.get().split();
+        int index = parent.get().index(), sibling = index > 0 ? index - 1 : 1;
+        boolean horizontal = split.orientation() == Orientation.HORIZONTAL;
+        Side side = index > 0 ? (horizontal ? Side.RIGHT : Side.DOWN) : (horizontal ? Side.LEFT : Side.UP);
+        Side toward = index > 0 ? (horizontal ? Side.LEFT : Side.UP) : (horizontal ? Side.RIGHT : Side.DOWN);
+        var near = new ArrayList<Group>();
+        collect(split.children().get(sibling).node(), near);
+        GroupId beside = neighbour(group, toward).filter(found -> near.stream().anyMatch(candidate -> candidate.id().equals(found)))
+            .orElse(near.getFirst().id());
+        double own = split.children().get(index).weight(), other = split.children().get(sibling).weight();
+        return new Origin(parentTab, beside, side, own / (own + other));
+    }
+
+    /**
+     * Bring Back's layout (parent tabs spec 5): {@code panes} beside {@code beside}, on {@code side} with {@code share} of
+     * the space the two share, nested as they were; their active group becomes the active one and a maximize ends (spec
+     * 11). The empty workspace takes {@code panes} whole.
+     *
+     * @param panes the layout coming back: at least one tab, and no id this layout has
+     * @param beside a group of this layout
+     * @param side where the panes go
+     * @param share their part of the space they and {@code beside} share: above 0 and below 1
+     * @return the new layout
+     * @throws IllegalArgumentException when {@code panes} is empty or shares an id with this layout, {@code beside} is not
+     *     in it, or the share is out of range
+     */
+    public Layout graft(Layout panes, GroupId beside, Side side, double share) {
+        Objects.requireNonNull(panes, "panes");
+        Objects.requireNonNull(side, "side");
+        if (panes.isEmpty()) throw new IllegalArgumentException("The empty workspace has no panes to bring back");
+        if (!(share > 0 && share < 1)) throw new IllegalArgumentException("A share is above 0 and below 1: " + share);
+        requireGroup(beside);
+        if (isEmpty()) return panes.unmaximize();
+        Node next = replace(root, beside, found -> new Split(side.orientation(), side.leading()
+            ? List.of(new Child(panes.root, share), new Child(found, 1 - share))
+            : List.of(new Child(found, 1 - share), new Child(panes.root, share))));
+        var order = new ArrayList<>(panes.recent);
+        order.addAll(recent);
+        var orders = new HashMap<>(tabOrders);
+        orders.putAll(panes.tabOrders);
+        return new Layout(next, panes.activeGroup, Optional.empty(), order, orders);
+    }
+
+    /** The split whose child {@code group} is, and that child's index. */
+    private record Parent(Split split, int index) { }
+
+    /** The split under {@code node} whose child is the group {@code group}; empty when it is {@code node} itself. */
+    private static Optional<Parent> parent(Node node, GroupId group) {
+        if (!(node instanceof Split split)) return Optional.empty();
+        for (int i = 0; i < split.children().size(); i++) {
+            Node child = split.children().get(i).node();
+            if (child instanceof Group found && found.id().equals(group)) return Optional.of(new Parent(split, i));
+            Optional<Parent> deeper = parent(child, group);
+            if (deeper.isPresent()) return deeper;
+        }
+        return Optional.empty();
+    }
+
+    /**
      * The group in {@code direction} from {@code group} over the unit square:
      * of the groups wholly on that side that overlap it across the direction, the nearest, then the one whose centre is
      * nearest across; a tie goes to the first in tree order. The maximize is ignored.
