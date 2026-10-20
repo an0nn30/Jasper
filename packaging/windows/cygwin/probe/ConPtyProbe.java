@@ -9,7 +9,7 @@ public final class ConPtyProbe {
     static String quietMode() { return "hidden"; }
     public static void main(String[] args) throws Exception {
         ProbeSupport.windows("terminal");
-        if (args.length != 3) throw new IllegalArgumentException("ConPtyProbe <fresh scratch root> <verified local payload> <report directory>");
+        if (args.length != 3 && args.length != 5) throw new IllegalArgumentException("ConPtyProbe <fresh scratch root> <verified local payload> <report directory> [experimental backend executable, native frontend executable]");
         Path payload = Path.of(args[1]).toAbsolutePath();
         Path setup = payload.resolve("setup-x86_64.exe");
         ProbeAssertions.require(Files.isRegularFile(setup), "Payload must contain verified setup-x86_64.exe and cache/");
@@ -44,10 +44,15 @@ public final class ConPtyProbe {
             result.put("installedBytes", Long.toString(installedBytes));
             // A direct bash/ssh preflight in this JVM changes later Cygwin console behavior.
             // Provisioning and the app are separate processes; exercise that same boundary here.
-            int sessionExit = ProbeSupport.run(List.of(
+            var sessionCommand = new java.util.ArrayList<>(List.of(
                 Path.of(System.getProperty("java.home"), "bin/java.exe").toString(),
-                "--enable-native-access=ALL-UNNAMED", "-Djava.awt.headless=true", "-cp",
-                System.getProperty("java.class.path"), "ConPtySessionProbe", scratch.toString()),
+                "--enable-native-access=ALL-UNNAMED", "-Djava.awt.headless=true"));
+            if (args.length == 5) {
+                sessionCommand.add("-Djasper.cygwinProbeRelay=" + args[3]);
+                sessionCommand.add("-Djasper.cygwinProbeFrontend=" + args[4]);
+            }
+            sessionCommand.addAll(List.of("-cp", System.getProperty("java.class.path"), "ConPtySessionProbe", scratch.toString()));
+            int sessionExit = ProbeSupport.run(sessionCommand,
                 scratch.resolve("terminal-session.log"), sessionTimeout());
             var sessionEvidence = new java.util.Properties();
             try (var in = Files.newInputStream(scratch.resolve("terminal-session.properties"))) { sessionEvidence.load(in); }

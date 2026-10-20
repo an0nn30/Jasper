@@ -39,7 +39,14 @@ def probeJar = tasks.register('cygwinProbeJar', Jar) {
             String input = kind == 'Installer' ? probeJar.get().archiveFile.get().asFile.absolutePath :
                 providers.gradleProperty('jasper.cygwinProbePayload').orNull
             if (!input) throw new GradleException('Set -Pjasper.cygwinProbePayload to a verified offline payload directory')
-            setArgs([root, input, layout.buildDirectory.dir('cygwin-probes/reports').get().asFile.absolutePath])
+            def probeArgs = [root, input, layout.buildDirectory.dir('cygwin-probes/reports').get().asFile.absolutePath]
+            String relay = providers.gradleProperty('jasper.cygwinProbeRelay').orNull
+            if (kind == 'Terminal' && relay) {
+                String frontend = providers.gradleProperty('jasper.cygwinProbeFrontend').orNull
+                if (!frontend) throw new GradleException('Set jasper.cygwinProbeFrontend with the relay backend')
+                probeArgs.addAll([relay, frontend])
+            }
+            setArgs(probeArgs)
         }
     }
 }
@@ -54,3 +61,51 @@ tasks.register('verifyCygwinProbeRuntime', JavaExec) {
  }
 
 tasks.named('check') { dependsOn('verifyCygwinProbeRuntime') }
+
+// Experimental only: never a dependency of check, packaging or user installation.
+tasks.register('compileCygwinRelayProbe', Exec) {
+    group = 'verification'
+    description = 'Builds the experimental POSIX relay with an explicitly selected Cygwin GCC.'
+    doFirst {
+        if (!System.getProperty('os.name').startsWith('Windows')) throw new GradleException('Cygwin relay build requires Windows')
+        String compiler = providers.gradleProperty('jasper.cygwinProbeCompiler').orNull
+        if (!compiler || !new File(compiler).isAbsolute() || !file(compiler).isFile())
+            throw new GradleException('Set -Pjasper.cygwinProbeCompiler to an absolute Cygwin gcc.exe path')
+        def output = layout.buildDirectory.file('cygwin-probes/cygwin-pty-relay.exe').get().asFile
+        output.parentFile.mkdirs()
+        environment('PATH', file(compiler).parent + File.pathSeparator + System.getenv('PATH'))
+        commandLine(compiler, '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2', '-pthread',
+            rootProject.file('packaging/windows/cygwin/probe/CygwinPtyRelay.c').absolutePath, '-o', output.absolutePath)
+    }
+}
+
+tasks.register('verifyCygwinRelayProtocol', JavaExec) {
+    group = 'verification'
+    dependsOn(probeCompiler)
+    classpath = files(probeClasses, configurations.runtimeClasspath)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'RelayProtocolTest'
+    doFirst {
+        String relay = providers.gradleProperty('jasper.cygwinProbeRelay').orNull
+        String shell = providers.gradleProperty('jasper.cygwinProbeShell').orNull
+        if (relay && shell) setArgs([relay, shell])
+        else throw new GradleException('Native protocol checks require both jasper.cygwinProbeRelay and jasper.cygwinProbeShell')
+    }
+}
+
+// Run from the matching MSVC developer environment; release/user installs consume prebuilts.
+tasks.register('compileConPtyRelayProbe', Exec) {
+    group = 'verification'
+    description = 'Builds the experimental native Windows console frontend with MSVC.'
+    doFirst {
+        if (!System.getProperty('os.name').startsWith('Windows')) throw new GradleException('Console relay build requires Windows')
+        String compiler = providers.gradleProperty('jasper.cygwinProbeMsvc').orNull
+        if (!compiler || !new File(compiler).isAbsolute() || !file(compiler).isFile())
+            throw new GradleException('Set -Pjasper.cygwinProbeMsvc to an absolute cl.exe path in a configured developer environment')
+        def output = layout.buildDirectory.dir('cygwin-probes/native-frontend').get().asFile
+        output.mkdirs()
+        workingDir(output)
+        commandLine(compiler, '/nologo', '/std:c++20', '/W4', '/WX', '/EHsc', '/MT', '/O2',
+            rootProject.file('packaging/windows/cygwin/probe/ConPtyRelay.cpp').absolutePath, '/Fe:conpty-relay.exe')
+    }
+}

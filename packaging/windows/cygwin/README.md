@@ -112,3 +112,33 @@ the initial size query; production launch remains gated. See
 The approved implementation plan requires native evidence before production
 packaging or shell integration starts. Run both probes on Windows x64 and ARM64;
 retain failures as evidence for revising the hook or launch mechanism.
+
+## Experimental POSIX PTY relay
+
+The user authorized this investigation after direct Cygwin console input lost
+characters during resize. The experiment keeps the existing terminal facade:
+ConPTY runs `ConPtyRelay.cpp` (native ARM64 or x64), which starts
+`CygwinPtyRelay.c` detached from the Windows console. Framed input and resize
+messages travel over private pipes; the Cygwin backend runs Bash on `forkpty`.
+A Windows job owns the backend process tree and terminates it on frontend exit.
+
+Build the backend explicitly with `:jasper-app:compileCygwinRelayProbe` and
+`-Pjasper.cygwinProbeCompiler=<absolute Cygwin gcc.exe>`. Build the frontend from
+an MSVC developer environment for the target architecture with
+`:jasper-app:compileConPtyRelayProbe` and
+`-Pjasper.cygwinProbeMsvc=<absolute cl.exe>`. Run its `--self-test` for UTF-16
+and Windows argument quoting. These builds are opt-in probe tasks.
+
+Pass `-Pjasper.cygwinProbeRelay=<absolute backend.exe>` and
+`-Pjasper.cygwinProbeFrontend=<absolute frontend.exe>` to the terminal probe.
+`verifyCygwinRelayProtocol` additionally takes
+`-Pjasper.cygwinProbeShell=<absolute POSIX shell>` and checks resize, Unicode,
+exit status, malformed/partial frames and pipe failure. The backend also builds
+on macOS for these protocol checks. `RelayCloseProbe` accepts the backend,
+owned Cygwin `bin` directory and frontend; it checks close under backpressure
+using a unique temporary backend executable.
+
+Production integration requires pinned prebuilt frontends for both Windows
+architectures and one x86_64 Cygwin backend, with hashes, sources and notices.
+The Gradle user installer must consume those artifacts without a native compiler.
+The experiment has not yet been wired into shipped shell profiles or installers.

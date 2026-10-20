@@ -173,3 +173,45 @@ and the runtime-image test. Independent review corrected a stale README claim
 and increased the child timeout to cover all per-event deadlines (RED/GREEN).
 The user authorized investigating a dedicated POSIX PTY relay; that experiment
 is not yet an accepted production launch mechanism.
+
+
+## Authorized POSIX PTY relay investigation
+
+The native frontend uses ConPTY console APIs and a detached Cygwin backend with
+`forkpty`. A private framed input pipe carries bytes and resize events; output
+is raw PTY data. A Windows kill-on-close job contains the backend and descendants.
+The initial Java/JNA frontend was replaced by native ARM64 and x64 frontends,
+so production adoption would not add a JVM for each terminal.
+
+The native ARM64 diagnostic passes 100 immediate resize/write cycles plus
+Unicode, startup profiles, working directory, OSC events, native `cmd.exe`,
+Ctrl+C and normal exit. The first fresh ARM64 checked-in run also passes twenty
+cycles (`arm64-native-relay-01`). Both frontend builds pass split-surrogate and
+argument-quoting self-tests. Native Windows backpressure-close testing passes.
+The x64 diagnostic using the earlier Java frontend passed 100 cycles; that is
+historical experiment evidence, not native-frontend x64 acceptance.
+
+Independent review found missing output wrapping, malformed frames reporting the
+child's successful shutdown status, partial frames blocking child-exit handling,
+and cleanup potentially targeting a concurrent probe. The fixes enable wrapping,
+retain a separate protocol-error result, poll incremental nonblocking frame reads,
+and copy the cleanup helper to a unique per-run path. The malformed-frame test
+failed before the fix; protocol checks now pass on macOS and Windows, including
+partial-header child exit and closed output. Windows image deletion retries the
+brief mapping-release delay after a successful backpressure-close check.
+
+Production integration still requires versioned prebuilt artifacts, installer
+staging, the actual Bash integration wrapper, interactive acceptance and native
+x64 Windows coverage. No shipped shell launch behavior changes in this experiment.
+
+
+Final hardened native frontend results: ARM64 passes twenty cycles and the new
+cursor-position wrapping assertion (`terminal-native-relay-arm64-02`, session
+rerun after correcting OSC evidence encoding). The fresh x64-emulated install
+passes the same complete probe (`reports/x64-native-relay-02/terminal.json`).
+Both use the native frontend and detached Cygwin backend, not the earlier Java
+frontend. Six reports/session evidence files were exported to
+`jasper-app/build/cygwin-probes/resize-investigation/`. The failed initial wrapping
+report remains historical; its semicolon-bearing OSC title truncated the evidence.
+Final scoped Gradle checks pass: 31 portable assertions, helper runtime check and
+native protocol checks. Source hygiene and `git diff --check` pass.

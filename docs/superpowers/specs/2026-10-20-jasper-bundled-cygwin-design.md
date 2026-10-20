@@ -2,7 +2,9 @@
 
 Status: approved by the user on 2026-10-20. The [implementation plan](../plans/2026-10-20-jasper-bundled-cygwin.md)
 is approved for execution. Task 1 installer probes pass in the Windows VM; repeated-resize input loss
-keeps the terminal launch gate open before production work begins.
+keeps the terminal launch gate open before production work begins. The user authorized
+a dedicated POSIX PTY relay investigation; its candidate mechanism and evidence are
+recorded below and in the probe results.
 
 ## 1. Outcome and scope
 
@@ -194,6 +196,24 @@ having the Cygwin integration emit a Windows-resolvable local path from
 `cygpath`; validate the resulting URI through the existing local-host and UNC
 protections. Conversion subprocesses must never run under the terminal buffer
 lock or on its reader thread. Preserve command markers and exit status.
+
+### Relay candidate from the authorized investigation
+
+The prototype launches a native Windows frontend through the existing ConPTY
+session. That frontend creates a detached Cygwin backend with private input and
+output pipes; the backend starts Bash on a POSIX PTY. Input bytes and terminal
+sizes use a bounded framed protocol. This keeps Cygwin's Windows console input
+reader out of the interactive input path. The frontend orders size updates before
+subsequent input, preserves UTF-16 surrogate pairs, forwards UTF-8 output, and
+owns the backend tree through a kill-on-close Windows job.
+
+Production adoption requires pinned ARM64 and x64 frontend binaries and an
+x86_64 Cygwin backend, including source, hashes and notices in the distribution
+manifest. Both installers must consume these prebuilts; the Gradle user-install
+graph remains free of native compilation. The app still uses the supported
+terminal facade. Interactive applications, descendant cleanup and native x64
+Windows remain acceptance requirements. The prototype is isolated from shipped
+shell profiles while that contract is completed.
 
 ## 6. Manage Cygwin packages action
 

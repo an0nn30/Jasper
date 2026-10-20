@@ -52,6 +52,17 @@ public final class ConPtySessionProbe {
             environment.put("LANG", "C.UTF-8");
             var command = List.of(bin.resolve("bash.exe").toString(), "--rcfile",
                 cygpath(bin, rc, scratch.resolve("rc-path.log")), "-i");
+            String relayPath = System.getProperty("jasper.cygwinProbeRelay");
+            result.put("transport", relayPath == null ? "direct-conpty" : "experimental-posix-relay");
+            if (relayPath != null) {
+                Path relay = Path.of(relayPath);
+                ProbeAssertions.require(relay.isAbsolute() && Files.isRegularFile(relay), "Invalid relay executable");
+                String frontendPath = System.getProperty("jasper.cygwinProbeFrontend");
+                ProbeAssertions.require(frontendPath != null && Path.of(frontendPath).isAbsolute()
+                    && Files.isRegularFile(Path.of(frontendPath)), "Invalid native relay frontend");
+                var wrapped = new java.util.ArrayList<>(List.of(frontendPath, relay.toString()));
+                wrapped.addAll(command); command = wrapped;
+            }
             result.put("bashCommand", command.toString());
             try (var session = TerminalSession.start(SessionLaunchOptions.builder().command(command)
                     .environment(environment).workingDirectory(cwd).build())) {
@@ -91,6 +102,8 @@ public final class ConPtySessionProbe {
                     result.put("completedResizes", Integer.toString(iteration + 1));
                 }
                 result.put("resize", "passed");
+                session.write("saved=$(stty -g); stty -echo -icanon; printf '\\033[2J\\033[H'; printf '%105s' x; printf '\\033[6n'; IFS= read -r -d R -t 5 position; stty \"$saved\"; position=${position#??}; probe_title \"wrap:${position/;/,}\"\r");
+                title(session, events, "wrap:2,6"); result.put("outputWrap", "passed");
                 session.write("cmd.exe /d /c exit 7; probe_title \"native:$?\"\r");
                 title(session, events, "native:7"); result.put("windowsProgram", "passed");
                 session.write("bash -c 'trap \"exit 130\" INT; printf \"\\033]2;sleeping\\007\"; read -r -t 60; exit 99'; probe_title \"interrupt:$?\"\r");
