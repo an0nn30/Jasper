@@ -1,6 +1,6 @@
 # Jasper parent tabs, panes and the window menu
 
-Status: **Draft for the user's review, 2026-10-19.** This design amends
+Status: **Approved on 2026-10-19** (the user: "Spec approved. Write the parent-tabs plans, then re-plan 6a and 6b on top of them."). This design amends
 [`2026-10-16-jasper-workspace-tabs-design.md`](2026-10-16-jasper-workspace-tabs-design.md) (the workspace tabs spec,
 "spec" below) in sections 1, 6, 7, 8, 10, 11, 12, 13, 14 and 15. Where the two disagree, this document wins. It lands
 after plan 5 and before plans 6a and 6b, which are paused and will be re-planned on top of it.

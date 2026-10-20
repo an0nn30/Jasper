@@ -13,6 +13,8 @@ look a window holding a single tab shows no tab strip; Enterprise's classic tabs
 4, and section 10). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
 Planned **after the Enterprise presentation series** (its plans 6–11) has merged: the implementation plans are written
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
+Amended 2026-10-19 (approved): parent tabs, panes, pane windows and the window menu, in
+[`2026-10-19-jasper-parent-tabs-design.md`](2026-10-19-jasper-parent-tabs-design.md), which wins where the two disagree.
 
 ## 1. Intent and decisions
 
