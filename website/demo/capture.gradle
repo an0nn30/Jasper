@@ -1,0 +1,7 @@
+allprojects {
+    afterEvaluate { p ->
+        if (p.name == 'jasper-app') {
+            p.sourceSets.test.java.srcDir(p.rootProject.file('website/demo'))
+        }
+    }
+}

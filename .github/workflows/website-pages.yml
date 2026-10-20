@@ -1,0 +1,62 @@
+name: Deploy website
+
+# Publishing is always explicit; app pushes and releases do not trigger this workflow.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Require main
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Run Deploy website from the main branch."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          # Keep the exact main revision selected when the manual run was started.
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Validate website and bundle boundaries
+        run: |
+          node --check website/script.js
+          node --check website/workspace-tour.js
+          python -m unittest discover -s website -p test_build_site.py
+      - name: Package public website
+        run: python website/build_site.py "$RUNNER_TEMP/jasper-pages"
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/jasper-pages
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Publish Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
