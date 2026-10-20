@@ -2,9 +2,11 @@
 
 ## Current state — 2026-10-04
 
-- **Editor Markdown preview design** (2026-10-04; `codex/editor-markdown-preview`): conversational design approved;
+- **Editor fonts and Markdown preview design** (2026-10-04, amended 2026-10-20; `codex/editor-markdown-preview`): conversational design approved;
   [written spec](superpowers/specs/2026-10-04-editor-markdown-preview-design.md) awaits user review before the
-  implementation plan. CommonMark plus native Swing, Source/Split/Preview controls, remembered default mode,
+  implementation plan. October 20 adds family/size/fallback/ligatures/line height, opt-in live following of saved
+  terminal fonts through the SDK, and a document toolbar directly below tabs with classic/modern artwork.
+  Implementation planning must refresh this branch against current main. CommonMark plus native Swing, Source/Split/Preview controls, remembered default mode,
   live unsaved preview and bidirectional linked scrolling; local/SFTP-relative images load automatically and web
   images load on demand per document. Scope includes tables, task lists, strikethrough, highlighted code and raster
   images; excludes browser runtime, embedded HTML layouts, SVG, diagrams and math. A small EditorDocument hook

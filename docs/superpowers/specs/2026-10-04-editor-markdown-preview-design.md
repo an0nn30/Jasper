@@ -1,17 +1,18 @@
-# Editor Markdown preview
+# Editor fonts and Markdown preview
 
-**Date:** 2026-10-04
+**Date:** 2026-10-04; amended 2026-10-20
 
-**Status:** Conversational design approved; written specification awaiting user review. Implementation has not started.
+**Status:** Conversational design and October 20 font/toolbar additions approved; amended written specification awaiting user review. Implementation has not started.
 
-**Baseline:** `d82efd6a`, on `codex/editor-markdown-preview`.
+**Baseline:** Original design at `d82efd6a`, on `codex/editor-markdown-preview`. Implementation planning must refresh against current main, including SDK 0.18.2 presentation queries and kit-provided Editor font defaults.
 
 **Delivery:** One runnable deliverable and one subsequent implementation plan.
 
 ## 1. Intent and authority
 
-Let a user read Markdown as a formatted document inside Jasper's Editor, either beside its source or filling the
-editor. A small group of icons at the top switches views, in the style of the familiar IDE Markdown workflow.
+Let a user customize Editor typography or follow the saved terminal font settings, and read Markdown as a formatted
+document beside its source or filling the editor. A small group of icons at the top switches views, in the style of
+the familiar IDE Markdown workflow.
 Success means readable documents, immediate feedback while writing, and switching views without losing editing
 state. The existing Editor remains responsible for files, saving, conflicts, undo and Vim mode.
 
@@ -19,10 +20,15 @@ This extends the [Editor design](2026-09-27-jasper-editor-plugin-design.md) and 
 [workspace-tab amendment](2026-09-27-hosted-workspace-tabs-design.md). It follows the
 [application architecture](2026-09-20-jasper-app-buddy-refactor-design.md), the
 [SDK architecture](../../sdk-architecture.md), and the existing workspace-glass contract. Historical separate-window
-descriptions do not override current app-hosted document tabs. Terminal and Buddy behavior is outside this change.
+descriptions do not override current app-hosted document tabs. Terminal font settings are consumed through the SDK;
+terminal rendering and Buddy behavior remain outside this change.
 
 The user approved these decisions during brainstorming:
 
+- Editor font family, size, ordered fallback fonts, ligatures and line height, with an opt-in Follow terminal font
+  settings choice that updates live and preserves independent Editor values.
+- A document toolbar below the tab strip, ready for later Editor actions, with classic/modern IntelliJ artwork
+  selected by the active presentation.
 - Source, Split and Preview modes, with source left and preview right in Split.
 - Remember the last explicitly selected mode across Markdown files and restarts; initially Source. Existing tabs
   retain their individual modes.
@@ -62,13 +68,16 @@ are omitted. Unsupported diagram/math syntax remains ordinary Markdown text or c
 ### 3.1 Eligibility and toolbar
 
 A document is eligible whenever its selected syntax language is Markdown, including an untitled document selected
-as Markdown manually. Existing `.md` and `.markdown` detection is retained. Non-Markdown documents have neither
-preview controls nor preview work. Changing away from Markdown shows Source and releases preview resources;
+as Markdown manually. Existing `.md` and `.markdown` detection is retained. Non-Markdown documents have no preview
+controls or preview work; an empty document toolbar collapses until it has actions to show. Changing away from
+Markdown shows Source and releases preview resources;
 switching back in the same tab restores that tab's previous Markdown mode.
 
-Place a compact, right-aligned toolbar inside the Editor tab, above its content and below any file-change banner.
-It belongs to the document, not the application's global toolbar or outer tab strip. It remains reachable in all
-three modes. Use the existing SDK icon catalog:
+Place a compact document toolbar inside the Editor tab directly below the outer tab strip, above any file-change
+banner and the editor content. Its first action group is the right-aligned Markdown view controls; later Editor
+actions can occupy the same toolbar without changing the content layout. It remains reachable in all three modes.
+Use the existing SDK icon catalog roles below, selecting their classic or modern IntelliJ artwork according to
+the active presentation. Planning must verify both catalog variants and the supported SDK icon access path:
 
 | Action | Catalog icon | Tooltip / accessible name |
 | --- | --- | --- |
@@ -154,14 +163,46 @@ resource policy. Raw document HTML never reaches the HTML parser unescaped. Gene
 escaped independently. Links dispatch through application-owned destination metadata rather than evaluating markup.
 
 The preview uses the current workspace background, foreground, accent, selection and syntax palette. Body text uses
-the current proportional UI font family at the configured Editor font size; code uses the Editor's monospace font.
+the current proportional UI font family at the effective Editor font size; code uses the effective Editor font,
+fallback order and ligature setting. Body and code line spacing use the effective line-height multiplier.
 Headings and spacing scale from that base. Theme, font and workspace-opacity changes apply live. Preserve the
 existing glass behavior: one background fill per surface, translucent when appropriate, with readable text, images,
 selection and code backgrounds. No hard-coded white page or unrelated CSS theme.
 
 Source references: [CommonMark Java](https://github.com/commonmark/commonmark-java) documents the parser, extensions,
-source spans and HTML-escaping options; [Swing HTML kit](https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/html/HTMLEditorKit.html)
+source spans and HTML-escaping options; [Swing HTML
+kit](https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/text/html/HTMLEditorKit.html)
 documents the native HTML presentation model. The layout and lifecycle policy here are Jasper's design decisions.
+
+### 4.1 Editor typography and following the terminal
+
+Settings > Tools > Editor > Font exposes **Follow terminal font settings** (`follow_terminal_font`, default false),
+Font (`font_family`), Font size (`font_size`), Fallback fonts (`font_fallback`), Ligatures (`font_ligatures`) and
+Line height (`font_line_height`). Size accepts finite fractional points from 6–72 and line height a finite
+multiplier from 0.5–3.0, matching terminal settings. Fallback is an ordered list of nonblank family names without
+NUL; an empty list is valid. Family selection retains the Editor's installed-font picker. New independent defaults
+are an empty explicit fallback list, ligatures off and line height 1.0, preserving existing rendering; existing
+family/size values and kit defaults remain effective. Existing integer size values load as the same point size.
+
+When following is off, all five Editor values are editable and apply live to every open Editor document. When on,
+the controls display the effective saved terminal values and are disabled; the Editor's own values remain stored
+unchanged. Turning following off restores those values, including kit defaults for fields without a saved override.
+Following is plugin-wide across windows. It follows saved terminal configuration, not a terminal pane's temporary
+zoom or whichever terminal currently has focus. New documents take the current effective settings immediately.
+
+Expose an immutable terminal typography value and a change subscription through the supported SDK appearance
+surface, implemented by the application and testkit. The value carries family, fractional size, ordered fallback,
+ligatures and line height. Notifications arrive on the UI thread after the current value is updated. The Editor
+reads this surface and owns/disposes its subscription with the plugin; it does not read app configuration files or
+import app/terminal internals. Independent mode ignores terminal font changes. Final API names, SDK release and
+consumer compatibility are determined against current main in the implementation plan.
+
+Apply typography consistently to source text, gutter, caret geometry, selection, hit testing, wrapping, folds and
+scroll mapping. A multiplier of 1.0 uses natural font metrics; lower values tighten rows, with the same potential
+for overlapping or clipped tall glyphs as the terminal. Font changes preserve the source document, undo, selection
+and Vim state and rebuild preview geometry. Ordered fallback must affect actual missing-glyph rendering, and
+ligatures must preserve correct caret and selection positions. Verify these behaviors against RSyntaxTextArea's
+layout before selecting the implementation; changing painted text alone is insufficient.
 
 ## 5. Data flow, ownership and threading
 
@@ -177,7 +218,9 @@ Suggested owners, finalized into exact classes by the implementation plan:
 | `api.EditorDocument` and providers | Resolve a relative file on the original document's storage context; existing asynchronous bounded read contract |
 
 Update affected package-info dependency descriptions. No new renderer interface with one implementation, exported
-CommonMark types, application imports, or Editor dependency on Remote. The SDK and application require no new API.
+CommonMark types, application imports, or Editor dependency on Remote. Terminal typography adds the SDK appearance
+value/subscription and host/testkit implementations described in section 4.1; Markdown rendering remains owned by the
+Editor.
 
 Live update sequence:
 
@@ -264,8 +307,9 @@ real implementations on the existing interface, with local and Remote tests. Oth
 the default and still render Markdown text and web images. Untitled documents have no base; show a save-first
 placeholder for relative images and a notice for relative file links.
 
-This is a small public Editor API addition, not a new SDK or file-service API. Bump Editor from 0.7.0 to 0.8.0 and
-document the hook. Remote's implementation names only `dev.jasper.editor.api` as before. Its additive provider method
+Relative resolution is an Editor API addition; terminal typography uses the SDK addition in section 4.1. Choose the
+next compatible Editor version from current main and document the hook and the required SDK typography version.
+Remote's implementation names only `dev.jasper.editor.api` as before. Its additive provider method
 does not require invoking the new method on an older Editor; preserve its existing optional dependency compatibility
 and bump its own patch version for the change. Verify that older-Editor loading still works rather than tightening
 the dependency gratuitously. No application imports of Editor internals are introduced.
@@ -314,7 +358,8 @@ Support PNG/JPEG/GIF by decoded format rather than filename alone. Limit active 
 Keep at most 64 MiB of decoded image pixels across all preview tabs, including currently visible retained images;
 budget exhaustion leaves an explanatory placeholder instead of silently retaining an unbounded cache. Release
 hidden-tab images first. Reserve decoded-pixel budget before decoding, including in-flight images, and avoid retaining
-both an original and a scaled copy outside that budget. Cache keys include document/storage context and resource identity; identical local paths
+both an original and a scaled copy outside that budget. Cache keys include document/storage context and resource
+identity; identical local paths
 on different remote hosts must not collide. No persistent image cache. Repeated URLs within a document coalesce.
 Reload/Retry clears failed entries; document reload also invalidates its local/SFTP image cache. No filesystem watcher
 is added for individual image files.
@@ -338,6 +383,8 @@ Required automated evidence:
 | Markdown | All supported blocks/inlines/extensions, escaping, Unicode, unknown code language, deterministic heading IDs, unsupported HTML/SVG, invisible mapping markers |
 | Real Swing layout | Headless rendered dark/light output, normal and large fonts, narrow widths, tables, long code, images, workspace glass; inspect images, not only HTML strings |
 | Editing and commands | Same document/undo/Vim/caret across modes, source retained, preview typing inert, Save/Close semantics, search target and options, Replace/Go to Line temporary reveal |
+| Typography | Independent and followed settings, fractional size/range validation, old integer-size migration, kit defaults, live cross-window updates, follow off/on/off restoration, fallback glyphs, ligatures, gutter/caret/hit testing, wraps/folds, tight rows and subscription disposal |
+| Toolbar | Placement below tabs and above banners, all three modes, classic/modern artwork, selected states, keyboard/accessibility, non-Markdown empty collapse |
 | Preferences | First-run Source, remembered explicit mode after reload, per-tab isolation, cross-window behavior, setting changes, rapid asynchronous saves/failure, no accidental persistence from navigation |
 | Updates | Debounce/coalescing, reload, Save As, rapid typing, old text/theme/image completions, failure/Retry, hidden tabs, reactivation, move, disposal, executor rejection, all resource bounds |
 | Scroll mapping | Both directions, nested lists/quotes/tables/code, source wraps/folds, empty/gap ranges, resize/image/font changes, deletion before anchor, bottom retention, disabled sync, no deferred feedback loop |
@@ -351,9 +398,12 @@ Run `git diff --check`, source hygiene and documentation checks. No GUI is neede
 is needed, only the headless `packageApp`/`verifyPackage` path without AOT is within unattended scope.
 
 Update `docs/editor.md`, `docs/editor-verification.md`, the relevant Editor API/provider documentation, and the
-Editor settings template when implemented. Keep design acceptance separate from claims of implementation success.
+Editor settings template, SDK appearance documentation and testkit contracts when implemented. Keep design acceptance
+separate from claims of implementation success.
 
-User-run native acceptance: the three modes and tooltips, dragging the divider, physical keyboard/trackpad scroll
+User-run native acceptance: independent/followed fonts and restoration, fractional sizes, fallback glyphs, ligatures,
+line height and pointer/caret alignment, classic/modern toolbar placement, the three modes and tooltips, dragging the
+divider, physical keyboard/trackpad scroll
 sync, preview selection/search, long-document typing, Vim/source focus, dark/light/glass, moving tabs, SFTP sign-in
 and resources, browser links, mode persistence across restart, and close while image work is in flight.
 
@@ -363,4 +413,6 @@ Reviewed inline for scope, contradictory mode persistence, source/preview focus,
 ownership, render bounds, unsupported destinations and missing test evidence. The file-chooser route mismatch is
 addressed by provider-relative document resolution. Dependency and visual-rendering feasibility remain validations
 for the implementation plan, not unverified claims in this design. There are no unresolved product choices; the
-written specification is now awaiting the user's review before planning begins.
+amended written specification awaits user review before planning. The October 20 self-review checked font precedence,
+SDK boundaries, toolbar/banner ordering and removal of stale fixed-version assumptions. Synchronized scrolling and
+remembered view mode retain their original semantics.
