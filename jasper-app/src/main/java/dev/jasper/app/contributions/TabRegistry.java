@@ -395,8 +395,8 @@ public final class TabRegistry {
     public void move(Tab tab, UUID window) { move(tab, window, next -> next.attach().accept(tab)); }
 
     /**
-     * As {@link #move(Tab, UUID)}, into a new group on {@code side} of {@code group} in that window: a tab dropped on a
-     * group's edge in another window (workspace tabs spec 12).
+     * As {@link #move(Tab, UUID)}, beside {@code group} in that window: into a new group on its {@code side}, as
+     * workspace plan 8c's pane drag moves a tab.
      *
      * @param tab the tab
      * @param window the window to move it to

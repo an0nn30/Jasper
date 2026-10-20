@@ -354,7 +354,7 @@ final class TabDrag {
      * Without a target in a window the overlay leaves its window.
      */
     private void showLanding() {
-        Target.Bar bar = target.orElse(null) instanceof Target.Bar into ? into : null;
+        Target.Bar bar = target.orElse(null) instanceof Target.Bar strip ? strip : null;
         WindowContent window = bar == null ? null : bar.window();
         JLayeredPane layers = window == null ? null : layers(window);
         Container parent = overlay.getParent();

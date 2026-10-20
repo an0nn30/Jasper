@@ -13,9 +13,9 @@ import javax.swing.Icon;
 import javax.swing.JComponent;
 
 /**
- * The drag guides of a dock drag and of a tab drag ({@link TabDrag}: the area the tab would take as the highlight, its
- * place in a strip as the placeholder), on the layered pane's DRAG_LAYER: a translucent highlight with a 1px border
- * where the dragged tool window would land (for a second slot, always that slot's half; see
+ * The drag guides of a dock drag and of a tab drag ({@link TabDrag}: the band or empty workspace that would take the
+ * tab as the highlight, its place in a strip as the placeholder), on the layered pane's DRAG_LAYER: a translucent
+ * highlight with a 1px border where the dragged tool window would land (for a second slot, always that slot's half; see
  * {@link dev.jasper.app.dock.DockGeometry#landing}), a highlighted rounded square in the stripe's gap, and the dragged
  * window's ghost at the cursor ({@link StripeSet#ghost}: its own icon on the rails, its stripe icon on labelled
  * stripes). It takes no mouse input.

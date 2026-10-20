@@ -10,11 +10,12 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * Where a dragged tab would drop (workspace tabs spec 12), from the cursor alone: into a group's strip at a place among
- * its tabs, into a group over the middle of its card area, or into a new group on the side whose outer quarter of the card
- * area the cursor is over; where a dragged parent tab would go in a parent-tab bar (parent tabs spec 5); the rectangle
- * that shows the landing; and which of several windows takes the drop. The tab drag's twin of {@link DockDropResolver}.
- * Pure; every rectangle and the cursor are in the caller's one coordinate space.
+ * Where a dragged tab would drop, from the cursor alone: its place in a window's tab strip (tabs and panes spec 6);
+ * for workspace plan 8c's pane drag, over a group (a pane), into its strip at a place among its tabs, into it over the
+ * middle of its card area, or into a new group on the side whose outer quarter of the card area the cursor is over
+ * (workspace tabs spec 12); the rectangle that shows the landing; and which of several windows takes the drop. The tab
+ * drag's twin of {@link DockDropResolver}. Pure; every rectangle and the cursor are in the caller's one coordinate
+ * space.
  */
 public final class WorkspaceDropResolver {
     private WorkspaceDropResolver() { }

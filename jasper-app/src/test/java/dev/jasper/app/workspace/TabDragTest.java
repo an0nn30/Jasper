@@ -246,6 +246,48 @@ class TabDragTest {
         });
     }
 
+    /** The item an entry shows closing between the press and the threshold (its shell exits) leaves nothing to drag. */
+    @Test void aPressWhoseItemClosesBeforeTheThresholdDragsNothing() throws Exception {
+        edt(() -> {
+            Component source = entry(owner, a);
+            Point press = middle(source), pastThird = onEntry(owner, c, 0.75);
+            mouse(source, MouseEvent.MOUSE_PRESSED, press);
+            owner.closeTab(a);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y + 12));
+            mouse(source, MouseEvent.MOUSE_DRAGGED, pastThird);
+            assertThat(owner.tabDrag().active()).as("a closed item has nothing to drag").isFalse();
+            assertThat(owner.tabDrag().label().text()).as("no drag started: its label never showed a title").isEmpty();
+            assertThat(owner.tabDrag().label().showing()).isFalse();
+            assertThat(keys.dispatchers).isEmpty();
+            assertThat(motionListeners()).isEqualTo(listeners);
+            mouse(source, MouseEvent.MOUSE_RELEASED, pastThird);
+            assertThat(ids()).containsExactly(second, third);
+        });
+    }
+
+    /** The entry giving way to another pane of its tab between the press and the threshold leaves nothing to drag. */
+    @Test void aPressWhoseEntryShowsAnotherPaneBeforeTheThresholdDragsNothing() throws Exception {
+        edt(() -> {
+            owner.split(Side.RIGHT);
+            Tab beside = owner.selectedTab();
+            owner.selectTab(a);
+            relayout(frame);
+            Component source = entry(owner, a);
+            Point press = middle(source), pastThird = onEntry(owner, c, 0.75);
+            mouse(source, MouseEvent.MOUSE_PRESSED, press);
+            owner.selectTab(beside);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y + 12));
+            mouse(source, MouseEvent.MOUSE_DRAGGED, pastThird);
+            assertThat(owner.tabDrag().active()).as("its entry shows the other pane's item now").isFalse();
+            assertThat(owner.tabDrag().label().text()).as("no drag started: its label never showed a title").isEmpty();
+            assertThat(owner.tabDrag().label().showing()).isFalse();
+            assertThat(keys.dispatchers).isEmpty();
+            assertThat(motionListeners()).isEqualTo(listeners);
+            mouse(source, MouseEvent.MOUSE_RELEASED, pastThird);
+            assertThat(ids()).containsExactly(first, second, third);
+        });
+    }
+
     /** Swing can lose a dock drag's release too: a press on an entry means it never came, so the dock drag ends there. */
     @Test void aPressOnAnEntryEndsADockDragWhoseReleaseWasLost() throws Exception {
         edt(() -> {
