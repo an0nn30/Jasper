@@ -1,5 +1,91 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 14: IntelliJ Classic's title bar at the user's direction — 2026-10-19** (`claude/enterprise-title-bar`, worktree `.claude/worktrees/enterprise-14`, from `main` at `3a36993ba`; [plan](superpowers/plans/2026-10-19-enterprise-14-title-bar.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
+Commits `200367316..98dedc443`, then this documentation commit; spec 1 (decision 8), 3 (principles 5 and 8), 4.8, 5.1 to
+5.3, 5.9, 9.1, 10.1 to 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1 amended, and the app architecture guide
+corrected. The user asked: "Next, on MacOS and Windows only - the enterprise theme uses a custom title bar that looks
+like the IntelliJ title bar, using the same color as the toolbar so it looks cohesive. Mac also moves the menu bar to
+the global mac menu bar area instead of using built-in, and on windows the title bar contains the file menu bar like in
+the normal variant of the app." After review they added that only the toolbar height and the macOS lights must match
+IntelliJ ("the content will be different because the apps are different"), then approved the design.
+`[chrome] title_bar` gains a third value, `"classic"`, which the Enterprise kit names; `Projections.Host` carries the
+platform (`Projections.Platform`: MAC, WINDOWS, or LINUX for any other system, from `os.name`). On macOS and Windows a
+classic title commits the default look's desktop flags, so a failed start falls back to exactly the default look; on
+Linux it gives exactly `native`'s projections. On macOS `MacTitleBand` (platform) gives the terminal window's root pane
+`apple.awt.fullWindowContent` and `apple.awt.transparentTitleBar` and a 28 pt band in the toolbar's colour (the header's
+`surface.app`, never a title-bar zone) above the toolbar row, where AppKit draws the traffic lights and the frame's
+title; the appearance is `NSAppearanceNameVibrantLight` or `NSAppearanceNameVibrantDark` by the theme; full screen
+removes the band and leaving restores it; a double-click zooms, minimises or does nothing as `AppleActionOnDoubleClick`
+says (`MacTitleDoubleClick`); the menus are in the screen menu bar, with About Jasper and Settings… in the application
+menu, and auxiliary frames keep their system title bars and show the minimal File menu there. On Windows FlatLaf's 28 px
+title pane, in the toolbar's colour, embeds the classic menus and then `ClassicWindowTitle`, the frame's title
+left-aligned 22 px after them in `text.secondary` and dimmed to `text.tertiary` while the window is inactive, over the
+classic menu row's 1 px `border.divider` rule; `CollapsingMenuBar` folds the menus into "…" and then ☰ before the title
+shrinks below 60 px, and `window.native_decorations = true` and Compact give the system title bar and the in-window menu
+row. Linux is unchanged. `TitleInset` (platform), published only by the band and by the Windows classic decoration,
+keeps classic in-window dialogs and overlays below the title and announces each change (`TitleInset.CHANGED`). The
+Enterprise toolbar is 28 px (`window.toolbar_height`), IntelliJ's, on every platform. No SDK, plugin or Enterprise
+version changes. Rulings (plan, "Rulings"): (1) one plan of eight tasks; (2) a third `title_bar` value, `classic`,
+rather than a per-host meaning of `native`; (3) `Projections.Platform` read from `os.name` without AWT, every other
+system counting as Linux; (4) the classic base keeps `native` and only the Enterprise kit names `classic`; (5) each of
+the six title-dependent projections is decided and tested, Linux's equal to `native`'s, and the three-argument
+`ShellLook` and `WindowLook` constructors mean no classic title; (6) `ClassicMenuBar` stays, with the menus where the
+platform puts them; (7) the macOS band is IntelliJ Classic's full-window-content mechanism, not `MacTitleBar` or JBR's
+`CustomTitleBar`; (8) the band's window takes the vibrant appearances by the theme's darkness; (9) full screen is
+FlatLaf's republished buttons bounds with width 0; (10) the band handles a double-click itself from
+`AppleActionOnDoubleClick`; (11) dragging the band is left to AppKit; (12) macOS auxiliary windows keep their system
+title bars and show the minimal File menu; (13) the Windows title is Jasper's `ClassicWindowTitle` inside the menu bar,
+not FlatLaf's label, in a 28 px bar; (14) its colours are `text.secondary` under the text guard and `text.tertiary`
+under the indicator guard; (15) the Windows rule is the classic menu row's own `border.divider`; (16) Windows auxiliary
+frames and dialogs take FlatLaf's title panes without a menu row; (17) `window.native_decorations = true` on Windows
+gives Linux's frame with no title inset; (18) Compact under a classic title keeps the system title bar without the band;
+(19) `TitleInset` is a root client property only the band and the Windows decoration publish; (20) the toolbar is 28 px
+as the kit's default, a saved value still overriding it; (21) the mock tests render under a Linux host and shift for the
+28 px row; (22) `ChromeRenderTest` gains `enterprise-mac` and `enterprise-windows`, `enterprise` moving to the Linux
+host; (23) no version bump; (24) the workspace-tabs reconciliation below. The execution rulings E1 to E13 and the Task 7
+record are in the plan's "Execution notes". Deviation from the approved design: W1's `centerTitleIfMenuBarEmbedded` is
+replaced by `ClassicWindowTitle` (Rulings 13) because the key is process-wide and FlatLaf's title does not dim.
+Deviations from the Enterprise mocks, at the user's 2026-10-19 direction: macOS and Windows no longer show the mocks'
+native title bar or in-window menu row (the mocks stay true on Linux, where the mock tests render); the toolbar is
+28 px, so `EnterpriseWorkstationMockTest`'s toolbar run, ink tops, search field top and tab rows move by the 12 device
+px (6 px at 1x) the mocks' 34 px row is taller, its rows' column stopping 12 rows sooner so the Dark tab run ends at the
+same row of the strip, `ClassicHeaderTest`'s header is 29 px (28 and the rule) with the first button at y 2 and the
+field at y 3, and the two toolbar pairs crop the mock's middle 56 device rows against the render's 56-row toolbar row
+(`chrome-toolbar-light` 0.581, `chrome-toolbar-dark` 0.577; the 0.30 floor unchanged). Deviations from the plan's text:
+the execution rulings E1 to E13 (anchors corrected in place, two more `ChromeSpec` comments, imports,
+`ChromeRenderTest.HOST` from `os.name`, fixed scratchpad paths for the Task 8 proof, the mock tests' copied list and
+shorter ink regions, the guide's paragraph kept whole, the spec's wrapped phrases, and the relayed traffic-light request
+met by the recorded checkpoint) and the Task 7 record (the Dark tab run's shorter column, the 56-row toolbar crops);
+Task 8 appends its record to the existing "Execution notes" instead of adding the section again, and writes the spec's
+header amendment as one line, as plans 12 and 13 did. `./gradlew check --continue`: **11,536 tests, 0 failures, 0
+errors, 25 skipped**; `check_pairs.py` passes 101 of 101 gated pairs with the same verdicts as `3a36993ba`, only the two
+`chrome-toolbar-*` lines changed; the headless gallery is byte-identical to `3a36993ba`'s (Slate Cobalt Dark and Light,
+161 files each) and so are the 11 default-look jasper-app renders (`ChromeRenderTest`'s default, complement and fallback
+chrome, palette and settings images, `DefaultDockPixelsTest`'s `default-dark` and `default-light`);
+`CustomTitleBarTest`, `MacTitleBarTest` and `DefaultDockPixelsTest` are unedited. The lights checkpoint (done before
+execution, with the user's yes): started from Jasper's app launcher, the band's mechanism draws IntelliJ's lights
+(centres 23 pt apart, about 14 pt across) and a leading title at about 84 pt; started through JBR's `bin/java`
+(`:jasper-app:run`), macOS draws its legacy controls and centres the title. **Before checking:** your
+`~/.config/jasper/config.toml` saves `window.toolbar_height = 34` (and `window.toolbar = "icons_and_labels"`), which
+override the look's defaults; delete those lines, or Reset them in Settings, to see the 28 px toolbar. GUI checks for
+the user, in this order: (1) macOS, Enterprise Light: in the packaged app (`./gradlew :jasper-app:packageApp`, then open
+`jasper-app/build/packaging/image/Jasper.app`; a `:jasper-app:run` window shows macOS's legacy controls by design), the
+traffic lights and the title against IntelliJ's screenshot (12.webp): centres 23 pt apart, about 14.7 pt across, the
+title leading-aligned after the lights; whether macOS leading-aligns or centres the title (if centred, a follow-up
+paints it); dragging the window by the band; a double-click in it with System Settings › Desktop & Dock's double-click
+action at Zoom, Minimize and Do Nothing; (2) the band's colour against the toolbar, with no seam, in Enterprise Light
+and Dark and under another theme; (3) the screen menu bar: the application menu's About Jasper, Settings… and Quit;
+File, Edit, View, Session, Transfer, Tools, Window and Help; no stray "…" or ☰ menu; ⌘Q once; (4) full screen and back:
+the band leaves and returns, and the lights and title follow; (5) auxiliary windows (Settings, About, Licenses, Errors,
+the Vault manager, a plugin window): their system title bars, the screen menu bar's File menu while one is focused, ⌘W
+closing it; (6) classic in-window dialogs and the Vault's sheets below the band; (7) Windows: the menus in the title bar
+after the icon; the title left after them, dimming when another window is active; the rule under the bar; a narrow
+window folding to "…" and ☰; maximise and restore; dragging and double-clicking empty title-bar space and the title;
+in-window dialogs below the bar; `window.native_decorations = true` giving the system title bar and the menu row;
+Compact; (8) Linux: unchanged apart from the 28 px toolbar. Reconciliation: the unmerged `claude/workspace-tabs` series
+rules that a child window has no menu bar under Enterprise; whichever of it and this plan merges second reconciles them,
+and on macOS a child window then needs the screen menu bar's menus. Not merged, not pushed.
+
 **Enterprise presentation, plan 13: stripe icons at the user's direction — 2026-10-19** (`claude/enterprise-stripe-icons`, worktree `.claude/worktrees/enterprise-13`, from `main` at `2c065f8cd`; [plan](superpowers/plans/2026-10-19-enterprise-13-stripe-icons.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
 Commits `eca2feca8..2606d5633`, then this documentation commit; spec 5.2, 10.7, 16.1 and 19.1 amended. After trying
 plan 12 the user asked: "Now I want the sidebar strip to have icons like the classic intelliJ does for plugins and

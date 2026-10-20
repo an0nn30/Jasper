@@ -19,6 +19,7 @@ Amended on 2026-10-18 by the series' final alignment pass, recording rulings app
 Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (side stripes fit their labels, centred, not resizable; the second group stands at the stripe's bottom), with 3, 9.1, 12.1 and 12.2 (Settings hides the Panel rail width).
 Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 6.4, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 10.8, 11.5, 14.4, 16.1, 17 and 19.1.
 Amended on 2026-10-19 at the user's direction after trying plan 12 (plan 13): 5.2, 10.7, 16.1 and 19.1 (every labelled stripe button starts with its tool window's icon, IntelliJ's classic tool-window icons under Enterprise, over the mocks' text-only labels).
+Amended on 2026-10-19 at the user's direction (plan 14): 1 (decision 8), 3 (principles 5 and 8), 4.8, 5.1, 5.2, 5.3, 5.9, 9.1, 10.1, 10.2, 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1. On macOS and Windows the Enterprise look draws IntelliJ Classic's title bar (`title_bar = "classic"`): on macOS a band in the toolbar's colour under its own traffic lights and title, with the menus in the screen menu bar; on Windows a custom title bar holding the menus and the title. Linux keeps the system title bar and the in-window menu row, and the toolbar is 28 px; these override the mocks' native title bar, in-window menu row and 34 px toolbar.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -40,10 +41,10 @@ Section 19.2 lists every amended specification and the line each status banner g
 
 Enterprise is a second look for Jasper, built the way IntelliJ builds its Classic UI: a bundled plugin that holds a
 declarative kit definition, a theme and fonts, while every line of presentation code lives in jasper-ui and the app.
-Turning the plugin on and restarting gives native title bars, menus inside the window, labelled tool-window stripes, a
-classic toolbar, ruled status cells, a Run window in place of the command palette card, and classic controls
-(checkboxes, radios, titled group boxes, spinners, classic tables and trees). Colours always come from the active
-theme, so every existing theme keeps working under both looks.
+Turning the plugin on and restarting gives IntelliJ Classic's title bar (Linux keeps the system's, with the menus inside
+the window), labelled tool-window stripes, a classic toolbar, ruled status cells, a Run window in place of the command
+palette card, and classic controls (checkboxes, radios, titled group boxes, spinners, classic tables and trees). Colours
+always come from the active theme, so every existing theme keeps working under both looks.
 
 The mocks and the design language the user supplied are preserved unchanged under
 [`docs/design/enterprise/reference/`](../../design/enterprise/reference/) with a [manifest](../../design/enterprise/reference/manifest.json)
@@ -66,7 +67,9 @@ The user's decisions (2026-10-14 and 2026-10-15):
 5. The overall shape and principles (section 3) are approved as presented.
 6. The presentation provider (section 4) is approved as presented.
 7. The kit file and the jasper-ui seam (sections 5 and 6) are approved as presented.
-8. **macOS menus under Enterprise are in the window** (`apple.laf.useScreenMenuBar=false`), not the screen menu bar.
+8. **macOS menus under Enterprise are in the screen menu bar**, as in the default look and IntelliJ Classic (since
+   2026-10-19, the user; plan 14), with About Jasper and Settings… in the application menu. Windows puts them in the
+   title bar and Linux in the window.
 9. **Stripe numbers come from the real toggle shortcuts** (IntelliJ semantics). With today's bindings the stripes read
    "1: Sessions", "2: SFTP" and "3: Transfers"; the mock's numbering is a fixture. Nothing is rebound.
 10. **The Run window stays open** (modeless, like the Windows Run dialog). It closes only on Escape, ×, Cancel or
@@ -258,16 +261,16 @@ Established on 2026-10-15 in the worktree at `3c6e9dcc3`. Do not re-derive; test
 5. **Behaviour stays the same.** Actions, palette scopes, verbs and keys, the Settings draft and Apply, and the
    immediate Plugins page are identical in both looks. A look changes presentation, host copy, and the effective
    defaults of a closed list of settings that a saved value always overrides; under `motion = "none"`,
-   `title_bar = "native"` and `tool_windows = "stripes"` it also ignores `ui.animations.enabled`,
-   `window.native_decorations` and `window.rail_width`. Where a plugin
-   composes differently, every action stays reachable (section 14.7).
+   `title_bar = "native"` (or `"classic"` on macOS and Linux) and `tool_windows = "stripes"` it also ignores
+   `ui.animations.enabled`, `window.native_decorations` and `window.rail_width`. Where a plugin composes differently,
+   every action stays reachable (section 14.7).
 6. **Composition belongs to its owner.** Where a mock changes layout (a tree table instead of rows), the owner branches
    once at its composition root: plugins on whether `Workstation` is published, app pages on the `Composition` value
    their factory receives. Renderers never branch on a look.
 7. **A small closed schema over a catalog the host owns.** The kit file selects a host catalog and tunes 11 public
    tokens. Unknown keys fail, and an invalid file means the default look.
-8. **No motion under Enterprise, and the header stays flush.** The native title, menu bar and toolbar rows are
-   separated by 1 px rules with no gutters.
+8. **No motion under Enterprise, and the header stays flush.** The title, menu bar and toolbar rows are separated by
+   1 px rules with no gutters, except that macOS's classic title band and the toolbar row are one band, as in IntelliJ.
 9. **The vocabulary grows semantically, and the default look holds still.** New SDK nodes state intent and both looks
    render them; the default look stays pixel-identical except for the approved changes of section 13.
 
@@ -459,9 +462,10 @@ thread inside `ApplicationBootstrap.start`, after the handoff checks (`:311-319`
    production `KitParser`. It touches no AWT.
 3. `new ConfigService(file, mac, selection.presentation().defaults())`: the service takes the injected `DefaultSource`
    (section 5.8), so the first snapshot already carries the kit's defaults.
-4. In `prepareDesktop`: `configureDesktopProperties(flags)` sets `apple.laf.useScreenMenuBar` to `false` when the
-   look's menus are in the window; `TitleBarStyle.choose(mac, nativeDecorations, compact, flags.nativeTitle())`
-   gives `NATIVE` on every platform for a native title; then built-in icons and `startDesktop` as today.
+4. In `prepareDesktop`: `configureDesktopProperties(flags)` sets `apple.laf.useScreenMenuBar` to `false` when the look's
+   menus are in the window; `TitleBarStyle.choose(mac, nativeDecorations, compact, flags.nativeTitle())` gives `NATIVE`
+   on every platform for a native title (a classic title commits the default look's flags on macOS and Windows and the
+   native ones on Linux); then built-in icons and `startDesktop` as today.
 
 `startPlugins(PluginSelection selection, AppDirs dirs)` and `PluginRuntime.start` consume this one selection: there is
 no second scan, and a `plugins.toml` edited during start-up cannot load a plugin set that disagrees with the chrome
@@ -512,7 +516,7 @@ kit = 1
 base = "classic"
 
 [chrome]
-title_bar = "native"
+title_bar = "classic"
 menu_bar = "window"
 window_title = "Workstation — {session} — {directory}"
 tool_windows = "stripes"
@@ -579,7 +583,7 @@ splash_art = "splash/art.svg"
 "ui.theme.light" = "enterprise"
 "ui.theme.dark" = "enterprise"
 "palette.visible_rows" = 8
-"window.toolbar_height" = 34
+"window.toolbar_height" = 28
 "window.toolbar" = "icons"
 ```
 
@@ -593,14 +597,14 @@ key so the file can be reviewed; `PresentationConformanceTest` pins the list.
 
 ### 5.2 Variant points
 
-Twenty-four points: 10 chrome points and 14 control points, all two-valued except the `window_title` template. There
-is no `toolbar` point: the classic
-header honours the existing `window.toolbar` setting (10.3).
+Twenty-four points: 10 chrome points and 14 control points, all two-valued except `title_bar`, which has three values,
+and the `window_title` template. There is no `toolbar` point: the classic header honours the existing `window.toolbar`
+setting (10.3).
 
 | `[chrome]` key | Default | Enterprise | What the Enterprise value does |
 |---|---|---|---|
-| `title_bar` | `unified` | `native` | The OS title bar on every platform (`TitleBarStyle.NATIVE`); the workspace header becomes a chrome row under it (10.1) |
-| `menu_bar` | `system` | `window` | macOS: `apple.laf.useScreenMenuBar=false`, so each window's menu bar is a row in the window; elsewhere menus already sit in the window |
+| `title_bar` | `unified` | `classic` | IntelliJ Classic's frame (10.1). On macOS, a 28 pt band in the toolbar's colour under the system's transparent title, with the menus in the screen menu bar. On Windows, a custom title bar holding the menus and the window title. On Linux, the OS title bar (`TitleBarStyle.NATIVE`). The workspace header becomes a chrome row under it. The third value, `native`, gives the OS title bar on every platform |
+| `menu_bar` | `system` | `window` | The classic menus (10.2), belonging to the window. Under the OS title bar they are a row in the window (macOS: `apple.laf.useScreenMenuBar=false`). Under `title_bar = "classic"` they are in the title bar on Windows and in the screen menu bar on macOS. |
 | `window_title` | `"{context}"` | `"Workstation — {session} — {directory}"` | The frame title template (10.4) |
 | `tool_windows` | `rails` | `stripes` | Labelled stripes, the bottom strip and header strips (10.7), whatever `window.rail_width` says |
 | `editor_tabs` | `equal` | `classic` | Content-sized, always-visible tabs with a status dot, ×, "+" and an underline (10.5) |
@@ -633,9 +637,9 @@ Back/Forward pair, notification cards (square, 1 px border, the catalog's popup 
 
 ### 5.3 Constraints
 
-`menu_bar = "window"` requires `title_bar = "native"`: the unified row hosts the header and leaves an in-window menu row
-no home. It is the only cross-field constraint. The `palette` point alone decides whether the "▶ Run…" status item
-exists, under either status layout.
+`menu_bar = "window"` requires `title_bar = "native"` or `"classic"`: the unified row hosts the header and leaves an
+in-window menu row no home. It is the only cross-field constraint. The `palette` point alone decides whether the
+"▶ Run…" status item exists, under either status layout.
 
 ### 5.4 Public tokens
 
@@ -760,7 +764,7 @@ each and at most 8 files. A kit is rejected for:
 
 - an unknown table or key, a wrong type, an unknown value, or `kit` other than 1;
 - a token outside its range, or a `[type].base` (the body size in points) that is not an integer from 10 to 16;
-- `menu_bar = "window"` without `title_bar = "native"`;
+- `menu_bar = "window"` with `title_bar = "unified"`;
 - a `[defaults]` key outside the allowlist, or a value its setting rejects;
 - a `[defaults]` theme id that is neither a built-in id nor a theme file the plugin declares;
 - a path that breaks the path rule, a missing file, or a font file that is not `.ttf` or `.otf`;
@@ -1133,7 +1137,7 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 |---|---|---|
 | `DesktopFlags` | `screenMenuBar`, `nativeTitle` | bootstrap: desktop properties, `TitleBarStyle` |
 | `WorkspaceLook` | menus (STANDARD, CLASSIC), header (UNIFIED, CLASSIC), stripes (RAILS, LABELLED), tabs (EQUAL, CLASSIC), status (SLASH, RULED), `runItem`, `FrameStyle`, icons (NEW_UI, CLASSIC) | workspace: `WorkspaceChrome.of` |
-| `ShellLook` | `unifiedTitle`, `windowMenus`, `followThemeAppearance` | windows: `ShellChrome.of`, `NativeShells` |
+| `ShellLook` | `unifiedTitle`, `windowMenus`, `followThemeAppearance`, `classicTitle` | windows: `ShellChrome.of`, `NativeShells`; workspace: `WindowLook` (`classicTitle`) |
 | `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, UPPER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
 | `SettingsChrome` | `integratedTitle`, `collapsibleNav`, `inlineReset`, `hiddenKeys`, `kitFontSize` (from which `fontRowCopy` follows) | settingsui |
 | `Composition` | ROWS, CLASSIC | composition roots: `CorePages`, `AppearanceSelection`, `NotificationGroupsEditor`, the environment-variables editor (`Editors`), `KeymapPage`, `PluginsPage` |
@@ -1145,6 +1149,10 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | `AppPanels` | `notificationsTitle`, `notificationsSlot` | application: `NotificationsFeature` |
 | `DefaultSource` (in `config`) | the kit's defaults | `ConfigService`, `SettingsDraft` |
 
+`Projections.Host` gives the table the platform (macOS, Windows, or Linux for any other system) and whether the unified
+macOS title bar is available; the platform changes only `title_bar = "classic"`, which on Linux gives exactly `native`'s
+values.
+
 `WorkspaceChrome.of`, `ShellChrome.of` and `PaletteViews.of` are the only classes that read the `WorkspaceLook`,
 `ShellLook` and `PaletteLook` variant enums and pick implementations; `DialogMapping` is read only by
 `AuxiliaryWindows`, `Motion` only by the application's animations supplier, and `Composition` only by the listed roots. Other readers read values (sizes, strings, booleans).
@@ -1154,22 +1162,23 @@ values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.
 
 | Field | Enterprise value, and when | Fallback |
 |---|---|---|
-| `DesktopFlags.screenMenuBar`, `nativeTitle` | false when `menu_bar = "window"`; true when `title_bar = "native"` | as committed |
+| `DesktopFlags.screenMenuBar`, `nativeTitle` | false when `menu_bar = "window"`, except under `title_bar = "classic"` on macOS and Windows; true when `title_bar = "native"`, or `"classic"` on Linux | as committed |
 | `WorkspaceLook.menus` | CLASSIC when `menu_bar = "window"` | STANDARD |
-| `WorkspaceLook.header` | CLASSIC when `title_bar = "native"` | UNIFIED, as a row under the native title, as `TitleBarStyle.NATIVE` keeps it today |
+| `WorkspaceLook.header` | CLASSIC when `title_bar` is `native` or `classic` | UNIFIED, as a row under the native title, as `TitleBarStyle.NATIVE` keeps it today |
 | `WorkspaceLook.stripes`, `FrameStyle` | LABELLED and flush frames when `tool_windows = "stripes"` | RAILS and today's frames |
 | `WorkspaceLook.tabs` | CLASSIC when `editor_tabs = "classic"` | EQUAL |
 | `WorkspaceLook.status` | RULED when `status_bar = "cells"` | SLASH |
 | `WorkspaceLook.icons` | CLASSIC when `icons = "classic"` | NEW_UI |
 | `WorkspaceLook.runItem`, `PaletteLook.view`, `PaletteLook.home` | true, RUN_WINDOW and UPPER when `palette = "run_window"` | false, CARD, TITLE_FIELD |
 | `ShellLook.unifiedTitle` | true only when `title_bar = "unified"` and `MacTitleBar.isSupported()` | false |
-| `ShellLook.windowMenus` | true when `menu_bar = "window"` | as committed |
-| `ShellLook.followThemeAppearance` | true when `title_bar = "native"` | true |
-| `SettingsChrome.integratedTitle` | false when `title_bar = "native"` | false |
+| `ShellLook.windowMenus` | true when `menu_bar = "window"`, except under `title_bar = "classic"` on macOS, where auxiliary frames carry the minimal File menu for the screen menu bar | as committed |
+| `ShellLook.followThemeAppearance` | true when `title_bar` is `native` or `classic` | true |
+| `ShellLook.classicTitle` | true when `title_bar = "classic"` on macOS or Windows | false |
+| `SettingsChrome.integratedTitle` | false when `title_bar` is `native` or `classic` | false |
 | `SettingsChrome.collapsibleNav`, `inlineReset`; `Composition` | true, false and CLASSIC when `base = "classic"` | false, true, ROWS |
-| `SettingsChrome.hiddenKeys` | `window.native_decorations` when `title_bar = "native"`, and `ui.animations.enabled` when `motion = "none"`, and `window.rail_width` when `tool_windows = "stripes"` | `window.native_decorations` |
+| `SettingsChrome.hiddenKeys` | `window.native_decorations` when `title_bar = "native"` or on macOS, or `"classic"` on Linux, and `ui.animations.enabled` when `motion = "none"`, and `window.rail_width` when `tool_windows = "stripes"` | `window.native_decorations` |
 | `SettingsChrome.fontRowCopy` | "Use the default font size" when `[type.ui]` names a face | "Use platform font size" |
-| `DialogMapping` | CLASSIC when `dialogs = "classic"`; `windowTitled` when `title_bar = "native"` | AS_REQUESTED, `windowTitled` |
+| `DialogMapping` | CLASSIC when `dialogs = "classic"`; `windowTitled` when `title_bar` is `native` or `classic` | AS_REQUESTED, `windowTitled` |
 | `Branding` | `[branding]` | `Branding.NONE` |
 | `Motion` | NONE when `motion = "none"` | STANDARD |
 | `TitleFormat` | `window_title` | `"{context}"` |
@@ -1206,9 +1215,25 @@ string. The graph stays acyclic; `dev.jasper.app.dock` stays JDK-only.
   bar.
 - On Windows and Linux, plan 6 sets the dark-caption hint where JBR exposes it; otherwise the documentation records
   that the system title bar follows the operating system's light or dark setting.
-- Under `menu_bar = "window"` the auxiliary frames show no menu row, as the 07 Credential Vault mocks draw them; their
-  actions stay on their own controls, and each frame binds Close Window's ⌘W itself.
-- The native title, menu bar and toolbar rows meet flush, separated by 1 px rules.
+- Under `menu_bar = "window"` the auxiliary frames show no menu row (on macOS under a classic title they carry the
+  minimal File menu, which the screen menu bar shows), as the 07 Credential Vault mocks draw them; their actions stay on
+  their own controls, and each frame binds Close Window's ⌘W itself.
+- The title, menu bar and toolbar rows meet flush, separated by 1 px rules, except that macOS's classic band and the
+  toolbar row are one band.
+- `title_bar = "classic"` (the user, 2026-10-19; plan 14) is IntelliJ Classic's frame. On macOS `TitleBarStyle` stays
+  `MAC_UNIFIED` and the committed flags are the default look's, so the menus are in the screen menu bar. The terminal
+  window's root pane takes `apple.awt.fullWindowContent` and `apple.awt.transparentTitleBar`. `MacTitleBand` paints a
+  28 pt band in the toolbar's colour (`surface.app`, never a title-bar zone) above the toolbar row, and macOS draws the
+  traffic lights and the frame's title over it. The window's appearance is `NSAppearanceNameVibrantLight` or
+  `NSAppearanceNameVibrantDark` by the theme. Full screen removes the band; a double-click in it zooms, minimises or
+  does nothing as `AppleActionOnDoubleClick` says. Auxiliary windows keep their system title bars.
+- On Windows `TitleBarStyle` is `CUSTOM` as in the default look. FlatLaf's 28 px title pane, in the toolbar's colour,
+  embeds the classic menus and then `ClassicWindowTitle`: the frame's title, left-aligned 22 px after them, in
+  `text.secondary` (`text.tertiary` while the window is inactive). The classic menu row's 1 px `border.divider` rule
+  runs under the whole bar. The menus fold into "…" and ☰ before the title shrinks below 60 px, and the window buttons
+  are the default look's. `window.native_decorations = true` gives the system title bar and the in-window menu row.
+  Auxiliary frames and dialogs take FlatLaf's title panes without a menu row.
+- On Linux a classic title is the system title bar, as `native`.
 
 ### 10.2 Menu composition
 
@@ -1217,8 +1242,9 @@ string. The graph stays acyclic; `dev.jasper.app.dock` stays JDK-only.
 - `StandardMenuBar`: File, Edit, View, Pane, Tab, Session, Transfer, Tools, plugin menus, Help;
 - `ClassicMenuBar`: File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help. Window holds the Pane items
   and the Tab items as two sections, then the tool-window toggles; Help is the app's Help menu, placed last by the
-  layout. Help holds About Jasper on every platform, including macOS under `menu_bar = "window"` (today it is in the
-  application menu there, `AboutWindows.java:72`). Classic menu items highlight in the accent with `text.onAccent`.
+  layout. Help holds About Jasper wherever the screen menu bar is off, including macOS under `menu_bar = "window"` with
+  a native title. While macOS shows the screen menu bar (the default look, and a classic title) it is in the application
+  menu (`AboutWindows.java:71`). Classic menu items highlight in the accent with `text.onAccent`.
 
 Each built-in menu that has no items of its own shows only while it has entries, extending today's Tools rule.
 
@@ -1234,7 +1260,8 @@ The classic header honours `window.toolbar`. `icons` (Enterprise's default, 5.8)
 are their labels, Split marking its menu with a small ▼ in its corner. `icons_and_labels` gives each button's icon, then
 its label (Split ending in ▾). `hidden` gives no row, so the Session view and Search everywhere go with it, and the Run
 window stays reachable by ⇧⌘P and "▶ Run…". The icons are the look's `[chrome] icons` set (5.2), IntelliJ's classic
-icons under Enterprise. `window.toolbar_height` is the classic toolbar row's height.
+icons under Enterprise. `window.toolbar_height` is the classic toolbar row's height; Enterprise's default is 28,
+IntelliJ's (the user, 2026-10-19, over the mocks' 34).
 
 **`ToolbarItem.View` admission and lifetime:**
 
@@ -1334,7 +1361,8 @@ visible = true
 the 07 Credential Vault mocks show them:
 
 - a card with the catalog's dialog radius on `surface.dialog`, a 1 px `border.hover` frame and the catalog's popup
-  shadow, over a still `surface.scrim` covering the window below its title bar;
+  shadow, over a still `surface.scrim` covering the window below its title bar (and below macOS's classic band or
+  Windows' classic title bar, which `TitleInset` publishes);
 - a 26 px header strip on `surface.header.active` above a `border.window` rule, holding the `DialogSpec.swatch` and the
   title in the semibold UI face; the form below it does not repeat the title;
 - the footer on `surface.footer` under a `border.window` rule, `Form.footnote` at its leading edge and the actions at
@@ -1358,7 +1386,9 @@ progress draws a still bar with its label, as it does with animations off today.
 ### 10.10 View modes
 
 Compact under a native-titled look hides the toolbar row and keeps the in-window menu bar, the only menu surface once
-`useScreenMenuBar` is false. Zen is unchanged, and the Run window's home does not depend on either.
+`useScreenMenuBar` is false. Zen is unchanged, and the Run window's home does not depend on either. Under a classic
+title Compact keeps the system title bar on macOS and Windows, as the default look's Compact does, without the band;
+macOS keeps the screen menu bar and Windows shows the in-window menu row.
 
 ### 10.11 Splash and application icon
 
@@ -1486,10 +1516,10 @@ Browse… runs the new File › Open File… action (section 13): Jasper's file 
 
 | Field | Default look | Enterprise |
 |---|---|---|
-| `integratedTitle` | true (`SettingsDialog.java:174-177`) | false: a native title bar with "Settings" |
+| `integratedTitle` | true (`SettingsDialog.java:174-177`) | false: the system's title bar with "Settings" (FlatLaf's title pane on Windows) |
 | `collapsibleNav` | false: fixed headings | true: ▼ section nodes; a click selects the page, the triangle toggles; the state is not saved |
 | `inlineReset` | true: the row's Reset button | false: "Reset to Default" in the row's context menu |
-| `hiddenKeys` | `window.native_decorations` on macOS (as today) | `window.native_decorations` (implied by the look), `ui.animations.enabled` (no motion) and `window.rail_width` (the stripes fit their labels) |
+| `hiddenKeys` | `window.native_decorations` on macOS (as today) | `window.native_decorations` (implied by the look; shown on Windows, where the classic title honours it), `ui.animations.enabled` (no motion) and `window.rail_width` (the stripes fit their labels) |
 | `fontRowCopy` | "Use platform font size" | "Use the default font size"; the default is `[type].base` (12) |
 
 The navigation surface comes from the `navigation_surface` slot, metrics from the catalog, and the footer sits on
@@ -1739,13 +1769,14 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    green unchanged.
 4. **Chrome renders, as JUnit.** Test forms of `mockUiPreview`, `titleBarPreview`, `commandPalettePreview` and
    `settingsPreview` render under the default, Enterprise and complement kits, both palette views and the fallback
-   combination (native title, window menus, default kit), and over a checked-in strength-2 array of `ChromeSpec` values
-   across 9 of the ten chrome points (`window_title` as its two shipped templates; `icons` is held at `classic` in every
-   row and covered by `ChromeArtworkTest`, `ZoneIconsTest`, `StripeIconTest` and `StripeIconsTest`) honouring the
-   `menu_bar`/`title_bar` constraint, asserting painted pairs and structure (a flush header, no gutter, the stripe
-   labels) and writing images under `build/` for inspection. The opt-in `JavaExec` tasks and `tools/visual/pairs.json`
-   stay opt-in tools. Each of plans 5 to 10 adds `tools/visual/pairs.json` crops pairing its Enterprise renders with the
-   preserved mocks; the comparison stays opt-in.
+   combination (native title, window menus, default kit), the shipped look on each platform (`enterprise` on Linux,
+   `enterprise-mac` with the band, `enterprise-windows` with FlatLaf's title pane), and over a checked-in strength-2
+   array of `ChromeSpec` values across 9 of the ten chrome points (`window_title` as its two shipped templates; `icons`
+   is held at `classic` in every row and covered by `ChromeArtworkTest`, `ZoneIconsTest`, `StripeIconTest` and
+   `StripeIconsTest`) honouring the `menu_bar`/`title_bar` constraint, asserting painted pairs and structure (a flush
+   header, no gutter, the stripe labels) and writing images under `build/` for inspection. The opt-in `JavaExec` tasks
+   and `tools/visual/pairs.json` stay opt-in tools. Each of plans 5 to 10 adds `tools/visual/pairs.json` crops pairing
+   its Enterprise renders with the preserved mocks; the comparison stays opt-in.
 5. **The shipped kit.** `EnterpriseKitRenderTest` (jasper-app tests) parses the real `enterprise.kit.toml` with the
    production `KitParser`, registers the real Plex fonts from `plugins/enterprise/src/main/resources`, and renders with
    the jasper-ui test fixtures. `EnterpriseFixtureTest` checks that the parsed kit's metrics, type scale, variants and
@@ -1806,11 +1837,12 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
 
 ### 16.2 GUI checks for the user
 
-Agents never launch the GUI or train the AOT cache. The user checks, per plan: the macOS in-window menu bar and native
-title, and Windows and Linux NATIVE with the caption colour; the Run window's drag, attach to home, saved place, focus
-hand-back and modeless behaviour; stripe drag and drop including the bottom strip; the classic in-window dialogs;
-Enterprise Dark against the Dark Mode mock; the splash and the Dock or taskbar icon on a cold start; the Credential
-Vault window; and Enterprise's cold-start time against the default look.
+Agents never launch the GUI or train the AOT cache. The user checks, per plan: the macOS classic title band (its traffic
+lights and title against IntelliJ's) and screen menu bar, Windows' classic title bar, and Linux NATIVE with the caption
+colour; the Run window's drag, attach to home, saved place, focus hand-back and modeless behaviour; stripe drag and drop
+including the bottom strip; the classic in-window dialogs; Enterprise Dark against the Dark Mode mock; the splash and
+the Dock or taskbar icon on a cold start; the Credential Vault window; and Enterprise's cold-start time against the
+default look.
 
 ## 17. Documentation
 
@@ -1836,22 +1868,22 @@ Smallest edits:
 
 ## 18. Out of scope
 
-Live switching between looks, and mixed or per-window looks; plugin renderers or Swing; an SDK active-presentation
-query or traits; the items of 8.4; per-look theme variants (`targetUi`) and a theme reset on switching; derived roles in
-the SDK's `SemanticColor`; public tokens beyond the 11 metrics and two colour slots; an Enterprise settings page or a
-look picker (turning the plugin on is the choice); `JASPER_PRESENTATION_SKIP`; AOT training of the classic strategies
-before a measurement; a `PaletteResults` total; a Problems panel; Detach; rebinding any shortcut; the macOS screen menu
-bar under Enterprise; remembering the master password in the Keychain (the Unlock Vault mock's "Remember in
-Keychain"); the splash steps "Unlocking credential vault…" and "Indexing hosts…", which no start-up phase performs;
-the product name anywhere but the splash; a new packaged application icon.
+Live switching between looks, and mixed or per-window looks; plugin renderers or Swing; an SDK active-presentation query
+or traits; the items of 8.4; per-look theme variants (`targetUi`) and a theme reset on switching; derived roles in the
+SDK's `SemanticColor`; public tokens beyond the 11 metrics and two colour slots; an Enterprise settings page or a look
+picker (turning the plugin on is the choice); `JASPER_PRESENTATION_SKIP`; AOT training of the classic strategies before
+a measurement; a `PaletteResults` total; a Problems panel; Detach; rebinding any shortcut; remembering the master
+password in the Keychain (the Unlock Vault mock's "Remember in Keychain"); the splash steps "Unlocking credential
+vault…" and "Indexing hosts…", which no start-up phase performs; the product name anywhere but the splash; a new
+packaged application icon.
 
 ## 19. Delivery
 
 ### 19.1 Plans
 
-Thirteen plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans`
+Fourteen plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans`
 and named `docs/superpowers/plans/YYYY-MM-DD-enterprise-N-<slug>.md` (the date each is written). Each adds its
-`migration.csv` rows. Order: 1 to 13 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
+`migration.csv` rows. Order: 1 to 14 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
 
 Plan 3 is delivered as five plans (the user, 2026-10-15): 3a `sdk-0-18-renames` (8.1, 8.3, 8.5, the 4.2 constant and
 `KitCompatibility`); 3b `sdk-0-18-controls` (Notice, Properties, `ChoiceKind.TABS`, `Field.readOnly`,
@@ -1877,6 +1909,7 @@ its additions in the default look and adds them to the testkit fake and the cont
 | 11 | `branding` | `[branding]` and its validation, the `Branding` projection, the Enterprise icons and splash art, the runtime application icon and `Splash` with its start-up steps (10.11); a render of the splash compared with the Boot Splash frames |
 | 12 | `intellij-classic` | The user's 2026-10-18 direction: IntelliJ's classic icons (vendored, attributed) under `[chrome] icons`, the classic header's icon buttons and `window.toolbar` as a look default, SDK 0.18.1's icon-only GHOST toolbar buttons with `run` and `application`, Remote's run-configuration combo and Run, the Enterprise theme as ports of IntelliJ Light and New UI Dark, a pressed tool window activated, the Run window's upper home |
 | 13 | `stripe-icons` | The user's 2026-10-19 direction: every labelled stripe button starts with its tool window's 13 px icon, upright at the reading start, IntelliJ's classic tool-window icons (vendored, attributed) under `[chrome] icons = "classic"`, the label's monochrome glyph for any other name, drag and the ghost keeping it |
+| 14 | `title-bar` | The user's 2026-10-19 direction: IntelliJ Classic's title bar on macOS (the toolbar-coloured band under the system's lights and title, the screen menu bar, full screen and double-click) and Windows (the custom title bar holding the menus and the left-aligned title, dimmed while inactive, over its rule, folding when narrow), Linux unchanged, classic dialogs below the title, the 28 px toolbar |
 
 ### 19.2 Amendments
 

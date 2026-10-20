@@ -218,10 +218,22 @@ and collapse to its magnifier. `toolbar = "hidden"` hides only the buttons. `Tit
 chosen at startup: on macOS `MacTitleBar` hosts the header in the native title row and gives it insets
 that keep clear of the traffic lights; on Windows and Linux FlatLaf's title pane embeds
 `CollapsingMenuBar`, which carries the header under the menus; with `window.native_decorations = true`
-the system title bar stays and the header is the top row of `WindowContent`. A look with a native title (the
-Enterprise presentation) gives every platform the system title bar; with `menu_bar = "window"` the bootstrap turns
-macOS's screen menu bar off, so each terminal window's menus are a row in the window (an auxiliary frame shows none
-and binds Close Window's shortcut itself). A native-titled macOS frame's appearance follows the theme; Jasper gives the
+the system title bar stays and the header is the top row of `WindowContent`. A look with a native title gives every
+platform the system title bar. With `menu_bar = "window"` the bootstrap turns macOS's screen menu bar off, so each
+terminal window's menus are a row in the window (an auxiliary frame shows none and binds Close Window's shortcut
+itself).
+
+The Enterprise presentation's classic title (`title_bar = "classic"`) is IntelliJ Classic's:
+- On macOS, `MacTitleBand` (platform) is a 28 pt band in the toolbar's colour under the system's transparent title,
+  which macOS draws with the traffic lights. The menus stay in the screen menu bar, and an auxiliary frame keeps its
+  system title bar and shows the minimal File menu there.
+- On Windows, FlatLaf's title pane embeds `CollapsingMenuBar` and `ClassicWindowTitle`, the window title left-aligned
+  after the menus, over a 1 px rule.
+- On Linux it is the system title bar.
+
+`TitleInset` keeps classic in-window dialogs and overlays below either.
+
+A native-titled macOS frame's appearance follows the theme; Jasper gives the
 Windows and Linux system title bar no appearance hint (JBR has none). `WorkspaceChrome.of` (workspace) and
 `ShellChrome.of` (windows) read the look's projections and choose the strategies, among them `MenuBarLayout`:
 `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).

@@ -1,5 +1,7 @@
 # Enterprise presentation 14: title bar Implementation Plan
 
+> **Status (2026-10-19): executed on `claude/enterprise-title-bar` (`200367316..98dedc443`, then the Task 8 documentation commit).** Deviations from this plan's text: the execution rulings E1 to E13 and the Task 7 record under "Execution notes", and the Task 8 record there. Deviation from the approved design: W1's `centerTitleIfMenuBarEmbedded` is replaced by `ClassicWindowTitle` (Rulings 13) because the key is process-wide and FlatLaf's title does not dim.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** On 2026-10-19 the user asked: "Next, on MacOS and Windows only - the enterprise theme uses a custom title bar that looks like the IntelliJ title bar, using the same color as the toolbar so it looks cohesive. Mac also moves the menu bar to the global mac menu bar area instead of using built-in, and on windows the title bar contains the file menu bar like in the normal variant of the app." After review they added that only the toolbar height and the macOS lights must match IntelliJ ("the content will be different because the apps are different"), then approved the design. This plan gives the Enterprise look IntelliJ Classic's frame on macOS and Windows, keeps Linux as it is, and makes the Enterprise toolbar 28 px on every platform.
@@ -1805,3 +1807,15 @@ Tasks, in order: 1 the model (`title_bar = "classic"`, `Projections.Platform`, f
 
 - **The Dark tab run's column stops `SHORTER` sooner.** In `theRowsDownTheWindowAreTheMocks` the render's column is `0` to `180 - SHORTER`, the user's 2026-10-19 direction. — Why: under the New UI Dark port the tab strip, its rule and the terminal below are one colour (`#1E1F22`), so the render's merged run reaches the column's end; at 34 px it was cut at 180 (60 rows against the mock's 58), at 28 px it measured 72. Stopping the column 12 rows sooner cuts it at the same row of the strip again (60). Light is unchanged by it; no tolerance moved.
 - **The toolbar pairs use 56 rows each** (`crop` `[2, 116, 2880, 56]`, `render_crop` `[0, 50, 2880, 56]`): every listed colour is present in the 56-row crop, so the 58-row fallback is not needed. Agreements: `chrome-toolbar-light` 0.581, `chrome-toolbar-dark` 0.577 (floor 0.30, unchanged); every other `chrome-` pair passes unchanged.
+
+### Task 8 record
+
+- **The execution notes already exist** (the refresh commit added them), so Task 8 appends this record instead of a
+  second `## Execution notes (2026-10-19)` section.
+- **The spec's header amendment is one line**, as plans 12 and 13 wrote theirs; every other spec edit is re-wrapped at 120
+  columns with its paragraph's indent.
+- **Results.** `./gradlew check --continue`: 11,536 tests, 0 failures, 0 errors, 25 skipped (base 11,514). The headless
+  gallery equals the Step 0 baseline (Slate Cobalt Dark and Light, 161 files each), and so do the 11 default-look
+  jasper-app renders; `CustomTitleBarTest`, `MacTitleBarTest` and `DefaultDockPixelsTest` are unedited.
+  `check_pairs.py` exits 0 with 101 of 101 PASS and the baseline's verdicts; only two lines changed:
+  `chrome-toolbar-light` 0.674 to 0.581 and `chrome-toolbar-dark` 0.670 to 0.577 (floor 0.30).
