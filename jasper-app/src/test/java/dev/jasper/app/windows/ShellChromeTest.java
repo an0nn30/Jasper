@@ -3,6 +3,8 @@ package dev.jasper.app.windows;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.jasper.app.presentation.ChromeSpec;
+import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.presentation.ShellLook;
 import javax.swing.JRootPane;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,17 @@ class ShellChromeTest {
             ShellChrome.of(new ShellLook(false, false, false), true).followTheme(other, null, true);
             assertThat(other.getClientProperty("apple.awt.windowAppearance")).as("off macOS, or a look that does not follow").isNull();
         });
+    }
+
+    /** Plan 14 (Rulings 12 and 16): under a classic title macOS frames carry the File menu for the screen menu bar; elsewhere none. */
+    @Test void aClassicTitleOnMacOsGivesAuxiliaryFramesTheMenuTheScreenMenuBarShows() {
+        var chrome = dev.jasper.app.testsupport.EnterpriseLook.titled(ChromeSpec.CLASSIC, ChromeSpec.TitleBar.CLASSIC);
+        var mac = ShellChrome.of(Projections.of(chrome, true, true, "p", new Projections.Host(Projections.Platform.MAC, true)).shell(), true);
+        assertThat(mac.frameMenuRow()).isTrue();
+        assertThat(mac.unifiedTitle()).as("their system title bars").isFalse();
+        for (var platform : new Projections.Platform[] {Projections.Platform.WINDOWS, Projections.Platform.LINUX})
+            assertThat(ShellChrome.of(Projections.of(chrome, true, true, "p", new Projections.Host(platform, false)).shell(), false).frameMenuRow())
+                .as("%s", platform).isFalse();
     }
 
     /** Plan 10b Rulings 14 (spec 10.1 as amended): a classic look's auxiliary frames show no menu row and close with their key. */

@@ -38,10 +38,11 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
      * inside {@code add}, never for a window
      * nobody sees, and the view closes with its window or with this registration. Its root is an INLINE
      * {@link Nodes.Stack} of LABEL {@link Nodes.Text}s, DROPDOWN, SEARCHABLE or PICKER {@link Nodes.Choice}s, at most one
-     * PRIMARY {@link Nodes.Button}, {@link Nodes.MenuButton}s and {@link Nodes.Separator}s. When it mounts the view the
-     * host refuses any other tree without an exception to the plugin: it records the refusal, naming the node, closes the
-     * view and that window shows none. {@link UiView#update} throws {@link IllegalArgumentException} naming the node and
-     * keeps the tree. A view never moves into the overflow menu: it hides while the toolbar is too narrow for it.
+     * PRIMARY {@link Nodes.Button} and any number of icon-only GHOST Buttons (a blank label with an icon and a tooltip,
+     * since 0.18.1), {@link Nodes.MenuButton}s and {@link Nodes.Separator}s. When it mounts the view the host refuses
+     * any other tree without an exception to the plugin: it records the refusal, naming the node, closes the view and
+     * that window shows none. {@link UiView#update} throws {@link IllegalArgumentException} naming the node and keeps the
+     * tree. A view never moves into the overflow menu: it hides while the toolbar is too narrow for it.
      *
      * @param factory builds one window's view
      * @since 0.18.0

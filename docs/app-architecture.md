@@ -172,7 +172,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT arguments, the home's instance lock and the handoff, and EDT composition. StartupResources owns rollback until explicit transfer; the owner's Instance keeps its lock for the life of the process. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
-| `workspace` | EDT windows (`WindowManager`, `MainWindow`, `ChildWindow`, their `WindowFrame`s), their workspaces of tab groups (`WorkspaceView`, `GroupView`, `SplitContainer`), terminal tabs and panes, the tab drag (`TabDrag`, the window manager's one, shared by its windows), the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
+| `workspace` | EDT windows (`WindowManager`, `MainWindow`, `ChildWindow`, their `WindowFrame`s), their workspaces of tab groups (`WorkspaceView`, `GroupView`, `SplitContainer`), terminal tabs and panes, the tab drag (`TabDrag`, the window manager's one, shared by its windows), the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`; and the tab drag's `WorkspaceDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, and the layout's group ids and sides, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
 | `layout` | Pure workspace layout model: tab and group ids, a workspace's tab groups in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximized group and the groups' order of use, the operations that return a new layout, and each group's region of the unit square with its directional neighbours. JDK-only (nothing from Swing or AWT, enforced by `verifyApplicationArchitecture`); immutable values, safe on any thread. `persistence.WorkspaceFile` reads and writes it as `workspace.toml`. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
@@ -189,10 +189,10 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `notifications` | EDT notification center (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, plus terminal and activity notice production for Buddy. Application owns the center and the incidents and closes notifiers before companion. |
 | `notificationui` | EDT Swing views of the center: the main window's CardLayer, the history panel, the Errors tab's ErrorsView, and their text, style and focus helpers. Application mounts each layer through WindowContent and closes it with its window; the Errors tab closes its view when it closes. |
 | `about` | The About and Licenses windows' views and the third-party notices index read from resources. Application's AboutWindows owns both windows and closes each view with its window. |
-| `splash` | The boot splash of a branded look: `SplashPainter` draws it from the look's files, the same in every theme, and `Splash` is its undecorated window. The bootstrap decodes the files off the EDT, opens the window on it and closes it through `StartupSteps` when the first window shows or start-up fails. |
+| `splash` | The boot splash of a branded look: `SplashPainter` draws it from the look's files, the same in every theme, and `Splash` is its undecorated window, which every paint reaches as one copy from `SplashBuffer`. The bootstrap decodes the files off the EDT, opens the window on it and closes it through `StartupSteps` when the first window shows or start-up fails. |
 | `residency` | The instance lock, the bounded handoff protocol and its endpoint worker. The lock lives as long as the process; bootstrap transfers endpoint close to application shutdown and process-hook backup. |
 | `commandline` | The `jasper` command's side: the command socket's wire format and listener (a reader and a writer virtual thread per call; output is only queued), the calls it dispatches, the subcommand list `jasper --help` reads, and putting the command on `PATH`. The home's owner binds the listener before AWT and holds its calls until the application is composed; the application closes it at shutdown. |
-| `platform` | OS adapters, icons, fonts, title-bar paint, logging and system notifications. Callers own registrations and native handles; Swing operations run on EDT, and logging and system notifications each have their own worker. |
+| `platform` | OS adapters, icons, fonts, title-bar paint, logging and system notifications. Callers own registrations and native handles; Swing operations run on EDT, logging and system notifications each have their own worker, and the macOS title band reads the double-click setting once on a short-lived virtual thread. |
 | `persistence` | Bounded TOML reads and atomic writes; synchronous helpers own short-lived file handles. Caller chooses thread and lifecycle. |
 | `presentation` | The presentation a process runs with, chosen once before Swing: the kit file parser (`KitParser`, `ChromeSpec`, `FontFile`), each provider's `PresentationFacts`, the attempt record (`AttemptStore`, `PresentationAttempt`), the projections of spec 9.1 and `Presentation`. The window chrome's projections are read by the bootstrap (`DesktopFlags`), `WorkspaceChrome.of`, `ShellChrome.of`, `WindowLook`, `WindowTitle` (`TitleFormat`) and the application's `LookMotion`, and the dialog mapping by `AuxiliaryWindows`. Values and bounded file stores; `PluginSelection` builds it and the application hands each consumer its kit or projection. `Branding` holds a look's product name, icons and splash art as bytes; the bootstrap and `ApplicationIcon` decode them. |
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. Declared plugin settings (DeclaredSettings) are read with the plugin's own schema and saved through PluginSettingsFiles. PluginRuntime.settingsPages gives Settings a page per plugin under Tools. |
@@ -233,11 +233,25 @@ and collapse to its magnifier. `toolbar = "hidden"` hides only the buttons. `Tit
 chosen at startup: on macOS `MacTitleBar` hosts the header in the native title row and gives it insets
 that keep clear of the traffic lights; on Windows and Linux FlatLaf's title pane embeds
 `CollapsingMenuBar`, which carries the header under the menus; with `window.native_decorations = true`
-the system title bar stays and the header is the top row of `WindowContent`. A look with a native title (the
-Enterprise presentation) gives every platform the system title bar; with `menu_bar = "window"` the bootstrap turns
-macOS's screen menu bar off, so the main window's menus are a row in the window (a child window shows none, and an
-auxiliary frame shows none and binds Close Window's shortcut itself). Otherwise, on macOS a focused child window's screen
-menu bar shows its own copy of the main window's menus, built from the same model. A native-titled macOS frame's appearance follows the theme; Jasper gives the
+the system title bar stays and the header is the top row of `WindowContent`. A look with a native title gives every
+platform the system title bar. With `menu_bar = "window"` the bootstrap turns macOS's screen menu bar off, so the main
+window's menus are a row in the window (a child window shows none, and an auxiliary frame shows none and binds Close
+Window's shortcut itself). Otherwise, on macOS a focused child window's screen menu bar shows its own copy of the main
+window's menus, built from the same model.
+
+The Enterprise presentation's classic title (`title_bar = "classic"`) is IntelliJ Classic's:
+- On macOS, `MacTitleBand` (platform) is a 28 pt band in the toolbar's colour under the system's transparent title,
+  which macOS draws with the traffic lights; a child window has it too. The menus stay in the screen menu bar, and an
+  auxiliary frame keeps its system title bar and shows the minimal File menu there.
+- On Windows, FlatLaf's title pane embeds `CollapsingMenuBar` and `ClassicWindowTitle`, the window title left-aligned
+  after the menus, over a 1 px rule. A child window's title pane is 28 px in the toolbar's colour and holds FlatLaf's
+  title alone.
+- On Linux it is the system title bar.
+
+`TitleInset` keeps classic in-window dialogs and overlays below either, and below the FlatLaf title pane of a Windows
+auxiliary frame or dialog under the classic title.
+
+A native-titled macOS frame's appearance follows the theme; Jasper gives the
 Windows and Linux system title bar no appearance hint (JBR has none). `WorkspaceChrome.of` (workspace) and
 `ShellChrome.of` (windows) read the look's projections and choose the strategies, among them `MenuBarLayout`:
 `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).
@@ -254,6 +268,12 @@ foreground (see [SDK architecture](sdk-architecture.md)).
 The header, both stripes and the status bar are the native chrome's receiving contexts (`AppIcons.chromeReceiver`):
 named glyphs painted inside them use the kit's original chrome artwork (`IconRegistry.chromeIcon`) without changing
 icon values or identities, and their painting and text sizes come from `ChromePainter.installed()` and named kit roles.
+Under `[chrome] icons = "classic"` each window's header and status bar are marked `ChromeArtwork.CLASSIC`, so the
+meanings the classic set has draw IntelliJ's classic icons (`assets-classic.tsv`).
+The labelled stripes and the bottom strip are not receivers: `DockChrome.stripes` gives them the look's
+`ChromeArtwork`, and they draw each label's icon at 13 px through `AppIcons.stripeIcon`: under CLASSIC, IntelliJ's
+classic tool-window icon where `IconRegistry.stripeIcon` has one, else the icon's monochrome glyph in the label's
+ink; under NEW_UI, the icon the rails draw.
 
 ## Themes
 

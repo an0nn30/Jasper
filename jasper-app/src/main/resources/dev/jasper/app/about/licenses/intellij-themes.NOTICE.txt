@@ -1,0 +1,13 @@
+The Enterprise theme's Light and Dark variants are ports of IntelliJ IDEA's "IntelliJ Light" and New UI "Dark" themes and their
+editor colour schemes, converted by Jasper's tools/themes/jasper_theme.py (the colour mapping is Jasper's).
+Copyright 2000-2026 JetBrains s.r.o. and contributors.
+Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+Source: https://github.com/JetBrains/intellij-community, platform/platform-resources/src/themes/Light.theme.json,
+intellijlaf.theme.json, darcula.theme.json, Light.xml, expUI/expUI_dark.theme.json, expUI/expUI_darkScheme.xml and
+platform/platform-resources/src/DefaultColorSchemesManager.xml, at commit f7377708b654b73b206da40bb382ecb4d44e8f12; the
+port is identical at tag idea/2026.2.3 (commit 8062c061ff33e22041d9f1844db5b8b8a6b5e4d7).
+
+NOTICE (from the upstream NOTICE.txt):
+This software includes code from IntelliJ IDEA
+Copyright (C) JetBrains s.r.o.
+https://www.jetbrains.com/idea/

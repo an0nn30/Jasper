@@ -16,8 +16,9 @@ import javax.swing.JComponent;
  * The drag guides of a dock drag and of a tab drag ({@link TabDrag}: the area the tab would take as the highlight, its
  * place in a strip as the placeholder), on the layered pane's DRAG_LAYER: a translucent highlight with a 1px border
  * where the dragged tool window would land (for a second slot, always that slot's half; see
- * {@link dev.jasper.app.dock.DockGeometry#landing}), a highlighted rounded square in the stripe's gap, and the window's
- * icon at the cursor. It takes no mouse input.
+ * {@link dev.jasper.app.dock.DockGeometry#landing}), a highlighted rounded square in the stripe's gap, and the dragged
+ * window's ghost at the cursor ({@link StripeSet#ghost}: its own icon on the rails, its stripe icon on labelled
+ * stripes). It takes no mouse input.
  * Colours: the canonical accent role at the named module alphas (25 % fill, 60 % border); vendor DragAndDrop.* keys
  * have no canonical role and do not bypass it. Both the highlight and the
  * placeholder draw their fill inside their 1px border, so the translucent colours never stack. {@link #show} repaints
@@ -44,7 +45,7 @@ final class DockDropOverlay extends JComponent {
      *
      * @param highlight where the window would land
      * @param placeholder the stripe's gap
-     * @param ghost the dragged window's icon
+     * @param ghost the dragged window's ghost, drawn at the cursor
      * @param cursor where to draw the ghost, centred
      */
     void show(Rectangle highlight, Rectangle placeholder, Icon ghost, Point cursor) {
@@ -76,6 +77,9 @@ final class DockDropOverlay extends JComponent {
     Rectangle highlight() { return highlight == null ? null : new Rectangle(highlight); }
 
     Rectangle placeholder() { return placeholder == null ? null : new Rectangle(placeholder); }
+
+    /** The ghost shown at the cursor, or null. */
+    Icon ghost() { return ghost; }
 
     /** Events pass through to whatever is underneath. */
     @Override public boolean contains(int x, int y) { return false; }

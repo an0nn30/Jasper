@@ -10,17 +10,21 @@ import org.junit.jupiter.api.Test;
 
 /** Spec 9.1: each consumer's projection, the default look's by the same rules, and the fallback. */
 class ProjectionsTest {
-    static final Projections.Host MAC = new Projections.Host(true, true), LINUX = new Projections.Host(false, false);
+    static final Projections.Host MAC = new Projections.Host(Projections.Platform.MAC, true),
+        WINDOWS = new Projections.Host(Projections.Platform.WINDOWS, false), LINUX = new Projections.Host(Projections.Platform.LINUX, false);
+    /** The classic look's chrome with IntelliJ Classic's title (plan 14). */
+    static final ChromeSpec CLASSIC_TITLE = dev.jasper.app.testsupport.EnterpriseLook.titled(ChromeSpec.CLASSIC, ChromeSpec.TitleBar.CLASSIC);
 
     @Test void theClassicLookMapsByTheSpecTable() {
         var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
         assertThat(classic.desktop()).isEqualTo(new DesktopFlags(false, true));
         assertThat(classic.workspace()).isEqualTo(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.CLASSIC,
-            WorkspaceLook.Stripes.LABELLED, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.FLUSH));
+            WorkspaceLook.Stripes.LABELLED, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.FLUSH,
+            WorkspaceLook.Icons.CLASSIC));
         assertThat(classic.shell()).isEqualTo(new ShellLook(false, true, true));
-        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
+        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.UPPER));
         assertThat(classic.settings()).isEqualTo(new SettingsChrome(false, true, false,
-            Set.of("window.native_decorations", "ui.animations.enabled"), true));
+            Set.of("window.native_decorations", "ui.animations.enabled", "window.rail_width"), true));
         assertThat(classic.composition()).isEqualTo(Composition.CLASSIC);
         assertThat(classic.dialogs()).isEqualTo(new DialogMapping(DialogMapping.Kind.CLASSIC, true));
         assertThat(classic.motion()).isEqualTo(Motion.NONE);
@@ -33,7 +37,8 @@ class ProjectionsTest {
         var mac = Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC);
         assertThat(mac.desktop()).isEqualTo(DesktopFlags.STANDARD);
         assertThat(mac.workspace()).isEqualTo(new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED,
-            WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD));
+            WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD,
+            WorkspaceLook.Icons.NEW_UI));
         assertThat(mac.shell()).isEqualTo(new ShellLook(true, false, false));
         assertThat(mac.settings()).isEqualTo(new SettingsChrome(true, false, true, Set.of("window.native_decorations"), false));
         assertThat(mac.dialogs()).isEqualTo(new DialogMapping(DialogMapping.Kind.AS_REQUESTED, false));
@@ -42,6 +47,46 @@ class ProjectionsTest {
         var linux = Projections.of(ChromeSpec.DEFAULT, false, false, "", LINUX);
         assertThat(linux.shell().unifiedTitle()).isFalse();
         assertThat(linux.settings().hiddenKeys()).isEmpty();
+        assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", WINDOWS)).isEqualTo(Projections.of(ChromeSpec.DEFAULT, false, false, "", LINUX));
+    }
+
+    /** Plan 14 (Rulings 5): a classic title is IntelliJ Classic's frame on macOS and Windows and the system's title bar on Linux. */
+    @Test void aClassicTitleIsIntelliJsFrameOnMacOsAndWindowsAndTheSystemsTitleBarOnLinux() {
+        var mac = Projections.of(CLASSIC_TITLE, true, true, "dev.jasper.enterprise", MAC);
+        assertThat(mac.desktop()).as("the default look's flags: the screen menu bar, no system title").isEqualTo(DesktopFlags.STANDARD);
+        assertThat(mac.workspace().menus()).isEqualTo(WorkspaceLook.Menus.CLASSIC);
+        assertThat(mac.workspace().header()).isEqualTo(WorkspaceLook.Header.CLASSIC);
+        assertThat(mac.shell()).as("system-titled auxiliary frames with the File menu; the band").isEqualTo(new ShellLook(false, false, true, true));
+        assertThat(mac.settings().integratedTitle()).isFalse();
+        assertThat(mac.settings().hiddenKeys()).contains("window.native_decorations", "ui.animations.enabled", "window.rail_width");
+        assertThat(mac.dialogs()).isEqualTo(new DialogMapping(DialogMapping.Kind.CLASSIC, true));
+        var windows = Projections.of(CLASSIC_TITLE, true, true, "dev.jasper.enterprise", WINDOWS);
+        assertThat(windows.desktop()).isEqualTo(DesktopFlags.STANDARD);
+        assertThat(windows.workspace()).isEqualTo(mac.workspace());
+        assertThat(windows.shell()).as("no auxiliary menu row; the custom title bar").isEqualTo(new ShellLook(false, true, true, true));
+        assertThat(windows.settings().integratedTitle()).isFalse();
+        assertThat(windows.settings().hiddenKeys()).as("the classic title honours window.native_decorations")
+            .doesNotContain("window.native_decorations").contains("ui.animations.enabled", "window.rail_width");
+        assertThat(windows.dialogs()).isEqualTo(new DialogMapping(DialogMapping.Kind.CLASSIC, true));
+        assertThat(Projections.of(CLASSIC_TITLE, true, true, "dev.jasper.enterprise", LINUX)).as("Linux: exactly the native title's projections")
+            .isEqualTo(Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", LINUX));
+    }
+
+    /** Spec 4.7 under plan 14: the classic title committed the default look's flags, so a failed start is the default look. */
+    @Test void aClassicTitleFallsBackToExactlyTheDefaultLookOnMacOsAndWindows() {
+        for (var host : new Projections.Host[] {MAC, WINDOWS})
+            assertThat(Projections.fallback(Projections.of(CLASSIC_TITLE, true, true, "p", host).desktop(), host)).as("%s", host)
+                .isEqualTo(Projections.standard(host));
+        assertThat(Projections.fallback(Projections.of(CLASSIC_TITLE, true, true, "p", LINUX).desktop(), LINUX))
+            .isEqualTo(Projections.fallback(new DesktopFlags(false, true), LINUX));
+    }
+
+    @Test void thePlatformComesFromTheOperatingSystemsName() {
+        assertThat(Projections.Platform.of("Mac OS X")).isEqualTo(Projections.Platform.MAC);
+        assertThat(Projections.Platform.of("Windows 11")).isEqualTo(Projections.Platform.WINDOWS);
+        for (String other : new String[] {"Linux", "FreeBSD", "", null}) assertThat(Projections.Platform.of(other)).as("%s", other).isEqualTo(Projections.Platform.LINUX);
+        assertThat(MAC.mac()).isTrue();
+        assertThat(WINDOWS.mac()).isFalse();
     }
 
     @Test void theFallbackIsSpecFourSevensValue() {
@@ -57,7 +102,7 @@ class ProjectionsTest {
         assertThat(fallback.panels()).isEqualTo(new AppPanels("Notifications", Slot.RIGHT_TOP));
         assertThat(Projections.fallback(new DesktopFlags(true, true), LINUX).settings().hiddenKeys())
             .as("a native title hides the decorations switch on every platform").containsExactly("window.native_decorations");
-        for (var host : new Projections.Host[] {MAC, LINUX})
+        for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX})
             assertThat(Projections.fallback(DesktopFlags.STANDARD, host)).as("a unified title was committed: the default look's values")
                 .isEqualTo(Projections.of(ChromeSpec.DEFAULT, false, false, "", host));
     }
@@ -69,13 +114,16 @@ class ProjectionsTest {
         for (var status : ChromeSpec.StatusBar.values()) for (var palette : ChromeSpec.PaletteKind.values())
         for (var dialogs : ChromeSpec.DialogKind.values()) for (var motion : ChromeSpec.MotionKind.values())
         for (String template : new String[] {"{context}", "Workstation — {session} — {directory}"}) {
-            if (menu == ChromeSpec.MenuBar.WINDOW && title != ChromeSpec.TitleBar.NATIVE) continue;
-            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion);
-            for (var host : new Projections.Host[] {MAC, LINUX})
+            if (menu == ChromeSpec.MenuBar.WINDOW && title == ChromeSpec.TitleBar.UNIFIED) continue;
+            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion, ChromeSpec.Icons.NEW_UI);
+            for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX})
                 assertThatCode(() -> Projections.of(chrome, true, true, "p", host)).doesNotThrowAnyException();
+            if (title != ChromeSpec.TitleBar.CLASSIC)
+                assertThat(Projections.of(chrome, true, true, "p", WINDOWS)).as("Windows and Linux agree without a classic title")
+                    .isEqualTo(Projections.of(chrome, true, true, "p", LINUX));
             built++;
         }
-        assertThat(built).isEqualTo(3 * 2 * 2 * 2 * 2 * 2 * 2 * 2);
+        assertThat(built).isEqualTo(5 * 2 * 2 * 2 * 2 * 2 * 2 * 2);
     }
 
     @Test void thePresentationOfAKitCarriesItAndFallsBackToTheDefaultKitKeepingItsDefaults() throws Exception {
@@ -113,11 +161,23 @@ class ProjectionsTest {
         assertThat(Presentation.standard(MAC).fallback(MAC).projections().dockLayout().key()).as("the fallback").isEmpty();
     }
 
+    /** The user's direction of 2026-10-18: labelled stripes fit their labels, so Settings hides the Panel rail width. */
+    @Test void labelledStripesHideThePanelRailWidth() {
+        var d = ChromeSpec.DEFAULT;
+        var stripes = new ChromeSpec(d.titleBar(), d.menuBar(), d.windowTitle(), ChromeSpec.ToolWindows.STRIPES, d.editorTabs(),
+            d.statusBar(), d.palette(), d.dialogs(), d.motion(), d.icons());
+        for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX}) {
+            assertThat(Projections.of(stripes, false, false, "p", host).settings().hiddenKeys()).contains("window.rail_width");
+            assertThat(Projections.of(d, false, false, "", host).settings().hiddenKeys()).doesNotContain("window.rail_width");
+            assertThat(Projections.fallback(DesktopFlags.STANDARD, host).settings().hiddenKeys()).doesNotContain("window.rail_width");
+        }
+    }
+
     /** Plan 9a: the kit file's Settings chrome and composition reach the projection. */
     @Test void theClassicSettingsChromeAndComposition() {
         var shipped = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
         assertThat(shipped.settings()).isEqualTo(new SettingsChrome(false, true, false,
-            Set.of("window.native_decorations", "ui.animations.enabled"), true));
+            Set.of("window.native_decorations", "ui.animations.enabled", "window.rail_width"), true));
         assertThat(shipped.composition()).isEqualTo(Composition.CLASSIC);
     }
 
@@ -131,7 +191,7 @@ class ProjectionsTest {
 
     /** Plan 9a: the default look's projections, for pages and dialogs made without a presentation. */
     @Test void theStandardProjectionsAreTheDefaultLooks() {
-        for (var host : new Projections.Host[] {MAC, LINUX})
+        for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX})
             assertThat(Projections.standard(host)).isEqualTo(Projections.of(ChromeSpec.DEFAULT, false, false, "", host));
         assertThat(Projections.standard(LINUX).settings()).isEqualTo(new SettingsChrome(true, false, true, Set.of(), false));
         assertThat(Projections.standard(MAC).settings().hiddenKeys()).containsExactly("window.native_decorations");
@@ -141,7 +201,15 @@ class ProjectionsTest {
     /** Plan 8b: the kit's run_window palette reaches the projection. */
     @Test void theRunWindowPaletteReachesTheProjection() {
         var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
-        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
+        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.UPPER));
         assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC).palette()).isEqualTo(PaletteLook.DEFAULT);
+    }
+
+    /** Plan 12 Rulings 6: the kit's [chrome] icons is the workspace look's icons; the default look and the fallback keep New UI. */
+    @Test void theIconsPointIsTheWorkspaceLooksIcons() {
+        assertThat(Projections.of(ChromeSpec.CLASSIC, true, false, "p", MAC).workspace().icons()).isEqualTo(WorkspaceLook.Icons.CLASSIC);
+        assertThat(Projections.standard(MAC).workspace().icons()).isEqualTo(WorkspaceLook.Icons.NEW_UI);
+        for (var committed : new DesktopFlags[] {DesktopFlags.STANDARD, new DesktopFlags(false, true)})
+            assertThat(Projections.fallback(committed, MAC).workspace().icons()).as("%s", committed).isEqualTo(WorkspaceLook.Icons.NEW_UI);
     }
 }

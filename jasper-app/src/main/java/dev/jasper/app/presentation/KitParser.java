@@ -36,7 +36,7 @@ import org.tomlj.TomlTable;
 /**
  * Reads a kit file (spec 5): TOML 1.0, strict and all or nothing, in the style of the plugin descriptor parser. A kit
  * names its format ({@code kit = 1}) and a host catalog ({@code base}), then optionally the chrome points, the control
- * points, the eleven public tokens, its type base and face files, two colour slots, four setting defaults and its branding. Every
+ * points, the eleven public tokens, its type base and face files, two colour slots, five setting defaults and its branding. Every
  * failure is one {@link Invalid} naming the key. Pure: files arrive through {@link Files}.
  */
 public final class KitParser {
@@ -55,7 +55,7 @@ public final class KitParser {
     private static final Pattern TOKEN = Pattern.compile("\\{([^{}]*)}");
     private static final Set<String> TITLE_TOKENS = Set.of("context", "session", "directory");
     private static final List<String> CHROME = List.of("title_bar", "menu_bar", "window_title", "tool_windows", "editor_tabs",
-        "status_bar", "palette", "dialogs", "motion");
+        "status_bar", "palette", "dialogs", "motion", "icons");
     private static final List<String> CONTROLS = List.of("toggle", "exclusive", "tabs", "group", "form_label", "empty", "table",
         "tree", "stepper", "ordered_list", "buttons", "tag", "route", "prompt");
 
@@ -303,9 +303,10 @@ public final class KitParser {
         var palette = point(table, "chrome", "palette", ChromeSpec.PaletteKind.class, base.palette());
         var dialogs = point(table, "chrome", "dialogs", ChromeSpec.DialogKind.class, base.dialogs());
         var motion = point(table, "chrome", "motion", ChromeSpec.MotionKind.class, base.motion());
-        if (menuBar == ChromeSpec.MenuBar.WINDOW && titleBar != ChromeSpec.TitleBar.NATIVE)
-            throw new Invalid("[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\"");
-        return new ChromeSpec(titleBar, menuBar, title, toolWindows, editorTabs, statusBar, palette, dialogs, motion);
+        var icons = point(table, "chrome", "icons", ChromeSpec.Icons.class, base.icons());
+        if (menuBar == ChromeSpec.MenuBar.WINDOW && titleBar == ChromeSpec.TitleBar.UNIFIED)
+            throw new Invalid("[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\" or \"classic\"");
+        return new ChromeSpec(titleBar, menuBar, title, toolWindows, editorTabs, statusBar, palette, dialogs, motion, icons);
     }
 
     private static String windowTitle(String text) throws Invalid {
@@ -514,7 +515,7 @@ public final class KitParser {
     private static Map<String, Setting<?>> defaultsByKey() {
         var byKey = new LinkedHashMap<String, Setting<?>>();
         for (Setting<?> setting : List.of(CoreSettings.UI_THEME_LIGHT, CoreSettings.UI_THEME_DARK, CoreSettings.PALETTE_VISIBLE_ROWS,
-                CoreSettings.WINDOW_TOOLBAR_HEIGHT)) byKey.put(String.join(".", setting.key()), setting);
+                CoreSettings.WINDOW_TOOLBAR_HEIGHT, CoreSettings.WINDOW_TOOLBAR)) byKey.put(String.join(".", setting.key()), setting);
         return java.util.Collections.unmodifiableMap(byKey);
     }
 }

@@ -5,18 +5,8 @@ name: linux-packages
 # and newer releases still provide. Each package is then installed into disposable containers of other
 # distributions to prove its dependencies resolve there.
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Package version (X.Y.Z); leave empty to take it from the commit's release tag
-        required: false
-  # A release tag (vX.Y.Z) always packages; a branch push or pull request only when packaging itself changes.
-  # GitHub does not evaluate path filters for tag pushes.
   push:
-    branches:
-      - '**'
-    tags:
-      - 'v*'
+    branches: [main]
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
@@ -28,6 +18,13 @@ on:
       - gradle/packaging-support.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   package:
@@ -56,9 +53,7 @@ jobs:
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v6
       - name: Package
-        env:
-          JASPER_VERSION: ${{ inputs.version }}
-        run: ./gradlew :jasper-app:packageDist ${JASPER_VERSION:+"-PjasperVersion=$JASPER_VERSION"} --continue --stacktrace
+        run: ./gradlew :jasper-app:packageDist --stacktrace
       - uses: actions/upload-artifact@v7
         with:
           name: jasper-linux-${{ matrix.arch }}

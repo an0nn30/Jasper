@@ -22,6 +22,22 @@ public final class KitFixtures {
     /** The shipped Enterprise theme's Dark variant (the Enterprise plugin's {@code themes/enterprise.json}). */
     public static GeneratedTheme enterpriseDark() { return enterpriseTheme().generated(true); }
 
+    /**
+     * {@code key}'s colour on {@code theme}: a {@link SemanticColor} from its palette or a {@link DerivedColor} from its
+     * derived palette, each as the role holds it (an alpha-carrying role keeps its alpha).
+     *
+     * @throws IllegalArgumentException when {@code key} names no semantic or derived role
+     */
+    public static java.awt.Color colour(GeneratedTheme theme, String key) {
+        var semantic = SemanticColor.of(key);
+        if (semantic.isPresent()) return semantic.get().color(theme);
+        for (var role : DerivedColor.values()) if (role.key().equals(key)) return role.color(theme);
+        throw new IllegalArgumentException("No semantic or derived colour role " + key);
+    }
+
+    /** What a face paints for {@code pair} on {@code theme}: {@link SurfaceContrast#painted(GeneratedTheme, PaintPair)}. */
+    public static java.awt.Color painted(GeneratedTheme theme, PaintPair pair) { return SurfaceContrast.painted(theme, pair); }
+
     /** The repository root, from {@code jasper.repoRoot}. */
     private static java.nio.file.Path repoRoot() {
         return java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();

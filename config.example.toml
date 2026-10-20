@@ -9,6 +9,7 @@ tab_height = 30
 # Live across open windows. Range: 28-64 logical pixels; out-of-range values use the nearest limit.
 rail_width = 28
 # Live across open windows. Options: "icons_and_labels", "icons", or "hidden".
+# The default depends on the active look.
 toolbar = "icons_and_labels"
 # Live across open windows, including the unified macOS title bar.
 # Range: 28-64 logical pixels; out-of-range values use the nearest limit.

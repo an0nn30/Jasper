@@ -57,7 +57,7 @@ class RunWindowModelessTest {
     }
 
     static Opened open(PaletteLook look) {
-        var owner = CornerHomeTest.owner(look);
+        var owner = UpperHomeTest.owner(look);
         var root = WindowCommandPaletteTest.install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
         owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
         var window = owner.commandPalette().component();

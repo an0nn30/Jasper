@@ -52,7 +52,8 @@ class NotificationsFeatureTest {
         contributions.onPanelRequest(requests::add);
         UUID window = UUID.randomUUID();
         contributions.action(NotificationsFeature.SHOW_HISTORY).orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
-        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, NotificationsFeature.PANEL_ID, Contributions.PanelRequest.Op.TOGGLE));
+        // Plan 12 Rulings 18: the View toggle action is a user gesture.
+        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, NotificationsFeature.PANEL_ID, Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
     }
 
     @Test void theBadgeCountsUnreadAndTurnsRedForErrors() {

@@ -105,12 +105,18 @@ class RunWindowPresentationTest {
     }
 
     /**
-     * Spec 7.3: a selected Commands row's BLUE square, which Enterprise Light paints in the accent itself, keeps its fill
+     * Spec 7.3: a selected Commands row's BLUE square, in a theme that paints it in the accent itself, keeps its fill
      * and takes a hairline ring in the guarded colour, so it stays visible on the selection; an unselected one has none.
      */
     @Test void aSelectedSquareInTheAccentsOwnHueKeepsItsFillInsideAGuardedRing() {
         Edt.run(() -> {
-            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            // The user's 2026-10-18 direction: the IntelliJ Light port's hue.blue is no longer its accent, so the fixture
+            // gives Enterprise Light a blue equal to its accent, as the old Enterprise Light had.
+            var base = KitFixtures.enterpriseLight();
+            var roles = new java.util.EnumMap<SemanticColor, Color>(SemanticColor.class);
+            for (var role : SemanticColor.values()) roles.put(role, base.semantic().color(role));
+            roles.put(SemanticColor.HUE_BLUE, base.semantic().color(SemanticColor.ACCENT));
+            var context = KitFixtures.context(KitFixtures.withSemantic(base, new dev.jasper.ui.theme.SemanticPalette(roles)), KitFixtures.enterprise());
             var items = List.of(
                 new ListItem("a", Optional.of(new Nodes.Icon("a.swatch", READY, "file", Nodes.Hue.BLUE, Nodes.IconSize.SWATCH, "Command")),
                     List.of(text("a.title", "New Editor File", Nodes.TextRole.BODY)), List.of(), List.of()),
@@ -125,7 +131,7 @@ class RunWindowPresentationTest {
                 var theme = context.theme();
                 var accent = theme.semantic().color(SemanticColor.ACCENT);
                 var blue = theme.semantic().color(SemanticColor.HUE_BLUE);
-                assertThat(blue).as("the fixture's premise: Enterprise Light's blue is its accent").isEqualTo(accent);
+                assertThat(blue).as("the fixture's premise: the blue is the accent").isEqualTo(accent);
                 int side = m(context, DesignMetrics.Role.RUN_WINDOW_ROW_SIDE), square = m(context, DesignMetrics.Role.RUN_WINDOW_SWATCH), x = side + square / 2;
                 int top = rows.get(0).getY(), end = top + rows.get(0).getHeight();
                 while (top < end && image.getRGB(x, top) == accent.getRGB()) top++;
@@ -275,7 +281,7 @@ class RunWindowPresentationTest {
                 assertThat(strong.getFont()).as("the mocks' 11 px semibold detail label").isEqualTo(ThemePainting.font(context, Typography.Role.RUN_HEADING));
                 var mono = find(view, "mono", JLabel.class);
                 assertThat(mono.getFont()).isEqualTo(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
-                assertThat(mono.getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_SECONDARY));
+                assertThat(mono.getForeground()).isEqualTo(SurfaceContrast.painted(context.theme(), RunWindowPresentation.valuePair(context.kit())));
                 var input = find(view, "query.input", javax.swing.text.JTextComponent.class);
                 assertThat(input.getFont()).as("the query in the data face").isEqualTo(ThemePainting.font(context, Typography.Role.MONO));
                 var surface = (TextFields.FieldSurface) input.getParent();

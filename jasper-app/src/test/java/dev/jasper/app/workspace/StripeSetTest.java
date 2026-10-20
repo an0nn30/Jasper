@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.kit.Kit;
 import java.util.ArrayDeque;
 import java.util.Optional;
@@ -26,7 +27,7 @@ class StripeSetTest {
         assertThat(rails.bottom()).isEmpty();
         assertThat(rails.all()).containsExactly(rails.left(), rails.right());
         assertThat(rails.left().thickness()).isEqualTo(rails.left().getPreferredSize().width);
-        assertThat(DockChrome.STANDARD.stripes(Kit.DEFAULT)).isInstanceOf(StripeSet.IconRails.class);
+        assertThat(DockChrome.STANDARD.stripes(Kit.DEFAULT, ChromeArtwork.NEW_UI)).isInstanceOf(StripeSet.IconRails.class);
     }
 
     @Test void aButtonCarriesTheDigitOfItsToggleAndKeepsItThroughABadge() {

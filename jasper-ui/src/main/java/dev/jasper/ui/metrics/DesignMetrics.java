@@ -150,9 +150,6 @@ public final class DesignMetrics {
         RUN_WINDOW_RADIUS(4), RUN_WINDOW_TITLE_HEIGHT(24), RUN_WINDOW_TITLE_SIDE(10), RUN_WINDOW_CLOSE(16), RUN_WINDOW_CLOSE_SIDE(5), RUN_WINDOW_SHORTCUT_GAP(10), RUN_WINDOW_SIDE(12), RUN_WINDOW_HELP_TOP(10), RUN_WINDOW_TILE(32), RUN_WINDOW_TILE_GLYPH(13), RUN_WINDOW_TILE_GAP(10), RUN_WINDOW_HELP_LINE(18), RUN_WINDOW_FIELD_TOP(11), RUN_WINDOW_LABEL_COLUMN(48), RUN_WINDOW_FIELD_SIDE(6), RUN_WINDOW_MENU_WIDTH(20), RUN_WINDOW_LIST_TOP(10), RUN_WINDOW_ROW_HEIGHT(21), RUN_WINDOW_HEADING_HEIGHT(18), RUN_WINDOW_ROW_SIDE(8), RUN_WINDOW_SWATCH(7), RUN_WINDOW_ROW_GAP(7), RUN_WINDOW_DETAIL_GAP(7), RUN_WINDOW_DETAIL_TOP(10), RUN_WINDOW_DETAIL_LABEL_GAP(6), RUN_WINDOW_CHECK_TOP(10), RUN_WINDOW_BOTTOM(10), RUN_WINDOW_FOOTER_HEIGHT(40), RUN_WINDOW_BUTTON_WIDTH(70), RUN_WINDOW_BUTTON_GAP(6),
         // Plan 5b: the help text's block under the help row's top, where the mocks set its first line (16 under the body's top).
         RUN_WINDOW_HELP_TEXT_TOP(1),
-        // Plan 8b: the Run window's home inset from the dock work area's left and bottom edges (06 Run Dialog mocks: 6 px
-        // right of the left stripe's rule, 5 px above the bottom strip's rule); read only by the Run window's home.
-        RUN_WINDOW_HOME_SIDE(6), RUN_WINDOW_HOME_BOTTOM(5),
         // Plan 8b: the Run window's button label padding, so every footer label the mocks show fits their 70 px buttons
         // (RUN_WINDOW_BUTTON_WIDTH); a longer label grows its button. Read only by the Run window's kit views.
         RUN_WINDOW_BUTTON_PADDING(8),
@@ -184,7 +181,16 @@ public final class DesignMetrics {
         KEYCAP_DETAIL_EDGE_ALPHA(0),
         // Plan 9b: an item list's heading row with its two rules where the table face bands list headings, and a two-line
         // item list's row; 0 keeps a heading as tall as the rows and measures a row from its lines (the classic Plugins list).
-        LIST_HEADING_HEIGHT(0), LIST_TWO_LINE_ROW_HEIGHT(0);
+        LIST_HEADING_HEIGHT(0), LIST_TWO_LINE_ROW_HEIGHT(0),
+        // Plan 12: the classic toolbar's icon-only button (IntelliJ's 22 px ActionButton) and the ▼ in an icon-only
+        // dropdown's corner; only ClassicToolbarButton reads them.
+        CHROME_ICON_BUTTON(22), CHROME_ICON_CARET(4),
+        // Plan 12: IntelliJ's run-configuration combo (ComboBoxButton) in a toolbar strip; only the classic buttons face reads them.
+        TOOLBAR_COMBO_HEIGHT(24), TOOLBAR_COMBO_LEADING(10), TOOLBAR_COMBO_ICON_GAP(4), TOOLBAR_COMBO_ARROW(16), TOOLBAR_COMBO_TRAILING(7),
+        TOOLBAR_COMBO_RADIUS(3), TOOLBAR_COMBO_TEXT_MAX(240),
+        // Plan 13: a labelled stripe button's icon (IntelliJ's classic 13 px tool-window icons) and its gap to the text
+        // (StripeButton's iconTextGap); only the labelled stripes read them.
+        STRIPE_ICON(13), STRIPE_ICON_GAP(4);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }

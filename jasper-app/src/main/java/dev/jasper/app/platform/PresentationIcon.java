@@ -30,6 +30,8 @@ public final class PresentationIcon implements Icon {
     public String name() { return name; }
     /** This artwork in {@code ink} at {@code size} device pixels, as a header strip draws it (spec 10.7). */
     Icon glyph(dev.jasper.ui.theme.SemanticPalette palette, java.awt.Color ink, int size) { return artwork.panel(name, palette, ink, size); }
+    /** This artwork as its own paint draws it, at {@code size} device pixels (a labelled stripe under New UI artwork). */
+    Icon ordinary(dev.jasper.ui.theme.GeneratedTheme theme, int size) { return artwork.icon(name, theme, Nodes.Hue.NONE, size); }
     public String pathData() { return pathData; }
     @Override public int getIconWidth() { return nativeArtwork==null?UIScale.scale(rail):nativeArtwork.size(); }
     @Override public int getIconHeight() { return nativeArtwork==null?UIScale.scale(rail):nativeArtwork.size(); }

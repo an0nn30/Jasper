@@ -77,7 +77,7 @@ final class WindowCommandPalette implements AutoCloseable {
         root.getLayeredPane().add(overlay, JLayeredPane.MODAL_LAYER);
         root.addComponentListener(resize); root.getLayeredPane().addComponentListener(resize);
         owner.addComponentListener(resize); owner.workspace().addComponentListener(resize);
-        // The corner home measures the dock work area, which can move without the tab strip resizing.
+        // The upper home clamps into the dock work area, which can move without the tab strip resizing.
         owner.area().addComponentListener(resize);
         layoutOverlay();
     }

@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Spec 14.4: under CLASSIC the toolbar's Sessions dropdown becomes one "Session: [combo] [Connect]" view per window. */
+/** Spec 14.4: under CLASSIC the toolbar's Sessions dropdown becomes one view per window, the session combo and Run. */
 class SessionToolbarViewTest {
     @TempDir Path dir;
     final List<String> events = new ArrayList<>();
@@ -62,7 +62,17 @@ class SessionToolbarViewTest {
             var window = host.addTerminalWindow();
             assertThat(host.toolbar()).as("no Sessions dropdown").noneMatch(item -> item.contains("Sessions"));
             var view = view(host, window);
-            assertThat(read(view, "session.label", Nodes.Text.class).text()).isEqualTo("Session:");
+            assertThat(value(() -> view.spec().root() instanceof Nodes.Stack stack ? stack.children().stream().map(Nodes.Node::id).toList() : List.of()))
+                .containsExactly("session.choice", "session.connect");
+            var face = choice(view).face().orElseThrow();
+            assertThat(face.primary()).isEqualTo("Mac (192.168.1.119)");
+            assertThat(face.icon()).isEqualTo("application");
+            assertThat(face.density()).isEqualTo(Nodes.PickerDensity.COMPACT);
+            var run = read(view, "session.connect", Nodes.Button.class);
+            assertThat(run.kind()).isEqualTo(Nodes.ButtonKind.GHOST);
+            assertThat(run.label()).isEmpty();
+            assertThat(run.icon()).isEqualTo("run");
+            assertThat(run.tooltip()).isEqualTo("Connect");
             assertThat(choice(view).options()).extracting(Option::label)
                 .containsExactly("Mac (192.168.1.119)", "minecraft-local (192.168.1.124)", "Ubuntu (WSL 2)", "Manage Sessions…");
             assertThat(choice(view).selectedId()).as("the first host while nothing is chosen").isEqualTo("host:" + mac.id());
@@ -82,6 +92,7 @@ class SessionToolbarViewTest {
             edt(toolbar::refresh);
             edt(() -> press(view, "session.connect"));
             edt(() -> emit(view, new UiEvent.Selected("session.choice", Set.of("distro:" + ubuntu.id()))));
+            assertThat(choice(view).face().orElseThrow().primary()).isEqualTo("Ubuntu (WSL 2)");
             edt(() -> press(view, "session.connect"));
             assertThat(events).containsExactly("activate Mac", "activate minecraft-local", "open Ubuntu");
             assertThat(selection.get(window)).contains("distro:" + ubuntu.id());
@@ -101,6 +112,19 @@ class SessionToolbarViewTest {
             edt(toolbar::refresh);
             assertThat(choice(view).options()).extracting(Option::id).containsExactly("none", "manage");
             assertThat(choice(view).selectedId()).isEqualTo("none");
+            assertThat(read(view, "session.connect", Nodes.Button.class).state().enabled()).isFalse();
+        }
+    }
+
+    /** Review Focus 3. */
+    @Test void withNoSavedSessionsTheComboSaysSoAndRunIsDisabled() throws Exception {
+        try (var host = new FakePluginHost()) {
+            distros = List.of();
+            start(host, Layout.CLASSIC);
+            store.remove(mac.id()).join(); store.remove(minecraft.id()).join();
+            edt(toolbar::refresh);
+            var view = view(host, host.addTerminalWindow());
+            assertThat(choice(view).face().orElseThrow().primary()).isEqualTo("No saved sessions");
             assertThat(read(view, "session.connect", Nodes.Button.class).state().enabled()).isFalse();
         }
     }

@@ -76,7 +76,10 @@ public final class DesktopTestSupport {
     }
     /** A window under {@code look}'s chrome, with this host's keymap. */
     public static WindowContent content(ShellLauncher launcher, ThemeController themes, WorkspaceChrome look) {
-        boolean macOs = System.getProperty("os.name").startsWith("Mac");
+        return content(launcher, themes, look, System.getProperty("os.name").startsWith("Mac"));
+    }
+    /** A window under {@code look}'s chrome, with one platform's keymap and shortcut text, whatever the host is. */
+    public static WindowContent content(ShellLauncher launcher, ThemeController themes, WorkspaceChrome look, boolean macOs) {
         WindowContent owner = new WindowContent(launcher, HOME, false, path -> {}, () -> {}, () -> {}, themes,
             KeyBindings.defaults(macOs), new CommandHistory(), macOs, look);
         OWNERS.add(owner);

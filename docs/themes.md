@@ -7,7 +7,7 @@ four flavours are built in too, converted from [its IntelliJ plugin](https://git
 **Catppuccin Latte** (Light), **Catppuccin Frappé**, **Catppuccin Macchiato** and **Catppuccin Mocha** (Dark), each with
 its own terminal scheme. **Ubuntu Yaru** (`ubuntu-yaru`) provides Light and Dark variants adapted from Ubuntu 26.04,
 with matching terminal and editor palettes; [its colour reference](design/theme-engine/ubuntu-yaru.md) records the source
-and mapping. Plugins can ship themes: the bundled Enterprise plugin brings **Enterprise** (Light and Dark)
+and mapping. Plugins can ship themes: the bundled Enterprise plugin brings **Enterprise** (Light and Dark, ports of IntelliJ's IntelliJ Light and New UI Dark)
 while it is turned on. Other themes are Jasper theme files in the themes folder: a UI theme recolours the whole application and brings its own terminal and
 editor schemes; a terminal-only theme adds terminal schemes.
 

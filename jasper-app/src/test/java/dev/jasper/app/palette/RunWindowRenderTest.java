@@ -90,20 +90,29 @@ public class RunWindowRenderTest {
     static final List<Feature> TYPING = List.of(
         new Feature("query text", 125, 186, 1, 0, c -> semantic(c, SemanticColor.SURFACE_INPUT), false, 3));
 
-    record Sample(String name, int x, int y, boolean lower) { }
-    static final List<Sample> SAMPLES = List.of(new Sample("frame", 200, 0, false), new Sample("title band", 200, 20, false),
-        new Sample("body", 20, 400, false), new Sample("help tile", 35, 90, false), new Sample("field", 500, 186, false),
-        new Sample("list edge", 26, 300, false), new Sample("heading band", 300, 250, false), new Sample("selected row", 600, 290, false),
-        new Sample("row", 860, 330, false), new Sample("hue square", 47, 290, false),
-        new Sample("footer rule", 200, 758, true), new Sample("footer", 200, 820, true),
+    /** A fill sample: where, and the colour the render paints there in a state, from the drawing context's theme. */
+    record Sample(String name, int x, int y, boolean lower, java.util.function.BiFunction<KitContext, String, Color> colour) { }
+    static final List<Sample> SAMPLES = List.of(new Sample("frame", 200, 0, false, (c, state) -> derived(c, DerivedColor.BORDER_HOVER)),
+        new Sample("title band", 200, 20, false, (c, state) -> derived(c, DerivedColor.SURFACE_HEADER_ACTIVE)),
+        new Sample("body", 20, 400, false, (c, state) -> dialog(c)), new Sample("help tile", 35, 90, false, (c, state) -> semantic(c, SemanticColor.ACCENT)),
+        new Sample("field", 500, 186, false, (c, state) -> semantic(c, SemanticColor.SURFACE_INPUT)),
+        new Sample("list edge", 26, 300, false, (c, state) -> dev.jasper.ui.theme.SurfaceContrast.painted(c.theme(),
+            dev.jasper.ui.swing.RunWindowPresentation.boxEdge(c.kit()))),
+        new Sample("heading band", 300, 250, false, (c, state) -> derived(c, DerivedColor.SURFACE_TABLE_HEADER)),
+        new Sample("selected row", 600, 290, false, (c, state) -> semantic(c, SemanticColor.ACCENT)),
+        new Sample("row", 860, 330, false, (c, state) -> semantic(c, SemanticColor.SURFACE_CARD)),
+        // The selected item's hue square, filled with its hue as authored: the snippet's green, then auth's purple.
+        new Sample("hue square", 47, 290, false, (c, state) -> semantic(c, state.equals("typing-auth") ? SemanticColor.HUE_PURPLE : SemanticColor.HUE_GREEN)),
+        new Sample("footer rule", 200, 758, true, (c, state) -> semantic(c, SemanticColor.BORDER_WINDOW)),
+        new Sample("footer", 200, 820, true, (c, state) -> derived(c, DerivedColor.SURFACE_FOOTER)),
         // Inside the primary button's left end, above its label.
-        new Sample("primary", 462, 782, true));
+        new Sample("primary", 462, 782, true, (c, state) -> semantic(c, SemanticColor.ACCENT)));
     /**
      * A only: the checkbox's inside. B selects a snippet, whose scope has no SPLIT verb, so spec 11.2 disables the box the B
      * mock draws enabled (plan 8a R12): there the render's {@code surface.tableHeader} against the mock's white is a
      * measured residual, printed.
      */
-    static final List<Sample> OPENED_SAMPLES = List.of(new Sample("checkbox inside", 38, 721, true));
+    static final List<Sample> OPENED_SAMPLES = List.of(new Sample("checkbox inside", 38, 721, true, (c, state) -> semantic(c, SemanticColor.SURFACE_INPUT)));
 
     /** What runs with a render on the EDT, while the context that drew it is still open. */
     @FunctionalInterface interface Drawn { void accept(BufferedImage render, KitContext context) throws Exception; }
@@ -153,8 +162,20 @@ public class RunWindowRenderTest {
 
     /** The probe's result in window pixels: in the mock from its window's origin, in the render the part under the list moved up. */
     static int probe(BufferedImage image, int originX, int originY, Feature feature, int shift, KitContext c) {
+        return probe(image, originX, originY, feature, shift, feature.background().apply(c));
+    }
+
+    /**
+     * The probe in the mock, on the mock's own colour where it starts: since the user's 2026-10-18 direction the theme ports
+     * IntelliJ's, so a role need not be the mock's colour; the mock still gives the layout.
+     */
+    static int mockProbe(BufferedImage mock, Feature feature) {
+        return probe(mock, MOCK_X, MOCK_Y, feature, 0, new Color(mock.getRGB(MOCK_X + feature.x(), MOCK_Y + feature.y())));
+    }
+
+    static int probe(BufferedImage image, int originX, int originY, Feature feature, int shift, Color background) {
         int steps = feature.dx() != 0 ? WIDTH : MOCK_HEIGHT;
-        int found = MockComparison.edge(image, originX + feature.x(), originY + feature.y() + shift, feature.dx(), feature.dy(), steps, feature.background().apply(c));
+        int found = MockComparison.edge(image, originX + feature.x(), originY + feature.y() + shift, feature.dx(), feature.dy(), steps, background);
         return found < 0 ? -1 : (feature.dx() != 0 ? feature.x() + found * feature.dx() : feature.y() + found * feature.dy());
     }
 
@@ -173,7 +194,7 @@ public class RunWindowRenderTest {
         features.addAll(state.equals("typing-auth") ? TYPING : OPENED);
         var misses = new ArrayList<String>();
         for (var feature : features) {
-            int expected = probe(mock, MOCK_X, MOCK_Y, feature, 0, c);
+            int expected = mockProbe(mock, feature);
             int actual = probe(render, 0, 0, feature, feature.lower() ? SHIFT : 0, c);
             assertThat(expected).as(state + ": the mock shows " + feature.name()).isNotNegative();
             String line = feature.name() + ": mock " + expected + ", render " + actual;
@@ -184,13 +205,13 @@ public class RunWindowRenderTest {
         var samples = new ArrayList<>(SAMPLES);
         if (!typing) samples.addAll(OPENED_SAMPLES);
         for (var sample : samples) {
-            double distance = distance(mock, render, sample);
-            String line = sampleLine(mock, render, sample);
+            double distance = distance(render, sample, state, c);
+            String line = sampleLine(mock, render, sample, state, c);
             if (distance > 3) colours.add(line);
         }
-        if (typing) OPENED_SAMPLES.forEach(sample -> System.out.println("run-window " + state + " (residual, plan 8a R12) " + sampleLine(mock, render, sample)));
+        if (typing) OPENED_SAMPLES.forEach(sample -> System.out.println("run-window " + state + " (residual, plan 8a R12) " + sampleLine(mock, render, sample, state, c)));
         assertThat(misses).as(state + ": geometry within tolerance").isEmpty();
-        assertThat(colours).as(state + ": fills within 3 dE76").isEmpty();
+        assertThat(colours).as(state + ": fills within 3 dE76 of the theme's").isEmpty();
         var masks = new ArrayList<>(List.of(SCROLLBAR));
         if (state.equals("typing-auth")) masks.add(COUNT);
         double top = MockComparison.bestAgreement(mock, new Rectangle(MOCK_X, MOCK_Y, WIDTH, BAND), render, new Rectangle(0, 0, WIDTH, BAND), masks, 2);
@@ -206,10 +227,13 @@ public class RunWindowRenderTest {
 
     static Color mockColour(BufferedImage mock, Sample sample) { return new Color(mock.getRGB(MOCK_X + sample.x(), MOCK_Y + sample.y())); }
     static Color renderColour(BufferedImage render, Sample sample) { return new Color(render.getRGB(sample.x(), sample.y() + (sample.lower() ? SHIFT : 0))); }
-    static double distance(BufferedImage mock, BufferedImage render, Sample sample) { return MockComparison.deltaE(mockColour(mock, sample), renderColour(render, sample)); }
-    static String sampleLine(BufferedImage mock, BufferedImage render, Sample sample) {
-        return sample.name() + ": mock " + ColorMath.hex(mockColour(mock, sample)) + ", render " + ColorMath.hex(renderColour(render, sample))
-            + String.format(" (%.1f)", distance(mock, render, sample));
+    /** The render's sample against the colour the shipped theme paints there (the theme follows IntelliJ, the mocks give the layout). */
+    static double distance(BufferedImage render, Sample sample, String state, KitContext c) {
+        return MockComparison.deltaE(sample.colour().apply(c, state), renderColour(render, sample));
+    }
+    static String sampleLine(BufferedImage mock, BufferedImage render, Sample sample, String state, KitContext c) {
+        return sample.name() + ": theme " + ColorMath.hex(sample.colour().apply(c, state)) + ", render " + ColorMath.hex(renderColour(render, sample))
+            + String.format(" (%.1f)", distance(render, sample, state, c)) + ", mock " + ColorMath.hex(mockColour(mock, sample));
     }
 
     @Test void justOpenedMatchesItsMock() throws Exception { compare("just-opened"); }
@@ -233,11 +257,10 @@ public class RunWindowRenderTest {
             assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_PRIMARY), derived(c, DerivedColor.SURFACE_HEADER_ACTIVE))).as("the title").isGreaterThanOrEqualTo(4.5);
             assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), dialog(c))).as("labels and help").isGreaterThanOrEqualTo(4.5);
             assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), derived(c, DerivedColor.SURFACE_TABLE_HEADER))).as("headings").isGreaterThanOrEqualTo(4.5);
-            // Spec 7.6 (plan 5b's accent ruling): Enterprise Dark's accent #3C74D6 keeps text.onAccent #FFFFFF at 4.505:1, so the
-            // selected row paints white, unrepaired, as the Dark Mode mock draws it.
+            // Spec 7.6: Enterprise Dark's accent keeps text.onAccent at 4.5:1, so the selected row paints text.onAccent, unrepaired.
             var selected = dev.jasper.ui.theme.SurfaceContrast.painted(c.theme(), dev.jasper.ui.swing.RunWindowPresentation.SELECTED_TITLE);
-            assertThat(ColorMath.hex(palette.color(SemanticColor.ACCENT))).as("the accent").isEqualToIgnoringCase("#3C74D6");
-            assertThat(ColorMath.hex(selected)).as("the selected row's text, as painted").isEqualToIgnoringCase("#FFFFFF");
+            assertThat(palette.color(SemanticColor.ACCENT)).as("the accent").isEqualTo(dev.jasper.app.testsupport.MockProfile.role(true, "accent"));
+            assertThat(selected).as("the selected row's text, as painted").isEqualTo(palette.color(SemanticColor.TEXT_ONACCENT));
             assertThat(ColorMath.contrast(selected, palette.color(SemanticColor.ACCENT))).as("the selected row, as painted").isGreaterThanOrEqualTo(4.5);
             for (var feature : structure())
                 assertThat(probe(dark, 0, 0, feature, feature.lower() ? SHIFT : 0, c)).as("dark: " + feature.name()).isEqualTo(light.get(feature.name()));

@@ -60,7 +60,7 @@ final class DockDrag {
 
     /** Applies a drop: the dragged window and where it goes. */
     BiConsumer<String, DockDropResolver.Target> onDrop = (id, target) -> { };
-    /** The dragged window's icon, drawn at the cursor. */
+    /** The dragged window's own icon, from which the stripes take its ghost and its gap's icon. */
     Function<String, Icon> icons = id -> null;
     /** Whether the stripes may show; while they may, a hidden (empty) stripe still takes drops at its edge. */
     BooleanSupplier railsEnabled = () -> false;
@@ -71,6 +71,8 @@ final class DockDrag {
     private JComponent source;
     private Point pressedAt;
     private String dragging;
+    /** The dragged window's ghost, from {@link StripeSet#ghost}, computed once when the drag starts. */
+    private Icon ghost;
     private Point last;
     private Optional<DockDropResolver.Target> target = Optional.empty();
     /**
@@ -200,6 +202,7 @@ final class DockDrag {
 
     private void start() {
         dragging = pressedId;
+        ghost = set.ghost(icons.apply(dragging));
         // Where a stripe button was, from the normal layout, before beginDrag lifts it out of it.
         if (stripes.stream().anyMatch(stripe -> SwingUtilities.isDescendingFrom(source, stripe)) && state.slot(dragging).isPresent()) {
             home = SwingUtilities.convertRectangle(source.getParent(), source.getBounds(), root);
@@ -217,7 +220,7 @@ final class DockDrag {
                 standAtEdge(stripe);
             }
             targets.add(stripe);
-            stripe.beginDrag(dragging, labels.apply(dragging));
+            stripe.beginDrag(dragging, labels.apply(dragging), icons.apply(dragging));
         }
         JLayeredPane layers = layers();
         if (layers != null) layers.add(overlay, JLayeredPane.DRAG_LAYER);
@@ -253,7 +256,7 @@ final class DockDrag {
             if (gap.isPresent()) placeholder = SwingUtilities.convertRectangle(stripe, gap.get(), layers);
         }
         overlay.setBounds(0, 0, layers.getWidth(), layers.getHeight());
-        overlay.show(highlight, placeholder, icons.apply(dragging), SwingUtilities.convertPoint(root, at, layers));
+        overlay.show(highlight, placeholder, ghost, SwingUtilities.convertPoint(root, at, layers));
     }
 
     /**
@@ -294,6 +297,7 @@ final class DockDrag {
     private void finish() {
         boolean wasActive = active();
         dragging = null;
+        ghost = null;
         pressedId = null;
         source = null;
         target = Optional.empty();

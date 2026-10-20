@@ -159,6 +159,37 @@ class ZoneIconsTest {
         } finally { themes.close(); ThemeTestSupport.controller(true); }
     }
 
+    /** Plan 12 Rulings 6: a receiver marked for the classic set paints its classic artwork; plain and unmarked do not. */
+    @Test void aClassicReceiverPaintsTheClassicSet() {
+        var themes = ThemeTestSupport.controller(true);
+        try (var registry = new dev.jasper.ui.icons.IconRegistry()) {
+            var theme = dev.jasper.app.appearance.ThemeTestSupport.generated(true);
+            var classic = new JPanel(); AppIcons.chromeReceiver(classic, dev.jasper.ui.icons.ChromeArtwork.CLASSIC);
+            var plain = new JPanel(); AppIcons.chromeReceiver(plain);
+            var unmarked = new JPanel();
+            var labels = new java.util.ArrayList<JLabel>();
+            for (var parent : java.util.List.of(classic, plain, unmarked)) {
+                var group = new JPanel(); parent.add(group);
+                group.putClientProperty("Jasper.zone", "workspace");
+                group.putClientProperty("Jasper.workspaceTheme", theme);
+                var label = new JLabel(); group.add(label); labels.add(label);
+            }
+            var icon = AppIcons.icon("square-plus");
+            int size = icon.getIconWidth();
+            var tint = dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY;
+            assertThat(AppIcons.chromeArtwork(labels.get(0))).contains(dev.jasper.ui.icons.ChromeArtwork.CLASSIC);
+            assertThat(AppIcons.chromeArtwork(labels.get(1))).contains(dev.jasper.ui.icons.ChromeArtwork.NEW_UI);
+            assertThat(AppIcons.chromeArtwork(labels.get(2))).isEmpty();
+            assertThat(pixels(icon, labels.get(0))).as("classic")
+                .isEqualTo(pixels(registry.chromeIcon("add", size, dev.jasper.ui.icons.ChromeArtwork.CLASSIC).icon(theme, tint), labels.get(0)))
+                .isNotEqualTo(pixels(icon, labels.get(1)));
+            assertThat(pixels(icon, labels.get(1))).as("New UI")
+                .isEqualTo(pixels(registry.chromeIcon("add", size).icon(theme, tint), labels.get(1)));
+            assertThat(pixels(icon, labels.get(2))).as("ordinary")
+                .isEqualTo(pixels(registry.themedIcon("add", size).icon(theme, tint), labels.get(2)));
+        } finally { themes.close(); ThemeTestSupport.controller(true); }
+    }
+
     private static int[] pixels(Icon icon, Component component) {
         var image = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
         var graphics = image.createGraphics();

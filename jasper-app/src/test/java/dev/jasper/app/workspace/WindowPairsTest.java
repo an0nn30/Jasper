@@ -48,7 +48,8 @@ import org.junit.jupiter.api.Test;
  */
 class WindowPairsTest {
     static final WorkspaceChrome CLASSIC = WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.CLASSIC,
-        WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.STANDARD), new TitleFormat("{context}"));
+        WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.STANDARD,
+        WorkspaceLook.Icons.NEW_UI), new TitleFormat("{context}"));
 
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
@@ -88,11 +89,12 @@ class WindowPairsTest {
         final ClassicTabs.Entry first, second;
         final JMenuBar menus = new JMenuBar();
         final ClassicToolbarButton button = new ClassicToolbarButton(new AbstractAction("Go") {
-            @Override public void actionPerformed(ActionEvent event) { } }, "Go", ClassicToolbarButton.Glyph.PLUS, true, null);
+            @Override public void actionPerformed(ActionEvent event) { } }, "Go", true, null);
         final ClassicHeader header = new ClassicHeader();
         final TitleSearchField field;
         final RunItem run, activeRun, slashRun, slashActiveRun;
         final WindowStatusBar warning, danger, idle;
+        final ClassicWindowTitle title = new ClassicWindowTitle(), inactiveTitle = new ClassicWindowTitle();
 
         Fixture(ThemeController themes) {
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, CLASSIC);
@@ -112,6 +114,7 @@ class WindowPairsTest {
             warning = bar(ConfigDiagnostic.Severity.WARNING, true);
             danger = bar(ConfigDiagnostic.Severity.ERROR, true);
             idle = bar(null, false);
+            inactiveTitle.setActive(false);
             restyle();
         }
 
@@ -128,6 +131,7 @@ class WindowPairsTest {
             tabs.refresh(); LayoutTestSupport.layoutTree(tabs);
             for (var bar : List.of(warning, danger, idle)) { bar.refreshTheme(); bar.setSize(600, 24); LayoutTestSupport.layoutTree(bar); }
             for (JComponent each : List.of(button, run, activeRun, slashRun, slashActiveRun)) { Dimension size = each.getPreferredSize(); each.setSize(size); }
+            for (var each : List.of(title, inactiveTitle)) { each.refresh(); each.setText("Workstation"); each.setSize(each.getPreferredSize()); }
         }
 
         BufferedImage search(boolean hover) {
@@ -192,7 +196,9 @@ class WindowPairsTest {
             new Declared("run item", WindowPairs.RUN, (theme, expected) -> paints(f.run, expected)),
             new Declared("run item on slash segments", WindowPairs.SLASH_RUN, (theme, expected) -> paints(f.slashRun, expected)),
             new Declared("active run item", WindowPairs.ACTIVE_RUN, (theme, expected) -> paints(f.activeRun, expected)),
-            new Declared("active run item on slash segments", WindowPairs.SLASH_ACTIVE_RUN, (theme, expected) -> paints(f.slashActiveRun, expected)));
+            new Declared("active run item on slash segments", WindowPairs.SLASH_ACTIVE_RUN, (theme, expected) -> paints(f.slashActiveRun, expected)),
+            new Declared("window title", WindowPairs.TITLE, (theme, expected) -> paints(f.title, expected)),
+            new Declared("inactive window title", WindowPairs.INACTIVE_TITLE, (theme, expected) -> paints(f.inactiveTitle, expected)));
     }
 
     /** A classic dialog over a 400 x 300 layer, at 4x, in {@code theme} under {@code kit}. */

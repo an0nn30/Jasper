@@ -164,6 +164,7 @@ private static void installUi(PluginContext context, long stepMillis) {
   registration. The factory also runs inside `toolbar().add(...)` while the main window is open, so finish
   initialising what it reads before you add the view; a factory that throws is not asked again for that window. Its
   root is an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER `Choice`s, at most one PRIMARY `Button`,
+  icon-only GHOST `Button`s (a blank label with an icon and a tooltip; SDK 0.18.1, declare `sdk = ">=0.18.1, <0.19"`),
   `MenuButton`s and `Separator`s. When a window mounts the view the host refuses any other tree by logging it, naming
   the node, and closing the view, and that window shows none; `update` throws `IllegalArgumentException` naming the
   node. A view never moves into the overflow menu: it hides while the toolbar is too narrow.

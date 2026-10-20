@@ -61,7 +61,8 @@ Use `TextRole.MONO*` and `FieldPresentation.TECHNICAL` for technical values (hos
 Under the Enterprise look an EXCLUSIVE choice draws radios, TABS draws folder tabs, a STEPPER or SLIDER draws a spinner,
 a Section with its Card draws a titled box, a Table draws a header band, zebra rows and banded headings, a Tree draws ▶
 and ▼, an Empty state shows one button (its visible PRIMARY action, or else its first visible one), a Chip is boxed in upper case, a ROUTE stack draws edged cells, and an ORDERED
-list's commands move to a side column that acts on the selection; the descriptors and events are the same.
+list's commands move to a side column that acts on the selection, and a panel's stripe label starts with its icon
+([plugin icons](sdk-icons.md)); the descriptors and events are the same.
 
 Descriptors say what a control means and the presentation draws it. GHOST is a quiet button, `ButtonPresentation.HELP`
 opens help and `FormKind.PROMPT` is a short, focused question. A `Section` holding a `Card` is a titled group.
@@ -192,8 +193,11 @@ confirms (set `pending` while a start or stop is in flight).
   is never selected. With no rows a `Table` shows its `empty` state (at most one action) or its `emptyText` below the
   kept headers, and an `ItemList` with no items shows its `emptyText`.
 - **Toolbar views.** An INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER choices, at most one PRIMARY
-  `Button`, `MenuButton`s and `Separator`s, placed in the main toolbar with `ToolbarItem.view` (see
+  `Button`, icon-only GHOST `Button`s (a blank label with an icon and a tooltip; SDK 0.18.1), `MenuButton`s and
+  `Separator`s, placed in the main toolbar with `ToolbarItem.view` (see
   [actions](plugin-authoring.md#actions-and-where-they-appear)). A choice's label is its accessible name, not a caption.
+  Under the Enterprise look a DROPDOWN with a `PickerFace` there draws as IntelliJ's run-configuration combo (its icon,
+  the name cut with an ellipsis at 240 px, an arrow box) and an icon-only GHOST `Button` as a 16 px glyph.
 - **Dialog swatch.** `DialogSpec.swatch` puts a small square of a hue before the dialog's title where Jasper draws the
   title (the macOS window title row, or the header strip of a dialog the Enterprise look draws in its window); `Hue.NONE`,
   the default, draws none.

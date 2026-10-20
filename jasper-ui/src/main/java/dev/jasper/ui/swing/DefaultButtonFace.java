@@ -6,6 +6,7 @@ import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.util.List;
@@ -31,6 +32,7 @@ final class DefaultButtonFace implements ButtonFace {
                                       boolean hover, boolean expanded) {
         PickerMenus.paintRichFace(owner, graphics, context, face, empty, focus, hover, expanded);
     }
+    @Override public Dimension toolbarCombo(Choices.ChoiceCombo combo) { return null; }
     @Override public boolean tiles() { return true; }
     @Override public int joinedOverlap() { return 0; }
     @Override public Color menuDivider(KitContext context) { return ThemePainting.color(context, SemanticColor.BORDER_MENU); }

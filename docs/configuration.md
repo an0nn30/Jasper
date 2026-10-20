@@ -194,8 +194,8 @@ family = "system"
 | Key | Default | Accepted values | When applied |
 |---|---|---|---|
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
-| `window.rail_width` | `28` | Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it (under the Enterprise look, the least thickness of the labelled side stripes); out-of-range values use the nearest limit with a warning | Live |
-| `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
+| `window.rail_width` | `28` | Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it (not under the Enterprise look, whose labelled stripes fit their labels and whose Settings hides the row); out-of-range values use the nearest limit with a warning | Live |
+| `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"`; the default depends on the active look | Live |
 | `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning; the default depends on the active look | Live |
 | `window.status_bar` | `true` | Boolean | Live |
 | `window.status_bar_height` | `24` | Integer 20–48 logical pixels; the bar grows past it only when a large UI font needs the room; out-of-range values use the nearest limit with a warning | Live |

@@ -167,7 +167,7 @@ final class WindowToolbar extends JToolBar {
                 if (!shown) { child.setBounds(0, 0, 0, 0); continue; }
                 if (previous) x += gap;
                 int width = child.getPreferredSize().width;
-                int height = isView(child) ? Math.min(getHeight(), child.getPreferredSize().height) : side;
+                int height = isView(child) ? Math.min(getHeight(), child.getPreferredSize().height) : child instanceof ClassicToolbarButton icon && icon.getText() == null ? Math.min(side, icon.getPreferredSize().height) : side;
                 child.setBounds(x, (getHeight() - height) / 2, width, height);
                 x += width;
                 previous = anyShown = true;

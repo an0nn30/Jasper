@@ -15,12 +15,28 @@ import dev.jasper.ui.theme.JasperTheme;
  * when they finish.
  */
 public final class EnterpriseLook {
-    /** Spec 5.1's {@code [chrome]} table, which the shipped kit file lists ({@code EnterpriseFixtureTest} holds them equal). */
-    public static final ChromeSpec CHROME = new ChromeSpec(ChromeSpec.TitleBar.NATIVE, ChromeSpec.MenuBar.WINDOW,
+    /**
+     * Spec 5.1's {@code [chrome]} table, which the shipped kit file lists ({@code EnterpriseFixtureTest} holds them equal),
+     * with IntelliJ Classic's title (plan 14).
+     */
+    public static final ChromeSpec CHROME = new ChromeSpec(ChromeSpec.TitleBar.CLASSIC, ChromeSpec.MenuBar.WINDOW,
         "Workstation — {session} — {directory}", ChromeSpec.ToolWindows.STRIPES, ChromeSpec.EditorTabs.CLASSIC,
-        ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE);
+        ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE,
+        ChromeSpec.Icons.CLASSIC);
 
     private EnterpriseLook() { }
+
+    /**
+     * {@code spec} with another title bar (plan 14).
+     *
+     * @param spec the chrome to copy
+     * @param title the title bar it takes
+     * @return every point of {@code spec}, with {@code title}
+     */
+    public static ChromeSpec titled(ChromeSpec spec, ChromeSpec.TitleBar title) {
+        return new ChromeSpec(title, spec.menuBar(), spec.windowTitle(), spec.toolWindows(), spec.editorTabs(), spec.statusBar(), spec.palette(),
+            spec.dialogs(), spec.motion(), spec.icons());
+    }
 
     /** The shipped Enterprise kit; its IBM Plex files are registered first. */
     public static Kit kit() { return EnterpriseResources.kit(); }

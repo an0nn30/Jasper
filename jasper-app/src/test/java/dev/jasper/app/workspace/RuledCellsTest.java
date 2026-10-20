@@ -181,8 +181,8 @@ class RuledCellsTest {
     }
 
     /**
-     * The 06 Run Dialog mock: under ruled cells the open Run window's item lies on {@code surface.header.active} (#D9DFEA
-     * in Enterprise Light, #3D4658 in Dark), its accent ink held readable on it by its pair's guard.
+     * The 06 Run Dialog mock: under ruled cells the open Run window's item lies on {@code surface.header.active}, its
+     * accent ink held readable on it by its pair's guard.
      */
     @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     void theOpenRunWindowsItemTakesTheMocksHeaderTintUnderRuledCells(boolean dark) throws Exception {
@@ -195,10 +195,10 @@ class RuledCellsTest {
                 var image = MockProfile.print(bar, 800, 24);
                 var theme = themes.current().chrome();
                 var tint = DerivedColor.SURFACE_HEADER_ACTIVE.color(theme);
-                assertThat(dev.jasper.ui.theme.ColorMath.hex(tint)).as("the theme's surface.header.active").isEqualToIgnoringCase(dark ? "#3D4658" : "#D9DFEA");
+                assertThat(tint).as("the shipped theme's surface.header.active").isEqualTo(MockProfile.role(dark, "surface.header.active"));
                 assertThat(MockProfile.at(image, 4, 24)).as("the open Run window's item").isEqualTo(tint);
-                if (!dark) assertThat(MockProfile.deltaE(MockProfile.at(image, 4, 22), MockProfile.at(MockProfile.mock(EnterpriseWorkstationMockTest.RUN),
-                    EnterpriseWorkstationMockTest.X + 4, 1795))).as("the Run Dialog mock's item").isLessThanOrEqualTo(2.5);
+                if (!dark) assertThat(MockProfile.deltaE(MockProfile.at(image, 4, 22), MockProfile.role(dark, "surface.header.active")))
+                    .as("the Run Dialog mock's item, on the tint").isLessThanOrEqualTo(2.5);
                 var pair = WindowPairs.run(true, true);
                 assertThat(pair.against()).as("its ink's pair lies on the tint").isEqualTo(DerivedColor.SURFACE_HEADER_ACTIVE);
                 var ink = dev.jasper.ui.theme.SurfaceContrast.painted(theme, pair);

@@ -149,7 +149,7 @@ final class EnterpriseSettings implements AutoCloseable {
             loaded.values(), false, defaults);
         // Spec 9.1's projections of the Enterprise kit file's chrome (6a's EnterpriseLook.CHROME) with its classic base and
         // named UI face, on the macOS host the mocks were drawn on.
-        var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, true));
+        var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.MAC, true));
         var holder = new JComponent[1];
         // The application's mapping (plan 6b): under Enterprise the dialog's sheets and confirmations take the classic path.
         var windows = new AuxiliaryWindows(UiState.inMemory(), surface -> {

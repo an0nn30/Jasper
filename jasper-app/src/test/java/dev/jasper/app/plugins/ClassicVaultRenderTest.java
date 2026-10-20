@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
 import dev.jasper.app.testsupport.MockMatch;
+import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.ui.theme.SemanticColor;
@@ -35,9 +36,13 @@ class ClassicVaultRenderTest {
     static final MockMatch.Crop SELECTED = new MockMatch.Crop(V + "3 - Item selected.png", 2, 60, 1640, 1142),
         NO_SELECTION = new MockMatch.Crop(V + "2 - New menu.png", 2, 60, 1640, 1142);
     static final String[][] LOGINS = {{"amp", "ubuntu", "synthetic-password-1"}, {"Proxmox", "root", "synthetic-password-2"}};
-    static final String TOOLBAR = "0+6 #ECEDEF, 6+1 #B4B8BF, 7+20 #FFFFFF, 27+1 #B4B8BF, 28+6 #ECEDEF, 34+1 #C4C7CC";
-    /** The status row at device column 1600: the tab's own row, where the mocks' window shows Done over a dialog band. */
-    static final String STATUS = "0+1 #E8E8E9, 1+29 #F7F7F8";
+    /** Down the manager's toolbar at x 1600: the search field on the kit's dialog surface (surface.app), then the frame's rule. */
+    static final String TOOLBAR = "0+6 surface.app, 6+1 border.input, 7+20 surface.input, 27+1 border.input, 28+6 surface.app, 34+1 border.window";
+    /**
+     * The status row at device column 1600: the tab's own row on surface.sidebar under its faint rule, where the mocks'
+     * window shows Done over a dialog band.
+     */
+    static final String STATUS = "0+1 " + ClassicCompositionRenderTest.rule(false, "surface.sidebar") + ", 1+29 surface.sidebar";
     @TempDir Path root;
 
     /**
@@ -94,7 +99,7 @@ class ClassicVaultRenderTest {
 
     /** The render's bands down device column {@code x} between device rows {@code top} and {@code bottom} match {@code expected} (±1 px). */
     static void bands(String name, BufferedImage render, int x, int top, int bottom, String expected) {
-        assertThat(MockMatch.mismatch(MockMatch.parse(expected), MockMatch.bands(render, x, top, bottom), 1))
+        assertThat(MockMatch.mismatch(MockMatch.parse(expected, EnterpriseLook.theme(false)), MockMatch.bands(render, x, top, bottom), 1))
             .as(name + " at x " + x + ", rows " + top + ".." + bottom).isEmpty();
     }
 
@@ -126,12 +131,13 @@ class ClassicVaultRenderTest {
      * mock's x 99 after the first rule and Lock Vault at its x 415 after the second (±2 logical px).
      */
     static void toolbarVerbs(BufferedImage render) {
-        assertThat(MockMatch.present(render.getSubimage(0, 0, render.getWidth(), 68), Color.decode("#1E1F22"))).as("the verbs' text.primary ink").isTrue();
-        // The rules are the device columns #C4C7CC from row 24 to 44; the labels are the dark ink after each.
+        assertThat(MockMatch.present(render.getSubimage(0, 0, render.getWidth(), 68), MockProfile.role(false, "text.primary"))).as("the verbs' text.primary ink").isTrue();
+        // The rules are the device columns of border.window from row 24 to 44; the labels are the dark ink after each.
         var rules = new java.util.ArrayList<Integer>();
+        Color window = MockProfile.role(false, "border.window");
         for (int x = 0; x < 1100; x++) {
             boolean rule = true;
-            for (int y = 24; y < 44 && rule; y++) rule = MockMatch.deltaE(new Color(render.getRGB(x, y)), Color.decode("#C4C7CC")) < 3;
+            for (int y = 24; y < 44 && rule; y++) rule = MockMatch.deltaE(new Color(render.getRGB(x, y)), window) < 3;
             if (rule && (rules.isEmpty() || x - rules.getLast() > 2)) rules.add(x);
         }
         assertThat(rules).as("the toolbar's two rules").hasSize(2);
@@ -150,14 +156,24 @@ class ClassicVaultRenderTest {
                 MockMatch.save("light/vault-frame", NO_SELECTION.read(), render);
                 bands("the toolbar row", render, 1600, 0, 70, TOOLBAR);
                 bands("the status row", render, 1600, 1082, 1142, STATUS);
-                assertThat(MockMatch.present(render, Color.decode("#C4C7CC"))).as("the classic rules").isTrue();
+                assertThat(MockMatch.present(render, MockProfile.role(false, "border.window"))).as("the classic rules").isTrue();
                 assertThat(vault.problems).isEmpty();
             }
         });
     }
 
-    static final String CATEGORIES = "0+34 #ECEDEF, 34+1 #C4C7CC, 35+24 #E1E3E6, 59+1 #C4C7CC, 60+4 #F7F7F8, 64+22 #2F65CA, 86+455 #F7F7F8, 541+1 #E8E8E9";
-    static final String ITEMS = "0+20 #F0F1F3, 20+1 #D3D6DA, 21+22 #2F65CA, 43+22 #F7F8FA, 65+420 #FFFFFF, 485+1 #E4E5E8, 486+20 #F7F8FA, 506+1 #E8E8E9";
+    /**
+     * The Categories column, on surface.sidebar: the IntelliJ Light port's sidebar is not its panel (the user's 2026-10-18
+     * direction). Its foot is the tab's status row's faint rule.
+     */
+    static final String CATEGORIES = "0+34 surface.app, 34+1 border.window, 35+24 surface.header, 59+1 border.window, 60+4 surface.sidebar, "
+        + "64+22 selection.bg, 86+455 surface.sidebar, 541+1 " + ClassicCompositionRenderTest.rule(false, "surface.sidebar");
+    /**
+     * The Items column: its last row's rule is border.row, where the mock draws #DDE0E4 (the user's 2026-10-18 direction);
+     * its foot is the tab's status row's faint rule.
+     */
+    static final String ITEMS = "0+20 surface.tableHeader, 20+1 border.divider, 21+22 selection.bg, 43+22 surface.zebra, 65+420 surface.card, "
+        + "485+1 border.row, 486+20 surface.zebra, 506+1 " + ClassicCompositionRenderTest.rule(false, "surface.sidebar");
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
     void theCategoriesAndItemsMatchTheItemSelectedMock() throws Exception {
@@ -169,18 +185,28 @@ class ClassicVaultRenderTest {
                 MockMatch.save("light/vault-columns", SELECTED.read(), render);
                 bands("the Categories column", render, 6, 0, 1084, CATEGORIES);
                 bands("the Items column", render, 854, 70, 1084, ITEMS);
-                assertThat(MockMatch.present(render, Color.decode("#F0F1F3"))).as("the table's header band").isTrue();
-                assertThat(MockMatch.present(render, Color.decode("#E1E3E6"))).as("the pane header strip").isTrue();
+                assertThat(MockMatch.present(render, MockProfile.role(false, "surface.tableHeader"))).as("the table's header band").isTrue();
+                assertThat(MockMatch.present(render, MockProfile.role(false, "surface.header"))).as("the pane header strip").isTrue();
                 assertThat(vault.problems).isEmpty();
             }
         });
     }
 
-    /** The Details pane on the workspace ground ({@code #F7F7F8}), where the mocks' window shows {@code #ECEDEF}. */
-    static final String DETAILS = "0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #F7F7F8, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1 #E4E5E8, 130+26 #FFFFFF, "
-        + "156+1 #D3D6DA, 157+8 #F7F7F8, 165+1 #C4C7CC, 166+60 #F7F7F8, 226+1 #B4B8BF, 227+22 #FEFEFE~#F6F6F6, 249+1 #B4B8BF, 250+256 #F7F7F8, "
-        + "506+1 #E8E8E9";
-    static final String DETAILS_NONE = "0+24 #E1E3E6, 24+1 #C4C7CC, 25+481 #F7F7F8, 506+1 #E8E8E9";
+    /**
+     * The Details pane of amp at x 1085: its header strip and rule, the Fields grid (border.row between its rows), the rule
+     * over the actions and a button's gradient, on surface.panel, the tab's ground. The mock draws the pane on #ECEDEF and
+     * the grid's rule #E6E8EB; the render's are surface.panel and border.row (the user's 2026-10-18 direction). Under the
+     * IntelliJ Light port the "Modified:" label's ink at x 1085 reads as a run of its own, so the pane is read there down to
+     * its rule at logical row 166 ({@link #DETAILS}) and from that row at x {@link #DETAILS_LOWER_X}, clear of the labels
+     * ({@link #DETAILS_LOWER}), down to the tab's status row's faint rule.
+     */
+    static final String DETAILS = "0+24 surface.header, 24+1 border.window, 25+77 surface.panel, 102+1 border.divider, 103+26 surface.card, "
+        + "129+1 border.row, 130+26 surface.card, 156+1 border.divider, 157+8 surface.panel, 165+1 border.window";
+    static final String DETAILS_LOWER = "0+60 surface.panel, 60+1 button.secondary.border, 61+22 button.secondary.bg~button.end, "
+        + "83+1 button.secondary.border, 84+256 surface.panel, 340+1 " + ClassicCompositionRenderTest.rule(false, "surface.sidebar");
+    static final int DETAILS_LOWER_X = 1200;
+    static final String DETAILS_NONE = "0+24 surface.header, 24+1 border.window, 25+481 surface.panel, 506+1 "
+        + ClassicCompositionRenderTest.rule(false, "surface.sidebar");
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
     void theManagerMatchesItsMocksWithAndWithoutASelection() throws Exception {
@@ -195,7 +221,8 @@ class ClassicVaultRenderTest {
                 vault.dispatchToManager(new UiEvent.Selected("rows", Set.of(ids.getFirst().toString())));
                 var selected = render(manager, SELECTED.logicalWidth(), SELECTED.logicalHeight());
                 MockMatch.save("light/vault-manager-selected", SELECTED.read(), selected);
-                bands("the Details pane of amp", selected, 1085, 70, 1084, DETAILS);
+                bands("the Details pane of amp", selected, 1085, 70, 70 + 2 * 166, DETAILS);
+                bands("the Details pane of amp below its rule", selected, DETAILS_LOWER_X, 70 + 2 * 166, 1084, DETAILS_LOWER);
                 bands("the Categories column", selected, 6, 0, 1084, CATEGORIES);
                 bands("the Items column", selected, 854, 70, 1084, ITEMS);
                 bands("the toolbar row", selected, 1600, 0, 70, TOOLBAR);
@@ -209,8 +236,8 @@ class ClassicVaultRenderTest {
                 assertThat(copy).as("the username's Copy shares the password's Show column").isEqualTo(show);
                 assertThat(show).as("the action lane, the mock's x 711").isBetween(707, 713);
                 bands("the status row", selected, 1600, 1082, 1142, STATUS);
-                for (String colour : List.of("#2F65CA", "#E1E3E6", "#F0F1F3", "#F7F8FA", "#E6E7EA", "#C4C7CC"))
-                    assertThat(MockMatch.present(selected, Color.decode(colour))).as("shows " + colour).isTrue();
+                for (String colour : List.of("selection.bg", "surface.header", "surface.tableHeader", "surface.zebra", "surface.footer", "border.window"))
+                    assertThat(MockMatch.present(selected, MockProfile.role(false, colour))).as("shows " + colour).isTrue();
                 MockCrops.fontsFloor("light/vault-manager-selected edge agreement", MockMatch.agreement(SELECTED.read(), selected), 0.55);
                 assertThat(vault.problems).isEmpty();
             }
@@ -231,6 +258,9 @@ class ClassicVaultRenderTest {
      * stays, a recorded residual).
      */
     static final int FIRST_RULE = 18;
+    /** The titled group face's box: border.window held to the structural guard on the kit's dialog surface (surface.app). */
+    static final dev.jasper.ui.theme.PaintPair GROUP_BOX = new dev.jasper.ui.theme.PaintPair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_APP,
+        dev.jasper.ui.theme.SurfaceContrast.Guard.STRUCTURAL);
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
     void theAddLoginAndAddSshKeySheetsMatchTheirMocks() throws Exception {
@@ -240,19 +270,22 @@ class ClassicVaultRenderTest {
                 var login = vault.awaitSurface("Add Login");
                 var loginRender = render(login, ADD_LOGIN.logicalWidth(), ADD_LOGIN.logicalHeight());
                 ClassicCompositionRenderTest.check("light/vault-add-login", ADD_LOGIN, loginRender,
-                    18, "0+206 #ECEDEF, 206+1 #C4C7CC, 207+40 #E6E7EA", 1, 0.55, "#C4C7CC", "#E6E7EA", "#FFFFFF");
+                    18, ClassicCompositionRenderTest.dialog(206, 40), 1, 0.55, "border.window", "surface.footer", "surface.input");
                 int top = FIRST_RULE;
-                bands("the Add Login groups", loginRender, GROUPS_X, 0, ADD_LOGIN.height(), "0+" + top + " #ECEDEF, " + top + "+1 #C4C7CC, "
-                    + (top + 1) + "+80 #ECEDEF, " + (top + 81) + "+1 #C4C7CC, " + (top + 82) + "+18 #ECEDEF, " + (top + 100) + "+1 #C4C7CC, "
-                    + (top + 101) + "+76 #ECEDEF, " + (top + 177) + "+1 #C4C7CC, " + (top + 178) + "+" + (206 - top - 178) + " #ECEDEF, 206+1 #C4C7CC, 207+40 #E6E7EA");
+                String box = ClassicCompositionRenderTest.painted(GROUP_BOX);
+                bands("the Add Login groups", loginRender, GROUPS_X, 0, ADD_LOGIN.height(), "0+" + top + " surface.app, " + top + "+1 " + box + ", "
+                    + (top + 1) + "+80 surface.app, " + (top + 81) + "+1 " + box + ", " + (top + 82) + "+18 surface.app, " + (top + 100) + "+1 " + box + ", "
+                    + (top + 101) + "+76 surface.app, " + (top + 177) + "+1 " + box + ", " + (top + 178) + "+" + (206 - top - 178) + " surface.app, "
+                    + ClassicCompositionRenderTest.band(206, 40));
                 onEdt(login::requestClose);
                 vault.dispatchToManager(new UiEvent.Action("add.SSH_KEY"));
                 var key = vault.awaitSurface("Add SSH Key");
                 var keyRender = render(key, ADD_SSH_KEY.logicalWidth(), ADD_SSH_KEY.logicalHeight());
                 ClassicCompositionRenderTest.check("light/vault-add-ssh-key", ADD_SSH_KEY, keyRender,
-                    18, "0+174 #ECEDEF, 174+1 #C4C7CC, 175+40 #E6E7EA", 1, 0.55, "#C4C7CC", "#E6E7EA", "#FFFFFF");
-                bands("the Add SSH Key group", keyRender, GROUPS_X, 0, ADD_SSH_KEY.height(), "0+" + top + " #ECEDEF, " + top + "+1 #C4C7CC, "
-                    + (top + 1) + "+144 #ECEDEF, " + (top + 145) + "+1 #C4C7CC, " + (top + 146) + "+" + (174 - top - 146) + " #ECEDEF, 174+1 #C4C7CC, 175+40 #E6E7EA");
+                    18, ClassicCompositionRenderTest.dialog(174, 40), 1, 0.55, "border.window", "surface.footer", "surface.input");
+                bands("the Add SSH Key group", keyRender, GROUPS_X, 0, ADD_SSH_KEY.height(), "0+" + top + " surface.app, " + top + "+1 " + box + ", "
+                    + (top + 1) + "+144 surface.app, " + (top + 145) + "+1 " + box + ", " + (top + 146) + "+" + (174 - top - 146) + " surface.app, "
+                    + ClassicCompositionRenderTest.band(174, 40));
                 onEdt(key::requestClose);
                 assertThat(vault.problems).isEmpty();
             }
@@ -270,7 +303,7 @@ class ClassicVaultRenderTest {
                 vault.invoke("dev.jasper.vault.open");
                 var unlock = vault.awaitSurface("Unlock Vault");
                 ClassicCompositionRenderTest.check("light/vault-unlock", UNLOCK, render(unlock, UNLOCK.logicalWidth(), UNLOCK.logicalHeight()),
-                    14, "0+114 #ECEDEF, 114+1 #C4C7CC, 115+40 #E6E7EA", 1, 0.55, "#2F65CA", "#E6E7EA", "#FFFFFF");
+                    14, ClassicCompositionRenderTest.dialog(114, 40), 1, 0.55, "accent", "surface.footer", "surface.input");
                 // The overlay asks for the mock's size, not only fills it: 400 wide, the 114 px body over the 41 px band.
                 assertThat(onEdtValue(() -> StagedVaultHost.kitView(unlock.holder()).getPreferredSize()))
                     .as("the Unlock Vault form's own size").isEqualTo(new Dimension(UNLOCK.logicalWidth(), UNLOCK.logicalHeight()));

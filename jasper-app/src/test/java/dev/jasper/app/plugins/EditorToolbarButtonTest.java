@@ -39,7 +39,7 @@ class EditorToolbarButtonTest {
                 assertThat(editor.contributions.toolbar()).containsExactly(new ToolbarEntry.Button(NEW_WINDOW));
                 assertThat(editor.contributions.action(NEW_WINDOW).orElseThrow().icon()).isInstanceOfSatisfying(PresentationIcon.class,
                     named -> assertThat(named.name()).isEqualTo("window.add"));
-                var enterprise = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", new Projections.Host(false, false));
+                var enterprise = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.LINUX, false));
                 for (boolean classic : new boolean[] {false, true}) {
                     var themes = classic ? EnterpriseLook.controller(false) : ThemeTestSupport.controller(true);
                     try {

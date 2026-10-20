@@ -12,6 +12,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
+import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 
@@ -54,11 +55,18 @@ abstract class DockStripe extends JPanel {
     /** Every button, in the stripe's order. */
     abstract List<AbstractButton> buttons();
 
-    /** Sets {@code window.rail_width} in logical pixels; the caller validates the range. */
+    /** Sets {@code window.rail_width} in logical pixels; the caller validates the range. Only the icon rails follow it. */
     abstract void setRailWidth(int width);
 
-    /** Shows every group for a drag of {@code id}, whose stripe label is {@code label}, and lifts its button out. */
-    abstract void beginDrag(String id, String label);
+    /**
+     * Shows every group for a drag of {@code id}, whose stripe label is {@code label} and whose icon is {@code icon} (the
+     * window's own; a labelled stripe resolves it as it would its own label's), and lifts its button out.
+     *
+     * @param id the dragged window; it may be on another stripe
+     * @param label its stripe label
+     * @param icon its own icon, or null
+     */
+    abstract void beginDrag(String id, String label, Icon icon);
 
     /** Opens the gap at {@code index} in the slot's group when this stripe shows the slot, and closes it otherwise. */
     abstract void showGap(Slot slot, int index);

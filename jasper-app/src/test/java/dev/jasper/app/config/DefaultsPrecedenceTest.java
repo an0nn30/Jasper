@@ -16,7 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 /** Spec 5.8: user-saved, then kit default, then core default, from the first snapshot of a fresh home to Settings' Reset. */
 class DefaultsPrecedenceTest {
     static final DefaultSource KIT = new DefaultSource(Map.of(CoreSettings.PALETTE_VISIBLE_ROWS, 8, CoreSettings.WINDOW_TOOLBAR_HEIGHT, 34,
-        CoreSettings.UI_THEME_DARK, "catppuccin-mocha", CoreSettings.UI_THEME_LIGHT, "catppuccin-latte"));
+        CoreSettings.UI_THEME_DARK, "catppuccin-mocha", CoreSettings.UI_THEME_LIGHT, "catppuccin-latte", CoreSettings.WINDOW_TOOLBAR, ToolbarMode.ICONS));
     @TempDir Path home;
 
     private ConfigService service(Path file) {
@@ -28,6 +28,7 @@ class DefaultsPrecedenceTest {
             var snapshot = service.initialState().snapshot();
             assertThat(snapshot.visibleRows()).isEqualTo(8);
             assertThat(snapshot.toolbarHeight()).isEqualTo(34);
+            assertThat(snapshot.toolbar()).isEqualTo(ToolbarMode.ICONS);
             assertThat(snapshot.darkTheme()).isEqualTo("catppuccin-mocha");
             assertThat(snapshot.lightTheme()).isEqualTo("catppuccin-latte");
             assertThat(service.initialState().defaults()).isSameAs(KIT);
@@ -47,6 +48,12 @@ class DefaultsPrecedenceTest {
         assertThat(ConfigLoader.parse(file, "[palette\n", false, KIT).snapshot().darkTheme()).isEqualTo("catppuccin-mocha");
         assertThat(ConfigLoader.parse(file, "", false).snapshot().darkTheme()).as("the core look").isEqualTo(CoreSettings.UI_THEME_DARK.defaultValue());
         assertThat(ConfigSnapshot.defaults(DefaultSource.CORE)).isEqualTo(ConfigSnapshot.defaults());
+    }
+
+    @Test void aSavedToolbarModeWinsOverTheLooks() {
+        Path file = home.resolve("config.toml");
+        assertThat(ConfigLoader.parse(file, "[window]\ntoolbar = \"hidden\"\n", false, KIT).snapshot().toolbar()).isEqualTo(ToolbarMode.HIDDEN);
+        assertThat(ConfigLoader.parse(file, "", false, KIT).snapshot().toolbar()).as("unsaved: the look's").isEqualTo(ToolbarMode.ICONS);
     }
 
     @Test void anInvalidSavedValueFallsBackToTheKitsDefault() {
@@ -82,7 +89,7 @@ class DefaultsPrecedenceTest {
                 assertThat(text).as(editor + " " + key).doesNotContain(key);
         }
         String pages = Files.readString(ui.resolve("CorePages.java"));
-        assertThat(pages).contains(".row(WINDOW_TOOLBAR_HEIGHT, Editors.stepper(\"px\"))", ".row(PALETTE_VISIBLE_ROWS, Editors.stepper(\"\"))",
+        assertThat(pages).contains(".row(WINDOW_TOOLBAR, Editors.segments(", ".row(WINDOW_TOOLBAR_HEIGHT, Editors.stepper(\"px\"))", ".row(PALETTE_VISIBLE_ROWS, Editors.stepper(\"\"))",
             ".row(UI_THEME_DARK).shownWhen(false)", ".row(UI_THEME_LIGHT).shownWhen(false)");
         assertThat(Files.readString(ui.resolve("Editors.java"))).as("OptionalNumber is made only for Float settings")
             .contains("static final class OptionalNumber implements ValueEditor<Float>");

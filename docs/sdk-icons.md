@@ -14,6 +14,15 @@ The host validates every name against the plugin's scoped registry. Unknown and 
 are rejected. Host and fake enforce the same rule. Retained host icons resolve the current theme
 at paint time, including a change between Slate Cobalt Dark and Light.
 
+Two built-in names are authored host artwork (SDK 0.18.1): `"run"`, IntelliJ's classic Run triangle,
+and `"application"`, its run-configuration icon. Controls draw them in their own colours in both
+looks; panels, prompts and tiles draw a monochrome glyph of the same name.
+
+Under the Enterprise look a panel's stripe label starts with its icon at 13 px: `"network"`,
+`"folder"`, `"tunnel"`, `"download"`, `"server"` and `"bell"` draw IntelliJ's classic tool-window
+icons, and any other name (a registered path included) its monochrome glyph in the label's colour;
+an identity name such as `more.vertical` keeps its authored art.
+
 For original artwork, register a constrained monochrome path in a 16-unit coordinate space:
 
 ```java

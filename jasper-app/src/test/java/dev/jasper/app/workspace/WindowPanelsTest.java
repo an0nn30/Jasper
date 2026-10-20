@@ -120,6 +120,57 @@ class WindowPanelsTest {
         });
     }
 
+    /** Plan 12 Rulings 18: under flush frames the View toggle action activates the panel it opens; a plugin's toggle does not. */
+    @Test void underFlushFramesTheViewToggleActivatesThePanelAndAPluginsToggleDoesNot() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            model.action("dev.x.hosts.toggle").orElseThrow().invoke(new Contributions.Invocation(owner.id(), Optional.empty()));
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("the View toggle is a user gesture").hasValue(Slot.LEFT_TOP);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            owner.area().focusMoved(null);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("a plugin's programmatic toggle").isEmpty();
+        });
+    }
+
+    /**
+     * Final review: a window toggled in by a user gesture in place of the active one keeps the activation. Handing focus
+     * back to the terminal first would post focus events that land after the activation and undo it.
+     */
+    @Test void underFlushFramesAnActivatingToggleThatReplacesAWindowDoesNotHandFocusBack() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            List<String> events = new ArrayList<>();
+            // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
+            model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+            for (String name : List.of("log", "transfers"))
+                model.addPanel("dev.x." + name, name, new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    site.onVisibility(visible -> events.add(name + ":" + visible));
+                    return new JLabel(name);
+                });
+            model.action("dev.x.log.toggle").orElseThrow().invoke(new Contributions.Invocation(owner.id(), Optional.empty()));
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            owner.leftStripe().buttons().get(1).doClick();
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isInstanceOfSatisfying(JLabel.class, label -> assertThat(label.getText()).isEqualTo("transfers"));
+            assertThat(events).as("no hand-back to the terminal").containsExactly("log:false", "transfers:true");
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            toggle(model, owner, "dev.x.log");
+            assertThat(events).as("a plugin's toggle still hands focus back").containsExactly("transfers:false", "focus", "log:true");
+        });
+    }
+
     @Test void aSplitPanelOpensUnderTheFirstHalfAndBothShowAtOnce() throws Exception {
         edt(() -> {
             var model = new Contributions();

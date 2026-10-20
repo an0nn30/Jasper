@@ -61,7 +61,7 @@ final class NotificationsFeature implements AutoCloseable {
         contributions.addAction(SHOW_HISTORY, "Notifications: Show History", icon,
             List.of("notifications", "history", "messages", "errors", "panel"), Optional.empty(),
             invocation -> contributions.requestPanel(new Contributions.PanelRequest(invocation.windowId(), PANEL_ID,
-                Contributions.PanelRequest.Op.TOGGLE)));
+                Contributions.PanelRequest.Op.ACTIVATING_TOGGLE)));
         contributions.addAction(DISMISS_CARDS, "Notifications: Dismiss Cards", null,
             List.of("notifications", "close", "clear", "balloons", "cards"), Optional.empty(), invocation -> {
                 Attached attached = windows.get(invocation.windowId());

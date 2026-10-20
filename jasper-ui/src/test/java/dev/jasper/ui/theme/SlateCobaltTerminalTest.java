@@ -14,12 +14,13 @@ class SlateCobaltTerminalTest {
     @Test void eachSchemeIsItsPaletteInAnsiOrder() {
         assertThat(DARK.colors().background()).isEqualTo(new Color(0x2B2F36));
         assertThat(DARK.colors().foreground()).isEqualTo(new Color(0xF2F4F7));
-        assertThat(DARK.colors().cursor()).isEqualTo(new Color(0x5B9BF5));
+        assertThat(DARK.colors().cursor()).isEqualTo(new Color(0xF2F4F7));
         assertThat(DARK.colors().selection()).isEqualTo(new Color(0x3A5A8C));
         assertThat(DARK.boldForeground()).isEqualTo(Color.WHITE);
         assertThat(DARK.colors().ansi().get(1)).isEqualTo(new Color(0xFFA49D));
         assertThat(DARK.colors().ansi().get(8)).isEqualTo(new Color(0xA5AEB9));
         assertThat(DARK.colors().ansi().get(15)).isEqualTo(Color.WHITE);
+        assertThat(LIGHT.colors().cursor()).isEqualTo(new Color(0x1B1F27));
         assertThat(LIGHT.boldForeground()).isEqualTo(Color.BLACK);
         assertThat(LIGHT.colors().ansi().get(7)).isEqualTo(new Color(0x5A6270));
         assertThat(HIGH_CONTRAST.colors().background()).isEqualTo(Color.BLACK);

@@ -15,7 +15,9 @@ final class BuiltInArtwork {
             "settings", pair("general/settings", Hashes.SELECTED), "network", pair("toolwindows/web", Hashes.SELECTED),
             "tunnel", pair("actions/swapPanels", Hashes.SELECTED), "more.vertical", pair("general/moreVertical", Hashes.SELECTED),
             "chevron.right", pair("general/chevronRight", Hashes.SELECTED),
-            "search", pair("general/search", Hashes.SELECTED), "file", pair("fileTypes/text", Hashes.SELECTED));
+            "search", pair("general/search", Hashes.SELECTED), "file", pair("fileTypes/text", Hashes.SELECTED),
+            "run", pair("classic/actions/execute", Hashes.CLASSIC),
+            "application", single("classic/runConfigurations/application", Hashes.CLASSIC));
     }
     /**
      * Original desktop artwork for the meanings the native workspace chrome depicts (title bar, toolbar, tool window
@@ -30,14 +32,47 @@ final class BuiltInArtwork {
             "server", pair("webReferences/server", Hashes.CHROME), "bell", pair("toolwindows/notifications", Hashes.CHROME),
             "lock", pair("general/locked", Hashes.CHROME), "terminal", pair("terminal/toolwindow/terminal", Hashes.CHROME));
     }
+    /**
+     * IntelliJ's classic artwork for six of the meanings the native workspace chrome depicts. Admitted only by
+     * {@link IconRegistry#chromeIcon(String, int, ChromeArtwork)} with {@link ChromeArtwork#CLASSIC}, and loaded on that
+     * first call: the start-up prewarm never decodes it, since the default look never shows it.
+     */
+    private static final class ClassicHolder {
+        static final Map<String, Pair> CLASSIC = Map.of(
+            "add", pair("classic/general/add", Hashes.CLASSIC), "split", pair("classic/actions/splitVertically", Hashes.CLASSIC),
+            "zoom", single("classic/general/expandComponent", Hashes.CLASSIC), "settings", pair("classic/general/settings", Hashes.CLASSIC),
+            "window.add", pair("classic/actions/moveToWindow", Hashes.CLASSIC), "search", pair("classic/actions/find", Hashes.CLASSIC));
+    }
+    private static final class StripeHolder {
+        static final Map<String, Pair> STRIPES = Map.of(
+            "network", pair("classic/toolwindows/webToolWindow", Hashes.CLASSIC),
+            "folder", pair("classic/toolwindows/toolWindowProject", Hashes.CLASSIC),
+            "tunnel", pair("classic/toolwindows/toolWindowModuleDependencies", Hashes.CLASSIC),
+            "download", pair("classic/toolwindows/toolWindowAnalyzeDataflow", Hashes.CLASSIC),
+            "server", pair("classic/toolwindows/toolWindowServer", Hashes.CLASSIC),
+            "bell", pair("classic/toolwindows/notifications", Hashes.CLASSIC));
+    }
     static Map<String, Pair> catalog() { return Holder.CATALOG; }
     static Map<String, Pair> chrome() { return ChromeHolder.CHROME; }
+    static Map<String, Pair> classicChrome() { return ClassicHolder.CLASSIC; }
+    /**
+     * IntelliJ's classic 13 px tool-window icons for a labelled stripe's buttons (Enterprise presentation spec 10.7).
+     * Admitted only by {@link IconRegistry#stripeIcon} and loaded on its first call, never by the start-up prewarm or a
+     * chrome receiver.
+     */
+    static Map<String, Pair> classicStripes() { return StripeHolder.STRIPES; }
     private static Pair pair(String stem, Map<String, String> hashes) {
         return new Pair(read(stem + ".svg", hashes), read(stem + "_dark.svg", hashes));
+    }
+    /** A file without a dark sibling serves both variants, as IntelliJ shows it on either theme. */
+    private static Pair single(String stem, Map<String, String> hashes) {
+        var artwork = read(stem + ".svg", hashes);
+        return new Pair(artwork, artwork);
     }
     private static final class Hashes {
         static final Map<String,String> SELECTED = hashes("assets-selected.tsv", 14);
         static final Map<String,String> CHROME = hashes("assets-chrome.tsv", 20);
+        static final Map<String,String> CLASSIC = hashes("assets-classic.tsv", 26);
         private static Map<String,String> hashes(String manifest, int count) {
             try(var input=BuiltInArtwork.class.getResourceAsStream(manifest)) {
                 if(input==null)throw new IOException("Missing hash manifest " + manifest);

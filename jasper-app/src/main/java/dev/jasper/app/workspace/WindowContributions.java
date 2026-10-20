@@ -83,7 +83,7 @@ final class WindowContributions implements AutoCloseable {
             renderStatus();
             restoreSizes();
             for (DockStripe stripe : owner.stripes().all()) {
-                stripe.onToggle = this::togglePanel;
+                stripe.onToggle = this::toggleAndActivate;
                 stripe.onMove = this::movePanel;
                 stripe.onHide = this::hidePanel;
             }
@@ -195,10 +195,26 @@ final class WindowContributions implements AutoCloseable {
             case SHOW -> showPanel(request.panelId());
             case HIDE -> hidePanel(request.panelId());
             case TOGGLE -> togglePanel(request.panelId());
+            case ACTIVATING_TOGGLE -> toggleAndActivate(request.panelId());
         }
     }
 
     private void togglePanel(String id) { if (panels.containsKey(id)) dock.toggle(id); }
+
+    /** A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). */
+    private void toggleAndActivate(String id) {
+        if (!panels.containsKey(id)) return;
+        // Standard frames activate nothing, so a window replaced there still hands focus back to the terminal.
+        activating = owner.area().flush() ? id : null;
+        try { dock.toggle(id); } finally { activating = null; }
+        if (dock.visible(id)) owner.area().activate(id);
+    }
+
+    /**
+     * The panel a user gesture is toggling and activating, or null: when it shows in place of another window, focus is
+     * not handed back to the terminal, whose focus events would otherwise land after the activation and undo it.
+     */
+    private String activating;
 
     private void showPanel(String id) { if (panels.containsKey(id)) dock.show(id); }
 
@@ -286,8 +302,8 @@ final class WindowContributions implements AutoCloseable {
         if (change.layout()) owner.area().sync();
         if (change.stripes()) renderStripes();
         for (String id : change.hidden()) notifyVisibility(id, false);
-        // Hiding a window by any route returns focus to the terminal.
-        if (!change.hidden().isEmpty()) owner.focusSelected();
+        // Hiding a window by any route returns focus to the terminal, unless a window being activated replaces it.
+        if (!change.hidden().isEmpty() && (activating == null || !change.shown().contains(activating))) owner.focusSelected();
         for (String id : change.shown()) notifyVisibility(id, true);
         persist();
     }

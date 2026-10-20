@@ -69,7 +69,8 @@ class EnterpriseMenuRowMockTest {
     static Mounted mounted(boolean dark, String name, java.util.function.Consumer<WindowContent> fixture) {
         var themes = EnterpriseLook.controller(dark);
         try {
-            var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, false));
+            // The mocks' host: the system title bar and the in-window menu row (plan 14).
+            var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", ChromeRenderTest.LINUX);
             var look = WindowLook.of(projections);
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look.chrome());
             owner.connectContributions(workstation());
@@ -100,10 +101,9 @@ class EnterpriseMenuRowMockTest {
         assertThat(renderRuns).as(what + " row and rule runs").hasSizeGreaterThanOrEqualTo(2);
         // The 24 px row (48 at 2x) on surface.app, then its 1 px rule.
         assertThat(renderRuns.get(0).length()).as(what + " row").isCloseTo(mockRuns.get(0).length(), within(2));
-        assertThat(MockProfile.deltaE(renderRuns.get(0).color(), mockRuns.get(0).color())).as(what + " row colour").isLessThanOrEqualTo(2.5);
+        assertThat(MockProfile.deltaE(renderRuns.get(0).color(), MockProfile.role(dark, "surface.app"))).as(what + " row colour").isLessThanOrEqualTo(2.5);
         assertThat(renderRuns.get(1).length()).as(what + " rule").isCloseTo(mockRuns.get(1).length(), within(1));
-        // Plan 6b Task 1 overrides Enterprise Dark's border.divider with the mock's rule (#4A4D53).
-        assertThat(MockProfile.deltaE(renderRuns.get(1).color(), mockRuns.get(1).color())).as(what + " rule colour").isLessThanOrEqualTo(2.5);
+        assertThat(MockProfile.deltaE(renderRuns.get(1).color(), MockProfile.role(dark, "border.divider"))).as(what + " rule colour").isLessThanOrEqualTo(2.5);
         var mockInks = MockProfile.inks(mock, new Rectangle(X + 2, Y + 2, 900, 44), 12, 25);
         var renderInks = MockProfile.inks(render[0], new Rectangle(2, 2, 900, 44), 12, 25);
         assertThat(mockInks).as("the mock's eight menu titles").hasSize(8);
