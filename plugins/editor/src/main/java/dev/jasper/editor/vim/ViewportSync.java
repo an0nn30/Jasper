@@ -21,6 +21,7 @@ final class ViewportSync {
     private final VimTextArea area;
     private JViewport viewport;
     private boolean moving;
+    private final java.beans.PropertyChangeListener typographyChanged = event -> resize(true);
     private final ChangeListener scrolled = event -> userScrolled();
     private final ComponentListener resized = new ComponentAdapter() {
         @Override public void componentResized(ComponentEvent event) { resize(); }
@@ -32,6 +33,7 @@ final class ViewportSync {
         this.editor = editor;
         this.area = area;
         area.addHierarchyListener(moved);
+        area.addPropertyChangeListener("editorTypography", typographyChanged);
         viewport();
     }
 
@@ -41,6 +43,7 @@ final class ViewportSync {
         if (found != viewport) {
             detach();
             viewport = found;
+            editor.view().physical(viewport != null);
             if (viewport != null) {
                 viewport.addChangeListener(scrolled);
                 viewport.addComponentListener(resized);
@@ -53,6 +56,8 @@ final class ViewportSync {
     /** Vim turned off: nothing is listened to any more. */
     void close() {
         area.removeHierarchyListener(moved);
+        area.removePropertyChangeListener("editorTypography", typographyChanged);
+        editor.view().physical(false);
         detach();
     }
 
@@ -68,7 +73,9 @@ final class ViewportSync {
      * left and right insets hold no text). When the size changes, the view scrolls to keep the cursor shown, and the
      * text area's room below the last line follows the new height.
      */
-    void resize() {
+    void resize() { resize(false); }
+
+    private void resize(boolean force) {
         JViewport port = viewport;
         if (port == null) return;
         Rectangle visible = port.getViewRect();
@@ -80,7 +87,7 @@ final class ViewportSync {
         View view = editor.view();
         int rows = Math.max(1, visible.height / lineHeight), columns = Math.max(1, textWidth / charWidth);
         area.revalidate();
-        if (rows == view.height() && columns == view.width()) return;
+        if (!force && rows == view.height() && columns == view.width()) return;
         view.resize(rows, columns);
         editor.viewResized();
     }

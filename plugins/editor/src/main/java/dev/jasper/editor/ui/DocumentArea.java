@@ -73,7 +73,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         if (closed) return;
         typography = value;
         if (appearance != null && settings != null) refreshAppearance();
-        else applyFont(new Font(value.family(), Font.PLAIN, 1).deriveFont((float) value.size()));
+        else { area.typography(value); scroll.getGutter().setLineNumberFont(area.getFont()); }
     }
 
     private void applyFont(Font font) {
@@ -88,8 +88,8 @@ final class DocumentArea extends JComponent implements AutoCloseable {
 
     void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax, double opacity) {
         if (closed) return;
-        applyFont(typography == null ? settings.font()
-            : new Font(typography.family(), Font.PLAIN, 1).deriveFont((float) typography.size()));
+        if (typography == null) applyFont(settings.font());
+        else { area.typography(typography); scroll.getGutter().setLineNumberFont(area.getFont()); }
         theme.apply(area, scroll, editor, syntax, opacity);
         area.setTabSize(settings.tabSize());
         glass(opacity, editor.background(), editor.gutter());
