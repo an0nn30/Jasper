@@ -96,7 +96,7 @@ plain text. TOML uses the Editor's own lexer.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `font_family` | first installed of JetBrains Mono, Menlo, Consolas, DejaVu Sans Mono, else Monospaced | editor font |
+| `font_family` | first installed of JetBrains Mono, Menlo, Consolas, DejaVu Sans Mono, else Monospaced; IBM Plex Mono under the Enterprise look | editor font |
 | `font_size` | 13 | points, 8–48 |
 | `tab_size` | 4 | columns, 1–16 |
 | `soft_wrap` | false | wrapping for new tabs |

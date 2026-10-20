@@ -41,7 +41,7 @@ digits are search text. Every colour comes from the installed theme.
 ## The Run window
 
 Under the Enterprise look the palette is the Run window, centred across the window, in its upper part. Its shortcut, the
-"▶ Run…" status item and the toolbar's Search everywhere field open it, and put the cursor back in its Open field while
+"▶ Run…" status item and the toolbar's Search Everywhere icon open it, and put the cursor back in its Open field while
 it is open, as a click on the window does. It stays open while you work: clicking a pane gives that pane the keyboard,
 and a row runs in the pane that is current when you run it. It closes on Escape (with the cursor in it), ×, Cancel or
 running a row. Drag it by its title row or an empty area; dropped near its home, it goes back there, and a double click

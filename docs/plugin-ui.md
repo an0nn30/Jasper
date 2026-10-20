@@ -61,7 +61,9 @@ Use `TextRole.MONO*` and `FieldPresentation.TECHNICAL` for technical values (hos
 Under the Enterprise look an EXCLUSIVE choice draws radios, TABS draws folder tabs, a STEPPER or SLIDER draws a spinner,
 a Section with its Card draws a titled box, a Table draws a header band, zebra rows and banded headings, a Tree draws ▶
 and ▼, an Empty state shows one button (its visible PRIMARY action, or else its first visible one), a Chip is boxed in upper case, a ROUTE stack draws edged cells, and an ORDERED
-list's commands move to a side column that acts on the selection; the descriptors and events are the same.
+list's commands move to a side column that acts on the selection, and a panel's stripe label starts with its icon
+([plugin icons](sdk-icons.md)), and the six classic icon names draw IntelliJ's classic art in headers
+and toolbar views; the descriptors and events are the same.
 
 Descriptors say what a control means and the presentation draws it. GHOST is a quiet button, `ButtonPresentation.HELP`
 opens help and `FormKind.PROMPT` is a short, focused question. A `Section` holding a `Card` is a titled group.
@@ -236,7 +238,8 @@ track, strong secondary text and the secondary button edge), or the
 `appearance().onChanged(...)` (chrome) or `onWorkspaceChanged(...)` (workspace content, including opacity). Never cache
 a color across a change. A role that carries opacity is painted as given; the kit applies treatments such as focus
 rings and hovers on top. Content in the workspace area of a translucent window paints its background with
-`workspaceOpacity(component)`.
+`workspaceOpacity(component)`. Specialized content that needs the look's faces reads them from
+`appearance().presentation()` (`uiFace`, `dataFace`, `bodySize`; SDK 0.18.2) (the look's own; the user's font settings are not reported).
 
 ## Testing
 

@@ -386,11 +386,20 @@ public final class PluginRuntime {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         clipboard = Objects.requireNonNull(value);
     }
-    private dev.jasper.ui.kit.Kit kit;
-    /** Supplies the presentation's kit, which plugins' views are made with, before plugin startup (spec 4.9). */
-    public void presentation(dev.jasper.ui.kit.Kit kit) {
+    /** The presentation given before plugin startup: its kit, what plugins learn of its look, and its defaults. */
+    private record Given(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) { }
+    private Given given;
+    /**
+     * Supplies the presentation before plugin startup: the kit plugins' views are made with (spec 4.9), and the look and
+     * defaults every plugin's appearance reports (plan 15a).
+     *
+     * @param kit the kit the look installed
+     * @param look what plugins learn of the look
+     * @param defaults the look's defaults
+     */
+    public void presentation(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) {
         if (host != null) throw new IllegalStateException("Plugins have already started");
-        this.kit = Objects.requireNonNull(kit);
+        given = new Given(Objects.requireNonNull(kit, "kit"), Objects.requireNonNull(look, "look"), Objects.requireNonNull(defaults, "defaults"));
     }
     /** Supplies the live application motion policy before plugin startup. */
     public void animations(java.util.function.BooleanSupplier enabled) {
@@ -684,7 +693,12 @@ public final class PluginRuntime {
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
             dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
         created.animations = animations;
-        if (kit != null) { var chosen = kit; created.kit = () -> chosen; }
+        if (given != null) {
+            var chosen = given;
+            created.kit = chosen::kit;
+            created.presentation = HostedPresentation.of(chosen.look(), chosen.kit(), chosen.defaults());
+            created.defaults = chosen.defaults();
+        }
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
         created.commandClient = commandClient;

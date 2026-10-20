@@ -174,10 +174,10 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `notifications` | EDT notification center (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, plus terminal and activity notice production for Buddy. Application owns the center and the incidents and closes notifiers before companion. |
 | `notificationui` | EDT Swing views of the center: each window's CardLayer, the history panel, the Errors window's ErrorsView, and their text, style and focus helpers. Application mounts each layer through WindowContent and closes it with its window; the Errors window closes its view when it closes. |
 | `about` | The About and Licenses windows' views and the third-party notices index read from resources. Application's AboutWindows owns both windows and closes each view with its window. |
-| `splash` | The boot splash of a branded look: `SplashPainter` draws it from the look's files, the same in every theme, and `Splash` is its undecorated window. The bootstrap decodes the files off the EDT, opens the window on it and closes it through `StartupSteps` when the first window shows or start-up fails. |
+| `splash` | The boot splash of a branded look: `SplashPainter` draws it from the look's files, the same in every theme, and `Splash` is its undecorated window, which every paint reaches as one copy from `SplashBuffer`. The bootstrap decodes the files off the EDT, opens the window on it and closes it through `StartupSteps` when the first window shows or start-up fails. |
 | `residency` | Bounded interprocess protocol and endpoint workers. Bootstrap transfers endpoint close to application shutdown and process-hook backup. |
 | `commandline` | The `jasper` command's side: the command socket's wire format and listener (a reader and a writer virtual thread per call; output is only queued), the calls it dispatches, the subcommand list `jasper --help` reads, and putting the command on `PATH`. Bootstrap binds the listener after plugins start; the application closes it at shutdown. |
-| `platform` | OS adapters, icons, fonts, title-bar paint, logging and system notifications. Callers own registrations and native handles; Swing operations run on EDT, and logging and system notifications each have their own worker. |
+| `platform` | OS adapters, icons, fonts, title-bar paint, logging and system notifications. Callers own registrations and native handles; Swing operations run on EDT, logging and system notifications each have their own worker, and the macOS title band reads the double-click setting once on a short-lived virtual thread. |
 | `persistence` | Bounded TOML reads and atomic writes; synchronous helpers own short-lived file handles. Caller chooses thread and lifecycle. |
 | `presentation` | The presentation a process runs with, chosen once before Swing: the kit file parser (`KitParser`, `ChromeSpec`, `FontFile`), each provider's `PresentationFacts`, the attempt record (`AttemptStore`, `PresentationAttempt`), the projections of spec 9.1 and `Presentation`. The window chrome's projections are read by the bootstrap (`DesktopFlags`), `WorkspaceChrome.of`, `ShellChrome.of`, `WindowLook`, `WindowTitle` (`TitleFormat`) and the application's `LookMotion`, and the dialog mapping by `AuxiliaryWindows`. Values and bounded file stores; `PluginSelection` builds it and the application hands each consumer its kit or projection. `Branding` holds a look's product name, icons and splash art as bytes; the bootstrap and `ApplicationIcon` decode them. |
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. Declared plugin settings (DeclaredSettings) are read with the plugin's own schema and saved through PluginSettingsFiles. PluginRuntime.settingsPages gives Settings a page per plugin under Tools. |
@@ -218,17 +218,30 @@ and collapse to its magnifier. `toolbar = "hidden"` hides only the buttons. `Tit
 chosen at startup: on macOS `MacTitleBar` hosts the header in the native title row and gives it insets
 that keep clear of the traffic lights; on Windows and Linux FlatLaf's title pane embeds
 `CollapsingMenuBar`, which carries the header under the menus; with `window.native_decorations = true`
-the system title bar stays and the header is the top row of `WindowContent`. A look with a native title (the
-Enterprise presentation) gives every platform the system title bar; with `menu_bar = "window"` the bootstrap turns
-macOS's screen menu bar off, so each terminal window's menus are a row in the window (an auxiliary frame shows none
-and binds Close Window's shortcut itself). A native-titled macOS frame's appearance follows the theme; Jasper gives the
+the system title bar stays and the header is the top row of `WindowContent`. A look with a native title gives every
+platform the system title bar. With `menu_bar = "window"` the bootstrap turns macOS's screen menu bar off, so each
+terminal window's menus are a row in the window (an auxiliary frame shows none and binds Close Window's shortcut
+itself).
+
+The Enterprise presentation's classic title (`title_bar = "classic"`) is IntelliJ Classic's:
+- On macOS, `MacTitleBand` (platform) is a 28 pt band in the toolbar's colour under the system's transparent title,
+  which macOS draws with the traffic lights. The menus stay in the screen menu bar, and an auxiliary frame keeps its
+  system title bar and shows the minimal File menu there.
+- On Windows, FlatLaf's title pane embeds `CollapsingMenuBar` and `ClassicWindowTitle`, the window title left-aligned
+  after the menus, over a 1 px rule.
+- On Linux it is the system title bar.
+
+`TitleInset` keeps classic in-window dialogs and overlays below either, and below the FlatLaf title pane of a Windows
+auxiliary frame or dialog under the classic title.
+
+A native-titled macOS frame's appearance follows the theme; Jasper gives the
 Windows and Linux system title bar no appearance hint (JBR has none). `WorkspaceChrome.of` (workspace) and
 `ShellChrome.of` (windows) read the look's projections and choose the strategies, among them `MenuBarLayout`:
 `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).
 `WindowTitle` fills the look's title template. `WorkspaceChrome.of` also picks the window content: `HeaderComposition`
-(`UnifiedHeader`, or `ClassicHeader`, a toolbar row of left-packed buttons with the search field and Settings…
-trailing), `TabStrip` (`WindowTabs`, or the content-sized `ClassicTabs`), `StatusCells` (`SlashSegments`, or
-`RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's dialog mapping and marks the surfaces
+(`UnifiedHeader`, or `ClassicHeader`, a toolbar row of left-packed buttons with the search field, or under
+`toolbar_search = "icon"` a Search Everywhere button, and Settings… trailing), `TabStrip` (`WindowTabs`, or the
+content-sized `ClassicTabs`), `StatusCells` (`SlashSegments`, or `RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's dialog mapping and marks the surfaces
 it makes; `NativeShells` draws a marked modal overlay or attached sheet whose window is showing in that window as a
 `ClassicDialog`. The title search field shows `WindowHeaderContext` and opens the palette, which `WindowCommandPalette`
 places through its `PaletteHome` (the field's bounds for the card). `WindowTabs` are IntelliJ editor tabs sized to content with a 3 px selection underline,
@@ -240,6 +253,13 @@ named glyphs painted inside them use the kit's original chrome artwork (`IconReg
 icon values or identities, and their painting and text sizes come from `ChromePainter.installed()` and named kit roles.
 Under `[chrome] icons = "classic"` each window's header and status bar are marked `ChromeArtwork.CLASSIC`, so the
 meanings the classic set has draw IntelliJ's classic icons (`assets-classic.tsv`).
+`ToolWindowArea` takes the window's `ChromeArtwork`: under CLASSIC its native and borrowed kit headers draw the six
+classic names through `AppIcons.classicChromeIcon` and `KitView.classicChromeIcons`, and `WindowChrome` marks each
+toolbar view the same way.
+The labelled stripes and the bottom strip are not receivers: `DockChrome.stripes` gives them the look's
+`ChromeArtwork`, and they draw each label's icon at 13 px through `AppIcons.stripeIcon`: under CLASSIC, IntelliJ's
+classic tool-window icon where `IconRegistry.stripeIcon` has one, else the icon's monochrome glyph in the label's
+ink; under NEW_UI, the icon the rails draw.
 
 ## Themes
 

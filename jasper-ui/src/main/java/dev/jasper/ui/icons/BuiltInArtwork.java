@@ -10,6 +10,8 @@ final class BuiltInArtwork {
         DecodedArtwork select(boolean darkTheme) { return darkTheme ? dark : light; }
     }
     static final Set<String> IDENTITIES = Set.of("network", "tunnel", "more.vertical");
+    /** The names {@link ClassicHolder} has, declared outside it so asking never decodes its files. */
+    static final Set<String> CLASSIC_NAMES = Set.of("add", "split", "zoom", "settings", "window.add", "search");
     private static final class Holder {
         static final Map<String, Pair> CATALOG = Map.of(
             "settings", pair("general/settings", Hashes.SELECTED), "network", pair("toolwindows/web", Hashes.SELECTED),
@@ -43,9 +45,24 @@ final class BuiltInArtwork {
             "zoom", single("classic/general/expandComponent", Hashes.CLASSIC), "settings", pair("classic/general/settings", Hashes.CLASSIC),
             "window.add", pair("classic/actions/moveToWindow", Hashes.CLASSIC), "search", pair("classic/actions/find", Hashes.CLASSIC));
     }
+    private static final class StripeHolder {
+        static final Map<String, Pair> STRIPES = Map.of(
+            "network", pair("classic/toolwindows/webToolWindow", Hashes.CLASSIC),
+            "folder", pair("classic/toolwindows/toolWindowProject", Hashes.CLASSIC),
+            "tunnel", pair("classic/toolwindows/toolWindowModuleDependencies", Hashes.CLASSIC),
+            "download", pair("classic/toolwindows/toolWindowAnalyzeDataflow", Hashes.CLASSIC),
+            "server", pair("classic/toolwindows/toolWindowServer", Hashes.CLASSIC),
+            "bell", pair("classic/toolwindows/notifications", Hashes.CLASSIC));
+    }
     static Map<String, Pair> catalog() { return Holder.CATALOG; }
     static Map<String, Pair> chrome() { return ChromeHolder.CHROME; }
     static Map<String, Pair> classicChrome() { return ClassicHolder.CLASSIC; }
+    /**
+     * IntelliJ's classic 13 px tool-window icons for a labelled stripe's buttons (Enterprise presentation spec 10.7).
+     * Admitted only by {@link IconRegistry#stripeIcon} and loaded on its first call, never by the start-up prewarm or a
+     * chrome receiver.
+     */
+    static Map<String, Pair> classicStripes() { return StripeHolder.STRIPES; }
     private static Pair pair(String stem, Map<String, String> hashes) {
         return new Pair(read(stem + ".svg", hashes), read(stem + "_dark.svg", hashes));
     }
@@ -57,7 +74,7 @@ final class BuiltInArtwork {
     private static final class Hashes {
         static final Map<String,String> SELECTED = hashes("assets-selected.tsv", 14);
         static final Map<String,String> CHROME = hashes("assets-chrome.tsv", 20);
-        static final Map<String,String> CLASSIC = hashes("assets-classic.tsv", 14);
+        static final Map<String,String> CLASSIC = hashes("assets-classic.tsv", 26);
         private static Map<String,String> hashes(String manifest, int count) {
             try(var input=BuiltInArtwork.class.getResourceAsStream(manifest)) {
                 if(input==null)throw new IOException("Missing hash manifest " + manifest);

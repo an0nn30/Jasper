@@ -11,6 +11,7 @@ import dev.jasper.remote.ui.RemoteScope;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.testing.FakePresentations;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,25 +57,35 @@ class RemotePluginTest {
 
     @Test void aStartUnderEnterpriseReadsTheClassicLayoutOnce(@TempDir Path dir) {
         try (var host = new FakePluginHost()) {
-            dev.jasper.remote.workstation.FakeEnterprise.start(host);
+            host.setPresentation(FakePresentations.CLASSIC);
             var plugin = plugin(dir.resolve("ssh"));
-            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise"), plugin);
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin);
             settle(host);
             assertThat(host.failures()).isEmpty();
             assertThat(plugin.layout()).isEqualTo(dev.jasper.remote.workstation.Layout.CLASSIC);
         }
         try (var host = new FakePluginHost()) {
             var plugin = plugin(dir.resolve("ssh-default"));
-            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise"), plugin);
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin);
             settle(host);
             assertThat(plugin.layout()).isEqualTo(dev.jasper.remote.workstation.Layout.ROWS);
         }
     }
 
+    /** Plan 15a: without a classic look Remote keeps its rows, so Sessions stays on the left. */
+    @Test void underTheDefaultLookSessionsStaysLeft(@TempDir Path dir) {
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin(dir.resolve("ssh")));
+            settle(host);
+            assertThat(host.failures()).isEmpty();
+            assertThat(host.panels()).contains("dev.jasper.remote.panel|Sessions|LEFT|dev.jasper.remote.hosts");
+        }
+    }
+
     @Test void underEnterpriseThePanelsTakeTheirSlotsAndTransfersIsABottomPanel(@TempDir Path dir) throws Exception {
         try (var host = new FakePluginHost()) {
-            dev.jasper.remote.workstation.FakeEnterprise.start(host);
-            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise"), plugin(dir.resolve("ssh")));
+            host.setPresentation(FakePresentations.CLASSIC);
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin(dir.resolve("ssh")));
             settle(host);
             assertThat(host.failures()).isEmpty();
             assertThat(host.panels()).containsExactlyInAnyOrder(

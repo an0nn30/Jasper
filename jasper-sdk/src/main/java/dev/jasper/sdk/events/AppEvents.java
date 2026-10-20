@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /** Application topics that need no capability. */
 public final class AppEvents {
-    /** The look changed; read {@link ThemeChanged#variant()}. */
+    /** The theme changed; read {@link ThemeChanged#variant()}. */
     public static final Topic<ThemeChanged> THEME_CHANGED = Topic.of("jasper.app.theme-changed", ThemeChanged.class);
     /** The configuration file was reloaded; plugin tables may have changed. */
     public static final Topic<ConfigReloaded> CONFIG_RELOADED = Topic.of("jasper.app.config-reloaded", ConfigReloaded.class);
@@ -13,7 +13,7 @@ public final class AppEvents {
     private AppEvents() { }
 
     /**
-     * The application's look changed.
+     * The application's theme changed.
      *
      * @param variant the new variant
      */

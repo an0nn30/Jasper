@@ -4,18 +4,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.PresentationIcon;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
 import dev.jasper.app.testsupport.MockProfile;
+import dev.jasper.ui.icons.ChromeArtwork;
+import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.swing.ChromePainter;
 import dev.jasper.ui.theme.PaintPair;
+import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Color;
+import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Map;
 import java.awt.Rectangle;
+import javax.swing.AbstractButton;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -25,7 +32,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * follow the UI face's glyphs are asserted under IBM Plex and printed only where an installed IBM Plex hides the plugin's
  * files ({@link MockProfile#fonts}, {@link MockCrops#fontsFloor}). Renders, crops and their differences are written under
  * {@code jasper-app/build/dock-renders/}. Mock data (titles, numbers, counts) are fixtures. The render's colours are the shipped
- * theme's roles and painted pairs, seen through the variant's scrim; the mocks give the geometry.
+ * theme's roles and painted pairs, seen through the variant's scrim; the mocks give the geometry. Since the user's direction
+ * of 2026-10-19 the stripes' labels start with their icons, which the text-only mocks do not draw: each stripe is compared
+ * with its icon slices cut out, and the slices are asserted as the icons.
  */
 @ExtendWith(EdtTestExtension.class)
 class DockMockTest {
@@ -99,15 +108,18 @@ class DockMockTest {
         for (Variant variant : VARIANTS) {
             try {
                 EnterpriseLook.install(variant.dark());
-                var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit());
-                stripe.render(List.of(LabelledStripeTest.window("sftp", "SFTP", Slot.LEFT_TOP, 1),
-                    LabelledStripeTest.window("servers", "File Servers", Slot.LEFT_BOTTOM, 2)), List.of());
+                var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+                stripe.render(List.of(LabelledStripeTest.window("sftp", "SFTP", Slot.LEFT_TOP, 1, new PresentationIcon("folder", null)),
+                    LabelledStripeTest.window("servers", "File Servers", Slot.LEFT_BOTTOM, 2, new PresentationIcon("server", null))), List.of());
                 int thickness = stripe.getPreferredSize().width;
+                int height = fitted("1: SFTP", "2: File Servers"), iconed = height + 2 * StripeIconsTest.slice();
+                var render = variant.seen(MockCrops.render(stripe, thickness, iconed, 2));
+                MockCrops.write(variant.name() + "-left-stripe", MockCrops.crop(render, 0, 0, 44, 2 * iconed), variant.crop(2, 180, 44, 2 * iconed));
                 MockProfile.fonts(variant.name() + " left stripe: the stripe fits its labels, the mocks' 22 and the rule", thickness, 23, 0);
-                int height = fitted("1: SFTP", "2: File Servers");
-                var render = variant.seen(MockCrops.render(stripe, thickness, height, 2));
-                assertSecondAtTheEnd(variant.name() + " left stripe", stripe, height);
-                compareStripe(variant, "left-stripe", render, variant.crop(2, 180, 44, 2 * height), thickness, Side.LEFT, List.of(29, 109, 151, 301));
+                assertSecondAtTheEnd(variant.name() + " left stripe", stripe, iconed);
+                assertIcons(variant, "left-stripe", render, stripe, List.of("folder", "server"));
+                compareStripe(variant, "left-stripe-text", StripeIconsTest.withoutIcons(render, stripe, 2), variant.crop(2, 180, 44, 2 * height),
+                    thickness, Side.LEFT, List.of(29, 109, 151, 301));
             } finally { EnterpriseLook.restoreDefault(); }
         }
     }
@@ -116,14 +128,18 @@ class DockMockTest {
         for (Variant variant : VARIANTS) {
             try {
                 EnterpriseLook.install(variant.dark());
-                var stripe = new LabelledStripe(Side.RIGHT, EnterpriseLook.kit());
-                stripe.render(List.of(LabelledStripeTest.window("sessions", "Sessions", Slot.RIGHT_TOP, 0),
-                    LabelledStripeTest.window("tunnels", "Tunnels", Slot.RIGHT_BOTTOM, 0)), List.of());
+                var stripe = new LabelledStripe(Side.RIGHT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+                stripe.render(List.of(LabelledStripeTest.window("sessions", "Sessions", Slot.RIGHT_TOP, 0, new PresentationIcon("network", null)),
+                    LabelledStripeTest.window("tunnels", "Tunnels", Slot.RIGHT_BOTTOM, 0, new PresentationIcon("tunnel", null))), List.of());
                 int thickness = stripe.getPreferredSize().width;
-                int height = fitted("Sessions", "Tunnels");
-                var render = variant.seen(MockCrops.render(stripe, thickness, height, 2));
-                assertSecondAtTheEnd(variant.name() + " right stripe", stripe, height);
-                compareStripe(variant, "right-stripe", render, variant.crop(2838, 180, 44, 2 * height), thickness, Side.RIGHT, List.of(29, 121, 164, 247));
+                int height = fitted("Sessions", "Tunnels"), iconed = height + 2 * StripeIconsTest.slice();
+                var render = variant.seen(MockCrops.render(stripe, thickness, iconed, 2));
+                MockCrops.write(variant.name() + "-right-stripe", MockCrops.crop(render, 2 * thickness - 44, 0, 44, 2 * iconed),
+                    variant.crop(2838, 180, 44, 2 * iconed));
+                assertSecondAtTheEnd(variant.name() + " right stripe", stripe, iconed);
+                assertIcons(variant, "right-stripe", render, stripe, List.of("network", "tunnel"));
+                compareStripe(variant, "right-stripe-text", StripeIconsTest.withoutIcons(render, stripe, 2), variant.crop(2838, 180, 44, 2 * height),
+                    thickness, Side.RIGHT, List.of(29, 121, 164, 247));
             } finally { EnterpriseLook.restoreDefault(); }
         }
     }
@@ -135,12 +151,47 @@ class DockMockTest {
      * this tall (166 and 138, the mocks' crops 332 and 276 tall at 2x) and the mocks' labels compare in place.
      */
     static int fitted(String top, String second) {
-        var labels = new StripeLabels(EnterpriseLook.kit());
-        return 2 * rail() + labels.length(top, java.util.Optional.empty()) + labels.length(second, java.util.Optional.empty());
+        var labels = new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+        return 2 * rail() + labels.length(top, java.util.Optional.empty(), null) + labels.length(second, java.util.Optional.empty(), null);
     }
 
     private static int rail() {
         return com.formdev.flatlaf.util.UIScale.scale(EnterpriseLook.kit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.RAIL_GAP));
+    }
+
+    /**
+     * Every iconed label of {@code stripe} in {@code render} (2x, under the variant's scrim): its whole icon slice
+     * ({@link StripeIconsTest#iconSlice}) is its tile (the open tile, or the closed stripe's surface) with IntelliJ's
+     * classic file for the fixture's name, in {@code art}'s order, painted upright at its icon box, as the variant's mock
+     * shows it, so the art, the gap and the margins beside the box are pinned together. Each fixture here gives two of its
+     * labels an icon.
+     */
+    static void assertIcons(Variant variant, String name, BufferedImage render, DockStripe stripe, List<String> art) {
+        var theme = EnterpriseLook.theme(variant.dark());
+        var labels = new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+        int iconed = 0;
+        for (AbstractButton button : stripe.buttons()) {
+            var label = (StripeLabels.Label) button;
+            if (label.icon == null) continue;
+            String file = art.get(iconed++);
+            Rectangle bounds = label.getBounds(), slice = StripeIconsTest.iconSlice(stripe.side(), bounds);
+            Point at = labels.iconAt(stripe.side(), bounds.width, bounds.height);
+            Color tile = labels.painter().stripeTile(theme, label.isSelected(), false);
+            Color ground = tile != null ? tile : labels.painter().stripeSurface(theme);
+            var expected = new BufferedImage(2 * slice.width, 2 * slice.height, BufferedImage.TYPE_INT_RGB);
+            var g = expected.createGraphics();
+            try {
+                g.setColor(ground);
+                g.fillRect(0, 0, expected.getWidth(), expected.getHeight());
+                g.drawImage(StripeIconsTest.referenceImage(StripeIconsTest.classic(file, variant.dark()), label, ground, 2),
+                    2 * (bounds.x + at.x - slice.x), 2 * (bounds.y + at.y - slice.y), null);
+            } finally { g.dispose(); }
+            var seen = variant.seen(expected);
+            assertThat(render.getRGB(2 * slice.x, 2 * slice.y, seen.getWidth(), seen.getHeight(), null, 0, seen.getWidth()))
+                .as(variant.name() + " " + name + ": " + label.text() + "'s icon slice, " + file + " in its tile")
+                .isEqualTo(seen.getRGB(0, 0, seen.getWidth(), seen.getHeight(), null, 0, seen.getWidth()));
+        }
+        assertThat(iconed).as(variant.name() + " " + name + ": its iconed labels").isEqualTo(art.size());
     }
 
     /** The stripe's second label ends {@code RAIL_GAP} above its bottom end. */
@@ -217,24 +268,31 @@ class DockMockTest {
      * fill, the mock's 22 now that the stripes fit their labels (any extra thickness of theirs would shift the render's
      * ink right of the mock's, and the comparison with it). Asserted: the surface, three dividers in the mock's colour and place, the
      * labels' edges, the pill's start and width, and the share of agreeing pixels under IBM Plex
-     * ({@link MockProfile#fonts}, {@link MockCrops#fontsFloor}). The render is 330 wide, past the mock's 270.
+     * ({@link MockProfile#fonts}, {@link MockCrops#fontsFloor}), on the render with its two icon slices cut out (Event Log's
+     * and Transfers' icons, asserted as the icons). The cut render is 330 wide, past the mock's 270.
      */
     @Test void theBottomStripMatchesTheMocks() throws Exception {
         for (Variant variant : VARIANTS) {
             try {
                 EnterpriseLook.install(variant.dark());
-                var strip = new BottomStrip(EnterpriseLook.kit());
+                var strip = new BottomStrip(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
                 var problems = new ToolStripe.Button("problems", "Problems", null, Slot.BOTTOM_LEFT, false,
                     java.util.Optional.of(new dev.jasper.app.contributions.PanelBadge(1, dev.jasper.app.contributions.PanelBadge.Tone.ERROR, "1 problem")),
                     java.util.OptionalInt.empty());
-                strip.render(List.of(new ToolStripe.Button("log", "Event Log", null, Slot.BOTTOM_LEFT, false),
-                    new ToolStripe.Button("transfers", "Transfers", null, Slot.BOTTOM_LEFT, false), problems), List.of());
+                strip.render(List.of(new ToolStripe.Button("log", "Event Log", AppIcons.semantic("bell"), Slot.BOTTOM_LEFT, false),
+                    new ToolStripe.Button("transfers", "Transfers", new PresentationIcon("download", null), Slot.BOTTOM_LEFT, false), problems), List.of());
                 int thickness = strip.getPreferredSize().height;
+                int shift = 2 * (new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC).getPreferredSize().width - 23);
+                int slices = 2 * StripeIconsTest.slice();
+                var iconed = variant.seen(MockCrops.render(strip, 330 + slices, thickness, 2));
+                // The whole strip, its 2 px rule at 2x and its fill, against the mock's (rule at 1706, fill from 1708): as it
+                // ships, beside the mock widened by the two slices, and with the slices cut out.
+                MockCrops.write(variant.name() + "-bottom-strip", MockCrops.crop(iconed, shift, 0, 520 + 2 * slices, 50),
+                    variant.crop(2, 1706, 520 + 2 * slices, 50));
+                var render = StripeIconsTest.withoutIcons(iconed, strip, 2);
+                MockCrops.write(variant.name() + "-bottom-strip-text", MockCrops.crop(render, shift, 0, 520, 50), variant.crop(2, 1706, 520, 50));
                 assertThat(thickness).as(where(variant) + ": the mocks' 24 and the rule").isEqualTo(25);
-                int shift = 2 * (new LabelledStripe(Side.LEFT, EnterpriseLook.kit()).getPreferredSize().width - 23);
-                var render = variant.seen(MockCrops.render(strip, 330, thickness, 2));
-                // The whole strip, its 2 px rule at 2x and its fill, against the mock's (rule at 1706, fill from 1708).
-                MockCrops.write(variant.name() + "-bottom-strip", MockCrops.crop(render, shift, 0, 520, 50), variant.crop(2, 1706, 520, 50));
+                assertIcons(variant, "bottom strip", iconed, strip, List.of("bell", "download"));
                 var mock = variant.crop(2, 1708, 520, 48);
                 // The render's fill (below its 2 px rule at 2x), 48 rows as the mock crop is the mock's fill.
                 var rows = MockCrops.crop(render, shift, 2, 600, 48);
@@ -327,15 +385,41 @@ class DockMockTest {
                 // The fixture's panels: SFTP's dot and detail and the others' counts, which the Disconnected mock drops but Sessions'.
                 var counted = connected ? List.of(HeaderText.TITLE, HeaderText.COUNT) : List.of(HeaderText.TITLE);
                 compareHeader(variant, kind + "-sftp-header", render, fixture.header("sftp"), fixture.nativeCount("sftp"), 48, 180, 600, true,
-                    connected ? List.of(HeaderText.TITLE, HeaderText.DOT, HeaderText.DETAIL) : List.of(HeaderText.TITLE));
-                compareHeader(variant, kind + "-servers-header", render, fixture.header("servers"), fixture.nativeCount("servers"), 48, 944, 600, false, counted);
-                compareHeader(variant, kind + "-tunnels-header", render, fixture.header("tunnels"), fixture.nativeCount("tunnels"), 2136, 1014, 700, false, counted);
+                    connected ? List.of(HeaderText.TITLE, HeaderText.DOT, HeaderText.DETAIL) : List.of(HeaderText.TITLE), actions(connected, "sftp"));
+                compareHeader(variant, kind + "-servers-header", render, fixture.header("servers"), fixture.nativeCount("servers"), 48, 944, 600, false, counted,
+                    actions(connected, "servers"));
+                compareHeader(variant, kind + "-tunnels-header", render, fixture.header("tunnels"), fixture.nativeCount("tunnels"), 2136, 1014, 700, false, counted,
+                    actions(connected, "tunnels"));
                 fixture.focus("sessions");
                 render = variant.seen(fixture.render(2));
                 compareHeader(variant, kind + "-sessions-header", render, fixture.header("sessions"), fixture.nativeCount("sessions"), 2136, 180, 700, true,
-                    List.of(HeaderText.TITLE, HeaderText.COUNT));
+                    List.of(HeaderText.TITLE, HeaderText.COUNT), actions(connected, "sessions"));
             }
         } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** The fixture panel {@code id}'s own header actions, in their order before Options and Hide. */
+    static List<String> actions(boolean connected, String id) {
+        return DockFixture.panels(connected).stream().filter(panel -> panel.id().equals(id)).findFirst().orElseThrow().actions();
+    }
+
+    /**
+     * The ink of IntelliJ's classic {@code name} art on a header strip, as the variant shows it: the art is authored (the
+     * classic {@code add} is #6E6E6E in Light), so it is painted in its 10 px glyph box at 2x on the strip's surface and
+     * its strongest pixel read as a run's is.
+     */
+    static Color classicInk(Variant variant, String name, boolean focused) {
+        var theme = EnterpriseLook.theme(variant.dark());
+        Color strip = new ChromePainter(EnterpriseLook.kit()).headerSurface(theme, focused);
+        try (var icons = new IconRegistry()) {
+            var icon = icons.classicChromeIcon(name, 20).orElseThrow().icon(theme, SemanticColor.TEXT_PRIMARY);
+            var image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
+            var g = image.createGraphics();
+            try { g.setColor(strip); g.fillRect(0, 0, 20, 20); icon.paintIcon(null, g, 0, 0); } finally { g.dispose(); }
+            var runs = MockCrops.runs(image, false, 60, 10, strip);
+            assertThat(runs).as("the classic %s art has one run", name).hasSize(1);
+            return variant.seen(runs.get(0).ink());
+        }
     }
 
     /** A header strip's text run: its title, connected dot, word detail or count. */
@@ -358,13 +442,14 @@ class DockMockTest {
      * A header strip against its mock crop (2x, its 24 px strip and its rule): the surface and the rule; the ink runs
      * along it, one per title, dot, detail and icon, the title's start within 2 px, each icon's centre within 2 (the icons
      * stand from the trailing edge, whatever the face), each icon's extent within {@link #GLYPH_EXTENT} and its ink within
-     * {@link Variant#glyphInkTolerance} (one glyph box and one ink for every action), and each text run's ink, {@code texts}
+     * {@link Variant#glyphInkTolerance} (one glyph box for every action, and the strip's action ink but for a classic name
+     * among {@code actions}, which has its classic art's ink, {@link #classicInk}), and each text run's ink, {@code texts}
      * in order; the other text edges (a text run's end within 3, a later run's start within 2) and the agreeing pixels of
      * the text, left of the icons, follow the title's advance width and glyphs and are asserted under IBM Plex.
      * Native count widths match an independent platform label render.
      */
-    static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, String nativeCount, int mockX, int mockY, int mockWidth,
-                              boolean focused, List<HeaderText> texts) {
+    static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, String nativeCount, int mockX, int mockY,
+                              int mockWidth, boolean focused, List<HeaderText> texts, List<String> actions) {
         String where = variant.name() + " " + name;
         assertThat(2 * header.width).as(where + ": the frame's width").isEqualTo(mockWidth);
         assertThat(2 * header.height).as(where + ": 24 and the rule").isEqualTo(50);
@@ -380,7 +465,7 @@ class DockMockTest {
         var theirs = MockCrops.runs(MockCrops.crop(mock, 0, 0, mockWidth, 48), false, 60, 10, surface);
         var ours = MockCrops.runs(MockCrops.crop(mine, 0, 0, mockWidth, 48), false, 60, 10, strip);
         assertThat(ours).as(where + ": one run per title, dot, detail and icon").hasSameSizeAs(theirs);
-        int firstIcon = mockWidth;
+        int firstIcon = mockWidth, icons = 0;
         for (int i = 0; i < theirs.size(); i++) {
             var mockRun = theirs.get(i);
             var run = ours.get(i);
@@ -391,7 +476,12 @@ class DockMockTest {
                     .isBetween((mockRun.start() + mockRun.end()) / 2.0 - 2, (mockRun.start() + mockRun.end()) / 2.0 + 2);
                 assertThat(run.length()).as(where + " icon " + i + " extent")
                     .isBetween(mockRun.length() - GLYPH_EXTENT, mockRun.length() + GLYPH_EXTENT);
-                Color action = variant.seen(painter.headerAction(theme, focused));
+                // The user's 2026-10-19 direction: a classic name (the panels' add) draws IntelliJ's classic art, authored,
+                // where the mocks set a glyph in the strip's ink; the other actions keep the strip's ink.
+                String named = icons < actions.size() ? actions.get(icons) : "";
+                icons++;
+                Color action = IconRegistry.classicChromeNames().contains(named) ? classicInk(variant, named, focused)
+                    : variant.seen(painter.headerAction(theme, focused));
                 assertThat(MockCrops.near(run.ink(), action, variant.glyphInkTolerance()))
                     .as(where + " icon " + i + " ink " + run.ink() + " against " + action).isTrue();
             } else {

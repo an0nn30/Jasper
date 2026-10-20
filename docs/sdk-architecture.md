@@ -432,6 +432,12 @@ and gutter colors from the workspace. SDK 0.12.0 adds `WorkspacePalette`, `Synta
 `onWorkspaceChanged` compares the complete workspace generated value, skips initial replay, contains handler failures,
 and removes registrations on disposal or stop. Chrome `variant` and `onChanged` retain their existing meaning.
 
+SDK 0.18.2 adds `Appearance.presentation()`: `HostedPresentation` builds one `Presentation` per run from the
+`PluginLook` projection, the installed kit and the look's `DefaultSource`, and
+`PluginRuntime.presentation(Kit, PluginLook, DefaultSource)` hands all three to the host before plugins start. It is an
+immutable value read from any thread; `FakePluginHost.setPresentation` mirrors it, and the contract case
+`presentationIsTheHostsForEveryPluginOnAnyThreadAndThroughThemeChanges` runs on both.
+
 SDK 0.14.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0, UI thread, null rejected); `onWorkspaceChanged` also
 reports its changes. The method takes a component because opacity is per window and content moves between windows (the
 design's no-argument form was changed for that reason). `dev.jasper.app.plugins.GlassSource` is the per-component lookup
@@ -467,6 +473,9 @@ and gets a typed `Setting` handle: `get()` is the file's value when its kind all
 saves through the same comment-preserving, atomic write as `config.toml`; `onChanged` runs on the UI thread. The
 application translates declarations into its own settings schema inside `dev.jasper.app.plugins`, reads the plugin's
 file with `dev.jasper.app.settings.SchemaReader`, and reports rejected values and undeclared keys against the file.
+A look's `[defaults."<plugin id>"]` values become each declared setting's default, read with the setting's kind when it
+is declared; a rejected value and an undeclared key are logged (`PluginHost.lookDefaultProblem`) and ignored, and
+`FakePluginHost.setKitDefault` and `lookDefaultProblems` mirror it.
 The testkit's `FakePluginHost` offers `setSetting`, `savedSettings`, `settingsReports` and `declared`, and the contract
 suite holds the fake and the application to the same behaviour. SDK 0.9.0 removed `PluginConfig`; every bundled plugin declares its settings.
 Settings shows the declarations as a page per plugin, described next.

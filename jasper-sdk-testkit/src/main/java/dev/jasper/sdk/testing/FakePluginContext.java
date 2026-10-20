@@ -235,7 +235,7 @@ public final class FakePluginContext implements PluginContext {
     /** Plugin windows and dialogs. */
     @Override public Windows windows() { return ui.windows(); }
 
-    /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */
+    /** The host's variant, presentation, change notifications, and icons checked against the plugin's own class loader. */
     @Override public Appearance appearance() {
         return new Appearance() {
             @Override public java.awt.Color color(dev.jasper.sdk.ui.SemanticColor role) { host.requireAppearanceThread(); return host.semanticColor(role); }
@@ -262,6 +262,7 @@ public final class FakePluginContext implements PluginContext {
             @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {
                 requireOpen();var subscription=host.subscribeAppearance(info.id(),handler);own(subscription);return subscription;
             }
+            @Override public dev.jasper.sdk.ui.Presentation presentation() { return host.presentation(); }
         };
     }
 }

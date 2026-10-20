@@ -78,6 +78,49 @@ class PresentationReachTest {
         }
     }
 
+    /**
+     * Plan 15a: a started plugin reads the presentation and the look's defaults for its settings that the application
+     * handed the plugin runtime.
+     */
+    @Test void theApplicationHandsTheLooksPluginDefaultsToThePlugins() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        String main = """
+            package dev.example.look;
+            public final class Main implements dev.jasper.sdk.plugin.Plugin {
+                @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                    var size = context.settings().declare(dev.jasper.sdk.settings.SettingSpec.of("size",
+                        dev.jasper.sdk.settings.SettingKind.integer(8, 48), 13).label("Size"));
+                    try {
+                        java.nio.file.Files.writeString(context.dataDirectory().resolve("read"),
+                            context.appearance().presentation().classic() + " " + size.get());
+                    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                }
+            }
+            """;
+        Path folder = home.resolve("dev").resolve("dev.example.look");
+        Path jar = dev.jasper.app.testsupport.PluginJars.build(folder.resolve("jars"), "dev.example.look.jar",
+            LookFixtures.descriptor("dev.example.look", "Example") + LookFixtures.provider("look.kit.toml"),
+            Map.of("dev.example.look.Main", main), java.util.List.of());
+        dev.jasper.app.testsupport.PluginJars.addResource(jar, "look.kit.toml", STILL_CLASSIC + "[defaults.\"dev.example.look\"]\nsize = 15\n");
+        var selection = PluginSelection.of(dirs(), null, "", folder, false);
+        boolean classic = selection.presentation().projections().plugins().classic();
+        assertThat(selection.presentation().defaults().plugin("dev.example.look")).containsEntry("size", 15L);
+        JasperApplication[] application = new JasperApplication[1];
+        try {
+            edt(() -> {
+                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
+                application[0].startPlugins(dirs());
+            });
+            Path read = dirs().plugins().resolve("dev.example.look/data/read");
+            dev.jasper.app.workspace.DesktopTestSupport.until(() -> java.nio.file.Files.exists(read));
+            assertThat(java.nio.file.Files.readString(read)).as("the look's classic flag and its default for the plugin's setting")
+                .isEqualTo(classic + " 15");
+        } finally {
+            edt(() -> { if (application[0] != null) application[0].quitNow(); });
+            edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
+        }
+    }
+
     /** Spec 10.9: a still look keeps everything still though the saved setting says otherwise. */
     @Test void aStillLookWinsOverTheSavedAnimationSetting() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();

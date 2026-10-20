@@ -9,7 +9,8 @@ import java.util.function.UnaryOperator;
 final class KitSettingRows {
     private KitSettingRows() {}
 
-    static Nodes.Node row(SettingSpec<?> spec, Object value, String invalidText, String error, String entry) {
+    /** {@code defaultValue}: the setting's effective default (the look's or the declared one), which Reset returns to. */
+    static Nodes.Node row(SettingSpec<?> spec, Object defaultValue, Object value, String invalidText, String error, String entry) {
         String id = "settings:" + spec.key();
         var state = new ControlState(true, true, false, error);
         Nodes.Node input;
@@ -48,8 +49,8 @@ final class KitSettingRows {
         }
         // As the host: the settings control slot, then the icon-only Reset, shown while the value differs from the default.
         // As the host: Reset also shows while an unparsed edit or its error is pending; decimals compare at float precision.
-        boolean differs = value instanceof Number a && spec.defaultValue() instanceof Number b && !(a instanceof Integer && b instanceof Integer)
-            ? a.floatValue() != b.floatValue() : !Objects.equals(value, spec.defaultValue());
+        boolean differs = value instanceof Number a && defaultValue instanceof Number b && !(a instanceof Integer && b instanceof Integer)
+            ? a.floatValue() != b.floatValue() : !Objects.equals(value, defaultValue);
         var reset = new Nodes.Button(id + ":reset", new ControlState(differs || invalidText != null || !error.isEmpty(), true, false, ""), "", "reset",
             Nodes.ButtonKind.GHOST, id + ":reset", "Reset " + spec.label() + " to default");
         return new Nodes.SettingRow(id + ":row", state, spec.label(), spec.description(),

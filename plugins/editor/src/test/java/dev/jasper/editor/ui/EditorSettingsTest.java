@@ -35,6 +35,21 @@ class EditorSettingsTest {
         }
     }
 
+    /** Plan 15a: a look's font family (Enterprise's IBM Plex Mono) is the default only when it is installed. */
+    @Test void aLooksFontFamilyIsTheDefaultOnlyWhenItIsInstalled() {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.setKitDefault(ID, "font_family", "IBM Plex Mono");
+            assertThat(start(host, Set.of("IBM Plex Mono", "Menlo")).current().fontFamily()).isEqualTo("IBM Plex Mono");
+            assertThat(host.lookDefaultProblems(ID)).isEmpty();
+        }
+        try (var host = new FakePluginHost(home.resolve("other"))) {
+            host.setKitDefault(ID, "font_family", "IBM Plex Mono");
+            assertThat(start(host, Set.of("Menlo")).current().fontFamily()).isEqualTo("Menlo");
+            assertThat(host.lookDefaultProblems(ID)).singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
+                .startsWith("dev.jasper.editor: the look's default for font_family is not used: ");
+        }
+    }
+
     @Test void badValuesAreReportedAndTheirDefaultsUsed() {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             host.setSetting(ID, "font_family", "Nope Mono");

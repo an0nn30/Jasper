@@ -62,13 +62,18 @@ warning, and when two plugins ship the same id the development copy wins, then t
 then the lowest plugin id. A kit file's `[defaults]` may name its own plugin's themes.
 
 The bundled Enterprise plugin (`plugins/enterprise`, off by default) is a worked presentation provider: its look is the
-kit file, IBM Plex fonts and theme its descriptor names, and its code only publishes
-`dev.jasper.enterprise.api.Workstation` while the Enterprise look is active. A plugin that composes a classic layout
-declares `requires = [{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]`, compiles against that
-package and checks `context.services().find(Workstation.class)` in `start`, wrapped in
-`try { … } catch (NoClassDefFoundError absent) { … }` with the default layout in the catch, as Remote does for `VaultApi`:
-the package is visible only while Enterprise is loaded. An in-repo plugin names `dev.jasper.enterprise.api` only in its
-own `workstation` package, which `verifyPluginArchitecture` checks.
+kit file, IBM Plex fonts and theme its descriptor names, and its code does nothing. A kit's `[defaults]` may also hold
+one table per plugin, `[defaults."<plugin id>"]`, keyed as that plugin's settings file writes its keys: each value
+becomes the setting's default when the plugin declares it, a saved value still wins, and Reset returns to it. A value
+the setting's kind rejects, or a key the plugin does not declare, is logged and ignored. Enterprise's gives the Editor
+IBM Plex Mono. A kit that holds such a table declares `sdk = ">=0.18.2, <0.19"`: an older host accepts the plugin by its
+range and then refuses the whole kit.
+
+Any plugin can ask which look is running: `context.appearance().presentation()` (SDK 0.18.2) says whether it is classic,
+its icon set, how tool windows are reached, the title bar and where the menus are, how the toolbar offers Search
+Everywhere, its UI and data faces, body size and default toolbar height. Branch on it once in `start` (Remote, File
+Server and Vault compose their classic layouts when `classic()` is true), and test both with
+`FakePluginHost.setPresentation(FakePresentations.CLASSIC)`. Declare `sdk = ">=0.18.2, <0.19"`.
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
@@ -85,7 +90,7 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
     context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("dev.jasper.sample:flask", "M 6 2 H 10 M 6.67 6 H 9.33 M 6.67 2 V 6 L 4 13.33 Q 3.8 14 4.33 14 H 11.67 Q 12.2 14 12 13.33 L 9.33 6 V 2"));
     context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
     context.events().subscribe(AppEvents.THEME_CHANGED,
-        event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
+        event -> context.log().log(System.Logger.Level.INFO, "The theme is now " + event.variant()));
     var settings = new SampleSettings(context.settings());
     context.settings().page(new SampleSettingsPanel(context.kit(), settings));
     long stepMillis = settings.stepMillis.get();
@@ -193,8 +198,9 @@ states, settings pages), icons, colors for specialized content and testing, with
 ## Panels, the rail and windows
 
 A panel is an owned `UiView` docked as a tool window in every terminal window, as in IntelliJ:
-stripes of icons on the window's left and right edges, and six slots. The left and right sides each
-have an upper and a lower half; the bottom area, the window's full width under the sides, has a left
+stripes on the window's left and right edges (icons, or under a classic look such as Enterprise
+labelled buttons that start with the icon and read the panel's title), and six slots. The left and
+right sides each have an upper and a lower half; the bottom area, the window's full width under the sides, has a left
 and a right half. `Anchor` picks the side and `PanelSpec.withSplit()` (SDK 0.13.0) the second half;
 SFTP, for example, opens under Sessions. Register a panel once; Jasper asks your factory for one
 instance per window, the first time the panel is shown there, and gives the panel a stripe icon, a
@@ -203,7 +209,11 @@ View › Tool Windows entry, so don't add a View menu item of your own that togg
 panel's title inside it. If you already have
 an action that toggles the panel, for example to give it a shortcut, register it first and name it
 with `PanelSpec.withToggleActionId(id)` (SDK 0.8.1): Tool Windows and the palette then list your action,
-with its shortcut, and Jasper registers no `<panel id>.toggle`. One panel shows per slot; the user
+with its shortcut, and Jasper registers no `<panel id>.toggle`. Under a look with flush tool windows
+(Enterprise), when your action shows the panel (through `Panels.toggle` or `PanelHost.show()`) it
+also makes it the active tool window, as a stripe click does, and its toggle of a shown panel that
+is not the active tool window activates it instead of hiding it; a toggle or show from anything else
+does not. One panel shows per slot; the user
 can drag a panel by its stripe icon or its header to another slot or another place on a stripe, or
 use the Move to menu on either, and Jasper remembers its slot, its place on the stripe and the side's
 size. A drop on a stripe keeps the panel shown or hidden as it was; a drop on the workspace shows it.
@@ -219,9 +229,10 @@ the panel, and callbacks become inert when the instance closes. It works the sam
 registered with `register`: the detail, dot and actions join that panel's own header row. Use `PanelHeader.EMPTY` to clear it;
 do not add a duplicate action row inside the panel. Declare `sdk = ">=0.18.0, <0.19"` when using it.
 
-A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window
-is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are
-its job; the content is yours. Dialogs belong to a terminal window or to one of your windows, so
+A rail button, on the left stripe after the panel icons (a labelled entry under a classic look),
+runs one of your actions. A plugin window is a frame Jasper builds: icon, title bar, menus (a minimal File menu,
+in the screen menu bar on macOS and in the window on Windows and Linux, where the Enterprise look
+shows none), theme tracking and remembered bounds are its job; the content is yours. Dialogs belong to a terminal window or to one of your windows, so
 they are parented correctly without your plugin ever seeing a frame.
 
 <!-- example:pluginpanels -->
@@ -229,7 +240,7 @@ they are parented correctly without your plugin ever seeing a frame.
 private static void installPanelAndWindow(PluginContext context, long stepMillis) {
     // One instance per window, built the first time the panel is shown there. Its body is the kit's empty state:
     // a tile, a title, one sentence and one secondary action, centered in the panel.
-    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
+    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host ->
         context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
             new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
             Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
@@ -294,6 +305,18 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
   Set your manifest's minimum SDK to `>=0.7.1` when using this method.
 - The application closes a plugin's panels, windows and dialogs when the plugin stops.
 - Jasper stays running while any plugin window is open, even with no terminal window.
+
+A plugin that composes differently under a classic look reads `context.appearance().presentation()` once in `start`
+(SDK 0.18.2): the Sample opens its panel in the bottom strip under labelled stripes.
+
+<!-- example:pluginlook -->
+```java
+/** IntelliJ's classic layout keeps a tool window like this one in the bottom strip: under labelled stripes it starts there. */
+private static Anchor panelAnchor(PluginContext context) {
+    var look = context.appearance().presentation();
+    return look.toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;
+}
+```
 
 ## Terminals and capabilities
 
@@ -656,7 +679,9 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
 
 Kinds are `bool`, `integer`, `number`, `text` (optionally with a rule and message), `choice` and `stringList`. A value
 the kind rejects falls back to the default and is reported against the file with its line; keys nothing declares are
-reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `PluginConfig` and `context.config()`.
+reported as unknown. Declaring after `start` returns throws. Under a look whose kit defaults the key, the default is the
+look's (see above); `FakePluginHost.setKitDefault` and `lookDefaultProblems` test it. SDK 0.9 removed `PluginConfig` and
+`context.config()`.
 
 Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
 heading wherever `section` changes (the page's name heads rows before the first one), the description under each control, and an editor chosen by kind or by
@@ -733,7 +758,7 @@ window under that name, and the modules compile with the rest of the project.
 ```sh
 ./gradlew :jasper-plugin-snippets:build          # compile, test and jar one plugin
 ./gradlew :jasper-plugin-snippets:stagePlugin    # plugins/snippets/build/plugin/dev.jasper.snippets/, a --plugin-dir directory
-./gradlew :jasper-plugin-snippets:pluginZip      # plugins/snippets/build/distributions/dev.jasper.snippets-0.1.0.zip
+./gradlew :jasper-plugin-snippets:pluginZip      # plugins/snippets/build/distributions/dev.jasper.snippets-0.3.0.zip
 ./gradlew pluginZips                             # every plugin, built and zipped, collected in plugins/build/zips/
 ```
 

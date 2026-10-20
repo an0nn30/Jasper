@@ -1,6 +1,345 @@
 # Jasper — Status and Handoff
 
-**Jasper Meadow Light — 2026-10-20**: The default light theme uses warm cream surfaces and moss #52643F accents for buttons, selections and focus. Existing saved theme choices, Enterprise defaults and the Slate Cobalt dark default are retained. Select Light appearance and Jasper Meadow Light in Settings to try it with an existing profile. Full headless `check` passed: 11,503 Java tests, zero failures/errors, 25 existing platform skips, plus theme-tool, native and architecture checks.
+**Jasper Meadow Light — 2026-10-20**: The default light theme uses warm cream surfaces and moss #52643F accents for buttons, selections and focus. Existing saved theme choices, Enterprise defaults and the Slate Cobalt dark default are retained. Select Light appearance and Jasper Meadow Light in Settings to try it with an existing profile. After merging the current remote main, full headless `check` passed: 11,618 Java tests, zero failures/errors, 25 existing platform skips, plus theme-tool, native and architecture checks.
+
+**Enterprise presentation, plan 15b: look polish at the user's direction — 2026-10-20** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, after plan 15a; [plan](superpowers/plans/2026-10-19-enterprise-15b-look-polish.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+Commits `41847317f..807169d15` (the anchor refresh, then Tasks 1 to 5), then this documentation commit and the final review fixes; plan 15's spec
+amendment line gains 5.2, 5.3, 10.3, 10.7, 11.6 and 16.2, and 5.1, 5.9, 9.1 and 16.1 are edited again. The user asked on
+2026-10-19: "in entperise I want to replace that text box command pallete in the toolbar with just search icon like in
+IntelliJ classic", and approved plan 15 ("... activation, classic icons everywhere, the search icon, versions, docs and
+the Sample plugin", quoted in full in plan 15a's entry below). What they became. **Activation:** a `Panels.toggle` or
+`PanelHost.show()` made synchronously inside the handler of the panel's own declared toggle action
+(`PanelSpec.withToggleActionId`) is sent as `PanelRequest.Op.ACTIVATING_TOGGLE` or the new `ACTIVATING_SHOW`, which
+`WindowContributions` maps to toggle or show, then activate; under flush frames (Enterprise) the tool window takes the
+focused tint and the keyboard, and under standard frames nothing activates. A hide, a deferred call, another action's
+call and a panel without a declared toggle stay plain. An activating toggle of a shown tool window that is not the
+active one activates it, and only the active one hides, as IntelliJ's ActivateToolWindowAction (final review). This answers plan 12's question (the user: yes): View › Tool
+Windows and ⌘⌥1 to ⌘⌥3 activate Sessions, SFTP, Tunnels, Transfers and File Servers, and Transfers' action, which only
+shows, activates on every press without a Remote change. No SDK or testkit value changes; the javadoc of
+`Panels.toggle`, `PanelHost.show` and `PanelSpec` says it (since 0.18.2). **Classic icons:** under `[chrome] icons =
+"classic"` the six classic names (`add`, `split`, `zoom`, `settings`, `window.add`, `search`) draw IntelliJ's classic
+art in the app-drawn `ToolWindowHeader` actions, a borrowed kit header's host actions, the panel's own header controls
+and the buttons of toolbar views, through `KitView.classicChromeIcons(boolean)`, `IconRegistry.classicChromeIcon`,
+`AppIcons.classicChromeIcon` and `ToolWindowArea` taking the window's `ChromeArtwork`; `BuiltInArtwork.CLASSIC_NAMES`
+lets the host ask without decoding the classic SVGs. Every other name, a document bar's buttons and every panel or
+window body keep their catalog art. **`toolbar_search`:** the eleventh chrome point, `[chrome] toolbar_search = "field"
+| "icon"`, is `field` in both bases and `icon` in Enterprise's kit; `icon` needs `palette = "run_window"` and a native
+or classic title bar, else the kit is refused with one message naming the key. `WorkspaceLook.Search` (read only by
+`WorkspaceChrome`) and `PluginLook.Search` carry it, and SDK 0.18.2's `Presentation.toolbarSearch` now reports `ICON`
+under Enterprise; `FakePresentations.CLASSIC` takes `ICON`. **The button:** `ClassicHeader(true)` puts an icon-only
+"Search Everywhere" button with the classic magnifier (a 22 px square, priority 100) first in the trailing group, 8 px
+before Settings…, in place of the field; it runs COMMAND_PALETTE as the field does, its tooltip is "Search Everywhere"
+plus the palette's shortcut in parentheses, it stays icon-only under `icons_and_labels`, goes with the row under
+`hidden` (⇧⌘P still opens the Run window) and stays beside Settings… in a narrow window. **`LookIdentityTest`:** no
+class in the app or jasper-ui jar, and no `dev/jasper/` class of a staged plugin other than Enterprise, holds
+"enterprise" in its constant pool, so a look stays data. No version moves: SDK 0.18.2, Enterprise 0.3.0, no plugin code
+or manifest changes. Rulings (plan, "Rulings"): (1) a toggle or show inside the panel's own declared toggle action
+activates, anything else stays plain; (2) activation needs no SDK or testkit change; (3) the classic set reaches
+tool-window headers and toolbar views, not bodies; (4) classic art for the six names only, through a `KitView` flag and
+`AppIcons.classicChromeIcon`; (5) the key is `toolbar_search`, values `field` and `icon`; (6) `icon` needs the Run
+window and a native or classic title bar; (7) the button is icon-only, named "Search Everywhere" with the shortcut,
+first in the trailing group, and runs COMMAND_PALETTE; (8) the covering array holds `toolbar_search` at `field`; (9) no
+version moves; (10) the identity guard scans constant pools, Enterprise's own classes and bundled libraries excepted;
+(11) `FakePresentations.CLASSIC` moves to `ICON`; (12) plan 15a's baseline is reused; (13) one spec header line for plan
+15. Execution rulings (plan, "Execution notes") X1 to X23, among them: X1 the window-level activation tests sit in
+`WindowPanelsTest`; X2 an activating toggle also needs `PanelEntry.namedToggle()`; X3 "in the panel header" is `panel &&
+!documentBar`; X4 `CLASSIC_NAMES` lives outside `ClassicHolder`; X7 `ClassicHeader` declares both constructors; X8
+`ProjectionsTest`'s Enterprise plugin looks take `Search.ICON`; X9 `EnterpriseMenuRowMockTest.Mounted` captures the
+button's bounds; X12 and X13 spec 5.3, 9.1 and 10.7 are corrected, not just extended. Deviations from the Enterprise
+mocks, as the user's 2026-10-19 direction: the toolbar's field is the icon, so `EnterpriseWorkstationMockTest` drops the
+field's assertions (mock x 2116-2715, y 122-165) for the button's (a 44 mock px square at the field's top, 16 mock px
+before Settings…; the Settings… crop is unchanged), and the pairs `chrome-toolbar-light` (0.581, now 0.427) and
+`chrome-toolbar-dark` (0.577, now 0.423) pass at their unchanged 0.30 floors with a note, the light one no longer
+listing `#FFFFFF`, the field's `surface.input`. Under classic artwork a header's `+` is IntelliJ's classic `add`,
+authored (#6E6E6E in Light), in the strip's 10 px glyph box beside ⋯ and − in the strip's ink (#404040 in Light), where
+the mocks set a glyph in the strip's ink: since the final review `DockFixture` builds its area with
+`ChromeArtwork.CLASSIC`, as Enterprise windows do, and `DockMockTest.compareHeader` expects that art's own ink for the
+`add` of File Servers, Sessions and Tunnels (the glyph centre and extent checks pass unchanged); the 16 dock header pairs
+pass their unchanged floors, each within 0.002 of before (`dock-light-kit-servers-header` 0.986 to 0.985,
+`dock-light-kit-sessions-header` 0.982 to 0.981, `dock-light-disconnected-kit-sessions-header` 0.982 to 0.981,
+`dock-light-disconnected-kit-tunnels-header` 0.996 to 0.995, `dock-dark-kit-servers-header` 0.986 to 0.985,
+`dock-dark-kit-sessions-header` 0.984 to 0.982, `dock-dark-kit-tunnels-header` 0.988 to 0.986,
+`dock-vault-kit-servers-header` 0.993 to 0.992, `dock-vault-kit-sessions-header` 0.983 to 0.982,
+`dock-vault-kit-tunnels-header` 0.997 to 0.995; the other six the same). `./gradlew check
+--continue`: **11,597 tests, 0 failures, 0 errors, 25 skipped** (plan 15a: 11,569 and 25); `check_pairs.py` passes 101
+of 101 gated pairs with the same verdicts as the baseline (`plan15-baseline`, from `f78bb0385`), and every agreement is
+the same except the two toolbar lines and `enterprise-settings-13` (0.723, 0.722 since plan 15a), and since the final
+review the dock header lines above; the headless gallery
+is byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look
+jasper-app renders. No test needed a re-run. The final review fixes add three tests
+(`KitClassicChromeIconsTest`, `WindowPanelsTest`, `HostedUiTest`), counted above. Later: the splash's fixed colours and "Workstation…" step text for other
+branded looks; the external THD plugin's port to SDK 0.18. GUI checks for the user, in this order: (1) under Enterprise
+Light and Dark, the toolbar's magnifier before the wrench, against IntelliJ Classic's: its hover, the tooltip "Search
+Everywhere (⇧⌘P)", a click opens the Run window, ⇧⌘P still does, Icons & Labels keeps it icon-only, and a narrow window
+keeps it beside the wrench; (2) View › Tool Windows › Sessions, SFTP, Tunnels, Transfers and File Servers, and ⌘⌥1 to
+⌘⌥3: each opens its tool window with the focused header tint, and typing goes there; for Sessions, SFTP, Tunnels and
+File Servers a second press hides it and hands the keyboard back to the terminal, a press while the terminal has the
+keyboard activates an open tool window instead of hiding it, while Transfers' action only shows, so
+a second View › Transfers or ⌘⌥3 keeps it open and activates it again; (3) Sessions', Tunnels' and File Servers'
+header `+` in IntelliJ's classic art: authored, in the strip's 10 px glyph box beside ⋯ and − in the strip's ink; judge
+its size and ink against IntelliJ Classic; (4) Remote's session view's Run button unchanged; (5) the
+default look: the title field, the rails, the headers and the shortcuts as before (a toggle shortcut opens without the
+tint). Merged to local main, not pushed.
+
+**Enterprise presentation, plan 15a: the look query at the user's direction — 2026-10-19** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, from `main` at `f78bb0385`; [plan](superpowers/plans/2026-10-19-enterprise-15a-look-query.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+Commits `2ad889b0b..23796aaa9`, then this documentation commit and the final review fixes; spec 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1,
+4.6, 4.7, 5.1, 5.8, 5.9, 8.4, 8.7, 9.1, 14.1 to 14.3, 15, 16.1, 17, 18 and 19.1 amended, and the plugin SDK design gains
+a banner line. The user asked: "Lets make sure that the changes we made were in the enterprise kit, and are exposed via
+plugin code and all plugins are up to date with these changes so that future plugins can also leverage look-specific
+settings when Enterprise is enabled." After the audit they approved: "Go ahead with plan 15 as proposed: SDK look query
+(and remove the Enterprise API), kit defaults for plugin settings, activation, classic icons everywhere, the search
+icon, versions, docs and the Sample plugin." This plan is the first of two; plan 15b
+(`2026-10-19-enterprise-15b-look-polish.md`) runs next on this branch. SDK 0.18.2 adds `Appearance.presentation()`,
+which returns `dev.jasper.sdk.ui.Presentation`, a JDK-only record of the look Jasper runs with: `classic` (the classic
+base), `icons` (`NEW_UI`, `CLASSIC`), `toolWindows` (`RAILS`, `STRIPES`), `titleBar` (`UNIFIED`, `NATIVE`, `CLASSIC`,
+resolved for the platform), `menus` (`SCREEN_MENU_BAR`, `TITLE_BAR`, `WINDOW`), `toolbarSearch` (`FIELD` for every look
+until 15b), `uiFace` and `dataFace`, `bodySize` and the look's default `toolbarHeight`; it is IntelliJ's
+`ExperimentalUI.isNewUI()` plus `JBUI.CurrentTheme`, fixed for the run, the same for every plugin and safe from any
+thread. The host builds it once in `dev.jasper.app.plugins.HostedPresentation` from the new `PluginLook` projection
+(`classic`, `classicIcons`, `stripes`, `titleBar`, `menus`, `search`; read only by `HostedPresentation`), the installed
+`Kit` and the look's `DefaultSource`, handed over by `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)`; the
+fallback (spec 4.7) reports the default look's chrome with the defaults read at start. The Enterprise API is removed
+outright: `dev.jasper.enterprise.api.Workstation`, its export, the optional requirements, the compile-only dependencies,
+the `workstationPackages` gate rule and the three `FakeEnterprise` copies are gone; Enterprise 0.3.0 has no exports and
+its `start` does nothing. Remote 0.15.0, Vault 0.7.0 and File Server 0.6.0 choose `Layout.CLASSIC` from
+`Layout.of(context.appearance().presentation())` in `start`, so any classic look drives their classic compositions;
+they, Sample 0.4.0 and Enterprise declare `sdk = ">=0.18.2, <0.19"` (Editor, History, Indexer and Snippets are
+unchanged). A kit's `[defaults."<plugin id>"]` table holds raw TOML values keyed as that plugin's settings file writes
+its keys; `DefaultSource` carries them, and `DeclaredSettings` reads each with the declared setting's own kind and uses
+it as the default, so the precedence is user-saved, then the kit's, then the plugin's own, and Reset to Default returns
+to the kit's (staging the plugin's own default under a kit default saves an explicit value). A value the kind rejects
+and a key the plugin never declares are logged at WARNING once (`PluginHost.lookDefaultProblem`) and ignored, and the
+plugin starts. Enterprise's kit sets `[defaults."dev.jasper.editor"] font_family = "IBM Plex Mono"`, its bundled data
+face. The Sample's panel starts in the bottom strip under labelled stripes and on the left otherwise
+(`example:pluginlook` in the authoring guide), and its `demo_step_millis` demonstrates a kit default under test. The
+testkit mirrors it all: `FakePluginHost.setPresentation`, `FakePresentations.STANDARD` and `CLASSIC`, `setKitDefault`
+and `lookDefaultProblems`, with shared contract cases on both hosts. Rulings (plan, "Rulings"): (1) two plans, 15a and
+15b; (2) the type is `dev.jasper.sdk.ui.Presentation`, reached as `Appearance.presentation()`; (3) the method is
+abstract; (4) the design's ten facts; (5) values a user can change are reported as the look's, fixed for the run, with
+no change notification; (6) `menus` is the look's placement in the Normal view with the platform's default decorations;
+(7) the fallback reports the default look's chrome with the defaults read at start; (8) a new projection `PluginLook`,
+read only by `HostedPresentation`; (9) `toolbarSearch` ships now and reads `FIELD` until 15b; (10) `Layout.CLASSIC`
+exactly when `classic()`; (11) the `workstation` packages keep their names; (12) Enterprise keeps an `EnterprisePlugin`
+whose `start` does nothing; (13) Enterprise is 0.3.0 once for plan 15; (14) the consumers and Enterprise declare
+`>=0.18.2`, and the Editor is not bumped; (15) the `[defaults."<plugin id>"]` format, with raw values checked by the
+declared kind; (16) a rejected value or an undeclared key is logged once and the plugin starts; (17) Reset returns to
+the kit's default; (18) Enterprise's kit sets only the Editor's `font_family`; (19) the Sample shows the query and a kit
+default with no new setting; (20) the external Hello example gets only its `jasperSdkVersion` default, `0.18.2`; (21)
+the `FakeKit.BUILT_INS` parity test reads the private field reflectively; (22) `FakePresentations` replaces the
+`FakeEnterprise` copies; (23) migration rows follow added and deleted files; (24) the two stale STATUS lines are
+corrected; (25) the docs are split by the plans' points; (26) `PluginRuntime.presentation` takes the kit, the look and
+the defaults, with no one-argument overload; (27) one spec header line for plan 15. Execution rulings (plan, "Execution
+notes"): E1 the app's default presentation is per platform (`SCREEN_MENU_BAR` on macOS) while
+`FakePresentations.STANDARD` is the Windows and Linux one; E2 one "started" flag in `FakePluginHost`; E3 the SDK
+README's version sentence names 0.18.2; E4 the staged fixtures set the host's presentation before the consumer starts
+and keep today's Vault compositions; E5 `KitParser.name` quotes non-bare segments; E6 Task 4 keeps
+`plugin-architecture.gradle.kts:51`, drops `EnterprisePluginTest`'s unused constants and corrects its migration row; E7
+Task 9 finds its guide anchors by text; E8 migration rows copy their neighbours' owners; E9 `sdkRelease --rerun` for
+stale jars; E10 a changed Enterprise render is recorded, never a lowered floor; E11 the `LayoutTest` javadoc; E12 Task
+6's logger, import and harness details; E13 the guide's `pluginlook` text after the `pluginpanels` notes; E14 every
+interface plan 15b relies on kept as written; E15 only the two STATUS lines of Rulings 24 are corrected; and
+`HostedPresentation.standard()` reads the default presentation (`Presentation.standard`), since only the listed classes
+may read `Kit.DEFAULT` (`StaticDefaultTest`). No Enterprise
+Settings render moved in Task 2. One Enterprise render changed, at the user's 2026-10-19 direction: Settings › Editor
+(`enterprise-settings/light/13.png`) shows the Font row's kit default, "IBM Plex Mono", where it showed "JetBrains Mono"
+(pair `enterprise-settings-13` 0.723, now 0.722). `./gradlew check --continue`: **11,569 tests, 0 failures, 0 errors, 25
+skipped**; `check_pairs.py` passes 101 of 101 gated pairs with the same verdicts as the Task 1 baseline (`f78bb0385`),
+and every agreement is the same except that line and `composition-light-vault-manager` (0.730, now 0.729), whose status
+bar prints the vault file's path under a fresh JUnit temporary directory on every run; the headless gallery is
+byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look jasper-app
+renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and settings images,
+`DefaultDockPixelsTest`'s `default-dark` and `default-light`). No test needed a re-run. Left for plan 15b: activation by
+a panel's own toggle action, classic icons in tool-window headers and toolbar views, the toolbar search icon
+(`[chrome] toolbar_search`, which `toolbarSearch` will report) and the identity guard, with their docs. Later: the
+splash's fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's port to SDK 0.18.
+The side-stripes entry below also ends "Not merged, not pushed.", but its commits are not ancestors of `f78bb0385` (the
+series was rebased), so it is left for the user to confirm (E15). GUI checks for the user, in this order: (1) under
+Enterprise, the Editor opens files in IBM Plex Mono, and Settings › Editor shows "IBM Plex Mono" with Reset to Default
+hidden; choosing another font shows Reset, and Reset returns to IBM Plex Mono; (2) with Enterprise off, the Editor keeps
+its own default font; (3) under Enterprise, Remote's Sessions on the right, Transfers in the bottom strip, File Servers'
+table and the Vault manager's classic layout, as before; (4) with Enterprise off, all three show their rows; (5) with
+`demo_ui = true`, the Sample panel starts in the bottom strip under Enterprise and on the left without it; (6) Settings
+› Plugins shows Enterprise 0.3.0, Remote 0.15.0, Vault 0.7.0, File Server 0.6.0 and Sample 0.4.0. The final review's
+fixes add `PresentationReachTest.theApplicationHandsTheLooksPluginDefaultsToThePlugins` (the application hands the look's
+plugin defaults to a started plugin) and `PluginSettingsPageTest.stagingThePluginsOwnDefaultUnderAKitDefaultSavesItAndResetReturnsToTheKits`,
+so the suite holds 11,569 tests (only the touched classes were re-run); a `[defaults]` table named without a dot now
+also says to quote a dotted setting key, and a rejected look default's report no longer ends "configuration was not
+applied". Merged to local main, not pushed.
+
+**Enterprise presentation, plan 14: IntelliJ Classic's title bar at the user's direction — 2026-10-19** (`claude/enterprise-title-bar`, worktree `.claude/worktrees/enterprise-14`, from `main` at `3a36993ba`; [plan](superpowers/plans/2026-10-19-enterprise-14-title-bar.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
+Commits `200367316..98dedc443`, then this documentation commit; spec 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1
+to 5.3, 5.9, 9.1, 10.1 to 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1 amended, and the app architecture guide
+corrected. The user asked: "Next, on MacOS and Windows only - the enterprise theme uses a custom title bar that looks
+like the IntelliJ title bar, using the same color as the toolbar so it looks cohesive. Mac also moves the menu bar to
+the global mac menu bar area instead of using built-in, and on windows the title bar contains the file menu bar like in
+the normal variant of the app." After review they added that only the toolbar height and the macOS lights must match
+IntelliJ ("the content will be different because the apps are different"), then approved the design.
+`[chrome] title_bar` gains a third value, `"classic"`, which the Enterprise kit names; `Projections.Host` carries the
+platform (`Projections.Platform`: MAC, WINDOWS, or LINUX for any other system, from `os.name`). On macOS and Windows a
+classic title commits the default look's desktop flags, so a failed start falls back to exactly the default look; on
+Linux it gives exactly `native`'s projections. On macOS `MacTitleBand` (platform) gives the terminal window's root pane
+`apple.awt.fullWindowContent` and `apple.awt.transparentTitleBar` and a 28 pt band in the toolbar's colour (the header's
+`surface.app`, never a title-bar zone) above the toolbar row, where AppKit draws the traffic lights and the frame's
+title; the appearance is `NSAppearanceNameVibrantLight` or `NSAppearanceNameVibrantDark` by the theme; full screen
+removes the band and leaving restores it; a double-click zooms, minimises or does nothing as `AppleActionOnDoubleClick`
+says (`MacTitleDoubleClick`); the menus are in the screen menu bar, with About Jasper and Settings… in the application
+menu, and auxiliary frames keep their system title bars and show the minimal File menu there. On Windows FlatLaf's 28 px
+title pane, in the toolbar's colour, embeds the classic menus and then `ClassicWindowTitle`, the frame's title
+left-aligned 22 px after them in `text.secondary` and dimmed to `text.tertiary` while the window is inactive, over the
+classic menu row's 1 px `border.divider` rule; `CollapsingMenuBar` folds the menus into "…" and then ☰ before the title
+shrinks below 60 px, and `window.native_decorations = true` and Compact give the system title bar and the in-window menu
+row. Linux is unchanged. `TitleInset` (platform), published only by the band, the Windows classic decoration and, under
+the classic title on Windows, the FlatLaf title panes of auxiliary frames and dialogs, keeps classic in-window dialogs
+and overlays below the title and announces each change (`TitleInset.CHANGED`). The
+Enterprise toolbar is 28 px (`window.toolbar_height`), IntelliJ's, on every platform. No SDK, plugin or Enterprise
+version changes. Rulings (plan, "Rulings"): (1) one plan of eight tasks; (2) a third `title_bar` value, `classic`,
+rather than a per-host meaning of `native`; (3) `Projections.Platform` read from `os.name` without AWT, every other
+system counting as Linux; (4) the classic base keeps `native` and only the Enterprise kit names `classic`; (5) each of
+the six title-dependent projections is decided and tested, Linux's equal to `native`'s, and the three-argument
+`ShellLook` and `WindowLook` constructors mean no classic title; (6) `ClassicMenuBar` stays, with the menus where the
+platform puts them; (7) the macOS band is IntelliJ Classic's full-window-content mechanism, not `MacTitleBar` or JBR's
+`CustomTitleBar`; (8) the band's window takes the vibrant appearances by the theme's darkness; (9) full screen is
+FlatLaf's republished buttons bounds with width 0; (10) the band handles a double-click itself from
+`AppleActionOnDoubleClick`; (11) dragging the band is left to AppKit; (12) macOS auxiliary windows keep their system
+title bars and show the minimal File menu; (13) the Windows title is Jasper's `ClassicWindowTitle` inside the menu bar,
+not FlatLaf's label, in a 28 px bar; (14) its colours are `text.secondary` under the text guard and `text.tertiary`
+under the indicator guard; (15) the Windows rule is the classic menu row's own `border.divider`; (16) Windows auxiliary
+frames and dialogs take FlatLaf's title panes without a menu row; (17) `window.native_decorations = true` on Windows
+gives Linux's frame with no title inset; (18) Compact under a classic title keeps the system title bar without the band;
+(19) `TitleInset` is a root client property only the band, the Windows decoration and the Windows auxiliary title panes
+publish; (20) the toolbar is 28 px
+as the kit's default, a saved value still overriding it; (21) the mock tests render under a Linux host and shift for the
+28 px row; (22) `ChromeRenderTest` gains `enterprise-mac` and `enterprise-windows`, `enterprise` moving to the Linux
+host; (23) no version bump; (24) the workspace-tabs reconciliation below. The execution rulings E1 to E13 and the Task 7
+record are in the plan's "Execution notes". Deviation from the approved design: W1's `centerTitleIfMenuBarEmbedded` is
+replaced by `ClassicWindowTitle` (Rulings 13) because the key is process-wide and FlatLaf's title does not dim.
+Deviations from the Enterprise mocks, at the user's 2026-10-19 direction: macOS and Windows no longer show the mocks'
+native title bar or in-window menu row (the mocks stay true on Linux, where the mock tests render); the toolbar is
+28 px, so `EnterpriseWorkstationMockTest`'s toolbar run, ink tops, search field top and tab rows move by the 12 device
+px (6 px at 1x) the mocks' 34 px row is taller, its rows' column stopping 12 rows sooner so the Dark tab run ends at the
+same row of the strip, `ClassicHeaderTest`'s header is 29 px (28 and the rule) with the first button at y 2 and the
+field at y 3, and the two toolbar pairs crop the mock's middle 56 device rows against the render's 56-row toolbar row
+(`chrome-toolbar-light` 0.581, `chrome-toolbar-dark` 0.577; the 0.30 floor unchanged). Deviations from the plan's text:
+the execution rulings E1 to E13 (anchors corrected in place, two more `ChromeSpec` comments, imports,
+`ChromeRenderTest.HOST` from `os.name`, fixed scratchpad paths for the Task 8 proof, the mock tests' copied list and
+shorter ink regions, the guide's paragraph kept whole, the spec's wrapped phrases, and the relayed traffic-light request
+met by the recorded checkpoint) and the Task 7 record (the Dark tab run's shorter column, the 56-row toolbar crops);
+Task 8 appends its record to the existing "Execution notes" instead of adding the section again, and writes the spec's
+header amendment as one line, as plans 12 and 13 did. `./gradlew check --continue`: **11,541 tests, 0 failures, 0
+errors, 25 skipped**; `check_pairs.py` passes 101 of 101 gated pairs with the same verdicts as `3a36993ba`, only the two
+`chrome-toolbar-*` lines changed; the headless gallery is byte-identical to `3a36993ba`'s (Slate Cobalt Dark and Light,
+161 files each) and so are the 11 default-look jasper-app renders (`ChromeRenderTest`'s default, complement and fallback
+chrome, palette and settings images, `DefaultDockPixelsTest`'s `default-dark` and `default-light`);
+`CustomTitleBarTest`, `MacTitleBarTest` and `DefaultDockPixelsTest` are unedited. The lights checkpoint (done before
+execution, with the user's yes): started from Jasper's app launcher, the band's mechanism draws IntelliJ's lights
+(centres 23 pt apart, about 14 pt across) and a leading title at about 84 pt; started through JBR's `bin/java`
+(`:jasper-app:run`), macOS draws its legacy controls and centres the title. **Before checking:** your
+`~/.config/jasper/config.toml` saves `window.toolbar_height = 34` (and `window.toolbar = "icons_and_labels"`), which
+override the look's defaults; delete those lines, or Reset them in Settings, to see the 28 px toolbar. GUI checks for
+the user, in this order: (1) macOS, Enterprise Light: in the packaged app (`./gradlew :jasper-app:packageApp`, then open
+`jasper-app/build/packaging/image/Jasper.app`; a `:jasper-app:run` window shows macOS's legacy controls by design), the
+traffic lights and the title against IntelliJ's screenshot (12.webp): centres 23 pt apart, about 14.7 pt across, the
+title leading-aligned after the lights; whether macOS leading-aligns or centres the title (if centred, a follow-up
+paints it); dragging the window by the band; a double-click in it with System Settings › Desktop & Dock's double-click
+action at Zoom, Minimize and Do Nothing; (2) the band's colour against the toolbar, with no seam, in Enterprise Light
+and Dark and under another theme; (3) the screen menu bar: the application menu's About Jasper, Settings… and Quit;
+File, Edit, View, Session, Transfer, Tools, Window and Help; no stray "…" or ☰ menu; ⌘Q once; (4) full screen and back:
+the band leaves and returns, and the lights and title follow; (5) auxiliary windows (Settings, About, Licenses, Errors,
+the Vault manager, a plugin window): their system title bars, the screen menu bar's File menu while one is focused, ⌘W
+closing it; (6) classic in-window dialogs and the Vault's sheets below the band; (7) Windows: the menus in the title bar
+after the icon; the title left after them, dimming when another window is active; the rule under the bar; a narrow
+window folding to "…" and ☰; maximise and restore; dragging and double-clicking empty title-bar space and the title;
+in-window dialogs below the bar, and the Vault manager's and Settings' sheets below their own title bars;
+`window.native_decorations = true` giving the system title bar and the menu row;
+Compact; (8) Linux: unchanged apart from the 28 px toolbar. Reconciliation: the unmerged `claude/workspace-tabs` series
+rules that a child window has no menu bar under Enterprise; whichever of it and this plan merges second reconciles them,
+and on macOS a child window then needs the screen menu bar's menus. Final review fixes ("Plan 14: final review fixes";
+the plan's "Final review record"): Windows auxiliary windows under the classic title publish their title pane's inset,
+so classic sheets hang below it; the Windows title shares the menus' baseline; the macOS classic menu bar never folds
+against the window's width, as AppKit lays out the screen menu bar; the chrome covering array gains two `classic` rows,
+rendered as macOS and Windows, and its strength check counts `title_bar`'s three values; the double-click reader closes
+its process streams. They add 5 tests; the windows, workspace, platform, presentation and documentation test packages
+(1,158 tests) and `javadoc` pass, the 11 default-look jasper-app renders still equal the baseline, and `check` was
+not rerun after them. Follow-up: the
+default look's macOS menu bar (in the unified bar) still folds against the window's width, a risk older than this plan.
+Merged to local `main` (`f78bb0385`), not pushed.
+
+**Enterprise presentation, plan 13: stripe icons at the user's direction — 2026-10-19** (`claude/enterprise-stripe-icons`, worktree `.claude/worktrees/enterprise-13`, from `main` at `2c065f8cd`; [plan](superpowers/plans/2026-10-19-enterprise-13-stripe-icons.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
+Commits `eca2feca8..2606d5633`, then this documentation commit; spec 5.2, 10.7, 16.1 and 19.1 amended. After trying
+plan 12 the user asked: "Now I want the sidebar strip to have icons like the classic intelliJ does for plugins and
+whatnot too you can use those classic IntelliJ icons we vendored in." Every labelled stripe button (both side stripes
+and the bottom strip) now starts, in reading order, with its tool window's or rail action's icon, as IntelliJ's classic
+`StripeButton`: 13 px (`STRIPE_ICON`), upright, centred across, `STRIPE_LABEL_PADDING` from the label's start, then a
+4 px gap (`STRIPE_ICON_GAP`) and the text, the same in every state. Under `[chrome] icons = "classic"` (Enterprise) the
+icon is the user's Set A, the classic counterpart of the panel's declared icon: `network` draws `webToolWindow`,
+`folder` `toolWindowProject`, `tunnel` `toolWindowModuleDependencies`, `download` `toolWindowAnalyzeDataflow`, `server`
+`toolWindowServer` and `bell` `notifications`; any other name, a plugin's own path included (the Sample's flask), draws
+its monochrome glyph in the label's ink; an identity name such as `more.vertical` keeps its authored art. Under
+`new_ui` a label draws what the icon rails draw, at 13 px (a built-in name's New UI chrome artwork, a plugin path's
+own glyph), and a window without an icon reads text only. A dragged label keeps its icon and its length, and the
+drag's ghost is that stripe icon. jasper-ui vendors 12 more unmodified SVGs (those six, light and dark) from
+JetBrains/intellij-community at
+`8062c061ff33`, hash-checked rows under `classic/toolwindows/` in `assets-classic.tsv` (26 rows), behind a stripe-only
+lazy table (`IconRegistry.stripeIcon`); every file keeps its JetBrains copyright comment except `toolWindowServer.svg`
+and `toolWindowServer_dark.svg`, which upstream ships without one (stated in `BuiltInArtworkTest`, `icons/SOURCE.md`
+and `ATTRIBUTION.txt`). The stripe numbers and Event Log's count pill stay; no SDK, plugin or Enterprise version
+changes. Rulings (plan, "Rulings"): (1) one plan of seven tasks; (2) the 12 files are appended to `assets-classic.tsv`
+under `classic/toolwindows/` and fetched by the existing script; (3) `toolWindowServer` keeps no comment, the one stated
+exception; (4) a separate lazy stripe table reached only through `IconRegistry.stripeIcon`, empty for a name without a
+file, the classic chrome set unchanged; (5) keyed by icon name, so a third-party panel naming one of the six gets that
+file; (6) the resolver is `AppIcons.stripeIcon` in `dev.jasper.app.platform`; (7) the fallback glyph's ink is the
+label's own painted ink, with no new `PaintPair`; (8) an identity name without stripe art draws its authored catalog
+art; (9) any other sized `Icon` is drawn as given, centred and scaled down into the box; (10) labelled stripes under
+`new_ui` draw what the rails draw, at 13 px; (11) the metrics `STRIPE_ICON` 13 and `STRIPE_ICON_GAP` 4, equal in both
+catalogs, are read only by `StripeLabels`; (12) a side stripe is the larger of its line and `STRIPE_ICON`, plus its two
+edges and its rule, thick, icons or not (still 23 under IBM Plex); (13) the icon box starts `STRIPE_LABEL_PADDING` from
+the reading start and is centred with integer division (4 across a side stripe, 5 down the bottom strip), without
+IntelliJ's 1.1 stretch; (14) the same untinted icon in every state; (15) rail actions lead with their icon too
+(`Command.ICON`, else `command`); (16) `DockStripe.beginDrag` receives the panel's icon and the ghost is
+`StripeSet.ghost(icon)`, the rails' unchanged; (17) the mock checks compare the cut render, below; (18) spec 9.1, 12.1
+and 12.2 are unchanged; (19) the label ink, the stripe surface and the default look's rails, ghost and drag are
+unchanged. The execution rulings R1 to R17 are in the plan's "Execution notes". Deviations from the Enterprise mocks, at
+the user's 2026-10-19 direction: the stripes' labels carry icons, so each is 17 px longer than the mocks'; `DockMockTest`
+renders the shipped icons, asserts each label's whole icon slice (the icon, its gap and the margins beside it, 17 px,
+34 at 2x) as its tile with IntelliJ's classic file, and compares the mocks with the slices cut out, which is
+pixel-identical to the text-only label, so every run expectation,
+tolerance and floor and the `FONTS` lines equal plan 12's. **For the user to confirm:** this cut is a change of method
+relative to the approved design ("update honestly to the iconed stripes"), beside the 17 px longer labels. The nine
+gated stripe pairs (`dock-{light,dark,vault}-{left-stripe,right-stripe,bottom-strip}`) read `-text-render.png`, with a
+note, and nine ungated `-iconed` pairs show the real iconed `-render.png` beside the mock crop widened by the slices,
+for `compare_all.py`; no other pair's crop or floor changed. Deviations from the plan's text: Task 7 also re-wraps spec 16.1 item 4,
+whose line the added test names pushed past 120 columns; the plan's "322 files each" for the gallery is 161 per theme,
+322 in all, as earlier entries count them. `./gradlew check --continue`: **11,503 tests, 0 failures, 0 errors, 25
+skipped**; `check_pairs.py` passes 101 of 101 gated pairs, the 25 dock pairs' output equal to plan 12's; the headless
+gallery is byte-identical to `2c065f8cd`'s (Slate Cobalt Dark and Light, 322 files) and so are the 11 default-look
+jasper-app renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and settings images,
+`DefaultDockPixelsTest`'s `default-dark` and `default-light`). GUI checks for the user: under Enterprise Light and Dark,
+each stripe label's icon against the user's screenshot of IntelliJ's Classic UI stripe: Sessions' globe, SFTP's folder,
+Tunnels' chain link, File Servers' server rack, Event Log's bell, Transfers' arrows, and the Sample panel's flask and
+"About Sample" in the label's colour; closed, hovered and open labels; switching Light and Dark with the stripes
+showing; dragging a label within a stripe, to the other stripe and between a side stripe and the bottom strip (the
+label keeps its icon, the gap fits it, the ghost is the icon); Event Log's count pill after its bell; a short window
+cutting off labels; the About page's IntelliJ icons entry; the default look's rails unchanged. Merged with local `main`'s
+splash fix (`64ead2e34`) and then to local `main`, not pushed: `./gradlew check --continue` on the merged tree gives
+**11,514 tests, 0 failures, 0 errors, 25 skipped**. Its first run timed out once in `StagedTransferLifecycleTest` and
+failed a `@TempDir` clean-up in `StartupStepsApplicationTest`; both passed three runs alone and the second full run.
+
+**The boot splash no longer flashes on Windows and Linux — 2026-10-19** (`claude/splash-no-flash`, worktree
+`.claude/worktrees/splash-flash`, from `main` at `2c065f8cd`; merged to local `main`, not pushed). Each start-up step repainted the
+whole branded splash straight onto its window, the gradient first, and Windows and X11 show a window's pixels as they
+are drawn, so between steps the art, icon, name, version and bar vanished to the bare gradient; macOS presents a paint at
+once. Under Xvfb in the Linux container, 408 of 789 screen captures taken during 599 steps showed the area above the
+step line changed (up to 185,125 of its 247,680 pixels); after the fix, 0 of 596 (XRender) and 0 of 571 (X11). The new
+`SplashBuffer` draws the splash off screen at the window's device scale, and every paint, the system's included, is one
+copy from it; a step draws again and copies only the step's line (from a pixel below the icon to the bar's rule) and
+the bar. Each area it draws starts from the window's own first fill, so a redraw at a fractional scale matches the whole
+splash; `SplashPainter` is unchanged. `SplashBufferTest` records every pixel a paint writes: at 1, 1.07, 1.25, 1.5,
+1.75 and 2x a step writes nothing above its line, no pixel changes twice, and the result is the whole splash on the new
+step; a step that only moves the fill writes only the bar, and an expose writes only its clip.
+`./gradlew check --continue`: **11,486 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: on Windows (100 % and 150 %) and Linux (X11 and a
+Wayland session, scale 1 and 2), with Enterprise on, a cold start's splash keeps its art, icon, name, version and
+copyright steady at every step while only the step text and the bar change, with no blank or dark frame, and a window
+dragged over it and away leaves it whole; on macOS it looks as before.
 
 **CI runtime optimization — 2026-10-19** (PR #1): CI runs independent Gradle projects with
 `--parallel`, two workers on Unix and one on Windows; each project's tests remain sequential. Root verifiers consume
@@ -148,7 +487,7 @@ Log and Transfers from their stripe labels after clicking into one (the tint sta
 against the user's screenshot (#DFE2E9); Enterprise Light and Dark as a whole against IntelliJ Light and New UI Dark;
 the Run window opening centred in the upper part in a tall window (about 1200 px or more), ending at the middle in a
 window about 1000 to 1200 px tall and just under the toolbar, crossing the middle, in a shorter one, then dragged away
-and back; the About page's IntelliJ entries. Not merged, not pushed.
+and back; the About page's IntelliJ entries. Merged to local `main` (`f78bb0385`), not pushed.
 
 **Enterprise presentation: side stripes at the user's direction — 2026-10-18** (`claude/enterprise-stripes`, worktree
 `.claude/worktrees/enterprise-stripes`, from `main` at `4ed94fb78`: `095e220b9`, `4b55dbfb7`, then this documentation
@@ -846,7 +1185,10 @@ a `--background` resident opens its first window and after Quit then reopen; no 
 Jasper's icon. Not merged, not pushed.
 
 2026-10-19 splash flicker fix: each step is completed in an offscreen image at the window graphics' actual X/Y
-scale and copied once, retaining fractional HiDPI resolution, origin and clipping. All 23 splash tests pass;
+scale and copied once, retaining fractional HiDPI resolution, origin and clipping. Merging with local `main` on
+2026-10-20 kept the boot splash's `SplashBuffer` (the boot-splash entry above), which also draws off screen at the device
+scale and copies only the step's line and the bar; `SplashPainter.frame` went, and `SplashFrameTest` now checks
+`SplashBuffer` on an offset, clipped target at the same seven scales. All 23 splash tests pass;
 independent review found no actionable issues. Serial `./gradlew check --continue`: Java XML **11,454 tests, 0 failures, 0 errors, 26 skipped**;
 only the previously documented `checkThemeTool.test_deeply_nested_input_is_a_message` assertion fails.
 Native Windows/Linux startup acceptance remains user-run.

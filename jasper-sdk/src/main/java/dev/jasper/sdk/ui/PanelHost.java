@@ -20,7 +20,11 @@ public interface PanelHost {
      */
     void setHeader(PanelHeader header);
 
-    /** Shows the panel in this window, hiding whatever else occupied its slot. */
+    /**
+     * Shows the panel in this window, hiding whatever else occupied its slot. Called from the panel's own toggle action
+     * as its handler runs, it also makes the panel the active tool window under a look with flush tool windows
+     * (since 0.18.2).
+     */
     void show();
 
     /** Hides the panel in this window. */

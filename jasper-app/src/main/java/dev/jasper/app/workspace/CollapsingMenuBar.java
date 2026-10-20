@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.ClassicMenuRow;
 import java.awt.Component;
@@ -17,9 +18,10 @@ import javax.swing.event.MenuListener;
  * The window's menu bar. As its room shrinks the trailing menus fold into a "…" menu (File always stays), then every
  * menu folds into one ☰ menu. Folded menus are the same {@code JMenu} objects: they move into the fold menu while it is
  * open and back when it closes. With a header (the Windows and Linux title bar) the header spans the bar under the
- * menus and decides their room, so the search field stays centred on the window. In a classic row
- * ({@link ClassicMenuRow#styled}) the menus stand at their {@link ClassicMenuRow#titleWidth}, each edge rounded from the
- * running total.
+ * menus and decides their room, so the search field stays centred on the window. With a title (the Windows classic
+ * title bar) the title follows the menus {@link ClassicWindowTitle#GAP} after them, and the menus fold before it shrinks
+ * below {@link ClassicWindowTitle#MINIMUM}. In a classic row ({@link ClassicMenuRow#styled}) the menus stand at their
+ * {@link ClassicMenuRow#titleWidth}, each edge rounded from the running total.
  */
 final class CollapsingMenuBar extends JMenuBar {
     enum Fold { NONE, MORE, ALL }
@@ -28,9 +30,11 @@ final class CollapsingMenuBar extends JMenuBar {
     private final JMenu more = new JMenu(), hamburger = new JMenu();
     private final Component glue = Box.createHorizontalGlue();
     private WindowHeader header;
+    private ClassicWindowTitle title;
     private Fold fold = Fold.NONE;
     private int kept;
     private boolean moving;
+    private boolean screenMenuBar;
 
     CollapsingMenuBar() {
         setLayout(new Layout());
@@ -55,6 +59,15 @@ final class CollapsingMenuBar extends JMenuBar {
         });
     }
 
+    /**
+     * Marks the bar as shown by macOS's screen menu bar (plan 14, the classic title): AppKit lays its menus out, so the bar
+     * never folds against the window's width, which the root still gives it.
+     */
+    void screenMenuBar(boolean value) {
+        screenMenuBar = value;
+        revalidate();
+    }
+
     Fold fold() { return fold; }
     List<JMenu> menus() { return List.copyOf(menus); }
     JMenu overflowMenu() { return more; }
@@ -67,6 +80,15 @@ final class CollapsingMenuBar extends JMenuBar {
         // FlatLaf stretches an embedded menu bar across the title bar only when it ends with a horizontal glue.
         super.addImpl(glue, null, -1);
         value.setLeading(this::fit, this::minimumMenusWidth);
+        revalidate();
+    }
+
+    /** Puts {@code value} after the menus, up to the bar's end; the menus fold before it shrinks below its minimum. */
+    void setTitle(ClassicWindowTitle value) {
+        title = value;
+        super.addImpl(value, null, -1);
+        // As in setHeader: the glue makes FlatLaf stretch the bar up to the window buttons.
+        super.addImpl(glue, null, -1);
         revalidate();
     }
 
@@ -121,7 +143,7 @@ final class CollapsingMenuBar extends JMenuBar {
     private int shownWidth() {
         double total = 0;
         for (Component child : getComponents())
-            if (child != header && child != glue && child.isVisible()) total += width(child);
+            if (child != header && child != glue && child != title && child.isVisible()) total += width(child);
         return pixels(total);
     }
 
@@ -173,6 +195,7 @@ final class CollapsingMenuBar extends JMenuBar {
         @Override public void removeLayoutComponent(Component component) { }
 
         @Override public Dimension preferredLayoutSize(Container parent) {
+            if (title != null) return titledSize();
             double run = 0;
             int height = 0;
             for (Component child : getComponents()) {
@@ -188,6 +211,20 @@ final class CollapsingMenuBar extends JMenuBar {
             return new Dimension(width + insets.left + insets.right, height + insets.top + insets.bottom);
         }
 
+        /**
+         * With a title the bar asks only for its folded minimum: FlatLaf sizes its left panel from this and, when its own
+         * title area drops below its minimum, squeezes the window buttons first. The glue still gives the bar its real
+         * width, and layoutContainer folds the menus into it.
+         */
+        private Dimension titledSize() {
+            int height = 0;
+            for (Component child : getComponents()) if (child != glue && child.isVisible()) height = Math.max(height, child.getPreferredSize().height);
+            int width = minimumMenusWidth() + UIScale.scale(ClassicWindowTitle.GAP)
+                + Math.min(title.getPreferredSize().width, UIScale.scale(ClassicWindowTitle.MINIMUM));
+            Insets insets = getInsets();
+            return new Dimension(width + insets.left + insets.right, height + insets.top + insets.bottom);
+        }
+
         @Override public Dimension minimumLayoutSize(Container parent) {
             int width = header != null ? header.getMinimumSize().width : minimumMenusWidth();
             return new Dimension(width, preferredLayoutSize(parent).height);
@@ -197,10 +234,20 @@ final class CollapsingMenuBar extends JMenuBar {
             Insets insets = getInsets();
             int height = getHeight() - insets.top - insets.bottom;
             if (header != null) { header.setBounds(0, 0, getWidth(), getHeight()); header.doLayout(); }
+            else if (title != null) {
+                int inner = getWidth() - insets.left - insets.right, gap = UIScale.scale(ClassicWindowTitle.GAP);
+                int keep = Math.min(title.getPreferredSize().width, UIScale.scale(ClassicWindowTitle.MINIMUM));
+                int used = fit(inner - gap - keep);
+                int x = insets.left + used + gap;
+                // At its text height, centred as FlatLaf centres a menu's text, so the title shares the menus' baseline.
+                int text = title.getPreferredSize().height;
+                title.setBounds(x, insets.top + (height - text) / 2, Math.max(0, insets.left + inner - x), text);
+            }
+            else if (screenMenuBar) apply(Fold.NONE, menus.size());
             else fit(getWidth() - insets.left - insets.right);
             double run = 0;
             for (Component child : getComponents()) {
-                if (child == header || child == glue || !child.isVisible()) continue;
+                if (child == header || child == glue || child == title || !child.isVisible()) continue;
                 int x = insets.left + pixels(run);
                 run += width(child);
                 child.setBounds(x, insets.top, insets.left + pixels(run) - x, height);

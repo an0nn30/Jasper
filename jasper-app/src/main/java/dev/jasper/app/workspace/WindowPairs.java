@@ -70,6 +70,12 @@ final class WindowPairs {
         SLASH_RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_STATUS, Guard.TEXT),
         ACTIVE_RUN = pair(DerivedColor.ACCENT_EDGE, DerivedColor.SURFACE_HEADER_ACTIVE, Guard.TEXT),
         SLASH_ACTIVE_RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_CONTROL_SELECTED, Guard.TEXT);
+    /**
+     * The Windows classic title bar's title, active and inactive (plan 14 Rulings 14): IntelliJ's TitlePane.infoForeground
+     * and inactiveInfoForeground.
+     */
+    static final PaintPair TITLE = pair(SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_APP, Guard.TEXT),
+        INACTIVE_TITLE = pair(SemanticColor.TEXT_TERTIARY, SemanticColor.SURFACE_APP, Guard.INDICATOR);
 
     /** Every window pair, the declared table of spec 16.1.1. */
     static final List<PaintPair> ALL = List.of(OPEN_MENU, RULE, BUTTON_LABEL, HOVERED_BUTTON_LABEL, PRESSED_BUTTON_LABEL, BUTTON_FRAME,
@@ -77,7 +83,7 @@ final class WindowPairs {
         PLACEHOLDER, KEYCAP_TEXT, TAB_LABEL, SELECTED_TAB_LABEL, INACTIVE_TAB_LABEL, INACTIVE_SELECTED_TAB_LABEL,
         RUNNING_TAB_DOT, RUNNING_SELECTED_TAB_DOT, IDLE_TAB_DOT, IDLE_SELECTED_TAB_DOT, TAB_CLOSE, SELECTED_TAB_CLOSE,
         TAB_INDICATOR, TAB_PLUS, CELL_TEXT, RUNNING_SESSION_DOT, IDLE_SESSION_DOT, WARNING_CELL, DANGER_CELL, RUN, SLASH_RUN, ACTIVE_RUN,
-        SLASH_ACTIVE_RUN);
+        SLASH_ACTIVE_RUN, TITLE, INACTIVE_TITLE);
 
     static PaintPair tabLabel(boolean activeWindow, boolean selected) {
         return activeWindow ? (selected ? SELECTED_TAB_LABEL : TAB_LABEL) : (selected ? INACTIVE_SELECTED_TAB_LABEL : INACTIVE_TAB_LABEL);

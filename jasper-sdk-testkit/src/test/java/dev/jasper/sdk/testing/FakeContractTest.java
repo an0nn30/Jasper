@@ -20,6 +20,8 @@ class FakeContractTest extends PluginContractTest {
                 return java.util.Optional.ofNullable(host.savedSettings(pluginId).get(key));
             }
             @Override public List<String> settingsReports(String pluginId) { return host.settingsReports(pluginId); }
+            @Override public void setKitDefault(String pluginId, String key, Object rawValue) { host.setKitDefault(pluginId, key, rawValue); }
+            @Override public List<String> lookDefaultProblems(String pluginId) { return host.lookDefaultProblems(pluginId); }
             @Override public void start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
                 ui(() -> host.start(info, requires, optional, plugin));
             }
@@ -115,6 +117,7 @@ class FakeContractTest extends PluginContractTest {
                 host.commandFinished(paneId, command, java.util.OptionalInt.of(exitStatus), java.time.Duration.ofMillis(1500));
             }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) { host.setVariant(variant); }
+            @Override public void setPresentation(dev.jasper.sdk.ui.Presentation presentation) { host.setPresentation(presentation); }
             @Override public java.util.Optional<String> clipboard() { return host.clipboard().text(); }
             @Override public void userCopies(String text) { host.clipboard().setText(text); }
             @Override public void clipboardBusy(boolean busy) { host.clipboard().failWrites(busy); }

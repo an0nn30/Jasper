@@ -262,6 +262,8 @@ final class ToolWindowArea extends JPanel {
     private final dev.jasper.ui.kit.Kit kit;
     /** Whether frames are flush (the classic look's frame style). */
     private final boolean flush;
+    /** The window's chrome artwork, which the headers' classic names follow (plan 15b). */
+    private final dev.jasper.ui.icons.ChromeArtwork artwork;
     /** The window's kit's chrome painter: the rules under flush frames. */
     private final dev.jasper.ui.swing.ChromePainter painter;
     private final Host center;
@@ -305,7 +307,21 @@ final class ToolWindowArea extends JPanel {
      * @param flush whether frames are flush: divided by painted rules, with header strips (spec 10.7)
      */
     ToolWindowArea(JComponent terminalColumn, DockState state, dev.jasper.ui.kit.Kit kit, boolean flush) {
+        this(terminalColumn, state, kit, flush, dev.jasper.ui.icons.ChromeArtwork.NEW_UI);
+    }
+
+    /**
+     * @param terminalColumn the terminal column the frames dock around
+     * @param state the window's dock state
+     * @param kit the window's kit
+     * @param flush whether frames are flush: divided by painted rules, with header strips (spec 10.7)
+     * @param artwork the window's chrome artwork: under {@code CLASSIC} the headers' classic names draw IntelliJ's
+     *     classic art (plan 15b)
+     */
+    ToolWindowArea(JComponent terminalColumn, DockState state, dev.jasper.ui.kit.Kit kit, boolean flush,
+                   dev.jasper.ui.icons.ChromeArtwork artwork) {
         super(null);
+        this.artwork = Objects.requireNonNull(artwork, "artwork");
         this.state = Objects.requireNonNull(state, "state");
         this.kit = Objects.requireNonNull(kit, "kit");
         this.flush = flush;
@@ -583,6 +599,8 @@ final class ToolWindowArea extends JPanel {
         sources.forEach(component -> dragSource.accept(component, id));
         var ready = dev.jasper.ui.model.ControlState.READY;
         var ghost = dev.jasper.ui.model.Nodes.ButtonKind.GHOST;
+        // The view lives only in this window's area, so the flag is never cleared on release.
+        if (artwork == dev.jasper.ui.icons.ChromeArtwork.CLASSIC) view.classicChromeIcons(true);
         view.setPanelHostActions(panel, List.of(
             new dev.jasper.ui.model.Nodes.Button("host.options", ready, "", "more", ghost, "host.options", "Options"),
             new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", flush ? "remove" : "collapse", ghost, "host.hide", "Hide")), event -> {
@@ -623,12 +641,17 @@ final class ToolWindowArea extends JPanel {
     /**
      * The module's description of the same metadata in its frame; callbacks stay the plugin boundary's guarded, contained
      * ones. On a header strip a host module glyph is described too, so the strip draws it as its other actions (spec 10.7).
+     * In a standard frame under classic artwork a host module glyph of the classic set is given as its classic art, which
+     * the view draws as given (plan 15b).
      */
-    private static dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state,
-                                                                  dev.jasper.ui.swing.PanelHostHeader.Frame frame) {
+    private dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state,
+                                                           dev.jasper.ui.swing.PanelHostHeader.Frame frame) {
         boolean strip = frame != dev.jasper.ui.swing.PanelHostHeader.Frame.STANDARD;
+        boolean classic = artwork == dev.jasper.ui.icons.ChromeArtwork.CLASSIC;
         return new dev.jasper.ui.swing.PanelHostHeader(state.detail(), state.active(), state.actions().stream()
-            .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(), action.icon(), action.invoke(), action.icon() instanceof dev.jasper.app.platform.PresentationIcon named
+            .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(),
+                classic && !strip ? dev.jasper.app.platform.AppIcons.classicChromeIcon(action.icon()).orElse(action.icon()) : action.icon(),
+                action.invoke(), action.icon() instanceof dev.jasper.app.platform.PresentationIcon named
                 ? new dev.jasper.ui.swing.PanelHostHeader.Artwork(named.name(), named.pathData())
                 : strip ? dev.jasper.app.platform.AppIcons.kitName(action.icon()).map(name -> new dev.jasper.ui.swing.PanelHostHeader.Artwork(name, null)).orElse(null) : null)).toList(), frame);
     }
@@ -666,7 +689,7 @@ final class ToolWindowArea extends JPanel {
         var header = new ToolWindowHeader(title,
             () -> ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
                 slot -> onMove.accept(id, slot), () -> onHide.accept(id)),
-            () -> onHide.accept(id), kit, flush);
+            () -> onHide.accept(id), kit, flush, artwork);
         header.presentation(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
         return header;
     }

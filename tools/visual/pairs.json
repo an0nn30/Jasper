@@ -895,46 +895,46 @@
     "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
     "crop": [
       2,
-      110,
+      116,
       2880,
-      70
+      56
     ],
     "render": "jasper-app/build/chrome-renders/enterprise-light-workstation.png",
     "render_crop": [
       0,
       50,
       2880,
-      70
+      56
     ],
     "min_agreement": 0.3,
     "colours": [
       "#F2F2F2",
       "#D1D1D1",
-      "#C4C4C4",
-      "#FFFFFF"
-    ]
+      "#C4C4C4"
+    ],
+    "note": "The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights. The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field; #FFFFFF, the field's surface.input, is no longer painted in the row."
   },
   {
     "name": "chrome-toolbar-dark",
     "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
     "crop": [
       2,
-      110,
+      116,
       2880,
-      70
+      56
     ],
     "render": "jasper-app/build/chrome-renders/enterprise-dark-workstation.png",
     "render_crop": [
       0,
       50,
       2880,
-      70
+      56
     ],
     "min_agreement": 0.3,
     "colours": [
       "#2B2D30"
     ],
-    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port."
+    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights. The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field."
   },
   {
     "name": "chrome-tabs-light",
@@ -1669,14 +1669,26 @@
       44,
       332
     ],
-    "render": "jasper-app/build/dock-renders/light-left-stripe-render.png",
+    "render": "jasper-app/build/dock-renders/light-left-stripe-text-render.png",
     "min_agreement": 0.85,
     "colours": [
       "#D1D1D1",
       "#000000",
       "#EAEAEA"
     ],
-    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right)."
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-light-left-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      180,
+      44,
+      400
+    ],
+    "render": "jasper-app/build/dock-renders/light-left-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
   },
   {
     "name": "dock-light-right-stripe",
@@ -1687,14 +1699,26 @@
       44,
       276
     ],
-    "render": "jasper-app/build/dock-renders/light-right-stripe-render.png",
+    "render": "jasper-app/build/dock-renders/light-right-stripe-text-render.png",
     "min_agreement": 0.9,
     "colours": [
       "#D1D1D1",
       "#000000",
       "#EAEAEA"
     ],
-    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right)."
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-light-right-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2838,
+      180,
+      44,
+      344
+    ],
+    "render": "jasper-app/build/dock-renders/light-right-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
   },
   {
     "name": "dock-light-bottom-strip",
@@ -1705,13 +1729,26 @@
       520,
       50
     ],
-    "render": "jasper-app/build/dock-renders/light-bottom-strip-render.png",
+    "render": "jasper-app/build/dock-renders/light-bottom-strip-text-render.png",
     "min_agreement": 0.8,
     "colours": [
       "#EAEAEA",
       "#000000",
       "#DDDDDD"
-    ]
+    ],
+    "note": "The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-light-bottom-strip-iconed",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      1706,
+      588,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-bottom-strip-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
   },
   {
     "name": "dock-light-disconnected-kit-sftp-header",
@@ -1858,14 +1895,26 @@
       44,
       332
     ],
-    "render": "jasper-app/build/dock-renders/dark-left-stripe-render.png",
+    "render": "jasper-app/build/dock-renders/dark-left-stripe-text-render.png",
     "min_agreement": 0.85,
     "colours": [
       "#4B4C4F",
       "#DFE1E5",
       "#313336"
     ],
-    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #43454A, which this crop does not paint under the port."
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #43454A, which this crop does not paint under the port. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-dark-left-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      180,
+      44,
+      400
+    ],
+    "render": "jasper-app/build/dock-renders/dark-left-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
   },
   {
     "name": "dock-dark-right-stripe",
@@ -1876,14 +1925,26 @@
       44,
       276
     ],
-    "render": "jasper-app/build/dock-renders/dark-right-stripe-render.png",
+    "render": "jasper-app/build/dock-renders/dark-right-stripe-text-render.png",
     "min_agreement": 0.9,
     "colours": [
       "#4B4C4F",
       "#DFE1E5",
       "#313336"
     ],
-    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #43454A, which this crop does not paint under the port."
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-18 direction: #50545B (surface.control.selected, border.field.raised, border.menu) maps to #43454A, which this crop does not paint under the port. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-dark-right-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2838,
+      180,
+      44,
+      344
+    ],
+    "render": "jasper-app/build/dock-renders/dark-right-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
   },
   {
     "name": "dock-dark-bottom-strip",
@@ -1894,13 +1955,26 @@
       520,
       50
     ],
-    "render": "jasper-app/build/dock-renders/dark-bottom-strip-render.png",
+    "render": "jasper-app/build/dock-renders/dark-bottom-strip-text-render.png",
     "min_agreement": 0.8,
     "colours": [
       "#313336",
       "#DFE1E5",
       "#3E3F42"
-    ]
+    ],
+    "note": "The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-dark-bottom-strip-iconed",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      1706,
+      588,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-bottom-strip-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
   },
   {
     "name": "dock-vault-kit-sftp-header",
@@ -1983,14 +2057,26 @@
       44,
       332
     ],
-    "render": "jasper-app/build/dock-renders/vault-left-stripe-render.png",
+    "render": "jasper-app/build/dock-renders/vault-left-stripe-text-render.png",
     "min_agreement": 0.85,
     "colours": [
       "#A5A5A5",
       "#000000",
       "#B9B9B9"
     ],
-    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim."
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-vault-left-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      66,
+      244,
+      44,
+      400
+    ],
+    "render": "jasper-app/build/dock-renders/vault-left-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
   },
   {
     "name": "dock-vault-right-stripe",
@@ -2001,13 +2087,25 @@
       44,
       276
     ],
-    "render": "jasper-app/build/dock-renders/vault-right-stripe-render.png",
+    "render": "jasper-app/build/dock-renders/vault-right-stripe-text-render.png",
     "min_agreement": 0.9,
     "colours": [
       "#A5A5A5",
       "#B9B9B9"
     ],
-    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim."
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right). The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-vault-right-stripe-iconed",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      2902,
+      244,
+      44,
+      344
+    ],
+    "render": "jasper-app/build/dock-renders/vault-right-stripe-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
   },
   {
     "name": "dock-vault-bottom-strip",
@@ -2018,14 +2116,26 @@
       520,
       50
     ],
-    "render": "jasper-app/build/dock-renders/vault-bottom-strip-render.png",
+    "render": "jasper-app/build/dock-renders/vault-bottom-strip-text-render.png",
     "min_agreement": 0.8,
     "colours": [
       "#B9B9B9",
       "#000000",
       "#AFAFAF"
     ],
-    "note": "The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim."
+    "note": "The user's 2026-10-18 direction: the colours are the IntelliJ Light port's roles under the mock's 21 % scrim. The user's direction of 2026-10-19 (plan 13): each label starts with its tool window's 13 px icon and a 4 px gap, which the text-only mocks do not draw; this pair reads the render with each label's icon slice cut out (-text-render.png, pixel-identical to the text-only label), and the iconed stripe is -render.png, its icons pinned by DockMockTest and StripeIconsTest."
+  },
+  {
+    "name": "dock-vault-bottom-strip-iconed",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      66,
+      1770,
+      588,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-bottom-strip-render.png",
+    "note": "The user's direction of 2026-10-19 (plan 13): the stripe as it ships, each label led by its 13 px icon and a 4 px gap, beside the text-only mock with its crop widened by the two labels' slices (4 x 17 at 2x); ungated, for inspection with compare_all.py; the gated pair without -iconed compares the cut."
   },
   {
     "name": "composition-light-sessions",

@@ -18,6 +18,16 @@ Two built-in names are authored host artwork (SDK 0.18.1): `"run"`, IntelliJ's c
 and `"application"`, its run-configuration icon. Controls draw them in their own colours in both
 looks; panels, prompts and tiles draw a monochrome glyph of the same name.
 
+Under the Enterprise look a panel's stripe label starts with its icon at 13 px: `"network"`,
+`"folder"`, `"tunnel"`, `"download"`, `"server"` and `"bell"` draw IntelliJ's classic tool-window
+icons, and any other name (a registered path included) its monochrome glyph in the label's colour;
+an identity name such as `more.vertical` keeps its authored art.
+
+Under the Enterprise look IntelliJ's classic icons also draw `"add"`, `"split"`, `"zoom"`,
+`"settings"`, `"window.add"` and `"search"` in the toolbar (actions and toolbar views), the status
+bar and tool-window headers (your `PanelHeader` actions and your panel's header controls); in a
+panel's or window's body these names keep their ordinary art.
+
 For original artwork, register a constrained monochrome path in a 16-unit coordinate space:
 
 ```java

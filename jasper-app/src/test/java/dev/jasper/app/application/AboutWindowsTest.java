@@ -105,6 +105,10 @@ class AboutWindowsTest {
         assertThat(AboutWindows.aboutInApplicationMenu(true, false)).isFalse();
         assertThat(AboutWindows.aboutInApplicationMenu(false, true)).isFalse();
         assertThat(AboutWindows.helpEntries(AboutWindows.aboutInApplicationMenu(true, false))).contains(new MenuEntry.Item("app.about"));
+        var classic = dev.jasper.app.presentation.Projections.of(dev.jasper.app.testsupport.EnterpriseLook.titled(dev.jasper.app.presentation.ChromeSpec.CLASSIC,
+            dev.jasper.app.presentation.ChromeSpec.TitleBar.CLASSIC), true, true, "p",
+            new dev.jasper.app.presentation.Projections.Host(dev.jasper.app.presentation.Projections.Platform.MAC, true));
+        assertThat(AboutWindows.aboutInApplicationMenu(true, classic.desktop().screenMenuBar())).as("plan 14: the classic title on macOS").isTrue();
     }
 
     @Test void helpListsTheVmOptionsActionsAfterKeyboardShortcutsAndAboutLastUnlessInTheApplicationMenu() {

@@ -54,8 +54,9 @@ public record PageContext(SettingsDraft draft, Consumer<String> navigate, Consum
 
     /** The default look's projections on this host, for pages and dialogs made without a presentation. */
     public static Projections standard() {
-        boolean mac = com.formdev.flatlaf.util.SystemInfo.isMacOS;
-        return Projections.standard(new Projections.Host(mac, mac && com.formdev.flatlaf.util.SystemInfo.isMacFullWindowContentSupported));
+        var platform = Projections.Platform.of(System.getProperty("os.name", ""));
+        return Projections.standard(new Projections.Host(platform,
+            platform == Projections.Platform.MAC && com.formdev.flatlaf.util.SystemInfo.isMacFullWindowContentSupported));
     }
 
     /** A context whose pages build no kit view, such as one that only wraps another component. */

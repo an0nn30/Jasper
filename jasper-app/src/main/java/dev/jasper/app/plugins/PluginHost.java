@@ -32,6 +32,8 @@ import dev.jasper.app.terminals.TerminalRegistry;
  * stop in reverse. It knows nothing about jars or descriptors; see {@link HostedPlugin}.
  */
 final class PluginHost {
+    private static final System.Logger LOG = System.getLogger(PluginHost.class.getName());
+
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
@@ -96,6 +98,12 @@ final class PluginHost {
     record Outcome(PluginStatus.State state, String reason) { }
 
     java.util.function.BooleanSupplier animations = () -> true;
+    /** The look every plugin's appearance reports; set before plugins start. */
+    volatile dev.jasper.sdk.ui.Presentation presentation = HostedPresentation.standard();
+    /** The look's defaults, whose table for a plugin defaults its declared settings (spec 5.8); set before plugins start. */
+    volatile dev.jasper.app.config.DefaultSource defaults = dev.jasper.app.config.DefaultSource.CORE;
+    /** Hears each look default a plugin cannot use: one line naming the plugin, the key and why. */
+    Consumer<String> lookDefaultProblem = message -> LOG.log(System.Logger.Level.WARNING, message);
     /** The kit plugins' views are made with: the presentation's, or the installed look and feel's for a runtime given none. */
     java.util.function.Supplier<dev.jasper.ui.kit.Kit> kit = dev.jasper.ui.swing.FlatLafInstaller::installedKit;
     /** The keymap text a plugin's menus show beside an item's action. */
@@ -151,7 +159,7 @@ final class PluginHost {
                 + (why == PluginStatus.State.FAILED ? "failed to start" : why == PluginStatus.State.SKIPPED ? "was skipped" : "is not running"));
         }
         var declared = new DeclaredSettings(id, environment.settingsFiles(), containment, environment.ui(), environment.configReport(),
-            () -> settingsWritten(id));
+            () -> settingsWritten(id), defaults.plugin(id), lookDefaultProblem);
         var context = new HostedContext(this, hosted, declared);
         contexts.put(id, context);
         Set<String> providers = new HashSet<>(hosted.requires());

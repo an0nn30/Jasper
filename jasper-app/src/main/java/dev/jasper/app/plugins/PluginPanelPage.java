@@ -51,7 +51,7 @@ final class PluginPanelPage implements SettingsPage {
                     PageContext context) {
         this.pluginId = pluginId; this.title = title; this.declared = declared; this.panel = panel;
         this.containment = containment; this.context = context;
-        kitRows = new KitSettingRows(rowHost, this::settingSpec, rowHost::unset, this::chooseFile, context.chrome().inlineReset());
+        kitRows = new KitSettingRows(rowHost, this::settingSpec, setting -> declared.handle(setting).defaultValue(), rowHost::unset, this::chooseFile, context.chrome().inlineReset());
         draft = new SettingsDraft(declared.values());
         stopListening = declared.onReloaded(() -> {
             draft.rebase(declared.values());
