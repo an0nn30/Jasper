@@ -19,6 +19,7 @@ import javax.swing.text.html.parser.ParserDelegator;
 final class PreviewPane implements AutoCloseable {
     private final JEditorPane editor = new Surface();
     private final Runnable geometryChanged;
+    Runnable beforeReplace = () -> {};
     private final IntConsumer activateLink;
     private final Map<Integer, BufferedImage> images = new HashMap<>();
     private final Map<Integer, String> imageReasons = new HashMap<>();
@@ -176,7 +177,7 @@ final class PreviewPane implements AutoCloseable {
                 var nextAnchors=collectAnchors((HTMLDocument)document,prepared.result);
                 var nextFont=bodyFont.deriveFont((float)typography.size());
                 var previousKit=editor.getEditorKit();var previousDocument=editor.getDocument();
-                try {editor.setEditorKit(nextKit);editor.setDocument(document);}
+                try {beforeReplace.run();editor.setEditorKit(nextKit);editor.setDocument(document);}
                 catch(RuntimeException failure){editor.setEditorKit(previousKit);editor.setDocument(previousDocument);throw failure;}
                 this.typography=typography;this.palette=palette;this.syntax=syntax;this.bodyFont=bodyFont;this.opacity=opacity;
                 images.clear();imageReasons.clear();imageIds=prepared.imageIds;changedImages.clear();imageNotificationGeneration++;imageNotificationPending=false;kit=nextKit;installed=prepared.result;pending=null;pendingStyle=null;

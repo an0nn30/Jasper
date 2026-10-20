@@ -113,6 +113,7 @@ final class MarkdownController implements AutoCloseable {
     private void invalidate() {
         if (closed) return;
         generation++;
+        tab.surface().scrollLink.invalidate();
         if (resources != null) { if (eligible()) resources.invalidate(); else resources.active(false); }
         debounce.stop(); pending = null; installing = null; current = null; dirty = true;
         tab.surface().preview().cancelInstall();
@@ -172,16 +173,19 @@ final class MarkdownController implements AutoCloseable {
     private void geometryChanged() {
         var job = installing;
         var pane = tab.surface().preview();
-        if (job == null || !current(job) || pane.installing()) return;
+        if (job == null) { if (current != null) tab.surface().scrollLink.geometryChanged(); return; }
+        if (!current(job) || pane.installing()) return;
         if (pane.installFailure().isPresent()) {
             installing = null; fail(pane.installFailure().get().getMessage());
         } else if (pane.installedResult().orElse(null) == job.result) {
             current = job.result; installing = null; failure = null;
+            tab.surface().scrollLink.install(job.generation, current);
             if (resources != null) { resources.refresh(current); resources.active(true); }
             changed.run();
         }
     }
     private void fail(String message) {
+        tab.surface().scrollLink.invalidate();
         failure = message == null || message.isBlank() ? "Could not preview this document" : message;
         dirty = true;
         changed.run();

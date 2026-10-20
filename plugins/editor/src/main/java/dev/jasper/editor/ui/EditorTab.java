@@ -222,7 +222,7 @@ public final class EditorTab {
             case "markdown.preview" -> markdownMode(MarkdownMode.PREVIEW, true);
             case "markdown.images.allow" -> { if (markdown != null) markdown.allowImages(); }
             case "markdown.images.retry" -> { if (markdown != null) markdown.retryImages(); }
-            case "markdown.scroll-sync" -> { if (showingText() && markdownEligible()) { linkedScrolling = !linkedScrolling; render(); } }
+            case "markdown.scroll-sync" -> { if (showingText() && markdownEligible()) { linkedScrolling = !linkedScrolling; document.scrollLink.linked(linkedScrolling); render(); } }
             case RETRY -> { if (session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
             case DISMISS -> { session.cancelLoad(); close.accept(this); }
             case FIRST -> { if (session.banner() == DocumentSession.Banner.DELETED) close.accept(this); else if (session.banner() == DocumentSession.Banner.CHANGED) session.reloadFromBanner(); }

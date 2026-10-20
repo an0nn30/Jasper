@@ -38,6 +38,32 @@ class MarkdownControllerTest {
     void preview(String text) throws Exception { edt(() -> { tab.area().setText(text); controller.mode(MarkdownMode.PREVIEW); }); }
     String visible() { return tab.surface().preview().editor().getText(); }
 
+    @Test void onlyAttachedCurrentResultEnablesPassageScrollingAndEditsPauseIt() throws Exception {
+        String text="# Start\n\n"+"paragraph\n\n".repeat(25)+"# Target\n\n"+"tail\n\n".repeat(25);
+        edt(() -> {tab.area().setText(text);controller.mode(MarkdownMode.SPLIT);});complete();
+        edt(() -> {dev.jasper.editor.testsupport.PreviewFixture.layout(tab.surface().scroll,250,140);
+            dev.jasper.editor.testsupport.PreviewFixture.layout(tab.surface().previewScroll,350,140);tab.surface().scrollLink.geometryChanged();});
+        for (int i=0;i<8;i++) edt(() -> {});
+        edt(() -> {
+            try {
+                int source=(int)tab.area().modelToView2D(text.indexOf("# Target")).getY();
+                var result=controller.currentResult().orElseThrow();
+                var block=result.blocks().stream().filter(b -> b.sourceStart()==text.indexOf("# Target")).findFirst().orElseThrow();
+                int target=(int)tab.surface().preview().editor().modelToView2D(tab.surface().preview().anchor(block.id()).orElseThrow()).getY();
+                tab.surface().scroll.getViewport().setViewPosition(new java.awt.Point(0,source));
+                assertThat(tab.surface().previewScroll.getViewport().getViewPosition().y).isCloseTo(target,within(2));
+                dev.jasper.editor.testsupport.Kits.click(tab.view(),"markdown.scroll-sync");
+                tab.surface().scroll.getViewport().setViewPosition(new java.awt.Point(0,0));
+                assertThat(tab.surface().previewScroll.getViewport().getViewPosition().y).isCloseTo(target,within(2));
+                dev.jasper.editor.testsupport.Kits.click(tab.view(),"markdown.scroll-sync");
+                tab.area().append("edit");assertThat(controller.currentResult()).isEmpty();
+                int before=tab.surface().previewScroll.getViewport().getViewPosition().y;
+                tab.surface().scroll.getViewport().setViewPosition(new java.awt.Point(0,source));
+                assertThat(tab.surface().previewScroll.getViewport().getViewPosition().y).isEqualTo(before);
+            } catch(javax.swing.text.BadLocationException e) {throw new AssertionError(e);}
+        });
+    }
+
     @Test void resourceControlsAppearOnlyAfterMatchingPreviewInstall() throws Exception {
         try (var loader = new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(1024))) {
             edt(() -> { controller.close(); controller = new MarkdownController(tab, worker, ui, tab::render, loader); controller.active(true); });
