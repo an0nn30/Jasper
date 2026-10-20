@@ -1,6 +1,14 @@
 # Workspace tabs 7a: parent tabs Implementation Plan
 
-**Status: not executed.** Written on 2026-10-19 against `claude/workspace-tabs` at `bba5c472e` (see Workspace).
+**Status: executed on 2026-10-20** (`c9cd1e2d8..05521e053`); see `docs/STATUS.md`. Deviations from the plan's text:
+`ParentTabs.java` got a ledger row (`new ArrayList` matches `CANDIDATE`); a new parent tab takes the window's theme and
+glass; `ParentTabsView` keeps its views in bar order; a strip in a hidden parent tab runs no motion; pins for Rulings 3,
+10 and 21; `MockUiTest` measures the content height relative to its own value; `WindowTabsTest` overrides
+`select_tab_1`; strip tab tooltips carry no shortcut by default; `StripSource.closeName()` makes the bar's × read
+"Close Parent Tab"; `ParentTabBarTest`'s search assertion names the first view's strip; tests pin a whole parent tab's
+close and no motion in the bar. Task 6 also lists `new_tab_in_pane` and `select_parent_tab_1` among
+`docs/configuration.md`'s action IDs and says in the README that Ctrl+PageUp and Ctrl+PageDown, disabled with one
+parent tab, still do not reach a terminal's shell.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

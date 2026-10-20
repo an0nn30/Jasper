@@ -679,9 +679,11 @@ dedicated connections, OS support and failure limits still apply. `PathBreadcrum
 saves light/dark local/remote/narrow previews under `build/render-preview`.
 
 
-Workspace tabs use centered text and equal-width cells; a window holding a single tab hides
-its strip (`WorkspaceChrome.showsStrip`, applied on every `WorkspaceView` render), which
-shows and hides at once, without motion.
+Workspace tabs use centered text and equal-width cells; a pane holding a single tab hides
+its strip (`WorkspaceChrome.showsStrip`, applied to each group on every `WorkspaceView` render), and a window holding a
+single parent tab its parent-tab bar (`WorkspaceChrome.showsParentTabBar`, applied by `ParentTabBar.refresh`); both
+show and hide at once, without motion. The bar is the look's strip over a `StripSource` (`ParentTabBar`, beside
+`GroupView`), and its entries never move.
 `WindowTabs` derives selected/inactive surfaces from the workspace palette while
 preserving glass alpha. Child repaints start at the strip to reconstruct translucent pixels
 once. Width animations interpolate the sampled Alacritty reference; resize/reorder/animation

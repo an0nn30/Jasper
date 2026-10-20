@@ -1,5 +1,69 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 7a: parent tabs — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `c9cd1e2d8..05521e053` (the Vault dialog commits and plans 7b and 7c's documents lie
+between), then this documentation commit;
+[plan](superpowers/plans/2026-10-19-workspace-7a-parent-tabs.md),
+[spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md)). A window holds parent tabs, each an unnamed set of
+panes (the split grid of plans 3 to 5), and shows one at a time. The model joins `layout` (`ParentTabId`, `ParentTab`,
+`ParentTabs` with its order of use, the sealed `WindowLayout` over `ParentTabs` and `PaneLayout`); `workspace.
+ParentTabsView` takes the terminal column's place in every window with a `WorkspaceView` per parent tab, the hidden ones
+kept in the tree, invisible, so a switch restarts nothing; `WindowContent.workspace()` is the shown parent tab's, its
+tabs are every parent tab's, and `windowLayout()` gives the model. New Tab (⌘T / Ctrl+Shift+T) opens a parent tab at the
+end of the bar, or fills the main window's empty workspace; `newTab`, plugins' `ACTIVE_GROUP` tabs, the registry's
+placements and single-instance requests open in the shown parent tab's active pane; New Terminal Window and New Editor
+Window open full windows. A parent tab closes with its last tab and the one used before it shows. The parent-tab bar
+(`ParentTabBar`, the look's strip over a `StripSource`) sits above the workspace, shows each parent tab as its active tab,
+never moves, and shows from two parent tabs under the equal tabs and always under the classic tabs. A pane shows its
+strip by its own count (superseding `128a0ac89`'s window count). Commands: `new_tab_in_pane`, `close_pane`,
+`close_parent_tab`, `maximize_pane`, `focus_pane_*`, `next_parent_tab`, `previous_parent_tab`, `select_parent_tab_1`-`9`
+(the `*_group` ids removed); `next_tab` and `previous_tab` move within the active pane on Ctrl+Tab. Rulings (plan,
+"Rulings"): (1) the model lives in `layout`; (2) a closing shown parent tab hands over to the one used most recently
+before it, then the never-shown ones after it in the bar, then before, nearest first; (3) New Tab puts its parent tab at
+the end of the bar; (4) one `WorkspaceView` per parent tab inside `ParentTabsView`, the hidden ones kept in the tree;
+(5) `workspace()` is the shown parent tab's, while `tabs()`, `tabCount()`, `terminalTabs()` and the SDK's
+`WindowHandle.tabs()` cover every parent tab in bar order; (6) a parent tab joins holding its first tab and leaves with
+its last, and only a window's only parent tab may be empty; (7) `newTab`, `openTab`, `Terminals.openTab`, placements and
+requests open in the shown parent tab's active pane, and only New Tab makes a parent tab; (8) a group id names its
+parent tab, so a tab placed beside a hidden parent tab's group lands there; (9) no tab moves between parent tabs of one
+window, so parent-tab changes report no `TAB_MOVED`; (10) a person's switch focuses the shown parent tab's active tab,
+and a close hands the focus on only when it was in the parent tabs or nowhere a person sees; (11) a pane shows its strip
+by its own tab count; (12) labels say Pane and Parent Tab while the code keeps `Group` and `Tab`; (13) the defaults of
+`ActionId` (⌘1-9 / Ctrl+1-9 select parent tabs, Select Tab 1-9 have none, Ctrl+Tab and Ctrl+Shift+Tab run on every
+platform); (14) Next and Previous Parent Tab run from the window's key dispatcher before the focus owner's own bindings;
+(15) the File and Tab menus' new order, Select Tab 1-9 only in the palette and the Keymap; (16) the bar shows each
+parent tab as its active tab, with "+" New Tab and a × and menu that close a parent tab with its tabs' guards; (17) the
+bar is the parent-tabs view's top row; (18) the mock test reads the pane's strip under the bar; (19) the bar is named
+`parentTabBar` and stays the view's last child; (20) new files take ledger rows `nonvisual-helper,none,none`; (21) a
+split beside a hidden parent tab's terminal opens there and does not show it. Spec issues: 1 (spec 8's Alt+1-9 for
+Select Parent Tab 1-9 is taken by Remote's tool-window toggles and is readline's digit argument) is open: Ctrl+1-9 moved
+from Select Tab to Select Parent Tab off macOS, and Alt+1-9 would first move Remote's three toggles. Deviations:
+`ParentTabs.java` got a ledger row, because `new ArrayList` matches `CANDIDATE`; a new parent tab takes the window's
+theme and glass, which the plan omitted; `ParentTabsView` keeps its views in bar order (`add(view, index)`); a strip in
+a hidden parent tab runs no motion (`WindowTabs.shown()`); pins were added for Rulings 3, 10 and 21; `MockUiTest`
+measures the content height relative to its own value; `WindowTabsTest` overrides `select_tab_1`; strip tab tooltips
+carry no shortcut by default; `StripSource.closeName()` was added, so the bar's × is "Close Parent Tab"; `ParentTabBarTest`'s
+search assertion names the first view's strip; tests pin a whole parent tab's close and no motion in the bar. Left for
+plan 7b: `PaneLayout`'s origin and the pane windows that hold it, and Pop Out Parent Tab and Move to Main Window in
+`WindowContent.parentTabMenu`; for plan 7c: a drag from `ParentTabBar.pressed` (the bar's entries start none), with moves
+between parent tabs of one window still refused by the registry; for plans 6a and 6b: `WindowContent.windowLayout()` is
+what a window saves, and `workspaceChanged(WorkspaceView, boolean)` runs on every layout and parent-tab change.
+`./gradlew check --continue`: **BUILD SUCCESSFUL, 11,948 tests, 0 failures, 0 errors, 25 skipped (app 3,976 with 19 skipped, terminal 459 with 5, ui 930, buddy 151, sdk 94, sdk-testkit 205, editor 4,913, enterprise 3, fileserver 285, history 41, indexer 99, remote 544, sample 14, snippets 13, vault 221 with 1)**. GUI checks for the user: in the standard
+look one parent tab shows no bar, ⌘T (Ctrl+Shift+T) and the toolbar's New tab show it at once above the panes, each
+opening a parent tab, and each entry is its parent tab's active tab's title; clicking an entry, ⌘1-9 / Ctrl+1-9 and
+⌘⇧[ ⌘⇧] / Ctrl+PageUp Ctrl+PageDown switch parent tabs with every shell still running (a `top` in a hidden parent tab is
+current when it shows) and the focus on the shown parent tab's tab, also with the focus in the Editor or a tool window's
+table; ⌃⇥ ⌃⇧⇥ (Ctrl+Tab, Ctrl+Shift+Tab) move within the active pane; a parent tab's last tab closing (Cmd+W, its shell
+exiting, the bar's ×, Close Parent Tab) shows the one used before it, and closing to one parent tab hides the bar; a bar
+entry's × and middle-click close every tab of that parent tab, without a prompt; under the Enterprise look the bar
+always shows above the pane strips, its "+" (New Tab) and the toolbar's New Session open a parent tab (a bar entry), a
+pane strip's "+" (New Tab in Pane) stacks in its pane, and the main window's empty workspace shows a bar with "+" alone;
+a pane holding one tab shows no strip in the standard look, in a split too; the File menu's Close Pane and Close Parent
+Tab, the Tab menu's new order and the Keymap's Panes category; Remote's Alt+1/2/3 still toggle its tool windows on
+Windows and Linux; a `jasper` request and a plugin's tab open in the shown parent tab; New Terminal Window and New Editor
+Window open windows that take parent tabs; a tab dragged within the shown parent tab and into another window lands as
+before. Not merged, not pushed.
+
 **Workspace tabs: local main merged in (Enterprise plans 12 to 14) — 2026-10-19** (`claude/workspace-tabs`, the merge
 `23436efc3` of local main `f78bb0385`, then the fixes `5e709850c` and `94c91e6d2` and "Merge fixes: a child window's
 activating toggle activates, its Windows title dims"). The merge had 22 conflicts; the merge commit lists the resolutions.
@@ -81,7 +145,8 @@ drag from. Files: `GroupView`, `WorkspaceView`, `WorkspaceChrome`, `WindowTabs`,
 `WorkspaceViewTest`, `WindowRolesTest`, `WorkspaceDropTest`, `WindowTabsTest`, `ClassicTabsTest`, `TabDragWindowsTest`
 (its child window holds two tabs; the tests that drag a window's only tab give it the classic tabs), `WindowTabMotionTest`,
 `TabHeightTest`, `MockUiTest`, `GraphiteChromeTest` and `ChromeRenderTest`; spec section 1 decision 4 and section 10,
-`README.md`, `docs/configuration.md` and `docs/app-maintenance.md`. `:jasper-app:check` passes: 3806 app tests (four new), 0 failures, 19 skipped. GUI check for the user:
+`README.md`, `docs/configuration.md` and `docs/app-maintenance.md`. `:jasper-app:check` passes: 3806 app tests
+(four new), 0 failures, 19 skipped. GUI check for the user:
 in the standard look one tab shows no strip, and a second tab (New Tab, a split, a tab moved in) shows it at once, with
 both tabs in place; closing back to one tab hides it at once; under the Enterprise look the strip always shows. Not
 merged, not pushed.

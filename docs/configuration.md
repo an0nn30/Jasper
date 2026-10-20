@@ -678,7 +678,7 @@ View › View Modes › Zen toggles a workspace-focused view in the current wind
 tool windows and their rails. The command palette field, toolbar icons, workspace tabs and native window/menu
 controls remain available; the toolbar keeps its selected style. A tool window opened in Zen (by its shortcut,
 View › Tool Windows, the palette or a plugin command) shows in its usual place, without the rails. Toggle Zen again
-to restore your layout: the tool windows opened in Zen close and the ones that showed before return; Maximize Group
+to restore your layout: the tool windows opened in Zen close and the ones that showed before return; Maximize Pane
 works independently.
 Zen is independent of Appearance's Normal/Compact setting: Compact keeps its native title bar, hidden header
 and floating command palette when Zen is toggled.
@@ -710,7 +710,7 @@ or **Exit Zen Mode**, and the menu toggle remains usable even after removing its
 
 ## Shortcuts
 
-The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_terminal_window`, `close_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `clear_terminal`, `open_settings` and `reload_config`.
+The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_tab_in_pane`, `new_terminal_window`, `close_window`, `close_tab`, `close_pane`, `close_parent_tab`, `split_right`, `split_down`, `next_parent_tab`, `previous_parent_tab`, `select_parent_tab_1`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `clear_terminal`, `open_settings` and `reload_config`.
 
 Settings › Keymap edits these bindings without opening the file; it writes the same `[keybindings]` entries.
 
@@ -720,8 +720,8 @@ On macOS, `cmd` means Command and `alt`/`option` means Option. For example:
 [keybindings]
 new_tab = "cmd+t"
 split_down = "cmd+shift+d"
-previous_tab = "cmd+{"
-next_tab = "cmd+}"
+previous_parent_tab = "cmd+{"
+next_parent_tab = "cmd+}"
 reload_config = "ctrl+F12"
 ```
 
@@ -731,8 +731,8 @@ Outside macOS, `cmd` maps to Ctrl+Shift. Defaults that also name Shift add Alt t
 [keybindings]
 new_tab = "ctrl+shift+t"
 split_down = "ctrl+alt+shift+d"
-previous_tab = "ctrl+{"
-next_tab = "ctrl+}"
+previous_parent_tab = "ctrl+pageup"
+next_parent_tab = "ctrl+pagedown"
 reload_config = "ctrl+F12"
 ```
 
@@ -877,8 +877,9 @@ turning it off and clicking Apply finishes running transitions immediately in op
 use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
 
 Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): opening takes 475 ms and
-closing 425 ms. Selection is immediate. A window holding a single tab shows no tab strip, and its second tab shows the
-strip at once, without motion; under the Enterprise look the strip always shows.
+closing 425 ms. Selection is immediate. A pane holding a single tab shows no tab strip, and its second tab shows the
+strip at once, without motion; under the Enterprise look the strip always shows. The parent-tab bar shows and hides
+at once too, and its tabs never move.
 
 The command palette drips open: over 300 ms its bottom edge eases down from the top of the card (quartic ease-out,
 fast then slow) while its rows stay in place, so the query field takes typing at once. Only a fresh open animates;
