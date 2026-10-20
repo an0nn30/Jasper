@@ -194,6 +194,8 @@ which passed separately); `sdkRelease` also passed. After the review fixes, the 
 Headless `packageApp` and `verifyPackage` rebuilt and verified the macOS arm64 image without a trained AOT cache.
 The whole-repository check has not been repeated after the review fixes.
 
+After local main integration at `048b58680`, full headless `check` passed with the Python 3.13 override: **11,866 tests, zero failures/errors, 29 skips**, all 150 tasks executed. The merge preserves newer platform Find Again shortcuts and host-owned Close Tab; independent conflict-resolution review passed.
+
 User-run desktop acceptance remains pending:
 
 - [ ] Follow saved terminal fonts in two windows, keep an unapplied independent draft, then turn following off.
