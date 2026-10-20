@@ -28,7 +28,7 @@ class PresentationConformanceTest {
     /** Every key of spec 5.1's kit file. */
     static final Set<String> KEYS = Set.of("kit", "base",
         "chrome/title_bar", "chrome/menu_bar", "chrome/window_title", "chrome/tool_windows", "chrome/editor_tabs", "chrome/status_bar",
-        "chrome/palette", "chrome/dialogs", "chrome/motion", "chrome/icons",
+        "chrome/palette", "chrome/dialogs", "chrome/motion", "chrome/icons", "chrome/toolbar_search",
         "controls/toggle", "controls/exclusive", "controls/tabs", "controls/group", "controls/form_label", "controls/empty",
         "controls/table", "controls/tree", "controls/stepper", "controls/ordered_list", "controls/buttons", "controls/tag",
         "controls/route", "controls/prompt",

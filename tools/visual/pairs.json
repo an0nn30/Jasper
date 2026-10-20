@@ -910,10 +910,9 @@
     "colours": [
       "#F2F2F2",
       "#D1D1D1",
-      "#C4C4C4",
-      "#FFFFFF"
+      "#C4C4C4"
     ],
-    "note": "The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights."
+    "note": "The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights. The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field; #FFFFFF, the field's surface.input, is no longer painted in the row."
   },
   {
     "name": "chrome-toolbar-dark",
@@ -935,7 +934,7 @@
     "colours": [
       "#2B2D30"
     ],
-    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights."
+    "note": "The user's 2026-10-18 direction: #2A2C30 (border.window) maps to #1E1F22, which this crop does not paint under the port. The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights. The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field."
   },
   {
     "name": "chrome-tabs-light",

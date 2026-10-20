@@ -11,6 +11,7 @@ import dev.jasper.app.config.ToolbarMode;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.app.presentation.PaletteLook;
 import dev.jasper.app.presentation.TitleFormat;
 import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.terminals.TerminalRegistry;
@@ -42,10 +43,13 @@ class ClassicHeaderTest {
 
     static WorkspaceChrome classic() { return classic(WorkspaceLook.Icons.NEW_UI); }
 
-    static WorkspaceChrome classic(WorkspaceLook.Icons icons) {
+    static WorkspaceChrome classic(WorkspaceLook.Icons icons) { return classic(icons, WorkspaceLook.Search.FIELD); }
+
+    /** The classic row with {@code search}; the icon comes with the Run window, as a parsed kit pairs them (spec 5.3). */
+    static WorkspaceChrome classic(WorkspaceLook.Icons icons, WorkspaceLook.Search search) {
         return WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.CLASSIC, WorkspaceLook.Stripes.RAILS,
             WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD,
-            icons), new TitleFormat("{context}"));
+            icons, search), new TitleFormat("{context}"), search == WorkspaceLook.Search.ICON ? PaletteLook.RUN_WINDOW : PaletteLook.DEFAULT);
     }
 
     static List<String> labels(WindowToolbar bar) {
@@ -62,7 +66,11 @@ class ClassicHeaderTest {
     static Window window(ThemeController themes, boolean view) { return window(themes, view, WorkspaceLook.Icons.NEW_UI); }
 
     static Window window(ThemeController themes, boolean view, WorkspaceLook.Icons icons) {
-        var chrome = classic(icons);
+        return window(themes, view, icons, WorkspaceLook.Search.FIELD);
+    }
+
+    static Window window(ThemeController themes, boolean view, WorkspaceLook.Icons icons, WorkspaceLook.Search search) {
+        var chrome = classic(icons, search);
         var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, chrome);
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
         owner.setToolbarHeight(28);
@@ -311,7 +319,10 @@ class ClassicHeaderTest {
     }
 
     /** {@code session}, at its preferred size, paints exactly IntelliJ's classic add icon at its centre. */
-    static void assertPaintsClassicAdd(ClassicToolbarButton session) {
+    static void assertPaintsClassicAdd(ClassicToolbarButton session) { assertPaintsClassic(session, "add"); }
+
+    /** {@code session}, at its preferred size, paints exactly IntelliJ's classic {@code name} icon at its centre. */
+    static void assertPaintsClassic(ClassicToolbarButton session, String name) {
         session.setSize(session.getPreferredSize());
         int size = scale(16), x = (session.getWidth() - size) / 2, y = (session.getHeight() - size) / 2;
         var actual = painted(session).getSubimage(x, y, size, size);
@@ -319,7 +330,7 @@ class ClassicHeaderTest {
         var g = expected.createGraphics();
         try {
             FlatUIUtils.setRenderingHints(g);
-            new IconRegistry().chromeIcon("add", size, ChromeArtwork.CLASSIC).icon(ThemeZone.theme(session), SemanticColor.TEXT_PRIMARY)
+            new IconRegistry().chromeIcon(name, size, ChromeArtwork.CLASSIC).icon(ThemeZone.theme(session), SemanticColor.TEXT_PRIMARY)
                 .paintIcon(session, g, x, y);
         } finally { g.dispose(); }
         var centre = expected.getSubimage(x, y, size, size);
@@ -329,8 +340,118 @@ class ClassicHeaderTest {
                 if (actual.getRGB(column, row) != centre.getRGB(column, row)) differing++;
                 if (centre.getRGB(column, row) >>> 24 != 0) inked++;
             }
-        assertThat(inked).as("the classic add icon has ink").isPositive();
-        assertThat(differing).as("New Session paints the classic add icon").isZero();
+        assertThat(inked).as("the classic " + name + " icon has ink").isPositive();
+        assertThat(differing).as(session.getClientProperty("label") + " paints the classic " + name + " icon").isZero();
+    }
+
+    /** The search button of the classic row under {@code window}. */
+    static ClassicToolbarButton searchButton(Window window) {
+        return (ClassicToolbarButton) ((ClassicHeader) window.owner().chrome().composition()).searchButton();
+    }
+
+    /** Plan 15b Rulings 7: under the icon the field gives way to IntelliJ Classic's magnifier, before Settings…. */
+    @Test void underTheSearchIconTheFieldIsAClassicMagnifierBeforeSettings() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var window = window(themes, false, WorkspaceLook.Icons.CLASSIC, WorkspaceLook.Search.ICON);
+                window.width(1440);
+                var header = window.owner().chrome().header();
+                var classic = (ClassicHeader) window.owner().chrome().composition();
+                assertThat(header.field().isVisible()).as("no field").isFalse();
+                assertThat(header.field().getWidth()).isZero();
+                assertThat(labels(classic.trailing())).containsExactly("Search Everywhere", "Settings…");
+                var search = searchButton(window);
+                assertThat(search.getText()).as("icon only").isNull();
+                assertThat(search.getPreferredSize()).as("IntelliJ's 22 px square").isEqualTo(new Dimension(scale(22), scale(22)));
+                String shortcut = window.owner().chrome().paletteShortcut();
+                assertThat(search.getToolTipText()).isEqualTo(shortcut.isBlank() ? "Search Everywhere" : "Search Everywhere (" + shortcut + ")");
+                assertThat(search.getAccessibleContext().getAccessibleName()).isEqualTo("Search Everywhere");
+                assertThat(search.getAction()).as("the palette's action").isSameAs(window.owner().action(dev.jasper.app.commands.ActionId.COMMAND_PALETTE));
+                // As the window installs it, so the palette has its root to open in.
+                window.owner().installRootBindings(window.root());
+                int[] clicks = {0};
+                search.addActionListener(event -> clicks[0]++);
+                assertThat(window.owner().paletteOpen()).isFalse();
+                search.doClick();
+                assertThat(clicks[0]).as("one run").isEqualTo(1);
+                assertThat(window.owner().paletteOpen()).as("it opens the Run window").isTrue();
+                assertPaintsClassic(search, "search");
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** Review Focus 3: under labels the button stays icon-only, as IntelliJ's; hidden takes the row. */
+    @Test void theSearchButtonStaysIconOnlyInEveryToolbarMode() throws Exception {
+        edt(() -> {
+            var window = window(ThemeTestSupport.controller(true), false, WorkspaceLook.Icons.CLASSIC, WorkspaceLook.Search.ICON);
+            var classic = (ClassicHeader) window.owner().chrome().composition();
+            var settings = labelled(classic.trailing(), "Settings…");
+            for (var mode : List.of(ToolbarMode.ICONS_AND_LABELS, ToolbarMode.ICONS, ToolbarMode.ICONS_AND_LABELS)) {
+                window.owner().setToolbarMode(mode);
+                window.width(1440);
+                assertThat(searchButton(window).getText()).as(mode.name()).isNull();
+                assertThat(settings.getText()).as(mode.name()).isEqualTo(mode == ToolbarMode.ICONS_AND_LABELS ? "Settings…" : null);
+            }
+            window.owner().setToolbarMode(ToolbarMode.HIDDEN);
+            assertThat(window.owner().chrome().header().isVisible()).as("hidden: no row").isFalse();
+        });
+    }
+
+    /** Review Focus 3: with no row, the palette's shortcut still opens the Run window. */
+    @Test void underAHiddenToolbarTheShortcutStillOpensTheRunWindow() throws Exception {
+        edt(() -> {
+            var window = window(ThemeTestSupport.controller(true), false, WorkspaceLook.Icons.CLASSIC, WorkspaceLook.Search.ICON);
+            window.owner().setToolbarMode(ToolbarMode.HIDDEN);
+            window.width(1440);
+            assertThat(window.owner().chrome().header().isVisible()).isFalse();
+            window.owner().installRootBindings(window.root());
+            window.owner().action(dev.jasper.app.commands.ActionId.COMMAND_PALETTE)
+                .actionPerformed(new java.awt.event.ActionEvent(window.owner(), java.awt.event.ActionEvent.ACTION_PERFORMED, "shortcut"));
+            assertThat(window.owner().paletteOpen()).isTrue();
+        });
+    }
+
+    /** Review Focus 2: the button stays beside Settings… while the leading toolbar gives way. */
+    @Test void underTheSearchIconANarrowWindowKeepsTheButtonBesideSettings() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var window = window(themes, true, WorkspaceLook.Icons.CLASSIC, WorkspaceLook.Search.ICON);
+                var classic = (ClassicHeader) window.owner().chrome().composition();
+                var bar = window.owner().chrome().windowToolbar();
+                var settings = labelled(classic.trailing(), "Settings…");
+                for (int width : new int[] {1440, 700, 420}) {
+                    window.width(width);
+                    var search = searchButton(window);
+                    assertThat(search.isVisible()).as("at " + width).isTrue();
+                    assertThat(search.getWidth()).as("at " + width).isEqualTo(scale(22));
+                    assertThat(search.getX() + search.getWidth()).as("before Settings… at " + width).isLessThanOrEqualTo(settings.getX());
+                    assertThat(settings.isVisible()).as("Settings… at " + width).isTrue();
+                    assertThat(bar.getX() + bar.getWidth()).as("the toolbar ends before the group at " + width).isLessThanOrEqualTo(classic.trailing().getX());
+                    assertThat(window.owner().chrome().header().field().getWidth()).as("no field at " + width).isZero();
+                }
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** Plan 15b: the field's row is today's under {@code toolbar_search = "field"}. */
+    @Test void theFieldIsUnchangedUnderSearchField() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var window = window(themes, false, WorkspaceLook.Icons.CLASSIC, WorkspaceLook.Search.FIELD);
+                window.width(1440);
+                var classic = (ClassicHeader) window.owner().chrome().composition();
+                assertThat(classic.searchButton()).isNull();
+                assertThat(labels(classic.trailing())).containsExactly("Settings…");
+                var field = window.owner().chrome().header().field();
+                assertThat(field.isVisible()).isTrue();
+                assertThat(field.getSize()).isEqualTo(new Dimension(300, 22));
+                var settings = classic.trailing().getComponent(0);
+                assertThat(field.getX() + field.getWidth()).as("6 before Settings…").isEqualTo(classic.trailing().getX() + settings.getX() - 6);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
     }
 
     /**

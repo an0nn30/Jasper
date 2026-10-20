@@ -174,6 +174,8 @@ final class WindowChrome {
 
     WindowToolbar windowToolbar() { return toolbar; }
     HeaderComposition composition() { return composition; }
+    /** The palette's shortcut as the window shows it, or blank when it has none. */
+    String paletteShortcut() { return owner.paletteShortcut(); }
 
     /** Today's contributed button, as UnifiedHeader draws it; a dropdown's shows its chevron and keeps its label. */
     JButton referenceButton(Action action, String label, Icon icon, boolean dropdown) {

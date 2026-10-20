@@ -17,12 +17,12 @@ import dev.jasper.ui.theme.JasperTheme;
 public final class EnterpriseLook {
     /**
      * Spec 5.1's {@code [chrome]} table, which the shipped kit file lists ({@code EnterpriseFixtureTest} holds them equal),
-     * with IntelliJ Classic's title (plan 14).
+     * with IntelliJ Classic's title (plan 14) and its Search Everywhere icon (plan 15b).
      */
     public static final ChromeSpec CHROME = new ChromeSpec(ChromeSpec.TitleBar.CLASSIC, ChromeSpec.MenuBar.WINDOW,
         "Workstation — {session} — {directory}", ChromeSpec.ToolWindows.STRIPES, ChromeSpec.EditorTabs.CLASSIC,
         ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE,
-        ChromeSpec.Icons.CLASSIC, ChromeSpec.ToolbarSearch.FIELD);
+        ChromeSpec.Icons.CLASSIC, ChromeSpec.ToolbarSearch.ICON);
 
     private EnterpriseLook() { }
 

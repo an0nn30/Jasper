@@ -12,6 +12,7 @@ palette = "run_window"
 dialogs = "classic"
 motion = "none"
 icons = "classic"
+toolbar_search = "icon"
 
 [controls]
 toggle = "checkbox"

@@ -26,7 +26,7 @@ class HostedPresentationTest {
         var parsed = EnterpriseResources.facts().parsed().orElseThrow();
         var look = Projections.of(parsed.chrome(), true, true, "dev.jasper.enterprise", LINUX).plugins();
         assertThat(HostedPresentation.of(look, parsed.kit(), parsed.defaults())).isEqualTo(new Presentation(true, Presentation.Icons.CLASSIC,
-            Presentation.ToolWindows.STRIPES, Presentation.TitleBar.NATIVE, Presentation.Menus.WINDOW, Presentation.ToolbarSearch.FIELD,
+            Presentation.ToolWindows.STRIPES, Presentation.TitleBar.NATIVE, Presentation.Menus.WINDOW, Presentation.ToolbarSearch.ICON,
             Optional.of("IBM Plex Sans"), Optional.of("IBM Plex Mono"), 12, 28));
     }
 

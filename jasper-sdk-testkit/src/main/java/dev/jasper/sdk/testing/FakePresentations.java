@@ -15,7 +15,7 @@ public final class FakePresentations {
 
     /** Enterprise's on Linux: the classic catalog, classic icons, stripes, the native title bar and the window's menu bar. */
     public static final Presentation CLASSIC = new Presentation(true, Presentation.Icons.CLASSIC, Presentation.ToolWindows.STRIPES,
-        Presentation.TitleBar.NATIVE, Presentation.Menus.WINDOW, Presentation.ToolbarSearch.FIELD, Optional.of("IBM Plex Sans"),
+        Presentation.TitleBar.NATIVE, Presentation.Menus.WINDOW, Presentation.ToolbarSearch.ICON, Optional.of("IBM Plex Sans"),
         Optional.of("IBM Plex Mono"), 12, 28);
 
     private FakePresentations() { }

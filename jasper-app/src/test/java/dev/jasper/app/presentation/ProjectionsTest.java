@@ -223,11 +223,11 @@ class ProjectionsTest {
         assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", LINUX).plugins().menus()).isEqualTo(PluginLook.Menus.TITLE_BAR);
         var classic = EnterpriseLook.CHROME;
         assertThat(Projections.of(classic, true, true, "dev.jasper.enterprise", MAC).plugins())
-            .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.CLASSIC, PluginLook.Menus.SCREEN_MENU_BAR, PluginLook.Search.FIELD));
+            .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.CLASSIC, PluginLook.Menus.SCREEN_MENU_BAR, PluginLook.Search.ICON));
         assertThat(Projections.of(classic, true, true, "dev.jasper.enterprise", WINDOWS).plugins())
-            .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.CLASSIC, PluginLook.Menus.TITLE_BAR, PluginLook.Search.FIELD));
+            .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.CLASSIC, PluginLook.Menus.TITLE_BAR, PluginLook.Search.ICON));
         assertThat(Projections.of(classic, true, true, "dev.jasper.enterprise", LINUX).plugins())
-            .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.NATIVE, PluginLook.Menus.WINDOW, PluginLook.Search.FIELD));
+            .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.NATIVE, PluginLook.Menus.WINDOW, PluginLook.Search.ICON));
         var nativeWindowMenus = EnterpriseLook.titled(classic, ChromeSpec.TitleBar.NATIVE);
         assertThat(Projections.of(nativeWindowMenus, true, true, "dev.jasper.enterprise", MAC).plugins().menus()).isEqualTo(PluginLook.Menus.WINDOW);
     }
