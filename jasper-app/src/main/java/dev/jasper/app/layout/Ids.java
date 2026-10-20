@@ -3,7 +3,7 @@ package dev.jasper.app.layout;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Parsing shared by {@link TabId} and {@link GroupId}. */
+/** Parsing shared by {@link TabId}, {@link GroupId} and {@link ParentTabId}. */
 final class Ids {
     private Ids() { }
 
