@@ -115,6 +115,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * Drags a tab from any of this window's strips (workspace tabs spec 12): the window manager's, which every window it
      * opens shares; until it gives that, one of this window's own, which drops within this window and tears nothing out.
      */
+    // Outside this window it reports a TearOut target its tear-out ignores (Rulings 10); managed windows share the manager's.
     private TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this), (tab, bounds) -> { });
     private UiState uiState = UiState.inMemory();
     private boolean railVisible = true;

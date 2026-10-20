@@ -368,6 +368,28 @@ final class TabDrag {
         return new Rectangle(x, y, width, height);
     }
 
+    /**
+     * The display a torn-out window opens on: the one its workspace, which holds the cursor, overlaps most, the first of
+     * equals. The workspace's top-left corner can lie on a neighbouring display, the cursor being right of and below it.
+     *
+     * @param workspace the new window's workspace on screen
+     * @param displays the displays' bounds on screen
+     * @return that display's index; empty when the workspace overlaps none, for the default display
+     */
+    static OptionalInt displayFor(Rectangle workspace, List<Rectangle> displays) {
+        OptionalInt chosen = OptionalInt.empty();
+        long most = 0;
+        for (int i = 0; i < displays.size(); i++) {
+            Rectangle overlap = workspace.intersection(displays.get(i));
+            long area = overlap.isEmpty() ? 0 : (long) overlap.width * overlap.height;
+            if (area > most) {
+                most = area;
+                chosen = OptionalInt.of(i);
+            }
+        }
+        return chosen;
+    }
+
     /** The frames on screen of Jasper's showing windows the drag does not reach, but the label's: see {@link #otherWindows}. */
     private List<Rectangle> auxiliaryFrames() {
         var reached = new HashSet<Component>();

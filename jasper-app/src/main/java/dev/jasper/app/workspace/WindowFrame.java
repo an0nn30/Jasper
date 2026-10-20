@@ -142,8 +142,8 @@ public final class WindowFrame {
     /**
      * Puts the frame, before it first shows, so that its workspace takes {@code workspace} on screen: the workspace
      * grown by the chrome the packed frame has around it (its title bar: the system's, the unified macOS bar or
-     * FlatLaf's title pane), then kept on the usable part of the display there. A torn-out tab's window (workspace tabs
-     * plan 5).
+     * FlatLaf's title pane), then kept on the usable part of the display the workspace overlaps most, the default display
+     * when it overlaps none. A torn-out tab's window (workspace tabs plan 5).
      */
     private void placeWorkspace(Rectangle workspace) {
         // Laid out at the frame's present size: the constructor may have resized it after pack().
@@ -153,11 +153,14 @@ public final class WindowFrame {
         int chromeWidth = frame.getWidth() - area.getWidth(), chromeHeight = frame.getHeight() - area.getHeight();
         Rectangle bounds = new Rectangle(workspace.x - corner.x, workspace.y - corner.y, workspace.width + chromeWidth,
             workspace.height + chromeHeight);
-        java.awt.GraphicsConfiguration display = frame.getGraphicsConfiguration();
-        for (var device : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
-            java.awt.GraphicsConfiguration candidate = device.getDefaultConfiguration();
-            if (candidate.getBounds().contains(workspace.getLocation())) display = candidate;
-        }
+        var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        var displays = java.util.Arrays.stream(environment.getScreenDevices())
+            .map(java.awt.GraphicsDevice::getDefaultConfiguration).toList();
+        // The workspace's corner can lie on the display left of the cursor's: the one it overlaps most takes it.
+        java.util.OptionalInt most = TabDrag.displayFor(workspace,
+            displays.stream().map(java.awt.GraphicsConfiguration::getBounds).toList());
+        java.awt.GraphicsConfiguration display = most.isPresent() ? displays.get(most.getAsInt())
+            : environment.getDefaultScreenDevice().getDefaultConfiguration();
         frame.setBounds(TabDrag.fitted(bounds, usableBounds(display)));
     }
 

@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static dev.jasper.app.workspace.TabDragTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.CommandHistory;
@@ -21,6 +22,7 @@ import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.IdleTerminalSession;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
@@ -180,6 +182,32 @@ class TabDragWindowsTest {
             drop(child.content(), tab, onTab(to, right, 0.75));
             assertThat(to.workspace().model().maximized()).as("a tab moving in ends it (spec 15)").isEmpty();
             assertThat(to.workspace().model().group(maximized).orElseThrow().tabs()).containsExactly(right.id(), tab.id());
+        });
+    }
+
+    @Test void aTabDroppedIntoAnotherWindowsInactiveGroupLandsThereAndActivatesIt() throws Exception {
+        edt(() -> {
+            WindowContent to = main.content();
+            Tab a = to.tabs().get(0), b = to.tabs().get(1);
+            GroupId left = activeGroup(main);
+            to.workspace().moveToNewGroup(b, left, Side.RIGHT);
+            GroupId right = activeGroup(main);
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());
+            to.selectTab(b);
+            relayout(frameOf(main));
+            assertThat(activeGroup(main)).isEqualTo(right);
+            assertThat(to.workspace().model().group(right).orElseThrow().tabs()).containsExactly(b.id(), notes.id());
+            Tab tab = child.content().tabs().get(0);
+            // The registry's move puts it at the end of the active group, shown there; the drop then takes it on.
+            drop(child.content(), tab, onTab(to, a, 0.25));
+            var layout = to.workspace().model();
+            assertThat(tab.window()).isEqualTo(main.id());
+            assertThat(layout.group(left).orElseThrow().tabs()).as("before the group's tab").containsExactly(tab.id(), a.id());
+            assertThat(layout.activeGroup()).as("the group it landed in").isEqualTo(left);
+            assertThat(layout.activeTab()).contains(tab.id());
+            assertThat(layout.group(right).orElseThrow().tabs()).containsExactly(b.id(), notes.id());
+            assertThat(layout.group(right).orElseThrow().selected()).as("the active group shows what it showed").contains(b.id());
+            assertThat(moves()).hasSize(1);
         });
     }
 
@@ -345,6 +373,68 @@ class TabDragWindowsTest {
         });
     }
 
+    @Test void aMoveThatIsRefusedOrFailsAtTheDropLeavesTheTabWhereItWasAndTheDragEnded() throws Exception {
+        edt(() -> {
+            KeyboardFocusManager previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            var keys = new CommandPaletteShortcutsTest.RecordingFocusManager();
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);
+            int listeners = motionListeners();
+            try {
+                WindowContent from = main.content(), to = child.content();
+                Tab tab = from.tabs().get(0);
+                Object session = session(tab);
+                Point there = onTab(to, to.tabs().get(0), 0.25);
+                // Refused: a listener of the tab throws as it takes the child window.
+                var refused = new IllegalStateException("the tab will not go");
+                var refusing = tab.onChanged(() -> { if (child.id().equals(tab.window())) throw refused; });
+                Component source = start(from, tab, there);
+                assertThat(keys.dispatchers).as("the drag owns Esc while it runs").hasSize(1);
+                try {
+                    assertThatThrownBy(() -> mouse(source, MouseEvent.MOUSE_RELEASED, there)).isSameAs(refused);
+                } finally {
+                    refusing.close();
+                }
+                assertThat(tab.window()).isEqualTo(main.id());
+                assertThat(from.tabs()).contains(tab);
+                assertThat(to.tabs()).doesNotContain(tab);
+                assertEnded(keys, listeners);
+                // Failed: the child window cannot show it (a listener of its TAB_MOVED throws an Error, which propagates).
+                var failed = new Error("the window cannot show it");
+                boolean[] thrown = {false};
+                var failing = terminals.onEvent(fact -> {
+                    if (!thrown[0] && fact instanceof TerminalEvent.TabMoved moved && moved.toWindowId().equals(child.id())) {
+                        thrown[0] = true;
+                        throw failed;
+                    }
+                });
+                Component again = start(from, tab, there);
+                try {
+                    assertThatThrownBy(() -> mouse(again, MouseEvent.MOUSE_RELEASED, there)).isSameAs(failed);
+                } finally {
+                    failing.close();
+                }
+                assertThat(thrown[0]).isTrue();
+                assertThat(tab.window()).as("back in the window it left").isEqualTo(main.id());
+                assertThat(from.tabs()).contains(tab);
+                assertThat(to.tabs()).doesNotContain(tab).hasSize(1);
+                assertThat(session(tab)).as("the same session").isSameAs(session);
+                assertThat(((TerminalContent) tab.content()).pane().session().exitFuture()).isNotDone();
+                assertEnded(keys, listeners);
+            } finally {
+                KeyboardFocusManager.setCurrentKeyboardFocusManager(previous);
+            }
+        });
+    }
+
+    /** The drag ended clean: no Esc dispatcher, lost-release listener, landing or label is left. */
+    private void assertEnded(CommandPaletteShortcutsTest.RecordingFocusManager keys, int listeners) {
+        assertThat(manager.tabDrag().active()).isFalse();
+        assertThat(keys.dispatchers).as("the Esc dispatcher goes").isEmpty();
+        assertThat(motionListeners()).as("the lost-release listener goes").isEqualTo(listeners);
+        assertThat(manager.tabDrag().overlay().getParent()).as("the landing goes").isNull();
+        assertThat(manager.tabDrag().label().showing()).as("the label goes").isFalse();
+    }
+
     @Test void releasingOverAnotherWindowOfJaspersLikeSettingsDropsNothing() throws Exception {
         edt(() -> {
             // A headless JVM has no windows: the drag is told where a Settings frame stands on the pretend screen.
@@ -380,5 +470,14 @@ class TabDragWindowsTest {
         assertThat(TabDrag.fitted(new Rectangle(-50, 0, 2000, 1200), usable)).as("larger: as large as it").isEqualTo(usable);
         assertThat(TabDrag.fitted(new Rectangle(5, 5, 800, 600), new Rectangle())).as("no display known: as it is")
             .isEqualTo(new Rectangle(5, 5, 800, 600));
+    }
+
+    @Test void aTearOutWindowOpensOnTheDisplayItsWorkspaceMostlyCovers() {
+        List<Rectangle> displays = List.of(new Rectangle(0, 0, 1440, 900), new Rectangle(1440, 0, 1920, 1080));
+        assertThat(TabDrag.displayFor(new Rectangle(1300, 200, 800, 600), displays))
+            .as("its corner on the left display, the cursor and most of it on the right").hasValue(1);
+        assertThat(TabDrag.displayFor(new Rectangle(100, 100, 800, 600), displays)).as("wholly on the left").hasValue(0);
+        assertThat(TabDrag.displayFor(new Rectangle(5000, 5000, 800, 600), displays)).as("on none: the default display")
+            .isEmpty();
     }
 }
