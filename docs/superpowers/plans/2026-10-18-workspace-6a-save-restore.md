@@ -755,6 +755,30 @@ Expected: FAIL: `expected: "0.21.0" but was: "0.20.0"`, and `cannot find symbol`
 python3 -I - <<'PY'
 import sys; sys.path.insert(0, "build/plan6a"); from edits import edit
 edit("jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java", [('VERSION = "0.20.0";', 'VERSION = "0.21.0";', 1)])
+# The SDK's Javadoc speaks of parent tabs and pane windows (pre-flight F20: plans 7a and 7b left the SDK frozen).
+edit("jasper-sdk/src/main/java/dev/jasper/sdk/terminal/WindowHandle.java", [
+    ("     * The window's tabs, terminal and content, in workspace order (group by group, each group's tabs in strip order);\n",
+     "     * The window's tabs, terminal and content: parent tab by parent tab in bar order, then group by group, each group's\n"
+     "     * tabs in strip order;\n", 1),
+    ("     * The active tab: the selected tab of the window's active group, terminal or content.\n",
+     "     * The active tab: the selected tab of the active pane of the window's shown parent tab, terminal or content.\n", 1)])
+edit("jasper-sdk/src/main/java/dev/jasper/sdk/terminal/Terminals.java", [
+    ("     * Opens a terminal tab in the window's active group and selects it.",
+     "     * Opens a terminal tab in the active pane of the window's shown parent tab and selects it.", 1)])
+edit("jasper-sdk/src/main/java/dev/jasper/sdk/ui/Windows.java", [
+    ("     * Opens an owned view as a content tab at the end of the active group of the owner's window\n",
+     "     * Opens an owned view as a content tab at the end of the active pane of the owner's window's shown parent tab\n", 1)])
+edit("jasper-sdk/src/main/java/dev/jasper/sdk/ui/TabPlacement.java", [
+    ("    /** At the end of the active group of the owner's window, or of the main window when there is no owner. */\n",
+     "    /**\n     * At the end of the active pane of the owner's window's shown parent tab, or of the main window's when there is\n"
+     "     * no owner.\n     */\n", 1)])
+edit("jasper-sdk/src/main/java/dev/jasper/sdk/ui/ContentTab.java", [
+    ("     * Move Tab to New Window: a new child window takes the tab and its content. A child window's only tab, a tab with a\n",
+     "     * Pop Out Tab: a new pane window takes the tab and its content, and its Bring Back returns them. A child window's\n"
+     "     * only tab, a tab with a\n", 1),
+    ("     * Move Tab to Main Window: the end of the main window's active group takes the tab and its content, the main window\n",
+     "     * Move to Main Window: the end of the active pane of the main window's shown parent tab takes the tab and its\n"
+     "     * content, the main window\n", 1)])
 for plugin in ["editor", "enterprise", "fileserver", "history", "indexer", "remote", "sample", "snippets", "vault"]:
     edit(f"plugins/{plugin}/src/main/resources/plugin.toml", [('sdk = ">=0.20.0, <0.21"', 'sdk = ">=0.21.0, <0.22"', 1)])
 edit("docs/examples/external-plugin/src/main/resources/plugin.toml", [('sdk = ">=0.20.0, <0.21"', 'sdk = ">=0.21.0, <0.22"', 1)])
@@ -4218,11 +4242,10 @@ edit(W + "ParentTabsView.java", [
         var made = new ArrayList<WorkspaceView>();
         try {
             for (ParentTab parent : saved.parentTabs()) {
-                var view = new WorkspaceView(owner, parent.id());
+                // Made after the window took its theme and glass: the helper gives it them (workspace plan 6a Rulings 30,
+                // plan 7b's one helper for every workspace a parent tab gets).
+                var view = workspace(parent.id());
                 made.add(view);
-                // Made after the window took its theme and glass: it takes them now (workspace plan 6a Rulings 30).
-                view.applyTheme(owner.theme(), false);
-                view.setGlass((float) owner.backgroundOpacity() < 1f);
                 view.restore(parent.layout(), parent.layout().tabs().stream().map(tabs::get).toList());
             }
         } catch (RuntimeException | Error failure) {
