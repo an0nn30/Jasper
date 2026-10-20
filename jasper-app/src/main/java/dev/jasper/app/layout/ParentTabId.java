@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * A parent tab's identity (parent tabs spec 4), unique in the application.
+ * A parent tab's identity (parent tabs spec 4), unique in the application and kept in {@code workspace.toml}.
  *
  * @param value the UUID
  */
