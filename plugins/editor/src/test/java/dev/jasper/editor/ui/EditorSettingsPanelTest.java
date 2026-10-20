@@ -64,14 +64,15 @@ class EditorSettingsPanelTest {
         FakeKitView view = page(Map.of());
         var page = (Nodes.Stack) view.spec().root();
         assertThat(page.role()).isEqualTo(Nodes.LayoutRole.SETTINGS_PAGE);
-        assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title()).containsExactly("Font", "Editing", "Files", "Default editor");
+        assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title()).containsExactly("Font", "Editing", "Markdown", "Files", "Default editor");
         assertThat(rows(view, EditorSettingsPanel.FONT)).containsExactly("settings:follow_terminal_font:row", "settings:font_family:row", "settings:font_size:row",
             "settings:font_fallback:row", "settings:font_ligatures:row", "settings:font_line_height:row");
         assertThat(rows(view, EditorSettingsPanel.EDITING)).containsExactly("settings:tab_size:row", "settings:soft_wrap:row", "settings:vim:row");
+        assertThat(rows(view, EditorSettingsPanel.MARKDOWN)).containsExactly("settings:markdown_view_mode:row");
         assertThat(rows(view, EditorSettingsPanel.FILES)).containsExactly("settings:max_file_mib:row", "settings:recent_files_days:row");
         assertThat(rows(view, EditorSettingsPanel.DEFAULT))
             .containsExactly(EditorSettingsPanel.CHOICE + ":row", "settings:keep_environment_editor:row", EditorSettingsPanel.ENVIRONMENT);
-        for (String section : List.of(EditorSettingsPanel.FONT, EditorSettingsPanel.EDITING, EditorSettingsPanel.FILES, EditorSettingsPanel.DEFAULT))
+        for (String section : List.of(EditorSettingsPanel.FONT, EditorSettingsPanel.EDITING, EditorSettingsPanel.MARKDOWN, EditorSettingsPanel.FILES, EditorSettingsPanel.DEFAULT))
             assertThat(node(view, section + ".card", Nodes.Card.class).kind()).as(section).isEqualTo(Nodes.CardKind.SETTINGS);
         assertThat(node(view, "settings:font_family", Nodes.Choice.class).kind()).as("the font picker, as on the generated page")
             .isEqualTo(Nodes.ChoiceKind.SEARCHABLE);

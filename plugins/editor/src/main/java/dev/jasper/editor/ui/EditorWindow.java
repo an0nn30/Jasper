@@ -58,6 +58,7 @@ public final class EditorWindow {
     private final Locations locations;
     private final EditorModel model = new EditorModel();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
+    private final java.util.Map<EditorTab, Boolean> markdownCommandsReady = new java.util.HashMap<>();
     private EditorTab selectedTab;
     private WindowOwner origin;
     private WindowOwner promptOwner;
@@ -152,11 +153,14 @@ public final class EditorWindow {
             command("new", "New File", KeyEvent.VK_N, 0, this::newUntitled),
             new Command("close-tab", "Close Tab", Optional.of(KeyNames.stroke(KeyEvent.VK_W, 0)), false, this::closeCurrent),
             command("find", "Find…", KeyEvent.VK_F, 0, () -> findBar.open(false)),
-            command("replace", "Replace…", KeyEvent.VK_F, InputEvent.ALT_DOWN_MASK, () -> findBar.open(true)),
+            command("replace", "Replace…", KeyEvent.VK_F, InputEvent.ALT_DOWN_MASK, () -> { selected().ifPresent(EditorTab::revealSource); findBar.open(true); }),
             command("find-next", "Find Next", KeyEvent.VK_G, 0, findBar::next),
             command("find-previous", "Find Previous", KeyEvent.VK_G, InputEvent.SHIFT_DOWN_MASK, findBar::previous),
             command("go-to-line", "Go to Line…", KeyEvent.VK_L, 0, this::goToLine),
             command("toggle-comment", "Toggle Comment", KeyEvent.VK_SLASH, 0, this::toggleComment),
+            new Command("markdown.source", "Markdown: Source", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.SOURCE)),
+            new Command("markdown.split", "Markdown: Source and Preview", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.SPLIT)),
+            new Command("markdown.preview", "Markdown: Preview", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW)),
             new Command("revert", "Revert to Saved", Optional.empty(), false, this::revert),
             new Command("language", "Language…", Optional.empty(), false, this::chooseLanguage),
             new Command("wrap", "Toggle Soft Wrap", Optional.empty(), false, this::toggleWrap),
@@ -510,8 +514,13 @@ public final class EditorWindow {
         return saveSession(session).thenCompose(saved -> saved ? approveTab(tab) : CompletableFuture.completedFuture(false));
     }
 
+    private void markdownMode(dev.jasper.editor.markdown.MarkdownMode mode) {
+        selected().ifPresent(tab -> { tab.markdownMode(mode, true); refreshStatus(); });
+    }
+
     public void goToLine() {
         selected().filter(tab -> tab.session().state() == DocumentSession.State.READY).ifPresent(tab -> {
+            tab.revealSource();
             RSyntaxTextArea area = tab.area();
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Go to Line", owner(), true));
             var panel = new GoToLinePanel(context.kit(), area.getCaretLineNumber() + 1, area.getLineCount(), line -> {
@@ -540,12 +549,13 @@ public final class EditorWindow {
 
     public void toggleComment() {
         selected().ifPresent(tab -> {
+            tab.revealSource();
             Action action = tab.area().getActionMap().get(RSyntaxTextAreaEditorKit.rstaToggleCommentAction);
             if (action != null) action.actionPerformed(new ActionEvent(tab.area(), ActionEvent.ACTION_PERFORMED, "toggle-comment"));
         });
     }
 
-    public void revert() { selected().ifPresent(tab -> tab.session().revert()); }
+    public void revert() { selected().ifPresent(tab -> { tab.revealSource(); tab.session().revert(); }); }
 
     public List<DocumentSession> sessions() { return model.sessions(); }
 
@@ -752,6 +762,8 @@ public final class EditorWindow {
         session.setWrap(settings.softWrap());
         var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
         tab.previews(context.background(), environment.ui());
+        tab.markdownPreferences(environment.markdownPreferences());
+        tab.modeChanged(() -> activate(tab));
         tab.appearance(context.appearance());
         tab.settings(settings);
         tab.typography(environment.typography());
@@ -764,6 +776,7 @@ public final class EditorWindow {
         tab.area().addCaretListener(event -> { if (selected().orElse(null) == tab) refreshStatus(); });
         session.addListener(() -> {
             if (!hosted.containsKey(tab)) return;
+            refreshCommands(tab);
             refreshHeaders();
             if (selected().orElse(null) == tab) refreshStatus();
         });
@@ -771,26 +784,52 @@ public final class EditorWindow {
         numbers.put(session, nextNumber++);
         var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab.view());
         hosted.put(tab, handle); ownerRef.set(handle);
-        handle.setFocusTarget(tab::focusText);
+        handle.setFocusTarget(tab::focusContent);
         handle.onActive(active -> { tab.active(active); if (active) activate(tab); });
         tab.active(handle.isActive());
         handle.onClosed(() -> remove(tab));
-        var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
-        for (var command : commands) {
-            if (command.id().equals("next-tab") || command.id().equals("previous-tab")) continue;
-            descriptions.add(new dev.jasper.sdk.ui.ContentCommand(command.id(), command.title(), command.stroke().orElse(null), true,
-                () -> { activate(tab); command.run().run(); }));
-        }
-        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("copy", "Copy", KeyNames.stroke(KeyEvent.VK_C, 0), true, tab.area()::copy));
-        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("paste", "Paste", KeyNames.stroke(KeyEvent.VK_V, 0), true, tab.area()::paste));
-        handle.setCommands(descriptions);
         activate(tab);
         readVimrcOnce();
         refresh();
     }
 
+    private void refreshCommands(EditorTab tab) {
+        var handle = hosted.get(tab);
+        if (handle == null || handle.isClosed()) return;
+        boolean ready = tab.showingText() && tab.markdownEligible();
+        if (Boolean.valueOf(ready).equals(markdownCommandsReady.put(tab, ready))) return;
+        var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
+        for (var command : commands) {
+            if (command.id().equals("next-tab") || command.id().equals("previous-tab")) continue;
+            descriptions.add(new dev.jasper.sdk.ui.ContentCommand(command.id(), command.title(), command.stroke().orElse(null),
+                !command.id().startsWith("markdown.") || ready,
+                () -> runHosted(tab, command.run())));
+        }
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("copy", "Copy", KeyNames.stroke(KeyEvent.VK_C, 0), true, () -> runHosted(tab, () -> selected().ifPresent(EditorTab::copy))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("paste", "Paste", KeyNames.stroke(KeyEvent.VK_V, 0), true, () -> runHosted(tab, () -> selected().ifPresent(EditorTab::paste))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("select-all", "Select All", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(EditorTab::selectAll))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("cut", "Cut", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().cut(); }))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("delete", "Delete", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().replaceSelection(""); }))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("undo", "Undo", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().undoLastAction(); }))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("redo", "Redo", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().redoLastAction(); }))));
+        handle.setCommands(descriptions);
+    }
+
+    private void runHosted(EditorTab captured, Runnable action) {
+        var owner = hosted.get(captured);
+        if (owner == null || owner.isClosed()) return;
+        if (!owner.isActive()) return;
+        activate(captured); action.run();
+    }
+
     private void remove(EditorTab tab) {
         if (hosted.remove(tab) == null) return;
+        markdownCommandsReady.remove(tab);
         tab.dispose(); tab.session().cancelLoad(); model.remove(tab.session());
         numbers.remove(tab.session());
         newFiles.remove(tab.session());
@@ -830,6 +869,7 @@ public final class EditorWindow {
         status.display(selected(), environment.settings().get().tabSize(), vimOn());
         if (selectedTab != null && hosted.containsKey(selectedTab)) {
             var tab = selectedTab;
+            refreshCommands(tab);
             hosted.get(tab).setStatus(status.items().stream().map(item -> new dev.jasper.sdk.ui.ContentStatus(
                 item.text(), item.tooltip(), item.run() == null ? null : () -> {
                     if (!hosted.containsKey(tab)) return;

@@ -1,6 +1,8 @@
 package dev.jasper.editor.ui;
 
 import dev.jasper.editor.session.DocumentSession;
+import dev.jasper.editor.markdown.MarkdownMode;
+import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN;
 import dev.jasper.editor.vim.EditorDefaults;
 import dev.jasper.editor.vim.Vim;
 import dev.jasper.editor.vim.VimEditor;
@@ -40,7 +42,44 @@ public final class EditorTab {
     private int tabSize = 4;
     private FindBar find;
     private MarkdownController markdown;
-    void markdown(MarkdownController value) { markdown = value; }
+    private MarkdownPreferences markdownPreferences;
+    private MarkdownMode retainedMarkdownMode;
+    private boolean wasMarkdown;
+    private boolean linkedScrolling = true;
+    private Runnable modeChanged = () -> {};
+    void modeChanged(Runnable value) { modeChanged = value; }
+    private Presentation.Icons icons = Presentation.Icons.NEW_UI;
+    void markdownPreferences(MarkdownPreferences value) { markdownPreferences = value; updateMarkdownEligibility(); render(); }
+    boolean markdownEligible() { return SYNTAX_STYLE_MARKDOWN.equals(session.style()); }
+    boolean linkedScrolling() { return linkedScrolling; }
+    void markdownMode(MarkdownMode mode, boolean explicit) {
+        if (closed || !showingText() || !markdownEligible() || markdown == null) return;
+        retainedMarkdownMode = mode;
+        markdown.mode(mode);
+        if (explicit && markdownPreferences != null) markdownPreferences.select(mode);
+        document.focusSource(mode != MarkdownMode.PREVIEW);
+        focusContent(); render(); modeChanged.run();
+    }
+    /** Reveals the existing source for an explicit command without changing the saved default. */
+    public void revealSource() {
+        if (markdown != null && markdown.mode() == MarkdownMode.PREVIEW) markdownMode(MarkdownMode.SPLIT, false);
+        document.focusSource(true); focusContent();
+    }
+    private void updateMarkdownEligibility() {
+        if (markdown == null) return;
+        boolean eligible = markdownEligible();
+        if (eligible && (!wasMarkdown || retainedMarkdownMode == null && markdownPreferences != null)) {
+            if (retainedMarkdownMode == null && markdownPreferences != null) retainedMarkdownMode = markdownPreferences.current();
+            markdown.mode(retainedMarkdownMode == null ? MarkdownMode.SOURCE : retainedMarkdownMode);
+        } else if (!eligible && wasMarkdown) { markdown.mode(MarkdownMode.SOURCE); document.focusSource(true); }
+        wasMarkdown = eligible;
+    }
+    javax.swing.text.JTextComponent focusedContent() { return document.focusedContent(); }
+    void copy() { focusedContent().copy(); }
+    void selectAll() { focusedContent().selectAll(); }
+    void paste() { revealSource(); area().paste(); }
+
+    void markdown(MarkdownController value) { markdown = value; updateMarkdownEligibility(); }
     MarkdownController markdown() { return markdown; }
     void previews(java.util.concurrent.Executor worker, java.util.concurrent.Executor ui) {
         new MarkdownController(this, worker, ui, this::render);
@@ -82,7 +121,7 @@ public final class EditorTab {
         find = null;
     }
 
-    void appearance(Appearance appearance) { document.appearance(appearance); }
+    void appearance(Appearance appearance) { icons = appearance.presentation().icons(); document.appearance(appearance); render(); }
     void settings(EditorSettings settings) {
         if (closed) return;
         tabSize = settings.tabSize();
@@ -95,9 +134,12 @@ public final class EditorTab {
     private void reveal(String id) { if (!closed) view.reveal(id); }
 
     /** Focuses the document immediately or once its pending read succeeds. A failure drops the request. */
-    public void focusText() {
+    public void focusText() { focusContent(); }
+    /** Restores the last valid source/preview content focus after selection, activation or moves. */
+    public void focusContent() {
         if (closed) return;
-        if (showingText()) focusArea.run(); else focusPending = true;
+        if (showingText()) { if (document.focusedContent() == area()) focusArea.run(); else document.focusedContent().requestFocusInWindow(); }
+        else focusPending = true;
     }
     void focusAction(Runnable value) { focusArea = value; }
 
@@ -153,9 +195,11 @@ public final class EditorTab {
         area().setWrapStyleWord(vim == null);
         area().setTabsEmulated(!session.tabs());
         if (vim != null) vim.editorDefaults(defaults());
+        if (markdown != null && wasMarkdown && !markdownEligible()) retainedMarkdownMode = markdown.mode();
         if (markdown != null) markdown.sessionChanged();
+        updateMarkdownEligibility();
         render();
-        if (showingText() && focusPending) { focusPending = false; focusArea.run(); }
+        if (showingText() && focusPending) { focusPending = false; focusContent(); }
     }
     private void event(UiEvent event) {
         if (closed) return;
@@ -163,7 +207,10 @@ public final class EditorTab {
         if (!(event instanceof UiEvent.Action action)) return;
         switch (action.id()) {
             case "document.preview.retry" -> { if (markdown != null) markdown.retry(); }
-            case "document.preview.source" -> { if (markdown != null) markdown.mode(dev.jasper.editor.markdown.MarkdownMode.SOURCE); }
+            case "document.preview.source", "markdown.source" -> markdownMode(MarkdownMode.SOURCE, true);
+            case "markdown.split" -> markdownMode(MarkdownMode.SPLIT, true);
+            case "markdown.preview" -> markdownMode(MarkdownMode.PREVIEW, true);
+            case "markdown.scroll-sync" -> { if (showingText() && markdownEligible()) { linkedScrolling = !linkedScrolling; render(); } }
             case RETRY -> { if (session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
             case DISMISS -> { session.cancelLoad(); close.accept(this); }
             case FIRST -> { if (session.banner() == DocumentSession.Banner.DELETED) close.accept(this); else if (session.banner() == DocumentSession.Banner.CHANGED) session.reloadFromBanner(); }
@@ -174,6 +221,7 @@ public final class EditorTab {
     private ViewSpec spec() {
         boolean ready = showingText(), failed = session.state() == DocumentSession.State.FAILED;
         var children = new ArrayList<Nodes.Node>();
+        children.add(MarkdownToolbar.node(markdown == null ? MarkdownMode.SOURCE : markdown.mode(), linkedScrolling, ready, markdownEligible(), icons));
         if (markdown != null && markdown.failure().isPresent() && markdown.mode() != dev.jasper.editor.markdown.MarkdownMode.SOURCE) {
             children.add(new Nodes.Stack("document.preview.failure", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
                 new Nodes.Text("document.preview.message", ControlState.READY, markdown.failure().orElseThrow(), Nodes.TextRole.BODY),

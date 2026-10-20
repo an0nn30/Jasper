@@ -19,10 +19,20 @@ import java.util.function.Supplier;
  * @param settings the current settings
  * @param saveVim saves Vim mode to the settings file; completes on any thread
  * @param timers whether the watcher, notice and typing timers run; tests drive them by hand
+ * @param markdownPreferences the plugin-wide default and ordered settings writer
  */
 public record EditorEnvironment(PluginContext context, Executor ui, Function<WindowOwner, Function<Question, String>> askers,
                                 Function<WindowOwner, BiFunction<String, CompletableFuture<Boolean>, Boolean>> waits,
-                                Supplier<EditorSettings> settings, Function<Boolean, CompletableFuture<Void>> saveVim, boolean timers) {
+                                Supplier<EditorSettings> settings, Function<Boolean, CompletableFuture<Void>> saveVim, boolean timers,
+                                MarkdownPreferences markdownPreferences) {
+    /** Environment for embedders without saved Markdown choices. */
+    public EditorEnvironment(PluginContext context, Executor ui, Function<WindowOwner, Function<Question, String>> askers,
+                             Function<WindowOwner, BiFunction<String, CompletableFuture<Boolean>, Boolean>> waits,
+                             Supplier<EditorSettings> settings, Function<Boolean, CompletableFuture<Void>> saveVim, boolean timers) {
+        this(context, ui, askers, waits, settings, saveVim, timers,
+            new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.SOURCE, mode -> CompletableFuture.completedFuture(null)));
+    }
+
     /** @return the typography to display, leaving the declared independent values intact */
     public dev.jasper.sdk.ui.TerminalTypography typography() {
         return EditorTypography.effective(settings.get(), context.appearance().terminalTypography());
@@ -36,6 +46,6 @@ public record EditorEnvironment(PluginContext context, Executor ui, Function<Win
      */
     public static EditorEnvironment production(PluginContext context, Executor ui, EditorSettings.Declared settings) {
         return new EditorEnvironment(context, ui, owner -> new DialogAsker(context.windows(), context.kit(), owner),
-            owner -> new SaveWait(context.windows(), context.kit(), owner), settings::current, settings::saveVim, true);
+            owner -> new SaveWait(context.windows(), context.kit(), owner), settings::current, settings::saveVim, true, settings.markdownPreferences());
     }
 }

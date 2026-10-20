@@ -1778,6 +1778,10 @@ public final class FakePluginHost implements AutoCloseable {
      * @return published status descriptors */
     public List<dev.jasper.sdk.ui.ContentStatus> contentStatus(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).status; }
 
+    /** @param tab hosted content handle
+     * @return published command descriptors */
+    public List<dev.jasper.sdk.ui.ContentCommand> contentCommands(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).commands; }
+
     /** A {@code Terminals.environment} contributor and the plugin that registered it. */
     record ShellContributor(FakePluginContext context, Function<Map<String, String>, Map<String, String>> contributor) { }
     final List<ShellContributor> shellContributors = new CopyOnWriteArrayList<>();

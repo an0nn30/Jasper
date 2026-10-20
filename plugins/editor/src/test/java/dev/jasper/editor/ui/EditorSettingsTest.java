@@ -26,7 +26,7 @@ class EditorSettingsTest {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             assertThat(start(host, Set.of("Menlo", "JetBrains Mono")).current())
                 .isEqualTo(new EditorSettings("JetBrains Mono", 13, java.util.List.of(), false, 1.0, false, 4, false, 10, false));
-            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "font_fallback", "font_ligatures", "font_line_height", "follow_terminal_font", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days",
+            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "font_fallback", "font_ligatures", "font_line_height", "follow_terminal_font", "markdown_view_mode", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days",
                 "default_editor", "custom_command", "custom_in_terminal", "keep_environment_editor");
             assertThat(host.settingsReports(ID)).isEmpty();
         }
@@ -90,7 +90,7 @@ class EditorSettingsTest {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             host.start(INFO, Set.of(), Set.of(), context -> new EditorSettings.Declared(recording(context.settings(), specs), Set.of()));
             assertThat(specs).extracting(spec -> spec.section() + "/" + spec.key()).containsExactly(
-                "Font/font_family", "Font/font_size", "Font/font_fallback", "Font/font_ligatures", "Font/font_line_height", "Font/follow_terminal_font", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days",
+                "Font/font_family", "Font/font_size", "Font/font_fallback", "Font/font_ligatures", "Font/font_line_height", "Font/follow_terminal_font", "Markdown/markdown_view_mode", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days",
                 "Default editor/default_editor", "Default editor/custom_command", "Default editor/custom_in_terminal",
                 "Default editor/keep_environment_editor");
             assertThat(specs).filteredOn(spec -> spec.kind() instanceof dev.jasper.sdk.settings.SettingKind.Bool)

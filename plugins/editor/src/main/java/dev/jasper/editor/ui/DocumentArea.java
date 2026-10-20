@@ -34,6 +34,13 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private MarkdownMode mode = MarkdownMode.SOURCE;
     private double dividerRatio = .5;
     private boolean restoringDivider;
+    private boolean sourceFocused = true;
+    private java.awt.Point sourcePosition;
+    private boolean restoreSourcePosition;
+    void focusSource(boolean value) { sourceFocused = value; }
+    javax.swing.text.JTextComponent focusedContent() {
+        return mode == MarkdownMode.PREVIEW || mode == MarkdownMode.SPLIT && !sourceFocused ? preview.editor() : area;
+    }
     private java.util.function.IntConsumer activateLink = id -> {};
     private Runnable geometryChanged = () -> {};
     Runnable controllerGeometry = () -> {};
@@ -51,6 +58,8 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     double dividerRatio() { return dividerRatio; }
     void mode(MarkdownMode value) {
         if (closed || mode==value) return;
+        if (value == MarkdownMode.PREVIEW) sourcePosition = scroll.getViewport().getViewPosition();
+        else if (mode == MarkdownMode.PREVIEW) restoreSourcePosition = true;
         mode=value;removeAll();split.setLeftComponent(null);split.setRightComponent(null);
         if(value==MarkdownMode.SOURCE){preview.cancelInstall();add(scroll,BorderLayout.CENTER);}
         else if(value==MarkdownMode.PREVIEW)add(previewScroll,BorderLayout.CENTER);
@@ -59,7 +68,12 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     }
     @Override public void doLayout() {
         restoringDivider=true;
-        try {super.doLayout();if(mode==MarkdownMode.SPLIT){split.setDividerLocation(dividerRatio);split.doLayout();}}
+        try {super.doLayout();if(mode==MarkdownMode.SPLIT){split.setDividerLocation(dividerRatio);split.doLayout();}
+            if (restoreSourcePosition && sourcePosition != null) {
+                scroll.doLayout(); scroll.getViewport().doLayout();
+                scroll.getViewport().setViewPosition(sourcePosition); restoreSourcePosition = false;
+            }
+        }
         finally{restoringDivider=false;}
     }
     private final java.awt.event.HierarchyListener hierarchy = event -> {
@@ -97,6 +111,12 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         scroll.setBorder(BorderFactory.createEmptyBorder());
         add(scroll, BorderLayout.CENTER);
         addHierarchyListener(hierarchy);
+        area.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusGained(java.awt.event.FocusEvent event) { sourceFocused = true; }
+        });
+        preview.editor().addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusGained(java.awt.event.FocusEvent event) { sourceFocused = false; }
+        });
     }
 
     void appearance(Appearance value) {

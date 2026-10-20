@@ -13,10 +13,12 @@ public final class MarkdownToolbar {
 
     /** Creates the right-aligned Markdown controls, hidden for an ineligible document. */
     public static Nodes.Stack node(MarkdownMode mode, boolean linked, boolean ready, boolean eligible, Presentation presentation) {
+        return node(mode, linked, ready, eligible, Objects.requireNonNull(presentation).icons());
+    }
+    static Nodes.Stack node(MarkdownMode mode, boolean linked, boolean ready, boolean eligible, Presentation.Icons icons) {
         Objects.requireNonNull(mode);
-        Objects.requireNonNull(presentation);
         var state = new ControlState(true, ready, false, "");
-        String suffix = presentation.icons() == Presentation.Icons.CLASSIC ? ".classic" : "";
+        String suffix = icons == Presentation.Icons.CLASSIC ? ".classic" : "";
         var children = new ArrayList<Nodes.Node>(List.of(
             new Nodes.Text("markdown.fill", ControlState.READY, "", Nodes.TextRole.CAPTION),
             toggle("source", "Source", mode == MarkdownMode.SOURCE, suffix, state),

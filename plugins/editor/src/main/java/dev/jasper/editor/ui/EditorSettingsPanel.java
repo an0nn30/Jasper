@@ -24,7 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The Editor's page in Settings > Tools > Editor: Font, Editing and Files as Settings' standard rows, grouped as the
+ * The Editor's page in Settings > Tools > Editor: Font, Editing, Markdown and Files as Settings' standard rows, grouped as the
  * generated page grouped them, then Default editor: a dropdown of the Jasper Editor, the editors detection found, the
  * system's default app and a custom command, the custom command's rows while it is chosen, and what Jasper's own
  * environment holds for {@code EDITOR} and {@code VISUAL}. Detection runs again each time the page opens, and the page
@@ -32,7 +32,7 @@ import java.util.Optional;
  */
 public final class EditorSettingsPanel implements SettingsPanel {
     static final String PAGE = "editor.settings", FONT = "editor.settings.font", EDITING = "editor.settings.editing",
-        FILES = "editor.settings.files", DEFAULT = "editor.settings.default", CHOICE = "editor.default-editor",
+        MARKDOWN = "editor.settings.markdown", FILES = "editor.settings.files", DEFAULT = "editor.settings.default", CHOICE = "editor.default-editor",
         COMMAND = "editor.custom-command", ENVIRONMENT = "editor.environment";
     /** The note under what Jasper's environment holds. */
     static final String NOTE = "An export in a shell startup file, such as ~/.zshrc, still wins.";
@@ -127,6 +127,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
         return new Nodes.Stack(PAGE, ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, List.of(
             section(FONT, "Font", fontRows()),
             section(EDITING, "Editing", List.of(host.row(settings.tabSize), host.row(settings.softWrap), host.row(settings.vim))),
+            section(MARKDOWN, "Markdown", List.of(host.row(settings.markdownViewMode))),
             section(FILES, "Files", List.of(host.row(settings.maxFileMib), host.row(settings.recentFilesDays))),
             section(DEFAULT, "Default editor", defaultEditor)));
     }

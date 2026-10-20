@@ -41,6 +41,8 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
     /** The Editor's declared settings; Settings checks their values and reports bad ones. {@link EditorSettingsPanel} shows them. */
     public static final class Declared {
         final Setting<String> fontFamily;
+        final Setting<dev.jasper.editor.markdown.MarkdownMode> markdownViewMode;
+        private final MarkdownPreferences markdownPreferences;
         final Setting<Integer> tabSize, maxFileMib, recentFilesDays;
         final Setting<Double> fontSize, fontLineHeight;
         final Setting<List<String>> fontFallback;
@@ -83,6 +85,12 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
             followTerminalFont = settings.declare(SettingSpec.of("follow_terminal_font", SettingKind.bool(), false)
                 .label("Follow terminal font").description("Use the saved terminal font settings in every Editor tab.")
                 .section("Font").keywords("editor", "font", "terminal"));
+            markdownViewMode = settings.declare(SettingSpec.of("markdown_view_mode", SettingKind.choice(List.of(
+                dev.jasper.sdk.settings.Choice.of("source", "Source", dev.jasper.editor.markdown.MarkdownMode.SOURCE),
+                dev.jasper.sdk.settings.Choice.of("split", "Source and preview", dev.jasper.editor.markdown.MarkdownMode.SPLIT),
+                dev.jasper.sdk.settings.Choice.of("preview", "Preview", dev.jasper.editor.markdown.MarkdownMode.PREVIEW))), dev.jasper.editor.markdown.MarkdownMode.SOURCE)
+                .label("Default view").description("View for newly opened Markdown documents.").section("Markdown").keywords("editor", "markdown", "preview"));
+            markdownPreferences = new MarkdownPreferences(markdownViewMode::get, markdownViewMode::set);
             tabSize = settings.declare(SettingSpec.of("tab_size", SettingKind.integer(1, 16), 4)
                 .label("Tab size").description("Columns per tab stop.").section("Editing").keywords("editor", "indent"));
             softWrap = settings.declare(SettingSpec.of("soft_wrap", SettingKind.bool(), false)
@@ -111,6 +119,9 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
                 .description("When Jasper was started with EDITOR or VISUAL set, its shells keep both and the default editor sets neither.")
                 .section("Default editor").keywords("editor", "EDITOR", "VISUAL", "environment"));
         }
+
+        /** @return the shared Markdown default and serialized settings writer */
+        public MarkdownPreferences markdownPreferences() { return markdownPreferences; }
 
         /** @return the current values */
         public EditorSettings current() {

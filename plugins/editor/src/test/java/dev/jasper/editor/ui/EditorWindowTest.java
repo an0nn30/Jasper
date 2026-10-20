@@ -185,6 +185,46 @@ class EditorWindowTest {
         assertThat(second.markdown().active()).isTrue();
     }
 
+    @Test void toolbarModeRefreshesSourceCoordinatesAndHostedModesAreUnavailableWhileLoading() throws Exception {
+        window.openLocal(file("pending-mode.md", "# Heading"));
+        var handle = host.contentTabs().getFirst();
+        assertThat(host.contentCommands(handle).stream().filter(command -> command.id().equals("markdown.preview")).findFirst().orElseThrow().enabled()).isFalse();
+        drain(); var tab = window.selected().orElseThrow();
+        Kits.press(tab.view(), "markdown.preview");
+        assertThat(host.contentStatus(handle)).anySatisfy(item -> assertThat(item.text()).startsWith("Source Ln "));
+    }
+    @Test void aPendingTabFinishingInAnotherWindowEnablesItsOwnCommands() throws Exception {
+        window.openLocal(file("pending-separate.md", "# Separate"));
+        var first = window.selected().orElseThrow(); var a = host.contentTabs().getFirst();
+        a.move(true);
+        window.openLocal(file("pending-main.md", "# Main"));
+        var second = window.selected().orElseThrow();
+        drain();
+        assertThat(first.session().state()).isEqualTo(DocumentSession.State.READY);
+        assertThat(window.selected()).containsSame(second);
+        assertThat(host.contentCommands(a).stream().filter(command -> command.id().equals("markdown.preview")).findFirst().orElseThrow().enabled()).isTrue();
+    }
+
+    @Test void hostedCommandsRetainPreviewSelectionRevealMutationsAndIgnoreInactiveOrClosedCaptures() throws Exception {
+        var first = opened(file("commands-a.md", "# First")); var a = host.contentTabs().getFirst();
+        first.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW, true);
+        first.surface().preview().editor().setText("rendered preview"); first.area().select(0, 2);
+        host.contentCommands(a).stream().filter(command -> command.id().equals("select-all")).findFirst().orElseThrow().run().run();
+        assertThat(first.surface().preview().editor().getSelectedText()).isEqualTo("rendered preview");
+        assertThat(first.area().getSelectionEnd()).isEqualTo(2);
+        var old = host.contentCommands(a).stream().filter(command -> command.id().equals("markdown.source")).findFirst().orElseThrow();
+        var second = opened(file("commands-b.md", "# Second")); var b = host.contentTabs().getLast();
+        old.run().run(); assertThat(window.selected()).containsSame(second);
+        assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
+        a.move(true); assertThat(first.focusedContent()).isSameAs(first.surface().preview().editor());
+        b.select();
+        host.contentCommands(a).stream().filter(command -> command.id().equals("delete")).findFirst().orElseThrow().run().run();
+        assertThat(window.selected()).containsSame(first);
+        assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        assertThat(first.area().getText()).isEqualTo("First"); assertThat(second.area().getText()).isEqualTo("# Second");
+        a.close(); old.run().run(); assertThat(window.selected()).containsSame(second);
+    }
+
     @Test void openingAFileThatIsStillLoadingSelectsItsTab() throws Exception {
         Path file = file("config.toml", "a = 1\n");
         window.openLocal(file);
