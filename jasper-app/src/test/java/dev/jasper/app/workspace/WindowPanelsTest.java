@@ -165,7 +165,27 @@ class WindowPanelsTest {
         });
     }
 
+    /** An activating toggle of the active tool window hides it and hands focus back, as a plain toggle does. */
     @Test void anActivatingToggleThatHidesThePanelActivatesNothing() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            List<String> events = new ArrayList<>();
+            // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
+            model.content().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            assertThat(events).as("focus is handed back").contains("focus");
+            assertThat(owner.area().focusedSlot()).isEmpty();
+        });
+    }
+
+    /** As IntelliJ's ActivateToolWindowAction: an activating toggle of a visible tool window that is not active activates it. */
+    @Test void anActivatingToggleOfAVisibleInactivePanelActivatesIt() throws Exception {
         edt(() -> {
             var model = new Contributions();
             var owner = framed(model, true);
@@ -173,8 +193,10 @@ class WindowPanelsTest {
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
             assertThat(owner.area().focusedSlot()).isEmpty();
             request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
-            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
-            assertThat(owner.area().focusedSlot()).isEmpty();
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("it stays open").isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("the active one hides").isNull();
         });
     }
 

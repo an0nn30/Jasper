@@ -151,6 +151,32 @@ class KitClassicChromeIconsTest {
         });
     }
 
+    /** A panel whose header's primary control is {@code primary}, over a body reading {@code body}. */
+    private static ViewSpec panel(Nodes.Node primary, String body) {
+        return new ViewSpec(new Nodes.Panel("panel", READY,
+            new Nodes.Header("panel-header", READY, "Sessions", OptionalInt.empty(), Optional.empty(), Optional.of(primary), List.of()),
+            Optional.empty(), new Nodes.Text("panel.body", READY, body, Nodes.TextRole.BODY), Optional.empty()));
+    }
+
+    @Test void aHeadersOwnControlsKeepTheClassicArtAcrossUpdates() {
+        Edt.run(() -> {
+            var menu = new Nodes.MenuButton("panel.new", READY, "", "add", ButtonKind.GHOST, "",
+                List.of(new dev.jasper.ui.model.MenuItem("panel.new.session", "Session", "", "session", true, false)), "New");
+            for (var primary : List.<Nodes.Node>of(ghost("panel.add", "add"), menu)) {
+                var context = KitFixtures.context();
+                try (var view = new KitView(context, panel(primary, "Contents"), event -> { })) {
+                    view.classicChromeIcons(true);
+                    view.update(panel(primary, "Other contents"));
+                    KitFixtures.render(view, 320, 120, 1);
+                    var button = primary instanceof Nodes.Button ? KitViewTest.find(view, "panel.add", AbstractButton.class)
+                        : ((Menus.MenuControl) view.control("panel.new")).main;
+                    assertClassic(context, button, "add");
+                    assertThat(button.getClientProperty("Jasper.button.icon")).as("classic art is not re-tinted").isNull();
+                } finally { context.binding().close(); context.icons().close(); }
+            }
+        });
+    }
+
     @Test void withoutTheFlagNothingChanges() {
         Edt.run(() -> {
             assertThat(pixels(toolbar(), view -> { view.toolbarStrip(true); view.classicChromeIcons(true); view.classicChromeIcons(false); }))

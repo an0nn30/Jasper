@@ -1376,8 +1376,9 @@ leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window 
   column hands the tint back; dragging a divider keeps it, and a plugin's toggle or `PanelHost.show()` activates the
   frame only when made while the panel's own declared toggle action runs (`PanelSpec.withToggleActionId`;
   `PanelRequest.Op.ACTIVATING_TOGGLE`, and `ACTIVATING_SHOW` for the show; the user, 2026-10-19; plan 15), so View ›
-  Tool Windows and the stripe-number shortcuts activate the bundled tool windows, as IntelliJ's ⌘1 does; any other
-  plugin toggle opens a frame without activating it. A header detail is muted, and a digits-only detail is parenthesised
+  Tool Windows and the stripe-number shortcuts activate the bundled tool windows, as IntelliJ's ⌘1 does: a toggle of a
+  shown tool window that is not the active one activates it, and only the active one hides; any other plugin toggle
+  opens a frame without activating it. A header detail is muted, and a digits-only detail is parenthesised
   ("Sessions (2)"). Kit `PanelHeaders` receive it as a host flag. Its arc and gutter are the window's kit metrics
   `WORKSPACE_SURFACE_ARC` and `WORKSPACE_GUTTER` (0 in the classic catalog), which replace the static finals at
   `ToolWindowArea.java:53,55` (6.6).

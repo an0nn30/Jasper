@@ -253,6 +253,9 @@ named glyphs painted inside them use the kit's original chrome artwork (`IconReg
 icon values or identities, and their painting and text sizes come from `ChromePainter.installed()` and named kit roles.
 Under `[chrome] icons = "classic"` each window's header and status bar are marked `ChromeArtwork.CLASSIC`, so the
 meanings the classic set has draw IntelliJ's classic icons (`assets-classic.tsv`).
+`ToolWindowArea` takes the window's `ChromeArtwork`: under CLASSIC its native and borrowed kit headers draw the six
+classic names through `AppIcons.classicChromeIcon` and `KitView.classicChromeIcons`, and `WindowChrome` marks each
+toolbar view the same way.
 The labelled stripes and the bottom strip are not receivers: `DockChrome.stripes` gives them the look's
 `ChromeArtwork`, and they draw each label's icon at 13 px through `AppIcons.stripeIcon`: under CLASSIC, IntelliJ's
 classic tool-window icon where `IconRegistry.stripeIcon` has one, else the icon's monochrome glyph in the label's

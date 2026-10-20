@@ -186,7 +186,7 @@ final class WindowContributions implements AutoCloseable {
             case SHOW -> showPanel(request.panelId());
             case HIDE -> hidePanel(request.panelId());
             case TOGGLE -> togglePanel(request.panelId());
-            case ACTIVATING_TOGGLE -> toggleAndActivate(request.panelId());
+            case ACTIVATING_TOGGLE -> activatingToggle(request.panelId());
             case ACTIVATING_SHOW -> showAndActivate(request.panelId());
         }
     }
@@ -200,6 +200,18 @@ final class WindowContributions implements AutoCloseable {
         activating = owner.area().flush() ? id : null;
         try { dock.toggle(id); } finally { activating = null; }
         if (dock.visible(id)) owner.area().activate(id);
+    }
+
+    /**
+     * A toggle by the user's View action or the panel's own toggle action, as IntelliJ's ActivateToolWindowAction: under
+     * flush frames a visible tool window that is not the active one is activated, and only the active one hides; else a
+     * toggle that activates what it shows. A stripe click stays {@link #toggleAndActivate}.
+     */
+    private void activatingToggle(String id) {
+        if (!panels.containsKey(id)) return;
+        var area = owner.area();
+        if (area.flush() && dock.visible(id) && !area.focusedSlot().equals(dock.slot(id))) { area.activate(id); return; }
+        toggleAndActivate(id);
     }
 
     /** A show by the panel's own toggle action: the panel becomes the active tool window under flush frames (plan 15b Rulings 1). */

@@ -365,7 +365,8 @@ class ClassicHeaderTest {
                 assertThat(search.getText()).as("icon only").isNull();
                 assertThat(search.getPreferredSize()).as("IntelliJ's 22 px square").isEqualTo(new Dimension(scale(22), scale(22)));
                 String shortcut = window.owner().chrome().paletteShortcut();
-                assertThat(search.getToolTipText()).isEqualTo(shortcut.isBlank() ? "Search Everywhere" : "Search Everywhere (" + shortcut + ")");
+                assertThat(shortcut).as("the fixture binds the palette, so the tooltip's shortcut form is exercised").isNotBlank();
+                assertThat(search.getToolTipText()).isEqualTo("Search Everywhere (" + shortcut + ")");
                 assertThat(search.getAccessibleContext().getAccessibleName()).isEqualTo("Search Everywhere");
                 assertThat(search.getAction()).as("the palette's action").isSameAs(window.owner().action(dev.jasper.app.commands.ActionId.COMMAND_PALETTE));
                 // As the window installs it, so the palette has its root to open in.

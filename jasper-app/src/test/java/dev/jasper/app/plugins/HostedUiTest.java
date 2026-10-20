@@ -421,6 +421,24 @@ class HostedUiTest {
         assertThat(requests).extracting(Contributions.PanelRequest::windowId).containsOnly(window);
     }
 
+    /** Inside the panel's own toggle action only that panel's toggle activates, into whichever window it names. */
+    @Test void insideAPanelsToggleActionAnotherPanelsToggleStaysPlainAndAnotherWindowIsKept() {
+        var window = UUID.randomUUID();
+        var other = UUID.randomUUID();
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        ui.actions().register(ActionSpec.of("dev.x.tool.hosts.show", "Hosts"), context -> {
+            ui.panels().toggle("dev.x.tool.files", context.window());
+            ui.panels().toggle("dev.x.tool.hosts", terminals.windowHandle(other));
+        });
+        ui.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", "file", Anchor.RIGHT).withToggleActionId("dev.x.tool.hosts.show"), host -> view());
+        ui.panels().register(new PanelSpec("dev.x.tool.files", "Files", "file", Anchor.LEFT), host -> view());
+        model.action("dev.x.tool.hosts.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        assertThat(requests).containsExactly(
+            new Contributions.PanelRequest(window, "dev.x.tool.files", Contributions.PanelRequest.Op.TOGGLE),
+            new Contributions.PanelRequest(other, "dev.x.tool.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
+    }
+
     /** Plan 15b (Rulings 1): a show inside the panel's own toggle action activates it; any other show goes to the site. */
     @Test void aShowInsideThePanelsOwnToggleActionActivates() {
         var requests = new ArrayList<Contributions.PanelRequest>();

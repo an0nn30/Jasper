@@ -87,7 +87,7 @@ final class DockFixture implements AutoCloseable {
         stripes = new StripeSet.LabelledStripes(kit, ChromeArtwork.CLASSIC);
         var terminal = new JPanel();
         terminal.setBackground(theme.semantic().color(SemanticColor.SURFACE_TERMINAL));
-        area = new ToolWindowArea(terminal, state, kit, true);
+        area = new ToolWindowArea(terminal, state, kit, true, ChromeArtwork.CLASSIC);
         body.add(stripes.left(), BorderLayout.WEST);
         body.add(area, BorderLayout.CENTER);
         body.add(stripes.right(), BorderLayout.EAST);

@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **Enterprise presentation, plan 15b: look polish at the user's direction — 2026-10-20** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, after plan 15a; [plan](superpowers/plans/2026-10-19-enterprise-15b-look-polish.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
-Commits `41847317f..807169d15` (the anchor refresh, then Tasks 1 to 5), then this documentation commit; plan 15's spec
+Commits `41847317f..807169d15` (the anchor refresh, then Tasks 1 to 5), then this documentation commit and the final review fixes; plan 15's spec
 amendment line gains 5.2, 5.3, 10.3, 10.7, 11.6 and 16.2, and 5.1, 5.9, 9.1 and 16.1 are edited again. The user asked on
 2026-10-19: "in entperise I want to replace that text box command pallete in the toolbar with just search icon like in
 IntelliJ classic", and approved plan 15 ("... activation, classic icons everywhere, the search icon, versions, docs and
@@ -10,7 +10,8 @@ the Sample plugin", quoted in full in plan 15a's entry below). What they became.
 (`PanelSpec.withToggleActionId`) is sent as `PanelRequest.Op.ACTIVATING_TOGGLE` or the new `ACTIVATING_SHOW`, which
 `WindowContributions` maps to toggle or show, then activate; under flush frames (Enterprise) the tool window takes the
 focused tint and the keyboard, and under standard frames nothing activates. A hide, a deferred call, another action's
-call and a panel without a declared toggle stay plain. This answers plan 12's question (the user: yes): View › Tool
+call and a panel without a declared toggle stay plain. An activating toggle of a shown tool window that is not the
+active one activates it, and only the active one hides, as IntelliJ's ActivateToolWindowAction (final review). This answers plan 12's question (the user: yes): View › Tool
 Windows and ⌘⌥1 to ⌘⌥3 activate Sessions, SFTP, Tunnels, Transfers and File Servers, and Transfers' action, which only
 shows, activates on every press without a Remote change. No SDK or testkit value changes; the javadoc of
 `Panels.toggle`, `PanelHost.show` and `PanelSpec` says it (since 0.18.2). **Classic icons:** under `[chrome] icons =
@@ -47,20 +48,34 @@ mocks, as the user's 2026-10-19 direction: the toolbar's field is the icon, so `
 field's assertions (mock x 2116-2715, y 122-165) for the button's (a 44 mock px square at the field's top, 16 mock px
 before Settings…; the Settings… crop is unchanged), and the pairs `chrome-toolbar-light` (0.581, now 0.427) and
 `chrome-toolbar-dark` (0.577, now 0.423) pass at their unchanged 0.30 floors with a note, the light one no longer
-listing `#FFFFFF`, the field's `surface.input`. Task 2 changed no Enterprise mock probe or pair. `./gradlew check
+listing `#FFFFFF`, the field's `surface.input`. Under classic artwork a header's `+` is IntelliJ's classic `add`,
+authored (#6E6E6E in Light), in the strip's 10 px glyph box beside ⋯ and − in the strip's ink (#404040 in Light), where
+the mocks set a glyph in the strip's ink: since the final review `DockFixture` builds its area with
+`ChromeArtwork.CLASSIC`, as Enterprise windows do, and `DockMockTest.compareHeader` expects that art's own ink for the
+`add` of File Servers, Sessions and Tunnels (the glyph centre and extent checks pass unchanged); the 16 dock header pairs
+pass their unchanged floors, each within 0.002 of before (`dock-light-kit-servers-header` 0.986 to 0.985,
+`dock-light-kit-sessions-header` 0.982 to 0.981, `dock-light-disconnected-kit-sessions-header` 0.982 to 0.981,
+`dock-light-disconnected-kit-tunnels-header` 0.996 to 0.995, `dock-dark-kit-servers-header` 0.986 to 0.985,
+`dock-dark-kit-sessions-header` 0.984 to 0.982, `dock-dark-kit-tunnels-header` 0.988 to 0.986,
+`dock-vault-kit-servers-header` 0.993 to 0.992, `dock-vault-kit-sessions-header` 0.983 to 0.982,
+`dock-vault-kit-tunnels-header` 0.997 to 0.995; the other six the same). `./gradlew check
 --continue`: **11,594 tests, 0 failures, 0 errors, 25 skipped** (plan 15a: 11,569 and 25); `check_pairs.py` passes 101
 of 101 gated pairs with the same verdicts as the baseline (`plan15-baseline`, from `f78bb0385`), and every agreement is
-the same except the two toolbar lines and `enterprise-settings-13` (0.723, 0.722 since plan 15a); the headless gallery
+the same except the two toolbar lines and `enterprise-settings-13` (0.723, 0.722 since plan 15a), and since the final
+review the dock header lines above; the headless gallery
 is byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look
-jasper-app renders. No test needed a re-run. Later: the splash's fixed colours and "Workstation…" step text for other
+jasper-app renders. No test needed a re-run. The final review fixes add three tests
+(`KitClassicChromeIconsTest`, `WindowPanelsTest`, `HostedUiTest`), passed in targeted runs, not in a new full check. Later: the splash's fixed colours and "Workstation…" step text for other
 branded looks; the external THD plugin's port to SDK 0.18. GUI checks for the user, in this order: (1) under Enterprise
 Light and Dark, the toolbar's magnifier before the wrench, against IntelliJ Classic's: its hover, the tooltip "Search
 Everywhere (⇧⌘P)", a click opens the Run window, ⇧⌘P still does, Icons & Labels keeps it icon-only, and a narrow window
 keeps it beside the wrench; (2) View › Tool Windows › Sessions, SFTP, Tunnels, Transfers and File Servers, and ⌘⌥1 to
 ⌘⌥3: each opens its tool window with the focused header tint, and typing goes there; for Sessions, SFTP, Tunnels and
-File Servers a second press hides it and hands the keyboard back to the terminal, while Transfers' action only shows, so
-a second View › Transfers or ⌘⌥3 keeps it open and activates it again; (3) Sessions' and Tunnels' header `+` and any
-header gear in IntelliJ's classic art, next to the toolbar's; (4) Remote's session view's Run button unchanged; (5) the
+File Servers a second press hides it and hands the keyboard back to the terminal, a press while the terminal has the
+keyboard activates an open tool window instead of hiding it, while Transfers' action only shows, so
+a second View › Transfers or ⌘⌥3 keeps it open and activates it again; (3) Sessions', Tunnels' and File Servers'
+header `+` in IntelliJ's classic art: authored, in the strip's 10 px glyph box beside ⋯ and − in the strip's ink; judge
+its size and ink against IntelliJ Classic; (4) Remote's session view's Run button unchanged; (5) the
 default look: the title field, the rails, the headers and the shortcuts as before (a toggle shortcut opens without the
 tint). Not merged, not pushed.
 

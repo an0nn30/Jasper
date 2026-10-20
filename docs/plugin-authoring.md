@@ -198,8 +198,8 @@ states, settings pages), icons, colors for specialized content and testing, with
 ## Panels, the rail and windows
 
 A panel is an owned `UiView` docked as a tool window in every terminal window, as in IntelliJ:
-stripes on the window's left and right edges: icons, or under a classic look such as Enterprise
-labelled buttons that start with the icon and read the panel's title, and six slots. The left and
+stripes on the window's left and right edges (icons, or under a classic look such as Enterprise
+labelled buttons that start with the icon and read the panel's title), and six slots. The left and
 right sides each have an upper and a lower half; the bottom area, the window's full width under the sides, has a left
 and a right half. `Anchor` picks the side and `PanelSpec.withSplit()` (SDK 0.13.0) the second half;
 SFTP, for example, opens under Sessions. Register a panel once; Jasper asks your factory for one
@@ -211,7 +211,8 @@ an action that toggles the panel, for example to give it a shortcut, register it
 with `PanelSpec.withToggleActionId(id)` (SDK 0.8.1): Tool Windows and the palette then list your action,
 with its shortcut, and Jasper registers no `<panel id>.toggle`. Under a look with flush tool windows
 (Enterprise), when your action shows the panel (through `Panels.toggle` or `PanelHost.show()`) it
-also makes it the active tool window, as a stripe click does; a toggle or show from anything else
+also makes it the active tool window, as a stripe click does, and its toggle of a shown panel that
+is not the active tool window activates it instead of hiding it; a toggle or show from anything else
 does not. One panel shows per slot; the user
 can drag a panel by its stripe icon or its header to another slot or another place on a stripe, or
 use the Move to menu on either, and Jasper remembers its slot, its place on the stripe and the side's
@@ -229,9 +230,9 @@ registered with `register`: the detail, dot and actions join that panel's own he
 do not add a duplicate action row inside the panel. Declare `sdk = ">=0.18.0, <0.19"` when using it.
 
 A rail button, on the left stripe after the panel icons (a labelled entry under a classic look),
-runs one of your actions. A plugin window is a frame Jasper builds: icon, title bar, menus (in the
-window, or under the Enterprise look in the screen menu bar on macOS and none on Windows and
-Linux), theme tracking and remembered bounds are its job; the content is yours. Dialogs belong to a terminal window or to one of your windows, so
+runs one of your actions. A plugin window is a frame Jasper builds: icon, title bar, menus (a minimal File menu,
+in the screen menu bar on macOS and in the window on Windows and Linux, where the Enterprise look
+shows none), theme tracking and remembered bounds are its job; the content is yours. Dialogs belong to a terminal window or to one of your windows, so
 they are parented correctly without your plugin ever seeing a frame.
 
 <!-- example:pluginpanels -->

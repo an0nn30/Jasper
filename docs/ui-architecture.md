@@ -249,9 +249,12 @@ palette shadow, and the classic dock's rules, stripe labels, count pills and hea
 through the pairs `ChromePainter.DOCK_PAIRS` declares) over named roles; `TITLE_CONTEXT`, `TOOLBAR_LABEL`, `STATUS_TEXT` and `STATUS_PATH` carry the reference
 chrome text sizes. `IconRegistry.chromeIcon` is the native chrome's receiving context: the meanings the workspace chrome
 depicts (add, new window, split, expand, chevron down, folder, server, bell, lock, terminal) use their byte-identical
-original desktop artwork (`assets-chrome.tsv`); descriptor, panel, tile and plugin-registered contexts never receive it.
+original desktop artwork (`assets-chrome.tsv`); descriptor, panel, tile and plugin-registered contexts never receive it, except for a toolbar strip's and a panel header's classic names (below).
 A receiver marked `ChromeArtwork.CLASSIC` (a look's `[chrome] icons = "classic"`) draws IntelliJ's classic icons
 (`assets-classic.tsv`) for add, split, zoom, settings, new window and search, and the New UI originals for the rest.
+The host-only `KitView.classicChromeIcons(true)` gives a toolbar strip's and a panel header's buttons and menu buttons
+named one of `IconRegistry.classicChromeNames()` that classic art (`IconRegistry.classicChromeIcon`); a document bar
+and every body keep theirs.
 `IconRegistry.stripeIcon` gives a labelled stripe IntelliJ's classic 13 px tool-window icons (the `toolwindows/` rows
 of `assets-classic.tsv`) for network, folder, tunnel, download, server and bell; it is a table of its own, so the
 classic chrome set is unchanged.
