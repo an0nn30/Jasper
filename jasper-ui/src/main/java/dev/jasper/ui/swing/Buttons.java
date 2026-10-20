@@ -69,6 +69,13 @@ final class Buttons {
             button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
             button.setRolloverEnabled(true); button.setHorizontalAlignment(SwingConstants.CENTER);
             button.focus = new ThemePainting.Focus(button, button, view); own(button.focus);
+            var revealAction = new java.awt.event.FocusAdapter() {
+                @Override public void focusGained(java.awt.event.FocusEvent event) {
+                    if (SwingUtilities.getAncestorOfClass(SplitViews.ActionBarScroll.class, button) != null)
+                        button.scrollRectToVisible(new Rectangle(0, 0, button.getWidth(), button.getHeight()));
+                }
+            };
+            button.addFocusListener(revealAction); own(() -> button.removeFocusListener(revealAction));
             ActionListener listener = event -> {
                 if (interactive()) try { events.accept(new UiEvent.Action(((Nodes.Button)this.node).action())); }
                 catch (Throwable failure) { view.report(failure); }

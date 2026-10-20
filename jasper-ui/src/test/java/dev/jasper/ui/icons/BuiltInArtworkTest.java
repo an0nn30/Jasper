@@ -10,6 +10,44 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class BuiltInArtworkTest {
+    @Test void editorActionsKeepAuthoredPixelsInEveryControlRoute() throws Exception {
+        var files = Map.of("editor.source", "editor/modern/general/editorOnly", "editor.split", "editor/modern/general/editorPreview",
+            "editor.preview", "editor/modern/general/previewOnly", "editor.scroll-sync", "editor/modern/actions/synchronizeScrolling",
+            "editor.source.classic", "editor/classic/general/layoutEditorOnly", "editor.split.classic", "editor/classic/general/layoutEditorPreview",
+            "editor.preview.classic", "editor/classic/general/layoutPreviewOnly", "editor.scroll-sync.classic", "editor/classic/actions/synchronizeScrolling");
+        try (var registry = new IconRegistry()) {
+            assertThat(registry.names()).containsAll(files.keySet());
+            for (var entry : files.entrySet()) for (var theme : List.of(KitFixtures.light(), KitFixtures.dark())) for (int scale : new int[]{1, 2}) {
+                var expected = direct(entry.getValue() + (theme.dark() ? "_dark.svg" : ".svg"), 16, scale);
+                assertThat(registry.authored(entry.getKey())).isTrue();
+                assertThat(registry.authored(entry.getKey(), true)).isTrue();
+                assertThat(pixels(registry.icon(entry.getKey(), theme, SemanticColor.STATUS_DANGER, 16), scale)).isEqualTo(expected);
+                assertThat(pixels(registry.panel(entry.getKey(), theme, SemanticColor.STATUS_DANGER, 16), scale)).isEqualTo(expected);
+                assertThat(pixels(registry.themedIcon(entry.getKey(), 16).icon(theme, SemanticColor.STATUS_DANGER), scale)).isEqualTo(expected);
+            }
+        }
+    }
+
+    @Test void editorManifestPinsSixteenUnmodifiedLicensedResources() throws Exception {
+        try (var in = getClass().getResourceAsStream("assets-editor.tsv")) {
+            assertThat(in).isNotNull();
+            var lines = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).lines().toList();
+            assertThat(lines).hasSize(16);
+            for (String line : lines) {
+                var columns = line.split("\t");
+                assertThat(columns).hasSize(3);
+                assertThat(columns[1]).startsWith("platform/icons/src/");
+                byte[] bytes;
+                try (var resource = getClass().getResourceAsStream(columns[0])) { bytes = resource.readAllBytes(); }
+                assertThat(new String(bytes, java.nio.charset.StandardCharsets.UTF_8)).contains("JetBrains s.r.o.", "Apache 2.0");
+                assertThatCode(() -> BuiltInArtwork.decodeRequired(columns[0], bytes, columns[2])).doesNotThrowAnyException();
+                assertThatThrownBy(() -> BuiltInArtwork.decodeRequired(columns[0], null, columns[2])).hasMessageContaining(columns[0]);
+                bytes[bytes.length - 1] ^= 1;
+                assertThatThrownBy(() -> BuiltInArtwork.decodeRequired(columns[0], bytes, columns[2])).hasMessageContaining("SHA-256");
+            }
+        }
+    }
+
     static int[] pixels(Icon icon,int scale) {
         var image=new BufferedImage(icon.getIconWidth()*scale,icon.getIconHeight()*scale,BufferedImage.TYPE_INT_ARGB);
         var g=image.createGraphics();try{g.scale(scale,scale);icon.paintIcon(null,g,0,0);}finally{g.dispose();}

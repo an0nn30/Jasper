@@ -18,6 +18,10 @@ Two built-in names are authored host artwork (SDK 0.18.1): `"run"`, IntelliJ's c
 and `"application"`, its run-configuration icon. Controls draw them in their own colours in both
 looks; panels, prompts and tiles draw a monochrome glyph of the same name.
 
+Document view controls (SDK 0.18.3) use authored light/dark artwork: `"editor.source"`, `"editor.split"`,
+`"editor.preview"` and `"editor.scroll-sync"`. Each also has a `".classic"` name. Choose the suffix when
+`Appearance.presentation().icons()` is `Presentation.Icons.CLASSIC`; controls preserve the selected art's colours.
+
 Under the Enterprise look a panel's stripe label starts with its icon at 13 px: `"network"`,
 `"folder"`, `"tunnel"`, `"download"`, `"server"` and `"bell"` draw IntelliJ's classic tool-window
 icons, and any other name (a registered path included) its monochrome glyph in the label's colour;
