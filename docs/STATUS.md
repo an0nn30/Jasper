@@ -3,7 +3,7 @@
 **Editor: a New Editor Window toolbar button — 2026-10-19** (`claude/workspace-tabs`, one commit on `914bfc272`). The user
 asked on 2026-10-19: "I also want a toolbar button in this mode and Enterprise mode where I can open a new Editor File
 window too." The Editor places `ToolbarItem.action("dev.jasper.editor.new_window")` after its File menu items; the
-action carries the kit's `window.add` glyph (a window with a plus, also the app's NEW_WINDOW glyph), its title is the
+action carries the Editor's `file` glyph (so it differs from New Terminal Window's), its title is the
 tip, and clicking it runs the action the File menu runs. Both looks' headers already draw a contributed button, so
 the standard look shows the glyph with its label and the Enterprise classic row shows the label-first button (the glyph
 when the toolbar is icons only); the Editor stays at 0.11.0. Files: `EditorPlugin`, `EditorPluginTest` (one new test),

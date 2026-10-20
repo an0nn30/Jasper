@@ -11,7 +11,7 @@ is the binding reference.
 - **Open File…** in the File menu or the palette (no default shortcut) opens the file you choose in
   the [default editor](#default-editor), as a Cmd-click does.
 - **New Editor File**, or **New File** (Cmd/Ctrl+N) inside an editor tab, for an untitled tab; **New Editor Window**
-  in the File menu, the palette or the toolbar's window-plus button (no default shortcut) opens the untitled tab in a
+  in the File menu, the palette or the toolbar's New Editor Window button (no default shortcut) opens the untitled tab in a
   new child window.
 - Drop files from the desktop onto an editor tab. Folders are ignored.
 - `jasper editor FILE[:LINE[:COLUMN]]...` from a terminal, once the

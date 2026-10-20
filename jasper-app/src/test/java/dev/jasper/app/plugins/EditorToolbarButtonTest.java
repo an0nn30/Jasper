@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The Editor's New Editor Window toolbar button (user request 2026-10-19): the staged Editor in the application's real
- * plugin host places it with the {@code window.add} glyph, and both looks' headers draw it as a contributed button
+ * plugin host places it with the Editor's {@code file} glyph, and both looks' headers draw it as a contributed button
  * with the action's title for its label and tip, the standard look's unified header and the Enterprise look's classic row.
  */
 class EditorToolbarButtonTest {
@@ -38,7 +38,7 @@ class EditorToolbarButtonTest {
             onEdt(() -> {
                 assertThat(editor.contributions.toolbar()).containsExactly(new ToolbarEntry.Button(NEW_WINDOW));
                 assertThat(editor.contributions.action(NEW_WINDOW).orElseThrow().icon()).isInstanceOfSatisfying(PresentationIcon.class,
-                    named -> assertThat(named.name()).isEqualTo("window.add"));
+                    named -> assertThat(named.name()).isEqualTo("file"));
                 var enterprise = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.LINUX, false));
                 for (boolean classic : new boolean[] {false, true}) {
                     var themes = classic ? EnterpriseLook.controller(false) : ThemeTestSupport.controller(true);
@@ -51,7 +51,7 @@ class EditorToolbarButtonTest {
                         var button = buttons.getFirst();
                         assertThat(button.getText()).as("the label").isEqualTo("New Editor Window");
                         assertThat(button.getIcon()).as("its glyph").isInstanceOfSatisfying(PresentationIcon.class,
-                            named -> assertThat(named.name()).isEqualTo("window.add"));
+                            named -> assertThat(named.name()).isEqualTo("file"));
                         assertThat(button.getParent()).as("placed in the toolbar").isInstanceOf(javax.swing.JToolBar.class);
                     } finally {
                         DesktopTestSupport.closeOwnersNow();

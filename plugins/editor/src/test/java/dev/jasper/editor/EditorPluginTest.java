@@ -241,7 +241,7 @@ class EditorPluginTest {
             assertThat(host.toolbar()).containsExactly("button:dev.jasper.editor.new_window");
             assertThat(host.actionSpec("dev.jasper.editor.new_window")).hasValueSatisfying(spec -> {
                 assertThat(spec.title()).as("the button's tooltip").isEqualTo("New Editor Window");
-                assertThat(spec.icon()).as("the button's glyph").contains("window.add");
+                assertThat(spec.icon()).as("the button's glyph").contains("file");
             });
             assertThat(host.invoke("dev.jasper.editor.new_window", main, null)).isTrue();
             var tab = host.contentTabs().getFirst();

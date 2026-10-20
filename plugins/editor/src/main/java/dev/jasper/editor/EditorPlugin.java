@@ -109,7 +109,7 @@ public final class EditorPlugin implements Plugin {
         context.actions().register(ActionSpec.of(NEW, "New Editor File").withKeywords(List.of("editor", "new", "file", "untitled")),
             invoked -> window().newUntitled(invoked.window()));
         // Workspace tabs spec 6.5: an untitled document in a child window of its own; no default key. Its icon is the toolbar button's.
-        context.actions().register(ActionSpec.of(NEW_WINDOW, "New Editor Window").withIcon("window.add")
+        context.actions().register(ActionSpec.of(NEW_WINDOW, "New Editor Window").withIcon("file")
                 .withKeywords(List.of("editor", "new", "window", "untitled")),
             invoked -> window().newUntitled(invoked.window(), dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW));
         context.actions().register(ActionSpec.of(SHOW, "Show Editor").withKeywords(List.of("editor", "tabs")), invoked -> window().show());
