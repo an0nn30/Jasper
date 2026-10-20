@@ -231,6 +231,24 @@ public final class ParentTabs implements WindowLayout {
     }
 
     /**
+     * Moves a parent tab to another place in the bar, as a drag along the bar drops it (parent tabs spec 5). The one
+     * that shows and the order of use stay.
+     *
+     * @param id a parent tab of the window
+     * @param index its place among the others, 0 to their number
+     * @return the new parent tabs
+     * @throws IllegalArgumentException when the window does not have it or the index is outside the bar
+     */
+    public ParentTabs move(ParentTabId id, int index) {
+        int at = requireParentTab(id);
+        if (index < 0 || index >= parentTabs.size())
+            throw new IllegalArgumentException("Index " + index + " is outside 0 to " + (parentTabs.size() - 1));
+        var next = new ArrayList<>(parentTabs);
+        next.add(index, next.remove(at));
+        return new ParentTabs(next, active, recent);
+    }
+
+    /**
      * The parent tab {@code delta} places along the bar from the one that shows, wrapping around (Next and Previous
      * Parent Tab).
      *

@@ -12,8 +12,9 @@ import java.util.OptionalInt;
 /**
  * Where a dragged tab would drop (workspace tabs spec 12), from the cursor alone: into a group's strip at a place among
  * its tabs, into a group over the middle of its card area, or into a new group on the side whose outer quarter of the card
- * area the cursor is over; the rectangle that shows the landing; and which of several windows takes the drop. The tab
- * drag's twin of {@link DockDropResolver}. Pure; every rectangle and the cursor are in the caller's one coordinate space.
+ * area the cursor is over; where a dragged parent tab would go in a parent-tab bar (parent tabs spec 5); the rectangle
+ * that shows the landing; and which of several windows takes the drop. The tab drag's twin of {@link DockDropResolver}.
+ * Pure; every rectangle and the cursor are in the caller's one coordinate space.
  */
 public final class WorkspaceDropResolver {
     private WorkspaceDropResolver() { }
@@ -117,16 +118,33 @@ public final class WorkspaceDropResolver {
     public static Optional<Drop> resolve(Point cursor, List<Area> areas) {
         Objects.requireNonNull(cursor, "cursor");
         for (Area area : areas) {
-            if (area.strip.contains(cursor)) {
-                int index = 0;
-                for (Rectangle tab : area.tabs) if (tab.x + tab.width / 2.0 < cursor.x) index++;
-                return Optional.of(new Drop.Strip(area.group, index));
-            }
+            if (area.strip.contains(cursor)) return Optional.of(new Drop.Strip(area.group, index(cursor, area.tabs)));
             if (!area.content.contains(cursor)) continue;
             Optional<Side> side = area.splits ? side(cursor, area.content) : Optional.empty();
             return Optional.of(side.<Drop>map(edge -> new Drop.Edge(area.group, edge)).orElseGet(() -> new Drop.Centre(area.group)));
         }
         return Optional.empty();
+    }
+
+    /**
+     * Where a dragged parent tab would go in a window's parent-tab bar (parent tabs spec 5), by the strip rule of
+     * {@link #resolve}: before the first of the bar's other entries whose middle is not left of the cursor.
+     *
+     * @param cursor the cursor
+     * @param bar the bar
+     * @param entries the bar's entries in bar order, without the dragged parent tab's own
+     * @return the place, 0 to the number of entries; empty when the cursor is not over the bar
+     */
+    public static OptionalInt place(Point cursor, Rectangle bar, List<Rectangle> entries) {
+        Objects.requireNonNull(cursor, "cursor");
+        return bar.contains(cursor) ? OptionalInt.of(index(cursor, entries)) : OptionalInt.empty();
+    }
+
+    /** How many of {@code entries}, in order along a strip, have their middle left of {@code cursor}. */
+    private static int index(Point cursor, List<Rectangle> entries) {
+        int index = 0;
+        for (Rectangle entry : entries) if (entry.x + entry.width / 2.0 < cursor.x) index++;
+        return index;
     }
 
     /** The side whose outer quarter of {@code content} holds {@code cursor}, the nearer when two do; empty in the middle. */
@@ -165,7 +183,7 @@ public final class WorkspaceDropResolver {
             .orElseThrow(() -> new IllegalArgumentException("No area for group " + drop.group()));
         Rectangle whole = area.bounds();
         return switch (drop) {
-            case Drop.Strip strip -> marker(area, strip.index(), bar);
+            case Drop.Strip strip -> marker(area.strip, area.tabs, strip.index(), bar);
             case Drop.Centre centre -> whole;
             case Drop.Edge edge -> switch (edge.side()) {
                 case LEFT -> new Rectangle(whole.x, whole.y, whole.width / 2, whole.height);
@@ -176,15 +194,22 @@ public final class WorkspaceDropResolver {
         };
     }
 
-    /** A bar {@code width} wide, centred on the place before the tab at {@code index} (after the last at the end), in the strip. */
-    private static Rectangle marker(Area area, int index, int width) {
-        List<Rectangle> tabs = area.tabs;
-        Rectangle strip = area.strip;
+    /**
+     * A drop's marker in a strip or a parent-tab bar: a bar {@code width} wide and as tall as {@code strip}, centred on
+     * the place before the entry at {@code index} (after the last at the end) and kept inside {@code strip}.
+     *
+     * @param strip the strip or bar
+     * @param entries its entries in order, without the dragged one's own
+     * @param index the place, 0 to the number of entries
+     * @param width the marker's width
+     * @return the marker, in the strip's coordinates
+     */
+    public static Rectangle marker(Rectangle strip, List<Rectangle> entries, int index, int width) {
         int x;
-        if (tabs.isEmpty()) x = strip.x;
-        else if (index == 0) x = tabs.getFirst().x;
-        else if (index >= tabs.size()) x = tabs.getLast().x + tabs.getLast().width;
-        else x = (tabs.get(index - 1).x + tabs.get(index - 1).width + tabs.get(index).x) / 2;
+        if (entries.isEmpty()) x = strip.x;
+        else if (index == 0) x = entries.getFirst().x;
+        else if (index >= entries.size()) x = entries.getLast().x + entries.getLast().width;
+        else x = (entries.get(index - 1).x + entries.get(index - 1).width + entries.get(index).x) / 2;
         int left = Math.max(strip.x, Math.min(x - width / 2, strip.x + strip.width - width));
         return new Rectangle(left, strip.y, width, strip.height);
     }

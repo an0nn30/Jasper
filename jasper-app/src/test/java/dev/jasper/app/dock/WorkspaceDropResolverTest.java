@@ -112,6 +112,26 @@ class WorkspaceDropResolverTest {
         assertThatIllegalArgumentException().isThrownBy(() -> WorkspaceDropResolver.landing(new Drop.Centre(GroupId.random()), TWO, 2));
     }
 
+    /** Parent tabs spec 5 and workspace plan 7c Rulings 2: a parent tab's place in a bar follows the strip rule. */
+    @Test void aParentTabGoesBeforeTheFirstOtherEntryOfABarWhoseMiddleIsNotLeftOfTheCursor() {
+        Rectangle bar = new Rectangle(0, 0, 600, 28);
+        List<Rectangle> entries = List.of(new Rectangle(0, 0, 200, 28), new Rectangle(400, 0, 200, 28));
+        assertThat(WorkspaceDropResolver.place(new Point(10, 10), bar, entries)).hasValue(0);
+        assertThat(WorkspaceDropResolver.place(new Point(100, 10), bar, entries)).as("on a middle: still before that entry")
+            .hasValue(0);
+        assertThat(WorkspaceDropResolver.place(new Point(101, 10), bar, entries)).hasValue(1);
+        assertThat(WorkspaceDropResolver.place(new Point(599, 27), bar, entries)).as("the bar's last pixel").hasValue(2);
+        assertThat(WorkspaceDropResolver.place(new Point(300, 5), bar, List.of())).as("a bar with no other entry").hasValue(0);
+        assertThat(WorkspaceDropResolver.place(new Point(300, 28), bar, entries)).as("just under the bar").isEmpty();
+        assertThat(WorkspaceDropResolver.place(new Point(-1, 10), bar, entries)).isEmpty();
+        assertThat(WorkspaceDropResolver.marker(bar, entries, 1, 2)).as("between the two entries")
+            .isEqualTo(new Rectangle(299, 0, 2, 28));
+        assertThat(WorkspaceDropResolver.marker(bar, entries, 2, 2)).as("after the last, kept inside the bar")
+            .isEqualTo(new Rectangle(598, 0, 2, 28));
+        assertThat(WorkspaceDropResolver.marker(bar, List.of(), 0, 2)).as("no other entry: the bar's start")
+            .isEqualTo(new Rectangle(0, 0, 2, 28));
+    }
+
     @Test void whereWindowsOverlapTheFirstListedTakesTheDrop() {
         Rectangle older = new Rectangle(0, 0, 800, 600), newer = new Rectangle(400, 300, 800, 600);
         Point both = new Point(500, 400);

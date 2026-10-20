@@ -116,6 +116,22 @@ class ParentTabsTest {
         assertThat(ParentTabs.of(a).step(1)).isEqualTo(a.id());
     }
 
+    /** Parent tabs spec 5 and workspace plan 7c Rulings 2: a parent tab dragged along its bar takes another place there. */
+    @Test void moveTakesAParentTabToAnotherPlaceAndKeepsTheShownOne() {
+        ParentTab a = parent(A), b = parent(B), c = parent(C);
+        ParentTabs tabs = new ParentTabs(List.of(a, b, c), b.id()).select(c.id());
+        ParentTabs moved = tabs.move(a.id(), 2);
+        assertThat(moved.parentTabs()).containsExactly(b, c, a);
+        assertThat(moved.active()).as("the shown one stays").isEqualTo(c.id());
+        assertThat(moved.recent()).as("and so does the order of use").isEqualTo(tabs.recent());
+        assertThat(moved.move(a.id(), 0).parentTabs()).containsExactly(a, b, c);
+        assertThat(tabs.move(b.id(), 1)).as("its own place").isEqualTo(tabs);
+        assertThatIllegalArgumentException().isThrownBy(() -> tabs.move(a.id(), 3)).withMessageContaining("Index 3");
+        assertThatIllegalArgumentException().isThrownBy(() -> tabs.move(a.id(), -1)).withMessageContaining("Index -1");
+        assertThatIllegalArgumentException().isThrownBy(() -> tabs.move(ParentTabId.random(), 0))
+            .withMessageContaining("not in the window");
+    }
+
     @Test void replaceGivesAParentTabItsNewLayoutAndLookupsFollowIt() {
         ParentTab a = parent(A), b = parent(B);
         ParentTabs tabs = new ParentTabs(List.of(a, b), b.id());
