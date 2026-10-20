@@ -16,8 +16,8 @@ class IndexStoreTest {
     @Test void projectsRoundTripWithAwkwardNames() throws IOException {
         var store = new IndexStore(data);
         assertThat(store.loadProjects()).as("no file yet").isEmpty();
-        var projects = List.of(new Project(ProjectKey.local(Path.of("/w/my \"app\"")), "my \"app\"", false),
-            new Project(ProjectKey.remote(UUID.randomUUID(), "/srv/tab\there"), "tab\there", true));
+        var projects = List.of(new Project(ProjectKey.local(Path.of("/w/my app")), "my \"app\"", false),
+            new Project(ProjectKey.remote(UUID.randomUUID(), "/srv/my \"app\"/tab\there"), "tab\there", true));
         store.saveProjects(projects);
         assertThat(Files.readString(data.resolve("projects.toml"))).startsWith("# Projects indexed by Project Index.");
         assertThat(store.loadProjects()).isEqualTo(projects);
@@ -43,7 +43,8 @@ class IndexStoreTest {
     }
 
     @Test void entriesWithBadKeysAreSkipped() throws IOException {
-        Files.writeString(data.resolve("projects.toml"), "[[project]]\nkey = \"nonsense\"\n[[project]]\nkey = \"local:/w/a\"\n");
+        var key = ProjectKey.local(Path.of("/w/a"));
+        Files.writeString(data.resolve("projects.toml"), "[[project]]\nkey = \"nonsense\"\n[[project]]\nkey = '" + key.id() + "'\n");
         assertThat(new IndexStore(data).loadProjects()).containsExactly(new Project(ProjectKey.local(Path.of("/w/a")), "a", false));
     }
 

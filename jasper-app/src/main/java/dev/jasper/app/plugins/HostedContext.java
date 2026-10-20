@@ -128,7 +128,7 @@ final class HostedContext implements PluginContext {
         if (interrupt) executor.shutdownNow(); else executor.shutdown();
     }
 
-    /** Completes when accepted background work has finished, interrupting it once the grace elapses. */
+    /** Completes when accepted work finishes or the grace elapses and interruption is requested. */
     CompletableFuture<Void> drain(Duration grace) {
         var done = new CompletableFuture<Void>();
         Thread.ofPlatform().daemon().name("jasper-plugin-drain-" + id).start(() -> {
@@ -139,6 +139,24 @@ final class HostedContext implements PluginContext {
                 Thread.currentThread().interrupt();
             }
             done.complete(null);
+        });
+        return done;
+    }
+
+    /** Actual completion, including cleanup after the bounded drain has requested interruption. */
+    CompletableFuture<Void> terminated() { return terminated(executor, id); }
+
+    static CompletableFuture<Void> terminated(ExecutorService executor, String name) {
+        if (executor.isTerminated()) return CompletableFuture.completedFuture(null);
+        var done = new CompletableFuture<Void>();
+        Thread.ofVirtual().name("jasper-plugin-termination-" + name).start(() -> {
+            try {
+                while (!executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)) { }
+                done.complete(null);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                done.completeExceptionally(interrupted);
+            }
         });
         return done;
     }

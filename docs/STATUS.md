@@ -339,6 +339,49 @@ Wayland session, scale 1 and 2), with Enterprise on, a cold start's splash keeps
 copyright steady at every step while only the step text and the bar change, with no blank or dark frame, and a window
 dragged over it and away leaves it whole; on macOS it looks as before.
 
+**CI runtime optimization — 2026-10-19** (PR #1): CI runs independent Gradle projects with
+`--parallel`, two workers on Unix and one on Windows; each project's tests remain sequential. Root verifiers consume
+root-owned runtime dependencies, and plugin staging consumes producer task outputs. Full local
+`check`, forcing all 15 Java test tasks to execute with warm build artifacts, fell from 8m48s
+serial to 4m45s parallel (46%). All 11,437 tests were retained, with zero failures/errors and the
+same 25 platform skips; one new regression prevents Windows Git Bash probing root UNC paths.
+Architecture/license checks and independent review passed. Hosted checks on the final head gate merge.
+Ubuntu improved from 13m47s to 9m26s. Windows with two workers hit subprocess/startup/cleanup
+deadlines that passed serially; the single-worker hosted Windows check subsequently passed in 18m01s.
+Synchronized main at `2c065f8cd`, retaining its Enterprise theme assertions alongside portable
+font checks; full local `check` passed (11,486 tests, zero failures/errors, 25 existing skips).
+
+**macOS/Windows CI follow-up — 2026-10-19** (`codex/ubuntu-rendering-tests`, PR #1): Startup
+fixtures await application shutdown before temporary-home cleanup. Windows fixes cover native
+linker artifacts and const-correct C fixtures, portable filesystem fixtures, FTP completion waits,
+font-aware rendering assertions and stable gallery scale. Remote shell tests now run through Git
+Bash on Windows; worktree/home comparison canonicalizes both paths. Plugin fixtures await actual
+worker termination before deleting data. Runtime shutdown retains plugin classloaders until worker
+cleanup completes, preserving the bounded stop grace. Shell fixtures use finite-file stdin and captures.
+Full local `check` passed (11,432 tests, zero failures/errors); GitHub macOS, Ubuntu and all Linux
+packaging/install checks passed. Focused checks cover the subsequent Windows fixture corrections;
+PR #1 is gated on all hosted checks. No new test skips.
+
+**Ubuntu CI fixes — 2026-10-18** (`codex/ubuntu-rendering-tests`): Reproduced the 12 rendering
+failures on Ubuntu 24.04 ARM64/JBR 25. Font fallback now reaches logical families when physical
+fonts lack symbols/CJK; CI installs DejaVu and Noto CJK. Settings mock fixtures explicitly select
+their depicted capabilities; exact paint checks sample opaque glyph interiors and menu sizing uses
+the actual shortcut font. Full Linux validation also exposed an SSH shutdown race: host-key
+rejection reasons now survive MINA session cleanup, with deterministic regressions. Full `check`
+passed on Ubuntu and macOS: 11,430 tests each, zero failures/errors (53/25 existing platform skips).
+The Ubuntu external SDK plugin check/ZIP build also passed (one additional test). No skips or
+layout tolerances added; actionlint, source hygiene and independent review passed.
+
+**Windows installer build — 2026-10-18** (`codex/fix-windows-launcher-build`). MSVC's export
+library and `.exp` file now go to the object directory instead of jpackage's launcher resources;
+`buildLauncher` previously rejected `jpackageapplauncher.exp` as missing Jasper's hook.
+`packaging/windows/Build-Installer.ps1` passed on Windows ARM64, including image and MSI
+verification, producing `Jasper-1.0.0-windows-aarch64-setup.exe`. Launcher core: 152 checks,
+zero failures; watcher tests passed. Broader `check --continue` failed in command-client core
+compilation (MSVC const qualifiers), Editor, File Server, Indexer, Remote and UI tests; app test
+compilation failed during overlapping builds and passed on the standalone installer rerun.
+Merged into `main`; no installer run.
+
 **Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18**
 (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`;
 [plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md),
@@ -1138,6 +1181,15 @@ are the Enterprise icon from the splash on; in a packaged Enterprise build, the 
 a `--background` resident opens its first window and after Quit then reopen; no splash with `--background` (the resident's later windows still carry the icon), `--no-window` or
 `--safe-mode`; a start that fails after the splash opened leaves no splash behind; the default look shows no splash and
 Jasper's icon. Not merged, not pushed.
+
+2026-10-19 splash flicker fix: each step is completed in an offscreen image at the window graphics' actual X/Y
+scale and copied once, retaining fractional HiDPI resolution, origin and clipping. Merging with local `main` on
+2026-10-20 kept the boot splash's `SplashBuffer` (the boot-splash entry above), which also draws off screen at the device
+scale and copies only the step's line and the bar; `SplashPainter.frame` went, and `SplashFrameTest` now checks
+`SplashBuffer` on an offset, clipped target at the same seven scales. All 23 splash tests pass;
+independent review found no actionable issues. Serial `./gradlew check --continue`: Java XML **11,454 tests, 0 failures, 0 errors, 26 skipped**;
+only the previously documented `checkThemeTool.test_deeply_nested_input_is_a_message` assertion fails.
+Native Windows/Linux startup acceptance remains user-run.
 
 **Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-17** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `4b373d85b..45616955d`, then this documentation commit and the final review's fixes;

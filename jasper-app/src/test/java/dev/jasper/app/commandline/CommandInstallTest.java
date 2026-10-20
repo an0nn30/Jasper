@@ -23,7 +23,7 @@ class CommandInstallTest {
     }
 
     @Test void onlyLinuxHintsAtPathBecauseAFinderLaunchedJasperHasNoUsefulPath(@TempDir Path home) {
-        String launchdPath = "/usr/bin:/bin:/usr/sbin:/sbin";
+        String launchdPath = String.join(java.io.File.pathSeparator, "/usr/bin", "/bin", "/usr/sbin", "/sbin");
         assertThat(CommandInstall.forThisPlatform("Mac OS X", "/Applications/Jasper.app/Contents/MacOS/Jasper", home).hint(launchdPath))
             .isEmpty();
         assertThat(CommandInstall.forThisPlatform("Linux", "/opt/jasper/bin/Jasper", home).hint(launchdPath))

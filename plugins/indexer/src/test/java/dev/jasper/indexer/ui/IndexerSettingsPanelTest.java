@@ -63,7 +63,7 @@ class IndexerSettingsPanelTest {
                 assertThat(node(view, "settings:excludes:row", Nodes.SettingRow.class).highlighted()).isTrue();
                 host.highlightSettingsPanel(IndexerTesting.INFO.id(), "");
                 assertThat(node(view, "settings:excludes:row", Nodes.SettingRow.class).highlighted()).isFalse();
-                assertThat(row(view, 0).cells()).containsEntry("name", "app").containsEntry("location", "at /w/app")
+                assertThat(row(view, 0).cells()).containsEntry("name", "app").containsEntry("location", "at " + Path.of("/w/app").toAbsolutePath())
                     .containsEntry("files", "2").containsEntry("state", "Fresh");
                 assertThat(table(view).columns()).filteredOn(column -> column.id().equals("location")).singleElement()
                     .satisfies(column -> assertThat(column.role()).as("spec 13: the data face").isEqualTo(Nodes.TextRole.MONO_SMALL));

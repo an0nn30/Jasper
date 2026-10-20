@@ -95,9 +95,11 @@ class BundledSamplePluginTest {
         }
         assertThat(lines.get()).contains(outcome);
         onEdt(() -> assertThat(deck.notices()).as("Buddy keeps live work only").isEmpty());
+        var workers = PluginShutdownTestSupport.capture(runtime.get());
         var pending = new AtomicReference<List<CompletableFuture<?>>>();
         onEdt(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        workers.await();
     }
     @Test void everyBundledPluginShipsAnIconAndRemoteNamesItsHomepage() throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
@@ -118,9 +120,11 @@ class BundledSamplePluginTest {
             assertThat(rows).filteredOn(row -> row.id().equals("dev.jasper.remote")).singleElement()
                 .satisfies(row -> assertThat(row.homepage()).isEqualTo("https://github.com/an0nn30/Jasper"));
         } finally {
+            var workers = PluginShutdownTestSupport.capture(runtime.get());
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
             onEdt(() -> pending.set(runtime.get().stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            workers.await();
         }
     }
 
@@ -172,9 +176,11 @@ class BundledSamplePluginTest {
                     dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, menu -> assertThat(dev.jasper.app.testsupport.IconPixels.of(menu.icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon)));
             });
         } finally {
+            var workers = PluginShutdownTestSupport.capture(runtime.get());
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
             onEdt(() -> pending.set(runtime.get().stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            workers.await();
             onEdt(() -> ThemeTestSupport.controller(true));
         }
     }

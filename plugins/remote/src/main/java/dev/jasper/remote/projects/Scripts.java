@@ -28,6 +28,7 @@ final class Scripts {
         var quoted = folders.stream().filter(Scripts::usable).map(ShellText::quote).toList();
         if (quoted.isEmpty()) return bytes(out);
         out.append("for d in ").append(String.join(" ", quoted)).append("\ndo\n");
+        out.append("  case \"$d\" in /) continue ;; esac\n");
         out.append("  case \"$HOME/\" in \"${d%/}\"/*) continue ;; esac\n");
         if (!literals.isEmpty()) {
             out.append("  for n in ").append(String.join(" ", literals.stream().map(ShellText::quote).toList())).append("\n  do\n");
@@ -48,6 +49,7 @@ final class Scripts {
             .append("cd -- ").append(ShellText.quote(root)).append(" 2>/dev/null || exit 3\n")
             .append("command -v git >/dev/null 2>&1 || exit 4\n")
             .append("top=$(git -c core.fsmonitor=false rev-parse --show-toplevel 2>/dev/null) || exit 4\n")
+            .append("top=$(cd -- \"$top\" 2>/dev/null && pwd -P) || exit 4\n")
             .append("home=$(cd -- \"${HOME:-/nonexistent}\" 2>/dev/null && pwd -P)\n")
             .append("[ \"$top\" = \"$home\" ] && exit 4\n")
             .append("printf '").append(LIST).append("\\000'\n")

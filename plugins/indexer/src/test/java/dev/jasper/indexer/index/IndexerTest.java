@@ -81,7 +81,7 @@ class IndexerTest {
         assertThat(progress).last().isEqualTo(Optional.empty());
         assertThat(notifications.lines()).containsExactly("dev.jasper.indexer.results|INFO|Indexed app|2 files");
         assertThat(store.loadIndex(APP)).isPresent();
-        assertThat(projectsFile()).contains("key = \"local:" + APP.root() + "\"");
+        assertThat(savedKeys()).containsExactly(APP);
     }
 
     @Test void aBackgroundJobIsSilent() {
@@ -242,7 +242,7 @@ class IndexerTest {
         indexer.add(new Project(LIB, "lib", false));
         settle();
         assertThat(projects.entries()).extracting(entry -> entry.project().key()).containsExactlyInAnyOrder(APP, LIB);
-        assertThat(projectsFile()).contains("key = \"local:" + APP.root() + "\"").contains("key = \"local:" + LIB.root() + "\"");
+        assertThat(savedKeys()).containsExactlyInAnyOrder(APP, LIB);
     }
 
     @Test void aProjectRemovedWhileTheListLoadsStaysGone() throws IOException {
@@ -252,7 +252,7 @@ class IndexerTest {
         indexer.remove(LIB);
         settle();
         assertThat(projects.entries()).extracting(entry -> entry.project().key()).containsExactly(APP);
-        assertThat(projectsFile()).contains("local:" + APP.root()).doesNotContain("local:" + LIB.root());
+        assertThat(savedKeys()).containsExactly(APP);
     }
 
     @Test void anUnreadableProjectListStillCompletesTheLoad() throws IOException {
@@ -265,7 +265,7 @@ class IndexerTest {
         settle();
         assertThat(java.nio.file.Files.readString(data.resolve("projects.toml.bad"))).as("the unreadable list is kept")
             .isEqualTo("[[project]]\nkey = 5\n");
-        assertThat(projectsFile()).contains("local:" + APP.root());
+        assertThat(savedKeys()).containsExactly(APP);
     }
 
     @Test void aFailingReportStillStartsTheFollowUpAndClearsProgress() {
@@ -277,6 +277,11 @@ class IndexerTest {
         assertThatThrownBy(this::settle).isInstanceOf(IllegalStateException.class);
         settle();
         assertThat(calls).as("the follow-up still started").hasSize(2);
+    }
+
+    List<ProjectKey> savedKeys() {
+        try { return store.loadProjects().stream().map(Project::key).toList(); }
+        catch (IOException missing) { throw new AssertionError(missing); }
     }
 
     String projectsFile() {

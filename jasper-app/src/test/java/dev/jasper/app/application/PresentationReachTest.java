@@ -73,6 +73,7 @@ class PresentationReachTest {
             });
         } finally {
             edt(() -> { if (application[0] != null) application[0].quitNow(); });
+            ApplicationPluginCleanup.await(application[0]);
             edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
         }
     }
@@ -136,6 +137,7 @@ class PresentationReachTest {
             });
         } finally {
             edt(() -> { if (application[0] != null) application[0].quitNow(); });
+            ApplicationPluginCleanup.await(application[0]);
             edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
             service.close();
         }
@@ -191,6 +193,7 @@ class PresentationReachTest {
             });
         } finally {
             edt(() -> { if (application[0] != null) application[0].quitNow(); });
+            ApplicationPluginCleanup.await(application[0]);
             edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
         }
     }
@@ -232,6 +235,7 @@ class PresentationReachTest {
                 .of("dev.example.look").state().equals(java.util.Optional.of(dev.jasper.app.presentation.AttemptStore.State.FAILED)));
         } finally {
             edt(() -> { if (application[0] != null) application[0].quitNow(); });
+            ApplicationPluginCleanup.await(application[0]);
             edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
             trace.look(look);
         }

@@ -3,6 +3,9 @@ import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JvmVendorSpec
 
+@Suppress("UNCHECKED_CAST")
+val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.gradle.api.artifacts.Configuration>
+
 // The build-time twin of PluginClassLoader: an in-repo plugin may reference only the JDK, the SDK,
 // its own packages, libraries it bundles, and the exported packages of plugins it requires.
 // Every plugins/<name>/ module (settings.gradle.kts discovers them) is checked; a plugin that requires
@@ -12,6 +15,7 @@ val pluginProjects = subprojects.filter { it.projectDir.parentFile == file("plug
 val pluginImports = pluginProjects.keys.associateWith { declaredImports[it] ?: listOf<String>() }
 val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
     pluginImports.keys.forEach { dependsOn("$it:classes") }
+    inputs.files(pluginProjects.keys.map { verificationClasspaths.getValue(it) })
     doLast {
         val launcher = pluginProjects.values.first().extensions.getByType<JavaToolchainService>().launcherFor {
             languageVersion = JavaLanguageVersion.of(25)
@@ -36,7 +40,7 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
                 it.relativeTo(classes).invariantSeparatorsPath.removeSuffix(".class").replace('/', '.').substringBeforeLast('.')
             }.toSet()
             // Bundled libraries are whatever the plugin ships beside its jar: its runtime classpath.
-            val bundled = module.configurations.getByName("runtimeClasspath").asPath
+            val bundled = verificationClasspaths.getValue(module.path).asPath
             // Source launch is explicitly the JetBrains25 toolchain, never the Gradle daemon JVM.
             tool("java", listOf("--class-path", bundled, checker, classes.absolutePath))
             val args = mutableListOf("--multi-release", "25", "--ignore-missing-deps", "-verbose:class", "-filter:none")

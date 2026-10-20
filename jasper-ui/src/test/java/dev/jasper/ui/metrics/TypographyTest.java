@@ -152,7 +152,7 @@ public class TypographyTest {
         for (var role : List.of(Typography.Role.BODY, Typography.Role.CAPTION, Typography.Role.SECTION_LABEL)) {
             assertThat(kit.font(role, "Run").getFontName(Locale.ROOT)).as(role + ": a text the face draws").isEqualTo(face);
             assertThat(kit.font(role, "Run")).as(role + ": as with no text").isEqualTo(kit.font(role));
-            assertThat(kit.font(role, shortcut)).as(role + ": the platform face draws the whole text").isEqualTo(platform().font(role));
+            assertThat(kit.font(role, shortcut)).as(role + ": the platform face draws the whole text").isEqualTo(platform().font(role, shortcut));
         }
         String cjk = "\u5831\u544A.txt";
         for (var role : List.of(Typography.Role.MONO, Typography.Role.MONO_SMALL, Typography.Role.RUN_DETAIL)) {
@@ -162,6 +162,19 @@ public class TypographyTest {
             assertThat(kit.font(role, cjk).getFamily(Locale.ROOT)).isEqualTo(Font.MONOSPACED);
         }
         assertThatThrownBy(() -> kit.font(Typography.Role.BODY, (String) null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test void aPhysicalUserFaceFallsBackToALogicalFontForMissingGlyphs() throws Exception {
+        String face = registeredWithoutModifierSymbols();
+        String shortcut = "\u21E7\u2318P";
+        var typography = named(face, 20);
+        var plain = typography.font(Typography.Role.CAPTION, "Run");
+        var fallback = typography.font(Typography.Role.CAPTION, shortcut);
+        assertThat(plain.getFamily(Locale.ROOT)).isEqualTo(face);
+        assertThat(fallback.getFamily(Locale.ROOT)).isEqualTo(Font.SANS_SERIF);
+        assertThat(fallback.canDisplayUpTo(shortcut)).as("logical fallback includes modifier glyphs").isEqualTo(-1);
+        assertThat(fallback.getSize2D()).isEqualTo(plain.getSize2D());
+        assertThat(fallback.getAttributes().get(TextAttribute.WEIGHT)).isEqualTo(plain.getAttributes().get(TextAttribute.WEIGHT));
     }
 
     /**

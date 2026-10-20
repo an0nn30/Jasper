@@ -40,21 +40,15 @@ application {
 
 // Bundled plugins are separate jars in plugins/<id>/, never on the application classpath.
 val stagePlugins = tasks.register<Sync>("stagePlugins") {
-    from(project(":jasper-plugin-sample").tasks.named("jar")) { into("dev.jasper.sample") }
-        from(project(":jasper-plugin-snippets").tasks.named("jar")) { into("dev.jasper.snippets") }
-        from(project(":jasper-plugin-snippets").configurations.named("runtimeClasspath")) { into("dev.jasper.snippets") }
-    from(project(":jasper-plugin-history").tasks.named("jar")) { into("dev.jasper.history") }
-    from(project(":jasper-plugin-vault").tasks.named("jar")) { into("dev.jasper.vault") }
-    from(project(":jasper-plugin-vault").configurations.named("runtimeClasspath")) { into("dev.jasper.vault") }
-    from(project(":jasper-plugin-remote").tasks.named("jar")) { into("dev.jasper.remote") }
-    from(project(":jasper-plugin-remote").configurations.named("runtimeClasspath")) { into("dev.jasper.remote") }
-    from(project(":jasper-plugin-editor").tasks.named("jar")) { into("dev.jasper.editor") }
-    from(project(":jasper-plugin-editor").configurations.named("runtimeClasspath")) { into("dev.jasper.editor") }
-    from(project(":jasper-plugin-fileserver").tasks.named("jar")) { into("dev.jasper.fileserver") }
-    from(project(":jasper-plugin-fileserver").configurations.named("runtimeClasspath")) { into("dev.jasper.fileserver") }
-    from(project(":jasper-plugin-indexer").tasks.named("jar")) { into("dev.jasper.indexer") }
-    from(project(":jasper-plugin-indexer").configurations.named("runtimeClasspath")) { into("dev.jasper.indexer") }
-    from(project(":jasper-plugin-enterprise").tasks.named("jar")) { into("dev.jasper.enterprise") }
+    from(project(":jasper-plugin-sample").tasks.named("stagePlugin")) { into("dev.jasper.sample") }
+    from(project(":jasper-plugin-snippets").tasks.named("stagePlugin")) { into("dev.jasper.snippets") }
+    from(project(":jasper-plugin-history").tasks.named("stagePlugin")) { into("dev.jasper.history") }
+    from(project(":jasper-plugin-vault").tasks.named("stagePlugin")) { into("dev.jasper.vault") }
+    from(project(":jasper-plugin-remote").tasks.named("stagePlugin")) { into("dev.jasper.remote") }
+    from(project(":jasper-plugin-editor").tasks.named("stagePlugin")) { into("dev.jasper.editor") }
+    from(project(":jasper-plugin-fileserver").tasks.named("stagePlugin")) { into("dev.jasper.fileserver") }
+    from(project(":jasper-plugin-indexer").tasks.named("stagePlugin")) { into("dev.jasper.indexer") }
+    from(project(":jasper-plugin-enterprise").tasks.named("stagePlugin")) { into("dev.jasper.enterprise") }
     into(layout.buildDirectory.dir("plugins"))
 }
 // installDist and the distribution archives carry them beside the application jar, where the runtime looks.

@@ -433,6 +433,8 @@ public final class PluginRuntime {
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<Problem> startupProblems = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
+    private final CompletableFuture<Void> resourcesClosed = new CompletableFuture<>();
+    private boolean stopped;
     private final PluginSettingsFiles settingsFiles;
     private java.util.concurrent.ScheduledExecutorService settingsPoller;
     private volatile Map<String, PluginCandidate> launched = Map.of();
@@ -852,26 +854,33 @@ public final class PluginRuntime {
     }
 
     /**
-     * Stops plugins in reverse order. The futures complete when background work has drained and the
-     * classloaders are closed; the caller bounds the wait.
+     * Stops plugins in reverse order. The futures bound the background work grace before interruption.
+     * Classloaders close once workers actually terminate, so their cleanup can still load classes.
      *
      * @return asynchronous remainders of the shutdown
      */
     public List<CompletableFuture<?>> stop() {
+        if (stopped) return List.of();
+        stopped = true;
         synchronized(artworkLock){artworkStopped=true;artworkEpoch++;pluginIcons=Map.of();}
         if (settingsPoller != null) settingsPoller.shutdownNow();
         PluginHost current = host;
-        if (current == null) return List.of();
+        if (current == null) { resourcesClosed.complete(null); return List.of(); }
         if (adminWorker != null) adminWorker.shutdown();
         List<CompletableFuture<?>> pending = new ArrayList<>(current.stop());
         List<PluginClassLoader> closing = List.copyOf(loaders);
         loaders.clear();
-        pending.add(CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).whenComplete((done, failure) -> {
+        var adminTerminated = adminWorker == null ? CompletableFuture.completedFuture(null)
+            : HostedContext.terminated(adminWorker, "admin");
+        CompletableFuture.allOf(current.workersTerminated(), adminTerminated,
+            CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new))).whenComplete((done, failure) -> {
+            if (failure != null) { resourcesClosed.completeExceptionally(failure); return; }
             for (PluginClassLoader loader : closing) {
                 try { loader.close(); }
                 catch (IOException ignored) { LOG.log(System.Logger.Level.DEBUG, "Could not close " + loader.getName()); }
             }
-        }));
+            resourcesClosed.complete(null);
+        });
         return pending;
     }
 

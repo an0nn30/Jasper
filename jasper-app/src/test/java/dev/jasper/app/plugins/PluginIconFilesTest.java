@@ -154,8 +154,10 @@ class PluginIconFilesTest {
             assertThat(row.icon()).hasValueSatisfying(icon -> assertThat(icon.svg()).isTrue());
         } finally {
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
+            var pluginWorkers = PluginShutdownTestSupport.capture(runtime.get());
             onEdt(() -> pending.set(runtime.get().stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            pluginWorkers.await();
         }
     }
 }

@@ -66,6 +66,8 @@ final class EnterpriseSettings implements AutoCloseable {
         rail_width = 28
         columns = 100
         lines = 35
+        [system]
+        run_in_background = true
         [notifications]
         system = true
         long_command_seconds = 10
@@ -193,8 +195,9 @@ final class EnterpriseSettings implements AutoCloseable {
                 var keymapHooks = new KeymapPage.Hooks(contributions, Map::of, runtime[0]::pluginNames, true,
                     edits -> CompletableFuture.completedFuture(null));
                 var pages = new CorePages.Pages(context -> new KeymapPage(keymapHooks, context), context -> manager.page(context), context -> runtime[0].settingsPages(context));
+                // Match the mock's macOS workspace capability as well as its projections and shortcut labels.
                 dialog[0] = new SettingsDialog(windows, CorePages.pages(choices, new CorePages.SystemActions(() -> Path.of("/Users/RQ7RQVF/.config/jasper/config.toml"),
-                        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.of(vm()), Optional.of(commandLine())), ShellChoices.NONE, new NotificationGroupChoices(EnterpriseSettings::groups), pages),
+                        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.of(vm()), Optional.of(commandLine())), ShellChoices.NONE, new NotificationGroupChoices(EnterpriseSettings::groups), pages, true),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }), () -> { }, () -> { },
                         uri -> { }, (parent, count) -> true, () -> themes[0].appearance().context(ThemeRoute.CHROME), projections.settings(), projections.composition()));
                 dialog[0].open(null, "appearance");
@@ -239,9 +242,11 @@ final class EnterpriseSettings implements AutoCloseable {
         try {
             if (dialog != null) SwingUtilities.invokeAndWait(dialog::cancel);
             if (runtime != null) {
+                var workers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime);
                 var stopping = new CompletableFuture<List<CompletableFuture<?>>>();
                 SwingUtilities.invokeAndWait(() -> stopping.complete(runtime.stop()));
                 CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+                workers.await();
             }
             SwingUtilities.invokeAndWait(() -> { windows.close(); if (themes != null) themes.close(); });
         } finally {

@@ -83,10 +83,21 @@ class EditorKitTest {
                         var text = find(view, "text0", JLabel.class);
                         assertThat(text.isEnabled()).as("passive does not dim error text").isTrue();
                         assertThat(text.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.STATUS_DANGER));
-                        var pixels=paint(text,140,28); int opaqueInk=0;
-                        for(int y=0;y<pixels.getHeight();y++)for(int x=0;x<pixels.getWidth();x++)
-                            if((pixels.getRGB(x,y)>>>24)>200)opaqueInk++;
-                        assertThat(opaqueInk).as("passive error glyphs paint at full opacity").isGreaterThan(10);
+                        var pixels=paint(text,140,28);
+                        var reference=new BufferedImage(140,28,BufferedImage.TYPE_INT_ARGB);
+                        var graphics=reference.createGraphics();
+                        try {
+                            ThemePainting.antialias(graphics);
+                            graphics.setFont(text.getFont()); graphics.setColor(text.getForeground());
+                            graphics.drawString(text.getText(),0,graphics.getFontMetrics().getAscent());
+                        } finally { graphics.dispose(); }
+                        long ink=0, referenceInk=0;
+                        for(int y=0;y<pixels.getHeight();y++)for(int x=0;x<pixels.getWidth();x++) {
+                            ink += pixels.getRGB(x,y) >>> 24;
+                            referenceInk += reference.getRGB(x,y) >>> 24;
+                        }
+                        assertThat(referenceInk).isPositive();
+                        assertThat(ink).as("passive error glyphs retain full opacity").isEqualTo(referenceInk);
                         find(view, "action0", AbstractButton.class).doClick();
                         assertThat(events).containsExactly(new UiEvent.Action("copy"));
                         view.reveal("text29");
