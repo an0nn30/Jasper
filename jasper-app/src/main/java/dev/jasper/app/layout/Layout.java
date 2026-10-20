@@ -381,9 +381,13 @@ public final class Layout {
     /**
      * Where {@code group} sits (parent tabs spec 4's origin; workspace plan 7b Rulings 2): the group beside it, across its
      * edge with the sibling its space goes to when it leaves (the one before it, or after it when it is first, as
-     * {@link #remove(TabId)} gives it); the side of that group it is on; and its weight's share of the two siblings'. Of the
-     * groups across that edge, the one {@link #neighbour} finds is beside it. A layout's only group sits on the right of
-     * itself, at half.
+     * {@link #remove(TabId)} gives it); the side of that group it is on; and its weight's share of the two siblings', held
+     * between 0.01 and 0.99 so that weights read from a file never make an origin fail. Of the groups across that edge, the
+     * one {@link #neighbour} finds is beside it. A layout's only group sits on the right of itself, at half.
+     * <p>{@link #remove(TabId)} then {@link #graft} at the origin restores the split exactly when the sibling is a single
+     * group. When it is a split, the group comes back beside the one of that split's groups nearest its edge (the one
+     * {@link #neighbour} finds), and the split around that group changes: {@code H(V(a, c), b)} gives
+     * {@code V(H(a, b), c)} for {@code b}.
      *
      * @param parentTab the parent tab this layout is
      * @param group a group of the layout
@@ -405,13 +409,13 @@ public final class Layout {
         GroupId beside = neighbour(group, toward).filter(found -> near.stream().anyMatch(candidate -> candidate.id().equals(found)))
             .orElse(near.getFirst().id());
         double own = split.children().get(index).weight(), other = split.children().get(sibling).weight();
-        return new Origin(parentTab, beside, side, own / (own + other));
+        return new Origin(parentTab, beside, side, Math.clamp(own / (own + other), MIN_SHARE, MAX_SHARE));
     }
 
     /**
      * Bring Back's layout (parent tabs spec 5): {@code panes} beside {@code beside}, on {@code side} with {@code share} of
      * the space the two share, nested as they were; their active group becomes the active one and a maximize ends (spec
-     * 11). The empty workspace takes {@code panes} whole.
+     * 11), the panes' own among them. The empty workspace takes {@code panes} whole.
      *
      * @param panes the layout coming back: at least one tab, and no id this layout has
      * @param beside a group of this layout
@@ -437,6 +441,9 @@ public final class Layout {
         orders.putAll(panes.tabOrders);
         return new Layout(next, panes.activeGroup, Optional.empty(), order, orders);
     }
+
+    /** The least and the most of the space {@link #origin} gives a pane. */
+    private static final double MIN_SHARE = 0.01, MAX_SHARE = 0.99;
 
     /** The split whose child {@code group} is, and that child's index. */
     private record Parent(Split split, int index) { }
