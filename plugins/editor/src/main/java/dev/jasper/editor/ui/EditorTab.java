@@ -69,6 +69,7 @@ public final class EditorTab {
     boolean linkedScrolling() { return linkedScrolling; }
     void markdownMode(MarkdownMode mode, boolean explicit) {
         if (closed || !showingText() || !markdownEligible() || markdown == null) return;
+        dismissHiddenFind(mode);
         retainedMarkdownMode = mode;
         markdown.mode(mode);
         if (explicit && markdownPreferences != null) markdownPreferences.select(mode).whenComplete((ignored, failure) -> {
@@ -82,13 +83,22 @@ public final class EditorTab {
         if (markdown != null && markdown.mode() == MarkdownMode.PREVIEW) markdownMode(MarkdownMode.SPLIT, false);
         document.focusSource(true); focusContent();
     }
+    private void dismissHiddenFind(MarkdownMode mode) {
+        if (find == null) return;
+        if (mode == MarkdownMode.PREVIEW) find.paneHidden(area());
+        else if (mode == MarkdownMode.SOURCE) find.paneHidden(document.preview().editor());
+    }
     private void updateMarkdownEligibility() {
         if (markdown == null) return;
         boolean eligible = markdownEligible();
         if (eligible && (!wasMarkdown || retainedMarkdownMode == null && markdownPreferences != null)) {
             if (retainedMarkdownMode == null && markdownPreferences != null) retainedMarkdownMode = markdownPreferences.current();
-            markdown.mode(retainedMarkdownMode == null ? MarkdownMode.SOURCE : retainedMarkdownMode);
-        } else if (!eligible && wasMarkdown) { markdown.mode(MarkdownMode.SOURCE); document.focusSource(true); }
+            var mode = retainedMarkdownMode == null ? MarkdownMode.SOURCE : retainedMarkdownMode;
+            dismissHiddenFind(mode); markdown.mode(mode);
+        } else if (!eligible && wasMarkdown) {
+            dismissHiddenFind(MarkdownMode.SOURCE);
+            markdown.mode(MarkdownMode.SOURCE); document.focusSource(true);
+        }
         wasMarkdown = eligible;
     }
     javax.swing.text.JTextComponent focusedContent() { return document.focusedContent(); }
@@ -133,6 +143,7 @@ public final class EditorTab {
     private void shutdown() {
         if (closed) return;
         closed = true;
+        if (find != null) find.dismiss();
         focusPending = false;
         edits.stop();
         if (markdown != null) markdown.close();
@@ -150,7 +161,11 @@ public final class EditorTab {
         if (vim != null) vim.editorDefaults(defaults());
     }
     void typography(TerminalTypography value) { if (!closed) document.typography(value); }
-    void find(FindBar value) { if (closed) return; find = value; render(); }
+    void find(FindBar value) {
+        if (closed) return;
+        if (find != null && find != value) find.dismiss();
+        find = value; render();
+    }
     void render() { if (!closed) view.update(spec()); }
     private void reveal(String id) { if (!closed) view.reveal(id); }
 
@@ -248,7 +263,8 @@ public final class EditorTab {
         if (markdown != null) children.add(MarkdownToolbar.resources(markdown.mode(), markdown.needsImageConsent(), markdown.imageFailures()));
         if (markdown != null && markdown.failure().isPresent() && markdown.mode() != dev.jasper.editor.markdown.MarkdownMode.SOURCE) {
             children.add(new Nodes.Stack("document.preview.failure", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-                new Nodes.Text("document.preview.message", ControlState.READY, markdown.failure().orElseThrow(), Nodes.TextRole.BODY),
+                new Nodes.Text("document.preview.message", ControlState.READY,
+                    (document.preview().installedResult().isPresent() ? "Preview is out of date. " : "") + markdown.failure().orElseThrow(), Nodes.TextRole.BODY),
                 button("document.preview.source", "Source", true), button("document.preview.retry", "Retry", true))));
         }
         boolean banner = session.banner() != DocumentSession.Banner.NONE;

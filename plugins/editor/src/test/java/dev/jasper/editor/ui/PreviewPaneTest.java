@@ -175,6 +175,32 @@ class PreviewPaneTest {
         });
         SwingUtilities.invokeAndWait(() -> {assertThat(pane.installedResult()).isEmpty();assertThat(pane.installFailure()).isEmpty();});
     }
+    @Test void traversalExitsWithNoLinksAndAtBothEndsOfLinkSequence() throws Exception {
+        var empty=install(prepare("No links here"));
+        var linked=install(prepare("[first](https://example.com/1) and [last](https://example.com/2)"));
+        SwingUtilities.invokeAndWait(() -> {
+            var original=KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            var transfers=new java.util.ArrayList<String>();
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(new DefaultKeyboardFocusManager() {
+                @Override public void focusNextComponent(Component component) {transfers.add("next");}
+                @Override public void focusPreviousComponent(Component component) {transfers.add("previous");}
+            });
+            try {
+                linkAction(empty,"next");linkAction(empty,"previous");
+                assertThat(transfers).containsExactly("next","previous");transfers.clear();
+                linked.editor().setCaretPosition(0);
+                linkAction(linked,"next");assertThat(linked.editor().getSelectedText()).isEqualTo("first");
+                linkAction(linked,"previous");assertThat(transfers).containsExactly("previous");transfers.clear();
+                linkAction(linked,"next");assertThat(linked.editor().getSelectedText()).isEqualTo("last");
+                linkAction(linked,"next");assertThat(transfers).containsExactly("next");
+                linkAction(linked,"previous");assertThat(linked.editor().getSelectedText()).isEqualTo("first");
+            } finally {KeyboardFocusManager.setCurrentKeyboardFocusManager(original);empty.close();linked.close();}
+        });
+    }
+    private static void linkAction(PreviewPane pane,String direction) {
+        pane.editor().getActionMap().get("preview."+direction+"-link").actionPerformed(
+            new java.awt.event.ActionEvent(pane.editor(),java.awt.event.ActionEvent.ACTION_PERFORMED,""));
+    }
     @Test void onlyKnownLinkIdsReachTheController() throws Exception {
         var prepared=prepare("[known](https://example.com)");var activated=new java.util.ArrayList<Integer>();PreviewPane[] holder={null};
         SwingUtilities.invokeAndWait(() -> {holder[0]=new PreviewPane(activated::add,() -> {});holder[0].install(prepared,TYPE,palette(false),EditorThemeTest.syntax(1),new Font("Serif",0,12),1);});

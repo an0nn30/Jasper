@@ -160,7 +160,7 @@ public final class EditorWindow {
         ask = question -> environment.askers().apply(owner()).apply(question);
         await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
         navigation = new MarkdownNavigation(this, context.platform()::browse);
-        findBar = new FindBar(() -> selected().flatMap(EditorTab::findTarget), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }));
+        findBar = new FindBar(() -> selected().flatMap(EditorTab::findTarget), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }), () -> selected().ifPresent(EditorTab::revealSource));
         status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim);
         commands = List.of(
             command("save", "Save", KeyEvent.VK_S, 0, this::save),

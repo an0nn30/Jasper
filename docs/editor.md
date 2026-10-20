@@ -126,9 +126,10 @@ existing tabs keep their own modes. The Synchronize scrolling toggle links corre
 directions and stays local to the tab. Changing the language away from Markdown releases preview work.
 
 Preview renders unsaved text after a 250 ms pause. Source and preview share the same document session and undo history.
-Find searches the pane last focused; preview search includes rendered code and excludes mapping markers. Replace and
-Go to Line reveal Source in Split without changing the saved default. Tab/Shift+Tab select preview links and Enter
-activates one. Save, Save As and close use the existing file and dirty-prompt flow.
+Find searches the pane last focused; preview search includes rendered code and excludes mapping markers. The Find bar
+closes when its tab changes or its pane is hidden. Replace and Go to Line reveal Source in Split without changing the
+saved default. Tab/Shift+Tab select preview links and leave the pane at either end; Enter activates a selected link.
+Save, Save As and close use the existing file and dirty-prompt flow.
 
 Headings, lists, quotes, tables, task marks, strikethrough and syntax-colored fenced code use a native Swing view.
 Raw HTML is escaped and comments are omitted. Body text follows the host UI family at the effective Editor size;
@@ -139,7 +140,8 @@ Relative images and file links resolve through the open document's provider, pre
 route and login. Relative Markdown links reuse already-open dirty tabs; fragments navigate to headings. Web links
 open through the host on activation. Web images require **Load external images** for that document and tab lifetime;
 consent survives reload and moves and resets on Save As or close. Failed images retain their alt text and a reason,
-with Retry available. Untitled documents must be saved before relative resources can resolve.
+with Retry available. A failed preview retains the previous rendering with an out-of-date label and Retry/Source actions.
+Untitled documents must be saved before relative resources can resolve.
 
 Preview limits are 2,097,152 UTF-16 units, 16 MiB of generated UTF-8 HTML and 50,000 mapped blocks. Exceeding a limit
 shows a Source action. Each image is limited to 8 MiB encoded and 16 million pixels; four loads and 64 MiB of retained

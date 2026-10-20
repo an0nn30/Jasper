@@ -19,6 +19,7 @@ public final class FindBar {
     private final Supplier<Optional<FindTarget>> target;
     private final Runnable changed;
     private final Consumer<String> focus;
+    private final Runnable revealSource;
     private FindTarget captured;
     private PreviewSearch previewSearch;
     private final Runnable previewChanged = this::update;
@@ -26,7 +27,10 @@ public final class FindBar {
     private boolean matchCase, wholeWord, regex, visible, withReplace;
 
     public FindBar(Supplier<Optional<FindTarget>> target, Runnable changed, Consumer<String> focus) {
-        this.target=target; this.changed=changed; this.focus=focus;
+        this(target,changed,focus,() -> {});
+    }
+    FindBar(Supplier<Optional<FindTarget>> target, Runnable changed, Consumer<String> focus, Runnable revealSource) {
+        this.target=target; this.changed=changed; this.focus=focus; this.revealSource=revealSource;
     }
     public void open(boolean withReplace) {
         detachPreview();
@@ -43,10 +47,16 @@ public final class FindBar {
     }
     public void close() {
         var restore = activeTarget();
-        visible=false;
-        restore.ifPresent(value -> { if (value instanceof FindTarget.Source source) source.area().clearMarkAllHighlights(); });
-        detachPreview(); captured=null; changed.run();
+        dismiss();
         restore.or(() -> target.get().filter(FindTarget::available)).ifPresent(value -> value.content().requestFocusInWindow());
+    }
+    /** Ends captured ownership without moving focus during tab/pane transitions. */
+    void dismiss() {
+        if (!visible) return;
+        visible=false; detachPreview(); captured=null; changed.run();
+    }
+    void paneHidden(javax.swing.text.JTextComponent pane) {
+        if (captured != null && captured.content() == pane) dismiss();
     }
     private void detachPreview() {
         if (captured instanceof FindTarget.Source source) source.area().clearMarkAllHighlights();
@@ -106,8 +116,16 @@ public final class FindBar {
     public void next() { search(true); }
     public void previous() { search(false); }
 
+    private Optional<RSyntaxTextArea> replacementSource() {
+        var owner=source();
+        if (owner.isEmpty()) return owner;
+        revealSource.run();
+        // Revalidate after revealing: a shared bar must never edit a different selected tab.
+        return owner.filter(area -> target.get().filter(FindTarget::available)
+            .map(value -> value.content() == area).orElse(false));
+    }
     public void replaceOne() {
-        source().ifPresent(area -> guarded(() -> {
+        replacementSource().ifPresent(area -> guarded(() -> {
             SearchContext context = context(true);
             context.setReplaceWith(replace);
             if (SearchEngine.replace(area, context).wasFound()) update();
@@ -116,7 +134,7 @@ public final class FindBar {
     }
 
     public void replaceAll() {
-        source().ifPresent(area -> guarded(() -> {
+        replacementSource().ifPresent(area -> guarded(() -> {
             SearchContext context = context(true);
             context.setReplaceWith(replace);
             status("Replaced " + SearchEngine.replaceAll(area, context).getCount());

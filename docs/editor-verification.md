@@ -187,11 +187,12 @@ per-document retained memory nor a process RSS limit.
 The vendor's single bulk Java-tokenizer call remains noninterruptible: the 2 MiB `int ` fixture measured
 about 27 seconds from interruption to return. It runs on the render worker with one replaceable pending snapshot.
 
-Before the scroll-restart review fix, headless `check` passed on October 20 with the installed Python 3.13 override:
-11,843 tests, zero failures/errors, 29 skips (25 existing platform skips and four opt-in performance cases, which passed separately). `sdkRelease`,
-`packageApp` and `verifyPackage` passed; the macOS arm64 image has no trained AOT cache. After that fix,
-107 focused scroll/controller/tab/window/integration tests and the plugin architecture gate passed; the full
-check and packaging have not been repeated.
+Before the review fixes, headless `check` passed on October 20 with the installed Python 3.13 override:
+11,843 tests, zero failures/errors, 29 skips (25 existing platform skips and four opt-in performance cases,
+which passed separately); `sdkRelease` also passed. After the review fixes, the full Editor check passed:
+5,115 tests, zero failures/errors, four opt-in performance skips, plus plugin, SDK and application architecture gates.
+Headless `packageApp` and `verifyPackage` rebuilt and verified the macOS arm64 image without a trained AOT cache.
+The whole-repository check has not been repeated after the review fixes.
 
 User-run desktop acceptance remains pending:
 
@@ -199,7 +200,7 @@ User-run desktop acceptance remains pending:
 - [ ] Check fractional sizes, installed fallback glyphs, ligatures, IME, wrapped combining marks/emoji, selection and pointer/caret alignment.
 - [ ] Check classic/modern toolbar tooltips, physical keyboard focus, Source/Split/Preview, divider dragging and restart persistence.
 - [ ] Scroll both panes with a trackpad, disable synchronization, edit/delete the visible heading, resize and change fonts while preserving passages.
-- [ ] Find and copy preview text, activate links by keyboard, and verify Replace/Go to Line reveal the source without changing the default mode.
+- [ ] Find and copy preview text, activate links by keyboard, Tab/Shift+Tab out of Preview, and verify Replace/Go to Line reveal the source without changing the default mode.
 - [ ] Check light/dark/glass, large fonts, dense markup and long-document typing on the target desktop.
 - [ ] Move hidden and active tabs between real windows while rendering, then reactivate and verify focus.
 - [ ] Load relative images through SFTP sign-in and distinct routes, grant web-image consent, Save As and close during late image completion.

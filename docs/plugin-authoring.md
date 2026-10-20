@@ -500,7 +500,7 @@ The Editor (`plugins/editor`) is the worked example for an exported interface th
 implements: `dev.jasper.editor.api.EditorDocument` is written by whoever supplies a file (Remote, for
 SFTP), while the Editor publishes `Editor` and calls the document's futures from the UI thread.
 Editor 0.11.0 adds the optional `EditorDocument.resolveRelative(String)` hook for Markdown resources and links.
-Validate the decoded relative path with `RelativePaths.require`; return a handle preserving the original storage,
+Validate the decoded relative path with `RelativePaths.requireValid`; return a handle preserving the original storage,
 authentication and owner context without I/O. The default returns empty. Local and Remote 0.15.1 implement it;
 Remote retains compatibility with older Editor APIs. Resource reads use the handle's existing bounded `read` future.
 

@@ -70,7 +70,6 @@ class MarkdownAcceptanceTest {
                 for(var tab:tabs){assertThat(tab.area().getFont().getSize2D()).isEqualTo(13.5f);assertThat(tab.markdown().currentResult()).isPresent();}
                 assertThat(requests).hasValue(0);
                 assertThat(tabs[0].markdown().needsImageConsent()).isTrue();assertThat(tabs[1].markdown().needsImageConsent()).isTrue();
-                tabs[1].markdown().allowImages();
                 var appearance=context[0].appearance();
                 host.setWorkspace(Variant.DARK,PreviewPaneTest.palette(true),appearance.editorPalette(),EditorThemeTest.syntax(0x552200));
                 var query=new org.fife.ui.rtextarea.SearchContext();query.setSearchFor("Unsaved");
@@ -79,6 +78,8 @@ class MarkdownAcceptanceTest {
                 tabs[1].area().redoLastAction();
                 tabs[1].session().save();tabs[0].session().save();
             });drain(host);
+            // Grant consent after undo/redo has settled its replacement render generation.
+            edt(() -> {assertThat(requests).hasValue(0);tabs[1].markdown().allowImages();});
             long deadline=System.nanoTime()+5_000_000_000L;
             while(requests.get()==0 && System.nanoTime()<deadline){drain(host);}
             assertThat(requests).hasValue(1);

@@ -53,6 +53,31 @@ class FindBarTest {
         stable.close();assertThat(original.focused).isZero();assertThat(fallback.focused).isEqualTo(1);
     }
 
+    @Test void dismissingOwnershipDoesNotRestoreFocus() {
+        class FocusArea extends RSyntaxTextArea {
+            int focused;
+            @Override public boolean requestFocusInWindow() {focused++;return true;}
+        }
+        var content=new FocusArea();
+        var model=new FindBar(() -> Optional.of(new FindTarget.Source(content)),() -> {},id -> {});
+        model.open(false);model.dismiss();
+        assertThat(model.isVisible()).isFalse();assertThat(content.focused).isZero();
+    }
+
+    @Test void replacementRevealsThenRevalidatesItsCapturedOwner() {
+        var other=new RSyntaxTextArea("foo");
+        var current=new java.util.concurrent.atomic.AtomicReference<FindTarget>(new FindTarget.Source(area));
+        var reveals=new java.util.concurrent.atomic.AtomicInteger();
+        var model=new FindBar(() -> Optional.of(current.get()),() -> {},id -> {},reveals::incrementAndGet);
+        model.open(true);model.event(new dev.jasper.sdk.ui.UiEvent.Edited(FindBar.FIND,"foo"));
+        model.event(new dev.jasper.sdk.ui.UiEvent.Edited(FindBar.REPLACE,"changed"));
+        current.set(new FindTarget.Source(other));model.replaceOne();model.replaceAll();
+        assertThat(reveals.get()).isEqualTo(2);
+        assertThat(area.getText()).isEqualTo("foo bar Foo foo\n");assertThat(other.getText()).isEqualTo("foo");
+        current.set(new FindTarget.Source(area));model.replaceAll();
+        assertThat(area.getText()).isEqualTo("changed bar changed changed\n");
+    }
+
     @Test void countsMatchesAndHonoursTheToggles() {
         assertThat(bar.isVisible()).isFalse();
         bar.open(false);

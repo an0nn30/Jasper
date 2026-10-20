@@ -246,8 +246,11 @@ class MarkdownControllerTest {
         }); broken.set(true);controller.retry();});
         complete();
         edt(() -> {assertThat(controller.failure()).contains("font failure");assertThat(visible()).contains("Old content");
+            assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(),"document.preview.message",dev.jasper.sdk.ui.Nodes.Text.class).text())
+                .contains("out of date", "font failure");
             tab.surface().setFont(new java.awt.Font("Serif",0,12));controller.retry();});
-        complete();edt(() -> assertThat(controller.failure()).isEmpty());
+        complete();edt(() -> {assertThat(controller.failure()).isEmpty();
+            assertThat(dev.jasper.editor.testsupport.Kits.find(tab.view(),"document.preview.message")).isEmpty();});
     }
     @Test void blockMapLimitShowsFailureAndRetryRecovers() throws Exception {
         preview("x\n\n".repeat(50001));complete();

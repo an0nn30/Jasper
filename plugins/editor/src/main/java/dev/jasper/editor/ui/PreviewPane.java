@@ -83,14 +83,16 @@ final class PreviewPane implements AutoCloseable {
     }
     void nextLink(boolean forward) {
         var links = linkElements();
-        if (links.isEmpty()) return;
         Element selected = null;
         if (forward) {
             for (var e : links) if (e.getStartOffset() >= editor.getSelectionEnd()) { selected=e;break; }
-            if (selected == null) selected=links.getFirst();
         } else {
             for (var e : links) if (e.getEndOffset() <= editor.getSelectionStart()) selected=e;
-            if (selected == null) selected=links.getLast();
+        }
+        if (selected == null) {
+            var manager=KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            if (forward) manager.focusNextComponent(editor); else manager.focusPreviousComponent(editor);
+            return;
         }
         editor.select(selected.getStartOffset(),Math.min(editor.getDocument().getLength(),selected.getEndOffset()));
     }

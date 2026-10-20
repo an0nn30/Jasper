@@ -283,6 +283,68 @@ class EditorWindowTest {
         a.close(); old.run().run(); assertThat(window.selected()).containsSame(second);
     }
 
+    @Test void sharedFindOwnershipEndsWhenSelectingAnotherTab() throws Exception { sharedFindOwnership("find"); }
+    @Test void sharedReplaceOwnershipEndsWhenSelectingAnotherTab() throws Exception { sharedFindOwnership("replace"); }
+    private void sharedFindOwnership(String command) throws Exception {
+        var first=opened(file("find-a.md","alpha alpha"));var a=host.contentTabs().getFirst();
+        var second=opened(file("find-b.md","beta beta"));var b=host.contentTabs().getLast();
+        a.select();
+        host.contentCommands(a).stream().filter(c -> c.id().equals(command)).findFirst().orElseThrow().run().run();
+        Kits.type(first.view(),FindBar.FIND,"alpha");Kits.type(first.view(),FindBar.REPLACE,"changed");
+        b.select();
+        assertThat(Kits.node(second.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+        Kits.press(second.view(),FindBar.ALL);
+        assertThat(first.area().getText()).isEqualTo("alpha alpha");
+        assertThat(second.area().getText()).isEqualTo("beta beta");
+        host.contentCommands(b).stream().filter(c -> c.id().equals(command)).findFirst().orElseThrow().run().run();
+        Kits.type(second.view(),FindBar.FIND,"beta");
+        assertThat(Kits.node(second.view(),FindBar.STATUS,Nodes.Text.class).text()).isEqualTo("2 matches");
+    }
+
+    @Test void closingCapturedFindTabLeavesNextTabWithFreshSearchOwnership() throws Exception {
+        var first=opened(file("close-find-a.md","alpha"));var a=host.contentTabs().getFirst();
+        var second=opened(file("close-find-b.md","beta"));var b=host.contentTabs().getLast();
+        a.select();host.contentCommands(a).stream().filter(c -> c.id().equals("find")).findFirst().orElseThrow().run().run();
+        Kits.type(first.view(),FindBar.FIND,"alpha");a.close();
+        assertThat(window.selected()).containsSame(second);
+        assertThat(Kits.node(second.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+        host.contentCommands(b).stream().filter(c -> c.id().equals("find")).findFirst().orElseThrow().run().run();
+        Kits.type(second.view(),FindBar.FIND,"beta");
+        assertThat(Kits.node(second.view(),FindBar.STATUS,Nodes.Text.class).text()).isEqualTo("1 match");
+    }
+
+    @Test void applyingPreviewDefaultAfterLanguageChangeDismissesSourceFind() throws Exception {
+        var tab=opened(file("source-find.txt","alpha"));var handle=host.contentTabs().getLast();
+        tab.markdownPreferences(new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.PREVIEW,
+            mode -> CompletableFuture.completedFuture(null)));
+        host.contentCommands(handle).stream().filter(c -> c.id().equals("find")).findFirst().orElseThrow().run().run();
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isTrue();
+        tab.session().setStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN);
+        assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+    }
+
+    @Test void hidingPreviewAfterLanguageChangeDismissesItsFindBar() throws Exception {
+        var tab=opened(file("preview-find.md","alpha"));var handle=host.contentTabs().getLast();
+        tab.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW,false);
+        host.contentCommands(handle).stream().filter(c -> c.id().equals("find")).findFirst().orElseThrow().run().run();
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isTrue();
+        tab.session().setStyle(SYNTAX_STYLE_PYTHON);
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+    }
+
+    @Test void hidingCapturedSourceDismissesReplaceAndReopeningRevealsItsOwner() throws Exception {
+        var tab=opened(file("hidden-replace.md","alpha alpha"));var handle=host.contentTabs().getLast();
+        var replace=host.contentCommands(handle).stream().filter(c -> c.id().equals("replace")).findFirst().orElseThrow();
+        replace.run().run();Kits.type(tab.view(),FindBar.FIND,"alpha");Kits.type(tab.view(),FindBar.REPLACE,"changed");
+        tab.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW,false);
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+        Kits.press(tab.view(),FindBar.ALL);assertThat(tab.area().getText()).isEqualTo("alpha alpha");
+        replace.run().run();Kits.press(tab.view(),FindBar.ALL);
+        assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        assertThat(tab.area().getText()).isEqualTo("changed changed");
+    }
+
     @Test void replaceAndGoToLineRevealSourceWithoutSavingModePreferences() throws Exception {
         var tab=opened(file("reveal.md", "# One\n\n# Two\n"));
         var writes=new ArrayList<dev.jasper.editor.markdown.MarkdownMode>();
