@@ -102,7 +102,10 @@ type names (`TabHandle` is an item), and its Javadoc says what each one is.
 - The strip's "+" opens a new terminal tab.
 - No pane shows a strip, in either look.
 - **The focused pane:** while a tab holds two or more panes, panes other than the focused one are dimmed, as iTerm2,
-  Ghostty and Warp do. Nothing is dimmed with one pane, and nothing animates.
+  Ghostty and Warp do; `terminal.dim_inactive_panes` sets how much. An inactive window dims its terminals as it does
+  today.
+- **Motion:** the tab strip keeps today's open and close motion where the look has motion. A dragged tab takes its
+  place at once, and nothing else animates.
 
 ## 6. Moving tabs
 
