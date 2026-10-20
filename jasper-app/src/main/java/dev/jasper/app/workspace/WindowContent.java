@@ -1103,7 +1103,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** @return whether this is the main window, which has Jasper's chrome and dock and whose workspace may be empty */
     public boolean isMain() { return role == WindowRole.MAIN; }
 
-    /** Connects with layout state that lives only as long as this window. */
     /** Connects this window to the application-wide terminal registry, once. {@code toFront} raises the native window. */
     public void connectTerminals(TerminalRegistry registry, Runnable toFront) {
         if (closed || terminals != null) return;

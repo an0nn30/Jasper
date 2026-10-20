@@ -370,12 +370,17 @@ public final class WindowManager {
         boolean moved = !to.closed()
             && to.parentTabs().view(parentTab).filter(arrived -> moving.stream().anyMatch(arrived::contains)).isPresent();
         if (moved && !from.closed()) {
-            // The rest stays under its id, so the part that arrived takes a new one: no id is in two windows (spec 4).
-            if (from.parentTabs().view(parentTab).filter(left -> !left.isEmpty()).isPresent())
-                to.parentTabs().reid(parentTab, ParentTabId.random());
-            // The window's only parent tab is the other window's now: the empty workspace it leaves takes a new id
-            // (Rulings 10).
-            else from.parentTabs().renew(parentTab);
+            try {
+                // The rest stays under its id, so the part that arrived takes a new one: no id is in two windows (spec 4).
+                if (from.parentTabs().view(parentTab).filter(left -> !left.isEmpty()).isPresent())
+                    to.parentTabs().reid(parentTab, ParentTabId.random());
+                // The window's only parent tab is the other window's now: the empty workspace it leaves takes a new id
+                // (Rulings 10).
+                else from.parentTabs().renew(parentTab);
+            } catch (RuntimeException | Error thrown) {
+                // A move's own failure is not lost to the repair's.
+                failure = keep(failure, thrown);
+            }
         }
         rethrow(failure);
         return moved;
