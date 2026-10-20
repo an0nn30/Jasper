@@ -18,6 +18,7 @@ public final class EditorFonts {
     private final TerminalTypography typography;
     private final FontRenderContext context;
     private final List<Font> fonts;
+    private final Font[][] styledFonts;
     private final float naturalHeight, ascent;
     private final int height;
 
@@ -36,6 +37,10 @@ public final class EditorFonts {
         }
         if (resolved.isEmpty()) resolved.add(new Font(Font.DIALOG, Font.PLAIN, 1).deriveFont((float)typography.size()));
         fonts = List.copyOf(resolved);
+        styledFonts=new Font[fonts.size()][4];
+        for(int i=0;i<fonts.size();i++) for(int style=0;style<4;style++)
+            styledFonts[i][style]=fonts.get(i).deriveFont(style).deriveFont(Map.of(
+                TextAttribute.LIGATURES,typography.ligatures()?1:0,TextAttribute.KERNING,typography.ligatures()?1:0));
         float a = 0, d = 0;
         for (Font font : fonts) for (int style = 0; style < 4; style++) {
             var metrics = font.deriveFont(style).getLineMetrics("Mg", context);
@@ -60,15 +65,11 @@ public final class EditorFonts {
     boolean ligatures() { return typography.ligatures(); }
     /** First configured font capable of the complete grapheme, with system fallback last. */
     public Font forGrapheme(String grapheme, int style) {
-        for (Font font : fonts) if (font.canDisplayUpTo(grapheme) < 0) return styled(font, style);
-        return styled(fonts.getLast(), style);
+        for(int i=0;i<fonts.size();i++) if(fonts.get(i).canDisplayUpTo(grapheme)<0) return styledFonts[i][style];
+        return styledFonts[fonts.size()-1][style];
     }
     Font forCodePoint(int codePoint, int style) {
-        for (Font font : fonts) if (font.canDisplay(codePoint)) return styled(font, style);
-        return styled(fonts.getLast(), style);
-    }
-    private Font styled(Font font, int style) {
-        return font.deriveFont(style).deriveFont(Map.of(TextAttribute.LIGATURES, typography.ligatures() ? 1 : 0,
-            TextAttribute.KERNING, typography.ligatures() ? 1 : 0));
+        for(int i=0;i<fonts.size();i++) if(fonts.get(i).canDisplay(codePoint)) return styledFonts[i][style];
+        return styledFonts[fonts.size()-1][style];
     }
 }

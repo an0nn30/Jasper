@@ -54,26 +54,29 @@ public final class LineLayout {
     /** Shapes a logical line, retaining whitespace and every source offset. */
     public static List<Row> layout(String text, int startOffset, List<Span> styles, EditorFonts fonts,
                                    float width, boolean wrap, boolean wordWrap, int tabSize) {
-        styles=List.copyOf(styles);
+        // Token producers are ordered; sorting also admits callers with unordered, disjoint spans.
+        styles=styles.stream().sorted(java.util.Comparator.comparingInt(Span::start)).toList();
         var boundaries=new ArrayList<Integer>(); boundaries.add(startOffset);
         var matcher=GRAPHEME.matcher(text);
         while(matcher.find()) boundaries.add(startOffset+matcher.end());
         if(text.isEmpty()) return List.of(new Row(startOffset,startOffset,List.of(),0,fonts,boundaries));
         var attributed=new AttributedString(text);
-        attributed.addAttribute(TextAttribute.FONT,fonts.primary());
-        attributed.addAttribute(TextAttribute.FOREGROUND,Color.BLACK);
         attributed.addAttribute(TextAttribute.LIGATURES,fonts.ligatures()?1:0);
         attributed.addAttribute(TextAttribute.KERNING,fonts.ligatures()?1:0);
+        var runs=new ArrayList<AttributeRun>();
+        int styleIndex=0;
         matcher.reset();
         while(matcher.find()) {
-            int style=0;
-            for(Span span:styles) if(span.start()<=startOffset+matcher.start() && span.end()>startOffset+matcher.start()) {style=span.fontStyle();break;}
+            int absolute=startOffset+matcher.start();
+            while(styleIndex<styles.size() && styles.get(styleIndex).end()<=absolute) styleIndex++;
+            Span span=styleIndex<styles.size() && styles.get(styleIndex).start()<=absolute?styles.get(styleIndex):null;
+            int style=span==null?0:span.fontStyle();
+            Color foreground=span==null?Color.BLACK:span.foreground();
             String grapheme=matcher.group();
             var font=fonts.forGrapheme(grapheme,style);
-            if(font.canDisplayUpTo(grapheme)<0) attributed.addAttribute(TextAttribute.FONT,font,matcher.start(),matcher.end());
+            if(font.canDisplayUpTo(grapheme)<0) appendRun(runs,matcher.start(),matcher.end(),font,foreground);
             else {
-                // Keep non-spacing marks and variation selectors with their preceding base even if no one
-                // physical face covers the cluster; Java's last logical family supplies the final fallback.
+                // Combining marks and variation selectors stay with their base during per-code-point fallback.
                 int p=matcher.start();
                 while(p<matcher.end()) {
                     int cp=text.codePointAt(p), end=p+Character.charCount(cp);
@@ -82,14 +85,12 @@ public final class LineLayout {
                         if(type!=Character.NON_SPACING_MARK && type!=Character.COMBINING_SPACING_MARK && type!=Character.ENCLOSING_MARK) break;
                         end+=Character.charCount(next);
                     }
-                    attributed.addAttribute(TextAttribute.FONT,fonts.forCodePoint(cp,style),p,end); p=end;
+                    appendRun(runs,p,end,fonts.forCodePoint(cp,style),foreground); p=end;
                 }
             }
         }
-        for(Span span:styles) {
-            int lo=Math.max(0,span.start()-startOffset), hi=Math.min(text.length(),span.end()-startOffset);
-            if(lo<hi) attributed.addAttribute(TextAttribute.FOREGROUND,span.foreground(),lo,hi);
-        }
+        for(var run:runs) attributed.addAttributes(java.util.Map.of(TextAttribute.FONT,run.font(),
+            TextAttribute.FOREGROUND,run.foreground()),run.start(),run.end());
         float limit=wrap?Math.max(1,width):Float.MAX_VALUE;
         float stop=Math.max(1,tabSize)*fonts.spaceAdvance();
         var rows=new ArrayList<Row>();
@@ -132,6 +133,16 @@ public final class LineLayout {
         if(rowStart<text.length() || rows.isEmpty()) rows.add(new Row(startOffset+rowStart,startOffset+p,segments,x,fonts,boundaries));
         return List.copyOf(rows);
     }
+    private record AttributeRun(int start,int end,java.awt.Font font,Color foreground) { }
+    private static void appendRun(List<AttributeRun> runs,int start,int end,java.awt.Font font,Color foreground) {
+        if(!runs.isEmpty()) {
+            var previous=runs.getLast();
+            if(previous.end()==start && previous.font().equals(font) && previous.foreground().equals(foreground)) {
+                runs.set(runs.size()-1,new AttributeRun(previous.start(),end,font,foreground));return;
+            }
+        }
+        runs.add(new AttributeRun(start,end,font,foreground));
+    }
     static Row shifted(Row row, int delta, EditorFonts fonts) {
         return new Row(row.start()+delta,row.end()+delta,row.segments().stream()
             .map(s -> new Segment(s.start()+delta,s.end()+delta,s.x(),s.layout())).toList(),row.width(),fonts,
@@ -148,16 +159,47 @@ public final class LineLayout {
         }
         return new java.awt.geom.Line2D.Float(0,-row.baseline(),0,row.height()-row.baseline());
     }
+    /** Biased insertion edge, including the weak caret at a bidi junction. */
+    public static Shape caret(Row row,Hit hit) {
+        int offset=row.clamp(hit.offset());
+        for(Segment segment:row.segments()) {
+            if(offset<segment.start() || offset>segment.end()) continue;
+            if(offset==segment.end() && !hit.backward() && segment!=row.segments().getLast()) continue;
+            if(segment.layout()!=null) {
+                int local=offset-segment.start();
+                TextHitInfo edge=hit.backward()?TextHitInfo.beforeOffset(local):TextHitInfo.afterOffset(local);
+                return AffineTransform.getTranslateInstance(segment.x(),0).createTransformedShape(segment.layout().getCaretShape(edge));
+            }
+            float x=offset==segment.start()?segment.x():segmentEnd(row,segment);
+            return new java.awt.geom.Line2D.Float(x,-row.baseline(),x,row.height()-row.baseline());
+        }
+        return caret(row,offset);
+    }
+    /** The one grapheme cell adjacent to a shaped hit; its bounds never cross the opposite bidi edge. */
+    public static Shape cell(Row row,Hit hit) {
+        int offset=row.clamp(hit.offset());
+        int start=hit.backward()?row.previous(offset):offset;
+        int end=hit.backward()?offset:row.next(offset);
+        if(start==end) {
+            float x=(float)caret(row,hit).getBounds2D().getX();
+            return new Rectangle2D.Float(x,-row.baseline(),1,row.height());
+        }
+        return highlight(row,start,end);
+    }
     /** Closest grapheme boundary to a visual x coordinate. */
-    public static int hit(Row row,float x) {
+    public static int hit(Row row,float x) { return hitInfo(row,x).offset(); }
+    /** Closest shaped hit, retaining its leading/trailing edge for Swing's bias-aware mapping. */
+    public static Hit hitInfo(Row row,float x) {
         for(Segment segment:row.segments()) {
             float end=segmentEnd(row,segment);
             if(x<=end || segment==row.segments().getLast()) {
-                if(segment.layout()==null) return x<(segment.x()+end)/2?segment.start():segment.end();
-                return row.clamp(segment.start()+segment.layout().hitTestChar(x-segment.x(),0).getInsertionIndex());
+                if(segment.layout()==null) return x<(segment.x()+end)/2
+                    ?new Hit(segment.start(),false):new Hit(segment.end(),true);
+                var hit=segment.layout().hitTestChar(x-segment.x(),0);
+                return new Hit(row.clamp(segment.start()+hit.getInsertionIndex()),!hit.isLeadingEdge());
             }
         }
-        return row.end();
+        return new Hit(row.end(),false);
     }
     private static float segmentEnd(Row row,Segment segment) {
         int next=row.segments().indexOf(segment)+1;

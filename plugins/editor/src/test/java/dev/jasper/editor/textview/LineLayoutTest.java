@@ -91,4 +91,27 @@ class LineLayoutTest {
             new LineLayout.Span(11,17,Font.ITALIC,Color.BLUE)),on,400,false,false,4).getFirst();
         assertEquals(1,mixed.segments().size(),"style boundaries are attributes, not independently shaped strings");
     }
+    @Test void tokenRichMinifiedLineHasBoundedColdLayoutCost() {
+        int repetitions=20_000;
+        String text="int a=1;".repeat(repetitions);
+        var spans=new java.util.ArrayList<LineLayout.Span>(repetitions*2);
+        for(int i=0;i<text.length();i+=8) {
+            spans.add(new LineLayout.Span(i,i+3,Font.BOLD,Color.BLUE));
+            spans.add(new LineLayout.Span(i+3,i+8,Font.PLAIN,Color.BLACK));
+        }
+        long started=System.nanoTime();
+        var rows=LineLayout.layout(text,0,spans,fonts(1),800,true,false,4);
+        long elapsed=System.nanoTime()-started;
+        System.out.println("minified: chars="+text.length()+", spans="+spans.size()+", rows="+rows.size()+", ms="+elapsed/1_000_000);
+        assertEquals(text.length(),rows.getLast().end());
+        assertTrue(elapsed<java.time.Duration.ofSeconds(15).toNanos(),"160k characters/40k token spans must complete within 15s; took "+elapsed/1_000_000+"ms");
+    }
+    @Test void unorderedDisjointStylesHaveTheSameShapingAsTokenOrder() {
+        var ordered=List.of(new LineLayout.Span(0,3,Font.BOLD,Color.BLUE),new LineLayout.Span(3,8,Font.PLAIN,Color.BLACK));
+        var reversed=List.of(ordered.get(1),ordered.get(0));
+        var a=LineLayout.layout("int a=1;",0,ordered,fonts(1),400,false,false,4).getFirst();
+        var b=LineLayout.layout("int a=1;",0,reversed,fonts(1),400,false,false,4).getFirst();
+        assertEquals(a.width(),b.width());
+        for(int i=0;i<=8;i++) assertEquals(LineLayout.caret(a,i).getBounds2D(),LineLayout.caret(b,i).getBounds2D());
+    }
 }

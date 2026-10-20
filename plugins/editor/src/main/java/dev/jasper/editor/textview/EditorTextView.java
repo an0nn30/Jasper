@@ -40,17 +40,34 @@ public final class EditorTextView extends SyntaxView {
     private boolean wrap, wordWrap;
     private int tabSize;
     private final Map<Element,CachedLine> cache=new HashMap<>();
+    private Geometry currentGeometry;
+    private org.fife.ui.rsyntaxtextarea.folding.FoldManager foldManager;
+    private final java.beans.PropertyChangeListener foldChanges=event -> foldsChanged();
     private record CachedLine(int start, String text, List<LineLayout.Row> rows) { }
     private record Placed(int line, int y, LineLayout.Row row) { }
     private record Geometry(List<Placed> rows, int[] tops, int[] heights, float width, int height) { }
 
     public EditorTextView(Element element,Supplier<TerminalTypography> typography) { super(element); this.typography=typography; }
+    @Override public void setParent(View parent) {
+        if(parent==null && foldManager!=null) {foldManager.removePropertyChangeListener(foldChanges);foldManager=null;}
+        currentGeometry=null;
+        super.setParent(parent);
+    }
+    /** Invalidates positions after a fold toggle while retaining the unchanged shaped logical lines. */
+    public void foldsChanged() {currentGeometry=null;preferenceChanged(null,false,true);}
+    private void clearLayouts() {cache.clear();currentGeometry=null;}
     private RSyntaxTextArea area() { return (RSyntaxTextArea)getContainer(); }
     private void configure() {
         RSyntaxTextArea area=area();
         var insets=area.getInsets();
         float available=area.getWidth()-insets.left-insets.right;
-        if(available>0 && width!=available) {width=available;cache.clear();}
+        if(available>0 && width!=available) {width=available;if(area.getLineWrap()) clearLayouts();}
+        if(foldManager!=area.getFoldManager()) {
+            if(foldManager!=null) foldManager.removePropertyChangeListener(foldChanges);
+            foldManager=area.getFoldManager();
+            if(foldManager!=null) foldManager.addPropertyChangeListener(foldChanges);
+            currentGeometry=null;
+        }
         TerminalTypography next=typography==null?null:typography.get();
         if(next==null) {
             Font font=area.getFont();
@@ -59,7 +76,7 @@ public final class EditorTextView extends SyntaxView {
         if(!next.equals(value) || scheme!=area.getSyntaxScheme() || wrap!=area.getLineWrap()
             || wordWrap!=area.getWrapStyleWord() || tabSize!=area.getTabSize()) {
             value=next; fonts=new EditorFonts(next,CONTEXT); scheme=area.getSyntaxScheme();
-            wrap=area.getLineWrap(); wordWrap=area.getWrapStyleWord(); tabSize=area.getTabSize(); cache.clear();
+            wrap=area.getLineWrap(); wordWrap=area.getWrapStyleWord(); tabSize=area.getTabSize(); clearLayouts();
         }
     }
     private List<LineLayout.Row> line(int index) {
@@ -86,6 +103,7 @@ public final class EditorTextView extends SyntaxView {
     }
     private Geometry geometry() {
         configure();
+        if(currentGeometry!=null) return currentGeometry;
         int count=getElement().getElementCount(), y=0; float max=0;
         var placed=new ArrayList<Placed>(); int[] tops=new int[count], heights=new int[count];
         for(int i=0;i<count;i++) {
@@ -94,7 +112,8 @@ public final class EditorTextView extends SyntaxView {
             for(var row:line(i)) { placed.add(new Placed(i,y,row)); y+=row.height(); max=Math.max(max,row.width()); }
             heights[i]=y-tops[i];
         }
-        return new Geometry(List.copyOf(placed),tops,heights,max,y);
+        currentGeometry=new Geometry(List.copyOf(placed),tops,heights,max,y);
+        return currentGeometry;
     }
     /** Physical wrapped row count for a logical line, independent of fold visibility. */
     public int rowsForLine(int logicalLine) { configure(); return line(logicalLine).size(); }
@@ -126,14 +145,15 @@ public final class EditorTextView extends SyntaxView {
         return (float)LineLayout.caret(g.rows().get(locate(g,offset,Position.Bias.Forward)).row(),offset).getBounds2D().getX();
     }
     private int locate(Geometry g,int offset,Position.Bias bias) {
-        int result=0;
-        for(int i=0;i<g.rows().size();i++) {
-            var row=g.rows().get(i).row();
-            if(offset<row.start()) return result;
-            result=i;
-            if(offset<row.end() || offset==row.end() && bias==Position.Bias.Backward) return i;
+        int low=0, high=g.rows().size();
+        while(low<high) {
+            int middle=(low+high)>>>1;
+            if(g.rows().get(middle).row().start()<=offset) low=middle+1;else high=middle;
         }
-        return result;
+        int index=Math.max(0,low-1);
+        if(bias==Position.Bias.Backward && index>0 && g.rows().get(index).row().start()==offset
+            && g.rows().get(index-1).row().end()==offset) index--;
+        return index;
     }
     @Override public float getPreferredSpan(int axis) {
         if(getContainer()==null) return 1;
@@ -142,7 +162,10 @@ public final class EditorTextView extends SyntaxView {
     @Override public float getMinimumSpan(int axis) { return axis==X_AXIS?1:getPreferredSpan(axis); }
     @Override public void setSize(float width,float height) {
         float next=Math.max(1,width);
-        if(this.width!=next) {this.width=next;cache.clear();preferenceChanged(null,true,true);}
+        if(this.width!=next) {
+            this.width=next;
+            if(getContainer()!=null && area().getLineWrap()) {clearLayouts();preferenceChanged(null,true,true);}
+        }
     }
     @Override public int getViewCount() { return getElement().getElementCount(); }
     @Override public View getView(int index) { return new LogicalLine(getElement().getElement(index),index); }
@@ -163,25 +186,37 @@ public final class EditorTextView extends SyntaxView {
     @Override public Shape modelToView(int offset,Shape allocation,Position.Bias bias) throws BadLocationException {
         if(offset<0 || offset>getDocument().getLength()) throw new BadLocationException("offset",offset);
         var g=geometry(); var placed=g.rows().get(locate(g,offset,bias)); var row=placed.row();
-        double x=LineLayout.caret(row,offset).getBounds2D().getX();
-        double next=LineLayout.caret(row,row.next(offset)).getBounds2D().getX();
+        var hit=new LineLayout.Hit(offset,bias==Position.Bias.Backward);
+        double x=LineLayout.caret(row,hit).getBounds2D().getX();
+        double cellWidth=LineLayout.cell(row,hit).getBounds2D().getWidth();
         var a=allocation.getBounds();
-        return new Rectangle2D.Float(a.x+(float)Math.min(x,next),a.y+placed.y(),(float)Math.max(1,Math.abs(next-x)),row.height());
+        return new Rectangle2D.Float(a.x+(float)x,a.y+placed.y(),(float)Math.max(1,cellWidth),row.height());
+    }
+    /** Glyph cell for RSTA block/underline carets; ordinary model mapping remains at the biased insertion edge. */
+    Shape cellBounds(int offset,Shape allocation,Position.Bias bias) {
+        var g=geometry();var placed=g.rows().get(locate(g,offset,bias));var row=placed.row();
+        var cell=LineLayout.cell(row,new LineLayout.Hit(offset,bias==Position.Bias.Backward)).getBounds2D();
+        var a=allocation.getBounds();
+        return new Rectangle2D.Float(a.x+(float)cell.getX(),a.y+placed.y(),(float)Math.max(1,cell.getWidth()),row.height());
     }
     @Override public Shape modelToView(int p0,Position.Bias b0,int p1,Position.Bias b1,Shape allocation) throws BadLocationException {
         var g=geometry(); var a=allocation.getBounds(); var result=new java.awt.geom.Path2D.Float();
-        for(var placed:g.rows()) {
+        if(p0==p1) return modelToView(p0,allocation,b0);
+        int first=locate(g,p0,b0), last=locate(g,p1,b1);
+        for(int i=first;i<=last;i++) {
+            var placed=g.rows().get(i);
             var row=placed.row(); if(p0>row.end() || p1<row.start()) continue;
-            if(p0==p1) return modelToView(p0,allocation,b0);
             Shape selected=LineLayout.highlight(row,p0,p1);
             result.append(AffineTransform.getTranslateInstance(a.x,a.y+placed.y()+row.baseline()).createTransformedShape(selected),false);
         }
         return result;
     }
     @Override public int viewToModel(float x,float y,Shape allocation,Position.Bias[] bias) {
-        var g=geometry(); var a=allocation.getBounds(); bias[0]=Position.Bias.Forward;
+        var g=geometry(); var a=allocation.getBounds();
         int index=Math.max(0,Math.min(g.rows().size()-1,(int)Math.floor((y-a.y)/fonts.height())));
-        return LineLayout.hit(g.rows().get(index).row(),x-a.x);
+        var hit=LineLayout.hitInfo(g.rows().get(index).row(),x-a.x);
+        bias[0]=hit.backward()?Position.Bias.Backward:Position.Bias.Forward;
+        return hit.offset();
     }
     @Override public int getNextVisualPositionFrom(int offset,Position.Bias bias,Shape allocation,int direction,Position.Bias[] result) throws BadLocationException {
         var g=geometry(); result[0]=Position.Bias.Forward;
@@ -194,12 +229,15 @@ public final class EditorTextView extends SyntaxView {
             int adjacent=index+(right?1:-1);
             if(adjacent<0 || adjacent>=g.rows().size()) return offset;
             var target=g.rows().get(adjacent).row();
-            return LineLayout.hit(target,right?0:target.width());
+            var hit=LineLayout.hitInfo(target,right?0:target.width());
+            result[0]=hit.backward()?Position.Bias.Backward:Position.Bias.Forward;return hit.offset();
         }
-        float x=xForOffset(offset);
+        float x=(float)LineLayout.caret(row,new LineLayout.Hit(offset,bias==Position.Bias.Backward)).getBounds2D().getX();
         var magic=area().getCaret().getMagicCaretPosition();
         if(magic!=null) x=magic.x-allocation.getBounds().x;
-        return moveRows(offset,direction==SwingConstants.SOUTH?1:-1,x);
+        int adjacent=Math.max(0,Math.min(g.rows().size()-1,index+(direction==SwingConstants.SOUTH?1:-1)));
+        var hit=LineLayout.hitInfo(g.rows().get(adjacent).row(),x);
+        result[0]=hit.backward()?Position.Bias.Backward:Position.Bias.Forward;return hit.offset();
     }
     @Override public int yForLine(Rectangle allocation,int line) {
         if(line<0 || line>=getViewCount()) return -1;
@@ -216,7 +254,11 @@ public final class EditorTextView extends SyntaxView {
             g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS,RenderingHints.VALUE_FRACTIONALMETRICS_ON);
             var geometry=geometry(); var a=allocation.getBounds(); var clip=g.getClipBounds();
             var host=area(); var highlighter=(RSyntaxTextAreaHighlighter)host.getHighlighter();
-            for(var placed:geometry.rows()) {
+            int first=clip==null?0:Math.max(0,(int)Math.floor((clip.y-a.y-fonts.naturalHeight())/fonts.height()));
+            int last=clip==null?geometry.rows().size()-1:Math.min(geometry.rows().size()-1,
+                (int)Math.ceil((clip.y+clip.height-a.y+fonts.naturalHeight())/fonts.height()));
+            for(int index=first;index<=last;index++) {
+                var placed=geometry.rows().get(index);
                 var row=placed.row();float baseline=a.y+placed.y()+row.baseline();
                 if(clip!=null && (baseline+fonts.naturalHeight()<clip.y || baseline-fonts.naturalHeight()>clip.y+clip.height)) continue;
                 highlighter.paintLayeredHighlights(g,row.start(),row.end(),allocation,host,this);
@@ -271,8 +313,13 @@ public final class EditorTextView extends SyntaxView {
         }
     }
     private void changed(DocumentEvent event) {
-        int first=getElement().getElementIndex(event.getOffset());
-        int last=getElement().getElementIndex(Math.min(getDocument().getLength(),event.getOffset()+event.getLength()));
+        currentGeometry=null;
+        // RSTA CHANGE events encode inclusive first/last logical lines in offset/length.
+        // INSERT and REMOVE retain Swing's character-offset semantics.
+        boolean syntax=event.getType()==DocumentEvent.EventType.CHANGE;
+        int first=syntax?Math.max(0,event.getOffset()):getElement().getElementIndex(event.getOffset());
+        int last=syntax?Math.min(getViewCount()-1,event.getLength())
+            :getElement().getElementIndex(Math.min(getDocument().getLength(),event.getOffset()+event.getLength()));
         for(int i=first;i<=last;i++) cache.remove(getElement().getElement(i));
         cache.keySet().removeIf(element -> element.getParentElement()!=getElement()
             || getElement().getElement(getElement().getElementIndex(element.getStartOffset()))!=element);

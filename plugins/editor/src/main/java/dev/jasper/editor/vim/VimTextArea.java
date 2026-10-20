@@ -109,6 +109,13 @@ public class VimTextArea extends RSyntaxTextArea {
         return (dev.jasper.editor.textview.EditorTextView)getUI().getRootView(this).getView(0);
     }
 
+    @Override public void foldToggled(org.fife.ui.rsyntaxtextarea.folding.Fold fold) {
+        if(getUI()!=null && getUI().getRootView(this).getViewCount()>0
+            && getUI().getRootView(this).getView(0) instanceof dev.jasper.editor.textview.EditorTextView view)
+            view.foldsChanged();
+        super.foldToggled(fold);
+    }
+
     @Override protected RTextAreaUI createRTextAreaUI() {
         return new dev.jasper.editor.textview.EditorTextAreaUI(this, () -> typography);
     }
