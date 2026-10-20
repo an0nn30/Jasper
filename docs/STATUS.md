@@ -1,5 +1,60 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 7c: dragging parent tabs — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `c789f0ec7`, `16a458a03` and `537db9b06` (plan 7b's final fix wave lies between the
+first two), then this documentation commit;
+[plan](superpowers/plans/2026-10-19-workspace-7c-parent-tab-drag.md),
+[spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md)). A parent tab drags as a tab does: a press on its
+bar entry (`ParentTabBar.pressed`) hands plan 5's `TabDrag` the whole parent tab (`pressed(ParentTabBar, Tab,
+MouseEvent)`, `Target.Bar`). Along its bar a release puts it at the strip rule's place (`WorkspaceDropResolver.place`,
+the public `marker`; `ParentTabs.move`, `ParentTabsView.reorder`, `WindowContent.reorderParentTab`) and the entries
+take their new places at once. On another main or full window's bar it moves there whole through
+`WindowManager.moveParentTab`, a window showing no bar taking it over the band at its top; outside every window it
+becomes a full window through `popOutParentTab(…, bounds, cursor)`, except a full window's only parent tab. A parent
+tab holding a pinned tab moves along its own bar only, and panes and pane windows take none. A tab released outside
+every window pops out into a pane window with its origin (`popOutTab(tab, bounds, cursor)`); the drag reaches the
+window manager through its window (`WindowContent.manager()`, `TabDrag(Supplier)`), and
+`moveToNewWindow(Tab, Rectangle, Point)` is gone. Plan 7a's two hand-offs are tested: both windows' pane strips after
+a move between them, and a torn-out pane window showing no strip and no bar. Rulings (plan, "Rulings"): (1) a parent
+tab drags with the one tab drag and ends it when the tab its entry shows closes, leaves or gives way; (2) along its bar
+the strip rule gives its place, its own place showing no landing; (3) nothing moves until the release, then the
+entries take their places at once and no `TAB_MOVED` is reported; (4) onto another main or full window's bar it moves
+whole through `moveParentTab`, one `TAB_MOVED` per tab; (5) a window whose bar hides takes it over the band at its top,
+at the end of its bar; (6) outside every window it becomes a full window on the cursor's display; (7) a full window's
+only parent tab has no tear-out target, yet another window's bar takes it; (8) a parent tab holding a pinned or closing
+tab takes its own bar only; (9) a parent tab drops on bars alone; (10) a tab released outside every window pops out
+into a pane window with its origin, and plan 7b's Rulings 19 ends; (11) a tab dropped on a bar drops nothing; (12) the
+drag reaches the window manager through its window, a window no manager opened moving nothing out. Spec issues: none.
+Deviations: Tasks 1 and 2 none, no pre-flight anchor needed refreshing; Task 3 removed
+`PopOutTest.plan5sTearOutOpensAFullWindow`, which pinned 7b's Rulings 19 that this plan ends (the pane-window tear-out
+is pinned in `TabDragWindowsTest` and `WindowManagerTest`), made the drop ignore the managers' results (the drag has already ended, and
+the managers refuse again on their own), and gave a window with no manager no parent-tab tear-out. Comments that
+still say "a torn-out tab's window (plan 5)" (`WindowFrame`, `WindowShell`, `WindowManager`) remain true. Left for
+plans 6a and 6b: `WindowManager.moveToNewWindow` is gone in every form (plan 7b removed the one-argument form, this
+plan the three-argument one), so the 6b re-plan pops a tab out with `popOutTab`; plan 5's hand-off stands
+(`Opening.bounds` and `WindowShell.place` are a tear-out's workspace bounds, for pane and full windows alike).
+`./gradlew check --continue`: **12,050 tests, 0 failures, 0 errors, 25 skipped** (`jasper-app` 4,078 with 19 skipped). GUI checks for the user:
+- a parent tab dragged along its bar, in both looks: the landing bar, then the entries in their new places at once,
+  with no slide;
+- a parent tab dropped on another window's bar between its entries, and on the top of a standard window with one
+  parent tab (the band highlights, then the bar shows with both), every shell running (a `top` stays current);
+- the hidden-bar band's discoverability: whether the top of a standard window with one parent tab reads as a place to
+  drop;
+- a parent tab dragged along the top of the main window's empty workspace (all its tabs closed): it takes the empty
+  workspace's place, and no bar shows;
+- a parent tab released outside every window: a full window under the cursor, on that display, its workspace the
+  parent tab's size (under Enterprise its bar sits above the workspace);
+- where an Enterprise full window lands when torn out;
+- under Enterprise, a full window's only parent tab: outside every window nothing happens; onto the main window's bar
+  it moves and its window closes;
+- a tab torn out into a pane window: under the cursor at its old pane's size, its origin where the tab was, no strip
+  in the standard look, and Bring Back returning it beside its pane;
+- a modal prompt in a tab: its parent tab moves along its own bar only;
+- a parent tab dragged over a pane window, a pane or a pane's strip: no landing, and nothing on release;
+- dragging across displays and in full screen.
+
+Not merged, not pushed.
+
 **Workspace tabs, plan 7b: Pop Out, Bring Back and the window menu — 2026-10-20** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `e80f2c322..66be37837` (plan 6b's re-planned document lies between), then this
 documentation commit, then its final fix wave ("Pane windows: final review fixes", after plan 7c's first commit);

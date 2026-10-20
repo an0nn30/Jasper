@@ -683,7 +683,7 @@ Workspace tabs use centered text and equal-width cells; a pane holding a single 
 its strip (`WorkspaceChrome.showsStrip`, applied to each group on every `WorkspaceView` render), and a window holding a
 single parent tab its parent-tab bar (`WorkspaceChrome.showsParentTabBar`, applied by `ParentTabBar.refresh`); both
 show and hide at once, without motion. The bar is the look's strip over a `StripSource` (`ParentTabBar`, beside
-`GroupView`), and its entries never move.
+`GroupView`), and its entries never slide: a parent tab dragged along it takes its new place at once.
 `WindowTabs` derives selected/inactive surfaces from the workspace palette while
 preserving glass alpha. Child repaints start at the strip to reconstruct translucent pixels
 once. Width animations interpolate the sampled Alacritty reference; resize/reorder/animation
@@ -693,13 +693,17 @@ The toolbar and shortcuts own new-tab actions; close is hover-only and titles re
 bounded tooltips. The fixed list/add controls and scrolling/underline motion are retired.
 
 Tab drags use plain mouse events too (`TabDrag`), never AWT drag and drop. A strip's left press hands the drag its tab
-(`GroupView.pressed`); past the kit's `TAB_REORDER_THRESHOLD` it follows the cursor in screen coordinates over the
+(`GroupView.pressed`), and a parent-tab bar's its whole parent tab (`ParentTabBar.pressed`); past the kit's
+`TAB_REORDER_THRESHOLD` it follows the cursor in screen coordinates over the
 windows the `WindowManager` lists, most recently active first, with `TabDragLabel` beside the cursor and the landing on
 the target window's `DockDropOverlay`. Where a tab would drop is `WorkspaceDropResolver`'s job, over
-`WorkspaceView.dropAreas`: change the zones in the resolver and its tests first. A drop within a window is
-`WorkspaceView.drop`; one into another window goes through the tab registry first, and a tear-out through the window
-manager. A child window's only tab and a pinned tab have no tear-out target, and a pinned tab takes targets in its own
-window only. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in
+`WorkspaceView.dropAreas`, and a parent tab's place in a bar (`place`): change the zones in the resolver and its tests
+first. A drop within a window is `WorkspaceView.drop`, or `ParentTabsView.reorder` for a parent tab; one into another
+window goes through the tab registry first (a parent tab's through `WindowManager.moveParentTab`; a window whose bar
+hides takes it over the band at its top), and a tear-out through the window manager (`popOutTab` makes a pane window,
+`popOutParentTab` a full window). A parent tab drops on bars alone. A child window's only tab, a full window's only
+parent tab and a pinned tab have no tear-out target, and a pinned tab, or a parent tab holding one, takes targets in
+its own window only. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in
 full screen on the display of the drag's own window, other than that window, takes no drop (`TabDrag.dropFrame`). Esc, a plain move or
 a press anywhere (a lost release), the source window losing the focus and the dragged tab closing or leaving its window
 or group end a drag. `TabDragTest` and `TabDragWindowsTest` drive it headlessly over stand-in frames on a pretend screen

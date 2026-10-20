@@ -1,7 +1,11 @@
 # Workspace tabs 7c: dragging parent tabs Implementation Plan
 
-**Status: not executed.** Written on 2026-10-20 against `claude/workspace-tabs` at `8e129ff34` with plans 7a's and 7b's
-text applied (see Workspace).
+**Status: executed on 2026-10-20** (`c789f0ec7`, `16a458a03` and `537db9b06`; plan 7b's final fix wave lies between the
+first two); see `docs/STATUS.md`. Written against `claude/workspace-tabs` at `8e129ff34` with plans 7a's and 7b's text
+applied (see Workspace). Deviations from the plan's text: no anchor needed refreshing; Task 3 removed
+`PopOutTest.plan5sTearOutOpensAFullWindow`, which pinned plan 7b's Rulings 19 that this plan ends, made the drop ignore
+the window managers' results (the drag has already ended, and the managers refuse again on their own), and gave a window
+with no manager no parent-tab tear-out.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
