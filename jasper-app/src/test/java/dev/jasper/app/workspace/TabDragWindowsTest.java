@@ -429,14 +429,48 @@ class TabDragWindowsTest {
         });
     }
 
+    /** Parent tabs spec 5 and workspace plan 7b Rulings 11: a pane window opens where its pane was, at its size. */
+    @Test void aPoppedOutTabsPaneWindowOpensAtItsPanesPlace() throws Exception {
+        edt(() -> {
+            GroupView pane = main.content().workspace().activeGroupView();
+            Rectangle expected = onScreen(pane, new Rectangle(pane.getSize()));
+            ChildWindow popped = manager.popOutTab(main.content().selectedTab()).orElseThrow();
+            assertThat(popped.content().isPaneWindow()).isTrue();
+            assertThat(placed).as("the pane's place and size").containsExactly(expected);
+            assertThat(cursors).as("on the display under its middle")
+                .containsExactly(new Point((int) expected.getCenterX(), (int) expected.getCenterY()));
+        });
+    }
+
+    /**
+     * Workspace plan 7b Rulings 11: a pane a maximize keeps out of the tree keeps its last size but has no place on
+     * screen, so the platform places its pane window.
+     */
+    @Test void aPaneAMaximizeHidesPopsOutWhereThePlatformPutsIt() throws Exception {
+        edt(() -> {
+            WindowContent from = main.content();
+            Tab hidden = from.tabs().get(0);
+            from.workspace().moveToNewGroup(from.tabs().get(1), activeGroup(main), Side.RIGHT);
+            relayout(frameOf(main));
+            from.workspace().toggleMaximize();
+            relayout(frameOf(main));
+            GroupId pane = hidden.group().orElseThrow();
+            assertThat(from.workspace().model().maximized()).isPresent().get().isNotEqualTo(pane);
+            assertThat(from.workspace().groupView(pane).getWidth()).as("its last size, out of the tree").isPositive();
+            ChildWindow popped = manager.popOutTab(hidden).orElseThrow();
+            assertThat(popped.content().isPaneWindow()).isTrue();
+            assertThat(placed).as("no place on screen").isEmpty();
+        });
+    }
+
     @Test void aTabMovedToAnotherWindowDuringTheDragEndsIt() throws Exception {
         edt(() -> {
             Tab tab = main.content().tabs().get(0);
             Point there = onTab(child.content(), child.content().tabs().get(0), 0.25);
             Component source = start(main.content(), tab, there);
             assertThat(manager.tabDrag().active()).isTrue();
-            // Move Tab to New Window from the keyboard while the mouse still drags the tab.
-            ChildWindow moved = manager.moveToNewWindow(tab).orElseThrow();
+            // Pop Out Tab from the keyboard while the mouse still drags the tab.
+            ChildWindow moved = manager.popOutTab(tab).orElseThrow();
             assertThat(manager.tabDrag().active()).isFalse();
             assertThat(manager.tabDrag().label().showing()).isFalse();
             assertThat(manager.tabDrag().overlay().getParent()).isNull();

@@ -238,11 +238,11 @@ class WindowManagerTest {
             var pane = ((TerminalContent) tab.content()).pane();
             var session = pane.session();
             assertThat(session).isNotNull();
-            ChildWindow child = manager.moveToNewWindow(tab).orElseThrow();
+            ChildWindow child = manager.popOutTab(tab).orElseThrow();
             assertThat(tab.window()).isEqualTo(child.id());
             assertThat(child.content().selectedTab()).isSameAs(tab);
             assertThat(main[0].content().tabCount()).as("the main window keeps its other tab").isEqualTo(1);
-            assertThat(manager.moveToNewWindow(tab)).as("a child window's only tab stays where it is").isEmpty();
+            assertThat(manager.popOutTab(tab)).as("a child window's only tab stays where it is").isEmpty();
             assertThat(manager.children()).containsExactly(child);
             model.tabs().moveToMainWindow(tab);
             assertThat(tab.window()).isEqualTo(main[0].id());
@@ -694,7 +694,7 @@ class WindowManagerTest {
             notes.onActive(active -> { if (!active && fail[0]) throw new IllegalStateException("move failed"); });
             failClosing = true;
             try {
-                assertThatThrownBy(() -> manager.moveToNewWindow(notes)).hasMessage("move failed").satisfies(failure ->
+                assertThatThrownBy(() -> manager.popOutTab(notes)).hasMessage("move failed").satisfies(failure ->
                     assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("closing failed"));
             } finally {
                 failClosing = false;
@@ -716,7 +716,7 @@ class WindowManagerTest {
                 if (fail[0] && !main.id().equals(notes.window())) throw new IllegalStateException("listener failed");
             });
             try {
-                assertThatThrownBy(() -> manager.moveToNewWindow(notes)).hasMessage("listener failed");
+                assertThatThrownBy(() -> manager.popOutTab(notes)).hasMessage("listener failed");
             } finally {
                 fail[0] = false;
             }
@@ -737,7 +737,7 @@ class WindowManagerTest {
             Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", child.id(), new JPanel());
             Tab todo = model.tabs().open("dev.example.editor", "todo", "todo.txt", main.id(), new JPanel());
             notes.onClosed(() -> asked.add(manager.openTerminalWindow(null)));
-            notes.onClosed(() -> asked.add(manager.moveToNewWindow(todo)));
+            notes.onClosed(() -> asked.add(manager.popOutTab(todo)));
             manager.closeAll();
             assertThat(asked).containsExactly(Optional.empty(), Optional.empty());
             assertThat(manager.isEmpty()).as("no window outlives the main window").isTrue();

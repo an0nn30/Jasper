@@ -3,6 +3,8 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
+import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Origin;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.nio.file.Path;
@@ -111,7 +113,7 @@ public final class WindowManager {
         // window a move empties closes after the move.
         model.tabs().windows(new TabRegistry.Windows(() -> openingMain ? null : ensureMain("plugin", null).map(JasperWindow::id)
             .orElseThrow(() -> new IllegalStateException("The main window is closing or Jasper is quitting")), this::isMain,
-            this::moveToNewWindow, this::movedOut, this::emptyWindow));
+            this::popOutTab, this::movedOut, this::emptyWindow));
         model.panelRoute(this::routePanel);
     }
 
@@ -219,21 +221,84 @@ public final class WindowManager {
     public Optional<ChildWindow> openTerminalWindow(Path directory) {
         requireEdt();
         if (ensureMain("menu", null).isEmpty()) return Optional.empty();
-        return openChild(false, directory, null, null);
+        return openChild(false, directory, null, null, null);
     }
 
     /**
-     * Move Tab to New Window (workspace tabs spec 6.5): a new child window takes {@code tab}, its content and session
-     * untouched. A tab being closed or pinned stays, and so does a child window's only tab: that window already is its own.
+     * Pop Out Tab (parent tabs spec 5): a new pane window takes {@code tab}, its content and session untouched, where its
+     * pane is on screen and at the pane's size, with the origin {@code WindowContent.popOutOrigin} gives (workspace plan
+     * 7b Rulings 3, 4 and 11). A tab being closed or pinned stays, and so does a child window's only tab: that window
+     * already is its own.
      *
      * @param tab a tab of one of these windows
-     * @return the new child window; empty when the tab stayed
+     * @return the new pane window; empty when the tab stayed
      */
-    public Optional<ChildWindow> moveToNewWindow(Tab tab) { return moveToNewWindow(tab, null, null); }
+    public Optional<ChildWindow> popOutTab(Tab tab) {
+        requireEdt();
+        WindowContent from = leaving(tab);
+        Rectangle bounds = from == null ? null : tab.group().flatMap(from::paneOnScreen).orElse(null);
+        return popOutTab(tab, bounds, centre(bounds));
+    }
 
     /**
-     * As {@link #moveToNewWindow(Tab)}, the new child window's workspace at {@code bounds} on screen, on the display under
-     * {@code cursor}: a tab torn out of its window (workspace tabs plan 5).
+     * As {@link #popOutTab(Tab)}, the pane window's workspace at {@code bounds} on screen, on the display under
+     * {@code cursor}.
+     *
+     * @param tab a tab of one of these windows
+     * @param bounds where the pane window's workspace goes on screen; null for where the platform puts it
+     * @param cursor a point on the display it opens on; null exactly when {@code bounds} is
+     * @return the new pane window; empty when the tab stayed
+     */
+    public Optional<ChildWindow> popOutTab(Tab tab, Rectangle bounds, Point cursor) {
+        requireEdt();
+        WindowContent from = leaving(tab);
+        return from == null ? Optional.empty() : moveToNewChild(tab, bounds, cursor, from.popOutOrigin(tab));
+    }
+
+    /**
+     * Pop Out Pane (parent tabs spec 5): a new pane window takes every tab of {@code pane}, in their order, showing the one
+     * the pane showed, where the pane is on screen and at its size; its origin is where the pane sat
+     * ({@code WindowContent.originOf}). A child window's only pane stays, as its only tab does, and a pane holding a tab
+     * that is pinned or being closed stays whole (workspace plan 7b Rulings 7 and 8).
+     *
+     * @param window the window holding the pane
+     * @param pane the pane
+     * @return the new pane window; empty when the pane stayed
+     */
+    public Optional<ChildWindow> popOutPane(WindowContent window, GroupId pane) {
+        requireEdt();
+        if (window == null || !window.mayPopOutPane(pane)) return Optional.empty();
+        WorkspaceView view = window.parentTabs().holding(pane).orElseThrow();
+        var group = view.model().group(pane).orElseThrow();
+        List<Tab> moving = group.tabs().stream().map(id -> view.tab(id).orElseThrow()).toList();
+        Tab shown = group.selected().flatMap(view::tab).orElse(null);
+        Rectangle bounds = window.paneOnScreen(pane).orElse(null);
+        Optional<ChildWindow> opened = openChild(true, null, bounds, centre(bounds), window.originOf(pane, true));
+        if (opened.isEmpty()) return opened;
+        ChildWindow child = opened.get();
+        Throwable failure = null;
+        for (Tab tab : moving) {
+            try {
+                model.tabs().move(tab, child.id());
+            } catch (RuntimeException | Error thrown) {
+                failure = keep(failure, thrown);
+            }
+        }
+        // The pane window shows the tab the pane showed.
+        if (shown != null && child.content().parentTabs().contains(shown)) {
+            try {
+                model.tabs().select(shown);
+            } catch (RuntimeException | Error thrown) {
+                failure = keep(failure, thrown);
+            }
+        }
+        return settle(child, failure);
+    }
+
+    /**
+     * Plan 5's tear-out: a new full child window takes {@code tab}, its content and session untouched, its workspace at
+     * {@code bounds} on screen, on the display under {@code cursor}. A tab being closed or pinned stays, and so does a
+     * child window's only tab.
      *
      * @param tab a tab of one of these windows
      * @param bounds where the new window's workspace goes on screen; null for where the platform puts it
@@ -242,19 +307,38 @@ public final class WindowManager {
      */
     public Optional<ChildWindow> moveToNewWindow(Tab tab, Rectangle bounds, Point cursor) {
         requireEdt();
-        if (tab == null || tab.closed() || tab.pinned()) return Optional.empty();
+        return leaving(tab) == null ? Optional.empty() : moveToNewChild(tab, bounds, cursor, null);
+    }
+
+    /**
+     * The window {@code tab} may leave for a window of its own: none for a closed or pinned tab, nor for a child window's
+     * only tab, whose window already is its own.
+     */
+    private WindowContent leaving(Tab tab) {
+        if (tab == null || tab.closed() || tab.pinned()) return null;
         Optional<JasperWindow> from = window(tab.window());
-        if (from.isEmpty() || !from.get().isMain() && from.get().content().tabCount() < 2) return Optional.empty();
-        Optional<ChildWindow> opened = openChild(true, null, bounds, cursor);
+        if (from.isEmpty() || !from.get().isMain() && from.get().content().tabCount() < 2) return null;
+        return from.get().content();
+    }
+
+    /** A new child window takes {@code tab}: a pane window from {@code origin}, or a full window when it is null. */
+    private Optional<ChildWindow> moveToNewChild(Tab tab, Rectangle bounds, Point cursor, Origin origin) {
+        Optional<ChildWindow> opened = openChild(true, null, bounds, cursor, origin);
         if (opened.isEmpty()) return opened;
-        ChildWindow child = opened.get();
         Throwable failure = null;
         try {
-            model.tabs().move(tab, child.id());
+            model.tabs().move(tab, opened.get().id());
         } catch (RuntimeException | Error thrown) {
             failure = thrown;
         }
-        // A move the registry refused, or one that failed, leaves no tab in the new window: it goes.
+        return settle(opened.get(), failure);
+    }
+
+    /**
+     * A new child window that a refused or failed move left without a tab goes; the move's failure propagates, the close's
+     * kept behind it.
+     */
+    private Optional<ChildWindow> settle(ChildWindow child, Throwable failure) {
         if (!child.closed() && model.tabs().inWindow(child.id()).isEmpty()) {
             try {
                 child.close();
@@ -263,7 +347,12 @@ public final class WindowManager {
             }
         }
         rethrow(failure);
-        return child.closed() ? Optional.empty() : opened;
+        return child.closed() ? Optional.empty() : Optional.of(child);
+    }
+
+    /** The middle of {@code bounds} on screen, whose display a window opening there takes; null for null. */
+    private static Point centre(Rectangle bounds) {
+        return bounds == null ? null : new Point((int) bounds.getCenterX(), (int) bounds.getCenterY());
     }
 
     /**
@@ -321,12 +410,17 @@ public final class WindowManager {
         return all;
     }
 
-    private Optional<ChildWindow> openChild(boolean empty, Path directory, Rectangle bounds, Point cursor) {
+    /**
+     * A child window: a pane window from {@code origin}, made one while it is empty and before its frame exists (parent tabs
+     * spec 4), or a full window when it is null.
+     */
+    private Optional<ChildWindow> openChild(boolean empty, Path directory, Rectangle bounds, Point cursor, Origin origin) {
         // A closing tab's listener asking for a window while every window closes gets none (spec 6.4).
         if (closingAll) return Optional.empty();
         ChildWindow[] made = new ChildWindow[1];
         return open(new Opening(WindowRole.CHILD, empty, directory, "menu", () -> { if (made[0] != null) made[0].emptied(); },
             Optional.ofNullable(bounds).map(Rectangle::new), Optional.ofNullable(cursor).map(Point::new)), content -> {
+            if (origin != null) content.paneWindow(origin);
             made[0] = new ChildWindow(this, content);
             children.add(made[0]);
             return made[0];
@@ -397,7 +491,7 @@ public final class WindowManager {
     private UUID emptyWindow() {
         if (openingMain) return null;
         if (ensureMain("plugin", null).isEmpty()) throw new IllegalStateException("The main window is closing or Jasper is quitting");
-        return openChild(true, null, null, null).map(JasperWindow::id)
+        return openChild(true, null, null, null, null).map(JasperWindow::id)
             .orElseThrow(() -> new IllegalStateException("The main window is closing or Jasper is quitting"));
     }
 

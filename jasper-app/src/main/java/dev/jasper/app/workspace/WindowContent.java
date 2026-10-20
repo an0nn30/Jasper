@@ -21,6 +21,8 @@ import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.contributions.WorkspaceHost;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.Origin;
+import dev.jasper.app.layout.PaneLayout;
 import dev.jasper.app.layout.WindowLayout;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
@@ -80,6 +82,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * 10; parent tabs spec 4), where the terminal column stood.
      */
     private final ParentTabsView parentTabs;
+    /** A pane window's origin (parent tabs spec 4), which the window manager gives it once while it is empty; else null. */
+    private Origin origin;
     /** The configured tab motion, which strips made later take too. */
     private dev.jasper.app.config.AnimationSettings animations = dev.jasper.app.config.AnimationSettings.defaults();
     private final WorkspaceActions workspaceActions;
@@ -1207,11 +1211,95 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     ParentTabsView parentTabs() { return parentTabs; }
 
     /**
-     * What this window holds (parent tabs spec 4): its parent tabs with their layouts, and the one that shows.
+     * What this window holds (parent tabs spec 4): its parent tabs with their layouts, and the one that shows; a pane
+     * window's one layout and its origin from its first tab on (a pane window still opening, empty, reports its empty
+     * parent tab).
      *
-     * @return the parent tabs
+     * @return the parent tabs, or the pane window's layout
      */
-    public WindowLayout windowLayout() { return parentTabs.model(); }
+    public WindowLayout windowLayout() {
+        return origin != null && !parentTabs.isEmpty() ? new PaneLayout(workspace().model(), origin) : parentTabs.model();
+    }
+
+    /**
+     * Makes this window, a child window still empty, a pane window from {@code value} (parent tabs spec 4; workspace plan
+     * 7b Rulings 9): one layout and no parent-tab bar. The window manager does it once, before the window's frame exists.
+     *
+     * @param value where its panes come from
+     * @throws IllegalStateException for the main window, a window holding a tab, or one that already is a pane window
+     */
+    void paneWindow(Origin value) {
+        if (isMain() || !parentTabs.isEmpty() || origin != null)
+            throw new IllegalStateException("Only a new, empty child window becomes a pane window");
+        origin = Objects.requireNonNull(value, "value");
+        parentTabs.refresh();
+    }
+
+    /** Whether this is a pane window (parent tabs spec 4). */
+    boolean isPaneWindow() { return origin != null; }
+
+    /** A pane window's origin; empty for the main window and a full window. */
+    Optional<Origin> origin() { return Optional.ofNullable(origin); }
+
+    /**
+     * Where a pane window made from {@code pane} comes from (parent tabs spec 4 and 5): a pane window's own origin, as its
+     * panes came from there (workspace plan 7b Rulings 4); else, when the pane goes {@code whole}, where it sits in its
+     * parent tab ({@link dev.jasper.app.layout.Layout#origin}); else the pane itself, which keeps its other tabs, with the
+     * new pane on its right at half its width (Rulings 3).
+     */
+    Origin originOf(GroupId pane, boolean whole) {
+        if (origin != null) return origin;
+        WorkspaceView view = parentTabs.holding(pane)
+            .orElseThrow(() -> new IllegalArgumentException("Pane " + pane + " is not in this window"));
+        return whole ? view.model().origin(view.id(), pane) : new Origin(view.id(), pane, Side.RIGHT, 0.5);
+    }
+
+    /** Pop Out Tab's origin for {@code tab}: its pane's, which goes with it when it is the pane's only tab (Rulings 3). */
+    Origin popOutOrigin(Tab tab) {
+        GroupId pane = parentTabs.groupOf(tab.id())
+            .orElseThrow(() -> new IllegalArgumentException("Tab " + tab.id() + " is not in this window"));
+        return originOf(pane, groupTabs(tab).size() == 1);
+    }
+
+    /**
+     * {@code pane}'s rectangle on screen while it shows in the shown parent tab and has a size; empty otherwise, as for a
+     * pane a maximize keeps out of the tree with its last size, which {@link WorkspaceView#dropAreas} skips too.
+     */
+    Optional<java.awt.Rectangle> paneOnScreen(GroupId pane) {
+        WorkspaceView shown = parentTabs.active();
+        return parentTabs.holding(pane).filter(view -> view == shown).map(view -> view.groupView(pane))
+            .filter(group -> SwingUtilities.isDescendingFrom(group, shown))
+            .filter(group -> group.getWidth() > 0 && group.getHeight() > 0).map(group -> {
+                var corner = new Point(0, 0);
+                SwingUtilities.convertPointToScreen(corner, group);
+                return new java.awt.Rectangle(corner, group.getSize());
+            });
+    }
+
+    /** How many panes this window has across its parent tabs; the main window's empty workspace counts its one. */
+    int paneCount() {
+        int count = 0;
+        for (WorkspaceView view : parentTabs.views()) count += view.model().groups().size();
+        return count;
+    }
+
+    /**
+     * Whether Pop Out Pane may take {@code pane}: one of this window's, holding tabs that may all move, in the main window
+     * or in a child window that has another pane (workspace plan 7b Rulings 7 and 8).
+     */
+    boolean mayPopOutPane(GroupId pane) {
+        if (closed || pane == null) return false;
+        WorkspaceView view = parentTabs.holding(pane).orElse(null);
+        if (view == null || !(isMain() || paneCount() > 1)) return false;
+        java.util.List<Tab> held = new ArrayList<>();
+        for (TabId id : view.model().group(pane).orElseThrow().tabs()) view.tab(id).ifPresent(held::add);
+        return movable(held);
+    }
+
+    /** Whether {@code moving} holds tabs and the registry would move every one ({@code TabRegistry.movable}, Rulings 7). */
+    private boolean movable(java.util.List<Tab> moving) {
+        return !moving.isEmpty() && moving.stream().allMatch(tab -> registry.movable(tab));
+    }
     /** The parent-tab bar's strip (parent tabs spec 7). */
     TabStrip parentTabBar() { return parentTabs.bar().strip(); }
     TabRegistry tabRegistry() { return registry; }
@@ -1357,13 +1445,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /**
      * New Tab (parent tabs spec 8): a terminal in a new parent tab at the end of the bar, shown, starting in
      * {@code directory}. The main window's empty workspace takes it in its only parent tab, the one parent tab that may be
-     * empty (workspace plan 7a Rulings 7).
+     * empty (workspace plan 7a Rulings 7). A pane window, which has no parent tabs, takes it in its active pane (workspace
+     * plan 7b Rulings 9).
      *
      * @param directory where its shell starts; null means where a new shell starts
      * @return the terminal tab; null once the window has closed
      */
     public TerminalContent newParentTab(Path directory) {
-        return parentTabs.isEmpty() ? openTab(directory)
+        return parentTabs.isEmpty() || origin != null ? openTab(directory)
             : openTerminal(directory, null, Optional.empty(), Optional.empty(), null, null, true);
     }
 

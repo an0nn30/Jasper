@@ -119,9 +119,9 @@ public final class Tab implements AutoCloseable {
     public void focus() { if (!closed) focus.run(); }
     /** Shows the tab in its window and raises the window, wherever the tab is now. */
     public void select() { registry.select(this); }
-    /** Move Tab to New Window: a new child window takes the tab (workspace tabs spec 6.5). */
+    /** Pop Out Tab: a new pane window takes the tab (parent tabs spec 5). */
     public void moveToNewWindow() { registry.moveToNewWindow(this); }
-    /** Move Tab to Main Window: the main window takes the tab (workspace tabs spec 6.5). */
+    /** The main window takes the tab, as {@code ContentTab.moveToMainWindow()} asks (workspace tabs spec 6.5). */
     public void moveToMainWindow() { registry.moveToMainWindow(this); }
     /** Closes the tab once its plugin's guard allows it. */
     public CompletableFuture<Boolean> requestClose() { return registry.requestClose(List.of(this)); }

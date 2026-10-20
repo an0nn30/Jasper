@@ -230,7 +230,7 @@ final class TabDrag {
         keys.addKeyEventDispatcher(escape);
         Toolkit.getDefaultToolkit().addAWTEventListener(lostRelease, AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
         closing = tab.onClosed(this::cancel);
-        // A command that moves the tab while it is dragged (Move Tab to New Window from the keyboard) ends the drag.
+        // A command that moves the tab while it is dragged (Pop Out Tab from the keyboard) ends the drag.
         changed = tab.onChanged(() -> { if (!inPlace()) cancel(); });
         // The title button saw the press: its release after a drag must not click it too.
         if (source instanceof AbstractButton button) {

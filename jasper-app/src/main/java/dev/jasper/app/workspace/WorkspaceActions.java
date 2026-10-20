@@ -137,7 +137,7 @@ final class WorkspaceActions {
                     case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
                          SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
                         id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < owner.groupTabCount();
-                    case CLOSE_PARENT_TAB -> owner.selectedTab() != null;
+                    case CLOSE_PARENT_TAB -> owner.selectedTab() != null && !owner.isPaneWindow();
                     case NEXT_PARENT_TAB, PREVIOUS_PARENT_TAB -> owner.parentTabCount() > 1;
                     case SELECT_PARENT_TAB_1, SELECT_PARENT_TAB_2, SELECT_PARENT_TAB_3, SELECT_PARENT_TAB_4, SELECT_PARENT_TAB_5,
                          SELECT_PARENT_TAB_6, SELECT_PARENT_TAB_7, SELECT_PARENT_TAB_8, SELECT_PARENT_TAB_9 ->
