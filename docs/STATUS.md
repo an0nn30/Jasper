@@ -24,10 +24,9 @@ activates it in the main window. Not merged, not pushed.
 `144ff89f1` on `bba5c472e`, then its review fix). The user decided on 2026-10-19: "Make the Vault manager a separate dialog window that floats above
 the main window. That needs no SDK change." This replaces plan 4b's tab form of the manager (`VaultManagerTab`,
 `82a4ddcbf`). `VaultManagerDialog` opens one modeless plugin dialog titled "Credential Vault", owned by the main window
-(`WindowHandle.isMain()`) whichever window asked; it is never a tab. A second request raises it, the main window first
-(`WindowHandle.toFront`, which restores it when minimized), and while the vault is locked shows the inline unlock prompt
-in it. Done and
-Escape close it again, which closes its sheets and cancels a live unlock prompt; ROWS keeps Lock and Add in its first
+(`WindowHandle.isMain()`) whichever window asked; it is never a tab. Opening it raises the main window first
+(`WindowHandle.toFront`, which restores it when minimized), then shows or raises the manager; while the vault is locked
+it shows the inline unlock prompt, and a consumer's unlock raises only the manager. Done and Escape close it again, which closes its sheets and cancels a live unlock prompt; ROWS keeps Lock and Add in its first
 row and CLASSIC its toolbar. A `PluginDialog` is no `WindowOwner`, so its add, edit, password and generator sheets hang
 from an anchor on its Done button; the passive Unlock asks over the main window. It is not restored on relaunch, and the
 Vault stays at 0.7.0. App rule, with no SDK API change: a modeless plugin dialog whose content is a WINDOW form becomes

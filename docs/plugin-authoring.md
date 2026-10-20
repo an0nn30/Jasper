@@ -273,7 +273,8 @@ private static void installPanelAndAboutTab(PluginContext context, long stepMill
 - `PanelHost.onClosed` tells an instance its window is gone. `onVisibility` tells it when it
   is shown or hidden, which is the moment to start or stop refreshing.
 - `WindowSurface.onClosing` guards run when the user closes the dialog; returning false keeps
-  it open. `close()` closes at once.
+  it open. `close()` closes at once. A dialog also closes, running its `onClosed` handlers, when the Jasper window that
+  owns it closes.
 - `Windows.onQuitting` (SDK 0.11.0) registers a guard asked when Jasper quits or restarts, after content tabs, even
   when your plugin has no tab: a background server can ask "stop the running servers?".
   Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit. It is not asked

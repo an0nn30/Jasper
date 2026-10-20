@@ -86,7 +86,7 @@ public final class VaultManagerDialog implements AutoCloseable {
         // The dialog floats over its window, so that window comes forward first, restored if it was minimized.
         owner.toFront(); opened.show();
     }
-    /** Raises the open dialog, its window first. */
+    /** Raises the open dialog for the user's own request, its window first. */
     private void raise() { owner.toFront(); dialog.toFront(); }
     /** Refresh existing content; never opens the manager in response to an unrelated consumer unlock. */
     public void changed() {
@@ -114,7 +114,8 @@ public final class VaultManagerDialog implements AutoCloseable {
             shown.clear();
             if (unlockPrompt == prompt && passwordPanel == shown) { unlockPrompt = null; passwordPanel = null; changed(); }
         });
-        raise(); return true;
+        // A consumer's unlock raises only the manager: its window coming forward would take the keyboard into a terminal.
+        dialog.toFront(); return true;
     }
     /** Every form, including the generator, gets the same modal ownership and close-time wipe. */
     public void dialog(String title, Function<Runnable, ? extends EditorForm> factory) { dialog(title, Nodes.Hue.NONE, factory); }
@@ -169,7 +170,7 @@ public final class VaultManagerDialog implements AutoCloseable {
         }));
     }
     /** Shows the saved plugin grants in the open manager; does nothing when it is closed or locked. */
-    public void showGrants() { if (dialog != null) { panel.showGrants(); raise(); } }
+    public void showGrants() { if (dialog != null) { panel.showGrants(); dialog.toFront(); } }
     /** Asks for a new master password over the open manager; does nothing when it is closed or locked. */
     public void changePassword() {
         dialog("Change Master Password", close -> new ChangePasswordForm(context.kit(), lock, close, failure -> {

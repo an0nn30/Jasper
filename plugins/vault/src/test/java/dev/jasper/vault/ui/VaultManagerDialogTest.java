@@ -142,10 +142,11 @@ class VaultManagerDialogTest {
                 assertThat(closed(escape)).isTrue();
                 manager.show(owner, Optional.empty()); f.manager.invalidate(); f.lock.lock(); manager.changed();
                 var prompting = manager.panel.view();
-                int raised = dialogs.calls().size();
+                int raised = dialogs.calls().size(), fronted = host.openRequests().size();
                 var waiting = service.requestUnlock(owner);
                 assertThat(manager.passwordPanel).isNotNull();
                 assertThat(dialogs.calls().subList(raised, dialogs.calls().size())).as("the prompt raises the manager").containsExactly("toFront|Credential Vault");
+                assertThat(host.openRequests()).as("but not its window, which would take the keyboard into a terminal").hasSize(fronted);
                 type(prompting, manager.passwordPanel.password, "typed-then-closed");
                 assertThat(host.requestClose("dialog")).as("its close button").isTrue();
                 assertThat(closed(prompting)).as("closing disposes the view").isTrue();
