@@ -270,8 +270,8 @@ final class WindowTabs extends JPanel implements TabStrip {
             super(null); this.tab = tab; slot = new Slot(this); setOpaque(false);
             flat(select); flat(close); select.setHorizontalAlignment(SwingConstants.CENTER);
             select.addActionListener(event -> { if (!disposed) source.select(tab); });
-            close.setRolloverEnabled(true); close.setToolTipText("Close tab");
-            close.getAccessibleContext().setAccessibleName("Close tab");
+            close.setRolloverEnabled(true); close.setToolTipText(source.closeName());
+            close.getAccessibleContext().setAccessibleName(source.closeName());
             close.addActionListener(event -> { if (!disposed) source.close(tab); });
             MouseAdapter gestures = new MouseAdapter() {
                 private void popup(MouseEvent event) { source.menu(tab).show(event.getComponent(), event.getX(), event.getY()); }

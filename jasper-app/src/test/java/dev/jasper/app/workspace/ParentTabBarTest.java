@@ -4,21 +4,31 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.config.KeyBindings;
+import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
+import dev.jasper.ui.swing.FlatLafInstaller;
+import dev.jasper.ui.theme.SemanticColor;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Rectangle;
+import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import javax.swing.AbstractButton;
 import javax.swing.JMenuItem;
+import javax.swing.JPanel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -49,7 +59,6 @@ class ParentTabBarTest {
             assertThat(bar.isVisible()).as("one parent tab: no bar").isFalse();
             Tab second = open(owner, "second");
             assertThat(bar.isVisible()).isTrue();
-            assertThat(bar.motionRunning()).as("its entries never move").isFalse();
             assertThat(WindowTabsTest.named(bar, "select:first")).isNotNull();
             assertThat(WindowTabsTest.named(bar, "select:second")).isNotNull();
             assertThat(owner.windowTabs()).as("a pane's strip is another strip").isNotSameAs(bar);
@@ -58,6 +67,28 @@ class ParentTabBarTest {
                 .isSameAs(owner.parentTabs().views().getFirst().activeGroupView().strip());
             owner.closeTab(second);
             assertThat(bar.isVisible()).as("one parent tab again: the bar hides at once").isFalse();
+        });
+    }
+
+    /** Workspace plan 7a Rulings 16: the bar's entries take their places at once while the window's tabs animate. */
+    @Test void theBarsEntriesNeverMove() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(pending));
+            assertThat(owner.animations().enabled() && owner.lookAnimates()).as("the window's tabs animate").isTrue();
+            owner.currentTerminal().rename("first");
+            owner.update();
+            owner.setSize(1000, 700);
+            LayoutTestSupport.layoutTree(owner);
+            var bar = (WindowTabs) owner.parentTabBar();
+            open(owner, "second");
+            LayoutTestSupport.layoutTree(owner);
+            open(owner, "third");
+            LayoutTestSupport.layoutTree(owner);
+            assertThat(bar.getWidth()).as("the bar is laid out").isPositive();
+            assertThat(bar.motionRunning()).as("a parent tab opens in place").isFalse();
+            button(bar, "close:second").doClick();
+            assertThat(owner.parentTabCount()).isEqualTo(2);
+            assertThat(bar.motionRunning()).as("and closes in place").isFalse();
         });
     }
 
@@ -76,6 +107,10 @@ class ParentTabBarTest {
             assertThat(source.tabs()).as("each parent tab's active tab, in bar order").containsExactly(right, other);
             assertThat(source.selected()).isSameAs(other);
             assertThat(WindowTabsTest.named(bar, "select:right")).isNotNull();
+            String shortcut = owner.shortcutText(ActionId.SELECT_PARENT_TAB_2);
+            assertThat(shortcut).isNotEmpty();
+            assertThat(button(bar, "select:other").getToolTipText()).as("an entry's tip carries Select Parent Tab's shortcut")
+                .isEqualTo("other (" + shortcut + ")");
             owner.selectTab(left);
             assertThat(source.tabs()).containsExactly(left, other);
             assertThat(source.selected()).isSameAs(left);
@@ -96,6 +131,12 @@ class ParentTabBarTest {
             Tab second = open(owner, "second");
             Tab third = open(owner, "third");
             var bar = (WindowTabs) owner.parentTabBar();
+            var close = button(bar, "close:second");
+            assertThat(close.getToolTipText()).as("the bar's × closes a parent tab").isEqualTo("Close Parent Tab");
+            assertThat(close.getAccessibleContext().getAccessibleName()).isEqualTo("Close Parent Tab");
+            var paneClose = button(owner.windowTabs(), "close:third");
+            assertThat(paneClose.getToolTipText()).as("a pane's × closes a tab").isEqualTo("Close tab");
+            assertThat(paneClose.getAccessibleContext().getAccessibleName()).isEqualTo("Close tab");
             button(bar, "select:first").doClick();
             assertThat(owner.activeParentTab()).isEqualTo(first);
             button(bar, "close:second").doClick();
@@ -106,6 +147,79 @@ class ParentTabBarTest {
             ((JMenuItem) menu.getComponent(0)).doClick();
             assertThat(third.closed()).isTrue();
             assertThat(owner.parentTabCount()).isEqualTo(1);
+        });
+    }
+
+    /** Workspace plan 7a Rulings 16: the bar's × and a middle click close every tab of a parent tab, after their guards. */
+    @Test void theBarsCloseAndAMiddleClickCloseAWholeParentTabAfterItsGuards() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(pending));
+            owner.setAnimations(new AnimationSettings(false, 0, 0, 0));
+            var model = new Contributions();
+            owner.connectContributions(model);
+            // The first parent tab: its tab, one stacked with it, one in a split and a plugin's tab whose guard decides.
+            Tab first = owner.selectedTab();
+            owner.newTab(HOME);
+            Tab stacked = owner.selectedTab();
+            owner.split(Side.RIGHT);
+            Tab split = owner.selectedTab();
+            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", owner.id(), new JPanel());
+            owner.selectTab(split);
+            owner.currentTerminal().rename("guarded");
+            owner.update();
+            // The second: its tab, one stacked with it and one in a split; the third holds one tab.
+            Tab second = open(owner, "second");
+            owner.newTab(HOME);
+            Tab secondStacked = owner.selectedTab();
+            owner.split(Side.RIGHT);
+            Tab secondSplit = owner.selectedTab();
+            owner.currentTerminal().rename("doomed");
+            owner.update();
+            Tab third = open(owner, "third");
+            boolean[] allow = {false};
+            var asked = new ArrayList<List<Tab>>();
+            model.tabs().guard("dev.example.editor", (tabs, batch) -> {
+                asked.add(tabs);
+                return CompletableFuture.completedFuture(allow[0]);
+            });
+            var bar = (WindowTabs) owner.parentTabBar();
+            var guarded = List.of(first, stacked, split, view);
+            button(bar, "close:guarded").doClick();
+            assertThat(asked).as("the plugin's guard is asked").containsExactly(List.of(view));
+            assertThat(guarded).as("a refusal closes nothing").noneMatch(Tab::closed);
+            assertThat(owner.parentTabCount()).isEqualTo(3);
+            allow[0] = true;
+            button(bar, "close:guarded").doClick();
+            assertThat(guarded).as("the × closes every tab of its parent tab").allMatch(Tab::closed);
+            assertThat(owner.parentTabCount()).as("and the parent tab goes").isEqualTo(2);
+            var doomed = button(bar, "select:doomed");
+            doomed.dispatchEvent(new MouseEvent(doomed, MouseEvent.MOUSE_PRESSED, 1, 0, 5, 5, 1, false, MouseEvent.BUTTON2));
+            assertThat(List.of(second, secondStacked, secondSplit)).as("a middle click closes every tab of its parent tab")
+                .allMatch(Tab::closed);
+            assertThat(owner.parentTabCount()).isEqualTo(1);
+            assertThat(owner.tabs()).as("the rest of the window").containsExactly(third);
+        });
+    }
+
+    /** The bar takes a new theme with the window's workspace, as a pane's strip does. */
+    @Test void theBarTakesANewThemeAsAPanesStripDoes() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(pending));
+            owner.currentTerminal().rename("first");
+            owner.update();
+            open(owner, "second");
+            // A workspace of the other darkness than the installed theme's, so its colours are not the defaults.
+            boolean dark = FlatLafInstaller.installedTheme().dark();
+            var split = ThemeTestSupport.mixed(ThemeTestSupport.generated(dark), ThemeTestSupport.generated(!dark));
+            Color ink = split.workspace().semantic().color(SemanticColor.TEXT_PRIMARY);
+            assertThat(ink).isNotEqualTo(FlatLafInstaller.installedTheme().semantic().color(SemanticColor.TEXT_PRIMARY));
+            owner.applyTheme(split, true);
+            var bar = (WindowTabs) owner.parentTabBar();
+            var pane = owner.windowTabs();
+            assertThat(bar.getClientProperty("Jasper.workspaceTheme")).as("the bar").isSameAs(split.workspace());
+            assertThat(pane.getClientProperty("Jasper.workspaceTheme")).as("as a pane's strip").isSameAs(split.workspace());
+            assertThat(button(bar, "select:second").getForeground()).as("the bar's selected entry").isEqualTo(ink);
+            assertThat(button(pane, "select:second").getForeground()).as("as a pane strip's").isEqualTo(ink);
         });
     }
 
@@ -140,6 +254,10 @@ class ParentTabBarTest {
                 assertThat(((ClassicTabs) owner.tabBar()).add().getToolTipText()).as("a pane's + stacks in its pane")
                     .isEqualTo("New Tab in Pane");
                 assertThat(bar.entries()).hasSize(1);
+                assertThat(bar.entries().getFirst().getAccessibleContext().getAccessibleAction().getAccessibleActionDescription(1))
+                    .as("the bar's × closes a parent tab").isEqualTo("Close Parent Tab");
+                assertThat(((ClassicTabs) owner.tabBar()).entries().getFirst().getAccessibleContext().getAccessibleAction()
+                    .getAccessibleActionDescription(1)).as("a pane's × closes a tab").isEqualTo("Close tab");
                 ((AbstractButton) bar.add()).doClick();
                 assertThat(owner.parentTabCount()).as("its + opens a parent tab").isEqualTo(2);
                 assertThat(bar.entries()).hasSize(2);

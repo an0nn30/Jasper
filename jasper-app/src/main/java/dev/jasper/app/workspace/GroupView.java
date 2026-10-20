@@ -112,6 +112,8 @@ final class GroupView extends JPanel implements StripSource {
     @Override public void newTab() { workspace.activate(id); owner.invoke(ActionId.NEW_TAB_IN_PANE); }
     /** New Tab in Pane: this pane's + stacks a tab in it. */
     @Override public String newTabName() { return ActionId.NEW_TAB_IN_PANE.label(); }
+    /** An entry's × closes its tab. */
+    @Override public String closeName() { return "Close tab"; }
     /** Whether {@code tab} joined this group by a move: the strip shows it at once, without the open motion (Rulings 27). */
     @Override public boolean moved(Tab tab) { return workspace.moved(tab); }
     /** The look's motion, which the equal tabs follow as tabs open and close. */

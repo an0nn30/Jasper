@@ -209,7 +209,10 @@ final class ClassicTabs extends JPanel implements TabStrip {
             return accessibleContext;
         }
 
-        /** A page tab, selected while it is; its first action selects it, its second ("Close tab") is the ×. */
+        /**
+         * A page tab, selected while it is; its first action selects it, its second is the ×, named by the source's
+         * {@link StripSource#closeName}.
+         */
         private final class AccessibleEntry extends AccessibleJComponent implements AccessibleAction {
             @Override public AccessibleRole getAccessibleRole() { return AccessibleRole.PAGE_TAB; }
             @Override public AccessibleStateSet getAccessibleStateSet() {
@@ -223,7 +226,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
             @Override public String getAccessibleActionDescription(int index) {
                 return switch (index) {
                     case 0 -> UIManager.getString("AbstractButton.clickText");
-                    case 1 -> "Close tab";
+                    case 1 -> source.closeName();
                     default -> null;
                 };
             }

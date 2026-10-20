@@ -73,6 +73,8 @@ final class ParentTabBar implements StripSource {
     @Override public void newTab() { owner.invoke(ActionId.NEW_TAB); }
     /** New Tab: the bar's "+" opens a parent tab. */
     @Override public String newTabName() { return ActionId.NEW_TAB.label(); }
+    /** Close Parent Tab: an entry's × closes every tab of its parent tab. */
+    @Override public String closeName() { return ActionId.CLOSE_PARENT_TAB.label(); }
     /** The bar's entries take their places at once. */
     @Override public boolean moved(Tab tab) { return true; }
     @Override public boolean animates() { return false; }

@@ -40,6 +40,8 @@ sealed interface StripSource permits GroupView, ParentTabBar {
     void newTab();
     /** The "+"'s name: what it opens. */
     String newTabName();
+    /** The ×'s name: what it closes. */
+    String closeName();
     /** Whether the entry takes its place at once, without the open motion. */
     boolean moved(Tab tab);
     /** Whether the strip's entries may move as they open and close. */

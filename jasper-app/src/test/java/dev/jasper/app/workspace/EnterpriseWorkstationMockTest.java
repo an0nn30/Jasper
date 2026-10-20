@@ -164,7 +164,7 @@ class EnterpriseWorkstationMockTest {
         assertThat(MockProfile.deltaE(MockProfile.at(render, left + 200, 2 * (mounted.firstTab().y + 14)), MockProfile.role(dark, "surface.card")))
             .as(what + "the active tab's ground").isLessThanOrEqualTo(2.5);
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
-        MockProfile.write(render.getSubimage(left, 2 * (mounted.firstTab().y), 700, 58), "enterprise-" + (dark ? "dark" : "light") + "-tabs");
+        MockProfile.write(render.getSubimage(left, 2 * mounted.firstTab().y, 700, 58), "enterprise-" + (dark ? "dark" : "light") + "-tabs");
     }
 
     @ParameterizedTest @ValueSource(booleans = {false, true})
