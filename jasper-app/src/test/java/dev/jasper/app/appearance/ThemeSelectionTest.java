@@ -20,6 +20,22 @@ import org.junit.jupiter.api.io.TempDir;
 class ThemeSelectionTest {
     @TempDir Path home;
 
+    @Test void freshSettingsUseMeadowForLightAndKeepCobaltForDark() {
+        var config = dev.jasper.app.config.ConfigSnapshot.defaults();
+        assertThat(config.lightTheme()).isEqualTo("jasper-meadow");
+        assertThat(config.darkTheme()).isEqualTo("slate-cobalt");
+        var selection = ThemeSelection.of(ThemeLibrary.bundledOnly(), config.darkTheme(), config.lightTheme(),
+            TerminalSchemeChoice.MATCH, (key, message) -> fail(message));
+        assertThat(selection.theme(false).name()).isEqualTo("Jasper Meadow Light");
+        assertThat(selection.terminal(false)).isSameAs(selection.theme(false).matching(false));
+    }
+
+    @Test void missingLightThemeFallsBackToMeadow() {
+        var selection = ThemeSelection.of(ThemeLibrary.bundledOnly(), "slate-cobalt", "missing-theme",
+            TerminalSchemeChoice.MATCH, (key, message) -> { });
+        assertThat(selection.theme(false).id()).isEqualTo("jasper-meadow");
+    }
+
     /** Slate Cobalt's file as {@code ocean} (both variants) and a terminal-only {@code zenburn}. */
     ThemeLibrary library() throws Exception {
         var themes = Files.createDirectories(home.resolve("themes"));
@@ -48,16 +64,16 @@ class ThemeSelectionTest {
         var problems = new LinkedHashMap<String, String>();
         var selection = ThemeSelection.of(library, "zenburn", "nord", TerminalSchemeChoice.parse("nord/dark").orElseThrow(), problems::put);
         assertThat(selection.theme(true)).isSameAs(JasperTheme.bundled());
-        assertThat(selection.theme(false)).isSameAs(JasperTheme.bundled());
+        assertThat(selection.theme(false)).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow());
         assertThat(selection.scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
         assertThat(problems).containsExactly(
             Map.entry("ui.theme.dark", "\"zenburn\" has no Dark variant. Use one of \"slate-cobalt\", \"catppuccin-frappe\", "
                 + "\"catppuccin-macchiato\", \"catppuccin-mocha\", \"ubuntu-yaru\", \"ocean\"; using the default."),
-            Map.entry("ui.theme.light", "\"nord\" is not an installed theme. Use one of \"slate-cobalt\", \"catppuccin-latte\", \"ubuntu-yaru\", \"ocean\"; "
+            Map.entry("ui.theme.light", "\"nord\" is not an installed theme. Use one of \"slate-cobalt\", \"catppuccin-latte\", \"ubuntu-yaru\", \"jasper-meadow\", \"ocean\"; "
                 + "using the default."),
             Map.entry("terminal.scheme", "\"nord/dark\" is not an installed scheme. Use \"match\" or one of \"slate-cobalt/dark\", "
                 + "\"slate-cobalt/light\", \"slate-cobalt/high-contrast\", \"catppuccin-latte/light\", \"catppuccin-frappe/dark\", "
-                + "\"catppuccin-macchiato/dark\", \"catppuccin-mocha/dark\", \"ubuntu-yaru/dark\", \"ubuntu-yaru/light\", \"ocean/dark\", \"ocean/light\", \"ocean/high-contrast\", "
+                + "\"catppuccin-macchiato/dark\", \"catppuccin-mocha/dark\", \"ubuntu-yaru/dark\", \"ubuntu-yaru/light\", \"jasper-meadow/light\", \"ocean/dark\", \"ocean/light\", \"ocean/high-contrast\", "
                 + "\"zenburn/dark\"; using the default."));
         assertThat(selection.withScheme(TerminalSchemeChoice.parse("nord/dark").orElseThrow()).scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
     }

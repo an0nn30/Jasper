@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**Jasper Meadow Light — 2026-10-20**: The default light theme uses warm cream surfaces and moss #52643F accents for buttons, selections and focus. Existing saved theme choices, Enterprise defaults and the Slate Cobalt dark default are retained. Select Light appearance and Jasper Meadow Light in Settings to try it with an existing profile. Full headless `check` passed: 11,503 Java tests, zero failures/errors, 25 existing platform skips, plus theme-tool, native and architecture checks.
+
 **CI runtime optimization — 2026-10-19** (PR #1): CI runs independent Gradle projects with
 `--parallel`, two workers on Unix and one on Windows; each project's tests remain sequential. Root verifiers consume
 root-owned runtime dependencies, and plugin staging consumes producer task outputs. Full local

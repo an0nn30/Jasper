@@ -87,7 +87,7 @@ class PluginThemesTest {
         var problems = new ArrayList<String>();
         var selection = ThemeSelection.of(library, "enterprise", "nowhere", TerminalSchemeChoice.MATCH, (key, message) -> problems.add(key));
         assertThat(selection.theme(true).id()).isEqualTo("slate-cobalt");
-        assertThat(selection.theme(false).id()).isEqualTo("slate-cobalt");
+        assertThat(selection.theme(false).id()).isEqualTo("jasper-meadow");
         assertThat(problems).as("only the unknown pick is reported").containsExactly("ui.theme.light");
         problems.clear();
         var dormantScheme = ThemeSelection.of(library, "slate-cobalt", "slate-cobalt",

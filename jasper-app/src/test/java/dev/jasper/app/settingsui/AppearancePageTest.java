@@ -50,9 +50,10 @@ class AppearancePageTest {
         List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", AppearanceFixtures.preview(true)),
             new InstalledThemes.ThemeOption("ocean", "Ocean", AppearanceFixtures.preview(true))),
         List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", AppearanceFixtures.preview(false)),
+            new InstalledThemes.ThemeOption("jasper-meadow", "Jasper Meadow Light", AppearanceFixtures.preview(false)),
             new InstalledThemes.ThemeOption("dawn", "Dawn", AppearanceFixtures.preview(false))),
         InstalledThemes.slateCobalt(AppearanceFixtures.preview(true), AppearanceFixtures.preview(false)).schemes(),
-        java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "dawn", "Dawn"));
+        java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "dawn", "Dawn", "jasper-meadow", "Jasper Meadow Light"));
     /** The Appearance page over {@code themes}, built on the test's draft. */
     private SchemaPage pageWith(InstalledThemes themes) {
         var choices = new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes, Optional.empty());
@@ -190,10 +191,10 @@ class AppearancePageTest {
         reset.doClick();
         assertThat(draft.value(CoreSettings.UI_APPEARANCE)).isEqualTo(CoreSettings.UI_APPEARANCE.defaultValue());
         assertThat(draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("slate-cobalt");
-        assertThat(draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("slate-cobalt");
+        assertThat(draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("jasper-meadow");
         assertThat(draft.modified()).isFalse();
         assertThat(selected(kit(page, "ui.appearance:dark-theme.input", JComboBox.class))).isEqualTo("Slate Cobalt");
-        assertThat(selected(kit(page, "ui.appearance:light-theme.input", JComboBox.class))).isEqualTo("Slate Cobalt");
+        assertThat(selected(kit(page, "ui.appearance:light-theme.input", JComboBox.class))).isEqualTo("Jasper Meadow Light");
     }
 
     @Test void theTerminalSchemeIsADropdownOfTheFourSchemes() {

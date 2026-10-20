@@ -134,11 +134,11 @@ blink = true
 appearance = "system"
 
 [ui.theme]
-# The themes the Dark and Light appearances show, live: "slate-cobalt", a built-in Catppuccin flavour such as
-# "catppuccin-mocha", or an imported theme's id (its file name in the themes folder without .json). A theme without that variant is reported and Slate Cobalt is used.
+# The themes the Dark and Light appearances show, live: "slate-cobalt" (Dark), "jasper-meadow" (Light), a built-in Catppuccin flavour such as
+# "catppuccin-mocha", or an imported theme's id (its file name in the themes folder without .json). A theme without that variant is reported and the corresponding appearance default is used.
 # The default depends on the active look.
 dark = "slate-cobalt"
-light = "slate-cobalt"
+light = "jasper-meadow"
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of [terminal.font].

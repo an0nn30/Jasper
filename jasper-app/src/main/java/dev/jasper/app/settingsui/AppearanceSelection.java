@@ -51,8 +51,8 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
         var plain = new ControlState(state.visible(), state.enabled(), state.busy(), "");
         Optional<Boolean> system = choices.systemDark().get();
-        var darkPreview = preview(themes.dark(), dark);
-        var lightPreview = preview(themes.light(), light);
+        var darkPreview = preview(themes.dark(), dark, UI_THEME_DARK.defaultValue());
+        var lightPreview = preview(themes.light(), light, UI_THEME_LIGHT.defaultValue());
         var tiles = new Nodes.Choice(id + ":policy", plain, Nodes.ChoiceKind.PREVIEWS, List.of(
             tile("dark", "Dark", label(true, dark), new Option.Preview(darkPreview, Optional.empty())),
             tile("light", "Light", label(false, light), new Option.Preview(lightPreview, Optional.empty())),
@@ -102,9 +102,11 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         return options;
     }
 
-    /** The picked theme's preview; one that is not installed, or lacks the variant, previews the first, Slate Cobalt, which is shown instead. */
-    private static Option.Palette preview(List<InstalledThemes.ThemeOption> installed, String picked) {
-        return installed.stream().filter(theme -> theme.id().equals(picked)).findFirst().orElse(installed.getFirst()).preview();
+    /** The picked theme's preview, falling back to the same appearance default as the application. */
+    private static Option.Palette preview(List<InstalledThemes.ThemeOption> installed, String picked, String defaultId) {
+        return installed.stream().filter(theme -> theme.id().equals(picked)).findFirst()
+            .orElseGet(() -> installed.stream().filter(theme -> theme.id().equals(defaultId)).findFirst()
+                .orElse(installed.getFirst())).preview();
     }
 
     private String label(boolean dark, String picked) {

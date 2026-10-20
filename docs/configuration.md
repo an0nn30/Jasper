@@ -231,7 +231,7 @@ family = "system"
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately; a look without motion keeps everything still whatever this says, and Settings hides it | Live |
 | `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
 | `ui.theme.dark` | `"slate-cobalt"` | A theme id: the theme the Dark appearance shows ([Themes](themes.md)); the default depends on the active look | Live |
-| `ui.theme.light` | `"slate-cobalt"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)); the default depends on the active look | Live |
+| `ui.theme.light` | `"jasper-meadow"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)); the default depends on the active look | Live |
 | `ui.workspace.opacity` | Opaque (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
 | `ui.workspace.blur` | `"theme"` | `"theme"` (Slate Cobalt's: no blur), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
@@ -829,13 +829,13 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme
 
-Jasper's built-in themes are Slate Cobalt, in Dark and Light, and Catppuccin Latte, Frappé, Macchiato and Mocha; imported
+Jasper's built-in themes include Jasper Meadow Light, Slate Cobalt in Dark and Light, Ubuntu Yaru, and Catppuccin Latte, Frappé, Macchiato and Mocha; imported
 themes live in the themes folder ([Themes](themes.md)).
 
 `ui.appearance` chooses the UI appearance: `"dark"`, `"light"`, or `"system"` (the default) to follow the operating
 system's light or dark setting live. When the operating system's appearance is unavailable, `"system"` uses Dark. An
 operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name the theme each
-appearance shows, `"slate-cobalt"` by default.
+appearance shows: `"slate-cobalt"` for Dark and `"jasper-meadow"` for Light by default.
 
 `terminal.scheme` chooses the terminal panes' colours: `"match"` (the default) uses the shown theme's own scheme; a
 scheme id such as `"slate-cobalt/high-contrast"` chooses one. Only the terminal text area changes: tabs, the tab strip,

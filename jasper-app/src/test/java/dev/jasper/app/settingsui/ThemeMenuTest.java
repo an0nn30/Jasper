@@ -247,7 +247,7 @@ class ThemeMenuTest {
         assertThat(asked).singleElement().satisfies(question -> {
             assertThat(question.question()).isEqualTo("Remove Ocean?");
             assertThat(question.consequence()).isEqualTo("Its file, ocean.json, is deleted from the themes folder. "
-                + "It is your Dark theme; Slate Cobalt will be used instead. It is your Light theme; Slate Cobalt will be used instead. "
+                + "It is your Dark theme; Slate Cobalt will be used instead. It is your Light theme; Jasper Meadow Light will be used instead. "
                 + "Its scheme is your terminal scheme; Same as UI theme will be used instead.");
         });
         assertThat(folder().resolve("ocean.json")).doesNotExist();
@@ -257,7 +257,7 @@ class ThemeMenuTest {
             assertThat(edit.expected()).containsOnly(Map.entry(CoreSettings.UI_THEME_DARK, Optional.of("ocean")),
                 Map.entry(CoreSettings.TERMINAL_SCHEME, Optional.of("ocean/high-contrast")));
         });
-        assertThat(draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("slate-cobalt");
+        assertThat(draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("jasper-meadow");
         assertThat(draft.modified(CoreSettings.UI_THEME_LIGHT)).as("the staged pick is gone, not replaced").isFalse();
         assertThat(draft.value(CoreSettings.UI_FONT_SIZE)).as("other staged changes stay").isEqualTo(15f);
         assertThat(told).isEmpty();

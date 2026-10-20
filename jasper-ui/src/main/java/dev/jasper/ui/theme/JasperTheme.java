@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 /**
  * A Jasper theme file ({@code docs/themes.md}): a name, an optional author, a Dark and/or Light UI variant, terminal
  * schemes and an editor scheme for each UI variant. The built-in themes are {@code <id>.json} beside this class: Slate
- * Cobalt, the default, Catppuccin's flavours ({@code tools/themes/catppuccin}), and Ubuntu Yaru. A UI
+ * Cobalt, Jasper Meadow Light, Catppuccin's flavours ({@code tools/themes/catppuccin}), and Ubuntu Yaru. A UI
  * variant lists every role except those that follow fixed rules, never colour values: {@code border.focus} is
  * {@code accent}, {@code surface.status} is {@code surface.app}, {@code border.identity} is {@code border.control} and
  * each {@code hue.<name>.surface} is its hue (the kit applies the tile alpha). A variant may leave out the title bar's
@@ -32,8 +32,10 @@ import java.util.regex.Pattern;
  * {@link ThemeFileException} naming the file and the entry. Immutable.
  */
 public final class JasperTheme {
-    /** The default theme's id, Slate Cobalt's. */
+    /** Slate Cobalt's id; the default Dark appearance. */
     public static final String BUNDLED_ID = "slate-cobalt";
+    /** The default Light appearance; Slate Cobalt remains the default Dark appearance. */
+    public static final String LIGHT_DEFAULT_ID = "jasper-meadow";
     /** The format this Jasper reads: {@code "jasper-theme": 1}. */
     public static final long FORMAT = 1;
     static final String RESOURCE = "/dev/jasper/ui/theme/slate-cobalt.json";
@@ -121,6 +123,7 @@ public final class JasperTheme {
             var themes = new ArrayList<JasperTheme>(List.of(bundled()));
             for (String id : CONVERTED) themes.add(load("/dev/jasper/ui/theme/" + id + ".json", id));
             themes.add(load("/dev/jasper/ui/theme/ubuntu-yaru.json", "ubuntu-yaru"));
+            themes.add(load("/dev/jasper/ui/theme/jasper-meadow.json", LIGHT_DEFAULT_ID));
             return List.copyOf(themes);
         }
     }
