@@ -164,6 +164,9 @@ class WorkspaceViewTest {
             var left = workspace.model().activeGroup();
             workspace.moveToNewGroup(owner.tabs().get(1), left, Side.RIGHT);
             var right = workspace.model().activeGroup();
+            // Select Tab 1 has no default since the digits select parent tabs (parent tabs spec 8): give it one.
+            owner.setBindings(dev.jasper.app.config.KeyBindings.withOverrides(System.getProperty("os.name").startsWith("Mac"),
+                java.util.Map.of("select_tab_1", "alt+1")));
             assertThat(owner.tabShortcut(0)).as("Select Tab 1 has a shortcut").isNotEmpty();
             assertThat(workspace.groupView(right).shortcut(0)).as("the active group's first tab").isEqualTo(owner.tabShortcut(0));
             assertThat(workspace.groupView(left).shortcut(0)).as("Select Tab acts in the active group only").isEmpty();

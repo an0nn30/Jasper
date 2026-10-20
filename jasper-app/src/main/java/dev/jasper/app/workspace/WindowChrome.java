@@ -78,8 +78,8 @@ final class WindowChrome {
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.
         toolbar.putClientProperty(com.formdev.flatlaf.FlatClientProperties.COMPONENT_TITLE_BAR_CAPTION,
             (java.util.function.Function<Point, Boolean>) point -> null);
-        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_TERMINAL_WINDOW, ActionId.OPEN_FILE, ActionId.CLOSE_TAB, ActionId.CLOSE_GROUP,
-            ActionId.CLOSE_WINDOW, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
+        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_TERMINAL_WINDOW, ActionId.OPEN_FILE, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
+            ActionId.CLOSE_PARENT_TAB, ActionId.CLOSE_WINDOW, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
             ActionId.FIND_PREVIOUS, ActionId.CLEAR_SCROLLBACK);
         JMenu view = menu("View", ActionId.COMMAND_PALETTE);
@@ -89,7 +89,7 @@ final class WindowChrome {
         zen.setAction(owner.action(ActionId.TOGGLE_ZEN_MODE));
         viewModes.add(zen);
         view.add(viewModes);
-        view.add(new MenuBarItems.Item(owner.action(ActionId.MAXIMIZE_GROUP)));
+        view.add(new MenuBarItems.Item(owner.action(ActionId.MAXIMIZE_PANE)));
         view.addSeparator();
         JMenu visibility = menu("Show/Hide");
         view.add(visibility);
@@ -121,7 +121,7 @@ final class WindowChrome {
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_TERMINAL_WINDOW, "app-window");
         toolbar.add(new ToolbarSeparator());
         addSplitButton();
-        addButton(ActionId.MAXIMIZE_GROUP, "maximize");
+        addButton(ActionId.MAXIMIZE_PANE, "maximize");
         pluginSeparator.setVisible(false);
         toolbar.add(pluginSeparator);
         toolbar.add(new ToolbarSeparator());
@@ -433,18 +433,23 @@ final class WindowChrome {
         menuBar.revalidate(); menuBar.repaint();
     }
 
-    /** The Tab menu's group and prompt items, before its tab items (workspace plan 3b Rulings 7). */
-    private static final ActionId[] GROUP_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_GROUP_LEFT,
-        ActionId.FOCUS_GROUP_RIGHT, ActionId.FOCUS_GROUP_UP, ActionId.FOCUS_GROUP_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
-    private static final ActionId[] TAB_ITEMS = {ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.RENAME_TAB,
-        ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4,
-        ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9};
+    /** The Tab menu's pane and prompt items, before its tab and parent tab items (workspace plan 3b Rulings 7). */
+    private static final ActionId[] GROUP_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
+        ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
+    private static final ActionId[] TAB_ITEMS = {ActionId.NEW_TAB_IN_PANE, ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.RENAME_TAB};
+    /** The parent tab items (parent tabs spec 8): Select Parent Tab 1 to 9 hold the digits Select Tab had. */
+    private static final ActionId[] PARENT_TAB_ITEMS = {ActionId.NEXT_PARENT_TAB, ActionId.PREVIOUS_PARENT_TAB,
+        ActionId.SELECT_PARENT_TAB_1, ActionId.SELECT_PARENT_TAB_2, ActionId.SELECT_PARENT_TAB_3, ActionId.SELECT_PARENT_TAB_4,
+        ActionId.SELECT_PARENT_TAB_5, ActionId.SELECT_PARENT_TAB_6, ActionId.SELECT_PARENT_TAB_7, ActionId.SELECT_PARENT_TAB_8,
+        ActionId.SELECT_PARENT_TAB_9};
 
-    /** Tab: splitting and focusing groups and moving between prompts, a rule, then the tab commands. */
+    /** Tab: splitting and focusing panes and moving between prompts, a rule, the tab commands, a rule, the parent tab commands. */
     private JMenu tabMenu() {
         JMenu menu = menu("Tab", GROUP_ITEMS);
         menu.addSeparator();
         for (ActionId id : TAB_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
+        menu.addSeparator();
+        for (ActionId id : PARENT_TAB_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
         return menu;
     }
 
@@ -478,7 +483,7 @@ final class WindowChrome {
     private JButton addButton(ActionId id, String icon) {
         String label = switch (id) {
             case NEW_TAB -> "New tab"; case NEW_TERMINAL_WINDOW -> "New terminal window";
-            case SPLIT_RIGHT -> "Split"; case MAXIMIZE_GROUP -> "Maximize group";
+            case SPLIT_RIGHT -> "Split"; case MAXIMIZE_PANE -> "Maximize pane";
             case RELOAD_CONFIG -> "Reload config"; case QUIT -> "Exit"; default -> id.label();
         };
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
@@ -570,7 +575,7 @@ final class WindowChrome {
         owner.updateActions();
         JPopupMenu menu = new JPopupMenu();
         for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL,
-            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_GROUP, ActionId.CLOSE_TAB}) menu.add(owner.action(id));
+            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE, ActionId.CLOSE_TAB}) menu.add(owner.action(id));
         if (contributions != null) {
             for (MenuSection section : contributions.model().menus()) {
                 if (section.target().type() != MenuTarget.Type.CONTEXT) continue;

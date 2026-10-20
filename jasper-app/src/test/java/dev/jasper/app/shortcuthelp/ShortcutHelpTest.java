@@ -19,6 +19,15 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ShortcutHelpTest {
+    /** Parent tabs spec 8: the parent-tab actions join Tabs, and the pane actions are Panes. */
+    @Test void theParentTabAndPaneActionsHaveTheirCategories() {
+        var rows = ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true);
+        for (String id : List.of("new_tab_in_pane", "close_parent_tab", "next_parent_tab", "select_parent_tab_1"))
+            assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Tabs"));
+        for (String id : List.of("close_pane", "maximize_pane", "focus_pane_left"))
+            assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Panes"));
+    }
+
     @Test void catalogIncludesEveryBuiltInAndUsesEffectivePluginBindings() throws Exception {
         edt(() -> {
             var contributions = new Contributions();

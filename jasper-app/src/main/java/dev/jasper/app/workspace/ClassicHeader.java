@@ -43,7 +43,7 @@ final class ClassicHeader implements HeaderComposition {
         chrome.classicButton(toolbar, ActionId.NEW_TAB, "New Session", "square-plus", 90);
         toolbar.add(chrome.separator(true));
         chrome.classicSplit();
-        chrome.classicButton(toolbar, ActionId.MAXIMIZE_GROUP, "Maximize", "maximize", 10);
+        chrome.classicButton(toolbar, ActionId.MAXIMIZE_PANE, "Maximize", "maximize", 10);
         chrome.addPluginGroup(true);
         toolbar.finish();
         trailing.setFloatable(false);

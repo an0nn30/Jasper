@@ -39,8 +39,8 @@ final class WindowCommands implements AutoCloseable {
         for (ActionId id : ActionId.values()) {
             if (id == ActionId.COMMAND_PALETTE) continue;
             String icon = switch (id) {
-                case NEW_TAB -> "square-plus"; case NEW_TERMINAL_WINDOW -> "app-window";
-                case SPLIT_RIGHT, SPLIT_DOWN -> "columns-2"; case MAXIMIZE_GROUP -> "maximize";
+                case NEW_TAB, NEW_TAB_IN_PANE -> "square-plus"; case NEW_TERMINAL_WINDOW -> "app-window";
+                case SPLIT_RIGHT, SPLIT_DOWN -> "columns-2"; case MAXIMIZE_PANE -> "maximize";
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> "search"; case OPEN_SETTINGS -> "settings";
                 case RELOAD_CONFIG -> "refresh"; default -> null;
             };
@@ -53,9 +53,12 @@ final class WindowCommands implements AutoCloseable {
                 case CLOSE_WINDOW -> List.of("window", "close");
                 case MOVE_TAB_TO_NEW_WINDOW -> List.of("detach", "separate window", "child window");
                 case MOVE_TAB_TO_MAIN_WINDOW -> List.of("attach", "main window");
+                case NEW_TAB -> List.of("parent tab", "terminal");
+                case NEW_TAB_IN_PANE -> List.of("stack", "pane", "terminal");
+                case CLOSE_PARENT_TAB, NEXT_PARENT_TAB, PREVIOUS_PARENT_TAB -> List.of("parent tab");
                 case OPEN_SETTINGS -> List.of("preferences", "configuration");
                 case RELOAD_CONFIG -> List.of("configuration", "refresh");
-                case MAXIMIZE_GROUP -> List.of("zoom", "restore");
+                case MAXIMIZE_PANE -> List.of("zoom", "restore");
                 case TOGGLE_ZEN_MODE -> List.of("view mode", "focus", "distraction free", "hide tools", "restore layout");
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> List.of("search");
                 case CLEAR_SCROLLBACK -> List.of("history", "clear");
@@ -138,8 +141,8 @@ final class WindowCommands implements AutoCloseable {
         boolean zen = owner.zenMode();
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Action.SELECTED_KEY, zen);
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Command.TITLE, zen ? "Exit Zen Mode" : "Enter Zen Mode");
-        owner.action(ActionId.MAXIMIZE_GROUP).putValue(Command.TITLE,
-            owner.workspace().model().maximized().isPresent() ? "Restore Group" : "Maximize Group");
+        owner.action(ActionId.MAXIMIZE_PANE).putValue(Command.TITLE,
+            owner.workspace().model().maximized().isPresent() ? "Restore Pane" : "Maximize Pane");
         view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
         view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
         // A child window has no toolbar, status bar, rail or Zen of its own (workspace tabs spec 6.3).

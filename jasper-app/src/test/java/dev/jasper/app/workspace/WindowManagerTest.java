@@ -366,7 +366,7 @@ class WindowManagerTest {
             var menu = child.content().tabMenu(child.content().selectedTab());
             var titles = new ArrayList<String>();
             for (var item : menu.getComponents()) if (item instanceof javax.swing.JMenuItem entry) titles.add(entry.getText());
-            assertThat(titles).containsExactly("Rename Tab", "Move to Main Window", "Close Tab", "Close Others", "Close Group");
+            assertThat(titles).containsExactly("Rename Tab", "Move to Main Window", "Close Tab", "Close Others", "Close Pane");
         });
         launch();
     }

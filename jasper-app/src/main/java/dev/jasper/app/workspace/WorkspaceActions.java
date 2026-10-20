@@ -49,7 +49,14 @@ final class WorkspaceActions {
         TerminalView view = pane == null ? null : pane.view();
         switch (id) {
             case COMMAND_PALETTE -> owner.commandPalette().open(PaletteScope.ALL_ID);
-            case NEW_TAB -> owner.newTab(owner.directory());
+            case NEW_TAB -> owner.newParentTab(owner.directory());
+            case NEW_TAB_IN_PANE -> owner.newTab(owner.directory());
+            case CLOSE_PARENT_TAB -> owner.closeParentTab(owner.activeParentTab());
+            case NEXT_PARENT_TAB -> owner.selectParentTabRelative(1);
+            case PREVIOUS_PARENT_TAB -> owner.selectParentTabRelative(-1);
+            case SELECT_PARENT_TAB_1, SELECT_PARENT_TAB_2, SELECT_PARENT_TAB_3, SELECT_PARENT_TAB_4, SELECT_PARENT_TAB_5,
+                 SELECT_PARENT_TAB_6, SELECT_PARENT_TAB_7, SELECT_PARENT_TAB_8, SELECT_PARENT_TAB_9 ->
+                owner.selectParentTabAt(id.ordinal() - ActionId.SELECT_PARENT_TAB_1.ordinal());
             case NEW_TERMINAL_WINDOW -> owner.requestNewTerminalWindow();
             case CLOSE_WINDOW -> owner.requestCloseWindow();
             case MOVE_TAB_TO_NEW_WINDOW -> owner.moveToNewWindow(owner.selectedTab());
@@ -57,15 +64,15 @@ final class WorkspaceActions {
             case OPEN_FILE -> owner.openFile();
             case QUIT -> owner.requestQuit();
             case CLOSE_TAB -> owner.closeTab(owner.selectedTab());
-            case CLOSE_GROUP -> owner.closeGroup(owner.selectedTab());
+            case CLOSE_PANE -> owner.closeGroup(owner.selectedTab());
             case SPLIT_RIGHT -> owner.split(Side.RIGHT);
             case SPLIT_DOWN -> owner.split(Side.DOWN);
-            case MAXIMIZE_GROUP -> owner.toggleMaximize();
+            case MAXIMIZE_PANE -> owner.toggleMaximize();
             case TOGGLE_ZEN_MODE -> owner.toggleZenMode();
-            case FOCUS_GROUP_LEFT -> owner.focusGroup(Side.LEFT);
-            case FOCUS_GROUP_RIGHT -> owner.focusGroup(Side.RIGHT);
-            case FOCUS_GROUP_UP -> owner.focusGroup(Side.UP);
-            case FOCUS_GROUP_DOWN -> owner.focusGroup(Side.DOWN);
+            case FOCUS_PANE_LEFT -> owner.focusGroup(Side.LEFT);
+            case FOCUS_PANE_RIGHT -> owner.focusGroup(Side.RIGHT);
+            case FOCUS_PANE_UP -> owner.focusGroup(Side.UP);
+            case FOCUS_PANE_DOWN -> owner.focusGroup(Side.DOWN);
             case NEXT_TAB -> owner.selectRelative(1);
             case PREVIOUS_TAB -> owner.selectRelative(-1);
             case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
@@ -116,7 +123,8 @@ final class WorkspaceActions {
                 boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
-                    case COMMAND_PALETTE, NEW_TAB, NEW_TERMINAL_WINDOW, CLOSE_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT, SPLIT_DOWN -> true;
+                    case COMMAND_PALETTE, NEW_TAB, NEW_TAB_IN_PANE, NEW_TERMINAL_WINDOW, CLOSE_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT,
+                         SPLIT_DOWN -> true;
                     // A child window's only tab stays: that window already is its own (workspace tabs spec 6.5).
                     case MOVE_TAB_TO_NEW_WINDOW -> owner.selectedTab() != null && (owner.isMain() || owner.tabCount() > 1);
                     case MOVE_TAB_TO_MAIN_WINDOW -> owner.selectedTab() != null && !owner.isMain();
@@ -129,12 +137,17 @@ final class WorkspaceActions {
                     case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
                          SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
                         id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < owner.groupTabCount();
-                    case MAXIMIZE_GROUP -> owner.workspace().model().groups().size() > 1;
-                    case CLOSE_GROUP -> owner.selectedTab() != null;
-                    case FOCUS_GROUP_LEFT -> owner.workspace().neighbour(Side.LEFT).isPresent();
-                    case FOCUS_GROUP_RIGHT -> owner.workspace().neighbour(Side.RIGHT).isPresent();
-                    case FOCUS_GROUP_UP -> owner.workspace().neighbour(Side.UP).isPresent();
-                    case FOCUS_GROUP_DOWN -> owner.workspace().neighbour(Side.DOWN).isPresent();
+                    case CLOSE_PARENT_TAB -> owner.selectedTab() != null;
+                    case NEXT_PARENT_TAB, PREVIOUS_PARENT_TAB -> owner.parentTabCount() > 1;
+                    case SELECT_PARENT_TAB_1, SELECT_PARENT_TAB_2, SELECT_PARENT_TAB_3, SELECT_PARENT_TAB_4, SELECT_PARENT_TAB_5,
+                         SELECT_PARENT_TAB_6, SELECT_PARENT_TAB_7, SELECT_PARENT_TAB_8, SELECT_PARENT_TAB_9 ->
+                        id.ordinal() - ActionId.SELECT_PARENT_TAB_1.ordinal() < owner.parentTabCount();
+                    case MAXIMIZE_PANE -> owner.workspace().model().groups().size() > 1;
+                    case CLOSE_PANE -> owner.selectedTab() != null;
+                    case FOCUS_PANE_LEFT -> owner.workspace().neighbour(Side.LEFT).isPresent();
+                    case FOCUS_PANE_RIGHT -> owner.workspace().neighbour(Side.RIGHT).isPresent();
+                    case FOCUS_PANE_UP -> owner.workspace().neighbour(Side.UP).isPresent();
+                    case FOCUS_PANE_DOWN -> owner.workspace().neighbour(Side.DOWN).isPresent();
                     default -> present;
                 });
                 action(id).setEnabled(enabled);

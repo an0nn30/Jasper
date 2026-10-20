@@ -139,10 +139,12 @@ class MockUiTest {
             });
             buttons.getFirst().doClick();
             assertThat(owner.tabCount()).isEqualTo(2);
+            layoutTree(owner);
+            int height = owner.currentPane().getHeight();
             owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).as("the header row, with its search field, stays when the toolbar is hidden").isEqualTo(416);
+            assertThat(owner.currentPane().getHeight()).as("the header row, with its search field, stays when the toolbar is hidden").isEqualTo(height);
             owner.setToolbarMode(ToolbarMode.ICONS); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(416);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(height);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
         });
     }

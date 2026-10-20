@@ -21,7 +21,7 @@ class WindowTabsTest {
             var owner = content(launcher(new ArrayDeque<>()));
             var strip = owner.windowTabs();
             assertThat(strip.isVisible()).as("workspace tabs spec 1, decision 4: a window's only tab shows no strip").isFalse();
-            owner.invoke(ActionId.NEW_TAB);
+            owner.invoke(ActionId.NEW_TAB_IN_PANE);
             assertThat(strip.isVisible()).isTrue();
             assertThat(strip.getPreferredSize().height).isEqualTo(owner.tabHeight());
             assertThat(strip.getMinimumSize().height).isEqualTo(owner.tabHeight());
@@ -181,8 +181,10 @@ class WindowTabsTest {
             assertThat(select.getToolTipText()).hasSizeLessThanOrEqualTo(210).startsWith("<html><img").contains("\u2026");
             var item = (JMenuItem) strip.tabList().getComponent(0);
             assertThat(item.getText()).hasSizeLessThanOrEqualTo(201).startsWith("<html><img").endsWith("\u2026");
+            // Select Tab 1 has no default since the digits select parent tabs (parent tabs spec 8): give it one.
+            owner.setBindings(dev.jasper.app.config.KeyBindings.withOverrides(true, java.util.Map.of("select_tab_1", "alt+1")));
             owner.currentTerminal().rename("short"); owner.update();
-            assertThat(select.getToolTipText()).isEqualTo("short (\u23181)");
+            assertThat(select.getToolTipText()).isEqualTo("short (\u23251)");
             assertThat(((JMenuItem) strip.tabList().getComponent(0)).getText()).isEqualTo("short");
         });
     }

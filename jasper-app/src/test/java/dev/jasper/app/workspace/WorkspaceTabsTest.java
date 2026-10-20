@@ -143,14 +143,14 @@ class WorkspaceTabsTest {
         var window = window(2);
         edt(() -> {
             window.updateActions();
-            assertThat(window.action(ActionId.MAXIMIZE_GROUP).isEnabled()).as("one group already fills the workspace").isFalse();
+            assertThat(window.action(ActionId.MAXIMIZE_PANE).isEnabled()).as("one group already fills the workspace").isFalse();
             window.workspace().moveToNewGroup(window.tabs().get(1), window.workspace().model().activeGroup(), Side.DOWN);
             window.updateActions();
-            assertThat(window.action(ActionId.MAXIMIZE_GROUP).isEnabled()).isTrue();
-            window.invoke(ActionId.MAXIMIZE_GROUP);
+            assertThat(window.action(ActionId.MAXIMIZE_PANE).isEnabled()).isTrue();
+            window.invoke(ActionId.MAXIMIZE_PANE);
             assertThat(window.workspace().model().maximized()).contains(window.workspace().model().activeGroup());
             assertThat(window.workspace().getComponent(0)).isSameAs(window.workspace().activeGroupView());
-            window.invoke(ActionId.MAXIMIZE_GROUP);
+            window.invoke(ActionId.MAXIMIZE_PANE);
             assertThat(window.workspace().model().maximized()).isEmpty();
         });
     }
@@ -163,17 +163,17 @@ class WorkspaceTabsTest {
             workspace.moveToNewGroup(b, workspace.model().activeGroup(), Side.RIGHT);
             workspace.moveToNewGroup(c, workspace.model().groupOf(b.id()).orElseThrow(), Side.DOWN);
             assertThat(window.selectedTab()).isSameAs(c);
-            window.invoke(ActionId.FOCUS_GROUP_UP);
+            window.invoke(ActionId.FOCUS_PANE_UP);
             assertThat(window.selectedTab()).isSameAs(b);
-            window.invoke(ActionId.FOCUS_GROUP_LEFT);
+            window.invoke(ActionId.FOCUS_PANE_LEFT);
             assertThat(window.selectedTab()).isSameAs(a);
             window.updateActions();
-            assertThat(window.action(ActionId.FOCUS_GROUP_LEFT).isEnabled()).as("nothing further left").isFalse();
-            window.invoke(ActionId.FOCUS_GROUP_LEFT);
+            assertThat(window.action(ActionId.FOCUS_PANE_LEFT).isEnabled()).as("nothing further left").isFalse();
+            window.invoke(ActionId.FOCUS_PANE_LEFT);
             assertThat(window.selectedTab()).isSameAs(a);
-            window.invoke(ActionId.FOCUS_GROUP_RIGHT);
+            window.invoke(ActionId.FOCUS_PANE_RIGHT);
             assertThat(window.selectedTab()).as("the nearest centre across, then tree order").isSameAs(b);
-            window.invoke(ActionId.FOCUS_GROUP_DOWN);
+            window.invoke(ActionId.FOCUS_PANE_DOWN);
             assertThat(window.selectedTab()).isSameAs(c);
         });
     }
@@ -225,9 +225,9 @@ class WorkspaceTabsTest {
         edt(() -> {
             var opened = (dev.jasper.app.contributions.Tab) view[0];
             owner[0].selectTab(opened);
-            owner[0].invoke(ActionId.NEW_TAB);
+            owner[0].invoke(ActionId.NEW_TAB_IN_PANE);
             var layout = owner[0].workspace().model();
-            assertThat(layout.groupOf(owner[0].selectedTab().id())).as("New Tab opens in the plugin view's group")
+            assertThat(layout.groupOf(owner[0].selectedTab().id())).as("New Tab in Pane opens in the plugin view's group")
                 .isEqualTo(layout.groupOf(opened.id()));
         });
         launch();
@@ -319,7 +319,7 @@ class WorkspaceTabsTest {
                 window.focusGroup(Side.RIGHT);
                 window.focusGroup(Side.LEFT);
                 assertThat(window.selectedTab()).isSameAs(view);
-                assertThat(focused[0]).as("Focus Group takes focus from wherever it is").isEqualTo(1);
+                assertThat(focused[0]).as("Focus Pane takes focus from wherever it is").isEqualTo(1);
                 // Focus left in a component nobody sees, such as the palette that just closed to run a command.
                 focus.own(new JTextField());
                 window.closeTab(background.get(1));

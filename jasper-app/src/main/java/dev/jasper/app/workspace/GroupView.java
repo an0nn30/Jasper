@@ -109,7 +109,7 @@ final class GroupView extends JPanel {
     /** A release on the strip, which ends the tab drag. */
     void released(MouseEvent event) { owner.tabDrag().released(event); }
     /** The classic tabs' "+": a new terminal tab in this group. */
-    void newTab() { workspace.activate(id); owner.invoke(ActionId.NEW_TAB); }
+    void newTab() { workspace.activate(id); owner.invoke(ActionId.NEW_TAB_IN_PANE); }
     /** Whether {@code tab} joined this group by a move: the strip shows it at once, without the open motion (Rulings 27). */
     boolean moved(Tab tab) { return workspace.moved(tab); }
 

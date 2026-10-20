@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Workspace tabs spec 11: the tab menu, Close Others, Close Group and the menus (workspace plan 3a Task 6). */
+/** Workspace tabs spec 11: the tab menu, Close Others, Close Pane and the menus (workspace plan 3a Task 6). */
 class TabMenuTest {
     private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
     private final Contributions model = new Contributions();
@@ -68,16 +68,16 @@ class TabMenuTest {
         edt(() -> {
             var keys = window.bindings();
             var menu = window.tabMenu(window.selectedTab());
-            assertThat(titles(menu)).containsExactly("Rename Tab", "Move to New Window", "Close Tab", "Close Others", "Close Group");
+            assertThat(titles(menu)).containsExactly("Rename Tab", "Move to New Window", "Close Tab", "Close Others", "Close Pane");
             assertThat(item(menu, "Rename Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.RENAME_TAB).orElseThrow());
             assertThat(item(menu, "Close Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_TAB).orElseThrow());
-            assertThat(item(menu, "Close Group").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_GROUP).orElseThrow());
+            assertThat(item(menu, "Close Pane").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_PANE).orElseThrow());
             assertThat(item(menu, "Close Others").isEnabled()).as("the group has no other tab").isFalse();
             Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
             int[] saved = {0};
             view.commands(List.of(new ContentCommand("save", "Save", null, true, () -> saved[0]++)));
             var hosted = window.tabMenu(view);
-            assertThat(titles(hosted)).containsExactly("Move to New Window", "Close Tab", "Close Others", "Close Group", "Save");
+            assertThat(titles(hosted)).containsExactly("Move to New Window", "Close Tab", "Close Others", "Close Pane", "Save");
             assertThat(item(hosted, "Close Others").isEnabled()).as("the terminal tab shares its group").isTrue();
             item(hosted, "Save").doClick();
             assertThat(saved[0]).isEqualTo(1);
@@ -116,12 +116,12 @@ class TabMenuTest {
                 asked.add(tabs);
                 return CompletableFuture.completedFuture(allow[0]);
             });
-            window.invoke(ActionId.CLOSE_GROUP);
+            window.invoke(ActionId.CLOSE_PANE);
             assertThat(asked).containsExactly(List.of(view));
             assertThat(terminal.closed()).as("a refusal closes nothing").isFalse();
             assertThat(window.tabs()).containsExactly(terminal, view, other);
             allow[0] = true;
-            window.invoke(ActionId.CLOSE_GROUP);
+            window.invoke(ActionId.CLOSE_PANE);
             assertThat(asked).hasSize(2);
             assertThat(terminal.closed()).isTrue();
             assertThat(view.closed()).isTrue();
@@ -230,7 +230,7 @@ class TabMenuTest {
             assertThat(window.dispatchShortcut(window.bindings().strokeFor(ActionId.CLOSE_TAB).orElseThrow(), window.currentPane())).isTrue();
             assertThat(window.tabs()).containsExactly(a2, b1);
             window.selectTab(a2);
-            assertThat(window.dispatchShortcut(window.bindings().strokeFor(ActionId.CLOSE_GROUP).orElseThrow(), window.currentPane())).isTrue();
+            assertThat(window.dispatchShortcut(window.bindings().strokeFor(ActionId.CLOSE_PANE).orElseThrow(), window.currentPane())).isTrue();
             assertThat(window.tabs()).containsExactly(b1);
         });
     }
@@ -238,13 +238,14 @@ class TabMenuTest {
     @Test void theFileViewAndTabMenusNameTabsAndGroups() throws Exception {
         var window = window(1);
         edt(() -> {
-            assertThat(items(window, "File")).containsSubsequence("New Tab", "New Terminal Window", "Open File…", "Close Tab", "Close Group",
-                "Close Window");
-            assertThat(items(window, "View")).contains("Maximize Group");
-            assertThat(items(window, "Tab")).containsExactly("Split Right", "Split Down", "Focus Group Left", "Focus Group Right",
-                "Focus Group Up", "Focus Group Down", "Previous Prompt", "Next Prompt", "Next Tab", "Previous Tab", "Rename Tab",
-                "Select Tab 1", "Select Tab 2", "Select Tab 3", "Select Tab 4", "Select Tab 5", "Select Tab 6", "Select Tab 7",
-                "Select Tab 8", "Select Tab 9");
+            assertThat(items(window, "File")).containsSubsequence("New Tab", "New Terminal Window", "Open File…", "Close Tab", "Close Pane",
+                "Close Parent Tab", "Close Window");
+            assertThat(items(window, "View")).contains("Maximize Pane");
+            assertThat(items(window, "Tab")).containsExactly("Split Right", "Split Down", "Focus Pane Left", "Focus Pane Right",
+                "Focus Pane Up", "Focus Pane Down", "Previous Prompt", "Next Prompt", "New Tab in Pane", "Next Tab", "Previous Tab",
+                "Rename Tab", "Next Parent Tab", "Previous Parent Tab", "Select Parent Tab 1", "Select Parent Tab 2",
+                "Select Parent Tab 3", "Select Parent Tab 4", "Select Parent Tab 5", "Select Parent Tab 6", "Select Parent Tab 7",
+                "Select Parent Tab 8", "Select Parent Tab 9");
         });
     }
 }

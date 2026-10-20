@@ -798,7 +798,7 @@ class WindowCommandPaletteTest {
                 content.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(content.commandPalette().component()).setText("zoom");
                 content.toggleMaximize();
                 assertThat(content.commandPalette().isOpen()).isTrue();
-                assertThat(content.action(ActionId.MAXIMIZE_GROUP).getValue(Command.TITLE)).isEqualTo("Restore Group");
+                assertThat(content.action(ActionId.MAXIMIZE_PANE).getValue(Command.TITLE)).isEqualTo("Restore Pane");
                 content.closeTab(content.terminalOf(origin)); assertThat(content.commandPalette().isOpen()).isFalse();
             });
         } finally { DesktopTestSupport.edt(() -> { if (owner[0] != null) owner[0].close(); }); }

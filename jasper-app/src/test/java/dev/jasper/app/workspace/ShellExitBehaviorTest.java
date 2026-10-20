@@ -86,7 +86,7 @@ class ShellExitBehaviorTest {
         TerminalPane hidden = owner.currentPane();
         edt(() -> owner.invoke(dev.jasper.app.commands.ActionId.SPLIT_RIGHT)); deliver();
         TerminalPane sibling = owner.currentPane();
-        edt(() -> { owner.invoke(dev.jasper.app.commands.ActionId.MAXIMIZE_GROUP); owner.newTab(directory); }); deliver();
+        edt(() -> { owner.invoke(dev.jasper.app.commands.ActionId.MAXIMIZE_PANE); owner.newTab(directory); }); deliver();
         TerminalContent selected = owner.currentTerminal(); TerminalPane selectedPane = owner.currentPane();
         reload("close");
         edt(() -> exit(hidden, 0));

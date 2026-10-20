@@ -665,8 +665,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Runs a root-bound shortcut whose key is also one of the focus owner's focus-traversal keys before focus traversal
-     * takes it, such as Linux Ctrl+Tab and Ctrl+Shift+Tab in a text area, a table or a field, and swallows that key's
-     * typed and released tail wherever focus went. Plain Tab is no Keymap binding, so it still traverses.
+     * takes it, such as Ctrl+Tab and Ctrl+Shift+Tab in a text area, a table or a field, and Next and Previous Parent Tab
+     * before the focus owner's own bindings, such as a scroll pane's Ctrl+PageUp and Ctrl+PageDown (workspace plan 7a
+     * Rulings 14); it swallows that key's typed and released tail wherever focus went. Plain Tab is no Keymap binding, so
+     * it still traverses.
      */
     private boolean traversalShortcut(KeyEvent event) {
         switch (event.getID()) {
@@ -676,7 +678,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 traversalTyped = false;
                 Component focus = event.getComponent();
                 KeyStroke stroke = KeyStroke.getKeyStrokeForEvent(event);
-                if (!ownsKeySource(focus) || !traversalKey(focus, event)
+                if (!ownsKeySource(focus) || !(traversalKey(focus, event) || parentTabKey(stroke))
                     || !(rootKeys.containsKey(stroke) || contentBindings.containsKey(stroke))
                     || !claimsShortcut(stroke, focus)) return false;
                 traversalHeld.add(event.getKeyCode()); traversalTyped = true;
@@ -688,6 +690,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         }
         event.consume();
         return true;
+    }
+
+    /** Whether {@code stroke} is Next or Previous Parent Tab's, which run before the focus owner's own bindings. */
+    private boolean parentTabKey(KeyStroke stroke) {
+        String bound = rootKeys.get(stroke);
+        return ActionId.NEXT_PARENT_TAB.id().equals(bound) || ActionId.PREVIOUS_PARENT_TAB.id().equals(bound);
     }
 
     private static boolean traversalKey(Component focus, KeyEvent event) {
@@ -1214,7 +1222,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
     /**
      * A tab's menu (workspace tabs spec 11): Rename Tab for a terminal tab, Move to New Window in the main window or Move
-     * to Main Window in a child window, Close Tab, Close Others and Close Group, then the content's commands.
+     * to Main Window in a child window, Close Tab, Close Others and Close Pane, then the content's commands.
      */
     JPopupMenu tabMenu(Tab tab) {
         var menu = new JPopupMenu();
@@ -1227,7 +1235,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var others = tabMenuItem("Close Others", null, () -> closeOthers(tab));
         others.setEnabled(groupTabs(tab).size() > 1);
         menu.add(others);
-        menu.add(tabMenuItem("Close Group", ActionId.CLOSE_GROUP, () -> closeGroup(tab)));
+        menu.add(tabMenuItem("Close Pane", ActionId.CLOSE_PANE, () -> closeGroup(tab)));
         if (!tab.commands().isEmpty()) menu.addSeparator();
         for (var command : tab.commands()) {
             var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
@@ -1437,10 +1445,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return openTerminal(directory, requestOrNull, profile, program, group, side, false);
     }
 
-    /** Maximize Group: the active group fills the workspace, or the splits come back. */
+    /** Maximize Pane: the active pane fills the workspace, or the splits come back. */
     void toggleMaximize() { workspace().toggleMaximize(); }
 
-    /** Focus Group: the neighbouring group that way takes focus with its selected tab; nothing past the edge. */
+    /** Focus Pane: the neighbouring pane that way takes focus with its selected tab; nothing past the edge. */
     void focusGroup(Side side) {
         WorkspaceView workspace = workspace();
         workspace.neighbour(side).ifPresent(group -> {

@@ -66,8 +66,8 @@ class ConfigLoaderTest {
             [keybindings]
             "copy" = "cmd+v"
             paste = "cmd+c"
-            next_tab = "cmd+}"
-            previous_tab = "cmd+{"
+            next_parent_tab = "cmd+}"
+            previous_parent_tab = "cmd+{"
             new_tab = "none"
             """);
         assertThat(result.rejected()).isFalse();
@@ -82,7 +82,7 @@ class ConfigLoaderTest {
             .contains(ActionId.COPY);
         assertThat(state.bindings(true).strokeFor(ActionId.NEW_TAB)).isEmpty();
         assertThat(state.bindings(true).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,
-            InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).contains(ActionId.NEXT_TAB);
+            InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).contains(ActionId.NEXT_PARENT_TAB);
     }
 
     @Test void acceptsNumericBoundariesAndEveryToolbarChoice() {
@@ -246,6 +246,15 @@ class ConfigLoaderTest {
         assertThat(result.rejected()).isFalse();
         assertThat(result.snapshot().bindings(true).strokeFor(ActionId.COPY)).isEmpty();
         assertDiagnostic(result, "keybindings.unknown", 2, 1, ConfigDiagnostic.Severity.WARNING);
+    }
+
+    /** Parent tabs spec 8's last bullet: the group ids are a clean break, so an old one is an unknown action. */
+    @Test void aRemovedGroupIdIsReportedAsAnUnknownAction() {
+        var result = parse("[keybindings]\nclose_group = \"cmd+w\"");
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.snapshot().keybindings()).doesNotContainKey("close_group");
+        assertDiagnostic(result, "keybindings.close_group", 2, 1, ConfigDiagnostic.Severity.WARNING);
+        assertThat(result.diagnostics()).singleElement().satisfies(d -> assertThat(d.message()).contains("Unknown action"));
     }
 
     @Test void invalidOrCollidingBindingsDefaultEntireMapAndPreserveOtherFields() {

@@ -17,12 +17,17 @@ class KeyBindingsTest {
     @Test
     void actionCatalogCoversEveryPhaseOneActionAndUsesStableIds() {
         assertThat(EnumSet.allOf(ActionId.class)).containsExactly(
-            ActionId.NEW_TAB, ActionId.CLOSE_TAB, ActionId.CLOSE_GROUP, ActionId.NEW_TERMINAL_WINDOW, ActionId.CLOSE_WINDOW,
+            ActionId.NEW_TAB, ActionId.NEW_TAB_IN_PANE, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE, ActionId.CLOSE_PARENT_TAB,
+            ActionId.NEW_TERMINAL_WINDOW, ActionId.CLOSE_WINDOW,
             ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TAB_TO_MAIN_WINDOW, ActionId.OPEN_FILE,
-            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_GROUP,
+            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE,
             ActionId.TOGGLE_ZEN_MODE,
-            ActionId.FOCUS_GROUP_LEFT, ActionId.FOCUS_GROUP_RIGHT,
-            ActionId.FOCUS_GROUP_UP, ActionId.FOCUS_GROUP_DOWN,
+            ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT,
+            ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
+            ActionId.NEXT_PARENT_TAB, ActionId.PREVIOUS_PARENT_TAB,
+            ActionId.SELECT_PARENT_TAB_1, ActionId.SELECT_PARENT_TAB_2, ActionId.SELECT_PARENT_TAB_3,
+            ActionId.SELECT_PARENT_TAB_4, ActionId.SELECT_PARENT_TAB_5, ActionId.SELECT_PARENT_TAB_6,
+            ActionId.SELECT_PARENT_TAB_7, ActionId.SELECT_PARENT_TAB_8, ActionId.SELECT_PARENT_TAB_9,
             ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB,
             ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3,
             ActionId.SELECT_TAB_4, ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6,
@@ -82,16 +87,21 @@ class KeyBindingsTest {
             KeyBindings bindings = KeyBindings.defaults(mac);
             for (int number = 1; number <= 9; number++) {
                 KeyStroke stroke = KeyStroke.getKeyStroke(KeyEvent.VK_1 + number - 1, modifier);
-                assertThat(bindings.actionFor(stroke)).contains(ActionId.valueOf("SELECT_TAB_" + number));
+                assertThat(bindings.actionFor(stroke)).as("parent tabs spec 8: the digits select parent tabs")
+                    .contains(ActionId.valueOf("SELECT_PARENT_TAB_" + number));
+                assertThat(bindings.strokeFor(ActionId.valueOf("SELECT_TAB_" + number))).isEmpty();
             }
-            KeyStroke previous = mac
+            KeyStroke previousParent = mac
                 ? KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET, modifier | InputEvent.SHIFT_DOWN_MASK)
-                : KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
-            KeyStroke next = mac
+                : KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_UP, InputEvent.CTRL_DOWN_MASK);
+            KeyStroke nextParent = mac
                 ? KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET, modifier | InputEvent.SHIFT_DOWN_MASK)
-                : KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK);
-            assertThat(bindings.actionFor(previous)).contains(ActionId.PREVIOUS_TAB);
-            assertThat(bindings.actionFor(next)).contains(ActionId.NEXT_TAB);
+                : KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_DOWN, InputEvent.CTRL_DOWN_MASK);
+            assertThat(bindings.actionFor(previousParent)).contains(ActionId.PREVIOUS_PARENT_TAB);
+            assertThat(bindings.actionFor(nextParent)).contains(ActionId.NEXT_PARENT_TAB);
+            assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)))
+                .contains(ActionId.PREVIOUS_TAB);
+            assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK))).contains(ActionId.NEXT_TAB);
             assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET, modifier))).isEmpty();
             assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,
                 modifier | InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK))).isEmpty();
@@ -109,7 +119,7 @@ class KeyBindingsTest {
             InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).contains(ActionId.PREVIOUS_TAB);
         assertThatIllegalArgumentException()
             .isThrownBy(() -> KeyBindings.withOverrides(true, Map.of("copy", "cmd+{")))
-            .withMessageContaining("copy").withMessageContaining("previous_tab");
+            .withMessageContaining("copy").withMessageContaining("previous_parent_tab");
         assertThatIllegalArgumentException().isThrownBy(() -> KeyBindings.parse("ctrl+{+]", false));
     }
 
