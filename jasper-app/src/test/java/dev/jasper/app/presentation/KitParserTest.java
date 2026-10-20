@@ -288,12 +288,34 @@ class KitParserTest {
         cases.put(head + "[colors]\ndialog_surface = \"surface.card\"\n", "[colors].dialog_surface: \"surface.card\" is not one of surface.dialog, surface.app");
         cases.put(head + "[chrome]\nwindow_title = \"#1E1F22\"\n", "[chrome].window_title: \"#1E1F22\" looks like a colour; colours come from the theme");
         cases.put(head + "# the accent is #2F65CA\n", "kit file: line 3: \"#2F65CA\" looks like a colour; colours come from the theme");
+        cases.put(head + "[defaults.ui]\ntheme = 1\n", "[defaults].\"ui\": a plugin's table is named by its id, such as \"dev.jasper.editor\"");
+        cases.put(head + "[defaults.\"jasper.core\"]\nx = 1\n", "[defaults].\"jasper.core\": not a plugin id");
+        cases.put(head + "[defaults.\"dev.x.tool\"]\n\"bad key\" = 1\n", "[defaults.\"dev.x.tool\"].\"bad key\": not a setting key");
+        cases.put(head + "[defaults.\"dev.x.tool\"]\nwhen = 1979-05-27\n", "[defaults.\"dev.x.tool\"].when: expected a string, number, boolean or array");
+        cases.put(head + "[defaults.\"dev.x.tool\"]\nhue = \"#FF0000\"\n",
+            "[defaults.\"dev.x.tool\"].hue: \"#FF0000\" looks like a colour; colours come from the theme");
+        cases.put(head + "[defaults.\"dev.x.tool\"]\n\"a.b\" = 1\na.b = 2\n", "[defaults.\"dev.x.tool\".a].b: sets a.b a second time");
         cases.put(head + "[chrome\n", null);
         for (var item : cases.entrySet()) {
             String message = problem(item.getKey());
             if (item.getValue() == null) assertThat(message).as(item.getKey()).startsWith("kit file: not valid TOML");
             else assertThat(message).as(item.getKey()).isEqualTo(item.getValue());
         }
+    }
+
+    /** Plan 15a: a [defaults] table keyed by a plugin's id holds that plugin's setting defaults, raw, by dotted key. */
+    @Test void aPluginsTableGivesItsSettingsDefaultsAsRawValues() throws Exception {
+        var parsed = parse("kit = 1\nbase = \"default\"\n[defaults]\n\"palette.visible_rows\" = 8\n[defaults.\"dev.x.tool\"]\nfont_family = \"Mono\"\n"
+            + "size = 12\nratio = 1.5\nwrap = true\nsftp.parallel = 3\nnames = [\"a\", \"b\"]\n");
+        var table = parsed.defaults().plugin("dev.x.tool");
+        assertThat(table).containsOnlyKeys("font_family", "size", "ratio", "wrap", "sftp.parallel", "names");
+        assertThat(table.get("font_family")).isEqualTo("Mono");
+        assertThat(table.get("size")).isEqualTo(12L);
+        assertThat(table.get("ratio")).isEqualTo(1.5);
+        assertThat(table.get("wrap")).isEqualTo(true);
+        assertThat(table.get("sftp.parallel")).as("a nested key is the dotted setting key").isEqualTo(3L);
+        assertThat(table.get("names")).isInstanceOf(org.tomlj.TomlArray.class);
+        assertThat(parsed.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(8);
     }
 
     @Test void filesOverTheirLimitsAreRefused() throws Exception {
@@ -311,6 +333,8 @@ class KitParserTest {
         String head = "kit = 1\nbase = \"default\"\n";
         assertThat(problem(head + "[" + "a.".repeat(20_000) + "b]\n")).isEqualTo("[a]: unknown table");
         assertThat(problem(head + "[chrome." + "a.".repeat(20_000) + "b]\n")).isEqualTo("[chrome].a: unknown key");
+        assertThat(problem(head + "[defaults.\"dev.x.tool\"." + "a.".repeat(20_000) + "b]\nwhen = 1979-05-27\n"))
+            .startsWith("[defaults.\"dev.x.tool\".a.a.").endsWith(".a.b].when: expected a string, number, boolean or array");
         assertThat(problem(head + "a = " + "[".repeat(30_000))).startsWith("kit file: not valid TOML");
     }
 
