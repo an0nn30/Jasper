@@ -378,7 +378,10 @@ public final class JasperApplication {
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             loginItems.accept(snapshot.backgroundEnabled());
-            if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
+            if (plugins != null) {
+                plugins.terminalTypography(snapshot.font());
+                plugins.configurationChanged(snapshot.plugins()); reportBindingProblems();
+            }
             updateMigrateAction();
         });
         if (configuration != null) {
@@ -987,6 +990,7 @@ public final class JasperApplication {
         plugins.animations(themes::animationsEnabled);
         // The kit the controller installed and the look plugins read: the presentation's, or the fallback when the kit was blamed (spec 4.7).
         plugins.presentation(themes.kit(), presentation.projections().plugins(), presentation.defaults());
+        plugins.terminalTypography((configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).font());
         plugins.shortcuts(this::shortcutLabel);
         plugins.clipboard(clipboard);
         plugins.commandClient(CommandInstall.client(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),

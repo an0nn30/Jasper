@@ -821,6 +821,59 @@ public abstract class PluginContractTest {
         assertThat(h.menu("TAB")).isEmpty();
     }
 
+    @Test void terminalTypographyIsPublishedBeforeCallbacksAcrossPluginsAndThreads() throws Exception {
+        var initial = new dev.jasper.sdk.ui.TerminalTypography("DialogInput", 13.5, List.of("Monospaced"), true, 1.25);
+        var next = new dev.jasper.sdk.ui.TerminalTypography("Monospaced", 15.25, List.of(), false, 1.5);
+        h.ui(() -> h.setTerminalTypography(initial)); h.flush();
+        var first = new AtomicReference<PluginContext>();
+        var second = new AtomicReference<PluginContext>();
+        var seen = new ArrayList<dev.jasper.sdk.ui.TerminalTypography>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            first.set(context);
+            context.appearance().onTerminalTypographyChanged(value -> {
+                assertThat(javax.swing.SwingUtilities.isEventDispatchThread()).isTrue();
+                assertThat(context.appearance().terminalTypography()).isEqualTo(value);
+                seen.add(value);
+            });
+        });
+        h.start(info("test.beta"), Set.of(), Set.of(), second::set);
+        assertThat(first.get().appearance().terminalTypography()).isEqualTo(initial);
+        assertThat(second.get().appearance().terminalTypography()).isEqualTo(initial);
+        assertThat(CompletableFuture.supplyAsync(() -> first.get().appearance().terminalTypography()).get(5, TimeUnit.SECONDS)).isEqualTo(initial);
+        assertThat(seen).isEmpty();
+        h.ui(() -> h.setTerminalTypography(new dev.jasper.sdk.ui.TerminalTypography(
+            "DialogInput", 13.5, List.of("Monospaced"), true, 1.25))); h.flush();
+        assertThat(seen).isEmpty();
+        h.ui(() -> h.setTerminalTypography(next)); h.flush();
+        assertThat(seen).containsExactly(next);
+        assertThat(second.get().appearance().terminalTypography()).isEqualTo(next);
+        h.stopAll();
+        h.ui(() -> h.setTerminalTypography(initial)); h.flush();
+        assertThat(seen).containsExactly(next);
+        h.ui(() -> assertThatIllegalStateException().isThrownBy(() ->
+            first.get().appearance().onTerminalTypographyChanged(value -> { })));
+    }
+
+    @Test void terminalTypographyCallbacksCanUnsubscribeAndFailuresDoNotBlockOthers() {
+        var next = new dev.jasper.sdk.ui.TerminalTypography("DialogInput", 14, List.of(), false, 1);
+        var later = new dev.jasper.sdk.ui.TerminalTypography("DialogInput", 16, List.of(), false, 1);
+        var seen = new ArrayList<String>();
+        var self = new AtomicReference<Subscription>();
+        var skipped = new AtomicReference<Subscription>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            self.set(context.appearance().onTerminalTypographyChanged(value -> {
+                seen.add("first"); self.get().close(); skipped.get().close();
+            }));
+            skipped.set(context.appearance().onTerminalTypographyChanged(value -> seen.add("skipped")));
+            context.appearance().onTerminalTypographyChanged(value -> { throw new IllegalStateException("bad typography callback"); });
+            context.appearance().onTerminalTypographyChanged(value -> seen.add("last"));
+        });
+        h.ui(() -> h.setTerminalTypography(next)); h.flush();
+        assertThat(seen).containsExactly("first", "last");
+        h.ui(() -> h.setTerminalTypography(later)); h.flush();
+        assertThat(seen).containsExactly("first", "last", "last");
+    }
+
     /** SDK 0.18.2: the presentation is the host's, the same for every plugin and on any thread, and a theme change keeps it. */
     @Test void presentationIsTheHostsForEveryPluginOnAnyThreadAndThroughThemeChanges() throws Exception {
         var classic = new Presentation(true, Presentation.Icons.CLASSIC, Presentation.ToolWindows.STRIPES, Presentation.TitleBar.NATIVE,

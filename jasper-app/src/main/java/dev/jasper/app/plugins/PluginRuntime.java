@@ -386,6 +386,20 @@ public final class PluginRuntime {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         clipboard = Objects.requireNonNull(value);
     }
+    private final HostedTypography typography = new HostedTypography();
+
+    /** Publishes saved terminal typography before plugin startup or on configuration changes. UI thread only.
+     * @param value the saved typography
+     */
+    public void terminalTypography(dev.jasper.sdk.ui.TerminalTypography value) { typography.publish(value); }
+
+    /** Converts the application's saved font configuration at the SDK boundary. UI thread only.
+     * @param font saved font settings
+     */
+    public void terminalTypography(dev.jasper.app.config.FontConfig font) {
+        terminalTypography(HostedTypography.from(Objects.requireNonNull(font, "font")));
+    }
+
     /** The presentation given before plugin startup: its kit, what plugins learn of its look, and its defaults. */
     private record Given(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) { }
     private Given given;
@@ -691,7 +705,7 @@ public final class PluginRuntime {
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
-            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
+            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass), typography);
         created.animations = animations;
         if (given != null) {
             var chosen = given;

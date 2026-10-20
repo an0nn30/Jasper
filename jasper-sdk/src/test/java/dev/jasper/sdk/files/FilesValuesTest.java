@@ -51,7 +51,7 @@ class FilesValuesTest {
     }
 
     @Test void theSdkIsVersionTenWithTheFileSourceCapability() {
-        assertThat(JasperSdk.VERSION).isEqualTo("0.18.2");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.18.3");
         assertThat(Capabilities.ALL).contains(Capabilities.FILES_SOURCE);
         assertThat(Capabilities.FILES_SOURCE).isEqualTo("files.source");
     }
