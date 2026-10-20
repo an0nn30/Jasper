@@ -483,8 +483,9 @@ class WindowManagerTest {
             main.content().newTab(HOME);
             Tab tab = main.content().selectedTab();
             events.clear();
-            ChildWindow child = manager.moveToNewWindow(tab, new java.awt.Rectangle(40, 50, 600, 400), new java.awt.Point(90, 60))
+            ChildWindow child = manager.popOutTab(tab, new java.awt.Rectangle(40, 50, 600, 400), new java.awt.Point(90, 60))
                 .orElseThrow();
+            assertThat(child.content().isPaneWindow()).as("a torn-out tab's window is a pane window (parent tabs spec 5)").isTrue();
             assertThat(events).as("placed before it shows").containsSubsequence("place child 40,50 600x400 under 90,60", "show child");
             assertThatThrownBy(() -> new WindowManager.Opening(WindowRole.CHILD, true, null, "menu", () -> { },
                 Optional.of(new java.awt.Rectangle(40, 50, 600, 400)), Optional.empty()))

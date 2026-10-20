@@ -14,7 +14,12 @@ import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.dock.WorkspaceDropResolver.Drop;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Orientation;
+import dev.jasper.app.layout.Origin;
+import dev.jasper.app.layout.ParentTab;
+import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.terminals.TerminalEvent;
@@ -46,7 +51,8 @@ import org.junit.jupiter.api.Test;
  * two terminal tabs, at 0,0 (1208 x 800), a child window, with two too, beside it at 1400,100 (800 x 600), and a new
  * window far away until a test places it. Under the standard look a pane's only tab shows no strip (parent tabs spec 7),
  * so a window's only tab has none to drag from or drop on; a test that drags a window's only tab gives its child window
- * the classic tabs, which always show (a mix of looks only these tests make; the drag reads no look).
+ * the classic tabs, which always show (a mix of looks only these tests make; the drag reads no look). A parent tab's
+ * drag starts from a window's parent-tab bar, which the standard look shows from two parent tabs.
  */
 class TabDragWindowsTest {
     private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
@@ -137,6 +143,30 @@ class TabDragWindowsTest {
 
     private List<TerminalEvent> moves() { return facts.stream().filter(TerminalEvent.TabMoved.class::isInstance).toList(); }
 
+    /** A new parent tab in {@code window}, shown and laid out, so its bar shows: its id. Its shell starts at the next launch. */
+    private ParentTabId secondParentTab(JasperWindow window) {
+        window.content().newParentTab(HOME);
+        relayout(frameOf(window));
+        return window.content().activeParentTab();
+    }
+
+    /** The tab that the bar's entry of {@code window}'s parent tab {@code id} shows. */
+    private static Tab entryOf(WindowContent window, ParentTabId id) {
+        return window.parentTabs().view(id).orElseThrow().selected();
+    }
+
+    /** {@code window}'s parent tabs, in bar order. */
+    private static List<ParentTabId> parentTabIds(WindowContent window) {
+        return ((ParentTabs) window.windowLayout()).parentTabs().stream().map(ParentTab::id).toList();
+    }
+
+    /** The band at the top of {@code window}'s parent tabs where its bar shows, on the pretend screen. */
+    private static Rectangle band(WindowContent window) {
+        var parents = window.parentTabs();
+        int height = window.parentTabBar().component().getPreferredSize().height;
+        return onScreen(parents, new Rectangle(0, 0, parents.getWidth(), height));
+    }
+
     @Test void everyWindowOfTheManagerSharesItsOneDrag() throws Exception {
         edt(() -> {
             assertThat(main.content().tabDrag()).isSameAs(manager.tabDrag());
@@ -170,6 +200,9 @@ class TabDragWindowsTest {
             assertThat(to.tabs()).as("before the child window's first tab").containsExactly(tab, there, last);
             assertThat(to.selectedTab()).isSameAs(tab);
             assertThat(from.tabs()).hasSize(1);
+            // Parent tabs spec 7 (workspace plan 7a's hand-off): after the move each pane shows its strip by its own tabs.
+            assertThat(from.windowTabs().isVisible()).as("the pane it left holds one tab").isFalse();
+            assertThat(to.windowTabs().isVisible()).as("the pane it joined holds three").isTrue();
             assertThat(session(tab)).as("the same session").isSameAs(session);
             assertThat(((TerminalContent) tab.content()).pane().session().exitFuture()).isNotDone();
             assertThat(moves()).as("one move, reported where it arrives")
@@ -285,7 +318,8 @@ class TabDragWindowsTest {
         });
     }
 
-    @Test void aTabReleasedOutsideEveryWindowTearsOutWithItsGroupsSizeUnderTheCursor() throws Exception {
+    /** Parent tabs spec 5 and workspace plan 7c Rulings 10: a tab released outside every window pops out into a pane window. */
+    @Test void aTabReleasedOutsideEveryWindowPopsOutIntoAPaneWindowUnderTheCursor() throws Exception {
         edt(() -> {
             WindowContent from = main.content();
             Tab tab = from.tabs().get(1);
@@ -307,12 +341,245 @@ class TabDragWindowsTest {
             assertThat(torn).isNotSameAs(child);
             assertThat(tab.window()).isEqualTo(torn.id());
             assertThat(torn.content().tabs()).containsExactly(tab);
+            assertThat(torn.content().isPaneWindow()).isTrue();
+            assertThat(torn.content().origin()).as("where the tab was: its pane, which keeps the other tab")
+                .contains(new Origin(from.activeParentTab(), group.id(), Side.RIGHT, 0.5));
+            // Workspace plan 7a's hand-off: its one tab shows no strip, and a pane window has no parent-tab bar.
+            assertThat(torn.content().windowTabs().isVisible()).isFalse();
+            assertThat(torn.content().parentTabBar().component().isVisible()).isFalse();
             assertThat(placed).as("its workspace, which its frame grows by its title bar").containsExactly(expected);
             assertThat(cursors).as("on the display under the cursor").containsExactly(outside);
             assertThat(session(tab)).isSameAs(session);
             assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(tab.id().value(), main.id(), torn.id()));
             assertThat(facts).as("the window opens empty, then the tab moves in")
                 .noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
+        });
+    }
+
+    /** Parent tabs spec 5 and workspace plan 7c Rulings 4: a parent tab dropped on another window's bar moves there whole. */
+    @Test void aParentTabDroppedOnAnotherWindowsBarMovesThereWhole() throws Exception {
+        ParentTabId[] ids = new ParentTabId[3];
+        edt(() -> {
+            ids[0] = main.content().activeParentTab();
+            secondParentTab(main);
+            ids[1] = child.content().activeParentTab();
+            ids[2] = secondParentTab(child);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            ParentTabId moving = ids[0], left = ids[1], right = ids[2];
+            WorkspaceView workspace = from.parentTabs().view(moving).orElseThrow();
+            List<Tab> tabs = workspace.tabs();
+            Layout layout = workspace.model();
+            var sessions = tabs.stream().map(TabDragWindowsTest::session).toList();
+            Point between = onParentTab(to, entryOf(to, right), 0.25);
+            facts.clear();
+            Component source = startParentTab(from, entryOf(from, moving), between);
+            assertThat(manager.tabDrag().draggedParentTab()).isEqualTo(moving);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.Bar(to, 1));
+            assertThat(manager.tabDrag().overlay().getParent()).as("the landing shows in the target window")
+                .isSameAs(SwingUtilities.getRootPane(to).getLayeredPane());
+            assertThat(manager.tabDrag().overlay().placeholder()).as("a bar between its entries").isNotNull();
+            mouse(source, MouseEvent.MOUSE_RELEASED, between);
+            assertThat(parentTabIds(to)).containsExactly(left, moving, right);
+            assertThat(to.parentTabs().view(moving).orElseThrow().model()).as("whole, with its id and layout").isEqualTo(layout);
+            assertThat(to.activeParentTab()).isEqualTo(moving);
+            assertThat(parentTabIds(from)).hasSize(1);
+            assertThat(from.parentTabBar().component().isVisible()).as("one parent tab left: its bar hides").isFalse();
+            assertThat(moves()).as("one move per tab, reported where it arrives").containsExactlyElementsOf(tabs.stream()
+                .map(tab -> (TerminalEvent) new TerminalEvent.TabMoved(tab.id().value(), main.id(), child.id())).toList());
+            assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
+            for (int i = 0; i < tabs.size(); i++) assertThat(session(tabs.get(i))).as("the same session").isSameAs(sessions.get(i));
+        });
+    }
+
+    /**
+     * Review Focus 2 and workspace plan 7c Rulings 5: a window showing no bar (the standard look, one parent tab) takes a
+     * parent tab over the band at its top, where its bar shows, at its end; over its panes, nothing.
+     */
+    @Test void aWindowShowingNoBarTakesAParentTabAlongItsTop() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            ids[0] = child.content().activeParentTab();
+            ids[1] = secondParentTab(main);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            assertThat(to.parentTabBar().component().isVisible()).as("one parent tab").isFalse();
+            Tab moving = entryOf(from, ids[1]);
+            Point panes = inside(cards(to, activeGroup(child)), 0.5, 0.5);
+            Component source = startParentTab(from, moving, panes);
+            assertThat(manager.tabDrag().target()).as("a pane takes no parent tab (parent tabs spec 13)").isEmpty();
+            Rectangle band = band(to);
+            Point top = inside(band, 0.5, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, top);
+            assertThat(manager.tabDrag().target()).as("at the end of its bar").contains(new TabDrag.Target.Bar(to, 1));
+            JLayeredPane layers = SwingUtilities.getRootPane(to).getLayeredPane();
+            Point corner = new Point(band.getLocation());
+            SwingUtilities.convertPointFromScreen(corner, layers);
+            assertThat(manager.tabDrag().overlay().highlight()).as("the band where its bar shows")
+                .isEqualTo(new Rectangle(corner, band.getSize()));
+            assertThat(manager.tabDrag().overlay().placeholder()).isNull();
+            mouse(source, MouseEvent.MOUSE_RELEASED, top);
+            assertThat(parentTabIds(to)).containsExactly(ids[0], ids[1]);
+            assertThat(to.parentTabBar().component().isVisible()).as("two parent tabs: its bar shows").isTrue();
+            assertThat(moving.window()).isEqualTo(child.id());
+            assertThat(from.parentTabBar().component().isVisible()).isFalse();
+        });
+    }
+
+    /**
+     * Review Focus 2 and workspace plan 7c Rulings 5: the main window's empty workspace, which shows no bar, takes a
+     * parent tab dragged along its top in its place.
+     */
+    @Test void theEmptyMainWorkspaceTakesAParentTabAlongItsTop() throws Exception {
+        ParentTabId[] id = new ParentTabId[1];
+        edt(() -> id[0] = secondParentTab(child));
+        launch();
+        edt(() -> {
+            WindowContent from = child.content(), to = main.content();
+            for (Tab open : List.copyOf(to.tabs())) to.closeTab(open);
+            relayout(frameOf(main));
+            assertThat(to.tabs()).isEmpty();
+            assertThat(to.parentTabBar().component().isVisible()).as("the empty workspace shows no bar").isFalse();
+            Tab moving = entryOf(from, id[0]);
+            Point top = inside(band(to), 0.5, 0.5);
+            Component source = startParentTab(from, moving, top);
+            assertThat(manager.tabDrag().target()).as("its bar has no entry").contains(new TabDrag.Target.Bar(to, 0));
+            mouse(source, MouseEvent.MOUSE_RELEASED, top);
+            assertThat(parentTabIds(to)).as("in the empty workspace's place").containsExactly(id[0]);
+            assertThat(to.parentTabBar().component().isVisible()).as("one parent tab: still no bar").isFalse();
+            assertThat(moving.window()).isEqualTo(main.id());
+            assertThat(parentTabIds(from)).hasSize(1);
+        });
+    }
+
+    /** Parent tabs spec 5 and workspace plan 7c Rulings 6: a parent tab released outside every window becomes a full window. */
+    @Test void aParentTabReleasedOutsideEveryWindowBecomesAFullWindowUnderTheCursor() throws Exception {
+        ParentTabId[] id = new ParentTabId[1];
+        edt(() -> id[0] = secondParentTab(main));
+        launch();
+        edt(() -> {
+            WindowContent from = main.content();
+            WorkspaceView workspace = from.parentTabs().view(id[0]).orElseThrow();
+            Layout layout = workspace.model();
+            Tab moving = entryOf(from, id[0]);
+            Object session = session(moving);
+            TabStrip bar = from.parentTabBar();
+            Rectangle home = onScreen(bar.component(), bar.tabBounds().get(1));
+            Point press = middle(barEntry(from, moving));
+            Point outside = new Point(2600, 900);
+            // The new window's workspace is the parent tab's size, with the entry's corner where the cursor holds it.
+            Rectangle expected = new Rectangle(outside.x - (press.x - home.x), outside.y - (press.y - home.y),
+                workspace.getWidth(), workspace.getHeight());
+            facts.clear();
+            Component source = startParentTab(from, moving, outside);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.TearOut(expected, outside));
+            assertThat(manager.tabDrag().overlay().getParent()).as("no landing in any window").isNull();
+            mouse(source, MouseEvent.MOUSE_RELEASED, outside);
+            ChildWindow full = manager.children().getLast();
+            assertThat(full).isNotSameAs(child);
+            assertThat(full.content().isPaneWindow()).as("a full window, with parent tabs").isFalse();
+            assertThat(full.content().windowLayout()).as("the parent tab, whole").isEqualTo(ParentTabs.of(new ParentTab(id[0], layout)));
+            assertThat(placed).as("its workspace, which its frame grows by its title bar").containsExactly(expected);
+            assertThat(cursors).as("on the display under the cursor").containsExactly(outside);
+            assertThat(session(moving)).isSameAs(session);
+            assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(moving.id().value(), main.id(), full.id()));
+            assertThat(from.parentTabCount()).isEqualTo(1);
+        });
+    }
+
+    /**
+     * Review Focus 3 and workspace plan 7c Rulings 7: a full window's only parent tab stays when released outside every
+     * window, as its window already is its own, but moves onto another window's bar, and its window closes after the move.
+     */
+    @Test void aFullWindowsOnlyParentTabStaysOutsideButMovesOntoAnotherWindowsBar() throws Exception {
+        edt(() -> {
+            classicChild();
+            secondParentTab(main);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = child.content(), to = main.content();
+            ParentTabId only = from.activeParentTab();
+            Tab moving = entryOf(from, only);
+            Point outside = new Point(3000, 1500);
+            Component source = startParentTab(from, moving, outside);
+            assertThat(manager.tabDrag().active()).isTrue();
+            assertThat(manager.tabDrag().target()).as("its window already is its own").isEmpty();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onParentTab(from, moving, 0.75));
+            assertThat(manager.tabDrag().target()).as("and its own bar has no other place for it").isEmpty();
+            mouse(source, MouseEvent.MOUSE_RELEASED, outside);
+            assertThat(manager.children()).containsExactly(child);
+            assertThat(placed).isEmpty();
+            List<ParentTabId> before = parentTabIds(to);
+            facts.clear();
+            dropParentTab(from, moving, onParentTab(to, to.parentTabs().bar().tabs().getLast(), 0.75));
+            assertThat(parentTabIds(to)).as("at the end of the main window's bar").containsExactly(before.get(0), before.get(1), only);
+            assertThat(child.closed()).as("its last parent tab moved out").isTrue();
+            int moved = facts.indexOf(new TerminalEvent.TabMoved(moving.id().value(), child.id(), main.id()));
+            int closed = facts.indexOf(new TerminalEvent.WindowClosed(child.id()));
+            assertThat(moved).as("TAB_MOVED").isNotNegative();
+            assertThat(closed).as("then WINDOW_CLOSED").isGreaterThan(moved);
+        });
+    }
+
+    /** Review Focus 1 and workspace plan 7c Rulings 8: a parent tab holding a pinned tab moves along its own bar only. */
+    @Test void aParentTabHoldingAPinnedTabMovesAlongItsOwnBarOnly() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            ids[0] = main.content().activeParentTab();
+            ids[1] = secondParentTab(main);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content();
+            var pin = from.parentTabs().view(ids[0]).orElseThrow().tabs().getFirst().pin();
+            try {
+                facts.clear();
+                Point there = inside(band(child.content()), 0.5, 0.5);
+                Component source = startParentTab(from, entryOf(from, ids[0]), there);
+                assertThat(manager.tabDrag().active()).isTrue();
+                assertThat(manager.tabDrag().target()).as("a modal owner holds one of its tabs in its window").isEmpty();
+                mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(2600, 900));
+                assertThat(manager.tabDrag().target()).as("nor does it tear out").isEmpty();
+                Point past = onParentTab(from, entryOf(from, ids[1]), 0.75);
+                mouse(source, MouseEvent.MOUSE_DRAGGED, past);
+                assertThat(manager.tabDrag().target()).as("its own bar still takes it").contains(new TabDrag.Target.Bar(from, 1));
+                mouse(source, MouseEvent.MOUSE_RELEASED, past);
+                assertThat(parentTabIds(from)).containsExactly(ids[1], ids[0]);
+                assertThat(manager.children()).containsExactly(child);
+                assertThat(moves()).isEmpty();
+            } finally {
+                pin.close();
+            }
+        });
+    }
+
+    /** Review Focus 4 and workspace plan 7c Rulings 9: a pane window has no parent tabs and takes none; nothing moves. */
+    @Test void aPaneWindowTakesNoParentTab() throws Exception {
+        ParentTabId[] id = new ParentTabId[1];
+        edt(() -> id[0] = secondParentTab(main));
+        launch();
+        edt(() -> {
+            ChildWindow pane = manager.popOutTab(child.content().tabs().get(1)).orElseThrow();
+            place(frameOf(pane), 100, 900, 800, 400);
+            assertThat(pane.content().isPaneWindow()).isTrue();
+            WindowContent from = main.content();
+            Tab moving = entryOf(from, id[0]);
+            Point top = inside(band(pane.content()), 0.5, 0.5);
+            Component source = startParentTab(from, moving, top);
+            assertThat(manager.tabDrag().target()).as("along its top").isEmpty();
+            Point middle = middle(pane.content().workspace());
+            mouse(source, MouseEvent.MOUSE_DRAGGED, middle);
+            assertThat(manager.tabDrag().target()).as("nor over its pane").isEmpty();
+            assertThat(manager.tabDrag().overlay().getParent()).isNull();
+            mouse(source, MouseEvent.MOUSE_RELEASED, middle);
+            assertThat(pane.content().tabs()).hasSize(1);
+            assertThat(from.parentTabCount()).isEqualTo(2);
+            assertThat(moving.window()).isEqualTo(main.id());
         });
     }
 

@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import javax.swing.AbstractButton;
 import javax.swing.JLayeredPane;
@@ -49,18 +48,24 @@ import javax.swing.SwingUtilities;
  * <p>The target: of the windows under the cursor that can take a drop (on macOS none in full screen on the display of
  * the drag's own window but that window), the most recently active; over its workspace, the resolver's drop unless it
  * would change nothing; anywhere else in that window (its dock, chrome or title bar), and over any other window of
- * Jasper's (Settings, About, a dialog), nothing; outside every window, a new child window whose workspace is the size
- * of the tab's old group, with the tab where the cursor holds it and kept on the display under the cursor, except for a
- * child window's only tab, whose window already is its own. A pinned tab (a modal owner holds it in its window) takes
- * targets in its own window only. Releasing the left button carries the target out: within a window through the
- * workspace's layout operations, into another window through the tab registry's moves, out of every window through the
- * window manager's; none touches a tab's content or session. Releasing on no target, Esc, another press or a plain move
- * (both mean Swing lost the release), the drag's window losing the focus (a modal dialog, another application), and the
- * dragged tab closing or leaving its window or its group (a command moving it) end the drag without a drop.
+ * Jasper's (Settings, About, a dialog), nothing; outside every window, a new pane window whose origin is where the tab
+ * was (parent tabs spec 5) and whose workspace is the size of the tab's old group, with the tab where the cursor holds
+ * it and kept on the display under the cursor, except for a child window's only tab, whose window already is its own. A
+ * pinned tab (a modal owner holds it in its window) takes targets in its own window only. Releasing the left button
+ * carries the target out: within a window through the workspace's layout operations, into another window through the
+ * tab registry's moves, out of every window through the window manager's; none touches a tab's content or session.
+ * Releasing on no target, Esc, another press or a plain move (both mean Swing lost the release), the drag's window
+ * losing the focus (a modal dialog, another application), and the dragged tab closing or leaving its window or its
+ * group (a command moving it) end the drag without a drop.
  * <p>A left press on a parent tab's entry in a window's parent-tab bar drags the whole parent tab the same way (parent
- * tabs spec 5): along its bar, where a release puts it before the first of the bar's other entries whose middle is not
- * left of the cursor and the bar's entries take their new places at once. A pane takes no parent tab (parent tabs spec
- * 13). The drag ends when the tab its entry shows closes, leaves it or gives way to another of its tabs. EDT only.
+ * tabs spec 5): along its bar, or onto the bar of another main or full window, where a release puts it before the first
+ * of the bar's other entries whose middle is not left of the cursor and the bar's entries take their new places at
+ * once; a window whose bar hides (the standard look's one parent tab, or the main window's empty workspace) takes it at
+ * its end over the band its bar takes when it shows; outside every window it becomes a full window the size of its
+ * workspace, except a full window's only parent tab. A pane and a pane window take no parent tab (parent tabs spec 13),
+ * and one holding a tab that is pinned or being closed takes targets along its own bar only. The drag ends when the tab
+ * its entry shows closes, leaves it or gives way to another of its tabs. Out of its window the drag goes through the
+ * window manager of the drag's window; a window no manager opened moves nothing out of itself. EDT only.
  */
 final class TabDrag {
     /** Where a release would put the dragged tab. */
@@ -83,7 +88,7 @@ final class TabDrag {
 
         /**
          * Out of every window, into a new child window whose workspace takes {@code bounds}, on the display under
-         * {@code cursor}.
+         * {@code cursor}: a pane window for a tab, a full window for a parent tab (parent tabs spec 5).
          *
          * @param bounds the new window's workspace on screen; its frame adds its title bar
          * @param cursor the cursor on screen, inside {@code bounds}
@@ -95,7 +100,6 @@ final class TabDrag {
     static final int LABEL_OFFSET = 8;
 
     private final Supplier<List<WindowContent>> windows;
-    private final BiConsumer<Tab, Target.TearOut> tearOut;
     private final DockDropOverlay overlay = new DockDropOverlay();
     private final TabDragLabel label = new TabDragLabel();
     /**
@@ -134,12 +138,11 @@ final class TabDrag {
     private Optional<Target> target = Optional.empty();
 
     /**
-     * @param windows the windows a drag can reach, the most recently active first
-     * @param tearOut opens a new child window for a tab where a tear-out target says, or leaves the tab where it is
+     * @param windows the windows a drag can reach, the most recently active first; what leaves its window goes through
+     *     the window manager of the drag's window ({@code WindowContent.manager()})
      */
-    TabDrag(Supplier<List<WindowContent>> windows, BiConsumer<Tab, Target.TearOut> tearOut) {
+    TabDrag(Supplier<List<WindowContent>> windows) {
         this.windows = Objects.requireNonNull(windows, "windows");
-        this.tearOut = Objects.requireNonNull(tearOut, "tearOut");
     }
 
     /** @return whether a drag runs: from the threshold to its release or its end */
@@ -315,14 +318,15 @@ final class TabDrag {
         GraphicsDevice home = device(from);
         OptionalInt under = WorkspaceDropResolver.windowAt(at,
             open.stream().map(window -> onScreen(window, window == from, home)).toList());
+        // What the registry keeps in its window stays there: a pinned tab, or a parent tab holding a tab that is pinned
+        // or being closed. No other window takes it, and it tears nothing out.
+        boolean stays = parentTab == null ? tab.pinned() : !movable();
         if (under.isPresent()) {
             WindowContent window = open.get(under.getAsInt());
-            // A parent tab drops on a bar alone; a pinned tab stays in its window, as the registry keeps it there.
-            if (parentTab != null) target = onBar(window, at);
-            else if (!tab.pinned() || window == from) target = into(window, at);
-        } else if (parentTab == null && WorkspaceDropResolver.windowAt(at, otherWindows.get()).isEmpty() && !tab.pinned()
-                && (from.isMain() || from.tabCount() > 1)) {
-            // Outside every window of Jasper's: a new child window, except for a child window's only tab (spec 12).
+            // A parent tab drops on a bar alone (parent tabs spec 13).
+            if (!stays || window == from) target = parentTab == null ? into(window, at) : onBar(window, at);
+        } else if (WorkspaceDropResolver.windowAt(at, otherWindows.get()).isEmpty() && !stays && tearsOut()) {
+            // Outside every window of Jasper's: a pane window for a tab, a full window for a parent tab.
             target = Optional.of(new Target.TearOut(tearOutBounds(at), new Point(at)));
         }
         showLanding();
@@ -339,22 +343,48 @@ final class TabDrag {
 
     /**
      * The dragged parent tab's drop on {@code window}'s parent-tab bar at {@code at} (parent tabs spec 5): before the
-     * first of the bar's other entries whose middle is not left of the cursor. Empty off the bar and for the place the
-     * parent tab has; for now, any bar but the drag's own takes none.
+     * first of the bar's other entries whose middle is not left of the cursor; while another window's bar hides, at its
+     * end, over the band the bar takes when it shows (workspace plan 7c Rulings 5). Empty for a pane window, which has
+     * no parent tabs, off the bar, and for the place the parent tab has.
      */
     private Optional<Target> onBar(WindowContent window, Point at) {
         boolean shows = window.parentTabBar().component().isVisible();
-        if (window != from || !shows) return Optional.empty();
+        if (window.isPaneWindow() || window == from && !shows) return Optional.empty();
         Point local = new Point(at);
         SwingUtilities.convertPointFromScreen(local, window.parentTabs());
-        OptionalInt index = WorkspaceDropResolver.place(local, barArea(window), barEntries(window));
+        Rectangle area = barArea(window);
+        OptionalInt index = shows ? WorkspaceDropResolver.place(local, area, barEntries(window))
+            : area.contains(local) ? OptionalInt.of(window.parentTabs().bar().tabs().size()) : OptionalInt.empty();
         if (index.isEmpty() || window == from && index.getAsInt() == from.parentTabs().model().indexOf(parentTab))
             return Optional.empty();
         return Optional.of(new Target.Bar(window, index.getAsInt()));
     }
 
-    /** {@code window}'s parent-tab bar in its parent-tabs view's coordinates. */
-    private static Rectangle barArea(WindowContent window) { return window.parentTabBar().component().getBounds(); }
+    /**
+     * {@code window}'s parent-tab bar in its parent-tabs view's coordinates: the bar while it shows, else the band at
+     * the view's top that it takes when it shows.
+     */
+    private static Rectangle barArea(WindowContent window) {
+        Component bar = window.parentTabBar().component();
+        if (bar.isVisible()) return bar.getBounds();
+        return new Rectangle(0, 0, window.parentTabs().getWidth(), bar.getPreferredSize().height);
+    }
+
+    /**
+     * Whether every tab of the dragged parent tab may move: none pinned or being closed (workspace plan 7b Rulings 7).
+     */
+    private boolean movable() {
+        Optional<WorkspaceView> view = from.parentTabs().view(parentTab);
+        return view.isPresent() && view.get().tabs().stream().allMatch(from.tabRegistry()::movable);
+    }
+
+    /**
+     * Whether a release outside every window takes the entry out of its window: never a child window's only tab, whose
+     * window already is its own (spec 12), nor a full window's only parent tab (workspace plan 7b Rulings 8).
+     */
+    private boolean tearsOut() {
+        return parentTab == null ? from.isMain() || from.tabCount() > 1 : from.mayPopOutParentTab(parentTab);
+    }
 
     /**
      * The bar's entries in {@code window}'s parent-tabs view's coordinates, in bar order, without the dragged one's
@@ -402,8 +432,13 @@ final class TabDrag {
                 if (into.drop() instanceof Drop.Strip) placeholder = landing;
                 else highlight = landing;
             }
-            case Target.Bar bar -> placeholder = SwingUtilities.convertRectangle(window.parentTabs(),
-                WorkspaceDropResolver.marker(barArea(window), barEntries(window), bar.index(), marker), layers);
+            case Target.Bar bar -> {
+                // A bar that hides takes the parent tab at its end: its band shows (workspace plan 7c Rulings 5).
+                if (!window.parentTabBar().component().isVisible())
+                    highlight = SwingUtilities.convertRectangle(window.parentTabs(), barArea(window), layers);
+                else placeholder = SwingUtilities.convertRectangle(window.parentTabs(),
+                    WorkspaceDropResolver.marker(barArea(window), barEntries(window), bar.index(), marker), layers);
+            }
             case Target.TearOut out -> { }
         }
         if (overlay.getParent() == null) layers.add(overlay, JLayeredPane.DRAG_LAYER);
@@ -450,13 +485,19 @@ final class TabDrag {
      * Carries a release out; nothing touches the tab's content or session. Within a window the workspace places the tab.
      * Into another window the tab registry moves it (both windows' maximizes end, TAB_MOVED reports it, a child window it
      * empties closes after the move): an edge drop straight into a new group beside its group, any other to the end of
-     * the window's active group, where the drop then puts it in place. Out of every window, the window manager's tear-out.
-     * A parent tab dropped along its bar takes its new place there ({@code home}, the drag's window, holds {@code parent}).
+     * the window's active group, where the drop then puts it in place. Out of every window, the window manager pops it
+     * out into a pane window. A parent tab dropped along its bar takes its new place there; on another window's bar, or
+     * out of every window into a full window, the window manager moves it whole ({@code home}, the drag's window, holds
+     * {@code parent}). A window no manager opened moves nothing out of itself.
      */
     private void drop(Tab moving, WindowContent home, ParentTabId parent, Target where) {
         if (moving.closed()) return;
         switch (where) {
-            case Target.Bar bar -> home.reorderParentTab(parent, bar.index());
+            case Target.Bar bar -> {
+                if (bar.window() == home) home.reorderParentTab(parent, bar.index());
+                // Another window's bar: the window manager moves the parent tab whole, through the tab registry.
+                else home.manager().ifPresent(manager -> manager.moveParentTab(home, parent, bar.window(), bar.index()));
+            }
             case Target.Into into -> {
                 WindowContent window = into.window();
                 if (window.closed()) return;
@@ -471,7 +512,10 @@ final class TabDrag {
                 }
                 workspace.drop(moving, into.drop());
             }
-            case Target.TearOut out -> tearOut.accept(moving, out);
+            case Target.TearOut out -> home.manager().ifPresent(manager -> {
+                if (parent == null) manager.popOutTab(moving, out.bounds(), out.cursor());
+                else manager.popOutParentTab(home, parent, out.bounds(), out.cursor());
+            });
         }
     }
 

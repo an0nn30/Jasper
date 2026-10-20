@@ -16,13 +16,10 @@ import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Origin;
 import dev.jasper.app.layout.PaneLayout;
 import dev.jasper.app.layout.ParentTabId;
-import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.testsupport.EnterpriseLook;
-import java.awt.Point;
-import java.awt.Rectangle;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -146,22 +143,6 @@ class PopOutTest {
             assertThat(windows.manager.popOutPane(content, content.workspace().model().activeGroup())).as("its only pane").isPresent();
             assertThat(content.tabCount()).isZero();
             assertThat(content.workspace().emptyWorkspace()).isNotNull();
-        });
-        windows.launch();
-    }
-
-    /** Workspace plan 7b Rulings 19: plan 5's tear-out still opens a full window, which has no origin. */
-    @Test void plan5sTearOutOpensAFullWindow() throws Exception {
-        edt(() -> {
-            var content = windows.main().content();
-            content.newTab(HOME);
-            Tab torn = content.selectedTab();
-            ChildWindow child = windows.manager.moveToNewWindow(torn, new Rectangle(100, 100, 600, 400), new Point(400, 300))
-                .orElseThrow();
-            assertThat(child.content().isPaneWindow()).isFalse();
-            assertThat(child.content().origin()).isEmpty();
-            assertThat(child.content().windowLayout()).isInstanceOf(ParentTabs.class);
-            assertThat(child.content().tabs()).containsExactly(torn);
         });
         windows.launch();
     }

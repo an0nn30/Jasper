@@ -91,9 +91,11 @@ public final class WindowManager {
     private final List<ChildWindow> children = new ArrayList<>();
     /** The windows that came to the front, the last one first. */
     private final List<JasperWindow> activations = new ArrayList<>();
-    /** The one tab drag of every window this manager opens (workspace tabs spec 12): it reaches them all, top first. */
-    private final TabDrag tabDrag = new TabDrag(() -> windowsByActivation().stream().map(JasperWindow::content).toList(),
-        (tab, out) -> moveToNewWindow(tab, out.bounds(), out.cursor()));
+    /**
+     * The one tab drag of every window this manager opens (workspace tabs spec 12): it reaches them all, top first, and
+     * carries what leaves a window to this manager, which each window knows (parent tabs spec 5).
+     */
+    private final TabDrag tabDrag = new TabDrag(() -> windowsByActivation().stream().map(JasperWindow::content).toList());
     private MainWindow main;
     private JasperWindow lastActive;
     private int openings;
@@ -245,7 +247,7 @@ public final class WindowManager {
 
     /**
      * As {@link #popOutTab(Tab)}, the pane window's workspace at {@code bounds} on screen, on the display under
-     * {@code cursor}.
+     * {@code cursor}: a tab the tab drag releases outside every window too (parent tabs spec 5).
      *
      * @param tab a tab of one of these windows
      * @param bounds where the pane window's workspace goes on screen; null for where the platform puts it
@@ -475,21 +477,6 @@ public final class WindowManager {
     }
 
     /**
-     * Plan 5's tear-out: a new full child window takes {@code tab}, its content and session untouched, its workspace at
-     * {@code bounds} on screen, on the display under {@code cursor}. A tab being closed or pinned stays, and so does a
-     * child window's only tab.
-     *
-     * @param tab a tab of one of these windows
-     * @param bounds where the new window's workspace goes on screen; null for where the platform puts it
-     * @param cursor where the cursor released the tab on screen; null exactly when {@code bounds} is
-     * @return the new child window; empty when the tab stayed
-     */
-    public Optional<ChildWindow> moveToNewWindow(Tab tab, Rectangle bounds, Point cursor) {
-        requireEdt();
-        return leaving(tab) == null ? Optional.empty() : moveToNewChild(tab, bounds, cursor, null);
-    }
-
-    /**
      * The window {@code tab} may leave for a window of its own: none for a tab the registry would not move (closed, pinned
      * or being closed: {@code TabRegistry.movable}), so no window opens for it, nor for a child window's only tab, whose
      * window already is its own.
@@ -501,7 +488,7 @@ public final class WindowManager {
         return from.get().content();
     }
 
-    /** A new child window takes {@code tab}: a pane window from {@code origin}, or a full window when it is null. */
+    /** A new pane window from {@code origin} takes {@code tab}: Pop Out Tab, and a tab the drag tears out. */
     private Optional<ChildWindow> moveToNewChild(Tab tab, Rectangle bounds, Point cursor, Origin origin) {
         Optional<ChildWindow> opened = openChild(true, null, bounds, cursor, origin);
         if (opened.isEmpty()) return opened;

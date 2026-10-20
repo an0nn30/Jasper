@@ -128,11 +128,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
     /**
-     * Drags a tab from any of this window's strips (workspace tabs spec 12): the window manager's, which every window it
-     * opens shares; until it gives that, one of this window's own, which drops within this window and tears nothing out:
-     * outside this window it reports a TearOut target its tear-out ignores (Rulings 10).
+     * Drags a tab, or a parent tab from the bar, from any of this window's strips (workspace tabs spec 12; parent tabs
+     * spec 5): the window manager's, which every window it opens shares; until it gives that, one of this window's own,
+     * which drops within this window and moves nothing out of it: outside this window it reports a TearOut target,
+     * which a window no manager opened ignores (Rulings 10).
      */
-    private TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this), (tab, out) -> { });
+    private TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this));
     private UiState uiState = UiState.inMemory();
     private boolean railVisible = true;
     /** False once {@link #forgetLayout} ran: closing then saves nothing. */
@@ -1584,6 +1585,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     TabDrag tabDrag() { return tabDrag; }
     /** The window manager that opened this window: its pop-outs, Bring Back and Move to Main Window go through it. */
     void manager(WindowManager value) { manager = Objects.requireNonNull(value, "value"); }
+
+    /** The window manager that opened this window, which carries a drag out of it; empty for any other window. */
+    Optional<WindowManager> manager() { return Optional.ofNullable(manager); }
 
     /** Shares the window manager's tab drag; a drag of this window's own ends first. */
     void tabDrag(TabDrag shared) {
