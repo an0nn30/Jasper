@@ -20,6 +20,7 @@ import dev.jasper.terminal.session.SessionLaunchOptions;
 import dev.jasper.terminal.session.TerminalSession;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -107,6 +108,26 @@ class WorkspaceSnapshotTest {
             terminal.close();
             assertThat(((ParentTabs) windows.manager.snapshot().orElseThrow().main().layout()).isEmpty())
                 .as("the main window may be saved empty").isTrue();
+        });
+        windows.launch();
+    }
+
+    /** A window that is closing, its content closed and its closed hook still to run, keeps nothing (Task 4's review). */
+    @Test void aWindowThatIsClosingIsNotInTheSnapshot() throws Exception {
+        windows();
+        edt(() -> {
+            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
+            ChildWindow child = windows.manager.openTerminalWindow(folder).orElseThrow();
+            var during = new ArrayList<WorkspaceFile.Snapshot>();
+            child.content().selectedTab().onClosed(() -> during.add(windows.manager.snapshot().orElseThrow()));
+            child.requestClose();
+            assertThat(windows.manager.children()).isEmpty();
+            assertThat(during).singleElement().as("taken as the closing window's tab closed")
+                .satisfies(snapshot -> assertThat(snapshot.children()).isEmpty());
+            var closing = new ArrayList<Optional<WorkspaceFile.Snapshot>>();
+            main.content().selectedTab().onClosed(() -> closing.add(windows.manager.snapshot()));
+            windows.manager.closeAll();
+            assertThat(closing).as("a main window that is closing is no main window").containsExactly(Optional.empty());
         });
         windows.launch();
     }

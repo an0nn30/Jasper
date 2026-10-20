@@ -1242,19 +1242,20 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * A parent tab's layout changed, or the window's parent tabs did (one opened, closed or shows now): the model takes
-     * {@code view}'s layout, the registry hears the selection, the palette a new active tab; the active tab takes focus
-     * when {@code refocus} and {@code view} is the shown parent tab's.
+     * {@code view}'s layout, which is saved, the registry hears the selection, the palette a new active tab; the active
+     * tab takes focus when {@code refocus} and {@code view} is the shown parent tab's.
      */
     void workspaceChanged(WorkspaceView view, boolean refocus) {
         if (closed) return;
         parentTabs.changed(view);
+        // Every parent tab's layout change and every parent-tab change ends here (workspace plan 6a Rulings 8 and 28): the
+        // save is asked for once the model has it, so a listener below that throws costs no save.
+        layoutChanged();
         if (terminals != null) terminals.tabSelected();
         Tab now = selectedTab();
         if (commandPalette != null && now != paletteTab) { paletteTab = now; commandPalette.tabChanged(); }
         update();
         if (refocus && view == parentTabs.active()) focusSelected();
-        // Every parent tab's layout change and every parent-tab change ends here (workspace plan 6a Rulings 8 and 28).
-        layoutChanged();
     }
 
     /** Something {@code workspace.toml} saves of this window changed (workspace tabs spec 13). */

@@ -43,6 +43,9 @@ public final class WindowFrame {
         @Override public void windowOpened(WindowEvent event) { reportState(); }
         @Override public void windowIconified(WindowEvent event) { reportState(); }
         @Override public void windowDeiconified(WindowEvent event) { reportState(); }
+        // A maximize, or its end, that brings no move or resize event is reported too (workspace plan 6a Task 2's review).
+        // No test: this frame is never built headless.
+        @Override public void windowStateChanged(WindowEvent event) { rememberBounds(); }
     };
 
     /**
@@ -140,6 +143,7 @@ public final class WindowFrame {
         placement.observe(frame.getBounds(), java.awt.Frame.NORMAL);
         frame.setExtendedState(placement.extendedState());
         frame.addComponentListener(geometry);
+        frame.addWindowStateListener(listener);
     }
 
     /** @return what this frame does for its window */
@@ -237,6 +241,7 @@ public final class WindowFrame {
         if (closed) return;
         closed = true;
         frame.removeComponentListener(geometry);
+        frame.removeWindowStateListener(listener);
         if (glass != null) glass.close();
         if (titleBar != null) titleBar.close();
         frame.removeWindowListener(listener); frame.dispose();

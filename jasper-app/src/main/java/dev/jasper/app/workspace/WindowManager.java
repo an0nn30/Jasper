@@ -77,7 +77,7 @@ public final class WindowManager {
      * @param state a window was shown, minimized or restored
      * @param closing a window is about to close, its content still whole; never for one that failed to open
      * @param closingAll every window is about to close (closing the main window, Quit, going to the background), before any
-     *     does: plan 6 saves the main window and its child windows here
+     *     does, and the workspace store has saved them as they are
      */
     public record Hooks(Function<Opening, WindowContent> content, Function<JasperWindow, WindowShell> frames,
                         Consumer<JasperWindow> opened, Consumer<JasperWindow> activated, Consumer<JasperWindow> closed,
@@ -104,6 +104,8 @@ public final class WindowManager {
     private JasperWindow lastActive;
     private int openings;
     private boolean openingMain;
+    /** Where the windows are saved; none in a test that does not save. */
+    private WorkspaceStore store;
     /** While {@link #closeAll()} runs: no window opens, so no child window outlives the main window and no fresh one opens. */
     private boolean closingAll;
 
@@ -125,6 +127,17 @@ public final class WindowManager {
             this::popOutTab, this::movedOut, this::emptyWindow));
         model.panelRoute(this::routePanel);
     }
+
+    /**
+     * Where the windows are saved and restored from (workspace tabs spec 13): the application gives it once it knows the
+     * Jasper home. Without it nothing is saved and every main window opens fresh.
+     *
+     * @param value the store
+     */
+    public void workspace(WorkspaceStore value) { store = Objects.requireNonNull(value, "value"); }
+
+    /** Something {@code workspace.toml} saves changed: a layout, a tab's name or directory, where a window is. */
+    void changed() { if (store != null) store.changed(); }
 
     /** @return the main window while it is open */
     public Optional<MainWindow> main() { return Optional.ofNullable(main); }
@@ -528,7 +541,8 @@ public final class WindowManager {
 
     /**
      * Closes every child window, then the main window, without asking any guard: Quit and going to the background ask
-     * first. The closing-all hook hears of it once before anything closes, while every window is whole. Every window
+     * first. While every window is whole, the workspace store saves them all and then holds until they are restored, and
+     * the closing-all hook hears of it, once, before anything closes (workspace tabs spec 6.4 and 13). Every window
      * closes whatever closing another one throws, and no child window opens meanwhile; the first failure is rethrown once
      * the main window has closed, the others suppressed under it.
      */
@@ -538,10 +552,18 @@ public final class WindowManager {
         closingAll = true;
         Throwable failure = null;
         try {
-            try {
-                if (!isEmpty()) hooks.closingAll().run();
-            } catch (RuntimeException | Error thrown) {
-                failure = thrown;
+            if (!isEmpty()) {
+                try {
+                    // Closing the windows closes their tabs: that is not saved, or nothing would come back.
+                    if (store != null) store.hold();
+                } catch (RuntimeException | Error thrown) {
+                    failure = thrown;
+                }
+                try {
+                    hooks.closingAll().run();
+                } catch (RuntimeException | Error thrown) {
+                    failure = keep(failure, thrown);
+                }
             }
             for (ChildWindow child : List.copyOf(children)) failure = close(child, failure);
             if (main != null) failure = close(main, failure);
@@ -611,12 +633,14 @@ public final class WindowManager {
             // Its pop-outs, Bring Back and Move to Main Window are this manager's (parent tabs spec 5).
             content.manager(this);
             window = make.apply(content);
+            content.onLayoutChanged = this::changed;
             window.shell(hooks.frames().apply(window));
             // A torn-out tab's window opens where it was dropped, on the cursor's display (workspace tabs plan 5).
             if (opening.bounds().isPresent())
                 window.shell().place().accept(opening.bounds().get(), opening.cursor().orElseThrow());
             window.shell().show().run();
             hooks.opened().accept(window);
+            changed();
             return Optional.of(window);
         } catch (RuntimeException | Error failure) {
             if (window != null) {
@@ -637,15 +661,16 @@ public final class WindowManager {
      * windows and its pane windows, each with where it is, what it holds (its parent tabs and the one that shows, or a
      * pane window's layout and origin) and what each of its tabs needs to come back. A tab that cannot come back is taken
      * out first, as closing it would take it out ({@code WorkspaceFile.keeping}): a parent tab left with none goes, a
-     * child window left with none is left out (workspace plan 2 Rulings 20), and the main window may be empty.
+     * child window left with none is left out (workspace plan 2 Rulings 20), and the main window may be empty. A window
+     * whose content has closed holds nothing, though it is listed until its closed hook runs.
      *
-     * @return the snapshot; empty while no main window is open, or while it opens
+     * @return the snapshot; empty while no main window is open, while it opens, or once its content has closed
      */
     public Optional<WorkspaceFile.Snapshot> snapshot() {
         requireEdt();
-        if (main == null || openingMain) return Optional.empty();
+        if (main == null || openingMain || main.content().closed()) return Optional.empty();
         var records = new ArrayList<WorkspaceFile.WindowRecord>();
-        for (JasperWindow window : windows()) windowRecord(window).ifPresent(records::add);
+        for (JasperWindow window : windows()) if (!window.content().closed()) windowRecord(window).ifPresent(records::add);
         return Optional.of(new WorkspaceFile.Snapshot(records));
     }
 
@@ -721,7 +746,13 @@ public final class WindowManager {
         else children.remove(window);
         activations.remove(window);
         if (lastActive == window) lastActive = null;
-        hooks.closed().accept(window);
+        try {
+            // A window closing is saved at once: a child window the user closed is gone with its tabs (spec 13).
+            if (store != null) store.save();
+        } finally {
+            // Residency, the Dock and shutdown hear of every window, whatever the save did.
+            hooks.closed().accept(window);
+        }
     }
 
     static void requireEdt() {

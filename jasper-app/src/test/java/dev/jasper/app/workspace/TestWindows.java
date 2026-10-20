@@ -10,6 +10,7 @@ import dev.jasper.app.testsupport.IdleTerminalSession;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 
 /**
@@ -18,7 +19,8 @@ import java.util.function.Function;
  * launched when the test runs {@link #launch()}. EDT only.
  */
 final class TestWindows {
-    final Queue<Runnable> pending = new ArrayDeque<>();
+    /** The shells' launches the windows asked for: the EDT adds them, {@link #launch()} runs them off it. */
+    final Queue<Runnable> pending = new ConcurrentLinkedQueue<>();
     /** Where each shell started, in order. */
     final Queue<Path> started = new ArrayDeque<>();
     /** What the stand-in frames did and what the application heard, in order. */

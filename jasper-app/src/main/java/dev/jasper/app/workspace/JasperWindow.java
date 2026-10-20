@@ -80,13 +80,19 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
     public final Placement placement() { return placement; }
 
     /**
-     * Its frame says where the window is now: after it shows, moves, resizes or is maximized. Ignored once it has closed.
+     * Its frame says where the window is now: after it shows, moves, resizes or is maximized; a new place is saved
+     * (workspace tabs spec 13). Ignored once it has closed, and when the window is there already.
      *
      * @param value the window's normal bounds and maximized bits
      */
     public final void placed(Placement value) {
+        WindowManager.requireEdt();
         if (closed) return;
-        placement = Objects.requireNonNull(value, "value");
+        Objects.requireNonNull(value, "value");
+        // Showing it, or a move or resize that ends where it was, asks for no save.
+        if (value.equals(placement)) return;
+        placement = value;
+        manager.changed();
     }
 
     /** Brings the window to the front, restoring it when it is minimized, and focuses its active tab. */
@@ -141,9 +147,10 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
     }
 
     /**
-     * Closes the content, which closes the tabs it still holds, then the frame; the manager forgets the window. The
-     * manager's closing hook hears of it first, while its content is whole (plan 6 saves the layout there). Every step
-     * runs whatever an earlier one throws; the first failure is rethrown at the end, the others suppressed under it.
+     * Closes the content, which closes the tabs it still holds, then the frame; the manager forgets the window, which
+     * saves the windows left (workspace tabs spec 13). The manager's closing hook hears of it first, while its content is
+     * whole. Every step runs whatever an earlier one throws; the first failure is rethrown at the end, the others
+     * suppressed under it.
      */
     final void close() {
         if (closed) return;
