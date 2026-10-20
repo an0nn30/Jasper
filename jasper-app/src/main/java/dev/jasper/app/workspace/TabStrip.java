@@ -14,7 +14,7 @@ import javax.swing.JPopupMenu;
  * window, or while the bar's window is active. EDT only.
  */
 sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs {
-    /** The component mounted above the group's cards. */
+    /** The component mounted above its source's content: a pane's cards, or the parent tabs' workspaces. */
     JComponent component();
     /** Takes its source's tabs (a pane's, or the parent tabs' in the bar), titles, selection and states. */
     void refresh();
