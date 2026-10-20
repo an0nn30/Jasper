@@ -59,13 +59,13 @@ pass their unchanged floors, each within 0.002 of before (`dock-light-kit-server
 `dock-dark-kit-sessions-header` 0.984 to 0.982, `dock-dark-kit-tunnels-header` 0.988 to 0.986,
 `dock-vault-kit-servers-header` 0.993 to 0.992, `dock-vault-kit-sessions-header` 0.983 to 0.982,
 `dock-vault-kit-tunnels-header` 0.997 to 0.995; the other six the same). `./gradlew check
---continue`: **11,594 tests, 0 failures, 0 errors, 25 skipped** (plan 15a: 11,569 and 25); `check_pairs.py` passes 101
+--continue`: **11,597 tests, 0 failures, 0 errors, 25 skipped** (plan 15a: 11,569 and 25); `check_pairs.py` passes 101
 of 101 gated pairs with the same verdicts as the baseline (`plan15-baseline`, from `f78bb0385`), and every agreement is
 the same except the two toolbar lines and `enterprise-settings-13` (0.723, 0.722 since plan 15a), and since the final
 review the dock header lines above; the headless gallery
 is byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look
 jasper-app renders. No test needed a re-run. The final review fixes add three tests
-(`KitClassicChromeIconsTest`, `WindowPanelsTest`, `HostedUiTest`), passed in targeted runs, not in a new full check. Later: the splash's fixed colours and "Workstation…" step text for other
+(`KitClassicChromeIconsTest`, `WindowPanelsTest`, `HostedUiTest`), counted above. Later: the splash's fixed colours and "Workstation…" step text for other
 branded looks; the external THD plugin's port to SDK 0.18. GUI checks for the user, in this order: (1) under Enterprise
 Light and Dark, the toolbar's magnifier before the wrench, against IntelliJ Classic's: its hover, the tooltip "Search
 Everywhere (⇧⌘P)", a click opens the Run window, ⇧⌘P still does, Icons & Labels keeps it icon-only, and a narrow window
