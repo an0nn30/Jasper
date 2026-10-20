@@ -17,6 +17,7 @@ import dev.jasper.sdk.terminal.PaneInfo;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.testing.FakePresentations;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.vault.api.LockState;
@@ -67,9 +68,9 @@ class FileServerPluginTest {
 
     @Test void aStartUnderEnterpriseReadsTheClassicLayoutOnce() {
         try (var host = new FakePluginHost()) {
-            dev.jasper.fileserver.workstation.FakeEnterprise.start(host);
+            host.setPresentation(FakePresentations.CLASSIC);
             var plugin = plugin();
-            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.enterprise"), plugin);
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
             assertThat(host.failures()).isEmpty();
             assertThat(plugin.layout()).isEqualTo(dev.jasper.fileserver.workstation.Layout.CLASSIC);
             assertThat(host.panels()).contains("dev.jasper.fileserver.panel|File Servers|LEFT+split|dev.jasper.fileserver.show-panel");

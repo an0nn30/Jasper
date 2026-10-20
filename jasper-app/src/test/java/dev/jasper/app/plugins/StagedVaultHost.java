@@ -1,10 +1,14 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.presentation.Projections;
+import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.ui.Presentation;
 import java.awt.Component;
 import java.awt.Container;
 import java.nio.file.Path;
@@ -45,16 +49,14 @@ final class StagedVaultHost implements AutoCloseable {
     /** The folders the host's file chooser answers, in order; it cancels when none is queued. */
     final java.util.Deque<Path> chosenFolders = new java.util.concurrent.ConcurrentLinkedDeque<>();
     final UUID window;
-    /** The staged Enterprise plugin's loader in Enterprise mode (plan 10b), else null. */
-    final PluginClassLoader enterpriseLoader;
 
     StagedVaultHost(Path data, boolean dark) throws Exception { this(data, dark, null); }
 
     StagedVaultHost(Path data, boolean dark, WorkspaceAppearanceFixture appearance) throws Exception { this(data, dark, appearance, false); }
 
     /**
-     * {@code enterprise}: the staged Enterprise plugin starts first in the same host and the Vault may see its API, so it
-     * composes its classic layout (plan 10b). The caller installs the Enterprise kit and theme first
+     * {@code enterprise}: the host reports {@link #enterprisePresentation()} before the Vault starts, so it composes its
+     * classic layout (plan 10b, plan 15a). The caller installs the Enterprise kit and theme first
      * ({@code EnterpriseLook.controller}).
      */
     StagedVaultHost(Path data, boolean dark, WorkspaceAppearanceFixture appearance, boolean enterprise) throws Exception {
@@ -69,17 +71,26 @@ final class StagedVaultHost implements AutoCloseable {
         host = AppContractTest.host(data, Duration.ofMillis(200), contributions, new AtomicBoolean(dark), auxiliary, terminals.registry,
             new NotificationsFixture(problems), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(),
             PluginRuntime.ShellProfiles.NONE, new CopyOnWriteArrayList<>(), appearance, GlassSource.NONE);
-        enterpriseLoader = enterprise ? StagedEnterprise.start(host) : null;
-        loader = new PluginClassLoader(UnboundVault.ID, ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(),
-            enterprise ? Map.of("dev.jasper.enterprise.api", enterpriseLoader) : Map.of());
+        if (enterprise) host.presentation = enterprisePresentation();
+        loader = new PluginClassLoader(UnboundVault.ID, ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), Map.of());
         plugin = (Plugin) loader.loadClass("dev.jasper.vault.VaultPlugin").getConstructor().newInstance();
         var opened = new AtomicReference<UUID>();
         onEdt(() -> {
-            host.start(new HostedPlugin(VAULT, Set.of(), enterprise ? Set.of("dev.jasper.enterprise") : Set.of(), Set.of("dev.jasper.vault.api"),
-                loader, () -> plugin));
+            host.start(new HostedPlugin(VAULT, Set.of(), Set.of(), Set.of("dev.jasper.vault.api"), loader, () -> plugin));
             opened.set(terminals.addWindow()); terminals.activateWindow(opened.get());
         });
         window = opened.get();
+    }
+
+    /**
+     * What the Enterprise look on Linux reports to plugins: its chrome's plugin projection, its kit and its defaults.
+     *
+     * @return the presentation a staged consumer reads under Enterprise
+     */
+    static Presentation enterprisePresentation() {
+        return HostedPresentation.of(Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise",
+            new Projections.Host(Projections.Platform.LINUX, false)).plugins(), EnterpriseLook.kit(),
+            EnterpriseResources.facts().parsed().orElseThrow().defaults());
     }
 
     /** Starts another plugin (on the test class loader) after the Vault, for example an API consumer. */
@@ -318,7 +329,7 @@ final class StagedVaultHost implements AutoCloseable {
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).join();
         } finally {
             onEdt(auxiliary::close);
-            try { loader.close(); } finally { if (enterpriseLoader != null) enterpriseLoader.close(); }
+            loader.close();
         }
     }
 }

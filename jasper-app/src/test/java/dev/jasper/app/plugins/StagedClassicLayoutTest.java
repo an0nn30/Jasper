@@ -7,8 +7,8 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** The staged Enterprise plugin in the real host publishes Workstation, and a staged consumer composes CLASSIC under it. */
-class StagedEnterpriseTest {
+/** Under the Enterprise presentation a staged consumer composes CLASSIC, and ROWS under the default look. */
+class StagedClassicLayoutTest {
     @TempDir Path root;
 
     @Test void aStagedConsumerReadsTheClassicLayoutUnderEnterpriseAndRowsWithout() throws Exception {

@@ -107,7 +107,7 @@ public class VaultPlugin implements Plugin {
 
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
-        layout = dev.jasper.vault.workstation.Layout.of(context.services());
+        layout = dev.jasper.vault.workstation.Layout.of(context.appearance().presentation());
         stopped = false;
         Files.createDirectories(context.dataDirectory());
         declared = new VaultSettings.Declared(context.settings());
