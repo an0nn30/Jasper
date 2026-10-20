@@ -286,6 +286,30 @@ class ClassicHeaderTest {
         });
     }
 
+    /** Plan 15b: a kit toolbar view draws the classic chrome icons only in a window whose chrome draws them. */
+    @Test void aToolbarViewUnderClassicIconsIsMarkedAndUnderNewUiIsNot() throws Exception {
+        for (var icons : WorkspaceLook.Icons.values())
+            edt(() -> {
+                var themes = ThemeTestSupport.controller(true);
+                var binding = new dev.jasper.ui.theme.ThemeBinding(themes.current().pair(), failure -> { throw new AssertionError(failure); });
+                var registry = new IconRegistry();
+                var context = dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, dev.jasper.ui.theme.ThemeRoute.CHROME,
+                    registry, () -> false, action -> "");
+                var view = new dev.jasper.ui.swing.KitView(context, new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Button("add",
+                    dev.jasper.ui.model.ControlState.READY, "", "add", dev.jasper.ui.model.Nodes.ButtonKind.GHOST, "add", "Add")), event -> { });
+                try {
+                    var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic(icons));
+                    var model = new Contributions();
+                    owner.connectContributions(model);
+                    owner.connectTerminals(new TerminalRegistry(), () -> { });
+                    model.addToolbar(new ToolbarEntry.View(window -> Optional.of(new ToolbarEntry.Mounted(view, view::close))));
+                    assertThat(view.toolbarStrip()).as(icons.name()).isTrue();
+                    assertThat(view.classicChromeIcons()).as(icons.name()).isEqualTo(icons == WorkspaceLook.Icons.CLASSIC);
+                    owner.close();
+                } finally { if (!view.isClosed()) view.close(); binding.close(); registry.close(); themes.close(); }
+            });
+    }
+
     /** {@code session}, at its preferred size, paints exactly IntelliJ's classic add icon at its centre. */
     static void assertPaintsClassicAdd(ClassicToolbarButton session) {
         session.setSize(session.getPreferredSize());

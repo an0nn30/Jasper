@@ -71,6 +71,8 @@ final class ToolWindowHeader extends JPanel {
     };
     private final JPanel labels;
     private final JPanel contributed = new JPanel();
+    /** The window's chrome artwork, which a contributed action's classic name follows. */
+    private final dev.jasper.ui.icons.ChromeArtwork artwork;
     private final java.util.List<JButton> actionButtons = new java.util.ArrayList<>();
     private dev.jasper.app.contributions.PanelHeaderState presentation = dev.jasper.app.contributions.PanelHeaderState.EMPTY;
 
@@ -93,7 +95,22 @@ final class ToolWindowHeader extends JPanel {
      * @param flush whether this is a flush frame's header strip
      */
     ToolWindowHeader(String text, Supplier<JPopupMenu> menu, Runnable onHide, dev.jasper.ui.kit.Kit kit, boolean flush) {
+        this(text, menu, onHide, kit, flush, dev.jasper.ui.icons.ChromeArtwork.NEW_UI);
+    }
+
+    /**
+     * @param text the window's title, shown as plain text
+     * @param menu builds the options menu each time it opens, so it names the window's current slot
+     * @param onHide hides the window
+     * @param kit the window's kit
+     * @param flush whether this is a flush frame's header strip
+     * @param artwork the window's chrome artwork: under {@code CLASSIC} a contributed action named in the classic set
+     *     draws IntelliJ's classic art (plan 15b)
+     */
+    ToolWindowHeader(String text, Supplier<JPopupMenu> menu, Runnable onHide, dev.jasper.ui.kit.Kit kit, boolean flush,
+                     dev.jasper.ui.icons.ChromeArtwork artwork) {
         super(new BorderLayout());
+        this.artwork = java.util.Objects.requireNonNull(artwork, "artwork");
         this.kit = java.util.Objects.requireNonNull(kit, "kit");
         this.styles = new NativeStyles(kit);
         this.painter = new dev.jasper.ui.swing.ChromePainter(kit);
@@ -229,7 +246,8 @@ final class ToolWindowHeader extends JPanel {
                 actionButtons.add(button); contributed.add(button);
             }
             var button = actionButtons.get(i);
-            button.setIcon(flush ? stripGlyph(action.icon()) : action.icon());
+            var shown = flush ? stripGlyph(action.icon()) : action.icon();
+            button.setIcon(artwork == dev.jasper.ui.icons.ChromeArtwork.CLASSIC ? AppIcons.classicChromeIcon(shown).orElse(shown) : shown);
             button.setToolTipText(action.label());
             button.getAccessibleContext().setAccessibleName(action.label());
         }

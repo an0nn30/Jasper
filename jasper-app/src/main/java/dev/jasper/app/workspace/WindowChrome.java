@@ -327,6 +327,7 @@ final class WindowChrome {
                         // in a title-bar zone, the window chrome's in a classic row or under a native title.
                         if (mounted.component() instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) {
                             kit.toolbarStrip(true);
+                            kit.classicChromeIcons(owner.look().chromeArtwork() == dev.jasper.ui.icons.ChromeArtwork.CLASSIC);
                             kit.route(headerIsTitleBar() ? dev.jasper.ui.theme.ThemeRoute.TITLE_BAR : dev.jasper.ui.theme.ThemeRoute.CHROME);
                         }
                         WindowToolbar.view(mounted.component(), VIEW_PRIORITY);

@@ -280,7 +280,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         stripes = look().dock().stripes(themes.kit(), look().chromeArtwork());
         leftStripe = stripes.left();
         rightStripe = stripes.right();
-        area = new ToolWindowArea(terminalColumn, dock, themes.kit(), look().dock().flushFrames());
+        area = new ToolWindowArea(terminalColumn, dock, themes.kit(), look().dock().flushFrames(), look().chromeArtwork());
         area.setStatusVisible(chrome.status().isVisible());
         area.setHeaderVisible(true);
         for (DockStripe stripe : stripes.all()) stripe.setVisible(false);

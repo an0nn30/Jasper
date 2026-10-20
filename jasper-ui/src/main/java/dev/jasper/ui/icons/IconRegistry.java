@@ -100,6 +100,25 @@ public final class IconRegistry implements AutoCloseable {
         return prepared(name, logicalSize, Objects.requireNonNull(artwork));
     }
     /**
+     * IntelliJ's classic chrome art for {@code name} when it is one of {@link #classicChromeNames()}: the same as
+     * {@code chromeIcon(name, logicalSize, ChromeArtwork.CLASSIC)}. Every other name gives empty, so a tool window header
+     * or toolbar view under the classic chrome icons keeps its own art for it.
+     *
+     * @param name the icon's name
+     * @param logicalSize the icon's size
+     * @return the prepared classic art, or empty for a name outside the classic set
+     */
+    public java.util.Optional<PreparedIcon> classicChromeIcon(String name, int logicalSize) {
+        return BuiltInArtwork.CLASSIC_NAMES.contains(name)
+            ? java.util.Optional.of(chromeIcon(name, logicalSize, ChromeArtwork.CLASSIC)) : java.util.Optional.empty();
+    }
+    /**
+     * The six names IntelliJ's classic chrome set draws. Asking decodes nothing.
+     *
+     * @return the classic chrome names
+     */
+    public static java.util.Set<String> classicChromeNames() { return BuiltInArtwork.CLASSIC_NAMES; }
+    /**
      * IntelliJ's classic 13 px tool-window icon for {@code name}, light and dark, authored and untinted, for a labelled
      * tool window stripe under {@link ChromeArtwork#CLASSIC}. Every other name has no file here, and the caller draws its
      * own glyph; an unknown or plugin name gives empty. {@link #chromeIcon(String, int, ChromeArtwork)} never returns

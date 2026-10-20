@@ -10,6 +10,8 @@ final class BuiltInArtwork {
         DecodedArtwork select(boolean darkTheme) { return darkTheme ? dark : light; }
     }
     static final Set<String> IDENTITIES = Set.of("network", "tunnel", "more.vertical");
+    /** The names {@link ClassicHolder} has, declared outside it so asking never decodes its files. */
+    static final Set<String> CLASSIC_NAMES = Set.of("add", "split", "zoom", "settings", "window.add", "search");
     private static final class Holder {
         static final Map<String, Pair> CATALOG = Map.of(
             "settings", pair("general/settings", Hashes.SELECTED), "network", pair("toolwindows/web", Hashes.SELECTED),

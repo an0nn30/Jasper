@@ -171,4 +171,14 @@ class BuiltInArtworkTest {
             }).as(name).doesNotThrowAnyException();
         }
     }
+    /** Plan 15b: the names a header or toolbar view may draw in classic art are the classic set's, without decoding it to ask. */
+    @Test void theClassicNamesAreTheClassicHoldersKeys() {
+        assertThat(IconRegistry.classicChromeNames()).isEqualTo(BuiltInArtwork.classicChrome().keySet());
+        try (var registry = new IconRegistry()) {
+            for (String name : IconRegistry.classicChromeNames())
+                assertThat(registry.classicChromeIcon(name, 16)).as(name).isPresent();
+            assertThat(registry.classicChromeIcon("folder", 16)).as("a New UI chrome name").isEmpty();
+            assertThat(registry.classicChromeIcon("more", 16)).as("a catalog name").isEmpty();
+        }
+    }
 }

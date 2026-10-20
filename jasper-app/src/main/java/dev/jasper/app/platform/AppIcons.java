@@ -119,6 +119,40 @@ public final class AppIcons {
         return java.util.Optional.of(new GivenStripeIcon(source, logicalSize));
     }
 
+    /**
+     * IntelliJ's classic chrome art in place of {@code icon} (plan 15b), for a tool window header's action under
+     * {@link ChromeArtwork#CLASSIC}: present for a built-in {@link PresentationIcon}, or a {@link #named},
+     * {@link #semantic} or {@link #icon} glyph (a header strip's glyph is first unwrapped to its source), whose name is
+     * one of {@link dev.jasper.ui.icons.IconRegistry#classicChromeNames()}. The icon has {@code icon}'s size and paints
+     * the classic art in the receiving component's theme, prepared on its first paint at that device size. Any other
+     * icon, a plugin's path included, gives empty.
+     *
+     * @param icon the icon the header would show
+     * @return the classic art at the same size, or empty
+     */
+    public static java.util.Optional<Icon> classicChromeIcon(Icon icon) {
+        Icon source = icon instanceof StripGlyph strip ? strip.source() : icon;
+        java.util.Optional<String> name = source instanceof PresentationIcon presentation
+            ? (presentation.pathData() == null ? java.util.Optional.of(presentation.name()) : java.util.Optional.empty()) : kitName(source);
+        return name.filter(dev.jasper.ui.icons.IconRegistry.classicChromeNames()::contains)
+            .map(value -> new ClassicChromeIcon(value, icon));
+    }
+
+    /** Classic chrome art prepared per name and device size, on first paint. */
+    private static final Map<PreparationKey, dev.jasper.ui.icons.IconRegistry.PreparedIcon> CLASSIC_CHROME = new ConcurrentHashMap<>();
+
+    /** A classic chrome name drawn at {@code sized}'s size in the receiving component's theme. */
+    private record ClassicChromeIcon(String name, Icon sized) implements Icon {
+        @Override public int getIconWidth() { return sized.getIconWidth(); }
+        @Override public int getIconHeight() { return sized.getIconHeight(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            int device = getIconWidth();
+            var prepared = CLASSIC_CHROME.computeIfAbsent(new PreparationKey(name, device),
+                key -> NAMED.classicChromeIcon(key.name(), key.size()).orElseThrow());
+            prepared.icon(ThemeZone.theme(component), SemanticColor.TEXT_PRIMARY).paintIcon(component, graphics, x, y);
+        }
+    }
+
     /** One stripe preparation: the chrome artwork, the icon name and the device size it was prepared at. */
     private record StripeKey(ChromeArtwork artwork, String name, int size) { }
     /**

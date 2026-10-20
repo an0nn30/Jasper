@@ -136,6 +136,57 @@ class ToolWindowKitPanelTest {
         }
     }
 
+    /**
+     * Plan 15b: under classic chrome artwork a borrowed header draws its classic names (a contributed add, in a standard
+     * frame and on a strip) in IntelliJ's classic art and keeps every other name's; under New UI nothing changes.
+     */
+    @Test void aBorrowedHeaderDrawsItsClassicNamesOnlyUnderClassicArtwork() {
+        ThemeTestSupport.install(true);
+        var theme = ThemeTestSupport.generated(true);
+        for (boolean flush : new boolean[] {false, true}) {
+            var drawn = new EnumMap<dev.jasper.ui.icons.ChromeArtwork, Map<String, int[]>>(dev.jasper.ui.icons.ChromeArtwork.class);
+            for (var artwork : dev.jasper.ui.icons.ChromeArtwork.values())
+                try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
+                     var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> { })) {
+                    var state = new DockState();
+                    var area = new ToolWindowArea(new JPanel(), state, FlatLafInstaller.installedKit(), flush, artwork);
+                    area.setContent("sessions", "Sessions", view);
+                    area.setHeader("sessions", new dev.jasper.app.contributions.PanelHeaderState("", false, List.of(
+                        new dev.jasper.app.contributions.PanelHeaderState.Action("New session", dev.jasper.app.platform.AppIcons.named("ADD"), () -> { }),
+                        new dev.jasper.app.contributions.PanelHeaderState.Action("Open folder", dev.jasper.app.platform.AppIcons.semantic("folder"), () -> { }))));
+                    state.add("sessions", Slot.LEFT_TOP);
+                    state.show("sessions");
+                    area.sync();
+                    assertThat(view.classicChromeIcons()).as("%s, flush %s", artwork, flush).isEqualTo(artwork == dev.jasper.ui.icons.ChromeArtwork.CLASSIC);
+                    var header = view.panelHeader("panel");
+                    var icons = new HashMap<String, int[]>();
+                    for (String label : List.of("New session", "Open folder")) {
+                        var button = button(header, label);
+                        icons.put(label, painted(button.getIcon(), button));
+                        if (label.equals("New session")) {
+                            int size = button.getIcon().getIconWidth();
+                            icons.put("classic", painted(new dev.jasper.ui.icons.IconRegistry().classicChromeIcon("add", size).orElseThrow()
+                                .icon(dev.jasper.app.platform.ThemeZone.theme(button), SemanticColor.TEXT_PRIMARY), button));
+                        }
+                    }
+                    drawn.put(artwork, icons);
+                    area.close();
+                }
+            var classic = drawn.get(dev.jasper.ui.icons.ChromeArtwork.CLASSIC);
+            var newUi = drawn.get(dev.jasper.ui.icons.ChromeArtwork.NEW_UI);
+            assertThat(classic.get("New session")).as("flush %s: the classic add", flush).isEqualTo(classic.get("classic"));
+            assertThat(newUi.get("New session")).as("flush %s: New UI keeps its add", flush).isNotEqualTo(newUi.get("classic"));
+            assertThat(classic.get("Open folder")).as("flush %s: folder keeps its art", flush).isEqualTo(newUi.get("Open folder"));
+        }
+    }
+
+    private static int[] painted(Icon icon, java.awt.Component component) {
+        var image = new java.awt.image.BufferedImage(icon.getIconWidth(), icon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { icon.paintIcon(component, g, 0, 0); } finally { g.dispose(); }
+        return image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+    }
+
     private static final Icon ARTWORK = new Icon() {
         @Override public int getIconWidth() { return 16; }
         @Override public int getIconHeight() { return 16; }
