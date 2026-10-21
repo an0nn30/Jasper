@@ -54,13 +54,14 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
     /**
      * Split with a choice beside this item (tabs and panes spec 8): selects it, then opens {@code choice} in a new pane on
      * {@code direction}'s side of its pane, as the Split lists' entries do: a terminal for {@link SplitChoice#TERMINAL},
-     * else the split item's view, through its action. A closed tab opens nothing.
+     * else the split item's view, through its action. A closed tab, or one being closed, opens nothing.
      *
      * @param choice one of {@link Windows#splitChoices()}
      * @param direction the new pane's side
      * @throws IllegalArgumentException when {@code choice} is not one of {@link Windows#splitChoices()}
      * @throws dev.jasper.sdk.MissingCapabilityException when {@code choice} is {@link SplitChoice#TERMINAL} and the plugin
-     *     lacks {@code terminal.open}
+     *     lacks {@code terminal.open}: checked first, as {@link dev.jasper.sdk.terminal.Terminals} checks it, so a
+     *     closed tab's split is refused too
      * @since 0.21.0
      */
     void split(SplitChoice choice, dev.jasper.sdk.terminal.Direction direction);

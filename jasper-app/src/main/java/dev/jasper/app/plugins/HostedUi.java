@@ -89,10 +89,11 @@ final class HostedUi {
     /** Whether this plugin ships with Jasper, which puts its split items first (workspace plan 8b Rulings 5); its context sets it. */
     BooleanSupplier bundled = () -> false;
     /**
-     * Requires {@code terminal.open}, then audits {@code what}: a terminal a content tab opens beside itself (workspace
-     * plan 8b Rulings 19). Its context sets it.
+     * The {@code terminal.open} gate for a terminal a content tab opens beside itself (workspace plan 8b Rulings 19):
+     * applying it requires the capability at once and gives what audits {@code what} once the terminal has opened. Its
+     * context sets it; unset, it refuses every such terminal.
      */
-    java.util.function.Consumer<String> terminalOpen = what -> { };
+    java.util.function.Function<String, Runnable> terminalOpen = what -> { throw new IllegalStateException("terminal.open gate not set: " + what); };
 
     HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
              BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
@@ -557,14 +558,17 @@ final class HostedUi {
             java.util.Objects.requireNonNull(choice, "choice");
             java.util.Objects.requireNonNull(direction, "direction");
             if (!splitChoices().contains(choice)) throw new IllegalArgumentException("Not one of Jasper's split choices: " + choice.label());
-            if (entry.closed()) return;
             boolean right = direction == dev.jasper.sdk.terminal.Direction.RIGHT;
             if (choice.equals(dev.jasper.sdk.ui.SplitChoice.TERMINAL)) {
-                // A local shell, as Terminals.split opens one: terminal.open first (workspace plan 8b Rulings 19).
-                terminalOpen.accept("opened a terminal beside content tab " + entry.id().value());
-                model.tabs().splitTerminal(entry, right ? dev.jasper.app.layout.Side.RIGHT : dev.jasper.app.layout.Side.DOWN);
+                // A local shell, as Terminals.split opens one: terminal.open before anything else, whatever the tab's
+                // state (workspace plan 8b Rulings 19), and audited only once a window opened it, as Terminals.split is
+                // once its target resolves. A closed tab, or one being closed, opens nothing.
+                Runnable audit = terminalOpen.apply("opened a terminal beside content tab " + entry.id().value());
+                if (model.tabs().splitTerminal(entry, right ? dev.jasper.app.layout.Side.RIGHT : dev.jasper.app.layout.Side.DOWN)) audit.run();
                 return;
             }
+            // A closed tab, or one waiting on a close decision, splits nothing, as it moves nowhere.
+            if (!model.tabs().splittable(entry)) return;
             // A plugin's choice opens beside the focused pane, so the item is selected first (workspace plan 8b Rulings 18).
             model.tabs().select(entry);
             java.util.UUID window = entry.window();

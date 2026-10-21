@@ -475,5 +475,37 @@ class HostedUiTest {
         assertThatCode(() -> { prompt.close(); trust.close(); prompt.setTitle("after close"); }).doesNotThrowAnyException();
     }
 
+    /**
+     * Workspace plan 8b Task 4 review: Terminal Right beside a content tab is audited once its window opened it, as
+     * {@code Terminals.split} is once its target resolves, and a closed tab's split is not; with no gate set, as before
+     * its context sets one, the split is refused before anything opens.
+     */
+    @Test void aContentTabsTerminalSplitIsAuditedOnlyWhenItOpens() {
+        UUID window = terminalFixture.addWindow();
+        List<String> heard = new ArrayList<>();
+        model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
+            tab -> Optional.empty(), (tab, group, side) -> { }, (tab, side) -> heard.add(side.name()), tab -> false, tab -> { }));
+        var notes = ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), terminals.windowHandle(window), view());
+        UUID id = model.tabs().inWindow(window).getFirst().id().value();
+        assertThatIllegalStateException().as("no gate set")
+            .isThrownBy(() -> notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.RIGHT))
+            .withMessageContaining("terminal.open gate not set");
+        assertThat(heard).isEmpty();
+        // As its context sets it (HostedContext).
+        var gate = new CapabilityGate("dev.x.tool", java.util.Set.of(dev.jasper.sdk.Capabilities.TERMINAL_OPEN));
+        ui.terminalOpen = what -> {
+            gate.require(dev.jasper.sdk.Capabilities.TERMINAL_OPEN);
+            return () -> gate.audit(dev.jasper.sdk.Capabilities.TERMINAL_OPEN, what);
+        };
+        List<String> lines = HostedTerminalsTest.audited(() -> {
+            notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.RIGHT);
+            notes.close();
+            notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.DOWN);
+        });
+        assertThat(heard).as("the closed tab's split reaches no window").containsExactly("RIGHT");
+        assertThat(lines).as("one line, for the split that opened")
+            .containsExactly("Plugin dev.x.tool used terminal.open: opened a terminal beside content tab " + id);
+    }
+
 
 }

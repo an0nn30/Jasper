@@ -41,8 +41,10 @@ final class FakeContent implements ContentTab {
     public void setFocusTarget(Runnable value){if(!closed)focus=value;}
     public void select(){if(closed)return;ui.host.workspace.select(tab);active(true);focus.run();}
     void active(boolean value){if(active==value)return;active=value;for(var listener:List.copyOf(activated))listener.accept(value);}
-    /** Neither closed, pinned by a modal prompt, nor waiting on a close decision. */
-    private boolean movable(){return !closed&&pins==0&&ui.pendingContent==null;}
+    /** Neither closed nor waiting on a close decision: a pane may open beside it, as the application's registry decides. */
+    private boolean splittable(){return !closed&&ui.pendingContent==null;}
+    /** Splittable, and not pinned by a modal prompt. */
+    private boolean movable(){return splittable()&&pins==0;}
     public void moveToNewWindow(){
         // A child window's only tab already is its own window.
         if(!movable()||!tab.window.main&&tab.window.tabs.size()==1)return;
@@ -58,13 +60,16 @@ final class FakeContent implements ContentTab {
     /** Spec 8: selected first, then the terminal beside it, or the split item's action, as the application runs them. */
     public void split(SplitChoice choice,dev.jasper.sdk.terminal.Direction direction){
         Objects.requireNonNull(choice,"choice");Objects.requireNonNull(direction,"direction");
-        if(!ui.windows().splitChoices().contains(choice))throw new IllegalArgumentException("Not one of Jasper's split choices: "+choice.label());
-        if(closed)return;
+        // Unguarded, so a closed content tab's split does nothing, as every other method of a closed handle does.
+        if(!ui.splitChoices().contains(choice))throw new IllegalArgumentException("Not one of Jasper's split choices: "+choice.label());
         boolean terminal=choice.equals(SplitChoice.TERMINAL);
-        // Rulings 19: a local shell needs terminal.open, refused before anything is selected or opens.
+        // Rulings 19: a local shell needs terminal.open, refused first, whatever the tab's state, as Terminals refuses.
         if(terminal)ui.context.terminals.require(dev.jasper.sdk.Capabilities.TERMINAL_OPEN);
+        // A closed tab, or one waiting on a close decision, splits nothing, as it moves nowhere.
+        if(!splittable())return;
         select();
         if(terminal){
+            ui.host.workspace.openRequests.add("beside|"+tab.id+"|"+direction);
             var local=(dev.jasper.sdk.terminal.OpenRequest.Local)dev.jasper.sdk.terminal.OpenRequest.local();
             ui.host.workspace.focus(ui.host.workspace.openTerminal(tab.window,"opened",FakeTerminals.openedInfo(local),tab));
             return;

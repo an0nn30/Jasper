@@ -357,7 +357,17 @@ public final class TabRegistry {
      * @param tab the tab
      * @return whether it may move
      */
-    public boolean movable(Tab tab) { return tabs.contains(tab) && !tab.closed() && !tab.pinned() && !pending.contains(tab); }
+    public boolean movable(Tab tab) { return splittable(tab) && !tab.pinned(); }
+
+    /**
+     * Whether a pane may open beside {@code tab}, as {@code ContentTab.split} asks: one of this registry's, open and not
+     * being closed, the part of {@link #movable} a split shares (a terminal opening in a window whose close is pending
+     * would surprise the user).
+     *
+     * @param tab the tab
+     * @return whether a split beside it may open
+     */
+    public boolean splittable(Tab tab) { return tabs.contains(tab) && !tab.closed() && !pending.contains(tab); }
 
     /**
      * {@code ContentTab.moveToNewWindow()} (tabs and panes spec 13): the window manager opens a full window holding the
@@ -387,16 +397,19 @@ public final class TabRegistry {
     /**
      * Split with a choice's Terminal Right and Terminal Down beside {@code tab}, as {@code ContentTab.split} asks (tabs
      * and panes spec 8; workspace plan 8b Rulings 18): its window selects it and opens a terminal in a new pane on
-     * {@code side} of its pane. A closed tab, or one no window holds, opens nothing.
+     * {@code side} of its pane. A tab that is not {@link #splittable}, or one no window holds, opens nothing.
      *
      * @param tab the tab
      * @param side where the new pane goes
+     * @return whether its window took the split, after it did; false when nothing opened
      */
-    public void splitTerminal(Tab tab, Side side) {
+    public boolean splitTerminal(Tab tab, Side side) {
         requireEdt();
         Objects.requireNonNull(side, "side");
-        var host = tabs.contains(tab) && !tab.closed() ? hosts.get(tab.window()) : null;
-        if (host != null) host.splitTerminal().accept(tab, side);
+        var host = splittable(tab) ? hosts.get(tab.window()) : null;
+        if (host == null) return false;
+        host.splitTerminal().accept(tab, side);
+        return true;
     }
 
     /**

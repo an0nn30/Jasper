@@ -35,7 +35,7 @@ class TabRegistryTest {
             (tab, group, side) -> {}, (tab, side) -> heard.add("terminal " + side + " of " + tab.title()),
             tab -> shares[0], tab -> heard.add("new tab " + tab.title())));
         Tab notes = registry.open("dev.example.editor", "notes", "Notes", main, new JPanel());
-        registry.splitTerminal(notes, Side.DOWN);
+        assertThat(registry.splitTerminal(notes, Side.DOWN)).as("its window took it").isTrue();
         assertThat(registry.mayMoveToNewTab(notes)).isTrue();
         registry.moveToNewTab(notes);
         shares[0] = false;
@@ -46,7 +46,7 @@ class TabRegistryTest {
         assertThat(registry.mayMoveToNewTab(notes)).as("a pinned tab").isFalse();
         pin.close();
         notes.close();
-        registry.splitTerminal(notes, Side.RIGHT);
+        assertThat(registry.splitTerminal(notes, Side.RIGHT)).as("a closed tab").isFalse();
         registry.moveToNewTab(notes);
         assertThat(heard).as("a closed tab reaches nothing").containsExactly("terminal DOWN of Notes", "new tab Notes");
     }

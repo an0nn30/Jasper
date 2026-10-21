@@ -275,7 +275,7 @@ class HostedTerminalsTest {
     }
 
     /** What the plugin audit log records while {@code action} runs. */
-    private static List<String> audited(Runnable action) {
+    static List<String> audited(Runnable action) {
         Logger logger = Logger.getLogger("dev.jasper.app.plugins.audit");
         Level previousLevel = logger.getLevel();
         boolean previousParents = logger.getUseParentHandlers();

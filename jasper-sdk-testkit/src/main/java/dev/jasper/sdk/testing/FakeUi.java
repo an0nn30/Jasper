@@ -517,6 +517,20 @@ final class FakeUi {
         public void close(){if(closed)return;closed=true;if(lifetime!=null)lifetime.close();if(content!=null)content.close();popovers.remove(this);for(var listener:List.copyOf(listeners))listener.run();listeners.clear();}
     }
     final List<FakePopover> popovers=new ArrayList<>();
+
+    /**
+     * The Split lists' choices (tabs and panes spec 2.10): the terminal, then every split item, the bundled plugins' first.
+     * Unguarded, as a closed content tab's {@code split} reads them and does nothing.
+     */
+    List<dev.jasper.sdk.ui.SplitChoice> splitChoices() {
+        var choices = new ArrayList<dev.jasper.sdk.ui.SplitChoice>(List.of(dev.jasper.sdk.ui.SplitChoice.TERMINAL));
+        host.splitItems.stream()
+            .sorted(java.util.Comparator.comparing((FakePluginHost.SplitItem item) -> !host.bundledPlugins.contains(item.pluginId())))
+            .forEach(item -> choices.add(new dev.jasper.sdk.ui.SplitChoice(item.spec().label(), item.spec().rightAction(),
+                item.spec().downAction())));
+        return List.copyOf(choices);
+    }
+
     Windows windows() {
         return new Windows() {
             @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content,
@@ -574,12 +588,7 @@ final class FakeUi {
             }
             @Override public List<dev.jasper.sdk.ui.SplitChoice> splitChoices() {
                 context.requireOpen();
-                var choices = new ArrayList<dev.jasper.sdk.ui.SplitChoice>(List.of(dev.jasper.sdk.ui.SplitChoice.TERMINAL));
-                host.splitItems.stream()
-                    .sorted(java.util.Comparator.comparing((FakePluginHost.SplitItem item) -> !host.bundledPlugins.contains(item.pluginId())))
-                    .forEach(item -> choices.add(new dev.jasper.sdk.ui.SplitChoice(item.spec().label(), item.spec().rightAction(),
-                        item.spec().downAction())));
-                return List.copyOf(choices);
+                return FakeUi.this.splitChoices();
             }
             @Override public Subscription onTabsClosing(java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean,java.util.concurrent.CompletableFuture<Boolean>> guard) {
                 context.requireOpen();contentGuard=guard;return ()->{if(contentGuard==guard)contentGuard=(tabs,batch)->java.util.concurrent.CompletableFuture.completedFuture(true);};

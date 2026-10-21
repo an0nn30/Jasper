@@ -167,7 +167,8 @@ public interface ContractHarness extends AutoCloseable {
     /**
      * What plugins asked to open: {@code tab|<window id>|<directory or ->} or {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->},
      * each followed by {@code |<profile id>} when the request named a shell profile, then by
-     * {@code |run:<the command's words joined by spaces>} when it runs a program.
+     * {@code |run:<the command's words joined by spaces>} when it runs a program; or
+     * {@code beside|<content tab id>|<RIGHT or DOWN>}, a content tab's Terminal Right or Terminal Down.
      */
     List<String> openRequests();
 
