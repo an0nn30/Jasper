@@ -2,7 +2,11 @@
 
 **Status: not executed.** Written against `claude/workspace-tabs` at `c1540b4e9` ("Docs: workspace tabs plan 8a, tabs
 hold panes"; its code is `2d7233474`'s) with plan 8a's committed text and then plan 8b's text applied on top (see
-Workspace). Record every deviation from this text here and in `docs/STATUS.md`.
+Workspace). Record every deviation from this text here and in `docs/STATUS.md`. Amendment 1 (2026-10-20, from plan 8b's
+final review, I2; the controller's ruling): a pane moving between tabs of its window is announced once, where it lands,
+and one that fails to land goes back where it was (Rulings 17; Tasks 2 and 3). Its case for plan 8b's Move Pane to New
+Tab is Task 2's, with the hold, because that command announces its old tab's next pane before this plan: that RED exists
+before Task 3.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -32,15 +36,20 @@ which execute first. Plans 6a and 6b are re-planned after this one (`2026-10-18-
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch
 `claude/workspace-tabs`. Every anchor below was matched at its stated count, and every file creation and edit script of
-Tasks 1-4 replayed in order with no failure: on a `git archive` copy of `c1540b4e9` after plan 8a's Tasks 1-6 (its
-committed text) and plan 8b's Tasks 1-7; re-replayed on `a49e33f69` (8a Tasks 1-5 executed) after 8a's Task 6 and plan
-8b (committed at `08a3bfe65`); and on `45658712e` (8a executed) after plan 8b. On that last copy JBR 25's `javac`
-compiled the main and test sources of `jasper-sdk`, `jasper-ui`, `jasper-buddy`, `jasper-terminal` and `jasper-app`,
-with the testkit and the test fixtures they use, and its doclint at the Javadoc task's level found nothing new; no
-Gradle task and no test ran. Line numbers are those of `c1540b4e9` with plans 8a and 8b applied ("after 8b"); anchors in
-text an earlier plan writes quote it as that plan leaves it. Plan 8a's execution words three things otherwise than its
-text: `TabRegistry.move(Tab, UUID, GroupId, Side)`'s Javadoc, `WorkspaceDropResolver`'s class Javadoc and a pattern
-variable in `TabDrag.showLanding`; Task 2's spans and its whole-file replacement take either text.
+Tasks 1-4 replayed in order with no failure, on a `git archive` copy of `0a6c6a18c`, where plans 8a (with its final fix
+wave, `d45b8171d`) and 8b (with its final fix wave) are executed. On that copy JBR 25's `javac` compiled the main and
+test sources of `jasper-sdk`, `jasper-ui`, `jasper-buddy`, `jasper-terminal` and `jasper-app`, with the testkit and the
+test fixtures they use; `-Xlint:all` warned of nothing in the files this plan touches, and doclint at the Javadoc task's
+level found nothing new. A plain JUnit launcher then ran, headless (`-Djava.awt.headless=true`, no Gradle, no window),
+`PaneDragTest` (27), `TabDragWindowsTest` (30), `MovePaneToNewTabTest` (7), `ParentTabsViewTest` (14),
+`WorkspaceViewTest` (9), `WindowTabMotionTest` (13), `TabDragTest` (16), `WindowTabsTest` (10), `ClassicTabsTest` (10),
+`SplitListsTest` (6), `WorkspaceDropResolverTest` (10) and `TerminalViewInteractionTest` (44 of 45; an existing case's
+off-macOS assumption aborts it on a Mac), with no failure. Earlier rounds replayed the plan on `c1540b4e9` after plan
+8a's and plan 8b's texts, and on `a49e33f69`, `45658712e` and `512c48ac4`; since `ee3cd8989` Task 1 quotes 8a's final
+fix wave's `paneClicks`, which the first three lack. Line numbers are `0a6c6a18c`'s. Anchors in text an earlier plan
+writes quote it as that plan leaves it. Plan 8a's execution words three things otherwise than its text:
+`TabRegistry.move(Tab, UUID, GroupId, Side)`'s Javadoc, `WorkspaceDropResolver`'s class Javadoc and a pattern variable
+in `TabDrag.showLanding`; Task 2's spans and its whole-file replacement take either text.
 
 Run every command from the worktree root. Every edit quotes the text it replaces, and the scripts stop with a message
 when that text is not found the stated number of times. Then re-find the quoted text (a change since may have reworded
@@ -56,12 +65,17 @@ anchor on text that earlier tasks of this plan wrote, and quote it as they leave
 - Plan 8b's "Left for plan 8c": `ParentTabsView.moveToNewTab(Tab)` gains an index (`moveToNewTab(Tab, int)`), which the
   drop on a new-tab place uses; `ContentTab.split` and `moveToNewTab` need no SDK member for the drag, so the SDK, the
   testkit and the contract do not change.
+- Plan 8b's final review (I2), left for this plan: Move Pane to New Tab announces its old tab's next pane on the way (a
+  stray `TAB_SELECTED`, two `ACTIVE_PANE_CHANGED`, `onActive` true then false, a focus request), and the testkit's fake
+  announces nothing; Rulings 17 holds the window's announcements for that command and for every pane drop between its
+  tabs (amendment 1).
 - Plan 7c's controller rulings for the tab drag (the hidden strip's band, the empty workspace) stand; a pane uses
   neither the band nor the tear-out.
 
 **6a impact:** the file format, `WorkspaceFile`, the snapshot and the store are untouched. A pane move is a layout
-change, which reaches `workspaceChanged` and the store's save as any layout change does; hovering a tab and showing the
-earlier one again go through `ParentTabsView.select`, then `workspaceChanged` and `layoutChanged`, so each asks the
+change, which reaches `workspaceChanged` and the store's save as any layout change does; a move between tabs reaches it
+once where it lands (Rulings 17), and a drop once more as `selectTab` selects the moved item; hovering a tab and showing
+the earlier one again go through `ParentTabsView.select`, then `workspaceChanged` and `layoutChanged`, so each asks the
 store for a save, as Select Tab does.
 
 ## Spec issues
@@ -146,10 +160,18 @@ code block.
    `TabDragWindowsTest.aFullWindowsLastPaneLeavingClosesItAfterItsMove` and
    `theMainWindowsOnlyPaneLeavingLeavesItsEmptyWorkspace`; Task 3:
    `TabDragWindowsTest.theMainWindowsEmptyWorkspaceTakesAPaneAnywhereOverIt`.
+6. **The selected item's pane moved between tabs of its window: by Move Pane to New Tab, beside another tab's pane, on a
+   new-tab place, and with a landing that throws.** The registry hears no `TAB_SELECTED`, `TAB_MOVED`, `TAB_CLOSED` or
+   `ACTIVE_PANE_CHANGED`, the items it leaves hear no activation change, and a failed landing leaves the window's tabs
+   as they were, the item in its pane. Task 2: `PaneDragTest.aPaneMovedIntoAnotherTabIsAnnouncedOnceWhereItLands`,
+   `movePaneToNewTabIsAnnouncedOnceWhereThePaneLands`, `aPaneThatFailsToLandGoesBackWhereItWas`,
+   `aTabsLastPaneThatFailsToLandKeepsItsTab`, `aNewTabThatFailsOnceItStandsGoesAgain` and
+   `hoveringATabsEntryShowsItAndAPaneOfItTakesTheDrop` (a drag's drop announces the moved item once); Task 3:
+   `PaneDragTest.aPaneDroppedOnANewTabPlaceIsAnnouncedOnceWhereItLands`.
 
 ## Verified facts
 
-From `c1540b4e9` with plans 8a and 8b applied (see Workspace).
+From `0a6c6a18c`, where plans 8a and 8b are executed (see Workspace).
 
 1. **The tab drag** (`workspace/TabDrag.java`): `pressed(ParentTabBar, Tab, MouseEvent)` (`:147-164`) records a press;
    `dragged` (`:170-189`) starts the drag past `TAB_REORDER_THRESHOLD` once `inPlace` (`:241-244`) holds; `released`
@@ -159,11 +181,11 @@ From `c1540b4e9` with plans 8a and 8b applied (see Workspace).
    (`:297-314`) or a tear-out; `showLanding` (`:356-381`) puts `DockDropOverlay` on the target's layered pane;
    `finish` (`:384-415`) takes it all away. The window manager's one drag is shared by its windows
    (`WindowManager.java:99`, `:511`); a window has its own until then (`WindowContent.java:142`); a window losing the
-   focus or closing ends a drag from it (`:2121-2122`, `:2149`).
-2. **The resolver** (`dock/WorkspaceDropResolver.java`): `Area(group, strip, tabs, content, splits)` (`:32-53`), `Drop`
-   with `Strip`, `Centre` and `Edge` (`:56-103`), `resolve` (`:118-127`: outer quarters split, the middle is the
-   centre), `landing` (`:181-195`), and the tab drag's `place` (`:138-141`), `marker` (`:208-218`) and `windowAt`
-   (`:229-232`). After plan 8a only `TabDrag` (`place`, `marker`, `windowAt`) and the tests call it.
+   focus or closing ends a drag from it (`:2146-2147`, `:2174`).
+2. **The resolver** (`dock/WorkspaceDropResolver.java`): `Area(group, strip, tabs, content, splits)` (`:33-54`), `Drop`
+   with `Strip`, `Centre` and `Edge` (`:57-104`), `resolve` (`:119-128`: outer quarters split, the middle is the
+   centre), `landing` (`:182-196`), and the tab drag's `place` (`:139-142`), `marker` (`:209-219`) and `windowAt`
+   (`:230-233`). After plan 8a only `TabDrag` (`place`, `marker`, `windowAt`) and the tests call it.
 3. **A press on a pane.** `WindowContent.paneClicks` (`:76-82`), an AWT listener for mouse events each window adds
    (after `addHost`) and removes (in `close`), makes the pane of the shown tab that a left press lands on active
    (`tabHolding(under(source, point))`: plan 8a's final fix wave finds the item by the press's location, since AWT hands
@@ -204,9 +226,9 @@ From `c1540b4e9` with plans 8a and 8b applied (see Workspace).
    `:285-291`) moves a pane within its tab; `openBeside` (`:84-87`) splits a pane, which ends a maximize
    (`Layout.split` `:267-273`, `activated` `:391-393`); `ParentTabsView.remove(Tab)` (`:196-210`) takes a tab with its
    last pane, except the window's only tab; plan 8b's `ParentTabsView.moveToNewTab(Tab)` (`:162-168`) gives a pane a
-   tab right after its own, and `WindowContent.mayMoveToNewTab` (`:1319-1322`) refuses a tab's only pane, a pinned item
-   and one being closed. `TabRegistry.move(Tab, UUID)` (`:433`) attaches an item in a new tab (plan 8a Rulings 3) and
-   `move(Tab, UUID, GroupId, Side)` (`:445-449`) beside a pane, both through `transfer`: one `TAB_MOVED` where it
+   tab right after its own, and `WindowContent.mayMoveToNewTab` (`:1324-1327`) refuses a tab's only pane, a pinned item
+   and one being closed. `TabRegistry.move(Tab, UUID)` (`:444`) attaches an item in a new tab (plan 8a Rulings 3) and
+   `move(Tab, UUID, GroupId, Side)` (`:456-460`) beside a pane, both through `transfer`: one `TAB_MOVED` where it
    arrives, the window it left told after (a full window it emptied closes), then `select`, which shows and raises it.
 9. **Motion.** `WindowTabs.refresh` (`:54-107`) opens an arriving entry with the motion unless its item is `moving()`
    (a move between windows) or `ParentTabBar.animates()` (`:97`) is false; a move within a window is not `moving()`.
@@ -218,6 +240,19 @@ From `c1540b4e9` with plans 8a and 8b applied (see Workspace).
     "variable macOs might not have been initialized"), so it reads `macOs()`, `dockDrag()` and `tabDrag()`, methods that
     run once the constructor is done. `TabDrag.gestureEvents` is a method reference (`this::gestureEvent`, like
     `lostRelease`); `hovered` and `textDrag` read nothing. No other field initializer this plan adds reads a field.
+12. **A move between tabs of one window announces its steps.** Plan 8b's `ParentTabsView.moveToNewTab(Tab)` (`:162-168`)
+    runs `from.remove(tab)`, then `openParentTab`. Each step reaches `WindowContent.workspaceChanged` (`:1255-1266`),
+    through `WorkspaceView.apply` (`:152-162`) or `openParentTab`'s own call: it asks for a save,
+    `WindowTerminals.tabSelected` (`:107-113`) publishes a changed selection, `update` (`:1877-1894`) sets each item's
+    `active` (`Tab.active`, `:146-150`, tells its `onActive` listeners) and asks the registry to `refresh` its active
+    pane, and a refocus focuses the shown tab's item. So a move from the shown tab first announces the pane that the old
+    tab selects next, then the moved item again. `TerminalRegistry.publish` (`:53-58`) refreshes after each event unless
+    `atomically` (`:61-66`) holds it, and `WindowTerminals.atomically` (`:79`) runs a change at once once the window has
+    closed. `ParentTabsView.remove(Tab)` (`:191-210`) takes a tab with its last item and never takes that item out of
+    the tab's workspace; `WorkspaceView.remove` (`:94-100`) and `place` (`:89-92`) change its items and layout and
+    render them. `WorkspaceView.remove` of a tab's last item empties its layout, which `ParentTabsView.changed` hands to
+    `ParentTabs.replace`, whose constructor (`ParentTabs.java:46-51`) refuses an empty parent tab beside others and a
+    tab in two parent tabs.
 
 ## Rulings
 
@@ -285,6 +320,19 @@ Record them in `docs/STATUS.md` (Task 4). "What — why".
     Reason: the Editor's Vim Normal and Visual modes turn input methods off, so a consumed press still reaches the text
     area, whose Swing text drag never asks (Verified facts 4 and 6); RTextArea already toggles `setDragEnabled` itself.
     Cost if wrong: none; the text drag returns at the release.
+17. **A pane moving between tabs of its window is announced once, where it lands** (`WindowContent.held`; the
+    controller's ruling, amendment 1). While `ParentTabsView.moveBeside` into another tab, or `moveToNewTab` (plan 8b's
+    command and Task 3's drop), runs, `workspaceChanged` lets the parent tabs' model take each layout and holds the
+    rest, keeping any focus request; at the end one `workspaceChanged` of the shown tab runs inside
+    `terminals.atomically`. Move Pane to New Tab keeps its item selected, so a plugin hears nothing; a drop beside
+    another tab's pane follows the hover that showed that tab (Rulings 4) and announces the moved item once. A tab's
+    last pane takes its tab out of the strip's model before it leaves, as no tab beside others may be empty
+    (`ParentTabs`), and its workspace goes once the pane has landed (`discard`). A move that throws restores both tabs'
+    layouts (`WorkspaceView.restore`), and a new tab that stood goes again: the item is back in its pane, nothing
+    closed, and the failure propagates, an announcement's failure suppressed under it. Reason: the selection does not
+    change, so a plugin should hear nothing, as plan 8a's `selectTab` fix established and the testkit's fake already
+    does; the move's steps announced the old tab's next pane (Verified facts 12). Cost if wrong: a listener that relied
+    on hearing that pane would miss it; none does.
 
 ## File structure
 
@@ -292,7 +340,8 @@ Record them in `docs/STATUS.md` (Task 4). "What — why".
 - `dev.jasper.app.dock`: `WorkspaceDropResolver` (Task 2, replaced; Task 3), `package-info` (Task 2).
 - `dev.jasper.app.contributions`: `TabRegistry` (Task 2, Javadoc).
 - `dev.jasper.app.workspace`: `TabDrag` (Tasks 1-3), `WindowContent` (Tasks 1-3), `ParentTabsView` (Tasks 2-3),
-  `WindowManager` (Tasks 2-3), `ParentTabBar`, `TabStrip`, `WindowTabs`, `ClassicTabs` (Task 3).
+  `WorkspaceView` (Task 2), `WindowManager` (Tasks 2-3), `ParentTabBar`, `TabStrip`, `WindowTabs`, `ClassicTabs` (Task
+  3).
 - Tests: `TerminalViewInteractionTest` (Task 1); new `PaneDragTest` and `TabDragTestSupport` (Tasks 1-3);
   `WorkspaceDropResolverTest` (Task 2, replaced); `TabDragWindowsTest` (Tasks 2-3); `WindowTabsTest`,
   `ClassicTabsTest`, `WindowTabMotionTest` (Task 3).
@@ -336,7 +385,7 @@ add them.
   `:86`, fields after `:116`, `draggedParentTab` `:133`, after `pressed` `:164`, `dragged` `:176-177`, after
   `lostRelease` `:235`, `inPlace` `:237-244`, `update` `:275-277`, `finish` `:393-394`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java` (`paneClicks` `:72-82`, the `tabDrag`
-  field's comment `:137-141`, after `lookAnimates` `:1054`, `tabDrag()` `:1491`)
+  field's comment `:137-141`, after `lookAnimates` `:1054`, `tabDrag()` `:1498`)
 - Create: `jasper-app/src/test/java/dev/jasper/app/workspace/PaneDragTest.java` (and its ledger row)
 - Modify: `jasper-app/src/test/java/dev/jasper/app/workspace/TabDragTestSupport.java` (class Javadoc, the end)
 - Test: `jasper-terminal/src/test/java/dev/jasper/terminal/view/TerminalViewInteractionTest.java`
@@ -1193,7 +1242,8 @@ window or another, on the side the cursor is nearest (Rulings 6), the landing sh
 its tab at once so a pane of it can take the drop (Rulings 4), and the tabs a drag showed show again when it ends
 elsewhere (Rulings 5). Within its window the move is a layout change (its tab goes with its last pane); into another
 window it goes through the window manager and the tab registry (Rulings 12). The resolver takes the pane drag's shape
-(Rulings 13).
+(Rulings 13). A pane moving between tabs of its window, by this drop or by plan 8b's Move Pane to New Tab, is announced
+once, where it lands, and one that fails to land goes back where it was (Rulings 17).
 
 **Files:**
 - Replace: `jasper-app/src/main/java/dev/jasper/app/dock/WorkspaceDropResolver.java`
@@ -1201,13 +1251,15 @@ window it goes through the window manager and the tab registry (Rulings 12). The
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/TabDrag.java` (imports; Task 1's class Javadoc paragraphs;
   `Target` `:65-83`; Task 1's fields; Task 1's `update` branch; after `barArea` `:320-324`; `released` `:205-210`;
   `showLanding` `:351-381`; `finish` `:383-415`; `drop` `:417-433`)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/ParentTabsView.java` (after plan 8b's `moveToNewTab`
-  `:157-168`)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java` (after plan 8b's `moveToNewTab`
-  `:1331`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/ParentTabsView.java` (imports `:6`; plan 8b's
+  `moveToNewTab` `:157-168`; `remove` `:191-210`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java` (fields after `landing` `:99`;
+  `workspaceChanged` `:1250-1266`; after `layoutChanged` `:1269`; after plan 8b's `moveToNewTab` `:1336`; `update`
+  `:1877-1879`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceView.java` (after `remove` `:94-100`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowManager.java` (imports `:6-9`; after
   `moveParentTab` `:322-353`)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java` (`move`'s Javadoc `:436-437`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java` (`move`'s Javadoc `:447-448`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/dock/package-info.java` (`:3-4`)
 - Test: `PaneDragTest` (Task 1's), `jasper-app/src/test/java/dev/jasper/app/workspace/TabDragWindowsTest.java` (class
   Javadoc `:44-50`, imports, the end)
@@ -1217,7 +1269,9 @@ window it goes through the window manager and the tab registry (Rulings 12). The
   `TabDragTestSupport.PANE`, `mouse(Component, int, Point, int)`, `startPane`, `dropPane`; plan 8a's
   `WorkspaceView.moveToNewGroup(Tab, GroupId, Side)`, `openBeside`, `groupViews()`, `ParentTabsView.remove(Tab)`,
   `select(ParentTabId)`, `holding(GroupId)`, `WindowContent.selectParentTab(ParentTabId)`, `activeParentTab()`,
-  `selectTab(Tab)`; plan 7b's `TabRegistry.move(Tab, UUID, GroupId, Side)`.
+  `selectTab(Tab)`, `workspaceChanged(WorkspaceView, boolean)`, `WindowTerminals.atomically(Runnable)`; plan 8b's
+  `ParentTabsView.moveToNewTab(Tab)` and `ActionId.MOVE_PANE_TO_NEW_TAB`; plan 7b's `TabRegistry.move(Tab, UUID,
+  GroupId, Side)`.
 - Produces:
   - `WorkspaceDropResolver.Area(GroupId group, Rectangle bounds)`, `Drop(GroupId group, Side side)`,
     `resolve(Point, List<Area>)` → `Optional<Drop>`, `landing(Drop, List<Area>)` → `Rectangle`; `place`, `marker` and
@@ -1225,6 +1279,15 @@ window it goes through the window manager and the tab registry (Rulings 12). The
   - `TabDrag.Target.Beside(WindowContent window, GroupId group, Side side)`;
   - `ParentTabsView.moveBeside(Tab tab, GroupId group, Side side)`;
   - `WindowContent.movePane(Tab tab, GroupId group, Side side)`;
+  - `void WindowContent.held(Runnable move)`: a pane move between the window's tabs, announced once, where it ends;
+  - `void WorkspaceView.restore(Tab tab, Layout before)`: a failed move's way back;
+  - `ParentTabsView`'s private `drop(WorkspaceView)`, `discard(WorkspaceView, boolean)` and `undo(Throwable, Tab,
+    WorkspaceView, Layout, WorkspaceView, Layout)`, and plan 8b's `moveToNewTab(Tab)` held, which Task 3's
+    `moveToNewTab(Tab, int)` takes over;
+  - `PaneDragTest.shellBesideC`, `announced` and `Refusing`, and the cases
+    `aPaneMovedIntoAnotherTabIsAnnouncedOnceWhereItLands`, `movePaneToNewTabIsAnnouncedOnceWhereThePaneLands`,
+    `aPaneThatFailsToLandGoesBackWhereItWas`, `aTabsLastPaneThatFailsToLandKeepsItsTab` and
+    `aNewTabThatFailsOnceItStandsGoesAgain`;
   - `WindowManager.movePane(WindowContent from, Tab tab, WindowContent to, GroupId group, Side side)` → `boolean`, and
     its private `mayMovePane(WindowContent, Tab, WindowContent)`;
   - `TabDrag`'s private `onPanes(WindowContent, Point)`, `hover`, `restore`, `finish(WindowContent)`, `window(Target)`
@@ -1381,6 +1444,10 @@ import sys; sys.path.insert(0, "build/plan8c")
 from edits import edit
 W = "jasper-app/src/test/java/dev/jasper/app/workspace/"
 edit(W + "PaneDragTest.java", [
+    ("import static org.assertj.core.api.Assertions.assertThat;\n",
+     "import static org.assertj.core.api.Assertions.assertThat;\nimport static org.assertj.core.api.Assertions.assertThatThrownBy;\n", 1),
+    ("import dev.jasper.app.config.AnimationSettings;\n",
+     "import dev.jasper.app.commands.ActionId;\nimport dev.jasper.app.config.AnimationSettings;\n", 1),
     ("import dev.jasper.app.layout.ParentTabId;\n", "import dev.jasper.app.layout.ParentTabId;\nimport dev.jasper.app.layout.Side;\n", 1),
     ("import java.awt.Point;\n", "import java.awt.Point;\nimport java.awt.Rectangle;\n", 1),
     ("import javax.swing.JTextArea;\n", "import javax.swing.JTextArea;\nimport javax.swing.SwingUtilities;\n", 1),
@@ -1453,6 +1520,8 @@ edit(W + "PaneDragTest.java", [
             assertThat(shape(owner)).isEqualTo("H[d, c]");
             assertThat(owner.selectedTab()).isSameAs(c);
             assertThat(moves()).isEmpty();
+            assertThat(announced()).as("announced once, where it lands")
+                .containsExactly(new TerminalEvent.TabSelected(owner.id(), c.id().value()));
             owner.selectParentTab(first);
             assertThat(shape(owner)).as("its old tab keeps its other panes").isEqualTo("H[a, b]");
         });
@@ -1496,6 +1565,151 @@ edit(W + "PaneDragTest.java", [
             assertThat(owner.parentTabCount()).as("its tab went with it").isEqualTo(1);
             assertThat(shape(owner)).isEqualTo("H[d, a, V[b, c]]");
             assertThat(owner.tabBar().component().isVisible()).as("one tab: the strip hides").isFalse();
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17's cases: a terminal opens beside "c" and is selected, so the registry, which takes this
+     * window as its active one, has an active pane to report; "a", "b" and "c", the plugin views a move of the terminal
+     * leaves behind, record into {@code heard} every activation change they hear from then on.
+     *
+     * @return the terminal's item
+     */
+    private Tab shellBesideC(List<Boolean> heard) {
+        owner.selectTab(c);
+        TerminalContent terminal = owner.split(Side.RIGHT);
+        Tab shell = owner.selectedTab();
+        assertThat(shell.content()).isSameAs(terminal);
+        terminals.windowActivated(owner.id());
+        for (Tab left : List.of(a, b, c)) left.onActive(heard::add);
+        facts.clear();
+        return shell;
+    }
+
+    /** What the registry heard of selections, moves, closes and the active pane since {@link #facts} was last cleared. */
+    private List<TerminalEvent> announced() {
+        return facts.stream().filter(fact -> fact instanceof TerminalEvent.TabSelected || fact instanceof TerminalEvent.TabMoved
+            || fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.ActivePaneChanged).toList();
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: the selected item's pane moved beside a pane of another tab of its window is announced
+     * once, where it lands. It stays the selected item, so the registry hears no selection, move, close or active pane,
+     * and no item of the tab it left turns active on the way. This pins {@code movePane} itself, called while the item's
+     * own tab shows: a drag shows the other tab first (Rulings 4), so its drop announces the moved item once, which
+     * {@code hoveringATabsEntryShowsItAndAPaneOfItTakesTheDrop} pins.
+     */
+    @Test void aPaneMovedIntoAnotherTabIsAnnouncedOnceWhereItLands() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<Boolean>();
+            Tab shell = shellBesideC(heard);
+            owner.movePane(shell, d.group().orElseThrow(), Side.RIGHT);
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+            assertThat(owner.workspace().tabs()).containsExactly(d, shell);
+            assertThat(owner.selectedTab()).isSameAs(shell);
+            assertThat(announced()).as("nothing changed for the registry").isEmpty();
+            assertThat(heard).as("no item it left turns active").isEmpty();
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: Move Pane to New Tab, plan 8b's command, is announced once too, where the pane lands,
+     * though the command announced its old tab's next pane before this plan.
+     */
+    @Test void movePaneToNewTabIsAnnouncedOnceWhereThePaneLands() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<Boolean>();
+            Tab shell = shellBesideC(heard);
+            owner.updateActions();
+            owner.invoke(ActionId.MOVE_PANE_TO_NEW_TAB);
+            assertThat(owner.parentTabCount()).isEqualTo(3);
+            assertThat(owner.workspace().tabs()).as("its own tab, shown").containsExactly(shell);
+            assertThat(announced()).as("nothing changed for the registry").isEmpty();
+            assertThat(heard).as("no item it left turns active").isEmpty();
+        });
+    }
+
+    /** A plugin's view whose next showing throws once armed, as a view that fails to take its new pane does. */
+    private static final class Refusing extends JPanel {
+        boolean armed;
+
+        @Override public void setVisible(boolean visible) {
+            if (visible && armed) {
+                armed = false;
+                throw new IllegalStateException("refused");
+            }
+            super.setVisible(visible);
+        }
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: a pane that fails to land goes back where it was, beside another tab's pane and into a
+     * new tab alike: the window's tabs and layouts as they were, the item in its pane, nothing closed, and the failure
+     * propagates.
+     */
+    @Test void aPaneThatFailsToLandGoesBackWhereItWas() throws Exception {
+        edt(() -> {
+            var refusing = new Refusing();
+            Tab notes = view("notes", refusing, TabRegistry.Placement.SPLIT_RIGHT);
+            var before = owner.windowLayout();
+            var pane = notes.group().orElseThrow();
+            refusing.armed = true;
+            assertThatThrownBy(() -> owner.movePane(notes, d.group().orElseThrow(), Side.RIGHT)).hasMessage("refused");
+            assertThat(owner.windowLayout()).as("beside another tab's pane").isEqualTo(before);
+            assertThat(refusing.getParent()).as("back in its pane").isSameAs(owner.workspace().groupView(pane));
+            refusing.armed = true;
+            assertThatThrownBy(() -> owner.moveToNewTab(notes)).hasMessage("refused");
+            assertThat(owner.windowLayout()).as("into a new tab").isEqualTo(before);
+            assertThat(refusing.getParent()).isSameAs(owner.workspace().groupView(pane));
+            assertThat(notes.closed()).as("nothing closes").isFalse();
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: a tab's last pane that fails to land beside another tab's pane goes back, its tab
+     * standing as it stood; once it lands, its tab goes with it (spec 4).
+     */
+    @Test void aTabsLastPaneThatFailsToLandKeepsItsTab() throws Exception {
+        edt(() -> {
+            var refusing = new Refusing();
+            Tab notes = view("notes", refusing, TabRegistry.Placement.NEW_TAB);
+            owner.selectParentTab(first);
+            var before = owner.windowLayout();
+            var pane = notes.group().orElseThrow();
+            ParentTabId own = owner.parentTabOf(notes).orElseThrow();
+            refusing.armed = true;
+            assertThatThrownBy(() -> owner.movePane(notes, a.group().orElseThrow(), Side.LEFT)).hasMessage("refused");
+            assertThat(owner.windowLayout()).isEqualTo(before);
+            assertThat(refusing.getParent()).as("back in its pane")
+                .isSameAs(owner.parentTabs().view(own).orElseThrow().groupView(pane));
+            assertThat(notes.closed()).as("nothing closes").isFalse();
+            owner.movePane(notes, a.group().orElseThrow(), Side.LEFT);
+            assertThat(owner.parentTabCount()).as("its tab went with it").isEqualTo(2);
+            assertThat(shape(owner)).isEqualTo("H[notes, a, V[b, c]]");
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: a new tab that fails once it stands in the strip, where a displayable window first
+     * gives its item's view a peer, goes again, and the pane goes back where it was.
+     */
+    @Test void aNewTabThatFailsOnceItStandsGoesAgain() throws Exception {
+        edt(() -> {
+            boolean[] armed = {false};
+            owner.parentTabs().addContainerListener(new java.awt.event.ContainerAdapter() {
+                @Override public void componentAdded(java.awt.event.ContainerEvent event) {
+                    if (!armed[0]) return;
+                    armed[0] = false;
+                    throw new IllegalStateException("refused");
+                }
+            });
+            var before = owner.windowLayout();
+            var pane = c.group().orElseThrow();
+            armed[0] = true;
+            assertThatThrownBy(() -> owner.moveToNewTab(c)).hasMessage("refused");
+            assertThat(owner.windowLayout()).isEqualTo(before);
+            assertThat(owner.parentTabs().views()).as("no tab stays behind").hasSize(2);
+            assertThat(c.component().getParent()).as("back in its pane").isSameAs(owner.workspace().groupView(pane));
         });
     }
 
@@ -2105,20 +2319,61 @@ span(P, """    /**
     }
 """)
 V = "jasper-app/src/main/java/dev/jasper/app/workspace/ParentTabsView.java"
-edit(V, [("""        from.remove(tab);
+edit(V, [
+    ("import dev.jasper.app.layout.GroupId;\n", "import dev.jasper.app.layout.GroupId;\nimport dev.jasper.app.layout.Layout;\n", 1),
+    ("""     * after it in the strip, which shows. Its component moves between the two workspaces: nothing closes, nothing leaves
+     * the window, and the registry hears no move. Nothing for a tab's only pane or an item the window does not hold.
+     */
+    void moveToNewTab(Tab tab) {
+        WorkspaceView from = holding(tab).orElse(null);
+        if (closed || from == null || from.tabCount() < 2) return;
+        int at = model.indexOf(from.id()) + 1;
+        from.remove(tab);
         openParentTab(tab, ParentTabId.random(), at);
     }
-""", """        from.remove(tab);
-        openParentTab(tab, ParentTabId.random(), at);
+""", """     * after it in the strip, which shows. Its component moves between the two workspaces: nothing closes, nothing leaves
+     * the window, and the registry hears no move. The window announces it once, where it lands, and a new tab that fails
+     * to take it leaves it where it was (workspace plan 8c Rulings 17). Nothing for a tab's only pane or an item the
+     * window does not hold.
+     */
+    void moveToNewTab(Tab tab) {
+        WorkspaceView from = holding(tab).orElse(null);
+        if (closed || from == null || from.tabCount() < 2) return;
+        int at = model.indexOf(from.id()) + 1;
+        Layout before = from.model();
+        ParentTabs strip = model;
+        ParentTabId id = ParentTabId.random();
+        owner.held(() -> {
+            try {
+                from.remove(tab);
+                openParentTab(tab, id, at);
+            } catch (RuntimeException | Error failure) {
+                // A new tab that stood when the failure came goes again before its item goes back.
+                WorkspaceView opened = views.remove(id);
+                if (opened != null) {
+                    model = strip;
+                    try {
+                        super.remove(opened);
+                        opened.close();
+                        reveal(active());
+                    } catch (RuntimeException | Error undone) {
+                        failure.addSuppressed(undone);
+                    }
+                }
+                undo(failure, tab, from, before, null, null);
+                throw failure;
+            }
+        });
     }
 
     /**
      * Moves {@code tab}'s pane beside the pane {@code group} of this window, on {@code side} (tabs and panes spec 7): within
      * its own tab a layout change ({@link WorkspaceView#moveToNewGroup}); into another tab it leaves its tab, which goes
      * with its last pane (spec 4), and joins that one, which shows, its maximize ending (spec 13). Its component moves
-     * between the workspaces: nothing closes, nothing leaves the window and the registry hears no move. Nothing for an
-     * item or a pane the window does not hold, or for the item's own pane; the focus stays where it is, for the caller to
-     * move.
+     * between the workspaces: nothing closes, nothing leaves the window and the registry hears no move. Into another tab
+     * the window announces it once, where it lands, and a pane that fails to land goes back where it was (workspace plan
+     * 8c Rulings 17). Nothing for an item or a pane the window does not hold, or for the item's own pane; the focus stays
+     * where it is, for the caller to move.
      */
     void moveBeside(Tab tab, GroupId group, Side side) {
         WorkspaceView from = holding(tab).orElse(null), to = holding(group).orElse(null);
@@ -2127,13 +2382,151 @@ edit(V, [("""        from.remove(tab);
             from.moveToNewGroup(tab, group, side);
             return;
         }
-        remove(tab);
-        to.openBeside(tab, group, side);
-        select(to.id());
+        Layout left = from.model(), joined = to.model();
+        ParentTabs strip = model;
+        // A tab's last pane takes its tab out of the strip first, as no tab beside others may be empty (spec 4); its
+        // workspace stands until the pane has landed, so a pane that fails to land goes back into it.
+        boolean last = from.tabCount() == 1, focused = last && from == active() && WorkspaceView.holdsFocus(owner, this);
+        owner.held(() -> {
+            try {
+                if (last) {
+                    model = model.remove(from.id());
+                    views.remove(from.id());
+                }
+                from.remove(tab);
+                to.openBeside(tab, group, side);
+            } catch (RuntimeException | Error failure) {
+                undo(failure, tab, from, left, to, joined);
+                if (last) {
+                    views.put(from.id(), from);
+                    model = strip;
+                }
+                throw failure;
+            }
+            if (last) discard(from, focused);
+            select(to.id());
+        });
+    }
+
+    /**
+     * Takes back a pane move whose landing failed (workspace plan 8c Rulings 17): {@code to}, when it was to take the pane,
+     * and {@code from} return to the layouts they had, {@code from} holding {@code tab} again, so nothing closes. A
+     * failure of that is suppressed under {@code failure}, which the caller rethrows.
+     */
+    private static void undo(Throwable failure, Tab tab, WorkspaceView from, Layout fromBefore, WorkspaceView to,
+                             Layout toBefore) {
+        try {
+            if (to != null) to.restore(tab, toBefore);
+            from.restore(tab, fromBefore);
+        } catch (RuntimeException | Error undone) {
+            failure.addSuppressed(undone);
+        }
+    }
+""", 1),
+    ("""        boolean held = view == active() && WorkspaceView.holdsFocus(owner, this);
+        model = model.remove(view.id());
+        views.remove(view.id());
+        super.remove(view);
+        view.close();
+        reveal(active());
+        owner.workspaceChanged(active(), held);
+    }
+""", """        drop(view);
+    }
+
+    /**
+     * Takes the tab {@code view}, whose last pane closed or left, out of the strip with its workspace: the one used before
+     * it shows, and takes the focus when the tab held it (spec 4; workspace plan 7a Rulings 2, 6 and 10).
+     */
+    private void drop(WorkspaceView view) {
+        boolean held = view == active() && WorkspaceView.holdsFocus(owner, this);
+        model = model.remove(view.id());
+        views.remove(view.id());
+        discard(view, held);
+    }
+
+    /**
+     * Takes the workspace of {@code view}, a tab the strip's model no longer has, out of the tree and closes it: the tab
+     * that shows then shows, taking the focus when {@code held}.
+     */
+    private void discard(WorkspaceView view, boolean held) {
+        super.remove(view);
+        view.close();
+        reveal(active());
+        owner.workspaceChanged(active(), held);
     }
 """, 1)])
 C = "jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java"
-edit(C, [("""    void moveToNewTab(Tab tab) { if (mayMoveToNewTab(tab)) parentTabs.moveToNewTab(tab); }
+edit(C, [
+    ("""    private Landing landing;
+""", """    private Landing landing;
+    /** Pane moves between this window's tabs under way ({@link #held}): only where the last one ends is announced. */
+    private int holding;
+    /** Whether a change during a held move asked for the focus. */
+    private boolean heldRefocus;
+""", 1),
+    ("""     * tab takes focus when {@code refocus} and {@code view} is the shown parent tab's.
+     */
+    void workspaceChanged(WorkspaceView view, boolean refocus) {
+        if (closed) return;
+        parentTabs.changed(view);
+""", """     * tab takes focus when {@code refocus} and {@code view} is the shown parent tab's. While a pane moves between tabs
+     * ({@link #held}) only the model takes it, and the rest follows once, where the pane lands.
+     */
+    void workspaceChanged(WorkspaceView view, boolean refocus) {
+        if (closed) return;
+        parentTabs.changed(view);
+        // A pane moving between tabs is announced once, where it lands (workspace plan 8c Rulings 17).
+        if (holding > 0) {
+            heldRefocus |= refocus;
+            return;
+        }
+""", 1),
+    ("""    void layoutChanged() { if (!closed) onLayoutChanged.run(); }
+""", """    void layoutChanged() { if (!closed) onLayoutChanged.run(); }
+
+    /**
+     * Runs {@code move}, a pane moving between tabs of this window, as one change (workspace plan 8c Rulings 17): while it
+     * runs the parent tabs' model takes each layout as it changes, and the save, the terminal registry, the palette, the
+     * items' activation and the focus hear only where it ends, once, in one registry change. No item is announced
+     * selected or turns active on the way. The move's failure propagates after that, a failure of the announcement
+     * suppressed under it.
+     *
+     * @param move the move
+     */
+    void held(Runnable move) {
+        holding++;
+        Throwable failure = null;
+        try {
+            move.run();
+        } catch (RuntimeException | Error thrown) {
+            failure = thrown;
+            throw thrown;
+        } finally {
+            if (--holding == 0) {
+                boolean refocus = heldRefocus;
+                heldRefocus = false;
+                Runnable landed = () -> workspaceChanged(parentTabs.active(), refocus);
+                try {
+                    if (terminals != null) terminals.atomically(landed); else landed.run();
+                } catch (RuntimeException | Error late) {
+                    // The move's own failure stays the one that propagates.
+                    if (failure == null) throw late;
+                    failure.addSuppressed(late);
+                }
+            }
+        }
+    }
+""", 1),
+    ("""    void update() {
+        if (closed) return;
+        Tab selected = selectedTab();
+""", """    void update() {
+        // A held move's items hear where it ends, once (workspace plan 8c Rulings 17).
+        if (closed || holding > 0) return;
+        Tab selected = selectedTab();
+""", 1),
+    ("""    void moveToNewTab(Tab tab) { if (mayMoveToNewTab(tab)) parentTabs.moveToNewTab(tab); }
 """, """    void moveToNewTab(Tab tab) { if (mayMoveToNewTab(tab)) parentTabs.moveToNewTab(tab); }
 
     /**
@@ -2150,6 +2543,24 @@ edit(C, [("""    void moveToNewTab(Tab tab) { if (mayMoveToNewTab(tab)) parentTa
         if (closed || tab == null || !registry.movable(tab) || !parentTabs.contains(tab)) return;
         parentTabs.moveBeside(tab, group, side);
         selectTab(tab);
+    }
+""", 1)])
+K = "jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceView.java"
+edit(K, [("""        tabs.remove(tab.id());
+        apply(next);
+    }
+""", """        tabs.remove(tab.id());
+        apply(next);
+    }
+
+    /**
+     * Takes back a pane move that failed (workspace plan 8c Rulings 17): this workspace returns to {@code before}, its
+     * layout when the move began, holding {@code tab} again if {@code before} places it and letting it go if not.
+     */
+    void restore(Tab tab, Layout before) {
+        if (before.contains(tab.id())) tabs.put(tab.id(), tab);
+        else tabs.remove(tab.id());
+        apply(before);
     }
 """, 1)])
 M = "jasper-app/src/main/java/dev/jasper/app/workspace/WindowManager.java"
@@ -2210,7 +2621,8 @@ PY
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.dock.*' --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.contributions.*' --continue`
 Expected: PASS: the new cases, Task 1's, `TabDragTest` and the rest of `TabDragWindowsTest` (a tab drag's landing and
-drop are unchanged), `MovePaneToNewTabTest` and `LayoutGeometryTest`'s pane moves. Then `./gradlew :jasper-app:check`:
+drop are unchanged), `MovePaneToNewTabTest` (plan 8b's command, now held, moves as before), `ParentTabsViewTest` (a
+tab's last item closing still takes its tab) and `LayoutGeometryTest`'s pane moves. Then `./gradlew :jasper-app:check`:
 PASS (`verifyApplicationArchitecture`: `dock` still names `layout` alone; the Javadoc of the public resolver and
 `WindowManager.movePane`).
 
@@ -2229,6 +2641,11 @@ its tab going with its last pane; into another window it goes through
 the window manager and the tab registry, one TAB_MOVED. The resolver
 keeps the pane drag's shape: no strip drop and no centre.
 
+A pane moving between tabs of its window, Move Pane to New Tab's too,
+is announced once, where it lands, inside one terminal-registry
+change: its old tab's next pane is no longer announced selected and
+active on the way. A pane that fails to land goes back where it was.
+
 🤖 Generated with Claude Code at The Home Depot
 
 Co-Authored-By: Claude <noreply@anthropic.com>
@@ -2244,7 +2661,8 @@ which shows (Rulings 3): an entry's leading quarter is the place before it and i
 in either look, and the classic tabs' "+" and the room after them are the strip's end. An entry's middle half keeps
 showing its tab (Task 2). The main window's empty workspace takes a pane anywhere over it, in its place (Rulings 10). In
 its own window the only pane of its tab takes no new tab at any place (Rulings 8), and the new tab takes its place at
-once, while plan 8b's Move Pane to New Tab, a command, keeps the strip's open motion (Rulings 9).
+once, while plan 8b's Move Pane to New Tab, a command, keeps the strip's open motion (Rulings 9). Both are held as Task 2
+holds them: announced once, where the pane lands, and back where it was if the new tab fails to take it (Rulings 17).
 
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/dock/WorkspaceDropResolver.java` (Task 2's class Javadoc; after Task
@@ -2253,9 +2671,9 @@ once, while plan 8b's Move Pane to New Tab, a command, keeps the strip's open mo
   `WindowTabs.java` (imports `:3`, `:19`, after `tabBounds` `:136-140`), `ClassicTabs.java` (imports `:6`, `:18-22`,
   after `tabBounds` `:98`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/ParentTabBar.java` (fields `:22-24`, `animates` `:96-97`)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/ParentTabsView.java` (plan 8b's `moveToNewTab`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/ParentTabsView.java` (Task 2's `moveToNewTab`, plan 8b's
   `:162-168`)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java` (before `tabRegistry()` `:1384`; after
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java` (before `tabRegistry()` `:1389`; after
   Task 2's `movePane`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowManager.java` (before Task 2's `mayMovePane`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/TabDrag.java` (Task 2's class Javadoc paragraph, `Target`,
@@ -2266,7 +2684,8 @@ once, while plan 8b's Move Pane to New Tab, a command, keeps the strip's open mo
 
 **Interfaces:**
 - Consumes: Task 2's `TabDrag.onPanes`, `showLanding`, `drop`, `window(Target)`, `WindowManager.mayMovePane`,
-  `WindowContent.movePane`, `WorkspaceDropResolver.place`; plan 8b's `ParentTabsView.moveToNewTab(Tab)`,
+  `WindowContent.movePane`, `held(Runnable)`, `ParentTabsView.moveToNewTab(Tab)` (held) and `undo`,
+  `PaneDragTest.shellBesideC` and `announced`, `WorkspaceDropResolver.place`; plan 8b's
   `WindowContent.mayMoveToNewTab(Tab)`, `moveToNewTab(Tab)`; plan 8a's `ParentTabsView.openParentTab(Tab, ParentTabId,
   int)` and `land`, `WindowContent.landing` (`Landing(ParentTabId, int)`), `ParentTabBar.animates()`; plan 7b's
   `TabRegistry.move(Tab, UUID)`.
@@ -2274,7 +2693,8 @@ once, while plan 8b's Move Pane to New Tab, a command, keeps the strip's open mo
   - `static OptionalInt WorkspaceDropResolver.newTabPlace(Point cursor, List<Rectangle> entries)`;
   - `OptionalInt TabStrip.newTabPlace(Point point)`, in the strip's coordinates;
   - `void ParentTabBar.atOnce(Runnable change)`;
-  - `void ParentTabsView.moveToNewTab(Tab tab, int index)`, which plan 8b's `moveToNewTab(Tab)` now calls;
+  - `void ParentTabsView.moveToNewTab(Tab tab, int index)`, which plan 8b's `moveToNewTab(Tab)` now calls, held as
+    Task 2 holds that one;
   - `void WindowContent.movePaneToNewTab(Tab tab, int index)`, `void WindowContent.receiveAsTab(Tab tab, int index)`;
   - `boolean WindowManager.movePaneToNewTab(WindowContent from, Tab tab, WindowContent to, int index)`;
   - `TabDrag.Target.NewTab(WindowContent window, int index)`.
@@ -2345,6 +2765,28 @@ edit(W + "PaneDragTest.java", [
             assertThat(moves()).as("within its window: no TAB_MOVED").isEmpty();
             owner.selectParentTab(first);
             assertThat(shape(owner)).isEqualTo("H[a, c]");
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: the selected item's pane dropped on a new-tab place of its window is announced once,
+     * where it lands: the registry hears no selection, move, close or active pane, and no item of its old tab turns active.
+     */
+    @Test void aPaneDroppedOnANewTabPlaceIsAnnouncedOnceWhereItLands() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<Boolean>();
+            Tab shell = shellBesideC(heard);
+            relayout(frame);
+            Point after = onEntry(owner, d, 0.9);
+            Component source = startPane(owner, shell, after);
+            assertThat(owner.tabDrag().target()).contains(new TabDrag.Target.NewTab(owner, 2));
+            facts.clear();
+            heard.clear();
+            mouse(source, MouseEvent.MOUSE_RELEASED, after, PANE);
+            assertThat(owner.parentTabCount()).isEqualTo(3);
+            assertThat(owner.workspace().tabs()).as("its own tab, shown").containsExactly(shell);
+            assertThat(announced()).as("nothing changed for the registry").isEmpty();
+            assertThat(heard).as("no item it left turns active").isEmpty();
         });
     }
 
@@ -2697,8 +3139,30 @@ edit(S + "ParentTabsView.java", [("""    void moveToNewTab(Tab tab) {
         WorkspaceView from = holding(tab).orElse(null);
         if (closed || from == null || from.tabCount() < 2) return;
         int at = model.indexOf(from.id()) + 1;
-        from.remove(tab);
-        openParentTab(tab, ParentTabId.random(), at);
+        Layout before = from.model();
+        ParentTabs strip = model;
+        ParentTabId id = ParentTabId.random();
+        owner.held(() -> {
+            try {
+                from.remove(tab);
+                openParentTab(tab, id, at);
+            } catch (RuntimeException | Error failure) {
+                // A new tab that stood when the failure came goes again before its item goes back.
+                WorkspaceView opened = views.remove(id);
+                if (opened != null) {
+                    model = strip;
+                    try {
+                        super.remove(opened);
+                        opened.close();
+                        reveal(active());
+                    } catch (RuntimeException | Error undone) {
+                        failure.addSuppressed(undone);
+                    }
+                }
+                undo(failure, tab, from, before, null, null);
+                throw failure;
+            }
+        });
     }
 """, """    void moveToNewTab(Tab tab) {
         WorkspaceView from = holding(tab).orElse(null);
@@ -2707,13 +3171,35 @@ edit(S + "ParentTabsView.java", [("""    void moveToNewTab(Tab tab) {
 
     /**
      * As {@link #moveToNewTab(Tab)}, the new tab at {@code index} of the strip (its end past it): a pane dropped on a
-     * new-tab place of the strip (tabs and panes spec 7).
+     * new-tab place of the strip (tabs and panes spec 7), held as that one is (workspace plan 8c Rulings 17).
      */
     void moveToNewTab(Tab tab, int index) {
         WorkspaceView from = holding(tab).orElse(null);
         if (closed || from == null || from.tabCount() < 2) return;
-        from.remove(tab);
-        openParentTab(tab, ParentTabId.random(), index);
+        Layout before = from.model();
+        ParentTabs strip = model;
+        ParentTabId id = ParentTabId.random();
+        owner.held(() -> {
+            try {
+                from.remove(tab);
+                openParentTab(tab, id, index);
+            } catch (RuntimeException | Error failure) {
+                // A new tab that stood when the failure came goes again before its item goes back.
+                WorkspaceView opened = views.remove(id);
+                if (opened != null) {
+                    model = strip;
+                    try {
+                        super.remove(opened);
+                        opened.close();
+                        reveal(active());
+                    } catch (RuntimeException | Error undone) {
+                        failure.addSuppressed(undone);
+                    }
+                }
+                undo(failure, tab, from, before, null, null);
+                throw failure;
+            }
+        });
     }
 """, 1)])
 edit(S + "WindowContent.java", [
@@ -2911,7 +3397,8 @@ which shows and takes its place at once; the main window's empty
 workspace takes one anywhere over it. In its own window the only pane
 of its tab takes no new tab. Into another window the move goes through
 the window manager and the tab registry, one TAB_MOVED. Move Pane to
-New Tab keeps its open motion.
+New Tab keeps its open motion. Within its window the move is announced
+once, where it lands, and a pane the new tab fails to take goes back.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -3001,25 +3488,30 @@ mouse event alone, so a terminal neither reports nor selects, and a text view's 
 drops beside another pane of any window's shown tab, on the side whose edge is nearest (`WorkspaceDropResolver`, now
 `Area(group, bounds)` and `Drop(group, side)`; `Drop.Strip` and `Drop.Centre` are gone), the landing showing that half;
 over the middle half of a tab's entry it shows that tab at once, and the tabs a drag showed show again when it ends
-elsewhere; on a new-tab place (`TabStrip.newTabPlace`: an entry's outer quarter in either look, the classic tabs' "+" and
-the room after them) it becomes a new tab there, at once; the main window's empty workspace takes one anywhere over it.
-Within its window a move is a layout change (`ParentTabsView.moveBeside`, `moveToNewTab(Tab, int)`), with no
-`TAB_MOVED`; into another window it goes through `WindowManager.movePane` and `movePaneToNewTab` and the tab registry,
-one `TAB_MOVED`, the session kept, a full window it empties closing after the move. Outside every window nothing
-happens; a pinned item's drag never starts. Rulings (plan, "Rulings"): (1) the modifier is exactly Cmd+Option (either
-Option key) or Ctrl+Alt, with the left button; (2) a pane's gesture is the drag's from its press to its release, a new
-left press ending one whose release went elsewhere, and the terminal view leaves a consumed event alone; (3) an entry's
-outer quarters are new-tab places in either look, and the classic tabs' "+" and the room after them the strip's end;
-(4) hovering an entry's middle half shows its tab at once, its item focused only in the drag's own window; (5) the tabs
-a drag showed show again when it ends, but in the drop's window; (6) a pane drops on the nearest side, with no centre;
-(7) where it already is means its own pane and its own tab's entry's middle half; (8) in its own window a tab's only
-pane takes no new tab at any place; (9) Move Pane to New Tab, a command, keeps the strip's open motion, and a tab a pane
-drop makes lands at once; (10) the main window's empty workspace takes a pane anywhere over it; (11) a pinned item's
-drag never starts; (12) moves within a window skip the registry, moves between windows go through the window manager
-and the registry; (13) the resolver keeps the pane drag's shape; (14) a modifier press makes its pane the active one;
-(15) no action is added; (16) a text view's text drag sits out the gesture. Spec issues: (1) the equal tabs have no
-empty end and no "+"; ruled by the controller: an entry's outer quarters are new-tab places in either look. Deviations:
-<none, or each with its cause>. `./gradlew check --continue`: **<counts>**.
+elsewhere; on a new-tab place (`TabStrip.newTabPlace`: an entry's outer quarter in either look, the classic tabs' "+"
+and the room after them) it becomes a new tab there, at once; the main window's empty workspace takes one anywhere over
+it. Within its window a move is a layout change (`ParentTabsView.moveBeside`, `moveToNewTab(Tab, int)`), with no
+`TAB_MOVED`; between its tabs it is announced once, where it lands, in one terminal-registry change, and a pane that
+fails to land goes back (`WindowContent.held`, `WorkspaceView.restore`), Move Pane to New Tab's included; into another
+window it goes through `WindowManager.movePane` and `movePaneToNewTab` and the tab registry, one `TAB_MOVED`, the
+session kept, a full window it empties closing after the move. Outside every window nothing happens; a pinned item's
+drag never starts. Rulings (plan, "Rulings"): (1) the modifier is exactly Cmd+Option (either Option key) or Ctrl+Alt,
+with the left button; (2) a pane's gesture is the drag's from its press to its release, a new left press ending one
+whose release went elsewhere, and the terminal view leaves a consumed event alone; (3) an entry's outer quarters are
+new-tab places in either look, and the classic tabs' "+" and the room after them the strip's end; (4) hovering an
+entry's middle half shows its tab at once, its item focused only in the drag's own window; (5) the tabs a drag showed
+show again when it ends, but in the drop's window; (6) a pane drops on the nearest side, with no centre; (7) where it
+already is means its own pane and its own tab's entry's middle half; (8) in its own window a tab's only pane takes no
+new tab at any place; (9) Move Pane to New Tab, a command, keeps the strip's open motion, and a tab a pane drop makes
+lands at once; (10) the main window's empty workspace takes a pane anywhere over it; (11) a pinned item's drag never
+starts; (12) moves within a window skip the registry, moves between windows go through the window manager and the
+registry; (13) the resolver keeps the pane drag's shape; (14) a modifier press makes its pane the active one; (15) no
+action is added; (16) a text view's text drag sits out the gesture; (17) a pane moving between tabs of its window is
+announced once, where it lands, and goes back if its landing fails. Spec issues: (1) the equal tabs have no empty end
+and no "+"; ruled by the controller: an entry's outer quarters are new-tab places in either look. Deviations: (1)
+amendment 1, from plan 8b's final review (I2, left for this plan): plan 8b's Move Pane to New Tab announced its old
+tab's next pane on the way; Task 2 holds it with the pane drops, so its case comes before Task 3; <any other, each with
+its cause>. `./gradlew check --continue`: **<counts>**.
 GUI checks for the user:
 - Cmd+Option-drag (Ctrl+Alt on Linux and Windows) a terminal pane onto another pane of its tab, then of another window:
   it splits beside that pane on the side nearest the cursor, the landing showing where, and the shell keeps running;
@@ -3037,6 +3529,8 @@ GUI checks for the user:
 - a drop on any entry's outer quarter, in either look, or on the "+" or the room after the tabs under Enterprise, makes
   a new tab at that place, with no slide, the bar marking it first; a tab's only pane does nothing there in its own
   window; Move Pane to New Tab still opens its tab with the strip's motion;
+- after Move Pane to New Tab, or a drop beside a pane of another tab, typing at once goes to the moved pane, and the
+  pane its old tab shows next never takes the focus on the way;
 - a full window's last pane dragged into the main window closes the full window; the main window's last pane dragged
   away leaves its empty workspace, which takes a pane dropped anywhere over it;
 - outside every window nothing happens and no window opens; on Linux, a desktop that takes Ctrl+Alt-drag for itself
@@ -3117,8 +3611,16 @@ Checked against the spec, the review's findings and the controller's rulings wit
   `movePaneToNewTab(Tab, int)` and `WindowManager.movePane(WindowContent, Tab, WindowContent, GroupId, Side)`,
   `movePaneToNewTab(WindowContent, Tab, WindowContent, int)` are what `drop` calls, the latter over
   `WindowContent.receiveAsTab(Tab, int)`; `TabStrip.newTabPlace(Point)` and `ParentTabBar.atOnce(Runnable)` (Task 3)
-  are what `onPanes` and `movePaneToNewTab` call; `TabDragTestSupport.PANE`, `mouse(Component, int, Point, int)`,
-  `inPane`, `startPane`, `dropPane` (Task 1) are what every pane test uses.
+  are what `onPanes` and `movePaneToNewTab` call; `WindowContent.held(Runnable)`, `WorkspaceView.restore(Tab, Layout)`
+  and `ParentTabsView`'s `undo`, `drop` and `discard` (Task 2) are what plan 8b's `moveToNewTab(Tab)`, `moveBeside` and Task 3's
+  `moveToNewTab(Tab, int)` call; `TabDragTestSupport.PANE`, `mouse(Component, int, Point, int)`, `inPane`,
+  `startPane`, `dropPane` (Task 1) are what every pane test uses, and `PaneDragTest.shellBesideC` and `announced` (Task
+  2) what the announcement cases use.
+- **Amendment 1.** Every move between tabs of one window runs held: plan 8b's `moveToNewTab(Tab)` and `moveBeside`'s
+  cross-tab branch from Task 2, and `moveToNewTab(Tab, int)` from Task 3, to which plan 8b's then delegates; a move
+  within one tab is one layout change already. Each has its RED: the command's and the beside drop's in Task 2, the
+  new-tab drop's in Task 3, and the rollback's for both kinds in Task 2. Moves between windows go through the tab
+  registry and are not held.
 - **Field initializers.** The one new lambda in a field initializer, `paneClicks`'s, reads `macOs()`, `tabDrag()` and
   `dockDrag()`, methods run after the constructor; `TabDrag.gestureEvents` is a method reference; `hovered` and
   `textDrag` read nothing (Verified facts 11).
