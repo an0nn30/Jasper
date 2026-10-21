@@ -10,13 +10,17 @@ import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.Side;
+import java.awt.AWTEvent;
 import java.awt.Color;
+import java.awt.Point;
+import java.awt.Toolkit;
 import java.awt.event.FocusEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -171,6 +175,95 @@ class PaneDimTest {
             assertThat(owner.selectedTab()).as("the pressed pane's item").isSameAs(view);
             assertThat(pane.dim()).as("its pane is the active one").isZero();
             assertThat(dim(terminal)).isEqualTo(DIM);
+        });
+    }
+
+    /** A window's terminal and, split to its right, a plugin's view with no listeners, laid out, the terminal active. */
+    private record Plugged(Tab terminal, Tab view, JPanel panel, GroupView pane) {
+        /** The middle of the view, in its pane's coordinates. */
+        Point overView() { return SwingUtilities.convertPoint(panel, panel.getWidth() / 2, panel.getHeight() / 2, pane); }
+    }
+
+    private static Plugged plugged(WindowContent owner) {
+        var model = new Contributions();
+        owner.connectContributions(model);
+        Tab terminal = owner.selectedTab();
+        var panel = new JPanel();
+        Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", owner.id(), panel, TabRegistry.Placement.SPLIT_RIGHT);
+        GroupView pane = owner.workspace().groupView(view.group().orElseThrow());
+        owner.selectTab(terminal);
+        owner.setSize(1000, 700);
+        WindowTabsTest.layoutTree(owner);
+        assertThat(panel.getWidth()).as("the view is laid out").isPositive();
+        assertThat(pane.dim()).as("the inactive pane").isEqualTo(DIM);
+        return new Plugged(terminal, view, panel, pane);
+    }
+
+    /** A press of {@code button} on {@code source} at {@code at}. */
+    private static MouseEvent press(java.awt.Component source, Point at, int button) {
+        int modifiers = button == MouseEvent.BUTTON1 ? InputEvent.BUTTON1_DOWN_MASK : InputEvent.BUTTON3_DOWN_MASK;
+        return new MouseEvent(source, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), modifiers, at.x, at.y, 1,
+            button == MouseEvent.BUTTON3, button);
+    }
+
+    /** The listeners for every mouse event on the toolkit. */
+    private static int mouseListeners() {
+        return Toolkit.getDefaultToolkit().getAWTEventListeners(AWTEvent.MOUSE_EVENT_MASK).length;
+    }
+
+    /**
+     * A press on a view's bare area: in a window AWT hands it to the deepest component with mouse listeners, or else to
+     * the frame, so it comes from an ancestor of the view; where it lands still finds the pane.
+     */
+    @Test void aPressOverAViewFromAnAncestorMakesItsPaneActive() throws Exception {
+        var owner = window(false);
+        edt(() -> {
+            var plugged = plugged(owner);
+            GroupView pane = plugged.pane();
+            assertThat(owner.tabHolding(pane)).as("the press's source holds no item").isNull();
+            pane.dispatchEvent(press(pane, plugged.overView(), MouseEvent.BUTTON1));
+            assertThat(owner.selectedTab()).as("the item under the press").isSameAs(plugged.view());
+            assertThat(pane.dim()).as("its pane is the active one").isZero();
+            assertThat(dim(plugged.terminal())).isEqualTo(DIM);
+        });
+    }
+
+    /** Only a left press makes a pane active: a right press leaves the active pane as it was. */
+    @Test void aRightPressOverAnInactivePaneSelectsNothing() throws Exception {
+        var owner = window(false);
+        edt(() -> {
+            var plugged = plugged(owner);
+            plugged.pane().dispatchEvent(press(plugged.pane(), plugged.overView(), MouseEvent.BUTTON3));
+            assertThat(owner.selectedTab()).as("the active pane's item").isSameAs(plugged.terminal());
+            assertThat(plugged.pane().dim()).as("still the inactive pane").isEqualTo(DIM);
+        });
+    }
+
+    /** Every window hears every press; only the window holding the place it lands on acts. */
+    @Test void aPressInAnotherWindowsViewSelectsNothingInThisWindow() throws Exception {
+        var owner = window(false);
+        var other = window(false);
+        edt(() -> {
+            var here = plugged(owner);
+            var there = plugged(other);
+            there.pane().dispatchEvent(press(there.pane(), there.overView(), MouseEvent.BUTTON1));
+            assertThat(other.selectedTab()).as("the other window's pressed pane").isSameAs(there.view());
+            assertThat(owner.selectedTab()).as("this window's active pane").isSameAs(here.terminal());
+            assertThat(here.pane().dim()).as("this window's inactive pane").isEqualTo(DIM);
+        });
+    }
+
+    /** Swing's look and feel adds a mouse listener of its own the first time a window is built, and keeps it. */
+    @Test void aClosedWindowLeavesNoMouseListenerOnTheToolkit() throws Exception {
+        var first = window(false);
+        edt(first::close);
+        int[] before = new int[1];
+        edt(() -> before[0] = mouseListeners());
+        var owner = window(false);
+        edt(() -> {
+            assertThat(mouseListeners()).as("the window's press listener").isGreaterThan(before[0]);
+            owner.close();
+            assertThat(mouseListeners()).as("the count before the window was built").isEqualTo(before[0]);
         });
     }
 

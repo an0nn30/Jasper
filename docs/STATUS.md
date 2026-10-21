@@ -1,77 +1,83 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 8a: tabs hold panes — 2026-10-20** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `4f2884089..a49e33f69`, then this documentation commit;
+`.claude/worktrees/workspace-tabs`, `c1540b4e9..a49e33f69`, then the documentation commit and its final-review fix wave;
 [plan](superpowers/plans/2026-10-20-workspace-8a-tabs-hold-panes.md),
-[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). Jasper has two levels: a window holds tabs, and
-a tab holds panes split in any direction, each holding one item (a terminal, an editor file or a plugin's view). The
-code keeps its names: a `ParentTab` is a tab, a `Group` a pane holding at most one tab, the contributions' `Tab` an
-item. Each window has one strip, the parent-tab bar (`ParentTabBar`, which takes in `StripSource`), shown from two tabs
-under the equal tabs and always under Enterprise (`WorkspaceChrome.showsTabStrip`); no pane has a strip, and the
-equal tabs open and close with the motion the pane strips had, an entry keeping its place while its tab shows another
-pane and a dragged or moved tab landing at once. Whatever opens without a pane opens as a new tab (`WindowContent.attach`; New Tab,
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). Jasper has two levels: a window holds tabs, and a
+tab holds panes split in any direction, each holding one item (a terminal, an editor file or a plugin's view). The code
+keeps its names: a `ParentTab` is a tab, a `Group` a pane holding at most one tab, the contributions' `Tab` an item.
+Each window has one strip, the parent-tab bar (`ParentTabBar`, which takes in `StripSource`), shown from two tabs under
+the equal tabs and always under Enterprise (`WorkspaceChrome.showsTabStrip`); no pane has a strip, and the equal tabs
+open and close with the motion the pane strips had, an entry keeping its place while its tab shows another pane and a
+dragged or moved tab landing at once. Whatever opens without a pane opens as a new tab (`WindowContent.attach`; New Tab,
 `newTab(Path)`, the registry's `NEW_TAB` placement, which the SDK's `TabPlacement.ACTIVE_GROUP` maps to, its moves and
 Move to Main Window), the main window's empty workspace taking it in its place. Pane windows (`Origin`, `PaneLayout`,
 `WindowLayout`, the `pane` role of `workspace.toml`), Pop Out Tab, Pop Out Pane, Bring Back, New Tab in Pane and the
 item drag are gone; the tab drag and Move Tab to New Window (`WindowManager.moveTabToNewWindow`, from two tabs) stay,
 and `ContentTab.moveToNewWindow()` opens a full window holding the item in a tab of its own. The keys follow the spec's
-table: Close Pane ⌘W / Ctrl+Shift+W, Close Tab ⌥⌘W / Ctrl+Alt+Shift+W, Next and Previous Tab ⌘⇧] ⌘⇧[ /
-Ctrl+PageDown Ctrl+PageUp, Select Tab 1-9 ⌘1-9 / Ctrl+1-9, Ctrl+Tab free. While a tab holds two or more panes every
-pane but the active one dims by `terminal.dim_inactive_panes` (a terminal through today's rule, unchanged, any other
-item under `GroupView.dim`'s overlay), and an inactive window dims every terminal, as before. The controller's rulings
-of 2026-10-20, which spec 5 records since `2d7233474`, kept the strip's motion and the inactive window's dimming. The
-user's decision of 2026-10-20 (the
-spec's decision 3: Enterprise always shows the strip, one tab too) supersedes the "Enterprise: one row of tabs" entry
-below, which is history and is not edited. Rulings (plan, "Rulings"): (1) the code names stay, their Javadoc saying
-tab, pane and item; (2) a group holds at most one tab, and a saved group listing two is a bad entry, its parent tab
-dropped alone; (3) whatever opens without a pane opens as a new tab, the main window's empty workspace taking it in its
-place; (4) the SDK's names stay and its Javadoc follows the app, the testkit and the contract cases keeping their model
-for plan 8b; (5) pane windows go whole; (6) `ContentTab.moveToNewWindow()` opens a full window holding the item, and
-Move Tab to New Window, like the tear-out, needs two tabs in its window; (7) the ⋮ menu lists Move Tab to New Window in
-every window and Move to Main Window in a full window, each enabled while its action is; (8) a strip entry's menu reads
-Rename Tab, Move Tab to New Window, Close Tab, then the shown item's commands, Move to Main Window staying in the ⋮
-and the context menu; (9) `ParentTabBar`
-takes in `StripSource`; (10) the strip shows from two tabs under the equal tabs and always under the classic tabs;
-(11) the classic strip's "+" is New Tab and the equal tabs have none; (12) a pane dims while its tab holds two or more
-panes and it is not the active one, by `terminal.dim_inactive_panes`; (13) an inactive window keeps dimming its
-terminals, as today, with the focused-pane dim on top; (14)
-the defaults of spec 10, Ctrl+Tab and Ctrl+Shift+Tab free; (15) Close Pane closes the focused pane's item after its
-guard, Close Tab the shown tab as one gesture after its guards; (16) Next and Previous Tab run before the focus owner's
-own bindings; (17) the File, Tab and context menus read as spec 10 names them; (18) the item drag goes whole; (19)
-plan 7c's hidden-strip band and empty-workspace landing stand; (20) the window's strip keeps the open and close
-motion where the look has it, an entry kept by its tab, a move, a reorder and a drag landing at once; (21) a left
-press on a pane's item makes its pane the active one, a view that takes no focus too. Spec issues,
-both ruled by the controller as the plan reads them: (1) spec 6 reads two ways on a window's only tab and Move Tab to
-New Window, and Move Tab to New Window needs two tabs in its window; (2) spec 15 puts a dimming setting out of scope,
-and `terminal.dim_inactive_panes` stays as the amount. Deviations: (1) Task 1: two `TabDragTest` pins for a press whose
-item closes, or whose entry shows another pane, before the threshold; each also asserts the drag label never showed a
-title, since the review's assertions alone passed with the guard removed. (2) Task 2: `MoveTabsTest` pins that a tab
-moved to a new window, or back to the main window, takes the focus there (the deleted `BringBackTest` held the only such
-pin); `WorkspaceFileReadTest` reads a legacy `role = "pane"` window and drops it alone. (3) Task 3:
+table: Close Pane ⌘W / Ctrl+Shift+W, Close Tab ⌥⌘W / Ctrl+Alt+Shift+W, Next and Previous Tab ⌘⇧] ⌘⇧[ / Ctrl+PageDown
+Ctrl+PageUp, Select Tab 1-9 ⌘1-9 / Ctrl+1-9, Ctrl+Tab free. While a tab holds two or more panes every pane but the
+active one dims by `terminal.dim_inactive_panes` (a terminal through today's rule, unchanged, any other item under
+`GroupView.dim`'s overlay), and an inactive window dims every terminal, as before. The controller's rulings of
+2026-10-20, which spec 5 records since `2d7233474`, kept the strip's motion and the inactive window's dimming. The
+user's decision of 2026-10-20 (the spec's decision 3: Enterprise always shows the strip, one tab too) supersedes the
+"Enterprise: one row of tabs" entry below, which is history and is not edited. Rulings (plan, "Rulings"): (1) the code
+names stay, their Javadoc saying tab, pane and item; (2) a group holds at most one tab, and a saved group listing two is
+a bad entry, its parent tab dropped alone; (3) whatever opens without a pane opens as a new tab, the main window's empty
+workspace taking it in its place; (4) the SDK's names stay and its Javadoc follows the app, the testkit and the contract
+cases keeping their model for plan 8b; (5) pane windows go whole; (6) `ContentTab.moveToNewWindow()` opens a full window
+holding the item, and Move Tab to New Window, like the tear-out, needs two tabs in its window; (7) the ⋮ menu lists Move
+Tab to New Window in every window and Move to Main Window in a full window, each enabled while its action is; (8) a
+strip entry's menu reads Rename Tab, Move Tab to New Window, Close Tab, then the shown item's commands, Move to Main
+Window staying in the ⋮ and the context menu; (9) `ParentTabBar` takes in `StripSource`; (10) the strip shows from two
+tabs under the equal tabs and always under the classic tabs; (11) the classic strip's "+" is New Tab and the equal tabs
+have none; (12) a pane dims while its tab holds two or more panes and it is not the active one, by
+`terminal.dim_inactive_panes`; (13) an inactive window keeps dimming its terminals, as today, with the focused-pane dim
+on top; (14) the defaults of spec 10, Ctrl+Tab and Ctrl+Shift+Tab free; (15) Close Pane closes the focused pane's item
+after its guard, Close Tab the shown tab as one gesture after its guards; (16) Next and Previous Tab run before the
+focus owner's own bindings; (17) the File, Tab and context menus read as spec 10 names them; (18) the item drag goes
+whole; (19) plan 7c's hidden-strip band and empty-workspace landing stand; (20) the window's strip keeps the open and
+close motion where the look has it, an entry kept by its tab, a move, a reorder and a drag landing at once; (21) a left
+press on a pane's item makes its pane the active one, a view that takes no focus too. Spec issues, both ruled by the
+controller as the plan reads them: (1) spec 6 reads two ways on a window's only tab and Move Tab to New Window, and Move
+Tab to New Window needs two tabs in its window; (2) spec 15 puts a dimming setting out of scope, and
+`terminal.dim_inactive_panes` stays as the amount. Deviations: (1) Task 1: two `TabDragTest` pins for a press whose item
+closes, or whose entry shows another pane, before the threshold; each also asserts the drag label never showed a title,
+since the review's assertions alone passed with the guard removed. (2) Task 2: `MoveTabsTest` pins that a tab moved to a
+new window, or back to the main window, takes the focus there (the deleted `BringBackTest` held the only such pin);
+`WorkspaceFileReadTest` reads a legacy `role = "pane"` window and drops it alone. (3) Task 3:
 `ClassicTabsTest.thePlusAndTheCloseActLikeButtons` keeps its strip after the "+" (which now opens a tab). (4) Task 4:
 `ClassicTabsTest` expects the window strip's "Close Tab"; a controller-ruled pin,
 `TabDragTest.aPressOnAnEntrysCloseStartsNoTabDrag`; and `WindowContent.selectTab` selects an item in a hidden tab before
 its tab shows, so no other item of that tab turns active on the way (no stray `onActive` or SDK `TAB_SELECTED`), pinned
-by `WorkspaceTabsTest` and `ParentTabsViewTest.selectingAnItemOfAHiddenTabPublishesOneTabSelectedForIt`.
-Left for plans 8b and 8c: the SDK's `TabPlacement.ACTIVE_GROUP` and the testkit's one-level model (8b), ⌥⌘T and
-Ctrl+Alt+Shift+T free for Move Pane to New Tab (8b), and the tab drag's machinery with `WorkspaceDropResolver`'s
-areas, drops and edges for the pane drag (8c). Plan 6a's re-plan follows plans 8a-8c. `./gradlew check --continue`: **12,022 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user:
-- Cmd+T opens a tab in the window's strip, in both looks; the standard look shows the strip from two tabs, Enterprise
-  always, its "+" opening a tab; no pane shows a strip, and a split tab shows one entry;
+by `WorkspaceTabsTest` and `ParentTabsViewTest.selectingAnItemOfAHiddenTabPublishesOneTabSelectedForIt`. (5)
+final-review fix wave: `paneClicks` finds the pane by the press's location, so a press on a view's bare area activates
+its pane; listener registration after `addHost`; pins for Move Tab to New Window from a full window, Close Pane and
+Close Tab at the edges, a split tab arriving settled, and `paneClicks`'s right press, other window and listener
+baseline. Known: `ClassicTabs.refresh` rebuilds every entry when a split tab's active pane changes (a hover or tooltip
+flicker in Enterprise); `WindowTabs` re-keys instead. Left for plans 8b and 8c: the SDK's `TabPlacement.ACTIVE_GROUP`
+and the testkit's one-level model (8b), ⌥⌘T and Ctrl+Alt+Shift+T free for Move Pane to New Tab (8b), and the tab drag's
+machinery with `WorkspaceDropResolver`'s areas, drops and edges for the pane drag (8c). Plan 6a's re-plan follows plans
+8a-8c. `./gradlew check --continue`: **12,032 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user:
+- Cmd+T opens a tab in the window's strip, in both looks, the Enterprise look with Enterprise enabled (Settings ›
+  Plugins, then restart); the standard look shows the strip from two tabs, Enterprise always, its "+" opening a tab; no
+  pane shows a strip, and a split tab shows one entry;
 - in the standard look a third tab opens and a tab closes with the strip's quick eased settle; a split, a click into
   another pane and closing a pane leave the entries in place; with Enable animations off nothing moves;
 - a tab of two panes: the inactive pane dims and the focused one is clear; a click into the other pane, Cmd+Option+arrow
-  and a tab switch move the dim at once; an Editor file as the inactive pane dims too, and a click on it makes its pane
-  the active one; a tab of one pane is clear; a window in the background dims its terminals, as before;
+  and a tab switch move the dim at once; an Editor file as the inactive pane (open a file, then Cmd+D) dims too, and a
+  click on it makes its pane the active one; a tab of one pane is clear; a window in the background dims its terminals,
+  as before;
+- a click on the blank background of a plugin view in an inactive pane makes that pane active, and Cmd+W then closes it;
 - Cmd+W closes the focused pane (an Editor file with unsaved edits asks first) and the tab with its last pane;
   Cmd+Option+W closes the whole tab after its guards; Cmd+Shift+] / [ and Cmd+1-9 switch tabs; on Linux and Windows
-  Ctrl+PageDown and Ctrl+PageUp do, and Ctrl+Tab reaches the terminal;
+  Ctrl+PageDown and Ctrl+PageUp do, and Ctrl+Tab reaches the terminal (try `cat -v`);
 - the ⋮ menu with two tabs: Move Tab to New Window opens a full window holding the tab with its panes, every shell
   running; with one tab it is disabled; a full window's Move to Main Window joins its tabs to the main window's strip,
   and a strip entry's menu has no Move to Main Window;
-- a tab dragged along the strip, onto another window's strip, onto the top band of a window with one tab, over the
-  main window's empty workspace and out of every window, landing at once with no slide; dragged over a pane it lands
-  nothing, and a press on a pane starts no drag;
+- a tab dragged along the strip, onto another window's strip, onto the top band of a window with one tab, over the main
+  window's empty workspace and out of every window, landing at once with no slide; dragged over a pane it lands nothing,
+  and a press on a pane starts no drag;
 - an Editor file opened from Open File… and a `jasper` CLI request open as new tabs, the main window's empty workspace
   taking the first.
 

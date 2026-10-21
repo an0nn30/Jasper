@@ -97,6 +97,50 @@ class TabCommandsTest {
         });
     }
 
+    /** Spec 4: either command closes the main window's only item and leaves its empty workspace, where neither acts. */
+    @Test void closePaneAndCloseTabOnTheMainWindowsOnlyItemLeaveItsEmptyWorkspace() throws Exception {
+        for (ActionId close : List.of(ActionId.CLOSE_PANE, ActionId.CLOSE_TAB)) edt(() -> {
+            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> { });
+            Tab only = main.selectedTab();
+            main.invoke(close);
+            assertThat(only.closed()).as("%s closes the only item", close).isTrue();
+            assertThat(main.workspace().emptyWorkspace()).as("its empty workspace shows").isNotNull();
+            assertThat(main.parentTabCount()).as("in one tab").isEqualTo(1);
+            assertThat(main.tabCount()).isZero();
+            main.updateActions();
+            assertThat(main.action(ActionId.CLOSE_PANE).isEnabled()).as("Close Pane").isFalse();
+            assertThat(main.action(ActionId.CLOSE_TAB).isEnabled()).as("Close Tab").isFalse();
+        });
+    }
+
+    /** Spec 4: Close Tab on a full window's last tab empties it, and its emptied handler closes it. */
+    @Test void closeTabOnAFullWindowsLastTabClosesTheWindow() throws Exception {
+        edt(() -> {
+            int[] emptied = {0};
+            var full = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> emptied[0]++);
+            full.invoke(ActionId.SPLIT_RIGHT);
+            var doomed = List.copyOf(full.tabs());
+            full.invoke(ActionId.CLOSE_TAB);
+            assertThat(doomed).hasSize(2).allMatch(Tab::closed);
+            assertThat(emptied[0]).as("the window's emptied handler, once").isEqualTo(1);
+        });
+    }
+
+    /** Close Tab shows the tab used before it, and its active item has the focus. */
+    @Test void closeTabGivesTheNextTabsItemTheFocus() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(pending));
+            Tab next = owner.selectedTab();
+            owner.invoke(ActionId.NEW_TAB);
+            int[] focused = {0};
+            next.focusTarget(() -> focused[0]++);
+            owner.invoke(ActionId.CLOSE_TAB);
+            assertThat(owner.parentTabCount()).isEqualTo(1);
+            assertThat(owner.selectedTab()).as("the tab used before it, shown").isSameAs(next);
+            assertThat(focused[0]).as("its item has the focus").isPositive();
+        });
+    }
+
     /** Rulings 15: Close Pane on a plugin's item closes it after its guard, and a refusal keeps it. */
     @Test void closePaneOnAPluginsItemClosesItAfterItsGuard() throws Exception {
         edt(() -> {

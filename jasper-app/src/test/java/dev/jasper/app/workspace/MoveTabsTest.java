@@ -84,6 +84,37 @@ class MoveTabsTest {
         windows.launch();
     }
 
+    /** Spec 6: a full window's tab moves whole to a new full window too, and its window keeps its other tab. */
+    @Test void moveTabToNewWindowFromAFullWindowLeavesItsOtherTab() throws Exception {
+        ChildWindow[] full = new ChildWindow[1];
+        edt(() -> { full[0] = windows.manager.openTerminalWindow(null).orElseThrow(); full[0].content().split(Side.RIGHT); });
+        windows.launch();
+        edt(() -> {
+            var content = full[0].content();
+            ParentTabId first = content.activeParentTab();
+            content.workspace().resizeSplit(List.of(), List.of(0.3, 0.7));
+            Layout before = content.workspace().model();
+            List<Tab> moving = content.tabs();
+            Tab active = content.selectedTab();
+            content.newTab(HOME);
+            ParentTabId second = content.activeParentTab();
+            int[] focused = {0};
+            active.focusTarget(() -> focused[0]++);
+            windows.facts.clear();
+            ChildWindow next = windows.manager.moveTabToNewWindow(content, first).orElseThrow();
+            assertThat(next).isNotSameAs(full[0]);
+            assertThat(full[0].closed()).as("the full window it left stays open").isFalse();
+            assertThat(content.parentTabCount()).as("with its other tab").isEqualTo(1);
+            assertThat(content.activeParentTab()).isEqualTo(second);
+            assertThat(next.content().windowLayout()).as("the tab whole, with its layout")
+                .isEqualTo(ParentTabs.of(new ParentTab(first, before)));
+            assertThat(next.content().selectedTab()).as("the tab's active item, shown").isSameAs(active);
+            assertThat(focused[0]).as("the item has the focus in its new window").isPositive();
+            assertThat(windows.tabFacts()).isEqualTo(moved(moving, full[0].id(), next.id()));
+        });
+        windows.launch();
+    }
+
     /** Spec 6 and workspace plan 7b Rulings 12: a full window's tabs join the main window's strip after its shown one. */
     @Test void moveToMainWindowJoinsTheTabsAfterTheShownOne() throws Exception {
         edt(() -> {
@@ -163,6 +194,35 @@ class MoveTabsTest {
             assertThat(windows.manager.moveParentTab(content, first, content, 0)).isFalse();
             assertThat(windows.tabFacts()).isEmpty();
             assertThat(content.parentTabCount()).isEqualTo(2);
+        });
+        windows.launch();
+    }
+
+    /**
+     * Spec 5 and workspace plan 8a Rulings 20: a split tab moving whole onto a window whose strip shows takes its place at
+     * once, though the strip is laid out and its motion on; a new tab there still opens with the motion.
+     */
+    @Test void aSplitTabArrivingInAShownStripTakesItsPlaceAtOnce() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            ParentTabId first = content.activeParentTab();
+            content.split(Side.RIGHT);
+            content.newTab(HOME);
+            var target = windows.manager.openTerminalWindow(null).orElseThrow().content();
+            target.newTab(HOME);
+            target.setSize(1000, 700);
+            WindowTabsTest.layoutTree(target);
+            var strip = target.windowTabs();
+            assertThat(target.animations().enabled() && target.lookAnimates()).as("the motion is on").isTrue();
+            assertThat(strip.isVisible()).as("two tabs: the strip shows").isTrue();
+            assertThat(strip.getWidth()).as("and is laid out").isPositive();
+            assertThat(strip.motionRunning()).isFalse();
+            assertThat(windows.manager.moveParentTab(content, first, target, 2)).isTrue();
+            assertThat(target.parentTabCount()).isEqualTo(3);
+            assertThat(target.parentTabs().view(first).orElseThrow().tabs()).as("the tab whole").hasSize(2);
+            assertThat(strip.motionRunning()).as("a tab that arrives by a move").isFalse();
+            target.newTab(HOME);
+            assertThat(strip.motionRunning()).as("a new tab opens with the motion").isTrue();
         });
         windows.launch();
     }

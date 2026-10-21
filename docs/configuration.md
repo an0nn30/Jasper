@@ -503,7 +503,7 @@ The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see
 
 ### Live settings and temporary choices
 
-Live changes reach existing windows and terminals, including hidden tabs, groups hidden behind a maximized group and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
+Live changes reach existing windows and terminals, including hidden tabs, panes hidden behind a maximized pane and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
 View menu choices save: Toolbar and Status Bar write `window.toolbar` and `window.status_bar` to `config.toml`, and the main window follows. Choose themes in Settings › Appearance and tab, rail, toolbar and status bar sizes in Settings › Window. The command palette’s Window Settings… command opens the Window page. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and the command palette’s Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
@@ -577,7 +577,7 @@ Environment entries overlay the inherited child environment and the variables pl
 - `"close_on_success"` closes the pane only after a normal exit with code 0. Nonzero or abnormal exits retain the output.
 - `"close"` closes the pane after any process exit, including nonzero or abnormal exits.
 
-Only the exited pane's tab closes; a child window closes with its final tab, and the main window stays open with an empty workspace. Other tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and close the failed tab. A tab that runs a program, such as the [default editor](editor.md#default-editor) or one a plugin opens with `LocalSpec.command`, closes after a code 0 exit and keeps its output otherwise, whatever this setting says.
+Only the exited pane closes; its tab closes with its last pane; a child window closes with its final tab, and the main window stays open with an empty workspace. Other tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and close the failed tab. A tab that runs a program, such as the [default editor](editor.md#default-editor) or one a plugin opens with `LocalSpec.command`, closes after a code 0 exit and keeps its output otherwise, whatever this setting says.
 
 To opt into closing successful exits, add or edit this setting in the existing `[terminal]` table:
 

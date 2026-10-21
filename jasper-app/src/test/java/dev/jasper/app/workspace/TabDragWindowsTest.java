@@ -373,6 +373,33 @@ class TabDragWindowsTest {
         });
     }
 
+    /** Tabs and panes spec 6: a tab dragged out of a full window of two tabs becomes a full window; its own keeps the other. */
+    @Test void aTabDraggedOutOfAFullWindowOfTwoTabsBecomesAFullWindow() throws Exception {
+        ParentTabId[] id = new ParentTabId[1];
+        edt(() -> id[0] = secondTab(child));
+        launch();
+        edt(() -> {
+            WindowContent from = child.content();
+            ParentTabId stays = tabIds(from).getFirst();
+            Layout layout = from.parentTabs().view(id[0]).orElseThrow().model();
+            Tab moving = entryOf(from, id[0]);
+            Object session = session(moving);
+            Point outside = new Point(2600, 900);
+            facts.clear();
+            Component source = start(from, moving, outside);
+            assertThat(manager.tabDrag().target()).as("out of every window").containsInstanceOf(TabDrag.Target.TearOut.class);
+            mouse(source, MouseEvent.MOUSE_RELEASED, outside);
+            ChildWindow full = manager.children().getLast();
+            assertThat(full).isNotSameAs(child);
+            assertThat(child.closed()).as("the full window it left stays open").isFalse();
+            assertThat(tabIds(from)).as("with its other tab").containsExactly(stays);
+            assertThat(full.content().parentTabs().model()).as("a full window, the tab whole").isEqualTo(ParentTabs.of(new ParentTab(id[0], layout)));
+            assertThat(cursors).as("on the display under the cursor").containsExactly(outside);
+            assertThat(session(moving)).isSameAs(session);
+            assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(moving.id().value(), child.id(), full.id()));
+        });
+    }
+
     /**
      * Workspace plan 7c Rulings 7: no standard look shows a strip over a window's only tab, so none can be dragged; the
      * window manager still moves it, as Move to Main Window does, onto another window's strip, never out to a window of

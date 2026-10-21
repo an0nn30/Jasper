@@ -76,7 +76,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final AWTEventListener paneClicks = event -> {
         if (event.getID() != MouseEvent.MOUSE_PRESSED || closed() || !(event instanceof MouseEvent press)
             || !SwingUtilities.isLeftMouseButton(press) || !(press.getSource() instanceof Component source)) return;
-        Tab tab = tabHolding(source);
+        Tab tab = tabHolding(under(source, press.getPoint()));
         if (tab != null && tab != selectedTab()
             && parentTabs().holding(tab).filter(view -> view == parentTabs().active()).isPresent()) selectTab(tab);
     };
@@ -90,14 +90,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The main window, with Jasper's chrome, or a child window, a workspace alone (workspace tabs spec 6). */
     private final WindowRole role;
     /**
-     * The window's parent tabs, each a workspace of tabs as groups in splits under the look's strips (workspace tabs spec
-     * 10; parent tabs spec 4), where the terminal column stood.
+     * The window's tabs, each holding panes in splits, under the window's one strip (workspace tabs spec 10; parent tabs
+     * spec 4), where the terminal column stood.
      */
     private final ParentTabsView parentTabs;
     /** Where tabs moving in land while {@link #receive} runs: a parent tab, and its place in the bar when it is new. */
     private record Landing(ParentTabId parentTab, int index) { }
     private Landing landing;
-    /** The configured tab motion, which strips made later take too. */
+    /** The configured tab motion, which the window's strip takes. */
     private dev.jasper.app.config.AnimationSettings animations = dev.jasper.app.config.AnimationSettings.defaults();
     private final WorkspaceActions workspaceActions;
     private final CommandRegistry commands = new CommandRegistry();
@@ -370,9 +370,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (role == WindowRole.MAIN) { add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH); }
         else add(area, BorderLayout.CENTER);
         themeRegistration = themes.subscribe(this::applyTheme);
+        host = registry.addHost(workspaceHost());
         focusManager.addPropertyChangeListener("permanentFocusOwner", focusOwners);
         Toolkit.getDefaultToolkit().addAWTEventListener(paneClicks, AWTEvent.MOUSE_EVENT_MASK);
-        host = registry.addHost(workspaceHost());
         if (!empty) {
             try { newTab(directory); }
             catch (RuntimeException | Error failure) {
@@ -1679,6 +1679,21 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     Tab tabHolding(Component component) {
         for (Tab tab : tabs()) if (SwingUtilities.isDescendingFrom(component, tab.component())) return tab;
         return null;
+    }
+
+    /**
+     * The component a press at {@code point} on {@code source} lands on: the deepest at that place under its native window,
+     * or for content in no native window (a headless test's) under its outermost component; {@code source} when none is
+     * there. In a window AWT hands a press to the deepest component with mouse listeners, or else to the frame, so a press
+     * on a view's bare area comes from an ancestor of the view. A popup or the drag overlay over the place is what it
+     * lands on.
+     */
+    private static Component under(Component source, Point point) {
+        Component root = SwingUtilities.getRoot(source);
+        if (root == null) { root = source; while (root.getParent() != null) root = root.getParent(); }
+        Point at = SwingUtilities.convertPoint(source, point, root);
+        Component deepest = SwingUtilities.getDeepestComponentAt(root, at.x, at.y);
+        return deepest == null ? source : deepest;
     }
 
     void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }

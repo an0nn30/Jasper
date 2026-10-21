@@ -31,7 +31,7 @@ class KeymapDefaultsTest {
         new Row("command_palette", KeyContext.GLOBAL, "cmd+shift+p", "ctrl+shift+p"),          // 14
         new Row("new_tab", KeyContext.GLOBAL, "cmd+t", "ctrl+shift+t"),                        // 22; tabs and panes spec 10
         new Row("close_pane", KeyContext.GLOBAL, "cmd+w", "ctrl+shift+w"),                     // 23; tabs and panes spec 10
-        new Row("close_tab", KeyContext.GLOBAL, "alt+cmd+w", "ctrl+alt+shift+w"),
+        new Row("close_tab", KeyContext.GLOBAL, "alt+cmd+w", "ctrl+alt+shift+w"),              // tabs and panes spec 10
         new Row("next_tab", KeyContext.GLOBAL, "cmd+shift+]", "ctrl+pagedown"),                // 24; tabs and panes spec 10
         new Row("previous_tab", KeyContext.GLOBAL, "cmd+shift+[", "ctrl+pageup"),              // 25
         new Row("select_tab_1", KeyContext.GLOBAL, "cmd+1", "ctrl+1"),                         // 26; workspace plan 7a Spec issues 1

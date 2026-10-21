@@ -1,6 +1,6 @@
 # Workspace tabs 8a: tabs hold panes Implementation Plan
 
-**Status: executed on 2026-10-20** (`4f2884089..a49e33f69`); see `docs/STATUS.md`. Written against
+**Status: executed on 2026-10-20** (`c1540b4e9..a49e33f69`); see `docs/STATUS.md`. Written against
 `claude/workspace-tabs` at `2d7233474` ("Docs: tabs and panes spec, dimming and the strip's motion kept as today"); see
 Workspace. Deviations from the plan's text: (1) Task 1: two `TabDragTest` pins for a press whose item closes, or whose
 entry shows another pane, before the threshold; each also asserts the drag label never showed a title, since the
