@@ -706,6 +706,38 @@ class EditorWindowTest {
         assertThat(Files.readString(copy)).as("back to the local disk").isEqualTo("hello\n");
     }
 
+    /**
+     * Workspace plan 8b final review I1: another plugin's resolver is handed the window, never the Editor's tab, whose
+     * handle carries the Editor's authority over it, {@code terminal.open} for Terminal Right and Down included; Jasper's
+     * own picker keeps the tab. Both for an open and for a Save As.
+     */
+    @Test void aResolverIsHandedTheWindowNeverTheEditorsTab() throws Exception {
+        var owners = new ArrayList<WindowOwner>();
+        locations.register("test.hosts", new LocationResolver() {
+            @Override public EditorDocument document(FileLocation.Sourced location, WindowOwner owner) {
+                owners.add(owner);
+                return new StubDocument("stub:" + location.path(), "app.conf", "me@box:" + location.path(), "box");
+            }
+            @Override public Optional<FileLocation.Sourced> location(String key) { return Optional.empty(); }
+        });
+        UUID main = host.addTerminalWindow();
+        host.addTerminalTab(main, "zsh");
+        window.openLocal(file("notes.txt", "hello\n"), context.terminals().window(main).orElseThrow());
+        drain();
+        host.queueFileChoice(List.of(new FileLocation.Sourced("test.hosts", "box", "/srv/app.conf")));
+        window.openFrom(null, Optional.empty());
+        drain();
+        host.queueFileChoice(List.of(new FileLocation.Sourced("test.hosts", "box", "/srv/copy.conf")));
+        window.saveAs();
+        drain();
+        assertThat(host.fileChoices()).as("Jasper's picker, for the open and the Save As").hasSize(2)
+            .allSatisfy(choice -> assertThat(choice.owner()).isInstanceOf(dev.jasper.sdk.ui.ContentTab.class));
+        assertThat(owners).as("the open's resolver call, then the Save As's").hasSize(2).allSatisfy(owner -> {
+            assertThat(owner).isNotInstanceOf(dev.jasper.sdk.ui.ContentTab.class).isInstanceOf(WindowHandle.class);
+            assertThat(((WindowHandle) owner).id()).isEqualTo(main);
+        });
+    }
+
     @Test void openAtPutsTheCaretOnTheLineAndColumnOnceTheTextHasLoaded() throws Exception {
         Path file = file("lines.txt", "one\ntwo\nthree\n");
         var settled = window.openAt(file, 2, 3, null);
@@ -829,6 +861,25 @@ class EditorWindowTest {
         for (var child : split.getMenuComponents())
             assertThat(((javax.swing.JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
                 .as("%s renders no HTML", ((javax.swing.JMenuItem) child).getText()).isNull();
+    }
+
+    /** Workspace plan 8b final review M1: an entry whose split item went after the menu opened does nothing when clicked. */
+    @Test void aSplitEntryWhoseItemWentDoesNothing() throws Exception {
+        var placements = new ArrayList<dev.jasper.sdk.ui.TabPlacement>();
+        var sketch = context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("dev.jasper.editor.sketch", "Sketch"),
+            (shown, placement) -> placements.add(placement));
+        UUID main = host.addTerminalWindow();
+        host.addTerminalTab(main, "zsh");
+        window.openLocal(file("a.txt", "a\n"), context.terminals().window(main).orElseThrow());
+        drain();
+        var popup = window.selected().orElseThrow().area().getPopupMenu();
+        opened(popup);
+        var stale = item(submenu(popup, "Split").getMenuComponents(), "Sketch Right");
+        sketch.close();
+        var before = host.windowTabs(main);
+        org.assertj.core.api.Assertions.assertThatNoException().as("a stale entry").isThrownBy(stale::doClick);
+        assertThat(placements).as("no opener runs").isEmpty();
+        assertThat(host.windowTabs(main)).as("nothing opens").isEqualTo(before);
     }
 
     /** The menu opening, as a right-click shows it: the Editor's pane entries are built again. */

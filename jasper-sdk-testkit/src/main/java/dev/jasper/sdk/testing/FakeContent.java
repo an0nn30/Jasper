@@ -41,8 +41,11 @@ final class FakeContent implements ContentTab {
     public void setFocusTarget(Runnable value){if(!closed)focus=value;}
     public void select(){if(closed)return;ui.host.workspace.select(tab);active(true);focus.run();}
     void active(boolean value){if(active==value)return;active=value;for(var listener:List.copyOf(activated))listener.accept(value);}
-    /** Neither closed nor waiting on a close decision: a pane may open beside it, as the application's registry decides. */
-    private boolean splittable(){return !closed&&ui.pendingContent==null;}
+    /**
+     * Neither closed nor itself waiting on a close decision: a pane may open beside it, as the application's registry
+     * decides for each tab.
+     */
+    private boolean splittable(){return !closed&&!ui.pendingTabs.contains(this);}
     /** Splittable, and not pinned by a modal prompt. */
     private boolean movable(){return splittable()&&pins==0;}
     public void moveToNewWindow(){

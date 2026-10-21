@@ -53,8 +53,8 @@ final class PaneItems implements PopupMenuListener {
         if (pane.isClosed()) return;
         var split = DocumentArea.submenu("Split");
         for (SplitChoice choice : choices.get()) {
-            split.add(DocumentArea.plainItem(choice.label() + " Right", () -> pane.split(choice, Direction.RIGHT)));
-            split.add(DocumentArea.plainItem(choice.label() + " Down", () -> pane.split(choice, Direction.DOWN)));
+            split.add(DocumentArea.plainItem(choice.label() + " Right", () -> splitIfListed(choice, Direction.RIGHT)));
+            split.add(DocumentArea.plainItem(choice.label() + " Down", () -> splitIfListed(choice, Direction.DOWN)));
         }
         var move = DocumentArea.plainItem("Move Pane to New Tab", pane::moveToNewTab);
         move.setEnabled(pane.mayMoveToNewTab());
@@ -62,6 +62,11 @@ final class PaneItems implements PopupMenuListener {
         added.add(popup.getComponent(popup.getComponentCount() - 1));
         add(split);
         add(move);
+    }
+
+    /** Splits beside the pane, unless the choice is no longer listed: an entry whose split item went does nothing. */
+    private void splitIfListed(SplitChoice choice, Direction direction) {
+        if (choices.get().contains(choice)) pane.split(choice, direction);
     }
 
     private void add(Component component) {

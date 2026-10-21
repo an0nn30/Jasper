@@ -302,7 +302,7 @@ equal. Finding things needs no capability. What a handle may do does:
 | `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()`, and subscribe to `TerminalEvents` |
 | `terminal.selection` | read `PaneHandle.selection()` |
 | `terminal.inject` | `sendText`, `sendBytes`, `paste` |
-| `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()`, `localProfile(id)` or a program (`LocalSpec.running`, SDK 0.17.1), and `Terminals.profiles()` and `onProfilesChanged` |
+| `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()`, `localProfile(id)` or a program (`LocalSpec.running`, SDK 0.17.1), `ContentTab.split(SplitChoice.TERMINAL, …)` (SDK 0.21.0), and `Terminals.profiles()` and `onProfilesChanged` |
 | `session.provide` | `Terminals.openTab` and `split` with `OpenRequest.session(...)` |
 | `files.source` | `FileSources.register`: add places, such as saved hosts, to the file chooser |
 | `network.listen` | nothing gated: declare it when your plugin accepts connections from other programs or computers, such as serving files |

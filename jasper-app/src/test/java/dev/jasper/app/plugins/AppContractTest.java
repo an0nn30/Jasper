@@ -576,6 +576,37 @@ class AppContractTest extends PluginContractTest {
         };
     }
 
+    /**
+     * Workspace plan 8b's final review, the application alone: Terminal Right beside a content tab, through a real
+     * {@code HostedContext}, writes exactly one audit line, naming the content tab.
+     */
+    @org.junit.jupiter.api.Test void aContentTabsTerminalSplitWritesOneAuditLine() {
+        ContractHarness harness = newHarness();
+        try {
+            UUID main = harness.addTerminalWindow(), shell = harness.addTerminalTab(main, "zsh");
+            harness.addTerminalPane(shell, "zsh", Path.of("/"));
+            var alpha = new AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+            harness.start(new PluginInfo("test.alpha", "test.alpha", "1.0.0",
+                Set.of(dev.jasper.sdk.Capabilities.TERMINAL_OBSERVE, dev.jasper.sdk.Capabilities.TERMINAL_OPEN)), Set.of(), Set.of(), alpha::set);
+            var notes = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            var note = new AtomicReference<UUID>();
+            harness.ui(() -> {
+                var owner = alpha.get().terminals().window(main).orElseThrow();
+                var view = alpha.get().kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",
+                    dev.jasper.sdk.ui.ControlState.READY, "Content", dev.jasper.sdk.ui.Nodes.TextRole.BODY)), event -> { });
+                notes.set(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), owner, view));
+                note.set(owner.activeTab().orElseThrow().id());
+            });
+            List<String> lines = HostedTerminalsTest.audited(() -> harness.ui(() ->
+                notes.get().split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.RIGHT)));
+            org.assertj.core.api.Assertions.assertThat(lines).as("one line, for the terminal that opened")
+                .containsExactly("Plugin test.alpha used terminal.open: opened a terminal beside content tab " + note.get());
+            org.assertj.core.api.Assertions.assertThat(harness.openRequests()).containsExactly("beside|" + note.get() + "|RIGHT");
+        } finally {
+            harness.close();
+        }
+    }
+
     private static void render(Contributions contributions, List<dev.jasper.app.contributions.MenuEntry> entries, String indent, List<String> lines) {
         for (var entry : entries) {
             switch (entry) {

@@ -14,10 +14,17 @@ fake's `split` is quiet once its plugin stops; the testkit's open requests recor
 Task 6: the Editor's right-click Split submenu is built through `DocumentArea.submenu` and `plainItem`, since the plugin
 presentation check refuses Swing controls elsewhere; the check's `DocumentArea` exception gains `JMenu`, with one
 fixture each way. Its review: `html.disable` goes in before the text in those factories, `WindowChrome.fillSplit` and
-`WindowContent.tabMenu`, since Swing reads it only on a later text change, so a plugin's "<html>" label is plain text
-(other app sites with the old order are left for a separate sweep); Revert to Saved and Reload vimrc from the palette or
-a key act on the file of the window they run in; Vim's `:q` and `ZQ` read "close the pane" (the Vim reference
-regenerated).
+`WindowContent.tabMenu`, since Swing reads it only on a later text change, so a plugin's `"<html>"` label is plain
+text (other app sites with the old order are left for a separate sweep); Revert to Saved and Reload vimrc from the
+palette or a key act on the file of the window they run in; Vim's `:q` and `ZQ` read "close the pane" (the Vim reference
+regenerated); `TabMenuTest` pins `tabMenu`'s order, though `NativeStyles.menuTree` already cleared the view; the
+sdk-architecture and plugin-authoring lines say "vendor-popup JMenuItem and JMenu"; `RunWindowFixtures` keeps "New
+Editor File", which is the mock's data. (5) The final-review fix wave: the Editor passes other plugins' resolvers its
+window, not its tab, and the SDK says why; a stale Editor Split entry does nothing; the fake removes a split item by
+identity and refuses splits per tab; `WorkspaceHost.splitTerminal` reports whether it split; the new pins (a split
+item's palette words, a stopped plugin's split choices, one audit line through a real `HostedContext`, the Split lists'
+keys after a rebind and the Tab menu's Split first, Move Pane to New Tab for a plugin's item and in the empty
+workspace).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

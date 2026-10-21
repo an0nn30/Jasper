@@ -475,16 +475,31 @@ class HostedUiTest {
         assertThatCode(() -> { prompt.close(); trust.close(); prompt.setTitle("after close"); }).doesNotThrowAnyException();
     }
 
+    /** Workspace plan 8b Rulings 13: a split item's two actions carry the palette's words, the label's included. */
+    @Test void aSplitItemsActionsCarryThePalettesWords() {
+        ui.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("dev.x.tool.notes", "Code Notes"), (window, placement) -> { });
+        assertThat(model.action("dev.x.tool.split_right_notes").orElseThrow().keywords()).as("Split Right with Code Notes")
+            .contains("split", "right", "new", "pane", "code", "notes");
+        assertThat(model.action("dev.x.tool.split_down_notes").orElseThrow().keywords()).as("Split Down with Code Notes")
+            .contains("split", "down", "new", "pane", "code", "notes");
+        ui.closeAll();
+    }
+
     /**
      * Workspace plan 8b Task 4 review: Terminal Right beside a content tab is audited once its window opened it, as
-     * {@code Terminals.split} is once its target resolves, and a closed tab's split is not; with no gate set, as before
-     * its context sets one, the split is refused before anything opens.
+     * {@code Terminals.split} is once its target resolves, and a split its window did not open (the final review) or a
+     * closed tab's is not; with no gate set, as before its context sets one, the split is refused before anything opens.
      */
     @Test void aContentTabsTerminalSplitIsAuditedOnlyWhenItOpens() {
         UUID window = terminalFixture.addWindow();
         List<String> heard = new ArrayList<>();
+        boolean[] splits = {true};
+        java.util.function.BiPredicate<dev.jasper.app.contributions.Tab, dev.jasper.app.layout.Side> split = (tab, side) -> {
+            heard.add(side.name());
+            return splits[0];
+        };
         model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
-            tab -> Optional.empty(), (tab, group, side) -> { }, (tab, side) -> heard.add(side.name()), tab -> false, tab -> { }));
+            tab -> Optional.empty(), (tab, group, side) -> { }, split::test, tab -> false, tab -> { }));
         var notes = ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), terminals.windowHandle(window), view());
         UUID id = model.tabs().inWindow(window).getFirst().id().value();
         assertThatIllegalStateException().as("no gate set")
@@ -499,10 +514,13 @@ class HostedUiTest {
         };
         List<String> lines = HostedTerminalsTest.audited(() -> {
             notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.RIGHT);
+            splits[0] = false;
+            notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.DOWN);
             notes.close();
             notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.DOWN);
         });
-        assertThat(heard).as("the closed tab's split reaches no window").containsExactly("RIGHT");
+        assertThat(heard).as("a window that split nothing, then the closed tab's split, which reaches no window")
+            .containsExactly("RIGHT", "DOWN");
         assertThat(lines).as("one line, for the split that opened")
             .containsExactly("Plugin dev.x.tool used terminal.open: opened a terminal beside content tab " + id);
     }

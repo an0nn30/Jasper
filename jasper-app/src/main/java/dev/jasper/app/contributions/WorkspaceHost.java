@@ -6,7 +6,7 @@ import dev.jasper.app.layout.TabId;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -23,13 +23,14 @@ import java.util.function.Predicate;
  * @param groupOf the group that holds a tab of this window
  * @param attachBeside shows a tab the registry placed in this window in a new group on a side of one of its groups
  * @param splitTerminal selects a tab of this window, then opens a terminal in a new pane on a side of its pane (tabs and
- *     panes spec 8's Terminal Right and Terminal Down beside a plugin's item; workspace plan 8b Rulings 18)
+ *     panes spec 8's Terminal Right and Terminal Down beside a plugin's item; workspace plan 8b Rulings 18), and answers
+ *     whether it did
  * @param mayMoveToNewTab whether Move Pane to New Tab would move a tab of this window (tabs and panes spec 9)
  * @param moveToNewTab Move Pane to New Tab: a tab's pane leaves its tab for a new tab right after it, which shows
  */
 public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach, Consumer<Tab> select,
                             Runnable toFront, Function<TabId, Optional<GroupId>> groupOf, Beside attachBeside,
-                            BiConsumer<Tab, Side> splitTerminal, Predicate<Tab> mayMoveToNewTab, Consumer<Tab> moveToNewTab) {
+                            BiPredicate<Tab, Side> splitTerminal, Predicate<Tab> mayMoveToNewTab, Consumer<Tab> moveToNewTab) {
     /** Shows a tab in a new pane beside a pane of the window (workspace tabs spec 14's split placements). */
     @FunctionalInterface
     public interface Beside {
@@ -64,7 +65,7 @@ public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach,
      */
     public WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach, Consumer<Tab> select, Runnable toFront,
                          Function<TabId, Optional<GroupId>> groupOf, Beside attachBeside) {
-        this(id, attach, detach, select, toFront, groupOf, attachBeside, (tab, side) -> { }, tab -> false, tab -> { });
+        this(id, attach, detach, select, toFront, groupOf, attachBeside, (tab, side) -> false, tab -> false, tab -> { });
     }
 
     /**

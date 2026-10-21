@@ -8,6 +8,8 @@ import java.util.function.Consumer;
 
 /** App-owned document tab, also a dynamic dialog/picker owner. All methods except close use the UI thread.
  * Moving retains content, selection/undo state and this handle. Closed handles do not reattach content.
+ * The handle carries the owning plugin's authority over the tab, its {@code terminal.open} for Terminal Right and Down
+ * ({@link #split}) included, so a plugin hands other plugins {@link #window()}, not the tab.
  * @since 0.8.5
  */
 public interface ContentTab extends WindowOwner, AutoCloseable {
@@ -54,11 +56,13 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
     /**
      * Split with a choice beside this item (tabs and panes spec 8): selects it, then opens {@code choice} in a new pane on
      * {@code direction}'s side of its pane, as the Split lists' entries do: a terminal for {@link SplitChoice#TERMINAL},
-     * else the split item's view, through its action. A closed tab, or one being closed, opens nothing.
+     * else the split item's view, through its action. A closed tab, or one being closed, opens nothing. Whoever calls it,
+     * it runs with the owning plugin's authority over the tab, its {@code terminal.open} for Terminal Right and Down
+     * included, so hand other plugins {@link #window()}, not the tab.
      *
      * @param choice one of {@link Windows#splitChoices()}
      * @param direction the new pane's side
-     * @throws IllegalArgumentException when {@code choice} is not one of {@link Windows#splitChoices()}
+     * @throws IllegalArgumentException when {@code choice} is not, or no longer, one of {@link Windows#splitChoices()}
      * @throws dev.jasper.sdk.MissingCapabilityException when {@code choice} is {@link SplitChoice#TERMINAL} and the plugin
      *     lacks {@code terminal.open}: checked first, as {@link dev.jasper.sdk.terminal.Terminals} checks it, so a
      *     closed tab's split is refused too

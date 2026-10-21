@@ -27,15 +27,23 @@ class TabRegistryTest {
         return new TabRegistry.Windows(() -> main, main::equals, tab -> registry.move(tab, separate));
     }
 
-    /** Workspace plan 8b Rulings 18: a tab reaches its window for a terminal beside it and for Move Pane to New Tab. */
+    /**
+     * Workspace plan 8b Rulings 18: a tab reaches its window for a terminal beside it and for Move Pane to New Tab; the
+     * registry reports whether the window split (its final review).
+     */
     @Test void aTabReachesItsWindowForATerminalBesideItAndMovePaneToNewTab() {
         var heard = new ArrayList<String>();
-        boolean[] shares = {true};
+        boolean[] shares = {true}, splits = {true};
+        java.util.function.BiPredicate<Tab, Side> split = (tab, side) -> {
+            heard.add("terminal " + side + " of " + tab.title());
+            return splits[0];
+        };
         registry.addHost(new WorkspaceHost(main, tab -> {}, tab -> {}, tab -> {}, () -> {}, tab -> Optional.empty(),
-            (tab, group, side) -> {}, (tab, side) -> heard.add("terminal " + side + " of " + tab.title()),
-            tab -> shares[0], tab -> heard.add("new tab " + tab.title())));
+            (tab, group, side) -> {}, split::test, tab -> shares[0], tab -> heard.add("new tab " + tab.title())));
         Tab notes = registry.open("dev.example.editor", "notes", "Notes", main, new JPanel());
         assertThat(registry.splitTerminal(notes, Side.DOWN)).as("its window took it").isTrue();
+        splits[0] = false;
+        assertThat(registry.splitTerminal(notes, Side.RIGHT)).as("its window split nothing").isFalse();
         assertThat(registry.mayMoveToNewTab(notes)).isTrue();
         registry.moveToNewTab(notes);
         shares[0] = false;
@@ -48,7 +56,8 @@ class TabRegistryTest {
         notes.close();
         assertThat(registry.splitTerminal(notes, Side.RIGHT)).as("a closed tab").isFalse();
         registry.moveToNewTab(notes);
-        assertThat(heard).as("a closed tab reaches nothing").containsExactly("terminal DOWN of Notes", "new tab Notes");
+        assertThat(heard).as("a closed tab reaches nothing")
+            .containsExactly("terminal DOWN of Notes", "terminal RIGHT of Notes", "new tab Notes");
     }
 
     /**

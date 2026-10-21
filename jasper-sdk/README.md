@@ -75,15 +75,16 @@ opens one beside that item's pane (the terminal's needs `terminal.open`), and `C
 
 ## Tabs of every kind (SDK 0.19.0)
 
-A window's tabs are terminal tabs and content tabs (an editor, a tool view, a plugin's view), and a split is a terminal
-tab in a new pane. `WindowHandle.tabs()` lists every tab in workspace order and `activeTab()` is the focused
+A window's tabs are terminal tabs and content tabs (an editor, a tool view, a plugin's view), and a new pane holds a
+terminal tab from `Terminals.split` or a plugin's view from a split placement or a split item. `WindowHandle.tabs()`
+lists every tab in workspace order and `activeTab()` is the focused
 pane's; `TabHandle.kind()` says which kind a tab is and `terminal()` is a terminal tab's one pane.
 `Terminals.split` opens a terminal tab beside the pane. `TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover
 every tab, and `TAB_MOVED` reports a tab moving to another window: a moved terminal tab reports no `PANE_OPENED` or
 `PANE_CLOSED`, and its pane keeps its id; a window opened for the move reports `WINDOW_OPENED` before the `TAB_MOVED`,
-and a window the move empties `WINDOW_CLOSED` after it. The Tab menu (`StandardMenu.TAB`) holds the split, pane-focus
-and prompt items; `ExitPolicy.CLOSE` closes a session's tab when it ends. The testkit adds
-`FakePluginHost.addContentTab` and `moveTab`, and `addTerminalPane` gives a terminal tab its one pane.
+and a window the move empties `WINDOW_CLOSED` after it. The Tab menu (`StandardMenu.TAB`) holds the Split submenu, Move
+Pane to New Tab, the pane-focus and prompt items; `ExitPolicy.CLOSE` closes a session's tab when it ends. The testkit
+adds `FakePluginHost.addContentTab` and `moveTab`, and `addTerminalPane` gives a terminal tab its one pane.
 
 ## Shell variables, the file editor and program tabs (SDK 0.17.1)
 

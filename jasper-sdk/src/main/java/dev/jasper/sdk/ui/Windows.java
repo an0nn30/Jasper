@@ -54,7 +54,8 @@ public interface Windows {
      * be bound under {@code [keybindings]} and placed in the plugin's menus and toolbar as its own actions. Running one
      * calls {@code opener} on the UI thread with the window it ran in and {@link TabPlacement#SPLIT_RIGHT} or
      * {@link TabPlacement#SPLIT_DOWN}; the plugin opens its view there, usually with
-     * {@link #openTab(ContentSpec, WindowOwner, UiView, TabPlacement)}. A failing opener is contained.
+     * {@link #openTab(ContentSpec, WindowOwner, UiView, TabPlacement)}. A failing opener is contained. An opener runs as
+     * a user's Split request, possibly offered from another plugin's menu, so it should only open its view.
      *
      * @param spec the item
      * @param opener opens the item's view in the window, at the placement

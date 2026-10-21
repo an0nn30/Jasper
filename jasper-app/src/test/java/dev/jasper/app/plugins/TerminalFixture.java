@@ -316,12 +316,15 @@ final class TerminalFixture {
      * A terminal in a new pane right after the item {@code tabId}, in its tab, focused, as Split with a choice's Terminal
      * Right and Terminal Down open one beside a plugin's item (tabs and panes spec 8): either side lists it right after,
      * and {@link #opened()} records {@code beside|<tab id>|<side>}.
+     *
+     * @return whether it opened, as a window answers: false for an item the fixture does not hold
      */
-    void splitBeside(UUID tabId, dev.jasper.app.layout.Side side) {
+    boolean splitBeside(UUID tabId, dev.jasper.app.layout.Side side) {
         Tab beside = tabs.get(tabId);
-        if (beside == null) return;
+        if (beside == null) return false;
         opened.add("beside|" + tabId + "|" + side);
         focusPane(openTerminal(beside.window.id, "split", null, beside));
+        return true;
     }
 
     /** Whether Move Pane to New Tab would move the item {@code tabId}: its tab holds another pane (tabs and panes spec 9). */

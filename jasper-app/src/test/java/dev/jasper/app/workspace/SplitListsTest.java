@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.SplitItem;
 import dev.jasper.app.contributions.TabRegistry;
@@ -13,6 +14,7 @@ import java.awt.Component;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import javax.swing.ImageIcon;
 import javax.swing.JMenu;
@@ -57,15 +59,20 @@ class SplitListsTest {
         return new Subscription(() -> { listed.close(); rightAction.close(); downAction.close(); });
     }
 
-    /** The Tab menu's Split submenu, from the menu bar. */
-    private static JMenu tabSplit(WindowContent window) {
+    /** The menu bar's Tab menu. */
+    private static JMenu tabMenu(WindowContent window) {
         var bar = window.menuBar();
         for (int i = 0; i < bar.getMenuCount(); i++) {
             JMenu menu = bar.getMenu(i);
-            if (menu == null || !"Tab".equals(menu.getText())) continue;
-            for (Component child : menu.getMenuComponents())
-                if (child instanceof JMenu split && "Split".equals(split.getText())) return split;
+            if (menu != null && "Tab".equals(menu.getText())) return menu;
         }
+        throw new AssertionError("no Tab menu");
+    }
+
+    /** The Tab menu's Split submenu, from the menu bar. */
+    private static JMenu tabSplit(WindowContent window) {
+        for (Component child : tabMenu(window).getMenuComponents())
+            if (child instanceof JMenu split && "Split".equals(split.getText())) return split;
         throw new AssertionError("no Split in the Tab menu");
     }
 
@@ -135,6 +142,31 @@ class SplitListsTest {
                 for (Component child : split.getMenuComponents())
                     assertThat(((JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
                         .as("%s renders no HTML", ((JMenuItem) child).getText()).isNull();
+            }
+        });
+    }
+
+    /** Workspace plan 8b Task 5 review: the standard Tab menu opens with the Split submenu. */
+    @Test void theStandardTabMenuStartsWithSplit() throws Exception {
+        var window = window();
+        edt(() -> assertThat(tabMenu(window).getMenuComponent(0)).as("the Tab menu's first entry")
+            .isInstanceOfSatisfying(JMenu.class, split -> assertThat(split.getText()).isEqualTo("Split")));
+    }
+
+    /** Workspace plan 8b Task 5 review: a rebind of Split Right and of an item's Right action reaches both lists' keys. */
+    @Test void aRebindReachesTheKeysOfBothLists() throws Exception {
+        var window = window();
+        boolean macOs = System.getProperty("os.name").startsWith("Mac");
+        edt(() -> {
+            item("com.example.notes", "notes", "Notes", false);
+            window.setBindings(KeyBindings.withOverrides(macOs, Map.of("split_right", "alt+shift+j",
+                "com.example.notes.split_right_notes", "alt+shift+k")));
+            var terminal = KeyBindings.parse("alt+shift+j", macOs).orElseThrow();
+            var notes = KeyBindings.parse("alt+shift+k", macOs).orElseThrow();
+            assertThat(window.bindings().strokeFor(ActionId.SPLIT_RIGHT)).as("the rebind took").contains(terminal);
+            for (JMenu split : List.of(tabSplit(window), contextSplit(window))) {
+                assertThat(entry(split, "Terminal Right").getAccelerator()).as("Split Right's new keys").isEqualTo(terminal);
+                assertThat(entry(split, "Notes Right").getAccelerator()).as("the item's new keys").isEqualTo(notes);
             }
         });
     }

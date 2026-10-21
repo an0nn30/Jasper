@@ -401,15 +401,13 @@ public final class TabRegistry {
      *
      * @param tab the tab
      * @param side where the new pane goes
-     * @return whether its window took the split, after it did; false when nothing opened
+     * @return whether its window opened the terminal, after it did; false when nothing opened
      */
     public boolean splitTerminal(Tab tab, Side side) {
         requireEdt();
         Objects.requireNonNull(side, "side");
         var host = splittable(tab) ? hosts.get(tab.window()) : null;
-        if (host == null) return false;
-        host.splitTerminal().accept(tab, side);
-        return true;
+        return host != null && host.splitTerminal().test(tab, side);
     }
 
     /**

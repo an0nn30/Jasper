@@ -208,6 +208,12 @@ public final class EditorWindow {
     }
     private WindowOwner owner() { return promptOwner != null ? promptOwner : selectedTab == null ? origin : hosted.get(selectedTab); }
     private WindowOwner owner(DocumentSession session) { return hosted.entrySet().stream().filter(e -> e.getKey().session() == session).map(e -> (WindowOwner)e.getValue()).findFirst().orElseGet(this::owner); }
+    /**
+     * The owner another plugin's code is handed: the window, never the Editor's tab, whose handle carries the Editor's
+     * authority over the tab, its {@code terminal.open} for Terminal Right and Down included (workspace plan 8b's final
+     * review). Jasper's own picker and prompts keep the tab.
+     */
+    private static WindowOwner forOthers(WindowOwner owner) { return owner instanceof ContentTab tab ? tab.window() : owner; }
     public void openLocal(Path file) { openLocal(file, null); }
     public void openLocal(Path file, WindowOwner owner) { open(new LocalDocument(file, context.background()), owner); }
 
@@ -479,7 +485,7 @@ public final class EditorWindow {
                 case FileLocation.Local local -> openLocal(local.path(), owner);
                 case FileLocation.Sourced sourced -> locations.resolver(sourced.sourceId()).ifPresent(resolver -> {
                     try {
-                        open(resolver.document(sourced, owner), owner);
+                        open(resolver.document(sourced, forOthers(owner)), owner);
                     } catch (RuntimeException failure) {
                         context.notifications().group().error("Could not open a file", sourced.path() + ": "
                             + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
@@ -723,7 +729,7 @@ public final class EditorWindow {
         Optional<LocationResolver> resolver = locations.resolver(location.sourceId());
         if (resolver.isEmpty()) return Optional.empty();
         try {
-            return Optional.of(resolver.get().document(location, owner));
+            return Optional.of(resolver.get().document(location, forOthers(owner)));
         } catch (RuntimeException failure) {
             context.notifications().group().error("Could not save a file", location.path() + ": "
                 + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);

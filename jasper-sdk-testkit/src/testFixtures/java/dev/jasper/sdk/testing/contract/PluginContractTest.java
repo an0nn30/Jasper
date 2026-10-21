@@ -1794,6 +1794,11 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThat(alpha.get().windows().splitChoices()).extracting(dev.jasper.sdk.ui.SplitChoice::label)
             .containsExactly("Terminal", "Sketch", "Boom"));
         assertThat(h.menu("TAB")).as("a placement of a closed action vanishes").isEmpty();
+        h.stopAll();
+        var fresh = new AtomicReference<PluginContext>();
+        h.start(info("test.gamma"), Set.of(), Set.of(), fresh::set);
+        h.ui(() -> assertThat(fresh.get().windows().splitChoices()).as("the stopped plugins' items go with them")
+            .containsExactly(dev.jasper.sdk.ui.SplitChoice.TERMINAL));
     }
 
     /**
@@ -1905,7 +1910,8 @@ public abstract class PluginContractTest {
 
     /**
      * Workspace plan 8b Task 4 review: a content tab waiting on a close decision splits nothing, with the terminal's choice
-     * or a split item's, as it moves nowhere; nothing opens or is selected, and the split item's opener never runs.
+     * or a split item's, as it moves nowhere; nothing opens or is selected, and the split item's opener never runs. The
+     * wait is that tab's alone: another content tab of the same plugin splits meanwhile.
      */
     @Test void aContentTabWaitingOnACloseDecisionSplitsNothing() {
         UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
@@ -1917,12 +1923,14 @@ public abstract class PluginContractTest {
             context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("test.alpha.sketch", "Sketch"),
                 (window, placement) -> placements.add(placement));
         });
-        var note = new AtomicReference<UUID>();
+        var ids = new AtomicReference<List<UUID>>();
         h.ui(() -> {
             var windows = alpha.get().windows();
             var owner = alpha.get().terminals().window(main).orElseThrow();
             var notes = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), owner, kitView(alpha.get()));
-            note.set(owner.activeTab().orElseThrow().id());
+            UUID note = owner.activeTab().orElseThrow().id();
+            var draft = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("draft", "Draft"), owner, kitView(alpha.get()));
+            UUID drafted = owner.activeTab().orElseThrow().id();
             var answer = new CompletableFuture<Boolean>();
             windows.onTabsClosing((tabs, batch) -> answer);
             var closing = notes.requestClose();
@@ -1930,12 +1938,16 @@ public abstract class PluginContractTest {
             notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, Direction.RIGHT);
             notes.split(windows.splitChoices().get(1), Direction.DOWN);
             assertThat(owner.activeTab().map(TabHandle::id)).as("nothing is selected").contains(shell);
+            draft.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, Direction.RIGHT);
+            ids.set(List.of(note, drafted, owner.activeTab().orElseThrow().id()));
             answer.complete(false);
             assertThat(closing.join()).isFalse();
         });
+        UUID note = ids.get().get(0), draft = ids.get().get(1), terminal = ids.get().get(2);
         assertThat(placements).as("the split item's opener never runs").isEmpty();
-        assertThat(h.windowTabs(main)).as("nothing opens").containsExactly(List.of(shell), List.of(note.get()));
-        assertThat(h.openRequests()).isEmpty();
+        assertThat(h.windowTabs(main)).as("nothing opens beside the waiting tab; the other tab's split opens")
+            .containsExactly(List.of(shell), List.of(note), List.of(draft, terminal));
+        assertThat(h.openRequests()).containsExactly("beside|" + draft + "|RIGHT");
     }
 
     @Test void openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane() {

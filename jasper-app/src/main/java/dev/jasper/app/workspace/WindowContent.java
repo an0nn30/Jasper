@@ -1167,8 +1167,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return new WorkspaceHost(id, this::attach, this::detach, this::selectTab, () -> bringToFront.run(),
             parentTabs::groupOf,
             (tab, group, side) -> attach(tab, false, group != null ? group : workspace().model().activeGroup(), side),
-            // A plugin's item: Terminal Right and Down beside it, and Move Pane to New Tab (workspace plan 8b Rulings 18).
-            (tab, side) -> { if (parentTabs.contains(tab)) { selectTab(tab); split(side); } },
+            // A plugin's item: Terminal Right and Down beside it, which answer whether a terminal opened, and Move Pane to
+            // New Tab (workspace plan 8b Rulings 18).
+            (tab, side) -> {
+                if (!parentTabs.contains(tab)) return false;
+                selectTab(tab);
+                return split(side) != null;
+            },
             this::mayMoveToNewTab, this::moveToNewTab);
     }
 

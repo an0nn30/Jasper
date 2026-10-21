@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 8b: split with a choice — 2026-10-20** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `ee3cd8989..62287a388`, then this documentation commit;
+`.claude/worktrees/workspace-tabs`, `ee3cd8989..62287a388`, then the documentation commit and its final-review fix wave;
 [plan](superpowers/plans/2026-10-20-workspace-8b-split-with.md),
 [spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). A new pane can hold a terminal, an editor or a
 plugin's view. The SDK (0.21.0, unreleased) renames `TabPlacement.ACTIVE_GROUP` to `NEW_TAB` and gains split items:
@@ -41,11 +41,23 @@ once its plugin stops; the testkit's open requests record `beside|<tab>|<RIGHT o
 right-click Split submenu is built through `DocumentArea.submenu` and `plainItem`, since the plugin presentation check
 refuses Swing controls elsewhere; the check's `DocumentArea` exception gains `JMenu`, with one fixture each way. Its
 review: `html.disable` goes in before the text in those factories, `WindowChrome.fillSplit` and `WindowContent.tabMenu`,
-since Swing reads it only on a later text change, so a plugin's "<html>" label is plain text (other app sites with the
-old order are left for a separate sweep); Revert to Saved and Reload vimrc from the palette or a key act on the file of
-the window they run in; Vim's `:q` and `ZQ` read "close the pane" (the Vim reference regenerated).
-`./gradlew check --continue`: **12,063 tests, 0 failures, 25 skipped, BUILD SUCCESSFUL** (SDK 95, testkit 213, app
-4,077, Editor 4,918, terminal 459, UI 930, Buddy 151, the other plugins 1,220); the example external plugin's
+since Swing reads it only on a later text change, so a plugin's `"<html>"` label is plain text (other app sites with
+the old order are left for a separate sweep); Revert to Saved and Reload vimrc from the palette or a key act on the file
+of the window they run in; Vim's `:q` and `ZQ` read "close the pane" (the Vim reference regenerated); `TabMenuTest`
+pins `tabMenu`'s order, though `NativeStyles.menuTree` already cleared the view; the sdk-architecture and
+plugin-authoring lines say "vendor-popup JMenuItem and JMenu"; `RunWindowFixtures` keeps "New Editor File", which is
+the mock's data. (5) The final-review fix wave: the Editor passes other plugins' resolvers its window, not its tab, and
+the SDK says why; a stale Editor Split entry does nothing; the fake removes a split item by identity and refuses splits
+per tab; `WorkspaceHost.splitTerminal` reports whether it split; the new pins (a split item's palette words, a stopped
+plugin's split choices, one audit line through a real `HostedContext`, the Split lists' keys after a rebind and the Tab
+menu's Split first, Move Pane to New Tab for a plugin's item and in the empty workspace). Known: the Editor's Split
+submenu shows no shortcuts, since the SDK gives a plugin no way to read a binding. Left for plan 8c: the pane drag, and
+one announcement per cross-tab pane move (8c's amended Tasks 2 and 3 hold the window's announcements while a pane moves
+between tabs). Merge with main: run `./gradlew sdkReference` and commit `docs/sdk-reference.html` (the branch's SDK is
+0.21.0); `Windows.java`'s `popover` Javadoc conflicts, and main's form, which has no mid-line `@return`, is the one to
+take; check main's guides for anchors of members this series renamed, such as `TabPlacement.ACTIVE_GROUP`.
+`./gradlew check --continue`: **12,070 tests, 0 failures, 25 skipped, BUILD SUCCESSFUL** (SDK 95, testkit 213, app
+4,082, Editor 4,920, terminal 459, UI 930, Buddy 151, the other plugins 1,220); the example external plugin's
 `check pluginZip` passes.
 GUI checks for the user:
 - the Tab menu's Split submenu and a terminal's right-click Split submenu: Terminal Right (Cmd+D) and Terminal Down
@@ -54,16 +66,18 @@ GUI checks for the user:
 - a terminal's right-click Split ▸ Terminal Right or Editor Right on the unfocused pane of a split tab opens beside that
   pane;
 - under the Enterprise look the Window menu, which holds the Tab menu's items, shows the same Split submenu;
-- in the packaged Jasper.app on macOS (the screen menu bar), Tab ▸ Split loses and regains the Editor's entries when the
-  Editor is disabled and enabled in Settings › Plugins, with no duplicate or missing Split; rebinding Split Right in
-  Settings › Keymap updates the glyph in the reopened submenu;
+- in the packaged Jasper.app on macOS (the screen menu bar), after the Editor is disabled in Settings › Plugins and
+  Jasper restarted, Tab ▸ Split lists no Editor entries; after it is enabled and Jasper restarted again, they return,
+  with no duplicate or missing Split; rebinding Split Right in Settings › Keymap updates the glyph in the reopened
+  submenu;
 - an editor's right-click menu: Split opens a terminal or an editor beside that editor, also when another pane had the
   focus; Move Pane to New Tab is disabled while the editor is its tab's only pane; Revert to Saved asks before
   discarding edits;
 - Option+Cmd+T (Ctrl+Alt+Shift+T on Linux and Windows) moves the focused pane into a tab right after its own, every
   shell running, and typing then reaches the moved pane; a maximized pane's old tab shows the rest;
+- after Option+Cmd+T, a vim or tmux in the pane left behind gets no focus-in or focus-out report;
 - New Editor Tab, Split Right with Editor and Split Down with Editor from the palette; typing "new editor pane" finds
-  the split;
+  Split Right and Split Down with Editor;
 - a Cmd-click on a file, `jasper editor FILE`, Open in Editor… and Recent Files each open a new tab, also while an
   editor pane of a split tab has the focus, and while the main window shows its empty workspace the file fills it, as
   the window's one tab, with no empty tab beside it (Review Focus 5);

@@ -583,7 +583,8 @@ final class FakeUi {
                 return () -> {
                     actions.remove(spec.rightAction(), right);
                     actions.remove(spec.downAction(), down);
-                    host.splitItems.remove(listed);
+                    // By identity: after a re-register, a repeated close leaves the new item listed.
+                    host.splitItems.removeIf(item -> item == listed);
                 };
             }
             @Override public List<dev.jasper.sdk.ui.SplitChoice> splitChoices() {

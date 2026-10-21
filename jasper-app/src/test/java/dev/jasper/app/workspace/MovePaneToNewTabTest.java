@@ -125,6 +125,30 @@ class MovePaneToNewTabTest {
         });
     }
 
+    /** Workspace plan 8b's final review: enabled while a plugin's item is selected, disabled in the empty workspace. */
+    @Test void itIsEnabledForAPluginsItemAndDisabledInTheEmptyWorkspace() throws Exception {
+        var window = window();
+        edt(() -> {
+            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel(),
+                TabRegistry.Placement.SPLIT_DOWN);
+            assertThat(window.selectedTab()).isSameAs(view);
+            window.updateActions();
+            assertThat(window.action(ActionId.MOVE_PANE_TO_NEW_TAB).isEnabled()).as("a plugin's item selected").isTrue();
+            window.invoke(ActionId.MOVE_PANE_TO_NEW_TAB);
+            assertThat(window.windowLayout().parentTabs().get(1).layout().tabs()).containsExactly(view.id());
+        });
+        edt(() -> {
+            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> { });
+            main.invoke(ActionId.CLOSE_PANE);
+            assertThat(main.workspace().emptyWorkspace()).as("its empty workspace shows").isNotNull();
+            main.updateActions();
+            assertThat(main.action(ActionId.MOVE_PANE_TO_NEW_TAB).isEnabled()).as("the empty workspace").isFalse();
+            main.invoke(ActionId.MOVE_PANE_TO_NEW_TAB);
+            assertThat(main.parentTabCount()).isEqualTo(1);
+            assertThat(main.workspace().emptyWorkspace()).isNotNull();
+        });
+    }
+
     /**
      * Workspace plan 8b Rulings 18: Terminal Right beside a plugin's item, as {@code ContentTab.split} asks, opens right
      * after the item in its tab, focused, though another pane had the focus.
@@ -137,7 +161,7 @@ class MovePaneToNewTabTest {
                 TabRegistry.Placement.SPLIT_DOWN);
             window.selectTab(left);
             assertThat(window.selectedTab()).isSameAs(left);
-            model.tabs().splitTerminal(view, Side.RIGHT);
+            assertThat(model.tabs().splitTerminal(view, Side.RIGHT)).as("the window answers that it opened one").isTrue();
             Tab terminal = window.selectedTab();
             assertThat(terminal).as("the new terminal, focused").isNotIn(left, right, view);
             assertThat(terminal.kind()).isEqualTo(Tab.Kind.TERMINAL);
