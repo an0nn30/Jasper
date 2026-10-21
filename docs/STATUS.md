@@ -1,13 +1,13 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-20
+## Current state — 2026-10-21
 
 Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (windows, tabs, panes
 and tool windows), the terminal (with the bundled Cygwin environment's Cygwin Bash on Windows), the command palette,
 notifications, Settings, themes and looks; most features, the Editor and its Markdown preview among them, are bundled
 plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
 
-- **Branches.** `origin/main` at `427321de4` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status
+- **Branches.** `origin/main` at `8c8776e7e` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status
   Bar Keymap actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise mode),
   the Editor's own typography and Markdown preview (SDK 0.18.3, Editor 0.11.0, Remote 0.15.1), the bundled Cygwin on
   Windows, Jasper Meadow as the default theme of both appearances in both looks, with a new Dark variant (`73c2b8f61`),
@@ -24,8 +24,9 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   (the side stripes as the rebased `e8ecfdcf2` to `faeec76f3`, which plan 15a's E15 leaves to confirm). The V1
   documentation overhaul (`claude/v1-docs`, with `origin/main` at `c6bb59fdd` merged in) is merged into `main`; its entry below, which
   ends "Not merged into `main`", was written before the merge. Since then `claude/v1-docs` has brought the guides up to
-  `427321de4`. Unmerged: `claude/workspace-tabs` (workspace tabs and single instance, in progress; its STATUS entries
-  are on that branch, and plan 14's entry says what it must reconcile with the classic title bar) and
+  `427321de4` (`8c8776e7e`, which `origin/main` now is) and merged local `main`'s Editor font size shortcuts
+  (`f77c41c94`, not pushed). Unmerged: `claude/workspace-tabs` (workspace tabs and single instance, in progress; its
+  STATUS entries are on that branch, and plan 14's entry says what it must reconcile with the classic title bar) and
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
@@ -39,14 +40,13 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** `./gradlew check` on local `main` with the Editor's typography and Markdown preview and the
-  bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in
+- **Last recorded checks.** `./gradlew check` on `claude/editor-font-zoom` (`427321de4` with the Editor font size
+  shortcuts; macOS, 2026-10-21): 11,893 tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in
   Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
   `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
   macOS, Ubuntu and every Linux packaging and install check passed, and so did the single-worker Windows check. No
-  check is recorded for the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode
-  (`eb424eeec`, `4743469e5`), the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the
-  Javadoc rename (`427321de4`).
+  check is recorded for `8c8776e7e` (the documentation merge's Javadoc and SDK reference changes) or for its merge with
+  `f77c41c94`.
 
 Bundled plugins, all enabled by default except Enterprise:
 
@@ -68,7 +68,8 @@ Open items, as the entries below record them:
   Enterprise look's, in the series entry (2026-10-18, spec 16.2); the side stripes entry and plans 13, 14, 15a and 15b
   add their own, plan 14's starting with the classic title band in the packaged macOS app. The Editor's fonts and
   Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
-  Meadow splash and the Rail and Status Bar shortcuts (2026-10-20) await theirs.
+  Meadow splash, the Rail and Status Bar shortcuts (2026-10-20) and the Editor font size shortcuts (2026-10-21) await
+  theirs.
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
@@ -90,6 +91,17 @@ Open items, as the entries below record them:
 ## Handoff log
 
 Newest first. Each entry describes its change as it stood when the entry was written.
+
+**Editor font size shortcuts — 2026-10-21** (`claude/editor-font-zoom`, worktree `.claude/worktrees/editor-font-zoom`,
+from `main` at `427321de4`): Increase, Decrease and Reset Font Size (Cmd+=, Cmd+- and Cmd+0; Ctrl+Shift+=, - and 0)
+act on a selected Editor tab as they do on a terminal pane: one point at a time from 6 to 72 points, the tab's Markdown
+preview included, nothing saved; Reset returns it to the saved Editor size (the terminal's while the Editor follows
+it). A new saved size replaces the tab's own size; other font changes keep it. The workspace runs a plugin tab's
+content commands `font-bigger`, `font-smaller` and `font-reset` for the three actions (named in the SDK's
+`ContentTab`/`ContentCommand` Javadoc, the plugin guide and the regenerated SDK reference); the Editor publishes them
+without shortcuts, so the keymap's keys apply. The SDK stays 0.18.3 and the Editor 0.11.0. A small change agreed in
+chat, without a written spec or plan. Full headless `check` passed on macOS with Python 3.13: 11,893 tests, zero
+failures/errors, 29 skips. GUI check pending.
 
 **Meadow theme pair — 2026-10-20**: Normal and Enterprise first-run defaults use Jasper Meadow in both appearances. Dark pairs moonlit blue-green surfaces with sage accents and ivory text across the UI, terminal and Editor; Light colours are unchanged. Saved picks take precedence. Implemented as a bounded theme update with an in-chat approved design and independent review.
 

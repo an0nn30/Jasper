@@ -1592,7 +1592,9 @@ already has open selects that tab and returns its handle. Through the <a href="#
 title, detail, icon, unsaved marker and location (<a href="#dev.jasper.sdk.ui.ContentTab.setPresentation(ContentPresentation)"><code>ContentTab.setPresentation(ContentPresentation)</code></a>), its commands
 (<a href="#dev.jasper.sdk.ui.ContentTab.setCommands(List)"><code>ContentTab.setCommands(List)</code></a>), which its context menu lists and whose shortcuts apply while it is selected, and
 its status bar items (<a href="#dev.jasper.sdk.ui.ContentTab.setStatus(List)"><code>ContentTab.setStatus(List)</code></a>). Commands with the ids <code>find</code>, <code>find-next</code>,
-<code>find-previous</code>, <code>copy</code> and <code>paste</code> answer Jasper's own Find, Find Next, Find Previous, Copy and Paste.
+<code>find-previous</code>, <code>copy</code>, <code>paste</code>, <code>font-bigger</code>, <code>font-smaller</code> and <code>font-reset</code>
+answer Jasper's own Find, Find Next, Find Previous, Copy, Paste, Increase Font Size, Decrease Font Size and Reset Font
+Size.
 The user can move the tab to a separate window and back. <a href="#dev.jasper.sdk.ui.Windows.onTabsClosing(BiFunction)"><code>Windows.onTabsClosing(BiFunction)</code></a> decides whether
 tabs with unsaved work may close.</p>
 
@@ -6461,7 +6463,8 @@ one a <a href="#dev.jasper.sdk.ui.TreeItem.trailing()"><code>TreeItem.trailing()
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.ContentCommand.id()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>id</b></code></td><td>content-local command identity, such as save; while the tab is selected, Jasper's Copy, Paste, Find, Find
-     Next and Find Previous run the enabled command whose id is copy, paste, find, find-next or find-previous (see
+     Next, Find Previous, Increase Font Size, Decrease Font Size and Reset Font Size run the enabled command whose id
+     is copy, paste, find, find-next, find-previous, font-bigger, font-smaller or font-reset (see
      <a href="#dev.jasper.sdk.ui.ContentTab.setCommands(List)"><code>ContentTab.setCommands</code></a>)</td></tr>
 <tr id="dev.jasper.sdk.ui.ContentCommand.title()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>title</b></code></td><td>literal menu text</td></tr>
 <tr id="dev.jasper.sdk.ui.ContentCommand.shortcut()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/KeyStroke.html" title="javax.swing.KeyStroke">KeyStroke</a></code></td><td class="cn"><code><b>shortcut</b></code></td><td>key binding or null</td></tr>
@@ -6562,9 +6565,11 @@ the tab is closed.</p></div>
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ContentTab.setCommands(List)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>setCommands</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.ContentCommand">ContentCommand</a>&gt; commands)</code></pre>
 <div class="doc"><p>Replaces the content's commands. They appear in the tab's context menu; while the tab is selected, a command's
 shortcut runs it ahead of the Jasper actions bound to the same key, the command palette's shortcuts excepted (a
-disabled command's shortcut does nothing), and Jasper's Copy, Paste, Find, Find Next and Find Previous run the enabled command with the id <code>copy</code>,
-<code>paste</code>, <code>find</code>, <code>find-next</code> or <code>find-previous</code>. In a text field, the shortcut of a
-<code>copy</code> or <code>paste</code> command keeps the field's own clipboard behaviour. Ignored once the tab is closed.</p></div>
+disabled command's shortcut does nothing), and Jasper's Copy, Paste, Find, Find Next, Find Previous, Increase
+Font Size, Decrease Font Size and Reset Font Size run the enabled command with the id <code>copy</code>,
+<code>paste</code>, <code>find</code>, <code>find-next</code>, <code>find-previous</code>, <code>font-bigger</code>, <code>font-smaller</code>
+or <code>font-reset</code>. In a text field, the shortcut of a <code>copy</code> or <code>paste</code> command keeps the field's
+own clipboard behaviour. Ignored once the tab is closed.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>commands</code> immutable snapshot of active-content commands</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.setStatus(List)">

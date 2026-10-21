@@ -149,7 +149,8 @@ The Sample plugin registers its demo actions only when its demo settings are on:
 
 While an Editor tab is selected, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save. They
 are listed in the Editor tab's right-click menu and in [Editor](editor.md#commands-and-shortcuts), and are not part of
-the keymap. The window's Close Pane, Cmd+W (Ctrl+Shift+W), closes an Editor tab.
+the keymap. The window's Increase, Decrease and Reset Font Size change the selected Editor tab's own font size
+([Editor](editor.md#tabs)), and its Close Pane, Cmd+W (Ctrl+Shift+W), closes an Editor tab.
 
 ## Fixed keys
 

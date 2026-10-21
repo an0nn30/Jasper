@@ -52,15 +52,21 @@ Each file is a tab in a workspace window's tab strip ([Plugin tabs](workspace.md
 
 Right-click the tab for **Open in Separate Window** (**Move to Main Window** in a separate window), every
 [command](#commands-and-shortcuts) with its shortcut, **Copy**, **Paste**, **Select All**, **Cut**, **Delete**,
-**Undo**, **Redo** and **Close Tab**. Moving a tab keeps its text, undo history, unsaved changes and Markdown view.
-Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the
-**Folding** submenu (Toggle Current Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by
-**Save**, **Find…**, **Go to Line…** and **Toggle Comment**.
+**Undo**, **Redo**, **Increase Font Size**, **Decrease Font Size**, **Reset Font Size** and **Close Tab**. Moving a
+tab keeps its text, undo history, unsaved changes and Markdown view. Right-click the text for Undo, Redo, Cut, Copy,
+Paste, Delete, Select All and the **Folding** submenu (Toggle Current Fold, Collapse All Comments, Collapse All Folds,
+Expand All Folds), followed by **Save**, **Find…**, **Go to Line…** and **Toggle Comment**.
 
 While an Editor tab is selected its own shortcuts take precedence over the window's: on macOS Cmd+N makes a new file
 instead of a new window. The Edit menu's **Copy**, **Paste**, **Find**, **Find Next** and **Find Previous**, and the
 File menu's **Close Tab** and **Close Pane**, act on the Editor tab. **Next Tab**, **Previous Tab** and
 **Select Tab 1**–**9** count Editor tabs with terminal tabs.
+
+**Increase Font Size** and **Decrease Font Size** (View › Font Size; Cmd+= and Cmd+-, Ctrl+Shift+= and Ctrl+Shift+- on
+Linux and Windows) change the selected Editor tab and its Markdown preview by one point, from 6 to 72 points, without
+saving anything. **Reset Font Size** (Cmd+0; Ctrl+Shift+0) returns the tab to the saved [font size](#fonts), the
+terminal's while **Follow terminal font** is on. Saving a new font size applies it to every tab, as does turning
+**Follow terminal font** on or off when that changes the size; other font changes keep each tab's own size.
 
 Jasper does not reopen Editor tabs when it starts again; **Recent Files…** reopens them.
 
@@ -112,6 +118,12 @@ Vim mode, `:action id` and `<Action>(id)` run them by the id in the last column.
 | Reload vimrc | | | `reload-vimrc` |
 | Copy | Cmd+C | Ctrl+C | |
 | Paste | Cmd+V | Ctrl+V | |
+| Increase Font Size | Cmd+= | Ctrl+Shift+= | |
+| Decrease Font Size | Cmd+- | Ctrl+Shift+- | |
+| Reset Font Size | Cmd+0 | Ctrl+Shift+0 | |
+
+The three font size commands take the keys Settings › Keymap gives the window's Increase, Decrease and Reset Font Size
+([Tabs](#tabs)).
 
 The three Markdown commands are available once a Markdown tab's text has loaded, and are dimmed in other tabs. In Vim
 mode a mapping such as `:nnoremap <Leader>p <Action>(markdown.preview)` gives one a key.
@@ -231,10 +243,10 @@ change applies to every tab at once.
 
 **Follow terminal font** (`follow_terminal_font`) shows every Editor tab in the terminal's saved font instead: the
 family, size, fallback fonts, ligatures and line height of [`[terminal.font]`](configuration.md#terminal-font), following
-each change to them at once. **Increase Font Size**, **Decrease Font Size** and **Reset Font Size** change a terminal
-pane for the session only and do not reach the Editor. While it is on, the Font section shows the terminal's values in
-place of the Editor's, and they cannot be edited there; the Editor's own values stay saved and apply again when you turn
-it off.
+each change to them at once. **Increase Font Size**, **Decrease Font Size** and **Reset Font Size** change only the
+terminal pane or Editor tab they act on ([Tabs](#tabs)), for the session. While it is on, the Font section shows the
+terminal's values in place of the Editor's, and they cannot be edited there; the Editor's own values stay saved and
+apply again when you turn it off.
 
 ## Markdown preview
 
@@ -269,7 +281,7 @@ with a language the Editor highlights, by its name in **Language…** (such as `
 `sh`, `bash`, `shell`, `c++` or `c#`, is coloured as the Editor colours that language; other code is plain. Code does
 not wrap: the preview scrolls sideways when a code line or a table is wider than the pane.
 
-Text is in the interface font's family at the Editor's font size, with larger headings; code is in the Editor's font,
+Text is in the interface font's family at the tab's font size, with larger headings; code is in the Editor's font,
 with its fallback fonts and ligatures, and **Line height** spaces the preview's lines too. Colours come from the UI
 theme ([Theme colours](#theme-colours)). A change of theme or font applies to the preview at once.
 

@@ -209,9 +209,9 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 
 Choices made outside Settings save here too, at once: View › Show/Hide › Toolbar and Status Bar, and the command
 palette's **Toolbar: …**, **Show Status Bar**/**Hide Status Bar** and **Terminal Scheme: …** commands. While
-`config.toml` is rejected they are refused with a message. Some choices last only for the session: a pane's own font
-size (Increase, Decrease and Reset Font Size) and **Show Jasper**/**Hide Jasper**. View › Show/Hide › Rail is kept in
-[`ui-state.toml`](#ui-statetoml).
+`config.toml` is rejected they are refused with a message. Some choices last only for the session: a pane's or Editor
+tab's own font size (Increase, Decrease and Reset Font Size) and **Show Jasper**/**Hide Jasper**. View › Show/Hide ›
+Rail is kept in [`ui-state.toml`](#ui-statetoml).
 
 ### Look-dependent defaults
 

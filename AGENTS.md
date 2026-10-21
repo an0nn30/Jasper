@@ -94,6 +94,9 @@ fixtures live in testsupport; owner-package test access bridges stay out of prod
   `#<qualified type>.<name>()` for record components and `#<qualified type>.<FIELD>` for fields and constants. No test
   checks these fragments in Markdown guides, so after renaming an SDK package, type or member, search the guides for
   its old anchor.
+- To bring the guides and the SDK reference up to `main` after features land, follow the docs-sync skill
+  ([`.claude/skills/docs-sync/SKILL.md`](.claude/skills/docs-sync/SKILL.md)). Each sync commit ends with a
+  `Docs-Synced-Through: <main commit>` trailer, which the next sync reads to find its range.
 - `docs/editor-vim-reference.md` is generated too:
   `./gradlew :jasper-plugin-editor:test --tests '*VimDocsTest' -PupdateDocs=true` rewrites it.
 - CI skips changes that touch only `docs/**` (except `docs/examples/**`) and `*.md` files. The tests and checks that
