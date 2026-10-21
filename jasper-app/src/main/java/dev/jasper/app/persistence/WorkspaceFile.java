@@ -563,11 +563,58 @@ public final class WorkspaceFile {
     }
 
     /**
+     * What {@link #write} writes for {@code snapshot}, counted in one pass that keeps none of the text (workspace plan 6b
+     * Rulings 16): the whole file and, for each item, what leaving it out alone takes out of the file: its entry, its pane's
+     * node and, when it is its tab's only item, that tab's own lines.
+     *
+     * @param snapshot the windows
+     * @return the sizes, in UTF-8 bytes
+     */
+    public static Sizes sizes(Snapshot snapshot) {
+        var sizes = new Counted();
+        encode(snapshot, new StringBuilder(), sizes);
+        return new Sizes(sizes.total, sizes.items);
+    }
+
+    /**
+     * What {@link #sizes} counted, in UTF-8 bytes.
+     *
+     * @param total the whole file, as {@link #encodedBytes(Snapshot)} counts it
+     * @param items by each item's id, what leaving it out alone takes out of the file
+     */
+    public record Sizes(long total, Map<TabId, Long> items) {
+        /** Copies the items. */
+        public Sizes { items = Map.copyOf(items); }
+    }
+
+    /** What {@link #sizes} has counted so far: each part of the text is counted once written, then dropped. */
+    private static final class Counted {
+        long total;
+        final Map<TabId, Long> items = new HashMap<>();
+    }
+
+    /** While {@link #sizes} counts, {@code text}, the part just written, counts toward the file and toward {@code item}, if any, and is dropped. */
+    private static void counted(Counted sizes, StringBuilder text, TabId item) {
+        if (sizes == null) return;
+        long bytes = text.toString().getBytes(StandardCharsets.UTF_8).length;
+        sizes.total += bytes;
+        if (item != null) sizes.items.merge(item, bytes, Long::sum);
+        text.setLength(0);
+    }
+
+    /**
      * The file's text: the windows in order; each window's tabs in strip order, each with its nodes, parents first; then
      * the window's items in window order.
      */
     static String encode(Snapshot snapshot) {
-        var text = new StringBuilder("version = 1\n");
+        var text = new StringBuilder();
+        encode(snapshot, text, null);
+        return text.toString();
+    }
+
+    /** Writes {@code snapshot}'s text into {@code text}; with {@code sizes} each part is counted there instead of kept. */
+    private static void encode(Snapshot snapshot, StringBuilder text, Counted sizes) {
+        text.append("version = 1\n");
         for (WindowRecord window : snapshot.windows()) {
             text.append("\n[[windows]]\nrole = \"").append(window.role() == Role.MAIN ? "main" : "full").append("\"\n");
             window.bounds().ifPresent(bounds -> text.append("x = ").append(bounds.x()).append("\ny = ").append(bounds.y())
@@ -575,19 +622,28 @@ public final class WorkspaceFile {
             text.append("extended_state = ").append(window.extendedState()).append('\n');
             text.append("shown_tab = \"").append(window.layout().active()).append("\"\n");
             for (ParentTab parent : window.layout().parentTabs()) {
+                counted(sizes, text, null);
                 text.append("\n[[windows.tabs]]\nid = \"").append(parent.id()).append("\"\n");
-                appendLayout(text, parent.layout(), "windows.tabs.nodes");
+                appendLayout(text, parent.layout(), "windows.tabs.nodes", sizes);
             }
-            for (TabId tab : window.layout().tabs()) appendTab(text, tab, window.tabs().get(tab));
+            for (TabId tab : window.layout().tabs()) {
+                appendTab(text, tab, window.tabs().get(tab));
+                counted(sizes, text, tab);
+            }
         }
-        return text.toString();
+        counted(sizes, text, null);
     }
 
-    /** A tab's active pane and maximize, then its nodes, parents first, each under the array table {@code nodes}. */
-    private static void appendLayout(StringBuilder text, Layout layout, String nodes) {
+    /**
+     * A tab's active pane and maximize, then its nodes, parents first, each under the array table {@code nodes}; counted,
+     * the tab's own lines go with its only item, and each pane's node with its item.
+     */
+    private static void appendLayout(StringBuilder text, Layout layout, String nodes, Counted sizes) {
         text.append("active_pane = \"").append(layout.activeGroup().value())
             .append("\"\nmaximized = \"").append(layout.maximized().map(id -> id.value().toString()).orElse("")).append("\"\n");
-        appendNode(text, layout.root(), "", 1.0, "", nodes);
+        List<TabId> items = layout.tabs();
+        counted(sizes, text, items.size() == 1 ? items.getFirst() : null);
+        appendNode(text, layout.root(), "", 1.0, "", nodes, sizes);
     }
 
     /**
@@ -598,21 +654,25 @@ public final class WorkspaceFile {
         return UUID.nameUUIDFromBytes(("jasper.split:" + path).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
-    private static void appendNode(StringBuilder text, Node node, String parent, double weight, String path, String nodes) {
+    private static void appendNode(StringBuilder text, Node node, String parent, double weight, String path, String nodes, Counted sizes) {
         switch (node) {
             case Split split -> {
                 String id = splitId(path);
                 text.append("\n[[").append(nodes).append("]]\nid = \"").append(id).append("\"\nkind = \"split\"\norientation = \"")
                     .append(split.orientation() == Orientation.HORIZONTAL ? "horizontal" : "vertical")
                     .append("\"\nparent = \"").append(parent).append("\"\nweight = ").append(weight).append('\n');
+                counted(sizes, text, null);
                 for (int i = 0; i < split.children().size(); i++) {
                     Child child = split.children().get(i);
-                    appendNode(text, child.node(), id, child.weight(), path.isEmpty() ? Integer.toString(i) : path + "." + i, nodes);
+                    appendNode(text, child.node(), id, child.weight(), path.isEmpty() ? Integer.toString(i) : path + "." + i, nodes, sizes);
                 }
             }
-            case Group group -> text.append("\n[[").append(nodes).append("]]\nid = \"").append(group.id().value())
-                .append("\"\nkind = \"pane\"\nparent = \"").append(parent).append("\"\nweight = ").append(weight)
-                .append("\nitem = \"").append(group.selected().map(tab -> tab.value().toString()).orElse("")).append("\"\n");
+            case Group group -> {
+                text.append("\n[[").append(nodes).append("]]\nid = \"").append(group.id().value())
+                    .append("\"\nkind = \"pane\"\nparent = \"").append(parent).append("\"\nweight = ").append(weight)
+                    .append("\nitem = \"").append(group.selected().map(tab -> tab.value().toString()).orElse("")).append("\"\n");
+                counted(sizes, text, group.selected().orElse(null));
+            }
         }
     }
 

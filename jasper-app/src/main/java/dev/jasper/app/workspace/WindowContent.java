@@ -1408,24 +1408,26 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Retry on a placeholder (workspace tabs spec 9.2): its plugin's restorer runs again, and the item it opens takes the
-     * placeholder's pane, in whichever tab holds it, selected; a placeholder that fails again says why (workspace plan 6b
-     * Rulings 6 and 19).
+     * Retry on a placeholder (workspace tabs spec 9.2): {@code rebuild} runs its plugin's restorer again, and the item it
+     * opens takes the placeholder's pane, in whichever tab holds it, selected; a placeholder whose restorer fails again
+     * says the new reason (workspace plan 6b Rulings 6 and 19).
+     *
+     * @param placeholder a placeholder this window holds
+     * @param rebuild runs the restorer for what was saved: the item it opened, else the sentence the placeholder says
      */
-    void retry(Tab placeholder) {
+    void retry(Tab placeholder, java.util.function.Function<WorkspaceFile.TabRecord.Content, TabRegistry.Restored> rebuild) {
         if (closed || !(placeholder.content() instanceof PlaceholderContent saved)) return;
         Optional<WorkspaceView> view = parentTabs.holding(placeholder);
         if (view.isEmpty()) return;
-        Optional<Tab> rebuilt = savedTabs.apply(TabId.random(), saved.saved());
-        if (rebuilt.isEmpty()) return;
-        if (rebuilt.get().content() instanceof PlaceholderContent again) {
-            saved.failed(again.reason(), again.retryable());
-            rebuilt.get().close();
+        TabRegistry.Restored rebuilt = rebuild.apply(saved.saved());
+        if (rebuilt.tab().isEmpty()) {
+            saved.failed(rebuilt.problem(), true);
             return;
         }
+        Tab item = rebuilt.tab().get();
         Runnable replace = () -> {
-            mount(rebuilt.get());
-            view.get().replace(placeholder, rebuilt.get());
+            mount(item);
+            view.get().replace(placeholder, item);
             placeholder.close();
         };
         if (terminals != null) terminals.atomically(replace); else replace.run();

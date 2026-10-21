@@ -348,6 +348,28 @@ class WorkspaceFileTest {
                 """);
     }
 
+    /**
+     * Workspace plan 6b Rulings 16 (6b Task 2's review): one counted pass gives the file's size in UTF-8 bytes, and for each
+     * item what leaving it out alone takes out of the file: its entry, its pane's node and, as its tab's only item, its tab.
+     */
+    @Test void sizesCountTheFilesBytesAndWhatLeavesWithEachItem() {
+        assertThat(WorkspaceFile.sizes(snapshot()).total()).as("spec 8's file, splits and all").isEqualTo((long) WorkspaceFile.encodedBytes(snapshot()));
+        assertThat(WorkspaceFile.sizes(snapshot()).items()).containsOnlyKeys(tab(1), tab(2), tab(3), tab(4), tab(5));
+        // Escaped, and wider in UTF-8 than in characters.
+        var wide = new TabRecord.Content("\u4e2d\u6587 \"notes\"", "dev.jasper.editor", "document",
+            Map.of("path", "/\u00e9t\u00e9/\uD83D\uDE00", "bell", "\u0007"));
+        var two = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(2), single(2))), parentTabId(2));
+        var items = new HashMap<>(terminals(two));
+        items.put(tab(1), wide);
+        var both = new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 0, two, items)));
+        var without = new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 0,
+            ParentTabs.of(new ParentTab(parentTabId(2), single(2))), Map.of(tab(2), items.get(tab(2))))));
+        WorkspaceFile.Sizes sizes = WorkspaceFile.sizes(both);
+        assertThat(sizes.total()).as("the file's bytes").isEqualTo((long) WorkspaceFile.encodedBytes(both));
+        assertThat(sizes.items().get(tab(1))).as("its entry, its pane and its tab")
+            .isEqualTo((long) (WorkspaceFile.encodedBytes(both) - WorkspaceFile.encodedBytes(without)));
+    }
+
     @Test void splitIdsAreNameBasedUuidsOfTheirPath() {
         assertThat(WorkspaceFile.splitId("")).isEqualTo("e8b5eccb-037b-3d65-a6c6-5e4889602b31");
         assertThat(WorkspaceFile.splitId("1")).isEqualTo("59943c66-5e92-39d1-a8ea-1f88b440a667");

@@ -4,18 +4,19 @@ import dev.jasper.app.contributions.TabContent;
 import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
-import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.NativeStyles;
-import dev.jasper.ui.theme.SemanticColor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.util.Objects;
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.SwingConstants;
+import javax.swing.JTextArea;
+import javax.swing.text.View;
 
 /**
  * A plugin's tab that could not come back when the windows were restored (workspace tabs spec 9.2 and 13): it says why,
@@ -24,7 +25,22 @@ import javax.swing.SwingConstants;
  */
 final class PlaceholderContent extends JPanel implements TabContent {
     private final WorkspaceFile.TabRecord.Content saved;
-    private final JLabel reason = new JLabel("", SwingConstants.CENTER);
+    /**
+     * Why it did not come back, as plain text that wraps (6b Task 2's review): one line as wide as its text while that fits
+     * the pane less its margins, else wrapped at that width, as tall as its lines.
+     */
+    private final JTextArea reason = new JTextArea() {
+        @Override public Dimension getPreferredSize() {
+            if (getUI() == null || getFont() == null) return super.getPreferredSize();
+            Insets insets = getInsets();
+            int line = getFontMetrics(getFont()).stringWidth(getText()) + insets.left + insets.right + 1;
+            int room = PlaceholderContent.this.getWidth() - 2 * NativeStyles.installed().metric(DesignMetrics.Role.NOTICE_HORIZONTAL_PADDING);
+            int width = room > 0 ? Math.min(line, room) : line;
+            View lines = getUI().getRootView(this);
+            lines.setSize(Math.max(1, width - insets.left - insets.right), Integer.MAX_VALUE);
+            return new Dimension(width, (int) Math.ceil(lines.getPreferredSpan(View.Y_AXIS)) + insets.top + insets.bottom);
+        }
+    };
     private final JButton retry = new JButton("Retry");
     private final JButton close = new JButton("Close");
     private final Runnable onShown;
@@ -51,7 +67,14 @@ final class PlaceholderContent extends JPanel implements TabContent {
         setOpaque(false);
         reason.setName("workspace.placeholder.reason");
         reason.putClientProperty("html.disable", Boolean.TRUE);
-        NativeStyles.installed().label(reason, Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY, () -> ThemeZone.theme(reason));
+        // Read, not edited: the keyboard goes from Retry to Close, never into the text.
+        reason.setEditable(false);
+        reason.setFocusable(false);
+        reason.setOpaque(false);
+        reason.setLineWrap(true);
+        reason.setWrapStyleWord(true);
+        reason.setBorder(BorderFactory.createEmptyBorder());
+        NativeStyles.installed().textArea(reason, () -> ThemeZone.theme(reason));
         for (JButton button : new JButton[]{retry, close}) {
             button.setName("workspace.placeholder." + button.getText().toLowerCase(java.util.Locale.ROOT));
             NativeStyles.installed().button(button, () -> ThemeZone.theme(button));
@@ -59,18 +82,16 @@ final class PlaceholderContent extends JPanel implements TabContent {
         retry.addActionListener(event -> onRetry.run());
         close.addActionListener(event -> onClose.run());
         int gap = NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING);
+        var actions = new JPanel(new FlowLayout(FlowLayout.CENTER, gap, 0));
+        actions.setOpaque(false);
+        actions.add(retry);
+        actions.add(close);
         var place = new GridBagConstraints();
-        place.gridwidth = 2;
         place.insets = new Insets(0, 0, gap, 0);
         add(reason, place);
         place = new GridBagConstraints();
         place.gridy = 1;
-        place.insets = new Insets(0, 0, 0, gap / 2);
-        add(retry, place);
-        place = new GridBagConstraints();
-        place.gridy = 1;
-        place.insets = new Insets(0, gap / 2, 0, 0);
-        add(close, place);
+        add(actions, place);
         failed(why, retryable);
     }
 

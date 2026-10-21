@@ -15,10 +15,14 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -137,7 +141,7 @@ public final class WindowManager {
     /** How each plugin stands, by id: without the application's answer, none is installed. */
     private Function<String, PluginState> plugins = id -> new PluginState(id, PluginState.Kind.NOT_INSTALLED);
     /** The items the size limit has left out of a save so far, each logged once (workspace plan 6b Rulings 16). */
-    private final java.util.Set<TabId> leftOut = new java.util.HashSet<>();
+    private final Set<TabId> leftOut = new HashSet<>();
     /** While {@link #closeAll()} runs: no window opens, so no child window outlives the main window and no fresh one opens. */
     private boolean closingAll;
 
@@ -709,8 +713,11 @@ public final class WindowManager {
             content.onLayoutChanged = this::changed;
             // A plugin's saved tab comes back through its plugin, or as a placeholder; one naming Jasper itself is left out
             // (workspace plan 6b Rulings 3 and 22).
-            content.savedTabs = (tabId, saved) -> saved.pluginId().equals(TabRegistry.APP_OWNER) ? Optional.empty()
-                : savedTab(content, tabId, saved);
+            content.savedTabs = (tabId, saved) -> {
+                if (!saved.pluginId().equals(TabRegistry.APP_OWNER)) return savedTab(content, tabId, saved);
+                LOG.log(System.Logger.Level.WARNING, "Not restoring a saved " + saved.restorer() + " item: Jasper's own items are not restored");
+                return Optional.empty();
+            };
             if (!prepare.test(window)) {
                 window.discard();
                 return Optional.empty();
@@ -756,49 +763,58 @@ public final class WindowManager {
     }
 
     /**
-     * The windows as {@code records} save them, with items taken out until the file fits {@link WorkspaceFile#MAX_BYTES},
-     * which a read would otherwise set aside (workspace plan 6b Rulings 16): plugins' items first, the largest first, then
-     * terminals; each is logged the first time, not at every save, and taken out as closing it would (Rulings 21): a tab
-     * left with none goes, and a full window left with none is left out.
+     * The windows as {@code records} save them, with items left out until the file fits {@link WorkspaceFile#MAX_BYTES},
+     * which a read would otherwise set aside (workspace plan 6b Rulings 16): plugins' items first, then terminals, each the
+     * largest first by the bytes the file writes for it, all counted in one pass ({@link WorkspaceFile#sizes}), so a save
+     * under the limit writes no text here. Each is logged the first time, not at every save, and left out as closing it
+     * would (Rulings 21): a tab left with none goes, and a full window left with none is left out.
      */
     private WorkspaceFile.Snapshot fitted(List<WorkspaceFile.WindowRecord> records) {
-        var windows = new ArrayList<>(records);
-        var snapshot = new WorkspaceFile.Snapshot(windows);
-        while (WorkspaceFile.encodedBytes(snapshot) > WorkspaceFile.MAX_BYTES) {
-            int holder = -1;
-            TabId largest = null;
-            long largestSize = -1;
-            boolean largestContent = false;
-            for (int index = 0; index < windows.size(); index++)
-                for (var entry : windows.get(index).tabs().entrySet()) {
-                    boolean content = entry.getValue() instanceof WorkspaceFile.TabRecord.Content;
-                    long size = size(entry.getValue());
-                    if (largest == null || content && !largestContent || content == largestContent && size > largestSize) {
-                        holder = index; largest = entry.getKey(); largestSize = size; largestContent = content;
-                    }
-                }
-            if (largest == null) break;
-            WorkspaceFile.WindowRecord window = windows.get(holder);
-            TabId out = largest;
-            if (leftOut.add(out)) LOG.log(System.Logger.Level.WARNING, "Not saving the tab " + window.tabs().get(out).title()
-                + ": the saved windows would pass workspace.toml's size limit");
-            Optional<ParentTabs> kept = WorkspaceFile.keeping(window.layout(), tab -> !tab.equals(out), window.role() == WorkspaceFile.Role.MAIN);
-            var tabs = new HashMap<>(window.tabs());
-            tabs.remove(out);
-            if (kept.isEmpty()) windows.remove(holder);
-            else windows.set(holder, new WorkspaceFile.WindowRecord(window.role(), window.bounds(), window.extendedState(), kept.get(), tabs));
-            snapshot = new WorkspaceFile.Snapshot(windows);
+        var snapshot = new WorkspaceFile.Snapshot(records);
+        WorkspaceFile.Sizes sizes = WorkspaceFile.sizes(snapshot);
+        long over = sizes.total() - WorkspaceFile.MAX_BYTES;
+        if (over <= 0) return snapshot;
+        var ranked = new ArrayList<Map.Entry<TabId, WorkspaceFile.TabRecord>>();
+        for (WorkspaceFile.WindowRecord window : records) ranked.addAll(window.tabs().entrySet());
+        ranked.sort(Comparator.comparing((Map.Entry<TabId, WorkspaceFile.TabRecord> item) -> !(item.getValue() instanceof WorkspaceFile.TabRecord.Content))
+            .thenComparing(item -> sizes.items().getOrDefault(item.getKey(), 0L), Comparator.reverseOrder())
+            .thenComparing(item -> item.getKey().value()));
+        var out = new HashSet<TabId>();
+        int next = 0;
+        while (true) {
+            for (; over > 0 && next < ranked.size(); next++) {
+                var item = ranked.get(next);
+                out.add(item.getKey());
+                over -= sizes.items().getOrDefault(item.getKey(), 0L);
+                if (leftOut.add(item.getKey())) LOG.log(System.Logger.Level.WARNING, "Not saving the tab " + item.getValue().title()
+                    + ": the saved windows would pass workspace.toml's size limit");
+            }
+            snapshot = without(records, out);
+            // What was counted leaves with each item, though a split it leaves may write its other panes' weights longer:
+            // the file is checked once, and more items leave only when it still passes the limit.
+            over = WorkspaceFile.encodedBytes(snapshot) - WorkspaceFile.MAX_BYTES;
+            if (over <= 0 || next == ranked.size()) return snapshot;
         }
-        return snapshot;
     }
 
-    /** About how much of the file a tab's record takes. */
-    private static long size(WorkspaceFile.TabRecord record) {
-        return switch (record) {
-            case WorkspaceFile.TabRecord.Terminal terminal -> terminal.title().length() + terminal.directory().length() + terminal.profile().length();
-            case WorkspaceFile.TabRecord.Content content -> content.title().length() + content.state().entrySet().stream()
-                .mapToLong(value -> value.getKey().length() + value.getValue().length()).sum();
-        };
+    /**
+     * {@code records} without the items {@code out} names, each window's taken out at once as closing them would
+     * ({@code WorkspaceFile.keeping}): a tab left with none goes, and a full window left with none is left out.
+     */
+    private static WorkspaceFile.Snapshot without(List<WorkspaceFile.WindowRecord> records, Set<TabId> out) {
+        var windows = new ArrayList<WorkspaceFile.WindowRecord>();
+        for (WorkspaceFile.WindowRecord window : records) {
+            if (window.tabs().keySet().stream().noneMatch(out::contains)) {
+                windows.add(window);
+                continue;
+            }
+            Optional<ParentTabs> kept = WorkspaceFile.keeping(window.layout(), tab -> !out.contains(tab), window.role() == WorkspaceFile.Role.MAIN);
+            if (kept.isEmpty()) continue;
+            var tabs = new HashMap<>(window.tabs());
+            tabs.keySet().removeAll(out);
+            windows.add(new WorkspaceFile.WindowRecord(window.role(), window.bounds(), window.extendedState(), kept.get(), tabs));
+        }
+        return new WorkspaceFile.Snapshot(windows);
     }
 
     private Optional<WorkspaceFile.WindowRecord> windowRecord(JasperWindow window) {
@@ -834,11 +850,24 @@ public final class WindowManager {
     private Optional<Tab> savedTab(WindowContent content, TabId id, WorkspaceFile.TabRecord.Content saved) {
         PluginState state = plugins.apply(saved.pluginId());
         if (state.kind() != PluginState.Kind.RUNNING) return placeholder(content, id, saved, reason(state), false);
+        TabRegistry.Restored restored = rebuilt(content, id, state, saved);
+        return restored.tab().isPresent() ? restored.tab() : placeholder(content, id, saved, restored.problem(), true);
+    }
+
+    /**
+     * Runs the restorer of {@code saved}'s plugin, which runs as {@code state} says, for {@code content}'s window under
+     * {@code id}: the item it opened, else why there is none, as a placeholder says it (workspace tabs spec 9.2 and 13).
+     */
+    private TabRegistry.Restored rebuilt(WindowContent content, TabId id, PluginState state, WorkspaceFile.TabRecord.Content saved) {
         TabRegistry.Restored restored = model.tabs().restore(id, saved.pluginId(),
             new TabRegistry.Restoring(content.id(), saved.title(), new TabRestore(saved.restorer(), saved.state())));
-        if (restored.tab().isPresent()) return restored.tab();
-        String problem = restored.problem().endsWith(".") ? restored.problem() : restored.problem() + ".";
-        return placeholder(content, id, saved, state.name() + " could not restore this tab: " + problem, true);
+        if (restored.tab().isPresent()) return restored;
+        return new TabRegistry.Restored(Optional.empty(), state.name() + " could not restore this tab: " + sentence(restored.problem()));
+    }
+
+    /** {@code text} ending a sentence: as it is when it already ends with a full stop, a question mark or an exclamation mark. */
+    private static String sentence(String text) {
+        return text.endsWith(".") || text.endsWith("?") || text.endsWith("!") ? text : text + ".";
     }
 
     /** Why a plugin that does not run restores nothing, as a placeholder says it. */
@@ -875,27 +904,30 @@ public final class WindowManager {
         return Optional.of(tab[0]);
     }
 
-    /** Retry on a placeholder: its plugin's restorer runs again in the window that holds it, while the plugin runs. */
+    /**
+     * Retry on a placeholder: while its plugin runs, its restorer runs again in the window that holds it, which puts what
+     * it opens in the placeholder's pane, or shows why there is none.
+     */
     private void retry(Tab placeholder) {
-        if (placeholder.closed() || !standing(placeholder)) return;
-        window(placeholder.window()).ifPresent(holder -> holder.content().retry(placeholder));
+        standing(placeholder).ifPresent(state -> window(placeholder.window()).ifPresent(holder ->
+            holder.content().retry(placeholder, saved -> rebuilt(holder.content(), TabId.random(), state, saved))));
     }
 
     /**
      * Says again how a placeholder's plugin stands: why it does not run, without Retry, or, for one that came back as not
      * running and runs now, that Retry brings the tab back.
      *
-     * @return whether the plugin runs
+     * @return how the plugin stands while it runs; empty when it does not, or the placeholder has closed
      */
-    private boolean standing(Tab placeholder) {
-        if (placeholder.closed() || !(placeholder.content() instanceof PlaceholderContent content)) return false;
+    private Optional<PluginState> standing(Tab placeholder) {
+        if (placeholder.closed() || !(placeholder.content() instanceof PlaceholderContent content)) return Optional.empty();
         PluginState state = plugins.apply(content.saved().pluginId());
         if (state.kind() != PluginState.Kind.RUNNING) {
             content.failed(reason(state), false);
-            return false;
+            return Optional.empty();
         }
         if (!content.retryable()) content.failed(state.name() + " runs now: Retry brings this tab back.", true);
-        return true;
+        return Optional.of(state);
     }
 
     /**
