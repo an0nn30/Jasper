@@ -421,7 +421,8 @@ and the first content tab the plugin opens meanwhile (`TabRegistry.open`), or th
 being restored (`WindowContent.openTerminal`), takes the saved id, while it is free, and that window, before any
 placement applies; the window then places it in its saved tab and pane with its other items, and takes no other item
 while the restorer runs, nor lets the saved tab move. A reason the restorer returns is the placeholder's and no
-incident; what it throws before it opens its tab is both. Otherwise the tab is a `Tab.Kind.PLACEHOLDER`
+incident; what it throws before it opens its tab is both, and so is an `Error` other than a `VirtualMachineError` at any
+point, which closes the tab it opened. Otherwise the tab is a `Tab.Kind.PLACEHOLDER`
 (`workspace.PlaceholderContent`) that says why, from `WindowManager.PluginState` (the application's reading of
 `PluginRuntime.standing`), saved again as it was; its Retry and Close act in the window that holds it then, and it asks
 how its plugin stands whenever it shows and on Retry.

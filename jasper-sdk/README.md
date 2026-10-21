@@ -81,7 +81,8 @@ shown yet has not started: its pane's `info().state()` is `SessionState.NOT_STAR
 sent to it is dropped; then its shell starts, or its session connects, as a new terminal's does.
 
 A plugin's tab comes back when the plugin says how: a `RestoreState` (`dev.jasper.sdk`: a restorer kind and at most 32
-strings, which Jasper writes into `workspace.toml`, so never a secret) in its `ContentSpec` or `SessionSpec`
+entries and 4,096 characters in all (keys and values), which Jasper writes into `workspace.toml`, so never a secret; a
+larger state, or a key holding a lone surrogate, throws `IllegalArgumentException`) in its `ContentSpec` or `SessionSpec`
 (`withRestore`), or later through `ContentTab.setRestore`, and a restorer for that kind registered in `start()` with
 `Windows.restorer(kind, restorer)`. The restorer gets a `RestoreRequest` (the window being restored, the saved title, the
 state) and opens the tab the way the plugin opens it, before it returns `Optional.empty()`; the first content tab it

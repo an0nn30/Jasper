@@ -950,7 +950,9 @@ A tab comes back when Jasper restores its windows (SDK 0.21.0) if you say how: g
 (`spec.withRestore(RestoreState.of("document", "path", file.toString()))`), change it with `ContentTab.setRestore` when the tab
 comes to stand for something else, and register the restorer for the kind in `start()`:
 `context.windows().restorer("document", request -> openDocument(request.state().values().get("path"), request.window()))`,
-where `openDocument` returns empty once the tab is open, or why it could not open it.
+where `openDocument` opens the tab at once and reads the file afterwards, off the UI thread, as the Editor does, and
+returns empty once the tab is open, or why it could not open it. A restorer runs on the UI thread before its window
+shows and must not block: it does no file or network I/O.
 The restorer opens the tab the way your action does, with the same restore state, and returns `Optional.empty()`; Jasper
 places it where it was saved, in whichever window, tab and pane held it. When it cannot come back now (its file is gone),
 return why instead, `Optional.of("its file is gone")`: its placeholder says so with Retry, and nothing reports a failure.

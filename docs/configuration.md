@@ -678,8 +678,8 @@ usable display. A terminal comes back with its name and profile and a new shell 
 new shell starts when that directory was on another host or is gone; only the terminals of the tab each window shows
 start at once, the others when their tab first shows. A plugin's view comes back in its tab and pane when its plugin
 can restore it (the Editor's files, Remote's SSH tabs), and otherwise as a placeholder that says why (the plugin is not
-installed, turned off, waiting for your review or could not start, or it could not restore that view), with Close and,
-while its plugin runs, Retry. Scrollback and running programs do not come back. A file Jasper
+installed, turned off, off in safe mode, waiting for your review or could not start, or it could not restore that view),
+with Close and, while its plugin runs, Retry. Scrollback and running programs do not come back. A file Jasper
 cannot read is kept as `workspace.toml.bad`, and Jasper starts with one terminal tab and says so. This file is written
 by Jasper and is not meant to be edited. Quit Jasper before changing it: once Jasper has opened a window it restores
 from what it last saved, not from the file, and a later save may replace the change.

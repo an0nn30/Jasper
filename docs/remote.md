@@ -95,13 +95,13 @@ it is fixed.
 An SSH connection is shared by tabs, splits, SFTP browsers and transfers using the same
 connection identity; it stays open for a few seconds after its last use. When it drops, every pane on that host
 shows the disconnected banner and Reconnect makes a new connection. When Jasper restores its windows, each SSH tab
-comes back to its host and folder (a folder too long to save is left out) and waits until it is first shown; then it
-connects at once when signing in asks nothing (every host on its route signs in through the SSH agent), after any
-connection in progress in that window, and otherwise (a Vault login, locked or not), or when its host's key is not
-trusted yet, it shows Not connected with Reconnect, which asks as usual. An SSH agent that confirms each use
-(`ssh-add -c`, 1Password, Secretive) prompts outside Jasper the first time a restored tab shows. The status bar shows
-how many SSH sessions are open; clicking it toggles the panel. Locking the Vault leaves live sessions alone;
-only new connections need it.
+comes back to its host, in the folder it was opened in, if any (a folder too long to save is left out), and waits
+until it is first shown; then it connects at once when signing in asks nothing (every host on its route signs in
+through the SSH agent), after any connection in progress in that window, and otherwise (a Vault login, locked or
+not), or when its host's key is not trusted yet, it shows Not connected with Reconnect, which asks as usual. An SSH
+agent that confirms each use (`ssh-add -c`, 1Password, Secretive) prompts outside Jasper when a restored tab
+connects. The status bar shows how many SSH sessions are open; clicking it toggles the panel. Locking the Vault
+leaves live sessions alone; only new connections need it.
 
 Host information is best-effort. After a successful user-initiated connection, a separate SSH exec
 channel reads `uname -s`, Linux `/etc/os-release`, or Windows `ver`; these commands never enter the
