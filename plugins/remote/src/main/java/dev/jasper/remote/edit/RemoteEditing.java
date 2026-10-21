@@ -17,7 +17,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -34,6 +36,9 @@ public final class RemoteEditing {
     private final Supplier<Optional<WindowHandle>> activeWindow;
     private final NotificationGroup notifications;
     private final Function<UUID, Optional<RemoteHost>> hosts;
+    private final Supplier<CompletableFuture<Void>> hostsLoaded;
+    private final Executor ui;
+    private final Predicate<ConnectionIdentity> silent;
 
     /**
      * @param editor the Editor's service
@@ -54,9 +59,27 @@ public final class RemoteEditing {
      */
     public RemoteEditing(Editor editor, EditChannels channels, Supplier<Optional<WindowHandle>> activeWindow, NotificationGroup notifications,
                          Function<UUID, Optional<RemoteHost>> hosts) {
+        this(editor, channels, activeWindow, notifications, hosts, () -> CompletableFuture.completedFuture(null), Runnable::run, route -> false);
+    }
+
+    /**
+     * @param editor the Editor's service
+     * @param channels where documents queue their operations
+     * @param activeWindow the Jasper window used last, for sign-in prompts once the origin window has closed
+     * @param notifications where a file the Editor cannot open is posted
+     * @param hosts finds a saved host by id, in memory, for reopening recent files
+     * @param hostsLoaded completes once the saved hosts have been read at start: before that a recorded key reopens a
+     *     document that finds them when it is first used (workspace tabs spec 13)
+     * @param ui the UI thread
+     * @param silent whether signing in to a route asks nothing, so a restored document's first read may sign in
+     */
+    public RemoteEditing(Editor editor, EditChannels channels, Supplier<Optional<WindowHandle>> activeWindow, NotificationGroup notifications,
+                         Function<UUID, Optional<RemoteHost>> hosts, Supplier<CompletableFuture<Void>> hostsLoaded, Executor ui,
+                         Predicate<ConnectionIdentity> silent) {
         this.editor = Objects.requireNonNull(editor); this.channels = Objects.requireNonNull(channels);
         this.activeWindow = Objects.requireNonNull(activeWindow); this.notifications = Objects.requireNonNull(notifications);
-        this.hosts = Objects.requireNonNull(hosts);
+        this.hosts = Objects.requireNonNull(hosts); this.hostsLoaded = Objects.requireNonNull(hostsLoaded);
+        this.ui = Objects.requireNonNull(ui); this.silent = Objects.requireNonNull(silent);
     }
 
     /**
@@ -91,15 +114,25 @@ public final class RemoteEditing {
 
     /**
      * @param key a recorded {@link RemoteDocument#key}
-     * @return empty when the key is malformed or a host on its route is no longer saved; otherwise builds the document on
-     *     the recorded route and logins, with the saved hosts as they are now, for the window reopening it
+     * @return empty when the key is malformed, or a host on its route is no longer saved once the saved hosts have loaded;
+     *     otherwise builds the document on the recorded route and logins, with the saved hosts as they are now, for the
+     *     window reopening it. Before the saved hosts have loaded (Jasper restoring its windows at start), the document
+     *     finds them when it is first used.
      */
     Optional<Function<WindowOwner, EditorDocument>> reopen(String key) {
         Optional<RemoteDocument.ParsedKey> parsed = RemoteDocument.parseKey(key);
-        Optional<ConnectionIdentity> identity = parsed.flatMap(this::identity);
-        if (identity.isEmpty()) return Optional.empty();
+        if (parsed.isEmpty()) return Optional.empty();
         String path = parsed.get().path();
-        return Optional.of(owner -> new RemoteDocument(identity.get(), path, channels, owner instanceof WindowHandle window ? owner(window) : activeWindow));
+        Optional<ConnectionIdentity> identity = identity(parsed.get());
+        if (identity.isPresent()) return Optional.of(owner -> new RemoteDocument(identity.get(), path, channels, owner(owner), silent));
+        if (hostsLoaded.get().isDone()) return Optional.empty();
+        return Optional.of(owner -> new SavedRemoteDocument(key, parsed.get(), this::identity,
+            found -> new RemoteDocument(found, path, channels, owner(owner), silent), hostsLoaded, ui));
+    }
+
+    /** The window that owns a reopened document's sign-in prompts: the one reopening it, else the one used last. */
+    private Supplier<Optional<WindowHandle>> owner(WindowOwner owner) {
+        return owner instanceof WindowHandle window ? owner(window) : activeWindow;
     }
 
     /**

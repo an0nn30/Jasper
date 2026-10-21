@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -28,6 +29,7 @@ public final class RemoteDocument implements EditorDocument {
     private final String path;
     private final EditChannels channels;
     private final Supplier<Optional<WindowHandle>> owner;
+    private final Predicate<ConnectionIdentity> silent;
 
     /** The start of every remote document's key. */
     public static final String KEY_PREFIX = "remote:";
@@ -58,6 +60,20 @@ public final class RemoteDocument implements EditorDocument {
      * @param owner the window for sign-in prompts when reconnecting
      */
     public RemoteDocument(ConnectionIdentity identity, String path, EditChannels channels, Supplier<Optional<WindowHandle>> owner) {
+        this(identity, path, channels, owner, route -> false);
+    }
+
+    /**
+     * @param identity the connection the file was browsed on
+     * @param path the absolute path as browsed
+     * @param channels where its operations queue
+     * @param owner the window for sign-in prompts when reconnecting
+     * @param silent whether signing in to a route asks nothing (an open connection, or the SSH agent for every host):
+     *     only then does {@link #readQuietly} read
+     */
+    public RemoteDocument(ConnectionIdentity identity, String path, EditChannels channels, Supplier<Optional<WindowHandle>> owner,
+                          Predicate<ConnectionIdentity> silent) {
+        this.silent = Objects.requireNonNull(silent);
         this.identity = Objects.requireNonNull(identity);
         try { this.path = FilePaths.absolute(path); }
         catch (IOException relative) { throw new IllegalArgumentException("An absolute path is required: " + path, relative); }
@@ -107,6 +123,16 @@ public final class RemoteDocument implements EditorDocument {
 
     @Override public CompletableFuture<Content> read(long limitBytes) {
         return channels.submit(identity, owner, endpoint -> read(endpoint, path, limitBytes));
+    }
+
+    /**
+     * Reads as {@link #read} does when signing in to the route asks nothing, on a channel opened quietly, which answers a
+     * host-key question Cancel; otherwise fails at once and says so, so a restored tab never asks before the user does
+     * (workspace tabs spec 13; workspace plan 6b Rulings 29). Retry then reads with {@link #read}.
+     */
+    @Override public CompletableFuture<Content> readQuietly(long limitBytes) {
+        if (silent.test(identity)) return channels.submitQuietly(identity, owner, endpoint -> read(endpoint, path, limitBytes));
+        return CompletableFuture.failedFuture(new IOException("Not signed in to " + identity.host().name() + "; Retry signs in"));
     }
 
     @Override public CompletableFuture<Optional<Revision>> revision() {

@@ -242,6 +242,43 @@ class SessionPaneTest {
         });
     }
 
+    /** Workspace tabs plan 6b: a restored session its plugin leaves not connected offers Reconnect, not Retry. */
+    @Test void aRestoredSessionLeftNotConnectedOffersReconnect() throws Exception {
+        edt(() -> {
+            var request = new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run);
+            pane = new TerminalPane(HOME, launcher(new ArrayDeque<>()), request);
+            pane.restored();
+            pane.start();
+        });
+        attempts.get(0).fail("Not connected: Reconnect to sign in");
+        until(() -> pane.noticeText().equals("Not connected: Reconnect to sign in"));
+        edt(() -> {
+            assertThat(pane.noticePrimary().getText()).isEqualTo("Reconnect");
+            pane.close();
+        });
+    }
+
+    /** Workspace plan 6b's review: cancelling a restored session's first connect keeps its pane, which offers Reconnect. */
+    @Test void cancellingARestoredSessionsFirstConnectKeepsItsPaneWithReconnect() throws Exception {
+        int[] closes = new int[1];
+        edt(() -> {
+            var request = new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run);
+            pane = new TerminalPane(HOME, launcher(new ArrayDeque<>()), request);
+            pane.onClose = () -> closes[0]++;
+            pane.restored();
+            pane.start();
+        });
+        edt(() -> {
+            assertThat(pane.noticeSecondary().getText()).isEqualTo("Cancel");
+            pane.noticeSecondary().doClick();
+            assertThat(attempts.get(0).isCancelled()).isTrue();
+            assertThat(closes[0]).as("its pane stays").isZero();
+            assertThat(pane.noticeText()).isEqualTo("Connection cancelled");
+            assertThat(pane.noticePrimary().getText()).isEqualTo("Reconnect");
+            pane.close();
+        });
+    }
+
     @Test void aFailedTransportSaysWhyAndClosePaneOnExitClosesIt() throws Exception {
         open(false);
         var broken = new Loopback();

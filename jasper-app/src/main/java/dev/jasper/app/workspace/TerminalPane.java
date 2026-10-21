@@ -378,14 +378,16 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     }
 
     private void showDisconnected(String message) {
-        showNotice(message, view == null ? "Retry" : "Reconnect", this::connect, "Close", () -> onClose.run());
+        // A restored session was connected when its tab was saved: connecting it again is a Reconnect (workspace tabs spec 13).
+        showNotice(message, view == null && !restored ? "Retry" : "Reconnect", this::connect, "Close", () -> onClose.run());
         onChanged.run();
     }
 
     private void cancelAttempt() {
         if (attempt != null) attempt.cancel();
-        // Nothing was ever shown in a pane whose first attempt is cancelled; a reconnect returns to the banner.
-        if (view == null) onClose.run(); else showDisconnected("Connection cancelled");
+        // Nothing was ever shown in a pane whose first attempt is cancelled; a reconnect returns to the banner, and so does
+        // a restored session's first attempt: its tab came back to be reconnected (workspace tabs spec 13).
+        if (view == null && !restored) onClose.run(); else showDisconnected("Connection cancelled");
     }
 
     private void showDropped() {

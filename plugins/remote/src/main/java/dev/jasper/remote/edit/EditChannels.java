@@ -31,6 +31,8 @@ public final class EditChannels implements AutoCloseable {
     @FunctionalInterface public interface Work<T> { T run(FileEndpoint endpoint) throws Exception; }
 
     private final BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>> opener;
+    /** Opens a quiet job's channel, a restored document's first read, asking nothing (workspace plan 6b Rulings 29). */
+    private final BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>> quietOpener;
     private final Predicate<ConnectionIdentity> authenticated;
     private final Executor background, ui;
     private final Map<ConnectionIdentity, Channel> channels = new HashMap<>();
@@ -44,7 +46,21 @@ public final class EditChannels implements AutoCloseable {
      */
     public EditChannels(BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>> opener,
                         Predicate<ConnectionIdentity> authenticated, Executor background, Executor ui) {
-        this.opener = Objects.requireNonNull(opener); this.authenticated = Objects.requireNonNull(authenticated);
+        this(opener, opener, authenticated, background, ui);
+    }
+
+    /**
+     * @param opener opens an endpoint, on the UI thread; the window, when present, owns sign-in prompts
+     * @param quietOpener opens one for a quiet job ({@link #submitQuietly}), asking nothing
+     * @param authenticated whether an authenticated connection exists, so opening needs no prompt
+     * @param background where operations run
+     * @param ui the UI thread
+     */
+    public EditChannels(BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>> opener,
+                        BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>> quietOpener,
+                        Predicate<ConnectionIdentity> authenticated, Executor background, Executor ui) {
+        this.opener = Objects.requireNonNull(opener); this.quietOpener = Objects.requireNonNull(quietOpener);
+        this.authenticated = Objects.requireNonNull(authenticated);
         this.background = Objects.requireNonNull(background); this.ui = Objects.requireNonNull(ui);
     }
 
@@ -56,7 +72,22 @@ public final class EditChannels implements AutoCloseable {
      * @return the work's result, completed on the UI thread
      */
     public <T> CompletableFuture<T> submit(ConnectionIdentity identity, Supplier<Optional<WindowHandle>> owner, Work<T> work) {
-        var job = new Job<T>(Objects.requireNonNull(owner), Objects.requireNonNull(work));
+        return submit(identity, owner, work, false);
+    }
+
+    /**
+     * As {@link #submit}, a restored document's first read (workspace tabs spec 13): a channel it must open opens with the
+     * quiet opener, which asks nothing.
+     *
+     * @param owner the window whose questions the quiet opener answers Cancel
+     * @return the work's result, completed on the UI thread
+     */
+    public <T> CompletableFuture<T> submitQuietly(ConnectionIdentity identity, Supplier<Optional<WindowHandle>> owner, Work<T> work) {
+        return submit(identity, owner, work, true);
+    }
+
+    private <T> CompletableFuture<T> submit(ConnectionIdentity identity, Supplier<Optional<WindowHandle>> owner, Work<T> work, boolean quiet) {
+        var job = new Job<T>(Objects.requireNonNull(owner), Objects.requireNonNull(work), quiet);
         if (closed) {
             job.result.completeExceptionally(new IOException("Remote has stopped"));
             return job.result;
@@ -100,7 +131,7 @@ public final class EditChannels implements AutoCloseable {
             return;
         }
         CompletableFuture<FileEndpoint> opening;
-        try { opening = opener.apply(channel.identity, owner); }
+        try { opening = (job.quiet ? quietOpener : opener).apply(channel.identity, owner); }
         catch (RuntimeException failure) { opening = CompletableFuture.failedFuture(failure); }
         channel.opening = opening;
         var requested = opening;
@@ -204,8 +235,10 @@ public final class EditChannels implements AutoCloseable {
     private static final class Job<T> {
         final Supplier<Optional<WindowHandle>> owner;
         final Work<T> work;
+        /** A restored document's first read: its channel opens asking nothing. */
+        final boolean quiet;
         final CompletableFuture<T> result = new CompletableFuture<>();
 
-        Job(Supplier<Optional<WindowHandle>> owner, Work<T> work) { this.owner = owner; this.work = work; }
+        Job(Supplier<Optional<WindowHandle>> owner, Work<T> work, boolean quiet) { this.owner = owner; this.work = work; this.quiet = quiet; }
     }
 }

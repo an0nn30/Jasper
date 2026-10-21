@@ -722,6 +722,238 @@ class RemotePluginTest {
         }
     }
 
+    /** An SSH agent holding one RSA key, which {@code server} accepts. */
+    private static dev.jasper.remote.agent.FakeAgent agent(LoopbackServer server) throws Exception {
+        var generator = java.security.KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        var pair = generator.generateKeyPair();
+        server.allow(pair.getPublic());
+        return new dev.jasper.remote.agent.FakeAgent(pair);
+    }
+
+    /** {@link #plugin(Path)}, signing in through {@code agent} as the SSH agent. */
+    RemotePlugin plugin(Path sshDir, dev.jasper.remote.agent.FakeAgent agent) {
+        return new TestRemotePlugin(Kits.UI, context -> Optional.of(new dev.jasper.remote.agent.AgentClient(agent::handle)),
+            (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
+    }
+
+    /**
+     * Workspace tabs spec 13: an SSH tab gives its host and comes back through Remote's restorer, waiting until it is
+     * shown; then not connected while signing in would ask (a Vault login), and connected when nothing has to be asked
+     * (the SSH agent, workspace plan 6b Rulings 9). A state naming no host declines, which is no failure.
+     */
+    @Test void anSshTabComesBackAndConnectsOnlyWhenSigningInAsksNothing(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(vault.password("p", "deploy", "s3cret")), "", Optional.empty());
+            var signed = RemoteHost.create("build", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(saved); plugin.store().put(signed); settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), saved)); settle(host);
+            UUID pane = host.terminalPanes().getFirst();
+            UUID tab = Kits.value(() -> context.terminals().pane(pane).orElseThrow().tab().id());
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            assertThat(Kits.value(() -> host.restoreState(tab))).contains(state);
+
+            vault.state = dev.jasper.vault.api.LockState.LOCKED;
+            Optional<UUID> locked = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state));
+            assertThat(locked).isPresent();
+            settle(host);
+            UUID waiting = Kits.value(() -> context.terminals().tab(locked.get()).orElseThrow().terminal().orElseThrow().id());
+            assertThat(host.sessionState(waiting)).as("restored, it waits to be shown").isEqualTo("NOT_STARTED|");
+            Kits.edt(() -> host.focusTerminalPane(waiting));
+            Kits.await(host, () -> host.sessionState(waiting).startsWith("EXITED|"), "the restored tab to decide");
+            assertThat(host.sessionState(waiting)).as("signing in would ask: not connected, with Reconnect").startsWith("EXITED|Not connected");
+            assertThat(host.windows()).as("nothing asks at restore").isEmpty();
+            vault.state = dev.jasper.vault.api.LockState.UNLOCKED;
+            Kits.edt(() -> host.reconnectSession(waiting)); settle(host);
+            assertThat(host.sessionState(waiting)).isEqualTo("RUNNING|");
+
+            // The SSH agent signs in asking nothing: restored, its tab connects once it is first shown.
+            var agentState = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", signed.id().toString(), "name", "build"));
+            Optional<UUID> alone = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "build", agentState));
+            settle(host);
+            UUID connected = Kits.value(() -> context.terminals().tab(alone.orElseThrow()).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> host.focusTerminalPane(connected));
+            Kits.await(host, () -> host.sessionState(connected).equals("RUNNING|"), "the restored tab to connect");
+            assertThat(Kits.value(() -> host.restoreState(alone.get()))).contains(agentState);
+
+            assertThat(Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "gone",
+                new dev.jasper.sdk.RestoreState("ssh", Map.of("host", "not-a-host"))))).isEmpty();
+            assertThat(Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "deleted",
+                new dev.jasper.sdk.RestoreState("ssh", Map.of("host", UUID.randomUUID().toString()))))).as("hosts loaded: a gone host").isEmpty();
+            assertThat(host.declinedRestores()).hasSize(2).allSatisfy(line -> assertThat(line).contains("it names no saved host"));
+            assertThat(host.failures()).as("expected outcomes, no failures").isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b Rulings 9: a Vault login never signs in alone at restore, even while the Vault is unlocked, since
+     * the Vault may ask to grant Remote the credential: the restored tab asks for none and offers Reconnect, which signs in.
+     */
+    @Test void aVaultSignedSshTabRestoredWhileTheVaultIsUnlockedAsksForNoCredentialAndOffersReconnect(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            UUID login = vault.password("p", "deploy", "s3cret");
+            var secret = vault.secrets.get(login);
+            var asked = new java.util.concurrent.atomic.AtomicInteger();
+            vault.secrets.put(login, () -> { asked.incrementAndGet(); return secret.get(); });
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(login), "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            assertThat(vault.state).isEqualTo(dev.jasper.vault.api.LockState.UNLOCKED);
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> host.focusTerminalPane(pane));
+            Kits.await(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the restored tab to decide");
+            assertThat(host.sessionState(pane)).isEqualTo("EXITED|Not connected: Reconnect to sign in");
+            assertThat(asked).as("no credential asked for at restore").hasValue(0);
+            assertThat(host.windows()).as("nothing asks at restore").isEmpty();
+            Kits.edt(() -> host.reconnectSession(pane)); settle(host);
+            assertThat(host.sessionState(pane)).as("Reconnect signs in through the Vault").isEqualTo("RUNNING|");
+            assertThat(asked.get()).isPositive();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace plan 6b's review: a restored tab's quiet connect that fails says why, asks nothing and offers Reconnect. */
+    @Test void aQuietConnectThatFailsSaysWhyAndOffersReconnect(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var plugin = plugin(dir, new dev.jasper.remote.agent.FakeAgent());
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> host.focusTerminalPane(pane));
+            Kits.await(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the quiet connect to fail");
+            assertThat(host.sessionState(pane)).as("why, with Reconnect").startsWith("EXITED|Not connected: ").contains("no usable keys");
+            assertThat(host.windows()).as("its overlay closed, nothing asked").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace tabs spec 13: restored SSH tabs shown together in one window connect one after another, none refused. */
+    @Test void restoredSshTabsShownTogetherInOneWindowAllConnect(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            UUID first = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID second = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID one = Kits.value(() -> context.terminals().tab(first).orElseThrow().terminal().orElseThrow().id());
+            UUID two = Kits.value(() -> context.terminals().tab(second).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> { host.focusTerminalPane(one); host.focusTerminalPane(two); });
+            Kits.await(host, () -> host.sessionState(one).equals("RUNNING|") && host.sessionState(two).equals("RUNNING|"),
+                "both restored tabs to connect");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b Rulings 29: a restored SSH tab whose host key is not trusted (a host accepted Once is unknown again
+     * at the next start) connects quietly, asks nothing and offers Reconnect, which asks as usual.
+     */
+    @Test void aRestoredSshTabWhoseHostKeyIsUnknownAsksNothingAndOffersReconnect(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            // The host's key is unknown: the question it raises mid-handshake is the one asked here. The fake's background
+            // work is left queued, so each connect stays in progress while its question is asked.
+            var question = new HostKeyVerifier.Question("127.0.0.1", server.port(), "ssh-ed25519", "SHA256:unknown");
+            Kits.edt(() -> {
+                host.focusTerminalPane(pane);
+                assertThat(host.windows()).as("its first connect runs").containsExactly("overlay|Connecting to prod|true");
+                var asked = plugin.askHostKey(context.terminals().window(window).orElseThrow(), question);
+                assertThat(asked).as("a quiet connect runs there: Cancel, unasked").isCompletedWithValue(HostKeyVerifier.Decision.CANCEL);
+                assertThat(host.windows()).as("no host-key question shown").containsExactly("overlay|Connecting to prod|true");
+                // The handshake fails on that Cancel: the quiet connect closes its overlay and leaves Reconnect.
+                cancel(plugin.currentConnectionPanel());
+                assertThat(host.sessionState(pane)).isEqualTo("EXITED|Not connected: Reconnect to sign in");
+                assertThat(host.windows()).as("the overlay closed").isEmpty();
+                host.reconnectSession(pane);
+                var again = plugin.askHostKey(context.terminals().window(window).orElseThrow(), question);
+                assertThat(host.windows()).as("Reconnect asks as usual").contains("dialog|Verify host key 127.0.0.1|true");
+                host.requestClose("dialog");
+                assertThat(again).isCompletedWithValue(HostKeyVerifier.Decision.CANCEL);
+                cancel(plugin.currentConnectionPanel());
+            });
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace plan 6b's review: a restored SSH tab closed while it waits for its window's connection passes its turn on. */
+    @Test void aRestoredSshTabClosedWhileItWaitsPassesItsTurnOn(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            // A connection in progress in the window, its connect held on the host's background executor until it settles.
+            Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), saved));
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            UUID first = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID second = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID one = Kits.value(() -> context.terminals().tab(first).orElseThrow().terminal().orElseThrow().id());
+            UUID two = Kits.value(() -> context.terminals().tab(second).orElseThrow().terminal().orElseThrow().id());
+            // Both shown while the window's connection is in progress: both wait for it, the first one first.
+            Kits.edt(() -> { host.focusTerminalPane(one); host.focusTerminalPane(two); });
+            Kits.edt(() -> host.closeTerminalPane(one));
+            Kits.edt(() -> cancel(plugin.currentConnectionPanel()));
+            Kits.await(host, () -> host.sessionState(two).equals("RUNNING|"), "the second waiting tab to connect");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6a Task 1's hand-off (Rulings 41): picking a host whose restored SSH tab still waits to be shown,
+     * NOT_STARTED, shows that tab, which then decides how to connect, instead of opening a second one.
+     */
+    @Test void activatingAHostShowsItsRestoredTabThatWaitsToBeShown(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(vault.password("p", "deploy", "s3cret")), "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            assertThat(host.sessionState(pane)).isEqualTo("NOT_STARTED|");
+            Kits.edt(() -> plugin.activateHost(context.terminals().window(window).orElseThrow(), saved));
+            Kits.await(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the shown tab to decide");
+            assertThat(host.terminalPanes()).as("no second tab for the host").containsExactly(pane);
+            assertThat(host.sessionState(pane)).as("shown, it decides as any restored tab").startsWith("EXITED|Not connected");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
     @Test void renamesDefaultGroupThroughThePanel(@TempDir Path dir) throws Exception {
         Kits.edt(() -> {
             try (var host = new FakePluginHost()) {
