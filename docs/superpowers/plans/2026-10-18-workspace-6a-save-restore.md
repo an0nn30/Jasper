@@ -1,9 +1,16 @@
 # Workspace tabs 6a: saving and restoring the workspace Implementation Plan
 
-**Status: Tasks 1-5 executed (`30cc4ca35..3f273675e`); Tasks 6-10 re-planned in place on 2026-10-21 on the
-tabs-and-panes model (plans 8a-8c); see Workspace.** Tasks 1-5 ran on the parent-tabs model, which had pane windows;
-their text below is history and is not run again. The pre-flight rulings F1-F21 of the earlier versions stand except
-where "Superseded" says otherwise. Record every deviation from the text of Tasks 6-10 here and in `docs/STATUS.md`.
+**Status: Tasks 1-5 executed (`30cc4ca35..3f273675e`), Tasks 6-10 executed on 2026-10-21** (`77d7b3033..987b30f63`, then
+the documentation commit), after the re-plan of 2026-10-21 on the tabs-and-panes model (plans 8a-8c); see
+`docs/STATUS.md`. Tasks 1-5 ran on the parent-tabs model, which had pane windows; their text below is history and is not
+run again. The pre-flight rulings F1-F21 of the earlier versions stand except where "Superseded" says otherwise.
+Deviations from the text of Tasks 6-10: (1) Task 8's review: a full window whose restore fails once its items are
+mounted is discarded unshown, not closed as one that opened (its emptying waits for its frame); one pane whose start
+fails leaves its tab's other panes starting; a restored window is sized as a new window is (the empty window's stand-in
+size goes); `keepAside` guards both set-asides; Rulings 43. (2) Task 9's review: the set-aside notice posts one EDT turn
+later (Rulings 44); the store takes a writer (`JasperApplication.workspaceWriter`) so tests pin that Quit waits for its
+save and that the store writes the Jasper home's `workspace.toml`. (3) 6b's text cites a few line numbers and a test
+count that moved; its anchors are unaffected.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -322,7 +329,8 @@ From `81f80c1af`, where plans 8a, 8b and 8c (with plan 8c's final-review fixes) 
 
 Record them in `docs/STATUS.md` (Task 10). Rulings 1 to 23 are the first version's and 24 to 31 the parent-tabs
 re-plan's, their numbers kept, as "What — why" (see Superseded for those the model makes moot or rewords); 32 to 42 are
-this re-plan's, each as "What. Reason. Cost if wrong".
+this re-plan's, each as "What. Reason. Cost if wrong"; 43 and 44 came from the reviews of Tasks 8 and 9, in the same
+style.
 
 1. **Plan 6 is two plans: 6a (windows and terminal tabs, the store, SDK 0.21.0) and 6b (plugins' tabs: restore state,
    restorers, placeholders, the Editor's, Remote's and the sample's tabs)** — the brief's split past about twelve tasks;
@@ -488,6 +496,17 @@ this re-plan's, each as "What. Reason. Cost if wrong".
     `WindowManager.open`, before the same turn's `newTab(directory)`, `mainOpened` and requested file; the start-up's
     first-paint proof, its settle and the memory watch should not wait for a restored terminal that a request's editor
     tab hides (6a review M3). Cost if wrong: the mark comes one EDT turn later.
+
+43. **A restore catches `RuntimeException | Error` once the main window shows and in the main window's own restore, and
+    keeps the saved windows aside** (Rulings 20, 35, 41; Task 8's review). Reason: a deterministic failure costs only what
+    failed and never repeats at each start; an `Error` after the main window showed marked it failed, discarded a main
+    window that could shut a non-resident Jasper down, and left the file in place to fail the same way at every start.
+    Cost if wrong: an `OutOfMemoryError` during a restore is logged instead of propagating.
+44. **The set-aside notice posts one EDT turn after the restore read the file, so it shows as a card on every first
+    opening, a settled resident Jasper's Dock reopen included** (Rulings 13; Task 9's review). Reason: on that reopen the
+    file was read before `open()` counted the opening, so the presence was idle and the notice went to the history, never
+    a card; a later turn finds the main window made and not yet activated, and the card waits for its activation as at a
+    cold start. Cost if wrong: the notice comes one EDT turn later.
 
 ## File structure
 

@@ -42,8 +42,8 @@ monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
 Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
 Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
 Specialized content retains explicit Appearance palettes and workspace opacity.
-Bundled manifests require `sdk = ">=0.21.0, <0.22"` (0.21.0 is a breaking boundary for saved workspaces; 0.20.0 is one too, described under Main and child windows
-below; 0.19.0 is one too, described under Tabs of every kind below;
+Bundled manifests require `sdk = ">=0.21.0, <0.22"` (0.21.0 is a breaking boundary, described under Tabs, panes and split items and under Saved workspaces below; 0.20.0 is one
+too, described under Main and child windows below; 0.19.0 is one too, described under Tabs of every kind below;
 0.18.1 adds icon-only GHOST buttons in toolbar views and the `run` and `application` icons; 0.18.0 is one too: `ChoiceKind.SEGMENTED` is `EXCLUSIVE`, `ButtonPresentation.CIRCULAR` is `HELP`, and `FormKind.HERO`, `HERO_COMPACT`, `LayoutRole.HERO`, `TextRole.HERO_TITLE` and `IconSize.HERO` are `PROMPT`, `PROMPT_COMPACT`, `PROMPT_HEADER`, `PROMPT_TITLE` and `PROMPT`, and it adds the `presentation.provide` capability, `StandardMenu.SESSION` and `TRANSFER`, `ToolbarItem.View` with `ToolbarViewFactory`, `ScopeSpec.hue` and `itemNoun`, `PaletteVerb.role`, `DialogSpec.swatch`, the `Notice`, `Properties` and `Separator` nodes, `ChoiceKind.TABS`, `Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, `IconSize.SWATCH`, `Form.footnote`, `Tree.columns`, `TableRow.cellNodes` and `TableRow.heading`, `Table.empty` and `emptyText`, and `ItemList.emptyText`, and an EXCLUSIVE choice with fewer than two or more than four options, a selected heading row, a table's empty state together with its empty text, an empty state with more than one action and more tree values than columns are refused; 0.17.1 adds `Terminals.environment`, `Platform.editor` with `FileEditor`, `LocalSpec.command`, `CommandLine.client()`, the `hidden` icon and the `TAB_INDICATOR` and `TITLEBAR` colours; 0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
 `DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
 Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed).
@@ -72,6 +72,13 @@ with` the item's label, whose ids follow from the item's (`dev.example.notes.not
 `Windows.splitChoices()` lists the Split choices for a menu a plugin builds itself, `ContentTab.split(choice, direction)`
 opens one beside that item's pane (the terminal's needs `terminal.open`), and `ContentTab.moveToNewTab()` (with
 `mayMoveToNewTab()`) gives its pane a tab of its own.
+
+## Saved workspaces (SDK 0.21.0)
+
+Jasper saves its windows and restores them at start and whenever the main window opens again: the main window and its
+full windows, their tabs, the panes of each tab and what each pane holds. A restored terminal whose tab Jasper has not
+shown yet has not started: its pane's `info().state()` is `SessionState.NOT_STARTED` until its tab first shows, and text
+sent to it is dropped; then its shell starts as a new terminal's does.
 
 ## Tabs of every kind (SDK 0.19.0)
 

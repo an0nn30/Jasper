@@ -663,14 +663,23 @@ settings file and data there too; their jars are in the application image). A zi
 unusable one is renamed `.rejected`. Enabled state and consented capabilities are in `plugins.toml`;
 pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
 launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
-dock's sizes and split ratios (each look apart: the Enterprise look keeps its own), which panels are open, stripe visibility, main-window size/position and maximized
-state, and the bounds of Settings, About and Licenses. The last main window closed supplies the layout for the next launch, including
+dock's sizes and split ratios (each look apart: the Enterprise look keeps its own), which panels are open, stripe visibility,
+and the bounds of Settings, About and Licenses. The last main window closed supplies the layout for the next launch, including
 the terminal area left between its panels; a resident Jasper (see [Background residency](#background-residency))
 uses it for its next window too, also after Quit sent it to the background, which closes every window as a real
-Quit does. Normal bounds are retained while maximized or minimized; relaunch
-never starts minimized. If a saved window no longer fits an available display, its bounds are fitted to a usable
-display. This file is written by Jasper and is not meant to be edited. Terminal sessions and editor documents
-are not recreated by this layout state.
+Quit does. This file is written by Jasper and is not meant to be edited.
+
+`workspace.toml` beside it keeps Jasper's windows: the main window and each full window, with its size, position and
+maximized state, its tabs in order with the one it shows, and each tab's split panes, the active one and what each pane
+holds. Jasper saves it within a second of each change, when a window closes, on Quit and when it goes to the
+background, and restores it at start and whenever the main window opens again. A window keeps its normal bounds while
+maximized or minimized and never comes back minimized; one that no longer fits an available display is fitted to a
+usable display. A terminal comes back with its name and profile and a new shell in its last local directory, or where a
+new shell starts when that directory was on another host or is gone; only the terminals of the tab each window shows
+start at once, the others when their tab first shows. Scrollback and running programs do not come back. A file Jasper
+cannot read is kept as `workspace.toml.bad`, and Jasper starts with one terminal tab and says so. This file is written
+by Jasper and is not meant to be edited; a hand edit of it while Jasper is running, or resident in the background, is
+ignored and later overwritten, so quit Jasper first.
 
 ## View modes
 

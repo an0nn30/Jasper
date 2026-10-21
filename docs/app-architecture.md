@@ -105,7 +105,13 @@ registry, then, when every tab arrived, `WorkspaceView.rearrange` gives the pare
 with no window and the menu bar item
 restore the main window first; closing the main window, Quit and going to the background close the child windows, then
 the main window. `MainWindow`'s constructor has one call site, `WindowManager.ensureMain`, which
-`verifyApplicationArchitecture` checks.
+`verifyApplicationArchitecture` checks. `WorkspaceStore` (workspace) keeps the windows in `workspace.toml`
+(`persistence.WorkspaceFile`, which writes each window's tabs, their panes and each pane's item in the spec's words):
+`WindowManager.snapshot()` builds what is saved, within a second of each change (a non-sliding timer on the EDT, the
+write on a virtual thread) and at once when a window closes; closing every window saves first and holds saving until
+the windows come back. `ensureMain` restores the main window, then its full windows, each with its place, tabs and
+items, before it shows; a restored terminal's shell starts when its tab first shows, and until then its pane reports
+`NOT_STARTED`.
 
 Residency retains indexes/config/history after the last window,
 and does not intentionally retain pane sessions; asynchronous child cleanup may
@@ -176,7 +182,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT arguments, the home's instance lock and the handoff, and EDT composition. StartupResources owns rollback until explicit transfer; the owner's Instance keeps its lock for the life of the process. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
-| `workspace` | EDT windows (`WindowManager`, `MainWindow`, `ChildWindow`, their `WindowFrame`s), their parent tabs (`ParentTabsView`, with the parent-tab bar `ParentTabBar`), each a workspace of groups, its panes, one tab each (`WorkspaceView`, `GroupView`, `SplitContainer`), terminal tabs and panes, the tab and pane drag (`TabDrag`, the window manager's one, shared by its windows), the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
+| `workspace` | EDT windows (`WindowManager`, `MainWindow`, `ChildWindow`, their `WindowFrame`s), their parent tabs (`ParentTabsView`, with the parent-tab bar `ParentTabBar`), each a workspace of groups, its panes, one tab each (`WorkspaceView`, `GroupView`, `SplitContainer`), the saved workspace (`WorkspaceStore`), terminal tabs and panes, the tab and pane drag (`TabDrag`, the window manager's one, shared by its windows), the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`; and the tab and pane drag's `WorkspaceDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, and the layout's group ids and sides, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
 | `layout` | Pure workspace layout model: a window's parent tabs (`ParentTabs`, with the shown one and their order of use), parent tab, tab and group ids, a workspace's groups (its panes, one tab each) in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximized group and the groups' order of use, the operations that return a new layout, and each group's region of the unit square with its directional neighbours. JDK-only (nothing from Swing or AWT, enforced by `verifyApplicationArchitecture`); immutable values, safe on any thread. `persistence.WorkspaceFile` reads and writes a workspace's `Layout` as `workspace.toml`. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |

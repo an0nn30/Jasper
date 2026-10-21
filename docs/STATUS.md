@@ -1,5 +1,108 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 6a: saving and restoring the workspace — 2026-10-21** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `30cc4ca35..3f273675e` on the parent-tabs model, then `77d7b3033..987b30f63` and
+this documentation commit; [plan](superpowers/plans/2026-10-18-workspace-6a-save-restore.md),
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). Jasper saves its windows to
+`<home>/workspace.toml` (`workspace.WorkspaceStore` over plan 2's `WorkspaceFile`): one second after the first change (a
+timer that does not slide), at once when a window closes, and before closing every window (closing the main window,
+Quit, going to the background), after which saving waits until the windows come back; writes run in order on virtual
+threads, each after the one before however it ended, a write the writer refuses logged as a failed one, and shutdown
+waits for them; a snapshot that fails, an `Error` too, costs only that save. The file says window, tab, pane and item
+(spec 12): each window's place, `shown_tab` and tabs in strip order (`[[windows.tabs]]`), each tab's `active_pane`,
+`maximized` and nodes, each pane naming its one item, then the window's items (`[[windows.items]]`); `version` stays 1.
+`WindowManager.snapshot()` keeps each window's `JasperWindow.Placement`, its tabs and a `TabRecord.Terminal` per local
+terminal (rename, last local directory, profile); other items are taken out as closing them would
+(`WorkspaceFile.keeping`): a tab left with none goes, a full window left with none is left out, Jasper's own Errors tab
+among them. `WindowManager.ensureMain` restores: the main window, then its full windows, each before its frame exists,
+the main window in front; tab, pane and item ids come back as saved; a request's directory opens in a new tab after the
+restored ones; with nothing saved, an unreadable file or a main window that cannot be restored, a new main window opens;
+a restore that throws once the main window shows, an `Error` too, costs only what failed, the saved windows kept aside
+(Rulings 43). Saved windows that do not all come back (an unreadable file, a dropped window, tab or item entry, a window
+that cannot be restored) are kept as `workspace.toml.bad` with the notice "Jasper could not restore your windows",
+posted one EDT turn after the file was read, so it shows as a card on every first opening, a settled resident Jasper's
+Dock reopen included (Rulings 44). A main window that shows no terminal (a maximized pane counts alone) marks the first
+paint with its own. A restored terminal waits (`TerminalPane.restored()`) until its tab is the one its window shows when
+an EDT turn ends (a gesture that passes over tabs, such as Move to Main Window, starts none of them; a request's new tab
+leaves the restored ones waiting), and reports `NOT_STARTED`, in the testkit's fake too (`FakePluginHost.holdPane`,
+local panes only, checked on both runtimes); a directory that is gone starts the shell where a new shell starts.
+`UiState`'s `[main_window]` is gone (no migration), and plan 5's keep-on-screen helpers are `WindowPlacement.fitted` and
+`displayFor`. The SDK is 0.21.0, a breaking boundary: `SessionState.NOT_STARTED`; every bundled manifest, the external
+example and every guide range declare `sdk = ">=0.21.0, <0.22"`. Rulings (plan, "Rulings"): (1) 6a is windows and
+terminal tabs, the store and SDK 0.21.0, and 6b plugins' tabs; (2) one SDK bump, to 0.21.0, 6b's additions `@since
+0.21.0`; (3) `NOT_STARTED` is the first constant of `SessionState` and of `PaneSnapshot.State`; (4) a restored terminal
+starts once its tab shows (narrowed by 37); (5) a restored pane whose directory is gone starts where a new shell starts,
+no WSL share probed; (6) a terminal tab saves its rename, inheritable local directory and profile, a program's tab as a
+shell, a provided session's not in 6a; (7) every window keeps the place its frame reports, and `[main_window]` goes with
+no migration; (8) a layout change, a rename, a terminal's new local directory, a window opening or closing and a new
+place are worth saving; (9) the save timer starts at the first change and never slides, the snapshot is taken on the
+EDT, an equal one is not written, writes run in order on virtual threads; (10) closing every window saves first and
+holds saving until they are restored, whatever that save does; (11) a restore in the same process uses the snapshot it
+saved last, not the file; (12) `ensureMain` is the one restore point, a request's directory opening in a new tab after
+the restored ones; (13) saved windows that do not all come back are kept as `workspace.toml.bad` with a notice; (14) the
+snapshot takes out each tab that cannot come back as closing it would; (15) no snapshot while no main window is open or
+while it opens; (16) a restored full window's timing line says `restore`; (17) a main window that shows no terminal
+marks the first paint with its own; (18) the rehearsal never touches the store; (19) shutdown waits for the last write;
+(20) a full window that cannot be restored is logged and left out, a main window that cannot opens fresh in place and is
+never discarded; (21) a restored window's place reaches its frame through `JasperWindow.placement`, never
+`Opening.bounds`; (22) a snapshot that throws costs only that save, and every write runs after the one before however it
+ended; (23) the testkit's fake holds a pane as Jasper holds a restored tab (`FakePluginHost.holdPane`); (24) the
+keep-on-screen helpers sit beside `WindowPlacement`, which fits a restored window with `fitted`; (25) the first file
+shape (roles, parent tabs, pane windows), replaced by 32; (26) a bad entry drops alone, and so does one repeating an
+earlier entry's ids; (27) tab, pane and item ids come back as saved, a window's id is new at every opening; (28) every
+layout change, moves between windows included, reaches `workspaceChanged`, where the save is asked for; (29) a pane
+window comes back as one, moot now that pane windows are gone; (30) a restored workspace takes the window's theme and
+glass, and its tabs take their places at once; (31) the start of the shown restored tabs waits for the end of the EDT
+turn and is asked for once per turn, so a gesture that passes over tabs starts none of them; (32) `workspace.toml` says
+window, tab, pane and item, `version` staying 1; (33) a write the writer refuses is logged as a failed one; (34)
+`save()` takes over a scheduled save only once it has windows to write; (35) an `Error` from the snapshot costs that
+save alone; (36) the store's tests record its log, and `layoutChanged()` stays right after the model takes a change;
+(37) a restored terminal starts once its tab is the one its window shows when an EDT turn ends, every pane of that tab;
+(38) every window restores by one route: `ensureMain` reads the store, restores the main window, then each full window;
+(39) Task 5's review fix round is a task of its own (Task 6); (40) the earlier tasks' Minors the ledger gave the final
+fix wave stay with it; (41) a request's new tab that a restored main window fails to open is logged and costs only
+itself; (42) the first-paint check reads the main window once its opening's EDT turn ends; (43) a restore catches
+`RuntimeException | Error` once the main window shows and in the main window's own restore, and keeps the saved windows
+aside, so a deterministic failure costs only what failed and never repeats at each start (Rulings 20, 35, 41; Task 8's
+review); (44) the set-aside notice posts one EDT turn after the restore read the file, so it shows as a card on every
+first opening, a settled resident Jasper's Dock reopen included (Rulings 13; Task 9's review); superseded or reworded
+for tabs and panes: Rulings 4, 14, 17, 25 to 31 and Spec issues 4; Spec issues 5 to 7 (the main window's empty tab keeps
+one empty pane, saved with `item = ""`; the file says the spec's words; a request's new tab covers the restored tab that
+showed, which waits). Deviations: (1) Task 8's review: a full window whose restore fails once its items are mounted is
+discarded unshown, not closed as one that opened (its emptying waits for its frame); one pane whose start fails leaves
+its tab's other panes starting; a restored window is sized as a new window is (the empty window's stand-in size goes);
+`keepAside` guards both set-asides; Rulings 43. (2) Task 9's review: the set-aside notice posts one EDT turn later
+(Rulings 44); the store takes a writer (`JasperApplication.workspaceWriter`) so tests pin that Quit waits for its save
+and that the store writes the Jasper home's `workspace.toml`. (3) 6b's text cites a few line numbers and a test count
+that moved; its anchors are unaffected. Left for plan 6b: plugins' items (restore state, restorers, placeholders) within
+SDK 0.21.0, restored with their saved ids straight into their windows and tabs, never through `TabRegistry.open`, and
+never saving Jasper's own items (`TabRegistry.APP_OWNER`); `ContentTab.window()` names a never-open window for an item
+that waits for the main window, which now waits through every full window's restore; Remote's restored `NOT_STARTED`
+panes; `AppContractTest`'s `emptyWindow` and panel routing and `FakeWorkspace.closeWindow` nulling `Panel.instance`; THD
+Sourcing Crypto rebuilt after 6b, against 0.21.0. Left for 6a's final fix wave: Task 1's re-review items 1 and 2, Task
+2's review Minors 2 and 3, Task 4's review Minors 5 to 7, Task 6's review Minors 1, 2 and 5 (one log recorder in
+`testsupport` that ends the store's and the codec's stderr warnings and lets the tests assert them; a hold with a
+scheduled save and nothing to save), Task 7's review Minors 1 to 4 (a pane with no item key; the `.bad` bytes of the
+old-words test; wording; the writer refusing a file over the reader's size limit, unless 6b's window fitting already
+keeps every write under it) and Task 8's review Minors 5 to 7 (redundant announcements inside `atomically`, harmless;
+the duplication of `restoreChild` and `openChild`, plan-mandated; test gaps and noise). Follow-up: AOT training trains
+only the fresh path (its home is deleted each time), so the restore classes are untrained; seeding the training home
+with a one-tab `workspace.toml`, and deleting it between `StartupRuns` benchmark runs, is left for the start-up work.
+The rehearsal never reaching the store is pinned by the code's structure (it never calls `WindowManager`); headless,
+`warmUp` rehearses nothing. `./gradlew check --continue`: **12,157 tests, 0 failures, 0 errors, 25 skipped, BUILD
+SUCCESSFUL** (app 4,168, Editor 4,920, UI 930, terminal 460, testkit 213, Buddy 151, SDK 95, the other plugins 1,220).
+GUI checks for the user: with two tabs in the main window (one split), a full window of two tabs, quit and start again:
+every window comes back where it was, the tab each showed shown, with its panes, their sizes and the active one, the tab
+strip as before in each look (Enterprise always shows it), and only the shown tab's shells start; a hidden tab's shells
+start when it shows; a renamed tab keeps its name; maximize a window, quit, start: it comes back maximized; unplug a
+display between runs: every window lands on the remaining one; close a full window, quit, start: it stays closed; close
+every tab of the main window, quit, start: the empty workspace comes back; corrupt `workspace.toml`, start: one tab and
+the notice, the file kept as `workspace.toml.bad`; with residency, close the main window and reopen from the Dock: the
+same windows; with Jasper resident in the background (the login item) and a corrupt `workspace.toml`, reopen from the
+Dock: the notice shows as a card; under Enterprise, a restored terminal tab not yet shown has the idle dot on its strip
+entry (a shell that ended has the same; its entry tells assistive technology of no running session) until it is first
+shown, when the dot turns to running, and the status bar names only the shown tab's active pane. Not merged, not pushed.
+
 **Workspace tabs, plan 8c: moving panes — 2026-10-20** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `107b7eb55..5ec032b5b`, then the documentation commit and its final-review fix wave;
 [plan](superpowers/plans/2026-10-20-workspace-8c-moving-panes.md),
