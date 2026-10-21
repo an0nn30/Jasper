@@ -16,7 +16,7 @@ import java.util.function.Function;
 /**
  * A window manager over stand-in frames, as {@code WindowManagerTest}'s, for the saved workspace's tests (workspace tabs
  * spec 13): each window's content is connected to one model and one terminal registry, and shells are idle sessions
- * launched when the test runs {@link #launch()}. EDT only.
+ * launched when the test runs {@link #launch()}. EDT only, but {@link #launch()}, which runs off it.
  */
 final class TestWindows {
     /** The shells' launches the windows asked for: the EDT adds them, {@link #launch()} runs them off it. */

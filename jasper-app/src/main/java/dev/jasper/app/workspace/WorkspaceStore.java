@@ -19,9 +19,9 @@ import javax.swing.SwingUtilities;
  * after a save is saved {@link #DELAY} later, with every change made meanwhile, so a crash loses at most that; a window
  * closing saves at once. Each save takes its snapshot on the EDT and writes it on {@code writer}, off the EDT, after the
  * writes before it, whatever happened to them. Closing the main window, Quit and going to the background save, then hold
- * every save ({@link #hold()}) until the windows are restored ({@link #load()}). A snapshot or a write that fails is
- * logged and costs only that save: the next save writes the windows, changed or not. EDT only, except
- * {@link #written()}.
+ * every save ({@link #hold()}) until the windows are restored ({@link #load()}). A snapshot or a write that fails, or a
+ * write the writer refuses, is logged and costs only that save: the next save writes the windows, changed or not. EDT
+ * only, except {@link #written()}.
  */
 public final class WorkspaceStore {
     /** The longest a change waits to be saved (spec 13: "within one second of each layout change"). */
@@ -120,24 +120,29 @@ public final class WorkspaceStore {
         save();
     }
 
-    /** Saves now, as a closing window does; a save a change scheduled is not needed any more. */
+    /**
+     * Saves now, as a closing window does; a save a change scheduled is not needed any more once this one has the
+     * windows. With nothing to save yet (no main window open, or it opens), or a snapshot that fails, the scheduled save
+     * stays.
+     */
     public void save() {
         requireEdt();
+        if (held) return;
+        Optional<WorkspaceFile.Snapshot> taken;
+        try {
+            taken = snapshot.get();
+        } catch (RuntimeException | Error failure) {
+            // A window that cannot say what it holds costs this save, never the close or quit that asked for it.
+            LOG.log(System.Logger.Level.WARNING, "Could not take the workspace's snapshot to save", failure);
+            return;
+        }
+        if (taken.isEmpty()) return;
         if (pending != null) {
             Runnable cancel = pending;
             pending = null;
             cancel.run();
         }
-        if (held) return;
-        Optional<WorkspaceFile.Snapshot> taken;
-        try {
-            taken = snapshot.get();
-        } catch (RuntimeException failure) {
-            // A window that cannot say what it holds costs this save, never the close or quit that asked for it.
-            LOG.log(System.Logger.Level.WARNING, "Could not take the workspace's snapshot to save", failure);
-            return;
-        }
-        if (taken.isEmpty() || taken.get().equals(lastWritten.get())) return;
+        if (taken.get().equals(lastWritten.get())) return;
         WorkspaceFile.Snapshot writing = taken.get();
         saved = writing;
         lastWritten.set(writing);
@@ -167,7 +172,12 @@ public final class WorkspaceStore {
     /** Writes after every write asked for before, however that one ended: a failed write, or a refused one, ends no chain. */
     private void writeLater(Path target, WorkspaceFile.Snapshot writing) {
         writes = writes.handle((done, failure) -> (Void) null).thenRunAsync(() -> write(target, writing), writer)
-            .whenComplete((done, refused) -> { if (refused != null) unwritten(target, writing); });
+            .whenComplete((done, refused) -> {
+                if (refused == null) return;
+                // The writer refused it (it is shutting down, say): a write that never ran, logged as one that failed.
+                LOG.log(System.Logger.Level.WARNING, "Could not save the workspace to " + target, refused);
+                unwritten(target, writing);
+            });
     }
 
     private void write(Path target, WorkspaceFile.Snapshot writing) {

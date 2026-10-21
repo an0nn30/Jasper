@@ -14,10 +14,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -34,15 +38,46 @@ class WorkspaceStoreTest {
     private Optional<WorkspaceFile.Snapshot> current = Optional.empty();
     /** Thrown by the next snapshot when set, as a window that cannot say what it holds would. */
     private RuntimeException failing;
+    /** Thrown by the next snapshot when set: an {@code Error}, as a bug deep in a window's layout would throw. */
+    private Error breaking;
     /** Refuses the next write when set, as an executor that is shutting down does. */
     private boolean refuseNext;
     private WorkspaceStore store;
+    /** What the store logged during the test: its warnings are asserted here, never printed. */
+    private final List<java.util.logging.LogRecord> logged = new ArrayList<>();
+    private final java.util.logging.Logger log = java.util.logging.Logger.getLogger(WorkspaceStore.class.getName());
+    private final java.util.logging.Handler recorder = new java.util.logging.Handler() {
+        @Override public void publish(java.util.logging.LogRecord record) { synchronized (logged) { logged.add(record); } }
+        @Override public void flush() { }
+        @Override public void close() { }
+    };
+    private boolean parents;
+
+    @BeforeEach void record() {
+        parents = log.getUseParentHandlers();
+        log.setUseParentHandlers(false);
+        log.addHandler(recorder);
+    }
+
+    @AfterEach void stopRecording() {
+        log.removeHandler(recorder);
+        log.setUseParentHandlers(parents);
+    }
+
+    /** The messages of the warnings the store logged, in order. */
+    private List<String> warnings() {
+        synchronized (logged) {
+            return logged.stream().filter(record -> record.getLevel() == java.util.logging.Level.WARNING)
+                .map(java.util.logging.LogRecord::getMessage).toList();
+        }
+    }
 
     private Path file() { return dir.resolve("workspace.toml"); }
 
     private void store() throws Exception {
         edt(() -> store = new WorkspaceStore(file(), () -> {
             if (failing != null) throw failing;
+            if (breaking != null) throw breaking;
             return current;
         }, (delay, task) -> {
             delays.add(delay);
@@ -107,6 +142,22 @@ class WorkspaceStoreTest {
         current = Optional.empty();
         edt(() -> store.save());
         assertThat(writes).as("no main window: nothing to save").isEmpty();
+    }
+
+    /** Workspace plan 6a Task 5's review: a save with nothing to save yet leaves the save a change scheduled in place. */
+    @Test void aSaveWithNothingToSaveKeepsTheSaveAChangeScheduled() throws Exception {
+        store();
+        edt(() -> { store.changed(); store.save(); });
+        assertThat(cancelled).as("no main window yet: the scheduled save stays").isZero();
+        assertThat(due).hasSize(1);
+        failing = new IllegalStateException("a window cannot say what it holds");
+        edt(() -> store.save());
+        assertThat(due).as("nor does a snapshot that fails take it").hasSize(1);
+        failing = null;
+        current = Optional.of(workspace("/work"));
+        edt(() -> due.remove().run());
+        write();
+        assertThat(onDisk()).isEqualTo(current.get());
     }
 
     @Test void writesRunInTheOrderTheyWereAskedFor() throws Exception {
@@ -178,6 +229,33 @@ class WorkspaceStoreTest {
         edt(() -> { store.load(); store.save(); });
         write();
         assertThat(onDisk()).isEqualTo(current.get());
+    }
+
+    /** Rulings 22, workspace plan 6a Task 5's review: an Error from a snapshot costs that save alone, logged. */
+    @Test void aSnapshotThatThrowsAnErrorCostsOnlyThatSave() throws Exception {
+        store();
+        breaking = new AssertionError("a layout that breaks its own rule");
+        edt(() -> store.save());
+        assertThat(writes).isEmpty();
+        assertThat(warnings()).containsExactly("Could not take the workspace's snapshot to save");
+        breaking = null;
+        current = Optional.of(workspace("/work"));
+        edt(() -> store.save());
+        write();
+        assertThat(onDisk()).isEqualTo(current.get());
+    }
+
+    /** Workspace plan 6a Task 5's review: a write the writer refuses is logged as a failed one is, never dropped quietly. */
+    @Test void aWriteTheWriterRefusesIsLogged() throws Exception {
+        store();
+        refuseNext = true;
+        current = Optional.of(workspace("/work"));
+        edt(() -> store.save());
+        assertThat(writes).as("refused").isEmpty();
+        assertThat(warnings()).as("logged with the file it was for").containsExactly("Could not save the workspace to " + file());
+        synchronized (logged) {
+            assertThat(logged.getLast().getThrown()).as("with why").hasRootCauseInstanceOf(java.util.concurrent.RejectedExecutionException.class);
+        }
     }
 
     @Test void aWriteThatFailsOrIsRefusedNeverStopsTheNextOne() throws Exception {
