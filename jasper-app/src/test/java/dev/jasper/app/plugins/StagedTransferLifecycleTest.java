@@ -64,7 +64,10 @@ class StagedTransferLifecycleTest {
             onEdt(()->assertThat(host.start(new HostedPlugin(new PluginInfo("dev.jasper.remote","Remote","0.3.0",Set.of()),Set.of(),Set.of(),Set.of(),loader,()->plugin)).state()).isEqualTo(PluginStatus.State.ACTIVE));
             try {
                 Object local=refType.getMethod("local").invoke(null),request=requestType.getConstructor(refType,List.class,refType,String.class).newInstance(local,List.of(source.toString()),local,destination.toString());
-                var enqueued=(CompletableFuture<?>)coordinatorType.getMethod("enqueue",requestType,WindowHandle.class).invoke(coordinator.get(),request,null);UUID id=(UUID)enqueued.get(5,TimeUnit.SECONDS);
+                // The enqueue runs once the control loop opens the queue, and this loader's first SQLite connection
+                // extracts and loads sqlite-jdbc's native library: seconds on a loaded machine. Wait for the enqueue
+                // itself; the suite's default test timeout catches a hang.
+                var enqueued=(CompletableFuture<?>)coordinatorType.getMethod("enqueue",requestType,WindowHandle.class).invoke(coordinator.get(),request,null);UUID id=(UUID)enqueued.join();
                 assertThat(blocked.await(10,TimeUnit.SECONDS)).as(boundary).isTrue();
                 var pending=new AtomicReference<List<CompletableFuture<?>>>();onEdt(()->pending.set(host.stop()));
                 CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5,TimeUnit.SECONDS);
