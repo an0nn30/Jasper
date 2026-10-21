@@ -11,8 +11,11 @@ window, or back to the main window, takes the focus there (the deleted `BringBac
 `ClassicTabsTest` expects the window strip's "Close Tab"; a controller-ruled pin,
 `TabDragTest.aPressOnAnEntrysCloseStartsNoTabDrag`; and `WindowContent.selectTab` selects an item in a hidden tab before
 its tab shows, so no other item of that tab turns active on the way (no stray `onActive` or SDK `TAB_SELECTED`), pinned
-by `WorkspaceTabsTest` and `ParentTabsViewTest.selectingAnItemOfAHiddenTabPublishesOneTabSelectedForIt`. No anchor of
-Task 6 needed refreshing.
+by `WorkspaceTabsTest` and `ParentTabsViewTest.selectingAnItemOfAHiddenTabPublishesOneTabSelectedForIt`. (5) The
+final-review fix wave (`d45b8171d`): `paneClicks` finds the pane by the press's location, so a press on a view's bare
+area activates its pane; the listeners register after `addHost`; pins for Move Tab to New Window from a full window,
+Close Pane and Close Tab at the edges, a split tab arriving settled, and `paneClicks`'s right press, other window and
+listener baseline. No anchor of Task 6 needed refreshing.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
