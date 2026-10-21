@@ -174,6 +174,11 @@ public final class JasperApplication {
      * {@code System.gc()}: the rehearsal's garbage would otherwise stay in the resident process's heap.
      */
     Runnable collector = System::gc;
+    /**
+     * Test seam: where the workspace store's writes run, set before {@link #workspace(Path)}. Production starts each on a
+     * virtual thread of its own.
+     */
+    Executor workspaceWriter = task -> Thread.ofVirtual().name("jasper-workspace-save").start(task);
     /** Test seams. Production plans from this process's own command line and starts a real process. */
     Function<RestartMode, Optional<List<String>>> restartPlanner = mode -> RestartCommand.current(mode, List.of());
     Consumer<List<String>> spawner = command -> {
@@ -450,14 +455,14 @@ public final class JasperApplication {
     }
 
     /**
-     * Saves the windows to {@code file} and restores them from it (workspace tabs spec 13): within a second of each change
-     * and whenever a window closes, written on a virtual thread; read when the main window opens. Saved windows that do not
-     * all come back are kept aside and a notice names where. The warm-up rehearsal never reaches it: it bypasses the window
-     * manager. Before the first window. EDT.
+     * Saves the windows to {@code file} (workspace tabs spec 13), within a second of each change and whenever a window
+     * closes, written by {@link #workspaceWriter}, and restores them whenever the main window opens: as this process last
+     * saved them, else as {@code file} has them. Saved windows that do not all come back are kept aside and a notice names
+     * where. The warm-up rehearsal never reaches it: it bypasses the window manager. Before the first window. EDT.
      */
     void workspace(Path file) {
-        workspaceStore = new WorkspaceStore(file, windows::snapshot, JasperApplication::afterDelay,
-            task -> Thread.ofVirtual().name("jasper-workspace-save").start(task), this::workspaceSetAside);
+        workspaceStore = new WorkspaceStore(file, windows::snapshot, JasperApplication::afterDelay, workspaceWriter,
+            this::workspaceSetAside);
         windows.workspace(workspaceStore);
     }
 
@@ -465,12 +470,18 @@ public final class JasperApplication {
     WorkspaceStore workspaceStore() { return workspaceStore; }
 
     /**
-     * Saved windows did not all come back (spec 15): {@code workspace.toml} could not be read, or a window in it could not
-     * be restored; the saved windows were kept as {@code kept}.
+     * Saved windows did not all come back (spec 15): {@code workspace.toml} could not be read, its reader dropped a window,
+     * tab or item entry, or a window in it could not be restored; the saved windows were kept as {@code kept}. Told on the
+     * next EDT turn: the file is read before the main window's opening counts, so a resident Jasper with no window would
+     * still be idle and send the card to history unseen; by then the main window is open and the card waits for it, as
+     * at a cold start (workspace plan 6a Rulings 13).
      */
     private void workspaceSetAside(Path kept) {
-        notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.WARNING, "Jasper could not restore your windows")
-            .withContent("Jasper opened what it could and kept the saved windows in " + kept + "."));
+        SwingUtilities.invokeLater(() -> {
+            if (stopped) return;
+            notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.WARNING, "Jasper could not restore your windows")
+                .withContent("Jasper opened what it could and kept the saved windows in " + kept + "."));
+        });
     }
 
     /** Tests replace the process-wide trace. EDT. */
@@ -960,9 +971,9 @@ public final class JasperApplication {
     /**
      * Every outside request to show Jasper ends here: a second launch's handoff, the {@code jasper} command, the macOS
      * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3, 5.4, 6.4 and 13). The main window is
-     * restored first when none is open, with its full windows as {@code workspace.toml} has them, and the first directory
-     * the request names opens in a new tab after the restored ones (with nothing to restore, a new main window opens
-     * there); an open main window is raised. Each other directory opens as a new terminal tab and each
+     * restored first when none is open, with its full windows as this process last saved them, else as
+     * {@code workspace.toml} has them, and the first directory the request names opens in a new tab after the restored
+     * ones (with nothing to restore, a new main window opens there); an open main window is raised. Each other directory opens as a new terminal tab and each
      * file in the editor a plugin provides, else revealed ({@code openRequestedFile}) ({@code OpenPlan}). {@code trigger}
      * names the caller for start-up timing. EDT.
      *
@@ -982,8 +993,8 @@ public final class JasperApplication {
 
     /**
      * A launch's main window, timed as a cold start unless a {@code --background} launch warmed up: restored with its full
-     * windows as {@code workspace.toml} has them (workspace tabs spec 13), the first directory {@code paths} names opening
-     * in a new tab after the restored ones; with nothing to restore, a new main window whose tab starts in that
+     * windows as this process last saved them, else as {@code workspace.toml} has them (workspace tabs spec 13), the first
+     * directory {@code paths} names opening in a new tab after the restored ones; with nothing to restore, a new main window whose tab starts in that
      * directory, else where a new shell starts. The rest of the paths open in it as {@link #open} opens them (plan Ruling
      * 13). EDT.
      *

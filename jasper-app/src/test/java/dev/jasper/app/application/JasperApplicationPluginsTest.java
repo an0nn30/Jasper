@@ -56,21 +56,28 @@ class JasperApplicationPluginsTest {
         PluginJars.build(dev, "life.jar", PluginJars.descriptor("dev.example.life", "1.0.0", "fix.life.Main"),
             Map.of("fix.life.Main", FIXTURE), List.of());
         var stoppedBeforeExit = new boolean[1];
+        var savedBeforeExit = new boolean[1];
         var terminated = new CountDownLatch(1);
         Path data = dirs.plugins().resolve("dev.example.life/data");
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> {
                 stoppedBeforeExit[0] = java.nio.file.Files.exists(data.resolve("stopped"));
+                savedBeforeExit[0] = java.nio.file.Files.exists(dirs.workspaceState());
                 terminated.countDown();
             });
             application[0].startPlugins(null, dev, false, dirs);
             application[0].startPlugins(null, dev, false, dirs);
+            // A stand-in frame opens the main window headless, so Quit has a window to save (workspace plan 6a Task 9).
+            application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
+                () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            application[0].openFirstWindow(List.of()).orElseThrow();
         });
         assertThat(data.resolve("started")).exists();
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(stoppedBeforeExit[0]).isTrue();
+        assertThat(savedBeforeExit[0]).as("the windows saved in the home's workspace.toml").isTrue();
     }
 
     private static final String BINDING_FIXTURE = """
