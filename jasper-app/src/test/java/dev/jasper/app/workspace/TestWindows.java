@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -28,6 +29,10 @@ final class TestWindows {
     final Contributions model = new Contributions();
     final TerminalRegistry terminals = new TerminalRegistry();
     final WindowManager manager;
+    /** Runs on the EDT as each shell's launch is asked for, inside its pane's start: a test makes a start throw with it. */
+    Runnable launching = () -> { };
+    /** Hears each window's content once it is composed, before its window restores or shows: a test arms a failure. */
+    Consumer<WindowContent> composed = content -> { };
     private final ShellLauncher launcher;
 
     /** Windows whose shells are idle sessions. */
@@ -35,10 +40,11 @@ final class TestWindows {
 
     /** Windows whose shells {@code shells} starts in the directory it is given. */
     TestWindows(Function<Path, dev.jasper.terminal.session.TerminalSession> shells) {
-        launcher = new ShellLauncher(pending::add, directory -> { started.add(directory); return shells.apply(directory); }, "idle-test-session");
+        launcher = new ShellLauncher(task -> { launching.run(); pending.add(task); },
+            directory -> { started.add(directory); return shells.apply(directory); }, "idle-test-session");
         manager = new WindowManager(model, new WindowManager.Hooks(this::compose, this::frame,
             window -> events.add("opened " + name(window)), window -> events.add("activated " + name(window)),
-            window -> events.add("closed " + name(window)), state -> { }, window -> { }, () -> { }));
+            window -> events.add("closed " + name(window)), state -> { }, window -> events.add("closing " + name(window)), () -> { }));
     }
 
     static String name(JasperWindow window) { return window.isMain() ? "main" : "child"; }
@@ -50,6 +56,7 @@ final class TestWindows {
             KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
         content.connectContributions(model);
         content.connectTerminals(terminals, () -> { });
+        composed.accept(content);
         return content;
     }
 

@@ -256,37 +256,51 @@ public final class WindowManager {
                 try {
                     window.restore(saved.main());
                     restored[0] = true;
-                } catch (RuntimeException failure) {
+                } catch (RuntimeException | Error failure) {
                     // It opens as a new main window instead, never discarded: the closed hook of the last window ends a
-                    // Jasper that is not resident. Its restore closed what it made; the saved windows are kept before this
-                    // window's first save replaces them.
+                    // Jasper that is not resident. An Error too: the saved windows are kept aside before this window's
+                    // first save replaces them, so the next start does not meet it again (workspace plan 6a Rulings 20).
+                    // Its restore closed what it made.
                     LOG.log(System.Logger.Level.WARNING, "Could not restore the main window; it opens as a new one", failure);
-                    store.setAside(saved);
+                    keepAside(saved);
                     window.content().newTab(directory);
                 }
                 return true;
             });
         if (opened.isEmpty() || !restored[0]) return opened;
+        // The main window has shown: from here a failure, an Error too, costs only what failed, never the window, nor the
+        // tabs that wait for it (workspace plan 6a Rulings 41).
         boolean whole = true;
         var back = new ArrayList<ChildWindow>();
         for (WorkspaceFile.WindowRecord child : saved.children()) {
             try {
                 restoreChild(child).ifPresent(back::add);
-            } catch (RuntimeException failure) {
+            } catch (RuntimeException | Error failure) {
                 // A full window that cannot come back costs only itself, and the saved windows are kept.
                 LOG.log(System.Logger.Level.WARNING, "Could not restore a full window", failure);
                 whole = false;
             }
         }
-        if (!whole) store.setAside(saved);
+        if (!whole) keepAside(saved);
         if (directory != null) {
-            // The main window has shown: a new tab that fails costs only itself, never the window (workspace plan 6a Rulings 41).
             try { opened.get().content().newTab(directory); }
-            catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "Could not open the requested directory in a new tab", failure); }
+            catch (RuntimeException | Error failure) { LOG.log(System.Logger.Level.WARNING, "Could not open the requested directory in a new tab", failure); }
         }
         // In front when a full window came back (workspace plan 6a Rulings 12).
-        if (!back.isEmpty()) opened.get().toFront();
+        if (!back.isEmpty()) {
+            try { opened.get().toFront(); }
+            catch (RuntimeException | Error failure) { LOG.log(System.Logger.Level.WARNING, "Could not bring the restored main window to the front", failure); }
+        }
         return opened;
+    }
+
+    /**
+     * Keeps the saved windows as {@code workspace.toml.bad} (workspace plan 6a Rulings 13); a failure there is logged, so
+     * it never costs the window that is opening.
+     */
+    private void keepAside(WorkspaceFile.Snapshot saved) {
+        try { store.setAside(saved); }
+        catch (RuntimeException | Error failure) { LOG.log(System.Logger.Level.WARNING, "Could not keep the saved windows aside", failure); }
     }
 
     /** A new main window with one terminal tab in {@code directory}, made by {@link #ensureMain}'s {@code make}. */
@@ -302,10 +316,12 @@ public final class WindowManager {
      */
     private Optional<ChildWindow> restoreChild(WorkspaceFile.WindowRecord record) {
         ChildWindow[] made = new ChildWindow[1];
+        // A restore that fails once its items are mounted closes them, which empties the window before its frame exists:
+        // it is discarded then, unshown, never closed as a window that opened is (no closing hook).
+        Runnable emptied = () -> { if (made[0] != null && made[0].shell() != null) made[0].emptied(); };
         // Its saved place reaches its frame through its placement, checked against today's displays, never as a tear-out's
         // workspace bounds, which its frame would grow by its chrome (workspace plan 6a Rulings 21).
-        return open(new Opening(WindowRole.CHILD, true, null, "restore", () -> { if (made[0] != null) made[0].emptied(); }, Optional.empty(),
-            Optional.empty()), content -> {
+        return open(new Opening(WindowRole.CHILD, true, null, "restore", emptied, Optional.empty(), Optional.empty()), content -> {
             made[0] = new ChildWindow(this, content);
             children.add(made[0]);
             return made[0];

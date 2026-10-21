@@ -1350,8 +1350,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         SwingUtilities.invokeLater(() -> {
             startPending = false;
             if (closed) return;
-            for (Tab tab : workspace().tabs())
-                if (tab.content() instanceof TerminalContent terminal) terminal.startIfWaiting();
+            for (Tab tab : workspace().tabs()) {
+                if (!(tab.content() instanceof TerminalContent terminal)) continue;
+                // A pane whose start throws costs only itself: the tab's other panes still start.
+                try { terminal.startIfWaiting(); }
+                catch (RuntimeException | Error failure) { LOG.log(System.Logger.Level.WARNING, "Could not start a restored terminal", failure); }
+            }
         });
     }
 
@@ -1367,6 +1371,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      */
     int restore(WorkspaceFile.WindowRecord record) {
         if (closed || !parentTabs.isEmpty()) throw new IllegalStateException("Only an empty open window restores");
+        // A window opened empty keeps a stand-in size for the item that moves in; a restored one gives it up, so its frame
+        // sizes it as a new window's, whether its items come back or it opens fresh.
+        setPreferredSize(null);
         var restored = new LinkedHashMap<TabId, Tab>();
         try {
             for (TabId saved : record.layout().tabs())

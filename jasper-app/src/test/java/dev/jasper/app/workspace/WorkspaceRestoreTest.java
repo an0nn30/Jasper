@@ -306,6 +306,145 @@ class WorkspaceRestoreTest {
         windows.launch();
     }
 
+    /** A main window and a full window, each saved with one terminal in {@code folder}. */
+    private WorkspaceFile.Snapshot mainAndFullWindow(TabId shell, TabId away) {
+        return new WorkspaceFile.Snapshot(List.of(mainWindow(shell, shell("", folder, "")),
+            new WorkspaceFile.WindowRecord(WorkspaceFile.Role.CHILD, Optional.empty(), 0, ParentTabs.of(tab(Layout.of(away))),
+                Map.of(away, shell("", folder, "")))));
+    }
+
+    /**
+     * The restore of the main window, or of a full window, fails once its items are mounted, as a listener's bug would:
+     * its first title change while it holds an item throws {@code failure}, once.
+     */
+    private void failOnceMounted(boolean main, Throwable failure) {
+        java.util.function.Consumer<WindowContent> before = windows.composed;
+        windows.composed = content -> {
+            before.accept(content);
+            if (content.isMain() != main) return;
+            boolean[] armed = {true};
+            content.onTitle = title -> {
+                if (!armed[0] || content.tabCount() == 0) return;
+                armed[0] = false;
+                if (failure instanceof Error error) throw error;
+                throw (RuntimeException) failure;
+            };
+        };
+    }
+
+    /**
+     * Workspace plan 6a Task 8's review: a full window whose restore fails once its items are mounted is discarded unshown,
+     * never closed as a window that opened is, and the saved windows are kept.
+     */
+    @Test void aFullWindowWhoseRestoreFailsOnceItsItemsAreMountedIsDiscardedUnshown() throws Exception {
+        TabId shell = TabId.random(), away = TabId.random();
+        var saved = mainAndFullWindow(shell, away);
+        WorkspaceFile.write(file(), saved);
+        windows();
+        edt(() -> {
+            failOnceMounted(false, new IllegalStateException("a listener's bug"));
+            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            assertThat(main.content().tabs()).extracting(Tab::id).containsExactly(shell);
+            assertThat(windows.manager.children()).isEmpty();
+            assertThat(windows.events).as("no closing hook for a window that never opened")
+                .containsExactly("show main", "opened main", "closed child");
+            assertThat(windows.model.tabs().tab(away)).as("its item went with it").isEmpty();
+        });
+        assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
+        assertThat(keptAside()).isEqualTo(saved);
+        windows.launch();
+        assertThat(windows.started).as("the main window's shell alone").containsExactly(folder);
+    }
+
+    /**
+     * Workspace plan 6a Task 8's review: an Error from a full window's restore costs only that window; the main window
+     * opens, and a tab that waited for it opens there.
+     */
+    @Test void anErrorFromAFullWindowsRestoreCostsOnlyThatWindow() throws Exception {
+        TabId shell = TabId.random(), away = TabId.random();
+        var saved = mainAndFullWindow(shell, away);
+        WorkspaceFile.write(file(), saved);
+        windows();
+        Tab[] early = new Tab[1];
+        edt(() -> {
+            // Asked for while the main window is composed, it waits for it (TabRegistry.mainOpened).
+            windows.composed = content -> {
+                if (content.isMain()) early[0] = windows.model.tabs().open("dev.example.editor", "early", "early.txt", null, new javax.swing.JPanel());
+            };
+            failOnceMounted(false, new AssertionError("a bug"));
+            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            assertThat(windows.manager.children()).isEmpty();
+            assertThat(early[0].closed()).as("the tab that waited for the main window").isFalse();
+            assertThat(early[0].window()).as("opened there").isEqualTo(main.id());
+            assertThat(main.content().tabs()).extracting(Tab::id).containsExactly(shell, early[0].id());
+        });
+        assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
+        assertThat(keptAside()).isEqualTo(saved);
+        windows.launch();
+    }
+
+    /**
+     * Workspace plan 6a Task 8's review and Rulings 20: an Error from the main window's restore opens it as a new main
+     * window, never discarded, and the saved windows are kept aside, so the next start does not meet it again.
+     */
+    @Test void anErrorFromTheMainWindowsRestoreOpensItAsANewOneAndKeepsTheSavedWindows() throws Exception {
+        Path work = Files.createDirectories(folder.resolve("work"));
+        TabId item = TabId.random();
+        var saved = new WorkspaceFile.Snapshot(List.of(mainWindow(item, shell("", folder, ""))));
+        WorkspaceFile.write(file(), saved);
+        windows();
+        edt(() -> {
+            failOnceMounted(true, new AssertionError("a bug"));
+            MainWindow main = windows.manager.ensureMain("cold", work).orElseThrow();
+            assertThat(main.content().tabs()).hasSize(1);
+            assertThat(main.content().tabs().getFirst().id()).isNotEqualTo(item);
+            assertThat(main.content().isPreferredSizeSet()).as("sized as a new main window is").isFalse();
+            assertThat(windows.events).as("never discarded: the last window's closed hook can end Jasper")
+                .containsExactly("show main", "opened main");
+        });
+        assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
+        assertThat(keptAside()).isEqualTo(saved);
+        windows.launch();
+        assertThat(windows.started).as("the failed item's shell never started").containsExactly(work);
+    }
+
+    /** Workspace plan 6a Task 8's review: a pane whose start throws costs only itself; the other panes of its tab start. */
+    @Test void aPaneWhoseStartThrowsLeavesTheOtherPanesOfItsTabStarting() throws Exception {
+        Path work = Files.createDirectories(folder.resolve("work"));
+        Path logs = Files.createDirectories(folder.resolve("logs"));
+        TabId first = TabId.random(), second = TabId.random();
+        Layout one = Layout.of(first);
+        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(mainWindow(Map.of(first, shell("", work, ""),
+            second, shell("", logs, "")), tab(one.split(second, one.activeGroup(), Side.RIGHT))))));
+        windows();
+        boolean[] threw = new boolean[1];
+        edt(() -> {
+            // Only an Error leaves a pane's start: the launcher reports any other failure through the launch's completion.
+            windows.launching = () -> {
+                if (threw[0]) return;
+                threw[0] = true;
+                throw new AssertionError("a launch that throws");
+            };
+            windows.manager.ensureMain("cold", null).orElseThrow();
+        });
+        windows.launch();
+        assertThat(threw[0]).as("the first pane's start threw").isTrue();
+        assertThat(windows.started).as("the second pane started all the same").containsExactly(logs);
+    }
+
+    /** Workspace plan 6a Task 8's review: a restored window gives up the stand-in size of a window opened empty. */
+    @Test void aRestoredWindowIsSizedAsANewWindowIs() throws Exception {
+        WorkspaceFile.write(file(), mainAndFullWindow(TabId.random(), TabId.random()));
+        windows();
+        edt(() -> {
+            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            assertThat(main.content().isPreferredSizeSet()).isFalse();
+            assertThat(windows.manager.children()).singleElement()
+                .satisfies(child -> assertThat(child.content().isPreferredSizeSet()).isFalse());
+        });
+        windows.launch();
+    }
+
     /**
      * Workspace plan 6a Rulings 31: Move to Main Window moves a full window's tabs one at a time, each showing for an
      * instant; only the one that shows when the move ends starts, and the tabs it passed over still wait.
