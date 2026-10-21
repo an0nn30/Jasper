@@ -64,8 +64,10 @@ final class NotificationsFeature implements AutoCloseable {
                 Contributions.PanelRequest.Op.ACTIVATING_TOGGLE)));
         contributions.addAction(DISMISS_CARDS, "Notifications: Dismiss Cards", null,
             List.of("notifications", "close", "clear", "balloons", "cards"), Optional.empty(), invocation -> {
+                // Cards show in the main window only, so a child window's Dismiss Cards closes them there.
                 Attached attached = windows.get(invocation.windowId());
                 if (attached != null) attached.layer().dismissAll();
+                else windows.values().forEach(each -> each.layer().dismissAll());
             });
         panel = contributions.addPanel(PANEL_ID, panels.notificationsTitle(), icon, panels.notificationsSlot(), Optional.of(SHOW_HISTORY),
             site -> new HistoryPanel(kit.get(), center, site, focused(site.windowId()), panels.notificationsTitle()));

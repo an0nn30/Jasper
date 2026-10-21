@@ -184,6 +184,18 @@ class NotificationsFeatureTest {
         assertThat(center.unread()).isZero();
     }
 
+    @Test void dismissCardsFromAWindowWithoutCardsClosesTheMainWindowsCards() {
+        // Cards show in the main window only; Dismiss Cards run from a child window (whose palette lists it) closes them.
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
+        var main = window();
+        feature.attach(main);
+        feature.info("One", "");
+        contributions.action(NotificationsFeature.DISMISS_CARDS).orElseThrow()
+            .invoke(new Contributions.Invocation(UUID.randomUUID(), Optional.empty()));
+        assertThat(feature.layer(main.id()).showing()).isEmpty();
+        assertThat(center.unread()).isZero();
+    }
+
     @Test void errorsWithoutDetailsStillPost() {
         var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         feature.error("Could not open config.toml", null);
