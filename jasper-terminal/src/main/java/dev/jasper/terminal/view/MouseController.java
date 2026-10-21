@@ -61,6 +61,9 @@ final class MouseController {
     }
 
     void handle(MouseEvent e) {
+        // A gesture an earlier listener took, such as the application's pane drag, is not the terminal's: no report, no
+        // selection.
+        if (e.isConsumed()) return;
         Type type = typeOf(e);
         if (type == null || (type == Type.MOVED && !terminal.mouseReporting())) return;
         if (macOs && type == Type.WHEEL && e.isShiftDown()) return;

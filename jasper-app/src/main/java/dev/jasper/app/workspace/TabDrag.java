@@ -22,6 +22,7 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.AWTEventListener;
+import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -35,31 +36,40 @@ import javax.swing.AbstractButton;
 import javax.swing.JLayeredPane;
 import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
+import javax.swing.text.JTextComponent;
 
 /**
- * The tab drag (workspace tabs spec 12; tabs and panes spec 6). A left press on a tab's entry in its window's strip,
- * the {@link ParentTabBar}, that moves past the kit's tab drag threshold ({@code TAB_REORDER_THRESHOLD}, 5 px by
- * default) starts it, carrying the whole tab with every pane of it. It uses plain mouse events in screen coordinates,
- * never AWT drag and drop: Swing keeps sending the pressed component its drag events wherever the cursor goes, and
- * synthetic events drive it in tests. While it runs, {@link TabDragLabel} shows the entry's label beside the cursor and
- * the target window's layered pane shows where the tab would land ({@link DockDropOverlay}); nothing moves until the
- * release.
+ * The tab drag and the pane drag (workspace tabs spec 12; tabs and panes spec 6 and 7). A left press on a tab's entry in
+ * its window's strip, the {@link ParentTabBar}, that moves past the kit's tab drag threshold
+ * ({@code TAB_REORDER_THRESHOLD}, 5 px by default) starts a tab drag, carrying the whole tab with every pane of it. A
+ * left press with the pane drag's modifier ({@link #movesPane}: Cmd+Option on macOS, Ctrl+Alt elsewhere) on an item of a
+ * window's shown tab, which that window hands over ({@link #pressedPane}), starts a pane drag past the same threshold,
+ * carrying the item's pane. Every event of a pane's gesture, from its press to its left button's release, is the pane
+ * drag's, whether the drag runs, has ended or never starts: the window consumes the press, and this drag the press's
+ * drags and its release, before any listener of the item hears them, so a terminal neither reports them to its program
+ * nor selects and a text view neither moves its caret nor drags its text. Both drags use plain mouse events in screen
+ * coordinates, never AWT drag and drop: Swing keeps sending the pressed component its drag events wherever the cursor
+ * goes, and synthetic events drive them in tests. While a drag runs, {@link TabDragLabel} shows the entry's or the item's
+ * label beside the cursor and the target window's layered pane shows where it would land ({@link DockDropOverlay});
+ * nothing moves until the release.
  * <p>The target: of the windows under the cursor that can take a drop (on macOS none in full screen on the display of
- * the drag's own window but that window), the most recently active. Over its strip, the place before the first of the
- * strip's other entries whose middle is not left of the cursor, where the entries take their new places at once on the
- * release; a window whose strip hides (the standard look's one tab) takes it at its end over the band its strip takes
- * when it shows, and the main window's empty workspace, which has no panes, anywhere over it, in its place. Anywhere
- * else in that window (a pane, its dock, chrome or title bar), and over any other window of Jasper's (Settings, About, a
- * dialog), nothing; outside every window, a new full window the size of the tab's workspace, with the entry where the
- * cursor holds it and kept on the display under the cursor, except for a window's only tab (a full window's already is
- * its own; workspace plan 8a Rulings 6). A tab holding an item that is pinned (a modal owner holds it in its window), or
- * one being closed, takes targets along its own strip only. Releasing the left button carries the target out:
- * along its own strip as a reorder, into another window or out of every window through the window manager of the
- * drag's window, which moves the tab's items through the tab registry; none touches an item's content or session, and a
- * window no manager opened moves nothing out of itself. Releasing on no target, Esc, another press or a plain move
- * (both mean Swing lost the release), the drag's window losing the focus (a modal dialog, another application), and the
- * item the entry shows closing, leaving its tab or giving way to another of its panes end the drag without a drop. EDT
- * only.
+ * the drag's own window but that window), the most recently active. For a tab, over its strip, the place before the
+ * first of the strip's other entries whose middle is not left of the cursor, where the entries take their new places at
+ * once on the release; a window whose strip hides (the standard look's one tab) takes it at its end over the band its
+ * strip takes when it shows, and the main window's empty workspace, which has no panes, anywhere over it, in its place.
+ * Anywhere else in that window (a pane, its dock, chrome or title bar), and over any other window of Jasper's (Settings,
+ * About, a dialog), nothing; outside every window, a new full window the size of the tab's workspace, with the entry
+ * where the cursor holds it and kept on the display under the cursor, except for a window's only tab (a full window's
+ * already is its own; workspace plan 8a Rulings 6). A tab holding an item that is pinned (a modal owner holds it in its
+ * window), or one being closed, takes targets along its own strip only.
+ * <p>A pane takes targets in windows alone, as a pane never becomes a window (tabs and panes spec 7); the drag of an item
+ * that is pinned or being closed never starts.
+ * <p>Releasing the left button carries the target out: a tab along its own strip as a reorder, into another window or
+ * out of every window through the window manager of the drag's window, which moves the tab's items through the tab
+ * registry; none touches an item's content or session, and a window no manager opened moves nothing out of itself.
+ * Releasing on no target, Esc, another press or a plain move (both mean Swing lost the release), the drag's window losing
+ * the focus (a modal dialog, another application), and the dragged item closing or leaving its tab, or, for a tab drag,
+ * the item its entry shows giving way to another of its panes end the drag without a drop. EDT only.
  */
 final class TabDrag {
     /** Where a release would put the dragged tab. */
@@ -84,6 +94,10 @@ final class TabDrag {
 
     /** How far right of and below the cursor the label's corner sits, so no window is ever under the pointer's tip. */
     static final int LABEL_OFFSET = 8;
+
+    /** The keys a mouse event may hold besides its buttons: a pane's press holds its modifier of them and no other. */
+    private static final int KEYS = InputEvent.SHIFT_DOWN_MASK | InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK
+        | InputEvent.META_DOWN_MASK | InputEvent.ALT_GRAPH_DOWN_MASK;
 
     private final Supplier<List<WindowContent>> windows;
     private final DockDropOverlay overlay = new DockDropOverlay();
@@ -114,6 +128,17 @@ final class TabDrag {
     /** End the drag when the item the entry shows closes, leaves the tab or gives way to another of its panes. */
     private Subscription closing, changed, shown;
     private Optional<Target> target = Optional.empty();
+    /** Whether the pending press or the drag carries an item's pane rather than a whole tab (tabs and panes spec 7). */
+    private boolean pane;
+    /**
+     * While a pane's gesture lasts, from its press to its left button's release: the component the press reached, whose
+     * events are the pane drag's, and the press itself, which the gesture's listener does not take for a new one.
+     */
+    private Component gesture;
+    private MouseEvent gesturePress;
+    private final AWTEventListener gestureEvents = this::gestureEvent;
+    /** The text view whose text drag sits out the gesture, while it does (workspace plan 8c Rulings 16). */
+    private JTextComponent textDrag;
 
     /**
      * @param windows the windows a drag can reach, the most recently active first; what leaves its window goes through
@@ -131,6 +156,9 @@ final class TabDrag {
 
     /** @return the dragged tab while a drag runs, else null */
     ParentTabId draggedParentTab() { return dragging ? parentTab : null; }
+
+    /** @return whether a running drag carries a pane (tabs and panes spec 7) */
+    boolean movingPane() { return dragging && pane; }
 
     /** @return where a release would put the tab now */
     Optional<Target> target() { return target; }
@@ -164,6 +192,43 @@ final class TabDrag {
     }
 
     /**
+     * Whether {@code event} carries the pane drag's modifier (tabs and panes spec 7; workspace plan 8c Rulings 1): the left
+     * button with Cmd+Option on macOS, either Option key, and Ctrl+Alt elsewhere, and no other key; Shift, and elsewhere
+     * AltGr, which Windows reports with Ctrl and Alt, make it none.
+     *
+     * @param event a mouse event
+     * @param macOs whether the window's keymap is macOS's
+     * @return whether a press with it begins a pane's gesture
+     */
+    static boolean movesPane(MouseEvent event, boolean macOs) {
+        int modifier = macOs ? InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK
+            : InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
+        int keys = event.getModifiersEx() & KEYS;
+        // macOS reports the right Option key as AltGraph; it has no AltGr of its own, so either Option counts.
+        if (macOs && (keys & InputEvent.ALT_GRAPH_DOWN_MASK) != 0) keys = keys & ~InputEvent.ALT_GRAPH_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
+        return SwingUtilities.isLeftMouseButton(event) && keys == modifier;
+    }
+
+    /**
+     * A left press with the pane drag's modifier on {@code item}, an item of {@code window}'s shown tab, which the window
+     * consumes (tabs and panes spec 7): the press's gesture is the pane drag's from now to its release (workspace plan 8c
+     * Rulings 2), and a drag of the item's pane may start from it. A press while another is pending or a drag runs ends
+     * that one first.
+     */
+    void pressedPane(WindowContent window, Tab item, MouseEvent event) {
+        if (this.tab != null) cancel();
+        Optional<ParentTabId> id = window.parentTabOf(item);
+        if (id.isEmpty()) return;
+        beginGesture(event);
+        from = window;
+        parentTab = id.get();
+        tab = item;
+        pane = true;
+        source = event.getComponent();
+        pressedAt = screen(event);
+    }
+
+    /**
      * A drag event from the pressed component: past the threshold with the left button held the drag starts, then follows
      * the cursor. An entry that changed since the press has nothing to drag.
      */
@@ -174,7 +239,8 @@ final class TabDrag {
             // Swing sends the pressed component a drag with any button held: only the left one drags a tab.
             if (!SwingUtilities.isLeftMouseButton(event)) return;
             if (at.distance(pressedAt) <= NativeStyles.installed().metric(DesignMetrics.Role.TAB_REORDER_THRESHOLD)) return;
-            if (!inPlace()) {
+            // A pinned item, or one being closed, does not move: its pane's drag never starts (workspace plan 8c Rulings 11).
+            if (!inPlace() || pane && !from.tabRegistry().movable(tab)) {
                 cancel();
                 return;
             }
@@ -234,13 +300,73 @@ final class TabDrag {
         if (dragging && (event.getID() == MouseEvent.MOUSE_MOVED || event.getID() == MouseEvent.MOUSE_PRESSED)) cancel();
     }
 
+    /** A pane's gesture begins with {@code press}: its later events come to {@link #gestureEvent} until its release. */
+    private void beginGesture(MouseEvent press) {
+        endGesture();
+        gesture = press.getComponent();
+        gesturePress = press;
+        // A text view with its input methods off (the Editor's Vim Normal and Visual modes) still hears a consumed press,
+        // and Swing's text drag never asks: it sits out the gesture, as RTextArea's own triple-click handling does.
+        JTextComponent text = gesture instanceof JTextComponent own ? own
+            : (JTextComponent) SwingUtilities.getAncestorOfClass(JTextComponent.class, gesture);
+        if (text != null && text.getDragEnabled()) {
+            text.setDragEnabled(false);
+            textDrag = text;
+        }
+        Toolkit.getDefaultToolkit().addAWTEventListener(gestureEvents, AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
+    }
+
+    /** The pane's gesture is over: a text view's text drag comes back, and its listener goes. */
+    private void endGesture() {
+        if (gesture == null) return;
+        gesture = null;
+        gesturePress = null;
+        if (textDrag != null) {
+            textDrag.setDragEnabled(true);
+            textDrag = null;
+        }
+        Toolkit.getDefaultToolkit().removeAWTEventListener(gestureEvents);
+    }
+
+    /** The gesture's release never came: the gesture is over, and so is the press or the drag it began. */
+    private void lost() {
+        endGesture();
+        if (pane) cancel();
+    }
+
     /**
-     * Whether the entry is still where the press found it: its item open and in the press's window, and still the item
-     * the press's tab shows.
+     * An event while a pane's gesture lasts, before any component hears it (workspace plan 8c Rulings 2): the pressed
+     * component's events while the left button is held, and that button's release, are consumed, a drag followed and the
+     * release ending the gesture and carrying the drag out; a new left press, another press away from it, or a plain move
+     * means that release never came: the gesture ends, with the press or the drag it began, and that event is not its.
+     */
+    private void gestureEvent(AWTEvent event) {
+        if (gesture == null || event == gesturePress || !(event instanceof MouseEvent mouse)) return;
+        // A new left press means this gesture's release went elsewhere: the gesture is over and the press is not its.
+        if (mouse.getID() == MouseEvent.MOUSE_PRESSED && mouse.getButton() == MouseEvent.BUTTON1) {
+            lost();
+            return;
+        }
+        boolean release = mouse.getID() == MouseEvent.MOUSE_RELEASED && mouse.getButton() == MouseEvent.BUTTON1;
+        if (mouse.getComponent() == gesture && (release || (mouse.getModifiersEx() & InputEvent.BUTTON1_DOWN_MASK) != 0)) {
+            mouse.consume();
+            if (mouse.getID() == MouseEvent.MOUSE_DRAGGED) dragged(mouse);
+            if (release) {
+                endGesture();
+                released(mouse);
+            }
+        } else if (mouse.getID() == MouseEvent.MOUSE_PRESSED || mouse.getID() == MouseEvent.MOUSE_MOVED) lost();
+    }
+
+    /**
+     * Whether what the press found is still in place: its item open and in the press's window, and for a tab drag still
+     * the item the press's tab shows, for a pane drag still in the press's tab.
      */
     private boolean inPlace() {
         if (tab == null || tab.closed() || !Objects.equals(tab.window(), from.id())) return false;
-        return from.parentTabs().view(parentTab).map(WorkspaceView::selected).filter(tab::equals).isPresent();
+        Optional<WorkspaceView> view = from.parentTabs().view(parentTab);
+        if (pane) return view.filter(held -> held.contains(tab)).isPresent();
+        return view.map(WorkspaceView::selected).filter(tab::equals).isPresent();
     }
 
     /** Starts the drag: what ends it is in place before anything shows, so {@link #finish} can always take it away. */
@@ -274,6 +400,11 @@ final class TabDrag {
         GraphicsDevice home = device(from);
         OptionalInt under = WorkspaceDropResolver.windowAt(at,
             open.stream().map(window -> onScreen(window, window == from, home)).toList());
+        if (pane) {
+            // A pane takes targets in a window alone: it never becomes a window (tabs and panes spec 7).
+            showLanding();
+            return;
+        }
         // What the registry keeps in its window stays there: a tab holding an item that is pinned or being closed. No
         // other window takes it, and it tears nothing out.
         boolean stays = !movable();
@@ -392,6 +523,7 @@ final class TabDrag {
         grab = null;
         size = null;
         target = Optional.empty();
+        pane = false;
         if (closing != null) {
             closing.close();
             closing = null;

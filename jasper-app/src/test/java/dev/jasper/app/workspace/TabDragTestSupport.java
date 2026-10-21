@@ -27,7 +27,8 @@ import javax.swing.SwingUtilities;
  * place on the pretend screen: a root pane holding the window's content, under a title bar that is the panel's top
  * inset, as a native frame's insets hold its title bar. Screen conversions, the drag's window bounds, the frame's
  * decorations and the overlay's layered pane then work without a display. A tab drags from its entry in its window's
- * strip, which shows the item of the tab's active pane: "the entry of an item" is that entry.
+ * strip, which shows the item of the tab's active pane: "the entry of an item" is that entry. A pane drags from a press
+ * with the pane drag's modifier ({@link #PANE}) inside it (tabs and panes spec 7).
  */
 final class TabDragTestSupport {
     /** The stand-in title bar's height: the frame's top inset. */
@@ -154,5 +155,52 @@ final class TabDragTestSupport {
     /** Hands {@code event} to every listener of mouse motion events, as AWT does before any component sees it. */
     static void broadcast(MouseEvent event) {
         for (var listener : Toolkit.getDefaultToolkit().getAWTEventListeners(AWTEvent.MOUSE_MOTION_EVENT_MASK)) listener.eventDispatched(event);
+    }
+
+    /** The pane drag's modifier on this host (tabs and panes spec 7): Cmd+Option on macOS, Ctrl+Alt elsewhere. */
+    static final int PANE = System.getProperty("os.name").startsWith("Mac")
+        ? InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK : InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
+
+    /**
+     * A left-button event at {@code screen} with {@code keys} held, sent to {@code source} as Swing sends a gesture's events
+     * to the pressed component: the button is down but on its release and its click.
+     *
+     * @return the event, which a listener may have consumed
+     */
+    static MouseEvent mouse(Component source, int id, Point screen, int keys) {
+        Point at = new Point(screen);
+        SwingUtilities.convertPointFromScreen(at, source);
+        boolean up = id == MouseEvent.MOUSE_RELEASED || id == MouseEvent.MOUSE_CLICKED;
+        int button = id == MouseEvent.MOUSE_DRAGGED ? MouseEvent.NOBUTTON : MouseEvent.BUTTON1;
+        var event = new MouseEvent(source, id, System.currentTimeMillis(), keys | (up ? 0 : InputEvent.BUTTON1_DOWN_MASK), at.x,
+            at.y, 1, false, button);
+        source.dispatchEvent(event);
+        return event;
+    }
+
+    /** The component a press in the middle of {@code item}'s pane reaches: the deepest one there. */
+    static Component inPane(WindowContent window, Tab item) {
+        GroupView pane = window.parentTabs().holding(item).orElseThrow().groupView(item.group().orElseThrow());
+        return SwingUtilities.getDeepestComponentAt(pane, pane.getWidth() / 2, pane.getHeight() / 2);
+    }
+
+    /**
+     * Presses the left button with the pane drag's modifier in the middle of {@code item}'s pane, drags 12 px down (past
+     * the 5 px threshold at any scale up to 2) and on to each point, without releasing.
+     *
+     * @return the pressed component, which takes the gesture's later events
+     */
+    static Component startPane(WindowContent window, Tab item, Point... path) {
+        Component source = inPane(window, item);
+        Point press = middle(source);
+        mouse(source, MouseEvent.MOUSE_PRESSED, press, PANE);
+        mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y + 12), PANE);
+        for (Point point : path) mouse(source, MouseEvent.MOUSE_DRAGGED, point, PANE);
+        return source;
+    }
+
+    /** As {@link #startPane}, then releases at the last point. */
+    static void dropPane(WindowContent window, Tab item, Point... path) {
+        mouse(startPane(window, item, path), MouseEvent.MOUSE_RELEASED, path[path.length - 1], PANE);
     }
 }

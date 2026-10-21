@@ -201,6 +201,18 @@ class TerminalViewInteractionTest {
         assertThat(connector.written()).isEqualTo("\033[<2;3;2M");
     }
 
+    /** A gesture an earlier listener consumed, as the application's pane drag does, is not the terminal's. */
+    @Test
+    void aGestureAnotherListenerConsumedNeitherSelectsNorReachesTheProgram() throws Exception {
+        show("hello world", 0, "hello world");
+        consumed(press(0, 0, 1, 0), drag(4, 0), release(4, 0));
+        assertThat(view.hasSelection()).as("no selection").isFalse();
+
+        enableSgrMouse();
+        consumed(press(1, 1, 1, 0), drag(3, 1), release(3, 1));
+        assertThat(connector.written()).as("no report reaches the program").isEmpty();
+    }
+
     @Test
     void shiftDraggingSelectsEvenWhenTheProgramWantsTheMouse() throws Exception {
         show("hello", 0, "hello");
@@ -643,6 +655,19 @@ class TerminalViewInteractionTest {
         view.handleMouse(new MouseEvent(view, MouseEvent.MOUSE_DRAGGED, 0, modifiers | InputEvent.BUTTON1_DOWN_MASK,
             x(toColumn), y(toRow), 1, false, MouseEvent.NOBUTTON));
         view.handleMouse(release(toColumn, toRow));
+    }
+
+    /** Hands {@code events} to the view consumed, as an earlier listener leaves them. */
+    private void consumed(MouseEvent... events) {
+        for (MouseEvent event : events) {
+            event.consume();
+            view.handleMouse(event);
+        }
+    }
+
+    private MouseEvent drag(int column, int row) {
+        return new MouseEvent(view, MouseEvent.MOUSE_DRAGGED, 0, InputEvent.BUTTON1_DOWN_MASK, x(column), y(row), 1, false,
+            MouseEvent.NOBUTTON);
     }
 
     private MouseEvent press(int column, int row, int clicks, int modifiers) {

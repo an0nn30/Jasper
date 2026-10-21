@@ -71,14 +71,26 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     };
     /**
      * A left press on a pane's item makes its pane the active one, a view that takes no focus too (tabs and panes spec 5;
-     * workspace plan 8a Rulings 21).
+     * workspace plan 8a Rulings 21). With the pane drag's modifier ({@link TabDrag#movesPane}) the press and its click are
+     * the pane drag's (spec 7; workspace plan 8c Rulings 2): consumed before the item hears them, the press handing the
+     * drag its gesture.
      */
     private final AWTEventListener paneClicks = event -> {
-        if (event.getID() != MouseEvent.MOUSE_PRESSED || closed() || !(event instanceof MouseEvent press)
-            || !SwingUtilities.isLeftMouseButton(press) || !(press.getSource() instanceof Component source)) return;
+        if (closed() || !(event instanceof MouseEvent press) || !SwingUtilities.isLeftMouseButton(press)
+            || !(press.getSource() instanceof Component source)) return;
+        int id = press.getID();
+        if (id != MouseEvent.MOUSE_PRESSED && id != MouseEvent.MOUSE_CLICKED) return;
         Tab tab = tabHolding(under(source, press.getPoint()));
-        if (tab != null && tab != selectedTab()
-            && parentTabs().holding(tab).filter(view -> view == parentTabs().active()).isPresent()) selectTab(tab);
+        if (tab == null || parentTabs().holding(tab).filter(view -> view == parentTabs().active()).isEmpty()) return;
+        if (TabDrag.movesPane(press, macOs())) {
+            press.consume();
+            if (id == MouseEvent.MOUSE_PRESSED) {
+                // A dock drag still running lost its release: it ends first, as a press on a strip's entry ends it.
+                dockDrag().cancel();
+                tabDrag().pressedPane(this, tab, press);
+            }
+        }
+        if (id == MouseEvent.MOUSE_PRESSED && tab != selectedTab()) selectTab(tab);
     };
     /** Where this window's tabs live: a registry of its own until it joins the application's (connectContributions). */
     private TabRegistry registry = new TabRegistry();
@@ -135,9 +147,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
     /**
-     * Drags a parent tab from the bar (tabs and panes spec 6): the window manager's, which every window it opens shares;
-     * until it gives that, one of this window's own, which reorders the bar and moves nothing out of this window, as a
-     * tear-out needs a manager ({@link #mayMoveTabToNewWindow}).
+     * Drags a tab from the strip, or a pane by its modifier (tabs and panes spec 6 and 7): the window manager's, which
+     * every window it opens shares; until it gives that, one of this window's own, which moves tabs and panes within this
+     * window and nothing out of it, as a move to another window needs a manager ({@link #mayMoveTabToNewWindow}).
      */
     private TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this));
     private UiState uiState = UiState.inMemory();
@@ -1052,6 +1064,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WorkspaceChrome look() { return look; }
     /** The application's one animations flag: the look's motion folded into the setting (spec 10.9). EDT. */
     boolean lookAnimates() { return themes.animationsEnabled(); }
+    /** Whether the keymap and shortcut text are macOS's: the pane drag's modifier follows it (workspace plan 8c Rulings 1). */
+    boolean macOs() { return macOs; }
     /** Whether the palette is open; the run item shows it (spec 10.6). Null-safe while the window is being built. */
     boolean paletteOpen() { return commandPalette != null && commandPalette.isOpen(); }
     /** The palette opened or closed: the run item repaints. */
@@ -1494,7 +1508,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The window's stripes. */
     StripeSet stripes() { return stripes; }
     DockDrag dockDrag() { return dockDrag; }
-    /** The tab drag this window's strips start. */
+    /** The drag this window's strip starts with a tab and its panes with a modifier press. */
     TabDrag tabDrag() { return tabDrag; }
     /** The window manager that opened this window: its moves to other windows go through it. */
     void manager(WindowManager value) { manager = Objects.requireNonNull(value, "value"); }
