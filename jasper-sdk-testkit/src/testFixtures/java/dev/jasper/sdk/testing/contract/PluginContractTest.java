@@ -2040,9 +2040,9 @@ public abstract class PluginContractTest {
         assertThat(h.menu("TAB")).as("the plugin places them as its own").containsExactly("item:test.alpha.split_right_notes");
         h.ui(() -> assertThat(alpha.get().windows().splitChoices()).as("the terminal, then the bundled plugins' items first")
             .containsExactly(dev.jasper.sdk.ui.SplitChoice.TERMINAL,
-                new dev.jasper.sdk.ui.SplitChoice("Sketch", "test.bundled.split_right_sketch", "test.bundled.split_down_sketch"),
-                new dev.jasper.sdk.ui.SplitChoice("Notes", "test.alpha.split_right_notes", "test.alpha.split_down_notes"),
-                new dev.jasper.sdk.ui.SplitChoice("Boom", "test.alpha.split_right_boom", "test.alpha.split_down_boom")));
+                new dev.jasper.sdk.ui.SplitChoice("Sketch", "test.bundled.split_right_sketch", "test.bundled.split_down_sketch", false),
+                new dev.jasper.sdk.ui.SplitChoice("Notes", "test.alpha.split_right_notes", "test.alpha.split_down_notes", false),
+                new dev.jasper.sdk.ui.SplitChoice("Boom", "test.alpha.split_right_boom", "test.alpha.split_down_boom", false)));
         h.ui(() -> {
             assertThat(h.invoke("test.alpha.split_right_notes", window, pane)).isTrue();
             assertThat(h.invoke("test.alpha.split_down_notes", window, null)).isTrue();
@@ -2060,6 +2060,34 @@ public abstract class PluginContractTest {
         h.start(info("test.gamma"), Set.of(), Set.of(), fresh::set);
         h.ui(() -> assertThat(fresh.get().windows().splitChoices()).as("the stopped plugins' items go with them")
             .containsExactly(dev.jasper.sdk.ui.SplitChoice.TERMINAL));
+    }
+
+    /**
+     * Pane flexibility spec 3 and workspace plan 9a Rulings 1: a split item whose actions ask something first ends its
+     * actions' titles and its Split entries with an ellipsis; one that opens at once has none.
+     */
+    @Test void anAskingSplitItemEndsItsEntriesAndItsActionsTitlesWithAnEllipsis() {
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("test.alpha.open-file", "Open File").asking(),
+                (shown, placement) -> { });
+            context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("test.alpha.notes", "Notes"), (shown, placement) -> { });
+        });
+        assertThat(h.actions()).containsExactly(
+            "test.alpha.split_right_open-file|Split Right with Open File…|true",
+            "test.alpha.split_down_open-file|Split Down with Open File…|true",
+            "test.alpha.split_right_notes|Split Right with Notes|true", "test.alpha.split_down_notes|Split Down with Notes|true");
+        h.ui(() -> {
+            var choices = alpha.get().windows().splitChoices();
+            assertThat(choices).containsExactly(dev.jasper.sdk.ui.SplitChoice.TERMINAL,
+                new dev.jasper.sdk.ui.SplitChoice("Open File", "test.alpha.split_right_open-file", "test.alpha.split_down_open-file", true),
+                new dev.jasper.sdk.ui.SplitChoice("Notes", "test.alpha.split_right_notes", "test.alpha.split_down_notes", false));
+            assertThat(choices).extracting(dev.jasper.sdk.ui.SplitChoice::rightLabel)
+                .containsExactly("Terminal Right", "Open File Right…", "Notes Right");
+            assertThat(choices).extracting(dev.jasper.sdk.ui.SplitChoice::downLabel)
+                .containsExactly("Terminal Down", "Open File Down…", "Notes Down");
+        });
     }
 
     /**
@@ -2098,7 +2126,8 @@ public abstract class PluginContractTest {
             UUID sketch = owner.activeTab().orElseThrow().id();
             ids.set(List.of(note, terminal.id(), sketch));
             assertThatIllegalArgumentException().as("not one of Jasper's choices").isThrownBy(() -> notes.get().split(
-                new dev.jasper.sdk.ui.SplitChoice("Other", "test.alpha.split_right_other", "test.alpha.split_down_other"), Direction.RIGHT));
+                new dev.jasper.sdk.ui.SplitChoice("Other", "test.alpha.split_right_other", "test.alpha.split_down_other", false),
+                Direction.RIGHT));
         });
         UUID note = ids.get().get(0), terminal = ids.get().get(1), sketch = ids.get().get(2);
         assertThat(h.windowTabs(main)).as("beside its own pane, whichever pane was focused")

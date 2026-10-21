@@ -21,13 +21,13 @@ class ContributionsTest {
     @Test void splitItemsAreUniqueTheBundledFirstAndChangeTheMenus() {
         model.onChanged(changes::add);
         var notes = model.addSplitItem(new SplitItem("com.example.notes.notes", "Notes", null,
-            "com.example.notes.split_right_notes", "com.example.notes.split_down_notes", false));
+            "com.example.notes.split_right_notes", "com.example.notes.split_down_notes", false, false));
         model.addSplitItem(new SplitItem("dev.jasper.editor.editor", "Editor", null,
-            "dev.jasper.editor.split_right_editor", "dev.jasper.editor.split_down_editor", true));
+            "dev.jasper.editor.split_right_editor", "dev.jasper.editor.split_down_editor", true, false));
         model.addSplitItem(new SplitItem("org.example.sketch.sketch", "Sketch", null,
-            "org.example.sketch.split_right_sketch", "org.example.sketch.split_down_sketch", false));
+            "org.example.sketch.split_right_sketch", "org.example.sketch.split_down_sketch", false, false));
         assertThatIllegalArgumentException().isThrownBy(() -> model.addSplitItem(new SplitItem("com.example.notes.notes", "Again",
-            null, "com.example.notes.a", "com.example.notes.b", false)));
+            null, "com.example.notes.a", "com.example.notes.b", false, false)));
         assertThat(model.splitItems()).extracting(SplitItem::label).containsExactly("Editor", "Notes", "Sketch");
         assertThat(changes).containsExactly(Contributions.Kind.MENUS, Contributions.Kind.MENUS, Contributions.Kind.MENUS);
         notes.close();

@@ -102,7 +102,7 @@ class WindowChromeMenusTest {
                 model.addAction("dev.x.split_" + side.toLowerCase(java.util.Locale.ROOT) + "_sketch", "Split " + side + " with Sketch",
                     new ImageIcon(), List.of(), Optional.empty(), invocation -> { });
             model.addSplitItem(new dev.jasper.app.contributions.SplitItem("dev.x.sketch", "Sketch", new ImageIcon(),
-                "dev.x.split_right_sketch", "dev.x.split_down_sketch", false));
+                "dev.x.split_right_sketch", "dev.x.split_down_sketch", false, false));
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), classic());
             owner.connectContributions(model);
             var window = items(menu(owner, "Window"));

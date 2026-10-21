@@ -45,7 +45,10 @@ class SplitListsTest {
      * A plugin's split item as {@code HostedUi} registers one: its two actions, with the item's icon, which open a plugin
      * view in a new pane beside the focused one, then the item.
      */
-    private Subscription item(String plugin, String name, String label, boolean bundled) {
+    private Subscription item(String plugin, String name, String label, boolean bundled) { return item(plugin, name, label, bundled, false); }
+
+    /** As {@link #item(String, String, String, boolean)}; with {@code asks} its actions ask something first. */
+    private Subscription item(String plugin, String name, String label, boolean bundled, boolean asks) {
         String right = plugin + ".split_right_" + name, down = plugin + ".split_down_" + name;
         var rightAction = model.addAction(right, "Split Right with " + label, new ImageIcon(), List.of(), Optional.empty(), invocation -> {
             opened.add(right);
@@ -55,7 +58,7 @@ class SplitListsTest {
             opened.add(down);
             model.tabs().open(plugin, down + opened.size(), label, invocation.windowId(), new JPanel(), TabRegistry.Placement.SPLIT_DOWN);
         });
-        var listed = model.addSplitItem(new SplitItem(plugin + "." + name, label, null, right, down, bundled));
+        var listed = model.addSplitItem(new SplitItem(plugin + "." + name, label, null, right, down, bundled, asks));
         return new Subscription(() -> { listed.close(); rightAction.close(); downAction.close(); });
     }
 
@@ -139,6 +142,25 @@ class SplitListsTest {
             item("com.example.bold", "bold", "<html><b>B", false);
             for (JMenu split : List.of(tabSplit(window), contextSplit(window))) {
                 assertThat(texts(split)).contains("<html><b>B Right", "<html><b>B Down");
+                for (Component child : split.getMenuComponents())
+                    assertThat(((JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
+                        .as("%s renders no HTML", ((JMenuItem) child).getText()).isNull();
+            }
+        });
+    }
+
+    /**
+     * Pane flexibility spec 3 and workspace plan 9a Rulings 1: an item whose actions ask something first ends its entries
+     * with an ellipsis in both lists, as plain text.
+     */
+    @Test void anAskingItemsEntriesEndWithAnEllipsisInBothLists() throws Exception {
+        var window = window();
+        edt(() -> {
+            item("dev.jasper.editor", "open-file", "Open File", true, true);
+            item("com.example.bold", "bold", "<html><b>B", false, true);
+            for (JMenu split : List.of(tabSplit(window), contextSplit(window))) {
+                assertThat(texts(split)).containsExactly("Terminal Right", "Terminal Down", "Open File Right…", "Open File Down…",
+                    "<html><b>B Right…", "<html><b>B Down…");
                 for (Component child : split.getMenuComponents())
                     assertThat(((JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
                         .as("%s renders no HTML", ((JMenuItem) child).getText()).isNull();

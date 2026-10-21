@@ -732,7 +732,8 @@ final class HostedUi {
     private List<dev.jasper.sdk.ui.SplitChoice> splitChoices() {
         var choices = new ArrayList<dev.jasper.sdk.ui.SplitChoice>();
         choices.add(dev.jasper.sdk.ui.SplitChoice.TERMINAL);
-        for (var item : model.splitItems()) choices.add(new dev.jasper.sdk.ui.SplitChoice(item.label(), item.rightAction(), item.downAction()));
+        for (var item : model.splitItems())
+            choices.add(new dev.jasper.sdk.ui.SplitChoice(item.label(), item.rightAction(), item.downAction(), item.asks()));
         return List.copyOf(choices);
     }
 
@@ -792,15 +793,17 @@ final class HostedUi {
                 Icon icon = spec.icon().map(HostedUi.this::icon).orElse(null);
                 if (model.splitItems().stream().anyMatch(item -> item.id().equals(spec.id())))
                     throw new IllegalArgumentException("Split item already registered: " + spec.id());
-                ActionEntry right = splitAction(spec.rightAction(), "Split Right with " + spec.label(), icon, "right", spec.label(),
-                    opener, dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+                // An item that asks first ends its actions' titles with an ellipsis (workspace plan 9a Rulings 1).
+                String asks = spec.asks() ? "…" : "";
+                ActionEntry right = splitAction(spec.rightAction(), "Split Right with " + spec.label() + asks, icon, "right",
+                    spec.label(), opener, dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
                 ActionEntry down;
                 try {
-                    down = splitAction(spec.downAction(), "Split Down with " + spec.label(), icon, "down", spec.label(),
+                    down = splitAction(spec.downAction(), "Split Down with " + spec.label() + asks, icon, "down", spec.label(),
                         opener, dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN);
                 } catch (RuntimeException failure) { right.close(); throw failure; }
                 var listed = model.addSplitItem(new dev.jasper.app.contributions.SplitItem(spec.id(), spec.label(), icon,
-                    spec.rightAction(), spec.downAction(), bundled.getAsBoolean()));
+                    spec.rightAction(), spec.downAction(), bundled.getAsBoolean(), spec.asks()));
                 ownActions.add(spec.rightAction());
                 ownActions.add(spec.downAction());
                 return tracked(() -> {

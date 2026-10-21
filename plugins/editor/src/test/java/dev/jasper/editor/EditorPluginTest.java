@@ -235,7 +235,8 @@ class EditorPluginTest {
             var consumer = new AtomicReference<PluginContext>();
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of(), Set.of(), consumer::set);
             assertThat(consumer.get().windows().splitChoices()).containsExactly(dev.jasper.sdk.ui.SplitChoice.TERMINAL,
-                new dev.jasper.sdk.ui.SplitChoice("Editor", "dev.jasper.editor.split_right_editor", "dev.jasper.editor.split_down_editor"));
+                new dev.jasper.sdk.ui.SplitChoice("Editor", "dev.jasper.editor.split_right_editor", "dev.jasper.editor.split_down_editor",
+                    false));
             assertThat(host.invoke("dev.jasper.editor.new_editor_tab", main, null)).isTrue();
             assertThat(host.windowTabs(main)).as("a new tab").hasSize(2);
             host.focusTerminalPane(pane);

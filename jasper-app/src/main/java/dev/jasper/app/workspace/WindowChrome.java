@@ -509,8 +509,9 @@ final class WindowChrome {
         entries.add(Map.entry("Terminal Down", owner.action(ActionId.SPLIT_DOWN)));
         if (contributions != null) for (var listed : contributions.model().splitItems()) {
             Action right = contributions.action(listed.rightAction()), down = contributions.action(listed.downAction());
-            if (right != null) entries.add(Map.entry(listed.label() + " Right", right));
-            if (down != null) entries.add(Map.entry(listed.label() + " Down", down));
+            // An item that asks first ends its entries with an ellipsis (pane flexibility spec 3).
+            if (right != null) entries.add(Map.entry(listed.rightLabel(), right));
+            if (down != null) entries.add(Map.entry(listed.downLabel(), down));
         }
         for (var entry : entries) {
             JMenuItem built = item.apply(entry.getValue());

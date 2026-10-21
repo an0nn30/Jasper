@@ -187,7 +187,9 @@ final class FakeUi {
                                dev.jasper.sdk.ui.TabPlacement placement) {
         var keywords = new ArrayList<>(List.of("split", side.toLowerCase(java.util.Locale.ROOT), "new", "pane"));
         for (String word : spec.label().toLowerCase(java.util.Locale.ROOT).split(" ")) if (!word.isBlank()) keywords.add(word.strip());
-        var action = new Action(new ActionSpec(id, "Split " + side + " with " + spec.label(), spec.icon(), keywords, Optional.empty()),
+        // An item that asks first ends its actions' titles with an ellipsis, as the application's do.
+        var action = new Action(new ActionSpec(id, "Split " + side + " with " + spec.label() + (spec.asks() ? "…" : ""), spec.icon(),
+            keywords, Optional.empty()),
             invoked -> opener.accept(invoked.window(), placement));
         actions.put(id, action);
         return action;
@@ -529,7 +531,7 @@ final class FakeUi {
         host.splitItems.stream()
             .sorted(java.util.Comparator.comparing((FakePluginHost.SplitItem item) -> !host.bundledPlugins.contains(item.pluginId())))
             .forEach(item -> choices.add(new dev.jasper.sdk.ui.SplitChoice(item.spec().label(), item.spec().rightAction(),
-                item.spec().downAction())));
+                item.spec().downAction(), item.spec().asks())));
         return List.copyOf(choices);
     }
 

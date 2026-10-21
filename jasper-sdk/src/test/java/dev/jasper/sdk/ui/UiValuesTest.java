@@ -24,8 +24,29 @@ class UiValuesTest {
         for (String id : new String[]{"", "nodot", "Upper.case", "dev.x." + "a".repeat(111)})
             assertThatIllegalArgumentException().as(id).isThrownBy(() -> SplitItemSpec.of(id, "Label"));
         assertThatIllegalArgumentException().isThrownBy(() -> SplitItemSpec.of("dev.x.notes", " "));
-        assertThatNullPointerException().isThrownBy(() -> new SplitItemSpec("dev.x.notes", "Notes", null));
-        assertThat(SplitChoice.TERMINAL).isEqualTo(new SplitChoice("Terminal", "split_right", "split_down"));
+        assertThatNullPointerException().isThrownBy(() -> new SplitItemSpec("dev.x.notes", "Notes", null, false));
+        assertThat(SplitChoice.TERMINAL).isEqualTo(new SplitChoice("Terminal", "split_right", "split_down", false));
+    }
+
+    /**
+     * Pane flexibility spec 3 and workspace plan 9a Rulings 1: an item whose actions ask something first says so, its
+     * copies keep it, and its entries end with an ellipsis; one that opens at once, the terminal's included, has none.
+     */
+    @Test void anAskingSplitItemsEntriesEndWithAnEllipsis() {
+        var openFile = SplitItemSpec.of("dev.jasper.editor.open-file", "Open File").asking();
+        assertThat(openFile.asks()).isTrue();
+        assertThat(openFile.withIcon("file").asks()).as("a copy with an icon keeps it").isTrue();
+        assertThat(openFile.withIcon("file").icon()).contains("file");
+        assertThat(SplitItemSpec.of("dev.jasper.editor.editor", "Editor").withIcon("file").asks()).as("an item that opens at once")
+            .isFalse();
+        assertThat(openFile.rightAction()).isEqualTo("dev.jasper.editor.split_right_open-file");
+        assertThat(ActionSpec.of(openFile.downAction(), "Split Down with Open File…").id()).as("an action id")
+            .isEqualTo("dev.jasper.editor.split_down_open-file");
+        var choice = new SplitChoice("Open File", openFile.rightAction(), openFile.downAction(), true);
+        assertThat(choice.rightLabel()).isEqualTo("Open File Right…");
+        assertThat(choice.downLabel()).isEqualTo("Open File Down…");
+        assertThat(SplitChoice.TERMINAL.rightLabel()).isEqualTo("Terminal Right");
+        assertThat(SplitChoice.TERMINAL.downLabel()).isEqualTo("Terminal Down");
     }
 
     @Test void actionSpecValidatesAndCopies() {
