@@ -155,6 +155,19 @@ final class ParentTabsView extends JPanel {
     }
 
     /**
+     * Move Pane to New Tab (tabs and panes spec 9): {@code tab} leaves its tab, whose other panes stay, for a new tab right
+     * after it in the strip, which shows. Its component moves between the two workspaces: nothing closes, nothing leaves
+     * the window, and the registry hears no move. Nothing for a tab's only pane or an item the window does not hold.
+     */
+    void moveToNewTab(Tab tab) {
+        WorkspaceView from = holding(tab).orElse(null);
+        if (closed || from == null || from.tabCount() < 2) return;
+        int at = model.indexOf(from.id()) + 1;
+        from.remove(tab);
+        openParentTab(tab, ParentTabId.random(), at);
+    }
+
+    /**
      * Moves the parent tab {@code id} to {@code index} among the others in the bar, where a drag along the bar dropped
      * it (parent tabs spec 5): its workspace takes its new place among the views. The one that shows stays, no tab
      * moves, and the bar takes the new order at once.

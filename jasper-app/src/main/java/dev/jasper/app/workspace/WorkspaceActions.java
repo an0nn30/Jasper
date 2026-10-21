@@ -60,6 +60,7 @@ final class WorkspaceActions {
             case CLOSE_WINDOW -> owner.requestCloseWindow();
             case MOVE_TAB_TO_NEW_WINDOW -> owner.moveTabToNewWindow(owner.selectedTab());
             case MOVE_TO_MAIN_WINDOW -> owner.moveToMainWindow();
+            case MOVE_PANE_TO_NEW_TAB -> owner.moveToNewTab(owner.selectedTab());
             case OPEN_FILE -> owner.openFile();
             case QUIT -> owner.requestQuit();
             case CLOSE_PANE -> owner.closeTab(owner.selectedTab());
@@ -123,6 +124,8 @@ final class WorkspaceActions {
                     case MOVE_TAB_TO_NEW_WINDOW -> owner.mayMoveTabToNewWindow(owner.activeParentTab());
                     // A parent tab or a window moves whole or not at all (workspace plan 7b Rulings 7).
                     case MOVE_TO_MAIN_WINDOW -> owner.mayMoveToMainWindow();
+                    // A tab's only pane, a pinned item and one being closed stay (workspace plan 8b Rulings 9).
+                    case MOVE_PANE_TO_NEW_TAB -> owner.mayMoveToNewTab(owner.selectedTab());
                     case TOGGLE_ZEN_MODE -> owner.isMain();
                     case PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();

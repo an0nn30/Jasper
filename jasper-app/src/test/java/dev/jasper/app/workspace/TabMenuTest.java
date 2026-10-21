@@ -248,7 +248,8 @@ class TabMenuTest {
             assertThat(items(window, "File")).containsSubsequence("New Tab", "New Terminal Window", "Open File…", "Close Pane",
                 "Close Tab", "Close Window").doesNotContain("Close Parent Tab");
             assertThat(items(window, "View")).contains("Maximize Pane");
-            assertThat(items(window, "Tab")).containsExactly("Split Right", "Split Down", "Focus Pane Left", "Focus Pane Right",
+            assertThat(items(window, "Tab")).containsExactly("Split Right", "Split Down", "Move Pane to New Tab", "Focus Pane Left",
+                "Focus Pane Right",
                 "Focus Pane Up", "Focus Pane Down", "Previous Prompt", "Next Prompt", "Rename Tab", "Next Tab", "Previous Tab",
                 "Select Tab 1", "Select Tab 2", "Select Tab 3", "Select Tab 4", "Select Tab 5", "Select Tab 6", "Select Tab 7",
                 "Select Tab 8", "Select Tab 9");

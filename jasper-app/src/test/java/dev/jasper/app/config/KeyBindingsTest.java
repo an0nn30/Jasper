@@ -21,7 +21,7 @@ class KeyBindingsTest {
             ActionId.NEW_TERMINAL_WINDOW, ActionId.CLOSE_WINDOW,
             ActionId.MOVE_TAB_TO_NEW_WINDOW,
             ActionId.MOVE_TO_MAIN_WINDOW, ActionId.OPEN_FILE,
-            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE,
+            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE, ActionId.MOVE_PANE_TO_NEW_TAB,
             ActionId.TOGGLE_ZEN_MODE,
             ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT,
             ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
@@ -77,7 +77,7 @@ class KeyBindingsTest {
         }
     }
 
-    /** Tabs and panes spec 10: each platform's tab and pane keys, and the keys plan 8b's Move Pane to New Tab takes. */
+    /** Tabs and panes spec 10: each platform's tab and pane keys, Move Pane to New Tab's included. */
     @Test
     void tabDefaultsFollowEachPlatformsTerminals() {
         for (boolean mac : new boolean[]{true, false}) {
@@ -104,7 +104,7 @@ class KeyBindingsTest {
             assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK | shift))).isEmpty();
             KeyStroke movePane = mac ? KeyStroke.getKeyStroke(KeyEvent.VK_T, modifier | alt)
                 : KeyStroke.getKeyStroke(KeyEvent.VK_T, modifier | alt | shift);
-            assertThat(bindings.actionFor(movePane)).as("free for plan 8b's Move Pane to New Tab").isEmpty();
+            assertThat(bindings.actionFor(movePane)).as("Move Pane to New Tab").contains(ActionId.MOVE_PANE_TO_NEW_TAB);
             assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET, modifier))).isEmpty();
             assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET, modifier | shift | alt))).isEmpty();
         }

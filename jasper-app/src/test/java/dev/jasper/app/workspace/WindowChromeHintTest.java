@@ -35,7 +35,7 @@ class WindowChromeHintTest {
             String[][] examples = {
                 {"cmd+t", "New Tab (\u2318T)"},
                 {"cmd+shift+t", "New Tab (\u21e7\u2318T)"},
-                {"cmd+alt+t", "New Tab (\u2325\u2318T)"},
+                {"cmd+alt+y", "New Tab (\u2325\u2318Y)"},
                 {"ctrl+alt+shift+cmd+t", "New Tab (\u2303\u2325\u21e7\u2318T)"},
                 {"F12", "New Tab (F12)"},
                 {"none", "New Tab"}

@@ -84,7 +84,7 @@ final class ShortcutCatalog {
             case NEW_TAB, CLOSE_TAB, NEXT_TAB, PREVIOUS_TAB, RENAME_TAB, MOVE_TAB_TO_NEW_WINDOW, SELECT_TAB_1, SELECT_TAB_2,
                 SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5, SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 -> "Tabs";
             case SPLIT_RIGHT, SPLIT_DOWN, CLOSE_PANE, MAXIMIZE_PANE, FOCUS_PANE_LEFT, FOCUS_PANE_RIGHT,
-                FOCUS_PANE_UP, FOCUS_PANE_DOWN -> "Panes";
+                FOCUS_PANE_UP, FOCUS_PANE_DOWN, MOVE_PANE_TO_NEW_TAB -> "Panes";
             case FIND, FIND_NEXT, FIND_PREVIOUS -> "Search";
             case COPY, PASTE -> "Clipboard";
             case FONT_BIGGER, FONT_SMALLER, FONT_RESET -> "Appearance";

@@ -1307,6 +1307,27 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean mayMoveToMainWindow() { return !closed && manager != null && !isMain() && movable(tabs()); }
 
     /**
+     * Whether Move Pane to New Tab may take {@code tab} (tabs and panes spec 9; workspace plan 8b Rulings 9): an item of
+     * this window whose tab holds another pane, neither pinned nor being closed.
+     *
+     * @param tab an item, or null
+     * @return whether it would move
+     */
+    boolean mayMoveToNewTab(Tab tab) {
+        if (closed || tab == null || !registry.movable(tab)) return false;
+        return parentTabs.holding(tab).map(view -> view.tabCount() > 1).orElse(false);
+    }
+
+    /**
+     * Move Pane to New Tab (tabs and panes spec 9): {@code tab}'s pane leaves its tab for a new tab right after it, which
+     * shows; its other panes stay, nothing closes and nothing leaves the window. Nothing when {@link #mayMoveToNewTab}
+     * says no.
+     *
+     * @param tab an item of this window
+     */
+    void moveToNewTab(Tab tab) { if (mayMoveToNewTab(tab)) parentTabs.moveToNewTab(tab); }
+
+    /**
      * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
      * one move each, so each keeps its content and session and reports {@code TAB_MOVED} once (parent tabs spec 5;
      * workspace plan 7b Rulings 6). A parent tab this window lacks opens under that id at {@code index} of the bar, in

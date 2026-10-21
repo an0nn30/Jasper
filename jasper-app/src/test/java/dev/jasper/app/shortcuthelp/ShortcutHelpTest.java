@@ -24,7 +24,7 @@ class ShortcutHelpTest {
         var rows = ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true);
         for (String id : List.of("new_tab", "close_tab", "next_tab", "select_tab_1", "move_tab_to_new_window"))
             assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Tabs"));
-        for (String id : List.of("close_pane", "maximize_pane", "focus_pane_left"))
+        for (String id : List.of("close_pane", "maximize_pane", "focus_pane_left", "move_pane_to_new_tab"))
             assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Panes"));
         // Workspace plan 7b Rulings 13: the window commands, with New Terminal Window and Close Window.
         for (String id : List.of("move_to_main_window", "new_terminal_window"))

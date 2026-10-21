@@ -454,8 +454,9 @@ final class WindowChrome {
     }
 
     /** The Tab menu's pane and prompt items, before Rename Tab and its tab items (workspace plan 8a Rulings 17). */
-    private static final ActionId[] GROUP_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
-        ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
+    private static final ActionId[] GROUP_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MOVE_PANE_TO_NEW_TAB,
+        ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
+        ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
     /** The tab items (tabs and panes spec 10): Next Tab, Previous Tab and Select Tab 1 to 9 switch the window's tabs. */
     private static final ActionId[] TAB_ITEMS = {ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.SELECT_TAB_1,
         ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4, ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6,
@@ -593,7 +594,8 @@ final class WindowChrome {
         owner.updateActions();
         JPopupMenu menu = new JPopupMenu();
         for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL,
-            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
+            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MOVE_PANE_TO_NEW_TAB, ActionId.MAXIMIZE_PANE,
+            ActionId.CLOSE_PANE}) menu.add(owner.action(id));
         // The window menu's entries, for a window whose strip hides (tabs and panes spec 6).
         menu.addSeparator();
         for (ActionId id : owner.windowMenuItems()) menu.add(owner.action(id));
