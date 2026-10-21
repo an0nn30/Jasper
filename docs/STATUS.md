@@ -1,5 +1,72 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 8c: moving panes — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `107b7eb55..5ec032b5b`, then this documentation commit;
+[plan](superpowers/plans/2026-10-20-workspace-8c-moving-panes.md),
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). Holding Cmd+Option (Ctrl+Alt on Linux and
+Windows) and dragging inside a pane moves it, the iTerm way: the tab drag (`TabDrag`) carries a pane too. A window's
+`paneClicks` hands it the modifier press on an item of its shown tab, consumed, and the drag's gesture listener consumes
+that press's drags and release, so no item hears any of them, whatever ends the drag; `TerminalView` leaves a consumed
+mouse event alone, so a terminal neither reports nor selects, and a text view's text drag sits out the gesture. A pane
+drops beside another pane of any window's shown tab, on the side whose edge is nearest (`WorkspaceDropResolver`, now
+`Area(group, bounds)` and `Drop(group, side)`; `Drop.Strip` and `Drop.Centre` are gone), the landing showing that half;
+over the middle half of a tab's entry it shows that tab at once, and the tabs a drag showed show again when it ends
+elsewhere; on a new-tab place (`TabStrip.newTabPlace`: an entry's outer quarter in either look, the classic tabs' "+"
+and the room after them) it becomes a new tab there, at once; the main window's empty workspace takes one anywhere over
+it. Within its window a move is a layout change (`ParentTabsView.moveBeside`, `moveToNewTab(Tab, int)`), with no
+`TAB_MOVED`; between its tabs it is announced once, where it lands, in one terminal-registry change, and a pane that
+fails to land goes back (`WindowContent.held`, `WorkspaceView.restore`), Move Pane to New Tab's included; into another
+window it goes through `WindowManager.movePane` and `movePaneToNewTab` and the tab registry, one `TAB_MOVED`, the
+session kept, a full window it empties closing after the move. Outside every window nothing happens; a pinned item's
+drag never starts. Rulings (plan, "Rulings"): (1) the modifier is exactly Cmd+Option (either Option key) or Ctrl+Alt,
+with the left button; (2) a pane's gesture is the drag's from its press to its release, a new left press ending one
+whose release went elsewhere, and the terminal view leaves a consumed event alone; (3) an entry's outer quarters are
+new-tab places in either look, and the classic tabs' "+" and the room after them the strip's end; (4) hovering an
+entry's middle half shows its tab at once, its item focused only in the drag's own window; (5) the tabs a drag showed
+show again when it ends, but in the drop's window; (6) a pane drops on the nearest side, with no centre; (7) where it
+already is means its own pane and its own tab's entry's middle half; (8) in its own window a tab's only pane takes no
+new tab at any place; (9) Move Pane to New Tab, a command, keeps the strip's open motion, and a tab a pane drop makes
+lands at once; (10) the main window's empty workspace takes a pane anywhere over it; (11) a pinned item's drag never
+starts; (12) moves within a window skip the registry, moves between windows go through the window manager and the
+registry; (13) the resolver keeps the pane drag's shape; (14) a modifier press makes its pane the active one; (15) no
+action is added; (16) a text view's text drag sits out the gesture; (17) a pane moving between tabs of its window is
+announced once, where it lands, and goes back if its landing fails. Spec issues: (1) the equal tabs have no empty end
+and no "+"; ruled by the controller: an entry's outer quarters are new-tab places in either look. Deviations: (1)
+amendment 1, from plan 8b's final review (I2, left for this plan): plan 8b's Move Pane to New Tab announced its old
+tab's next pane on the way; Task 2 holds it with the pane drops, so its case comes before Task 3; no other: Tasks 1-3
+ran their text verbatim. Known: a Cmd+Option-click (Ctrl+Alt-click on Linux and Windows) starts the pane gesture, so it
+no longer opens a link or reaches a program that reads the mouse, and Cmd-click, Ctrl-click and Alt-drag keep their
+meanings; on Windows only the left Alt counts, since Java reports the right one as AltGraph; a move to another window
+that fails lands its item in a new tab of its old window (the registry's recovery), and nothing closes. `./gradlew check
+--continue`: **12,108 tests, 0 failures, 0 errors, 25 skipped, BUILD SUCCESSFUL** (app 4,119, Editor 4,920, UI 930,
+terminal 460, testkit 213, Buddy 151, SDK 95, the other plugins 1,220; the plugin, Buddy, SDK and testkit test tasks
+were up to date from the same sources).
+GUI checks for the user:
+- Cmd+Option-drag (Ctrl+Alt on Linux and Windows) a terminal pane onto another pane of its tab, then of another window:
+  it splits beside that pane on the side nearest the cursor, the landing showing where, and the shell keeps running;
+- the same drag in a terminal running tmux or vim with the mouse on, with Esc mid-drag before the release: nothing
+  reaches the program and no selection starts; without the modifier a drag selects or reaches the program as before;
+- an editor pane with a selection: a Cmd+Option-drag over the selection moves the pane and never drags the text; a
+  plain drag still selects or drags the text; with `vim = true`, in Visual mode, a Cmd+Option-drag over the selection
+  moves the pane and never moves the text;
+- Cmd and the right Option key drag a pane on macOS; on Windows the left Alt key with Ctrl does, and AltGr does not;
+- hovering the middle of a tab's entry shows that tab at once and dropping on one of its panes moves the pane there;
+  Esc, or a release over a title bar, brings back the tab that showed before, in the drag's window and in another
+  window;
+- dragging a pane over another tab of its own window keeps the drag running (the pressed view hides while the hovered
+  tab shows) until the drop;
+- a drop on any entry's outer quarter, in either look, or on the "+" or the room after the tabs under Enterprise, makes
+  a new tab at that place, with no slide, the bar marking it first; a tab's only pane does nothing there in its own
+  window; Move Pane to New Tab still opens its tab with the strip's motion;
+- after Move Pane to New Tab, or a drop beside a pane of another tab, typing at once goes to the moved pane, and the
+  pane its old tab shows next never takes the focus on the way;
+- a full window's last pane dragged into the main window closes the full window; the main window's last pane dragged
+  away leaves its empty workspace, which takes a pane dropped anywhere over it;
+- outside every window nothing happens and no window opens; on Linux, a desktop that takes Ctrl+Alt-drag for itself
+  leaves Jasper no gesture.
+
+Not merged, not pushed.
+
 **Workspace tabs, plan 8b: split with a choice — 2026-10-20** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `ee3cd8989..62287a388`, then the documentation commit and its final-review fix wave;
 [plan](superpowers/plans/2026-10-20-workspace-8b-split-with.md),

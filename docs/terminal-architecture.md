@@ -104,6 +104,8 @@ Mouse routing first decides between local gestures and terminal reports. A
 reported gesture uses geometry only; it must not copy screen rows or trigger a
 local repaint. Ownership and modifiers are captured at press and survive release.
 Shift bypasses application mouse capture. Fractional wheel motion accumulates.
+A mouse event an earlier listener consumed, such as the application's pane drag,
+is not the terminal's: the view neither reports nor selects with it.
 A Cmd-click (Ctrl-click elsewhere) opens the URL under the pointer in the browser;
 otherwise, once the application set `setFileLinkHandler`, it reports the path or
 local `file:` link there as a `FileLink`; otherwise it starts a selection.

@@ -711,6 +711,15 @@ a plain move or a press anywhere (a lost release), the source window losing the 
 closing, leaving its parent tab or giving way to another of its groups end a drag. `TabDragTest` and
 `TabDragWindowsTest` drive it headlessly over stand-in frames on a pretend screen (`TabDragTestSupport`).
 
+A pane drags with the same `TabDrag`: a window's `paneClicks` hands it a left press with `TabDrag.movesPane`'s modifier
+(Cmd+Option, Ctrl+Alt elsewhere) on an item of its shown tab, consumed, and the drag's gesture listener consumes that
+press's drags and release, so no item hears the gesture (`TerminalView` leaves a consumed event alone). It drops beside
+a pane of a shown tab (`WorkspaceDropResolver.resolve`, the nearest side), shows a hovered entry's tab until it ends
+elsewhere, and makes a new tab at a strip's new-tab place (`TabStrip.newTabPlace`: an entry's outer quarter, the classic
+"+" and the room after it) or on the main window's empty workspace; within its window `WindowContent.movePane` and
+`movePaneToNewTab` move it, into another `WindowManager.movePane` and `movePaneToNewTab`, through the tab registry. A
+text view's text drag sits out the gesture. `PaneDragTest` and `TabDragWindowsTest` drive it.
+
 Startup keyboard focus belongs to the active terminal. `WindowContent` provides the
 native frame's default focus traversal target: the pending `TerminalPane` until its
 `TerminalView` exists, then the view. The pending pane is focusable only until adoption.

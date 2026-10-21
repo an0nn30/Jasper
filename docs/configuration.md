@@ -878,8 +878,8 @@ use the same `ui.animations.enabled` policy. Tab content and keyboard focus chan
 
 Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): opening takes 475 ms and
 closing 425 ms. Selection is immediate. A window's tab strip shows and hides at once, with its second tab (under the
-Enterprise look it always shows, and its tabs never move); a tab dragged along it, moved between windows or showing
-another of its panes takes its new place at once.
+Enterprise look it always shows, and its tabs never move); a tab dragged along it, moved between windows, made from a
+dragged pane or showing another of its panes takes its new place at once.
 
 The command palette drips open: over 300 ms its bottom edge eases down from the top of the card (quartic ease-out,
 fast then slow) while its rows stay in place, so the query field takes typing at once. Only a fresh open animates;
