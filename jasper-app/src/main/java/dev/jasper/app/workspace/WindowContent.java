@@ -1118,6 +1118,43 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
     public boolean isActiveAndOpen() { return active && !closed; }
 
+    private final java.util.List<Runnable> afterPaint = new ArrayList<>();
+
+    /**
+     * Whether no terminal shows in this window now, so none paints the window's first output (workspace tabs spec 13):
+     * no pane of the tab it shows that shows (the maximized one alone while one is maximized) holds a terminal, or the
+     * workspace is empty. A hidden tab's terminal shows nothing.
+     *
+     * @return true when no shown pane holds a terminal
+     */
+    public boolean showsNoTerminal() {
+        WorkspaceView workspace = workspace();
+        Layout layout = workspace.model();
+        java.util.List<dev.jasper.app.layout.Group> shown = layout.maximized().flatMap(layout::group).map(java.util.List::of)
+            .orElseGet(layout::groups);
+        for (dev.jasper.app.layout.Group group : shown)
+            if (group.selected().flatMap(workspace::tab).filter(tab -> tab.content() instanceof TerminalContent).isPresent()) return false;
+        return true;
+    }
+
+    /**
+     * Runs {@code task} once, after this window's content next paints. EDT.
+     *
+     * @param task what runs after the paint
+     */
+    public void afterNextPaint(Runnable task) {
+        afterPaint.add(Objects.requireNonNull(task, "task"));
+        repaint();
+    }
+
+    @Override public void paint(Graphics graphics) {
+        super.paint(graphics);
+        if (afterPaint.isEmpty()) return;
+        var tasks = java.util.List.copyOf(afterPaint);
+        afterPaint.clear();
+        for (Runnable task : tasks) task.run();
+    }
+
     /** Stable identity of this window for extensions; never a Swing object. */
     public UUID id() { return id; }
 

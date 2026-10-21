@@ -332,6 +332,25 @@ class WorkspaceRestoreTest {
             .as("front and first started at the restore; second and third wait to be shown").containsExactly(false, false, true, true));
     }
 
+    /** Workspace plan 6a Rulings 17: only the panes of the tab that shows count, the maximized one alone while one is. */
+    @Test void aWindowShowsNoTerminalWhenAMaximizedPaneOrAHiddenTabHidesTheOneThatStarted() throws Exception {
+        windows();
+        edt(() -> {
+            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
+            assertThat(main.content().showsNoTerminal()).isFalse();
+            Tab notes = windows.model.tabs().open("dev.example.editor", "notes", "notes.md", main.id(), new javax.swing.JPanel(),
+                dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT);
+            main.content().selectTab(notes);
+            assertThat(main.content().showsNoTerminal()).as("the terminal's pane still shows").isFalse();
+            main.content().toggleMaximize();
+            assertThat(main.content().showsNoTerminal()).as("only the maximized pane shows").isTrue();
+            main.content().toggleMaximize();
+            windows.model.tabs().open("dev.example.editor", "more", "more.md", main.id(), new javax.swing.JPanel());
+            assertThat(main.content().showsNoTerminal()).as("the tab that shows holds a plugin's item alone").isTrue();
+        });
+        windows.launch();
+    }
+
     @Test void reopeningTheMainWindowRestoresWhatWasSavedWhenItClosed() throws Exception {
         Path work = Files.createDirectories(folder.resolve("work"));
         windows();

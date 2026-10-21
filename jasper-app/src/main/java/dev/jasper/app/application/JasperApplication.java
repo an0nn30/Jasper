@@ -46,6 +46,7 @@ import dev.jasper.app.workspace.WindowManager;
 import dev.jasper.app.workspace.WindowRole;
 import dev.jasper.app.workspace.WindowShell;
 import dev.jasper.app.workspace.WorkspaceActivity;
+import dev.jasper.app.workspace.WorkspaceStore;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.rendering.FontSet;
 import dev.jasper.terminal.session.SessionLaunchOptions;
@@ -163,6 +164,8 @@ public final class JasperApplication {
     private boolean aboutHandlerInstalled;
     private boolean openFileHandlerInstalled;
     private UiState uiState = UiState.inMemory();
+    /** Where the windows are saved and restored from; null before {@link #startPlugins(AppDirs)}, and then nothing is. */
+    private WorkspaceStore workspaceStore;
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
     private PluginManager pluginManager;
@@ -446,6 +449,30 @@ public final class JasperApplication {
         return timer::stop;
     }
 
+    /**
+     * Saves the windows to {@code file} and restores them from it (workspace tabs spec 13): within a second of each change
+     * and whenever a window closes, written on a virtual thread; read when the main window opens. Saved windows that do not
+     * all come back are kept aside and a notice names where. The warm-up rehearsal never reaches it: it bypasses the window
+     * manager. Before the first window. EDT.
+     */
+    void workspace(Path file) {
+        workspaceStore = new WorkspaceStore(file, windows::snapshot, JasperApplication::afterDelay,
+            task -> Thread.ofVirtual().name("jasper-workspace-save").start(task), this::workspaceSetAside);
+        windows.workspace(workspaceStore);
+    }
+
+    /** The store {@link #workspace(Path)} made; null before it. Tests. */
+    WorkspaceStore workspaceStore() { return workspaceStore; }
+
+    /**
+     * Saved windows did not all come back (spec 15): {@code workspace.toml} could not be read, or a window in it could not
+     * be restored; the saved windows were kept as {@code kept}.
+     */
+    private void workspaceSetAside(Path kept) {
+        notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.WARNING, "Jasper could not restore your windows")
+            .withContent("Jasper opened what it could and kept the saved windows in " + kept + "."));
+    }
+
     /** Tests replace the process-wide trace. EDT. */
     void trace(StartupTrace value) { trace = java.util.Objects.requireNonNull(value, "value"); }
 
@@ -583,6 +610,15 @@ public final class JasperApplication {
         if (windowTrace != null) windowTrace.mark(WindowTrace.Milestone.SHOWN);
         trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
         startupSteps.done();
+        // A main window that shows no terminal once its opening's turn ends (a request's new tab or file comes after this
+        // in the same turn) paints none at once: its own first paint is the start-up's, which proves the look and settles
+        // residency (workspace plan 6a Rulings 17 and 42).
+        if (window.isMain()) SwingUtilities.invokeLater(() -> {
+            if (!window.closed() && window.content().showsNoTerminal()) window.content().afterNextPaint(() -> {
+                if (windowTrace != null) windowTrace.mark(WindowTrace.Milestone.FIRST_PAINT);
+                trace.mark(StartupTrace.Milestone.FIRST_PAINT);
+            });
+        });
     }
 
     /**
@@ -923,9 +959,10 @@ public final class JasperApplication {
 
     /**
      * Every outside request to show Jasper ends here: a second launch's handoff, the {@code jasper} command, the macOS
-     * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3, 5.4 and 6.4). The main window is restored
-     * first when none is open (until workspace-tabs plan 6, a new main window opens, in the first directory the request
-     * names when there is one), else raised; each other directory opens as a new terminal tab and each
+     * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3, 5.4, 6.4 and 13). The main window is
+     * restored first when none is open, with its full windows as {@code workspace.toml} has them, and the first directory
+     * the request names opens in a new tab after the restored ones (with nothing to restore, a new main window opens
+     * there); an open main window is raised. Each other directory opens as a new terminal tab and each
      * file in the editor a plugin provides, else revealed ({@code openRequestedFile}) ({@code OpenPlan}). {@code trigger}
      * names the caller for start-up timing. EDT.
      *
@@ -944,9 +981,11 @@ public final class JasperApplication {
     }
 
     /**
-     * A launch's main window, timed as a cold start unless a {@code --background} launch warmed up: its tab starts in the
-     * first directory {@code paths} names, else where a new shell starts, and the rest of the paths open in it as
-     * {@link #open} opens them (plan Ruling 13). EDT.
+     * A launch's main window, timed as a cold start unless a {@code --background} launch warmed up: restored with its full
+     * windows as {@code workspace.toml} has them (workspace tabs spec 13), the first directory {@code paths} names opening
+     * in a new tab after the restored ones; with nothing to restore, a new main window whose tab starts in that
+     * directory, else where a new shell starts. The rest of the paths open in it as {@link #open} opens them (plan Ruling
+     * 13). EDT.
      *
      * @param paths the launch's absolute paths
      * @return the main window; empty while the application is quitting
@@ -1166,6 +1205,7 @@ public final class JasperApplication {
         }
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         uiState = UiState.load(dirs.uiState(), presentation().projections().dockLayout().key());
+        workspace(dirs.workspaceState());
         shells = new NativeShells(themes, uiState, this::nativeWindow, this::quit,
             dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());
@@ -2179,6 +2219,8 @@ public final class JasperApplication {
         pending.addAll(cleanups);
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
         pending.add(history.closedFuture());
+        // The last save (closing every window saved them) reaches the disk before the process ends.
+        if (workspaceStore != null) pending.add(workspaceStore.written());
         shutdown.await(pending);
     }
 
