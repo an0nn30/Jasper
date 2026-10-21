@@ -50,8 +50,8 @@ final class FakeContent implements ContentTab {
      * decides for each tab.
      */
     private boolean splittable(){return !closed&&!ui.pendingTabs.contains(this);}
-    /** Splittable, and not pinned by a modal prompt. */
-    private boolean movable(){return splittable()&&pins==0;}
+    /** Splittable, not pinned by a modal prompt, and not a restorer's tab while its restore runs (6b Task 1's review). */
+    private boolean movable(){return splittable()&&pins==0&&(ui.host.workspace.slot==null||ui.host.workspace.slot.taken!=tab);}
     public void moveToNewWindow(){
         // A child window's only tab already is its own window.
         if(!movable()||!tab.window.main&&tab.window.tabs.size()==1)return;

@@ -1761,6 +1761,38 @@ public abstract class PluginContractTest {
     }
 
     /**
+     * Workspace plan 6b Rulings 30 (6b Task 1's review): while its restorer runs, the saved tab stays in the window being
+     * restored, whatever move the restorer asks of it, and comes back there.
+     */
+    @Test void aRestorersTabStaysInTheWindowBeingRestoredWhateverMoveItAsksFor() {
+        UUID main = h.addTerminalWindow(), child = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        var movable = new ArrayList<Boolean>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.windows().restorer("note", request -> {
+                var tab = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("note:" + request.title(), request.title()),
+                    request.window(), kitView(context));
+                movable.add(tab.mayMoveToNewTab());
+                tab.moveToNewWindow();
+                tab.moveToMainWindow();
+                tab.moveToNewTab();
+                return Optional.empty();
+            });
+        });
+        h.ui(() -> {
+            for (UUID window : List.of(main, child)) {
+                Optional<UUID> back = h.restoreTab("test.alpha", window, window.equals(main) ? "Main" : "Child",
+                    new dev.jasper.sdk.RestoreState("note", java.util.Map.of()));
+                assertThat(back).as("restored").isPresent();
+                assertThat(alpha.get().terminals().tab(back.get()).orElseThrow().window().id()).as("where it was restored").isEqualTo(window);
+            }
+            assertThat(alpha.get().terminals().windows()).as("no window opened for a move").hasSize(2);
+            assertThat(movable).containsExactly(false, false);
+        });
+    }
+
+    /**
      * Workspace tabs spec 6.4 and 14: a content tab placed in a new window while no window is open opens the main window
      * first, then a child window of its own for the tab.
      */

@@ -710,7 +710,7 @@ public final class WindowManager {
             // A plugin's saved tab comes back through its plugin, or as a placeholder; one naming Jasper itself is left out
             // (workspace plan 6b Rulings 3 and 22).
             content.savedTabs = (tabId, saved) -> saved.pluginId().equals(TabRegistry.APP_OWNER) ? Optional.empty()
-                : Optional.of(savedTab(content, tabId, saved));
+                : savedTab(content, tabId, saved);
             if (!prepare.test(window)) {
                 window.discard();
                 return Optional.empty();
@@ -829,14 +829,14 @@ public final class WindowManager {
 
     /**
      * A plugin's saved tab for {@code content}'s window, with the saved id: rebuilt by its plugin's restorer, else a
-     * placeholder that says why (workspace tabs spec 9.2 and 13).
+     * placeholder that says why (workspace tabs spec 9.2 and 13); empty when an item with that id is already open.
      */
-    private Tab savedTab(WindowContent content, TabId id, WorkspaceFile.TabRecord.Content saved) {
+    private Optional<Tab> savedTab(WindowContent content, TabId id, WorkspaceFile.TabRecord.Content saved) {
         PluginState state = plugins.apply(saved.pluginId());
         if (state.kind() != PluginState.Kind.RUNNING) return placeholder(content, id, saved, reason(state), false);
         TabRegistry.Restored restored = model.tabs().restore(id, saved.pluginId(),
             new TabRegistry.Restoring(content.id(), saved.title(), new TabRestore(saved.restorer(), saved.state())));
-        if (restored.tab().isPresent()) return restored.tab().get();
+        if (restored.tab().isPresent()) return restored.tab();
         String problem = restored.problem().endsWith(".") ? restored.problem() : restored.problem() + ".";
         return placeholder(content, id, saved, state.name() + " could not restore this tab: " + problem, true);
     }
@@ -854,9 +854,17 @@ public final class WindowManager {
 
     /**
      * A placeholder tab in {@code content}'s window, titled as the saved tab was. Its Retry and Close act in whatever window
-     * holds it when they are pressed, and it asks how its plugin stands again when it shows and on Retry.
+     * holds it when they are pressed, and it asks how its plugin stands again when it shows and on Retry. Empty when an item
+     * with the saved id is already open.
      */
-    private Tab placeholder(WindowContent content, TabId id, WorkspaceFile.TabRecord.Content saved, String why, boolean retryable) {
+    private Optional<Tab> placeholder(WindowContent content, TabId id, WorkspaceFile.TabRecord.Content saved, String why, boolean retryable) {
+        if (model.tabs().tab(id).isPresent()) {
+            // It came back elsewhere: a placeholder under its id would throw out of this window's restore, which leaves the
+            // record out instead (6b Task 1's review).
+            LOG.log(System.Logger.Level.WARNING, "Not restoring " + saved.pluginId() + "'s saved item " + id.value()
+                + " here: an item with its id is already open");
+            return Optional.empty();
+        }
         Tab[] tab = new Tab[1];
         var placeholder = new PlaceholderContent(saved, why, retryable, () -> retry(tab[0]),
             () -> window(tab[0].window()).ifPresent(holder -> holder.content().closeTab(tab[0])), () -> standing(tab[0]));
@@ -864,7 +872,7 @@ public final class WindowManager {
         tab[0].presentation(saved.title(), "", null, false, "", "");
         // Focusing the tab from the keyboard reaches its action: Retry while it shows, otherwise Close.
         tab[0].focusTarget(placeholder::focusAction);
-        return tab[0];
+        return Optional.of(tab[0]);
     }
 
     /** Retry on a placeholder: its plugin's restorer runs again in the window that holds it, while the plugin runs. */

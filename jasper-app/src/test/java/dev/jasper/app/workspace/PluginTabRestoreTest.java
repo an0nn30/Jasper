@@ -124,6 +124,31 @@ class PluginTabRestoreTest {
         windows.launch();
     }
 
+    /**
+     * 6b Task 1's review: a saved item whose id is already open is taken as restored elsewhere. It is left out of its
+     * window's restore with a warning that names its plugin and id, and no placeholder is registered under that id, which
+     * would throw out of the restore.
+     */
+    @Test void aSavedItemWhoseIdIsAlreadyOpenIsLeftOutOfItsWindowsRestoreWithAWarning() throws Exception {
+        TabId shell = TabId.random(), saved = TabId.random();
+        windows(mainWith(shell, saved, NOTE), Map.of(NOTES, "Notes"));
+        notesRestorer();
+        try (var log = dev.jasper.app.testsupport.LogRecorder.of(WindowManager.class.getName())) {
+            edt(() -> {
+                windows.model.tabs().add(saved, Tab.Kind.TERMINAL, new dev.jasper.app.contributions.TabContent() {
+                    @Override public javax.swing.JComponent component() { return new javax.swing.JPanel(); }
+                    @Override public void dispose() { }
+                }, UUID.randomUUID());
+                MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+                assertThat(main.content().tabs()).extracting(Tab::id).as("the saved window, without the item").containsExactly(shell);
+                assertThat(windows.model.tabs().tab(saved).orElseThrow().kind()).as("the open item, untouched").isEqualTo(Tab.Kind.TERMINAL);
+            });
+            assertThat(log.warnings()).as("named once").filteredOn(warning -> warning.contains(saved.value().toString()))
+                .singleElement().asString().contains(NOTES);
+        }
+        windows.launch();
+    }
+
     @Test void anItemWhosePluginIsNotRunningComesBackAsAPlaceholderAndIsSavedAgainAsItWas() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         windows(mainWith(shell, saved, NOTE), Map.of());

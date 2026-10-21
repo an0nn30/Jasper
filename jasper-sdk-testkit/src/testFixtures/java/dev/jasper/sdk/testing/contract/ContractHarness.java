@@ -159,8 +159,9 @@ public interface ContractHarness extends AutoCloseable {
      * UI thread: restores one saved tab through its plugin's restorer, as Jasper does when it restores its windows (workspace
      * tabs spec 13).
      *
-     * @return the tab the restorer opened in the window; empty when the plugin has no restorer for the kind, or it threw or
-     *     opened nothing
+     * @return the tab the restorer opened in the window, whatever it then returned or threw; empty when the plugin has no
+     *     restorer for the kind, or its restorer opened nothing before it returned or threw. An {@link Error} other than a
+     *     {@link LinkageError} closes the tab and is thrown on.
      */
     java.util.Optional<java.util.UUID> restoreTab(String pluginId, java.util.UUID windowId, String title, dev.jasper.sdk.RestoreState state);
 

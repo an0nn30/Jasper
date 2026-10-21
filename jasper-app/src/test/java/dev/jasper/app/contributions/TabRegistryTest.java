@@ -553,6 +553,53 @@ class TabRegistryTest {
         assertThat(tab.restore()).contains(state);
     }
 
+    /**
+     * Workspace plan 6b Rulings 30 (6b Task 1's review): while its restore runs, a restorer's item stays in the window being
+     * restored, whatever move it asks for, and the restore gives it back; once the restore ends it moves as any item does.
+     */
+    @Test void aRestorersItemStaysInTheWindowBeingRestoredWhateverMoveItAsksFor() {
+        hosts();
+        var movable = new ArrayList<Boolean>();
+        registry.restorer("plugin.notes", "note", restoring -> {
+            Tab opened = registry.open("plugin.notes", "note:" + restoring.title(), restoring.title(), null, new JPanel());
+            movable.add(registry.movable(opened));
+            opened.moveToNewWindow();
+            opened.moveToMainWindow();
+            registry.move(opened, restoring.window().equals(main) ? detached : main);
+            registry.moveToNewTab(opened);
+            return Optional.empty();
+        });
+        for (UUID window : List.of(main, detached)) {
+            TabId saved = TabId.random();
+            TabRegistry.Restored restored = registry.restore(saved, "plugin.notes",
+                new TabRegistry.Restoring(window, window.equals(main) ? "Main" : "Detached", new dev.jasper.app.layout.TabRestore("note", Map.of())));
+            assertThat(restored.problem()).as("restored").isEmpty();
+            Tab tab = restored.tab().orElseThrow();
+            assertThat(tab.id()).isEqualTo(saved);
+            assertThat(tab.window()).as("the window being restored").isEqualTo(window);
+            assertThat(registry.movable(tab)).as("once its restore ends").isTrue();
+        }
+        assertThat(movable).as("not while its restore runs").containsExactly(false, false);
+        assertThat(mounted).as("each window being restored places its item; no move attached one").isEmpty();
+    }
+
+    /** 6b Task 1's review: an Error a restorer lets out, which no containment holds, takes the item it opened with it. */
+    @Test void aRestorerThatOpensItsItemAndThrowsAnErrorLeavesNoTab() {
+        hosts();
+        TabId saved = TabId.random();
+        Tab[] opened = new Tab[1];
+        registry.restorer("plugin.notes", "fatal", restoring -> {
+            opened[0] = registry.open("plugin.notes", "fatal", restoring.title(), null, new JPanel());
+            throw new InternalError("the restorer broke");
+        });
+        assertThatThrownBy(() -> registry.restore(saved, "plugin.notes",
+            new TabRegistry.Restoring(main, "Fatal", new dev.jasper.app.layout.TabRestore("fatal", Map.of()))))
+            .isInstanceOf(InternalError.class).hasMessage("the restorer broke");
+        assertThat(opened[0].closed()).as("closed").isTrue();
+        assertThat(registry.tab(saved)).as("no tab under the saved id").isEmpty();
+        assertThat(registry.restoring(main)).as("the restore ended").isFalse();
+    }
+
     @Test void aHostedTabHasAnIdItsKindAndItsContent() {
         hosts();
         var panel = new JPanel();

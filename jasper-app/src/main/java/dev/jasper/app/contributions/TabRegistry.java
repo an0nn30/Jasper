@@ -404,13 +404,19 @@ public final class TabRegistry {
     }
 
     /**
-     * Whether a move would take {@code tab}: one of this registry's, open, neither pinned nor being closed. A parent tab
-     * moves whole or not at all (workspace plan 7b Rulings 7).
+     * Whether a move would take {@code tab}: one of this registry's, open, neither pinned nor being closed, nor a restorer's
+     * item while its restore runs. A parent tab moves whole or not at all (workspace plan 7b Rulings 7).
      *
      * @param tab the tab
      * @return whether it may move
      */
-    public boolean movable(Tab tab) { return splittable(tab) && !tab.pinned(); }
+    public boolean movable(Tab tab) { return splittable(tab) && !tab.pinned() && !held(tab); }
+
+    /**
+     * Whether {@code tab} is the item a restorer opened while its restore still runs: it stays in the window being
+     * restored, which places it (workspace plan 6b Rulings 30; 6b Task 1's review).
+     */
+    private boolean held(Tab tab) { return slot != null && slot.taken == tab; }
 
     /**
      * Whether a pane may open beside {@code tab}, as {@code ContentTab.split} asks: one of this registry's, open and not
@@ -424,25 +430,27 @@ public final class TabRegistry {
 
     /**
      * {@code ContentTab.moveToNewWindow()} (tabs and panes spec 13): the window manager opens a full window holding the
-     * tab, or leaves it where it is (a child window's only tab). A pinned tab or one being closed stays.
+     * tab, or leaves it where it is (a child window's only tab). A pinned tab, one being closed or a restorer's item while
+     * its restore runs stays.
      *
      * @param tab the tab
      */
     public void moveToNewWindow(Tab tab) {
         requireEdt();
-        if (tab.closed() || tab.pinned() || pending.contains(tab) || windows == null) return;
+        if (tab.closed() || tab.pinned() || pending.contains(tab) || held(tab) || windows == null) return;
         windows.newWindow().accept(tab);
     }
 
     /**
      * {@code ContentTab.moveToMainWindow()} (workspace tabs spec 6.5): the end of the active pane of the main window's
-     * shown parent tab. A pinned tab, one being closed or one the main window holds stays.
+     * shown parent tab. A pinned tab, one being closed, a restorer's item while its restore runs or one the main window
+     * holds stays.
      *
      * @param tab the tab
      */
     public void moveToMainWindow(Tab tab) {
         requireEdt();
-        if (tab.closed() || tab.pinned() || pending.contains(tab) || isMain(tab.window())) return;
+        if (tab.closed() || tab.pinned() || pending.contains(tab) || held(tab) || isMain(tab.window())) return;
         WorkspaceHost target = main();
         if (target != null) move(tab, target.id());
     }
@@ -488,7 +496,8 @@ public final class TabRegistry {
 
     /**
      * Moves a tab of any kind to {@code window}, in a new tab of that window, and selects it there; its
-     * content and session are untouched. A pinned tab, one being closed or one already there stays.
+     * content and session are untouched. A pinned tab, one being closed, a restorer's item while its restore runs or one
+     * already there stays.
      *
      * @param tab the tab
      * @param window the window to move it to
@@ -517,7 +526,7 @@ public final class TabRegistry {
         requireEdt();
         var next = hosts.get(Objects.requireNonNull(window, "window"));
         if (next == null) throw new IllegalArgumentException("No workspace " + window);
-        if (tab.closed() || tab.pinned() || pending.contains(tab) || window.equals(tab.window())) return;
+        if (tab.closed() || tab.pinned() || pending.contains(tab) || held(tab) || window.equals(tab.window())) return;
         var old = hosts.get(tab.window());
         if (old == null) return;
         transfer(tab, old, next, attach);
@@ -628,6 +637,8 @@ public final class TabRegistry {
     /**
      * Rebuilds one saved tab through its plugin's restorer (workspace tabs spec 13). The tab the plugin opens meanwhile
      * takes {@code id} and the window being restored, whatever window it named, and is not shown: that window places it.
+     * It stays there while the restorer runs, whatever move it asks for, and closes when {@code restorer} throws, before
+     * the failure goes on.
      *
      * @param id the saved tab's id
      * @param plugin the plugin that saved it
@@ -641,15 +652,23 @@ public final class TabRegistry {
         if (tab(id).isPresent()) return new Restored(Optional.empty(), "a tab with its id is already open");
         var restorer = restorers.getOrDefault(plugin, Map.of()).get(saved.state().kind());
         if (restorer == null) return new Restored(Optional.empty(), "it does not restore " + saved.state().kind() + " tabs");
-        slot = new Slot(id, saved.window(), plugin);
+        Slot rebuilding = new Slot(id, saved.window(), plugin);
+        slot = rebuilding;
         Optional<String> problem;
-        Tab taken;
         try {
             problem = restorer.apply(saved);
+        } catch (RuntimeException | Error failure) {
+            // What gets past the plugin's containment, an Error, takes the item the restorer opened with it, so its saved
+            // id is free again (6b Task 1's review).
+            slot = null;
+            if (rebuilding.taken != null) {
+                try { rebuilding.taken.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); }
+            }
+            throw failure;
         } finally {
-            taken = slot.taken;
             slot = null;
         }
+        Tab taken = rebuilding.taken;
         // Only a tab still open in the window being restored is the saved tab (workspace plan 6b Rulings 30).
         if (taken != null && !taken.closed() && saved.window().equals(taken.window())) return new Restored(Optional.of(taken), "");
         return new Restored(Optional.empty(), problem.orElse("it opened no tab"));

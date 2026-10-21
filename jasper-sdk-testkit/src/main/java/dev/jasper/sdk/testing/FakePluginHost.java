@@ -1786,8 +1786,9 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Restores one saved tab as Jasper does when it restores its windows (workspace tabs spec 13): the plugin's restorer for
-     * {@code state}'s kind runs, and the first tab it opens, a content tab or a provided session's, is the saved tab, in
-     * window {@code windowId} whatever window or placement it named. A content tab is placed there, not shown: it is
+     * {@code state}'s kind runs, and the first content tab it opens, whatever window or placement it named, or the first
+     * provided session it opens in window {@code windowId}, is the saved tab, in that window, where it stays while the
+     * restorer runs: a move asked of it does nothing. A content tab is placed there, not shown: it is
      * neither selected nor active until the test shows it. A session's tab waits as Jasper's does, {@code NOT_STARTED} with
      * no connection attempt, until its tab is shown ({@link #focusTerminalPane} or its {@code TabHandle.select()}). Jasper
      * places the tab where it was saved, in its tab and pane; this fake puts it in a new tab at the end of the window's
@@ -1797,9 +1798,11 @@ public final class FakePluginHost implements AutoCloseable {
      * @param windowId the window being restored
      * @param title the tab's saved title
      * @param state its saved restore state
-     * @return the tab the restorer opened, content or terminal, while it is open in that window; empty when the plugin is
-     *     not running or has no restorer for the kind, or its restorer declined (recorded in {@link #declinedRestores()}),
-     *     threw before it opened a tab (recorded in {@link #failures()}) or opened nothing, where Jasper shows a placeholder
+     * @return the tab the restorer opened, content or terminal, while it is open in that window, whatever the restorer then
+     *     returned or threw; empty when the plugin is not running or has no restorer for the kind, or its restorer opened
+     *     nothing: it declined (recorded in {@link #declinedRestores()}), threw an exception or a {@link LinkageError}
+     *     (recorded in {@link #failures()}, as Jasper contains them) or returned empty, where Jasper shows a placeholder
+     * @throws Error another {@link Error} the restorer threw, as Jasper lets it through, once the tab it opened has closed
      * @since 0.21.0
      */
     public java.util.Optional<UUID> restoreTab(String pluginId, UUID windowId, String title, dev.jasper.sdk.RestoreState state) {
@@ -1813,19 +1816,36 @@ public final class FakePluginHost implements AutoCloseable {
         java.util.Optional<String> declined;
         try {
             declined = restorer.restore(new dev.jasper.sdk.ui.RestoreRequest(context.terminals.windowHandle(windowId), title, state));
-        } catch (RuntimeException | LinkageError failure) {
+        } catch (Exception | LinkageError failure) {
+            // Contained as Jasper's containment holds it: a checked exception too, which another JVM language may throw.
             failures.add(pluginId + " restorer " + state.kind() + ": " + failure);
             return java.util.Optional.ofNullable(slot.taken).filter(tab -> tab.open && tab.window == window).map(tab -> tab.id);
+        } catch (Error fatal) {
+            // What Jasper lets through takes the tab the restorer opened with it.
+            workspace.slot = null;
+            if (slot.taken != null) {
+                try { closeRestored(slot.taken); } catch (RuntimeException | Error closing) { fatal.addSuppressed(closing); }
+            }
+            throw fatal;
         } finally {
             workspace.slot = null;
         }
-        if (declined != null && declined.isPresent()) declines.add(pluginId + " " + state.kind() + ": " + declined.get());
-        // As Jasper's: only a tab still open in the window being restored is the saved tab.
-        return java.util.Optional.ofNullable(slot.taken).filter(tab -> tab.open && tab.window == window).map(tab -> tab.id);
+        // As Jasper's: only a tab still open in the window being restored is the saved tab, and a reason counts without one.
+        java.util.Optional<UUID> restored = java.util.Optional.ofNullable(slot.taken).filter(tab -> tab.open && tab.window == window).map(tab -> tab.id);
+        if (restored.isEmpty() && declined != null && declined.isPresent()) declines.add(pluginId + " " + state.kind() + ": " + declined.get());
+        return restored;
+    }
+
+    /** Closes a tab a restorer opened, a content tab through its handle. */
+    private void closeRestored(FakeWorkspace.Tab tab) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeContent content : List.copyOf(context.ui.contents)) if (content.tab == tab) { content.close(); return; }
+        workspace.close(tab);
     }
 
     /**
-     * Why restorers declined to restore a tab, in order: an expected outcome a placeholder shows, which is no failure.
+     * Why restorers declined to restore a tab, in order, each only when no tab came back, as Jasper drops the reason of a
+     * restorer that opened its tab: an expected outcome a placeholder shows, which is no failure.
      *
      * @return lines of the form {@code <plugin id> <kind>: <reason>}
      * @since 0.21.0

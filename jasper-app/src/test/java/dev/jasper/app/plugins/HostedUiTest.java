@@ -468,6 +468,43 @@ class HostedUiTest {
         assertThat(containment.failures("dev.x.tool")).as("no incident").isZero();
     }
 
+    /**
+     * Workspace plan 6b Rulings 5, through the plugin's restorer: a reason it returns is the placeholder's, with no
+     * incident; what it throws is the placeholder's reason and an incident; a blank or null return gives no reason; and an
+     * Error that no containment holds takes the item it opened with it (6b Task 1's review).
+     */
+    @Test void aRestorersReasonIsNoIncidentWhatItThrowsIsAndAnErrorClosesItsItem() {
+        var windows = ui.windows();
+        var owner = terminals.windowHandle(terminalFixture.addWindow());
+        var opened = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        windows.restorer("declined", request -> java.util.Optional.of("its file is gone"));
+        windows.restorer("thrown", request -> { throw new IllegalStateException("the disk is unreadable"); });
+        windows.restorer("unsaid", request -> { throw new IllegalStateException(); });
+        windows.restorer("blank", request -> java.util.Optional.of("  "));
+        windows.restorer("null", request -> null);
+        windows.restorer("fatal", request -> {
+            opened.set(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("fatal", request.title()), request.window(), view()));
+            throw new InternalError("the restorer broke");
+        });
+        java.util.function.Function<String, dev.jasper.app.contributions.TabRegistry.Restored> restore = kind ->
+            model.tabs().restore(dev.jasper.app.layout.TabId.random(), "dev.x.tool", new dev.jasper.app.contributions.TabRegistry.Restoring(
+                owner.id(), "Saved", new dev.jasper.app.layout.TabRestore(kind, java.util.Map.of())));
+        try (var log = dev.jasper.app.testsupport.LogRecorder.of("dev.jasper.plugins.dev.x.tool")) {
+            assertThat(restore.apply("declined").problem()).isEqualTo("its file is gone");
+            assertThat(containment.failures("dev.x.tool")).as("a reason is no incident").isZero();
+            assertThat(restore.apply("thrown").problem()).isEqualTo("the disk is unreadable");
+            assertThat(containment.failures("dev.x.tool")).as("a throw is one").isEqualTo(1);
+            assertThat(restore.apply("unsaid").problem()).as("a throw without a message names its class").isEqualTo("IllegalStateException");
+            assertThat(restore.apply("blank").problem()).as("a blank reason is none").isEqualTo("it opened no tab");
+            assertThat(restore.apply("null").problem()).as("a null return is none").isEqualTo("it opened no tab");
+            assertThat(containment.failures("dev.x.tool")).isEqualTo(2);
+            assertThat(log.warnings()).hasSize(2);
+        }
+        assertThatThrownBy(() -> restore.apply("fatal")).isInstanceOf(InternalError.class).hasMessage("the restorer broke");
+        assertThat(opened.get().isClosed()).as("its item closed").isTrue();
+        assertThat(model.tabs().tabs()).as("nothing registered").isEmpty();
+    }
+
     @Test void dialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {
         var owner = terminals.windowHandle(terminalFixture.addWindow());
         List<String> events = new ArrayList<>();

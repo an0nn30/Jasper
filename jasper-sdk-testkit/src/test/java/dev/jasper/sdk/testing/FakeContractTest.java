@@ -176,6 +176,127 @@ class FakeContractTest extends PluginContractTest {
         } });
     }
 
+    /**
+     * Workspace plan 6b Rulings 24 for a split, the fake alone, as the application's {@code WindowContent.openTerminal}
+     * decides it: while a restorer runs, the window being restored splits only into the saved session, which takes the
+     * slot, placed, not shown and not started; a local split and any other session are refused.
+     */
+    @org.junit.jupiter.api.Test void whileARestorerRunsTheWindowBeingRestoredSplitsOnlyIntoTheSavedSession() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            java.util.UUID window = host.addTerminalWindow();
+            java.util.UUID shell = host.addTerminalTab(window, "shell");
+            host.addTerminalPane(shell, FakeTerminalsTest.info("shell"));
+            var local = new java.util.concurrent.atomic.AtomicReference<java.util.Optional<dev.jasper.sdk.terminal.PaneHandle>>();
+            var saved = new java.util.concurrent.atomic.AtomicReference<java.util.Optional<dev.jasper.sdk.terminal.PaneHandle>>();
+            var other = new java.util.concurrent.atomic.AtomicReference<java.util.Optional<dev.jasper.sdk.terminal.PaneHandle>>();
+            var alpha = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+            host.start(new PluginInfo("test.alpha", "Alpha", "1.0.0", Set.of(dev.jasper.sdk.Capabilities.SESSION_PROVIDE,
+                    dev.jasper.sdk.Capabilities.TERMINAL_OPEN)), Set.of(), Set.of(),
+                context -> { alpha.set(context); context.windows().restorer("ssh", request -> {
+                    var terminals = context.terminals();
+                    var target = terminals.window(request.window().id()).orElseThrow().activeTab().orElseThrow().terminal().orElseThrow();
+                    local.set(terminals.split(target, dev.jasper.sdk.terminal.Direction.RIGHT, dev.jasper.sdk.terminal.OpenRequest.local()));
+                    saved.set(terminals.split(target, dev.jasper.sdk.terminal.Direction.RIGHT, dev.jasper.sdk.terminal.OpenRequest.session(
+                        dev.jasper.sdk.terminal.SessionSpec.of("saved", pending -> { }).withRestore(request.state()))));
+                    other.set(terminals.split(target, dev.jasper.sdk.terminal.Direction.DOWN, dev.jasper.sdk.terminal.OpenRequest.session(
+                        dev.jasper.sdk.terminal.SessionSpec.of("other", pending -> { }))));
+                    return java.util.Optional.empty();
+                }); });
+            java.util.Optional<java.util.UUID> back = host.restoreTab("test.alpha", window, "saved", new dev.jasper.sdk.RestoreState("ssh", java.util.Map.of()));
+            org.assertj.core.api.Assertions.assertThat(local.get()).as("a local split is refused").isEmpty();
+            org.assertj.core.api.Assertions.assertThat(other.get()).as("another session is refused").isEmpty();
+            org.assertj.core.api.Assertions.assertThat(saved.get().map(pane -> pane.tab().id())).as("the saved session takes the slot").isEqualTo(back).isPresent();
+            org.assertj.core.api.Assertions.assertThat(host.sessionState(saved.get().orElseThrow().id())).as("not started").isEqualTo("NOT_STARTED|");
+            org.assertj.core.api.Assertions.assertThat(alpha.get().terminals().window(window).orElseThrow().activeTab().map(tab -> tab.id()))
+                .as("not shown").contains(shell);
+        } });
+    }
+
+    /**
+     * Workspace plan 6b Rulings 34 and 35, the fake alone: a restored content tab is neither selected nor active until its
+     * tab is shown, and a restored session's pane waits, not started, until its tab is first shown, when it connects.
+     */
+    @org.junit.jupiter.api.Test void aRestoredTabWaitsUnshownAndItsSessionConnectsWhenItsTabIsFirstShown() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            java.util.UUID window = host.addTerminalWindow();
+            int[] connects = {0};
+            var content = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            var alpha = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+            host.start(new PluginInfo("test.alpha", "Alpha", "1.0.0", Set.of(dev.jasper.sdk.Capabilities.SESSION_PROVIDE)), Set.of(), Set.of(), context -> {
+                alpha.set(context);
+                context.windows().restorer("note", request -> {
+                    content.set(context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("note", request.title()), request.window(), view(context)));
+                    return java.util.Optional.empty();
+                });
+                context.windows().restorer("ssh", request -> {
+                    context.terminals().openTab(request.window(), dev.jasper.sdk.terminal.OpenRequest.session(
+                        dev.jasper.sdk.terminal.SessionSpec.of("saved", pending -> connects[0]++).withRestore(request.state())));
+                    return java.util.Optional.empty();
+                });
+            });
+            var terminals = alpha.get().terminals();
+            java.util.UUID note = host.restoreTab("test.alpha", window, "Note", new dev.jasper.sdk.RestoreState("note", java.util.Map.of())).orElseThrow();
+            org.assertj.core.api.Assertions.assertThat(terminals.window(window).orElseThrow().activeTab().map(tab -> tab.id())).as("not selected").isNotEqualTo(java.util.Optional.of(note));
+            org.assertj.core.api.Assertions.assertThat(content.get().isActive()).as("not active").isFalse();
+            terminals.tab(note).orElseThrow().select();
+            org.assertj.core.api.Assertions.assertThat(content.get().isActive()).as("active once shown").isTrue();
+            java.util.UUID session = host.restoreTab("test.alpha", window, "saved", new dev.jasper.sdk.RestoreState("ssh", java.util.Map.of())).orElseThrow();
+            java.util.UUID pane = terminals.tab(session).orElseThrow().terminal().orElseThrow().id();
+            org.assertj.core.api.Assertions.assertThat(host.sessionState(pane)).isEqualTo("NOT_STARTED|");
+            org.assertj.core.api.Assertions.assertThat(connects[0]).as("no attempt before its tab shows").isZero();
+            host.focusTerminalPane(pane);
+            org.assertj.core.api.Assertions.assertThat(connects[0]).as("one attempt once it shows").isEqualTo(1);
+            org.assertj.core.api.Assertions.assertThat(host.sessionState(pane)).isEqualTo("CONNECTING|");
+            terminals.tab(note).orElseThrow().select();
+            terminals.tab(session).orElseThrow().select();
+            org.assertj.core.api.Assertions.assertThat(connects[0]).as("shown again, no second attempt").isEqualTo(1);
+        } });
+    }
+
+    /**
+     * 6b Task 1's review, the fake alone, as the application: a restorer's reason is recorded only when no tab came back, a
+     * checked exception is contained as Jasper's containment holds one, and an Error closes the tab it opened and goes on.
+     */
+    @org.junit.jupiter.api.Test void aRestorersReasonCountsOnlyWithoutATabAndAnErrorClosesTheTabItOpened() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            java.util.UUID window = host.addTerminalWindow();
+            var fatal = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            host.start(new PluginInfo("test.alpha", "Alpha", "1.0.0", Set.of()), Set.of(), Set.of(), context -> {
+                var windows = context.windows();
+                windows.restorer("kept", request -> {
+                    windows.openTab(new dev.jasper.sdk.ui.ContentSpec("kept", request.title()), request.window(), view(context));
+                    return java.util.Optional.of("declined once open");
+                });
+                windows.restorer("declined", request -> java.util.Optional.of("its file is gone"));
+                windows.restorer("checked", request -> { throw FakeContractTest.<RuntimeException>sneaky(new java.io.IOException("unreadable")); });
+                windows.restorer("fatal", request -> {
+                    fatal.set(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("fatal", request.title()), request.window(), view(context)));
+                    throw new InternalError("the restorer broke");
+                });
+            });
+            org.assertj.core.api.Assertions.assertThat(host.restoreTab("test.alpha", window, "Kept", new dev.jasper.sdk.RestoreState("kept", java.util.Map.of())))
+                .as("its tab came back").isPresent();
+            org.assertj.core.api.Assertions.assertThat(host.restoreTab("test.alpha", window, "Declined", new dev.jasper.sdk.RestoreState("declined", java.util.Map.of()))).isEmpty();
+            org.assertj.core.api.Assertions.assertThat(host.declinedRestores()).as("only the decline that left no tab").containsExactly("test.alpha declined: its file is gone");
+            org.assertj.core.api.Assertions.assertThat(host.restoreTab("test.alpha", window, "Checked", new dev.jasper.sdk.RestoreState("checked", java.util.Map.of()))).isEmpty();
+            org.assertj.core.api.Assertions.assertThat(host.failures()).singleElement().asString().contains("unreadable");
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> host.restoreTab("test.alpha", window, "Fatal",
+                new dev.jasper.sdk.RestoreState("fatal", java.util.Map.of()))).isInstanceOf(InternalError.class).hasMessage("the restorer broke");
+            org.assertj.core.api.Assertions.assertThat(fatal.get().isClosed()).as("the tab it opened closed").isTrue();
+            org.assertj.core.api.Assertions.assertThat(host.contentTabs()).as("only the kept tab").singleElement().satisfies(tab -> org.assertj.core.api.Assertions.assertThat(tab.isClosed()).isFalse());
+        } });
+    }
+
+    /** A plugin's view for a fake-only case. */
+    private static dev.jasper.sdk.ui.UiView view(dev.jasper.sdk.plugin.PluginContext context) {
+        return context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body", dev.jasper.sdk.ui.ControlState.READY, "Content",
+            dev.jasper.sdk.ui.Nodes.TextRole.BODY)), event -> { });
+    }
+
+    /** Throws {@code failure} unchecked, as code in another JVM language may throw a checked exception. */
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> T sneaky(Throwable failure) throws T { throw (T) failure; }
+
     /** The contract's line for a fake post. */
     static String contractLine(FakeNotifications.Post post) {
         var spec = post.spec();
