@@ -10,6 +10,11 @@ import java.util.function.Consumer;
 /** Functional, EDT-confined plugin kit; construct freely, then operate on the EDT. */
 public final class FakeKit implements UiKit, AutoCloseable {
     private final String owner;
+    private java.awt.Font contentFont=new java.awt.Font(java.awt.Font.SANS_SERIF,java.awt.Font.PLAIN,13);
+    java.awt.Font contentFont(){return contentFont;}
+    /** Simulates the current host UI body font and its normal property changes on specialized content. */
+    public void contentFont(java.awt.Font font){guard();contentFont=Objects.requireNonNull(font);for(var view:List.copyOf(views))view.contentFont(font);}
+
     Object anchorHost;
     private final Set<FakeKitView> views = new LinkedHashSet<>();
     private final Map<String,IconAsset> icons = new java.util.concurrent.ConcurrentHashMap<>();
@@ -23,7 +28,7 @@ public final class FakeKit implements UiKit, AutoCloseable {
     public FakeKit(String owner) { this.owner=Objects.requireNonNull(owner); }
     static void edt() { if(!EventQueue.isDispatchThread()) throw new IllegalStateException("Kit requires EDT"); }
     void guard() { edt(); if(closed.get()) throw new IllegalStateException("Kit is closed"); }
-    private static final Set<String> BUILT_INS=Set.of("question","appearance","window","font","cursor","keyboard","bell","notification.card","notification.sticky","notification.off","notification.history","command-palette","chevron.left","none","user","bookmark","home","desktop","preview","hidden","logout","download","help","history","clock","lock.keyhole","link","match.case","folder.add","window.add","paste","pause","regex","remove","save","settings","split","unlock","zoom","add","more","menu","collapse","chevron.down","chevron.right","chevron.up","search","shield","lock","edit","delete","copy","reveal","refresh","upload","back","forward","folder","folder.filled","file","server","key","login","note","network","more.vertical","tunnel","terminal","play","play.filled","triangle.down","warning","info","error","plugin","check","close","sparkle","star","star.filled","match.word","laptop","target","arrow.right","import","brightness","reset","expand.all","collapse.all","run","application");
+    private static final Set<String> BUILT_INS=Set.of("editor.source","editor.split","editor.preview","editor.scroll-sync","editor.source.classic","editor.split.classic","editor.preview.classic","editor.scroll-sync.classic","question","appearance","window","font","cursor","keyboard","bell","notification.card","notification.sticky","notification.off","notification.history","command-palette","chevron.left","none","user","bookmark","home","desktop","preview","hidden","logout","download","help","history","clock","lock.keyhole","link","match.case","folder.add","window.add","paste","pause","regex","remove","save","settings","split","unlock","zoom","add","more","menu","collapse","chevron.down","chevron.right","chevron.up","search","shield","lock","edit","delete","copy","reveal","refresh","upload","back","forward","folder","folder.filled","file","server","key","login","note","network","more.vertical","tunnel","terminal","play","play.filled","triangle.down","warning","info","error","plugin","check","close","sparkle","star","star.filled","match.word","laptop","target","arrow.right","import","brightness","reset","expand.all","collapse.all","run","application");
     void validateIcon(String name){if(name!=null && !BUILT_INS.contains(name) && !icons.containsKey(name))throw new IllegalArgumentException("Unknown icon: " + name);}
     void validateIcons(ViewSpec spec) {
         var available=new HashSet<>(BUILT_INS);available.addAll(icons.keySet());

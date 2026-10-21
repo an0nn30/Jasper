@@ -50,6 +50,7 @@ public enum ActionId {
     FONT_RESET("font_reset", "Reset Font Size", "cmd+0", "ctrl+shift+0"),
     OPEN_SETTINGS("open_settings", "Settings", "cmd+,", "ctrl+shift+,"),
     RELOAD_CONFIG("reload_config", "Reload Config", "none", "none"),
+    MANAGE_CYGWIN_PACKAGES("manage_cygwin_packages", "Manage Cygwin packages…", "none", "none"),
     QUIT("quit", "Quit", "cmd+q", "ctrl+alt+shift+q");
 
     private final String id;
@@ -68,6 +69,10 @@ public enum ActionId {
         this.macDefault = macDefault;
         this.otherDefault = otherDefault;
         this.context = context;
+    }
+
+    public boolean availableOn(String osName) {
+        return this != MANAGE_CYGWIN_PACKAGES || osName.startsWith("Windows");
     }
 
     public String id() {

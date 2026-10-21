@@ -33,7 +33,7 @@ tasks.named('check') { dependsOn(verifySupport) }
 gradle.taskGraph.whenReady { graph ->
     if (graph.hasTask("${project.path}:installWindowsUser")) {
         assert !graph.allTasks.any { it.name in ['packageApp', 'packageDist', 'buildLauncher', 'buildWatcher',
-            'buildCommandClient', 'trainAotCache'] || it.name.startsWith('compileMac') } :
+            'buildCommandClient', 'trainAotCache', 'compileCygwinRelayProbe', 'compileConPtyRelayProbe', 'refreshCygwinSeed'] || it.name.startsWith('compileMac') } :
             'Run installWindowsUser separately from native build and packaging tasks.'
     }
 }
@@ -42,6 +42,11 @@ verifySupport.configure {
         def dependencies = { String name -> tasks.getByName(name).taskDependencies.getDependencies(tasks.getByName(name))*.name }
         assert dependencies('installWindowsUser').toSet() == ['packageWindowsUser', 'compileWindowsUserInstaller'].toSet()
         assert dependencies('packageWindowsUser') == ['stageWindowsUser']
+        if (System.getProperty('os.name').startsWith('Windows')) {
+            assert dependencies('stageWindowsUser').containsAll(['stageCygwinSeed', 'cygwinToolJar'])
+            assert dependencies('stageCygwinSeed').contains('acquireCygwinSeed')
+        }
+
         assert dependencies('uninstallWindowsUser') == ['compileWindowsUserInstaller']
         assert tasks.named('installWindowsUser').get().mainClass.get() == 'UserInstall'
         assert tasks.named('uninstallWindowsUser').get().mainClass.get() == 'UserInstall'

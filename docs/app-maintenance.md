@@ -531,6 +531,9 @@ To add a bundled plugin:
 
 ## Packaged runtime, bundled natives and the AOT cache
 
+Bundled Windows Cygwin provisioning, seed refresh, ownership/recovery and native acceptance are documented in the
+[Cygwin guide](../packaging/windows/cygwin/README.md).
+
 `gradle/packaging-support.gradle` holds what packaging decides: the runtime's modules, the native libraries copied into
 the app and the AOT training launch. `verifyPackagingSupport` (in `check`) tests it with fixtures; `verifyPackage`
 checks a built image ([start-up performance](packaging.md#start-up-performance)).

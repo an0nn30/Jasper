@@ -49,3 +49,14 @@ Apache-2.0 `platform/icons` module. `python3 -I tools/icons/fetch-classic-icons.
 Chrome receivers marked `ChromeArtwork.CLASSIC` get six of them (add, split, zoom, settings, window.add and search);
 the catalog's `run` and `application` get two more; `IconRegistry.stripeIcon` gives the six tool-window icons to the
 labelled stripes for network, folder, tunnel, download, server and bell.
+
+# Editor document actions
+
+Sixteen unmodified SVGs under `editor/`, recorded in `assets-editor.tsv` (destination, upstream path, SHA-256),
+come from JetBrains/intellij-community tag `idea/2026.2.3`, commit `8062c061ff33e22041d9f1844db5b8b8a6b5e4d7`.
+The installed IntelliJ IDEA 2026.2.3 build `IU-262.10968.63` supplied the bytes, verified byte-for-byte against
+that pinned upstream commit: classic `general/layoutEditorOnly`, `general/layoutEditorPreview`,
+`general/layoutPreviewOnly`, `actions/synchronizeScrolling`; modern `expui/general/editorOnly`,
+`expui/general/editorPreview`, `expui/general/previewOnly`, `expui/actions/synchronizeScrolling`; each with its
+`_dark.svg` sibling. They retain JetBrains' copyright and Apache-2.0 comments; `LICENSE.txt` and `NOTICE.txt`
+cover these files. They form a separate lazy document-action catalog. Builds and runtime use only bundled bytes.

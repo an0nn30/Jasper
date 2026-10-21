@@ -66,6 +66,7 @@ Building the distribution (`installDist`, `packageApp`) is headless; on macOS, A
   write, test and package one.
 - [Terminal onboarding](../jasper-terminal/README.md), [UI kit](../jasper-ui/README.md) and
   [Buddy embedding](../jasper-buddy/README.md): the libraries' supported surfaces.
+- [Bundled Cygwin](../packaging/windows/cygwin/README.md): Windows provisioning, persistent roots, package management and the PTY relay.
 - [Status](../docs/STATUS.md): current state, open items and decisions.
 
 Starting points by change:

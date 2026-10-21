@@ -149,7 +149,7 @@ so tasks can overlap.</li>
 <li>The fake checks the calling thread only for the kit's views, which need the event dispatch thread, and for
 {@link Appearance}'s colours, palettes, workspace opacity and change subscriptions, which need the thread that made the
 host or the event dispatch thread ({@link Appearance#variant()}, {@link Appearance#workspaceVariant()} and
-{@link Appearance#presentation()} answer any thread). Calls Jasper refuses off the
+{@link Appearance#presentation()} and {@link Appearance#terminalTypography()} answer any thread). Calls Jasper refuses off the
 UI thread with {@code IllegalStateException} (registrations, subscribing, publishing services, handling subcommands,
 terminal queries, the clipboard) succeed in the fake from any thread.</li>
 <li>Services: the fake does not check that a service's interface is in one of the provider's exported packages, and an

@@ -267,6 +267,28 @@ class EditorKitTest {
         });
     }
 
+    @Test void specializedContentReceivesCurrentBodyFontAndLiveFamilyChanges() {
+        Edt.run(() -> {
+            var saved=new Object[3];
+            UIManager.getDefaults().forEach((key,value) -> {
+                if("defaultFont".equals(key))saved[0]=value;
+                if("Label.font".equals(key))saved[1]=value;
+                if("Jasper.uiFontFamilyOverride".equals(key))saved[2]=value;
+            });
+            var context=KitFixtures.context();
+            try {
+                UIManager.put("defaultFont",new Font("Serif",Font.PLAIN,17));UIManager.put("Label.font",new Font("Serif",Font.PLAIN,17));UIManager.put("Jasper.uiFontFamilyOverride",true);
+                try(var view=new KitView(context,new ViewSpec(new Custom("node",READY,"content",CustomKind.EDITOR,"Editor")),event -> {})) {
+                    var content=new JComponent() {};var changes=new ArrayList<Font>();content.addPropertyChangeListener("font",event -> changes.add((Font)event.getNewValue()));
+                    view.registerContent("content",content,() -> {});
+                    assertThat(content.getFont().getFamily()).isEqualTo("Serif");
+                    UIManager.put("defaultFont",new Font("SansSerif",Font.PLAIN,20));
+                    assertThat(content.getFont().getFamily()).isEqualTo("SansSerif");assertThat(changes).hasSizeGreaterThanOrEqualTo(2);
+                }
+            }finally{UIManager.put("defaultFont",saved[0]);UIManager.put("Label.font",saved[1]);UIManager.put("Jasper.uiFontFamilyOverride",saved[2]);release(context);}
+        });
+    }
+
     @Test void editorCanvasAdmissionRejectsOrdinaryRootsAndDisposesTheAcceptedWrapper() {
         Edt.run(() -> {
             var context = KitFixtures.context(); int[] disposed = {0};

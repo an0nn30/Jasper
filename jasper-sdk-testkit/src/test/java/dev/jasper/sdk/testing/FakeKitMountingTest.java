@@ -144,6 +144,38 @@ class FakeKitMountingTest {
             }
         });
     }
+    @Test void standardDraftEventsNotifyThePageAfterPublishingPendingValues() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var host = new FakePluginHost()) {
+                var view = new AtomicReference<FakeKitView>();
+                var rows = new AtomicReference<SettingsPanelHost>();
+                var wrap = new AtomicReference<Setting<Boolean>>();
+                var observed = new ArrayList<Boolean>();
+                host.start(new PluginInfo("test.pending", "Pending", "1.0.0", Set.of()), Set.of(), Set.of(), plugin -> {
+                    wrap.set(plugin.settings().declare(SettingSpec.of("wrap", SettingKind.bool(), false).label("Wrap lines")));
+                    plugin.settings().page(new SettingsPanel() {
+                        @Override public UiView create(SettingsPanelHost h) {
+                            rows.set(h);
+                            var made = (FakeKitView) plugin.kit().create(new ViewSpec(h.row(wrap.get())), e -> { });
+                            view.set(made);
+                            return made;
+                        }
+                        @Override public void pendingChanged() { observed.add(rows.get().pending(wrap.get())); }
+                    });
+                });
+                host.settingsPanel("test.pending");
+                rows.get().stage(wrap.get(), true);
+                assertThat(observed).as("plugin staging does not recurse").isEmpty();
+                view.get().emit(new UiEvent.Toggled("settings:wrap", false));
+                view.get().emit(new UiEvent.Toggled("settings:wrap", true));
+                view.get().emit(new UiEvent.Action("settings:wrap:reset"));
+                assertThat(observed).containsExactly(false, true, false);
+                host.closeSettingsPanel("test.pending");
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
     @Test void resetRemovesSavedOverrideWithoutChangingOrdinaryStageDefault() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try(var host=new FakePluginHost()) {

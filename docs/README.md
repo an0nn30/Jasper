@@ -82,6 +82,7 @@ user's authorization.
 
 - [Packaging](packaging.md): native images, the DMG, the Windows ZIP, setup wizard and user installation, the Linux
   packages, the release workflow and the acceptance checklists.
+- [Bundled Windows Cygwin](../packaging/windows/cygwin/README.md): seed, provisioning, package management and native acceptance.
 - [Benchmarks](benchmarks.md): throughput, memory and start-up measurements and how to compare them.
 - [Launcher](../packaging/launcher/README.md): Jasper's build of the jpackage launcher and its launch watcher.
 - [The `jasper` command](../packaging/cli/README.md): the native client and its protocol.

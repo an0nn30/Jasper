@@ -43,6 +43,19 @@ public interface EditorDocument {
     Optional<String> host();
 
     /**
+     * Resolves a resource against this file's parent, retaining this handle's storage and authentication context.
+     * Called on the UI thread; performs no I/O and does not open a tab. Since Editor 0.11.0.
+     *
+     * @param path a nonempty, already decoded relative path with {@code /} separators; dot segments are allowed
+     * @return the resource handle, or empty when this provider has no relative resolution support
+     * @throws IllegalArgumentException when {@link RelativePaths#requireValid(String)} rejects the path
+     */
+    default Optional<EditorDocument> resolveRelative(String path) {
+        RelativePaths.requireValid(path);
+        return Optional.empty();
+    }
+
+    /**
      * Reads the whole file. Fails with {@link TooLargeException}, before transferring content, when it is
      * larger than {@code limitBytes}. Cancelling the future aborts the transfer. The Editor words a
      * {@link TooLargeException}, {@link java.nio.file.NoSuchFileException} or

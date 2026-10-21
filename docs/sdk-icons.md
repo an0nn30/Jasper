@@ -34,7 +34,8 @@ way. `ScopeSpec.withIcon` is checked like any other name, but neither palette dr
 
 `add`, `appearance`, `application`, `arrow.right`, `back`, `bell`, `bookmark`, `brightness`, `check`, `chevron.down`,
 `chevron.left`, `chevron.right`, `chevron.up`, `clock`, `close`, `collapse`, `collapse.all`, `command-palette`, `copy`,
-`cursor`, `delete`, `desktop`, `download`, `edit`, `error`, `expand.all`, `file`, `folder`, `folder.add`,
+`cursor`, `delete`, `desktop`, `download`, `edit`, `editor.preview`, `editor.preview.classic`, `editor.scroll-sync`,
+`editor.scroll-sync.classic`, `editor.source`, `editor.source.classic`, `editor.split`, `editor.split.classic`, `error`, `expand.all`, `file`, `folder`, `folder.add`,
 `folder.filled`, `font`, `forward`, `help`, `hidden`, `history`, `home`, `import`, `info`, `key`, `keyboard`, `laptop`,
 `link`, `lock`, `lock.keyhole`, `login`, `logout`, `match.case`, `match.word`, `menu`, `more`, `more.vertical`,
 `network`, `none`, `note`, `notification.card`, `notification.history`, `notification.off`, `notification.sticky`,
@@ -45,6 +46,10 @@ way. `ScopeSpec.withIcon` is checked like any other name, but neither palette dr
 `run` and `application` are authored host artwork: `run` is IntelliJ's classic Run triangle and `application` its
 run-configuration icon. Controls draw them in their own colours under every look; panels, prompts and tiles draw a
 monochrome glyph of the same name. The two names need SDK 0.18.1.
+
+Document view controls (SDK 0.18.3) use authored light/dark artwork: `editor.source`, `editor.split`,
+`editor.preview` and `editor.scroll-sync`. Each also has a `.classic` name. Choose the suffix when
+`Appearance.presentation().icons()` is `Presentation.Icons.CLASSIC`; controls preserve the selected art's colours.
 
 ## The Enterprise look's classic art
 

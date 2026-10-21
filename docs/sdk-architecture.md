@@ -33,7 +33,9 @@ own packages, the libraries it bundles and the exported packages listed for it i
 `gradle/architecture/PluginPresentationCheck.java`, which it runs, refuses presentation code in plugin classes:
 constructing ordinary Swing controls, painting, and setting colours, fonts, borders, sizes, layout, alignment or icons
 on visible components. The Editor's `DocumentArea`, `VimTextArea` and `EditorTheme` are the named exceptions for its
-document surface, and its `SystemClipboard` for Vim registers. A plugin built elsewhere is not checked at build time;
+document surface, with operation-specific exceptions for `EditorTextView`, `EditorTextAreaUI`, `PreviewPane`,
+`PreviewKit` and `PreviewImageView`, and its `SystemClipboard` for Vim registers. Each exception requires its exact
+class and matching source file. A plugin built elsewhere is not checked at build time;
 at run time the SDK has no way to mount an ordinary control, and custom content admission (below) refuses one.
 
 ## Launch
@@ -285,11 +287,17 @@ view or the view closes.
 
 `HostedUi.appearance()` reads the presentation's themes: `color` and the variant from the chrome theme, the
 `WorkspacePalette`, `EditorPalette` and `SyntaxPalette` from the workspace theme (`HostedPalettes` maps semantic roles
-and the editor scheme onto SDK values; no SDK value enters `UIManager`). The variant getters are safe from any thread,
-everything else needs the UI thread. `onWorkspaceChanged` also fires when the workspace opacity behind a component
+and the editor scheme onto SDK values; no SDK value enters `UIManager`). The variant getters are safe from any thread;
+colour and palette getters and listener registration need the UI thread. `onWorkspaceChanged` also fires when the workspace opacity behind a component
 changes: `GlassSource`, built by `JasperApplication` from its windows, answers `workspaceOpacity(component)` (the
 window's opacity inside the centre deck that holds terminal and content tabs, 1.0 for chrome, stripes and tool
 windows), and `WindowContent.setGlassListener` reports opacity changes and content mounting in a translucent window.
+
+`Appearance.terminalTypography()` and `onTerminalTypographyChanged` (SDK 0.18.3) expose saved terminal typography.
+`HostedTypography` publishes an immutable saved-config value, readable on any thread, before EDT notifications.
+Equal values are skipped, initial state is read explicitly, and subscriptions close with the plugin.
+`JasperApplication` supplies `FontConfig` through `PluginRuntime`; conversion remains in `app.plugins`. The testkit
+mirrors publication and disposal. Temporary pane zoom does not publish a new value.
 
 `Appearance.presentation()` returns one immutable `Presentation` per run, read from any thread.
 `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)` hands the host the installed kit, the presentation's

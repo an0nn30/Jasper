@@ -199,6 +199,12 @@ helper, compiled with the JBR SDK, copies the files and creates the shortcut thr
 execution can stay disabled; Windows must allow the generated `Jasper.exe` to run. Run the task on its own, not with
 the native packaging tasks.
 
+The task also installs the pinned Cygwin starter set in `%LOCALAPPDATA%\Jasper\cygwin`, using bundled Setup and relay
+binaries. Gradle fetches only hash-locked artifacts using Java; installation works offline once staged. Select
+**Cygwin Bash** in the shell settings and use **Manage Cygwin packages…** to add tools. Updates and uninstall preserve
+the Cygwin root, packages and user files. See the [Cygwin guide](packaging/windows/cygwin/README.md) for package
+management and recovery.
+
 Exit Jasper, including its background process, before installing an update or running
 `.\gradlew.bat :jasper-app:uninstallWindowsUser`, which does not build the application; it removes the installation,
 its shortcut and its matching login entry, keeping your settings and data in `%APPDATA%\jasper`. Jasper's background

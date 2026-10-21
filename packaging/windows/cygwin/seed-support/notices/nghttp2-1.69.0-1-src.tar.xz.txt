@@ -1,0 +1,305 @@
+Package source: src/release/nghttp2/nghttp2-1.69.0-1-src.tar.xz
+License identifier: LicenseRef-Upstream-libnghttp2_14
+
+--- nghttp2-1.69.0-1.src/nghttp2.cygport ---
+#|/usr/bin/cygport
+# nghttp2.cygport - nghttp2 Cygwin package build control script definitions
+
+NAME=nghttp2
+VERSION=1.69.0
+RELEASE=1
+
+CATEGORY="Web Libs"
+SUMMARY="HTTP/2 implementation"
+#XARCH=$ARCH
+#ARCH=noarch
+DESCRIPTION="HTTP/2 and its header compression algorithm HPACK implementation.
+The framing layer of HTTP/2 is implemented as a reusable library.
+Also included are an HTTP/2 client, server, proxy, load test and
+benchmarking tool."
+#Package provides Mingw MS VC RT-linked binaries, NOT Cygwin binaries,
+#for use with the mingw64-$XARCH-gcc cross compiler, installed in
+#/usr/$XARCH-w64-mingw32/sys-root/mingw/{bin,lib,include}/."
+BASE=${NAME#mingw*-*86*-}
+
+HOMEPAGE=https://nghttp2.org
+SRC_URI=https://github.com/$BASE/$BASE/releases/download/v$VERSION/$BASE-$VERSION.tar.xz
+SRC_URI+=" $SRC_URI.asc"
+#SRC_URI+=" asm-socket.h"
+SRC_DIR=$BASE-$VERSION
+GITHUB=https://github.com/$BASE/$BASE/commit
+#PATCH_URI=nghttp2-include-asm-socket.h-add-SO_REUSEPORT.patch
+# ares_getaddrinfo requires libcares >= 1.16: we only have 1.14
+#	nghttp2-1.61-revert-nghttpx-migrate-to-ares_getaddrinfo.patch
+#	configure-ac-cxx-ext.patch				# 1.58 includes
+#	tests-Makefile-am-staticlib.patch			# 1.58 includes
+#	nghttp2-1.57-nghttp2_time-c-time_now_sec-cygwin-defines.patch	# 1.58 includes
+#	nghttp2-1.57-nghttp2_time-c-time_now_sec-cygwin-mingw-defines.patch
+#	nghttp2-1.57-lib-nghttp2_time-c-time_now_sec-mingw64.patch
+#	nghttp2-1.57-configure-ac-cygwin-ignore-GetTickCount64.patch
+#	shrpx-cc-RLIMIT_MEMLOCK-1.46.0.patch
+#	$GITHUB/407df2822e4b989c53c04b4f7902d2a9210ad506.patch
+#	1.7.1-win32-tests.patch
+
+
+# temporary patch to asm/socket.h
+#CYGPORT_USE_UNSTABLE_API=1
+
+#src_unpack_hook() {
+#    [ -r asm-socket.h ] && verbose cp -v asm-socket.h /usr/include/asm/socket.h
+#}
+
+
+DIFF_EXCLUDES=integration-tests
+
+BUILD_REQUIRES="libbrotli-devel libev-devel libjansson-devel
+		libcares-devel libevent-devel libiconv-devel libxml2-devel
+		libssl-devel zlib-devel
+		binutils CUnit gcc-core gcc-g++
+		autoconf automake libtool pkg-config"
+
+CYGCONF_ARGS="
+	 --enable-app
+	   --with-libbrotlidec
+	   --with-libbrotlienc
+	CPPFLAGS=-DSO_REUSEPORT=SO_REUSEADDR
+"	# Windows reuse addr allows port
+#	 --enable-app			Build applications (nghttp, nghttpd, nghttpx and h2load) [default=check]
+#	--disable-assert		turn off assertions
+#	 --enable-debug			Turn on debug output
+#	 --enable-dependency-tracking	do not reject slow dependency extractors
+#	--disable-dependency-tracking	speeds up one-time build
+#	 --enable-examples		Build examples [default=check]
+#	--disable-failmalloc		Do not build failmalloc test program
+#	 --enable-fast-install[=PKGS]	optimize for fast installation [default=yes]
+#	 --enable-hpack-tools		Build HPACK tools [default=check]
+#	 --enable-http3			(EXPERIMENTAL) Enable HTTP/3.
+#					This requires ngtcp2, nghttp3, and a custom OpenSSL.
+#	--disable-largefile		omit support for large files
+#	 --enable-lib-only		Build libnghttp2 only. This is a short hand for
+#					--disable-app --disable-examples --disable-hpack-tools
+#	--disable-libtool-lock		avoid locking (might break parallel builds)
+#	--disable-option-checking	ignore unrecognized --enable/--with options
+#	 --enable-shared[=PKGS]		build shared libraries [default=yes]
+#	 --enable-silent-rules		less verbose build output (undo: "make V=1")
+#	--disable-silent-rules		verbose build output (undo: "make V=0")
+#	 --enable-static[=PKGS]		build static libraries [default=yes]
+#	--disable-threads		Turn off threading in apps
+#	 --enable-werror		Turn on compile time warnings
+#	 --enable-year2038		support timestamps after 2038
+#	   --with-aix-soname=aix|svr4|both	shared library versioning (aka "SONAME")
+#					variant to provide on AIX, [default=aix].
+#	   --with-gnu-ld		assume the C compiler uses GNU ld [default=no]
+#	   --with-jansson		Use jansson [default=check]
+#	   --with-jemalloc		Use jemalloc [default=check]
+#	   --with-libbpf		Use libbpf [default=no]
+#	   --with-libbrotlidec		Use libbrotlidec [default=no]
+#	   --with-libbrotlienc		Use libbrotlienc [default=no]
+#	   --with-libcares		Use libc-ares [default=check]
+#	   --with-libev			Use libev [default=check]
+#	   --with-libevent-openssl	Use libevent_openssl [default=check]
+#	   --with-libnghttp3		Use libnghttp3 [default=check]
+#	   --with-libngtcp2		Use libngtcp2 [default=check]
+#	   --with-libxml2		Use libxml2 [default=check]
+#	   --with-mruby			Use mruby [default=no]
+#	   --with-neverbleed		Use neverbleed [default=no]
+#	   --with-openssl		Use openssl [default=check]
+#	   --with-pic[=PKGS]		try to use only PIC/non-PIC objects [default=use both]
+#	   --with-python_exec_prefix	override the default PYTHON_EXEC_PREFIX
+#	   --with-python_prefix		override the default PYTHON_PREFIX
+#	   --with-python-sys-prefix	use Python's sys.prefix and sys.exec_prefix values
+#	   --with-sysroot[=DIR]		Search for dependent libraries within DIR (or the compiler's sysroot if not specified).
+#	   --with-systemd		Enable systemd support in nghttpx [default=check]
+#	   --with-zlib			Use zlib [default=check]
+
+ABI=14
+
+PKG_NAMES="lib${BASE}_${ABI} lib${BASE}-devel ${BASE}"
+
+# CROSS_HOST=$XARCH-w64-mingw32	scallywag build source does not interpret variables work around
+#CROSS_HOST=x86_64-w64-mingw32
+#inherit cross
+
+# should be conditional on ENABLE_APP
+#MAKEOPTS+=" man_MANS=  dist_pkgdata_SCRIPTS= "
+
+
+declare lib${BASE}_${ABI}_CATEGORY="$CATEGORY"
+declare lib${BASE}_${ABI}_SUMMARY="$SUMMARY (library)"
+declare lib${BASE}_${ABI}_CONTENTS="
+	usr/bin/cyg${BASE}-${ABI}.dll
+	usr/share/doc/
+"
+
+
+libnghttp2_devel_CATEGORY="$CATEGORY Devel"
+libnghttp2_devel_SUMMARY="$SUMMARY (development)"
+libnghttp2_devel_CONTENTS="
+	usr/include/$BASE/
+	usr/lib/lib$BASE.dll.a
+	usr/lib/pkgconfig/lib$BASE.pc
+"
+
+
+nghttp2_CATEGORY="${CATEGORY% Libs}"
+nghttp2_SUMMARY="$SUMMARY (utilities)"
+nghttp2_CONTENTS="
+	usr/bin/*.exe
+	usr/share/man/man1/
+"
+#	usr/share/$BASE/fetch-ocsp-response - dropped
+
+
+LICENSE=MIT
+LICENSE_SPDX="SPDX-License-Identifier: $LICENSE"
+# SPDX-License-Identifier: MIT
+LICENSE_URI=COPYING
+
+CYGWIN_MAINTAINER=Brian%20Inglis
+CYGWIN_MAINTAINER_EMAIL=Brian.Inglis@SystematicSW.ab.ca
+
+#https://github.com/nghttp2/nghttp2/releases/tag/v$VERSION
+RELEASE_NOTES=${SRC_URI%/*}
+RELEASE_NOTES=${RELEASE_NOTES/download/tag}
+RELEASE_NOTES=$HOMEPAGE/blog
+
+UPSTREAM_MAINTAINER=Tatsuhiro%20Tsujikawa
+UPSTREAM_MAINTAINER_EMAIL=tatsuhiro-t@github.com
+UPSTREAM_EMAIL=nghttp2@github.com
+SUBJECT=${OSTYPE^}%20Package%20$NAME%20$VERSION
+MAILTO=mailto:$UPSTREAM_MAINTAINER%20%3C$UPSTREAM_MAINTAINER_EMAIL%3E\
+,$UPSTREAM_MAINTAINER%20%3C$UPSTREAM_EMAIL%3E\
+\?from=$CYGWIN_MAINTAINER%20%3C$CYGWIN_MAINTAINER_EMAIL%3E\
+\&subject=$SUBJECT\&body=$SUBJECT
+
+
+Source archive: src/release/nghttp2/nghttp2-1.69.0-1-src.tar.xz
+
+--- nghttp2-1.69.0-1.src/nghttp2-1.69.0.tar.xz!/nghttp2-1.69.0/tests/munit/COPYING ---
+µnit Testing Framework
+Copyright (c) 2013-2016 Evan Nemerson <evan@nemerson.com>
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+--- nghttp2-1.69.0-1.src/nghttp2-1.69.0.tar.xz!/nghttp2-1.69.0/doc/_exts/rubydomain/LICENSE.rubydomain ---
+If not otherwise noted, the extensions in this package are licensed
+under the following license.
+
+Copyright (c) 2010 by the contributors (see AUTHORS file).
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+* Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--- nghttp2-1.69.0-1.src/nghttp2-1.69.0.tar.xz!/nghttp2-1.69.0/COPYING ---
+The MIT License
+
+Copyright (c) 2012, 2014, 2015, 2016 Tatsuhiro Tsujikawa
+Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+--- nghttp2-1.69.0-1.src/nghttp2-1.69.0.tar.xz!/nghttp2-1.69.0/third-party/mruby/LICENSE ---
+Copyright (c) 2010- mruby developers
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+
+--- nghttp2-1.69.0-1.src/nghttp2-1.69.0.tar.xz!/nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-set/LICENSE ---
+mruby-set
+
+Copyright (c) yui-knk 2016
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+[ MIT license: http://www.opensource.org/licenses/mit-license.php ]

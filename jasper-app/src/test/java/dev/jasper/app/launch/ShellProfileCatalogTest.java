@@ -36,6 +36,19 @@ class ShellProfileCatalogTest {
         edt(() -> { });
     }
 
+    @Test void cygwinDiscoveryRefreshesAndDropsRemovedBash() throws Exception {
+        var found = new AtomicReference<>(Optional.of("C:/owned/root/bin/bash.exe"));
+        var catalog = new AtomicReference<ShellProfileCatalog>();
+        edt(() -> {
+            catalog.set(new ShellProfileCatalog("Windows 11", Map.of(), () -> DEFAULT, List::of, Optional::empty, found::get, background::add));
+            catalog.get().refresh();
+        });
+        detect();
+        edt(() -> assertThat(catalog.get().current()).extracting(ShellProfile::id).contains("cygwin"));
+        found.set(Optional.empty()); edt(() -> catalog.get().refresh()); detect();
+        edt(() -> { assertThat(catalog.get().current()).extracting(ShellProfile::id).doesNotContain("cygwin"); catalog.get().close(); });
+    }
+
     @Test void detectionRunsOffTheEdtAndPublishesOnIt() throws Exception {
         var catalog = new AtomicReference<ShellProfileCatalog>();
         var changes = new AtomicInteger();

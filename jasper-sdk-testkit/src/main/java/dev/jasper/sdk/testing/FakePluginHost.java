@@ -198,6 +198,55 @@ public final class FakePluginHost implements AutoCloseable {
         });
     }
 
+    private volatile dev.jasper.sdk.ui.TerminalTypography terminalTypography = new dev.jasper.sdk.ui.TerminalTypography(
+        "Cousine Nerd Font Mono", 12, List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true, 1);
+    private final List<Entry> typographyHandlers = new CopyOnWriteArrayList<>();
+
+    /** Queues saved terminal typography for publication on the next {@link #flush()}. Equal values do not notify.
+     * Handlers run on the EDT after the getter is updated.
+     * @param value the saved terminal typography
+     * @since 0.18.3
+     */
+    public void setTerminalTypography(dev.jasper.sdk.ui.TerminalTypography value) {
+        requireAppearanceThread();
+        Objects.requireNonNull(value, "typography");
+        events.add(() -> {
+            Runnable publish = () -> {
+                if (terminalTypography.equals(value)) return;
+                terminalTypography = value;
+                for (var entry : List.copyOf(typographyHandlers)) {
+                    if (!entry.closed().get()) {
+                        try { entry.handler().accept(value); }
+                        catch (RuntimeException | LinkageError failure) {
+                            recordFailure(entry.pluginId() + " terminal typography: " + failure);
+                        }
+                    }
+                }
+            };
+            if (javax.swing.SwingUtilities.isEventDispatchThread()) publish.run();
+            else {
+                try { javax.swing.SwingUtilities.invokeAndWait(publish); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+                catch (java.lang.reflect.InvocationTargetException failure) {
+                    if (failure.getCause() instanceof Error error) throw error;
+                    if (failure.getCause() instanceof RuntimeException runtime) throw runtime;
+                    throw new IllegalStateException(failure.getCause());
+                }
+            }
+        });
+    }
+
+    dev.jasper.sdk.ui.TerminalTypography terminalTypography() { return terminalTypography; }
+
+    Subscription subscribeTypography(String pluginId, Consumer<dev.jasper.sdk.ui.TerminalTypography> handler) {
+        if (!javax.swing.SwingUtilities.isEventDispatchThread())
+            throw new IllegalStateException("Terminal typography registration requires the UI thread");
+        Objects.requireNonNull(handler, "handler");
+        var entry = new Entry(pluginId, value -> handler.accept((dev.jasper.sdk.ui.TerminalTypography) value), new AtomicBoolean());
+        typographyHandlers.add(entry);
+        return () -> { entry.closed().set(true); typographyHandlers.remove(entry); };
+    }
+
     private volatile Variant variant = Variant.DARK;
     private volatile dev.jasper.sdk.ui.Presentation presentation = FakePresentations.STANDARD;
     /** Set by the first {@link #start} and never cleared, even when every plugin has stopped since. */
@@ -428,7 +477,12 @@ public final class FakePluginHost implements AutoCloseable {
             try {
             var owned=java.util.Objects.requireNonNull(panel.create(rows),"Settings view");
             var view=context.kit().requireOwned(owned);view.mount(rows);rows.view=view;view.hostSpec=rows::descriptor;
-            view.hostEvents=rows::event;
+            view.hostEvents = event -> {
+                if (rows.closed) return false;
+                boolean handled = rows.event(event);
+                if (handled) panel.pendingChanged();
+                return handled;
+            };
             rows.component=view.component;return rows.component;
             }catch(Throwable failure){recordFailure("Settings callback failed");rows.component=new javax.swing.JLabel("This page could not be shown.");return rows.component;}
         });
@@ -1762,6 +1816,10 @@ public final class FakePluginHost implements AutoCloseable {
      * @param tab hosted content handle
      * @return published status descriptors */
     public List<dev.jasper.sdk.ui.ContentStatus> contentStatus(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).status; }
+
+    /** @param tab hosted content handle
+     * @return published command descriptors */
+    public List<dev.jasper.sdk.ui.ContentCommand> contentCommands(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).commands; }
 
     /** A {@code Terminals.environment} contributor and the plugin that registered it. */
     record ShellContributor(FakePluginContext context, Function<Map<String, String>, Map<String, String>> contributor) { }

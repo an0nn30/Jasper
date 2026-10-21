@@ -944,7 +944,7 @@ final class Stacks {
                 int width = natural(child, fill);
                 if (child == fill) {
                     // Under a catalog search width (plan 10b) a text fill gives way down to its own width before the search clips.
-                    int least = metric(DesignMetrics.Role.DOCUMENT_BAR_FILL_MIN_WIDTH);
+                    int least = parent.getParent() instanceof SplitViews.ActionRow ? 0 : metric(DesignMetrics.Role.DOCUMENT_BAR_FILL_MIN_WIDTH);
                     if (metric(DesignMetrics.Role.DOCUMENT_BAR_SEARCH_WIDTH) > 0 && owner.barTexts.contains(child)) least = Math.min(least, child.getPreferredSize().width);
                     int minimum = Math.min(least, Math.max(0, right - x));
                     width = Math.max(minimum, right - aligned(parent) - x);

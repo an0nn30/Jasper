@@ -1,0 +1,7 @@
+{
+  "repository": "https://cygwin.com/git/cygwin-apps/setup.git",
+  "tag": "release_2.937",
+  "commit": "05a4f232e47c6ec809cb61a1b0a139f654f6fcaf",
+  "source": "setup-2.937.tar.gz",
+  "sha512": "42bdf3a4828973b24a49e59215eab8fcaa7484514c0a2ff773e6c615d670c5dedc9374cb4139fae941788cd23834ddbd172d4cba222a6328349b267ddeeacb59"
+}

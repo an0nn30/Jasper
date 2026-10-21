@@ -1,0 +1,69 @@
+Package source: x86_64/release/editrights/editrights-1.04-1-src.tar.xz
+License identifier: BSD-3-Clause
+
+--- editrights-1.04-1.src/editrights.cygport ---
+NAME="editrights"
+LICENSE="BSD-3-Clause"
+VERSION="1.04"
+RELEASE=1
+CATEGORY="Base"
+SUMMARY="Alter Windows user rights and privileges from command line"
+DESCRIPTION="Alter Windows user rights and privileges from command line"
+HOMEPAGE="http://cygwin.com/"
+
+GIT_URI="https://cygwin.com/git/cygwin-apps/editrights.git"
+GIT_REV="v${VERSION}"
+inherit git
+
+BUILD_REQUIRES=" \
+  gcc-g++ \
+  make \
+"
+
+src_compile() {
+  cd ${B}
+  cygmake -f ${S}/Makefile srcdir=${S}
+}
+
+src_install() {
+  cd ${B}
+  cyginstall -f ${S}/Makefile srcdir=${S}
+}
+
+SCALLYWAG="notest"
+
+Source archive: x86_64/release/editrights/editrights-1.04-1-src.tar.xz
+
+--- editrights-1.04-1.src/editrights-1.04.tar.bz2!/editrights/LICENCE ---
+editrights version 1.01: a cygwin application to edit user
+                         rights on a windows NT system
+
+Copyright (c) 2003, Chris Rodgers <editrights-at-bulk.rodgers.org.uk>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or
+without modification, are permitted provided that the following
+conditions are met:
+
+Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer. 
+
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution. 
+
+The name of Chris Rodgers may not be used to endorse or promote
+products derived from this software without specific prior written
+permission. 
+
+THIS SOFTWARE IS PROVIDED BY CHRIS RODGERS "AS IS" AND ANY EXPRESS
+OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL CHRIS RODGERS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

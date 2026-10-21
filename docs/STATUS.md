@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**Bundled Cygwin implementation complete — 2026-10-20** (merged into local `main`): The approved [design](superpowers/specs/2026-10-20-jasper-bundled-cygwin-design.md) and [plan](superpowers/plans/2026-10-20-jasper-bundled-cygwin.md) now include the locked 114-package seed, corresponding sources/notices, production PTY relay, Cygwin Bash discovery, Manage Cygwin packages, and persistent provisioning through both Windows install routes. Default Gradle acquisition/install uses Java and bundled artifacts without PowerShell or separately installed tooling. Disconnected Windows ARM64 acceptance passes real MSI install/add-package/repair/upgrade/uninstall and actual Gradle install/update/uninstall/reinstall; all 8,275 Cygwin root entries survive the Gradle lifecycle unchanged. Native validation fixed WiX/source path limits, MSI empty-root process inspection and read-only launcher cleanup. Independent review and the full merged headless check pass: 11,878 tests, zero failures/errors and 29 skips. Native x64 Windows and interactive-app acceptance remain outstanding and block release publication. [Verification evidence](superpowers/plans/2026-10-20-jasper-cygwin-verification.md).
+
 **Shell Prompt icon and Meadow website — 2026-10-20**: The approved moss shell/terminal artwork replaces package and runtime icons on all three platforms, including the native macOS catalog. The website header, footer and favicon match. Enterprise uses the same platform icon through its kit’s `icons = "@jasper"` selection, including its splash emblem. The icon generator uses the tracked raster master, retains platform framing and exports native containers plus a manifest. The local merge also includes the animated Meadow splash and visible-workspace handoff, Meadow website scenery, welcome section and shared tab transitions. Full headless check and macOS package verification pass (11,633 tests, zero failures/errors, 25 existing skips). Pages remains manual-only; deployment has not been run.
 
 **Local Meadow splash — 2026-10-20** (`codex/meadow-splash-preview`): Standard windowed launches show
@@ -32,8 +34,8 @@ bundled plugins on the public plugin SDK. The [documentation index](README.md) l
   the classic title bar) and `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.18.2` (`JasperSdk.VERSION`); Credential Vault, Enterprise, File Server, Remote and Sample declare
-  `sdk = ">=0.18.2, <0.19"`, and Editor, Project Index, Shell History and Snippets `sdk = ">=0.18.0, <0.19"`.
+- **SDK** `0.18.3` (`JasperSdk.VERSION`); Credential Vault, Enterprise, File Server, Remote and Sample declare
+  `sdk = ">=0.18.2, <0.19"`; Editor declares `sdk = ">=0.18.3, <0.19"`, and Project Index, Shell History and Snippets `sdk = ">=0.18.0, <0.19"`.
 - **Themes.** Built in: Slate Cobalt (Dark and Light; the default Dark theme), Jasper Meadow Light (the default Light
   theme), Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise
   theme. **Looks:** the default look, and the Enterprise look while its plugin is on (Settings › Plugins, then restart;
@@ -50,11 +52,11 @@ Bundled plugins, all enabled by default except Enterprise:
 | Plugin | Id | Version | Exports | Provides |
 | --- | --- | --- | --- | --- |
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
-| Editor | `dev.jasper.editor` | 0.10.0 | `dev.jasper.editor.api` | Local and remote text files in tabs; `jasper editor` |
+| Editor | `dev.jasper.editor` | 0.11.0 | `dev.jasper.editor.api` | Local and remote text files in tabs; `jasper editor` |
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
 | File Server | `dev.jasper.fileserver` | 0.6.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
-| Remote | `dev.jasper.remote` | 0.15.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
+| Remote | `dev.jasper.remote` | 0.15.1 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
 | Sample | `dev.jasper.sample` | 0.4.0 | — | Exercises the plugin runtime; inert unless a `demo_*` setting is set |
 | Shell History | `dev.jasper.history` | 0.3.0 | — | Searching every shell's history from the palette |
 | Snippets | `dev.jasper.snippets` | 0.3.0 | `dev.jasper.snippets.api` | Saved commands in the palette |
@@ -3740,6 +3742,13 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
   `./gradlew check --continue` on main passed **8,771 tests, 0 failures, 0 errors, 6 existing skips**.
   Previews are preserved in the main checkout under `jasper-app/build/flat-tabs-preview/`.
   The managed worktree is archived after verification. No push performed.
+
+- **Editor fonts and Markdown preview** (2026-10-20; `codex/editor-markdown-preview`): written spec approved.
+  Local main `34aa868fe` merged as `c74465f5d`; the [implementation plan](superpowers/plans/2026-10-20-editor-fonts-markdown-preview.md)
+  is approved for subagent-driven implementation and per-task review; all 13 tasks implemented and independently reviewed; whole-branch review and scoped re-review passed through `59e790a6c`. Thirteen tasks cover SDK typography, independent/followed
+  fonts and source geometry, current semantic-icon toolbar, native Markdown rendering, provider-relative resources,
+  mode persistence, focus/search/navigation and linked scrolling. Refresh replaces the removed icon enums with
+  semantic names and targets SDK 0.18.3, Editor 0.11.0 and Remote 0.15.1. Headless baseline passed using Python 3.13 for the theme-tool test. Task 3 uses a uniform configured-font line box, preserves the stock gutter, and adapts physical Vim geometry; its review fixed syntax invalidation, bidi caret mapping and repeated layout costs. Task 13 measures full-limit, dense and multiple-preview fixtures and fixes native break/attribute scans, repeated preferred-size invalidation and unsliced anchor rebuilding. Warm maps now rebuild in about 1 ms for giant/dense paragraphs; exact cold source layout still takes about 1.28/2.12 s and can recur after invalidation. The vendor Java tokenizer can delay worker cancellation about 27 s. See [verification evidence and pending native acceptance](editor-verification.md#fonts-and-markdown-preview); maximum-size responsiveness is not claimed. Before review fixes, full `check` passed with Python 3.13: **11,843 tests, zero failures/errors, 29 skips** (25 existing plus four opt-in performance tests, separately passed), and `sdkRelease` passed. After final fixes, **5,115 Editor tests, zero failures/errors, four opt-in skips**, all three architecture gates, and rebuilt `packageApp`/`verifyPackage` passed. Review fixes cover scroll intent across geometry retries, Find ownership across tab/pane changes, keyboard traversal out of Preview and stale-content labeling. Merged into local main as `048b58680`; independent conflict-resolution review passed. Full merged-tree `check` passed with Python 3.13: **11,866 tests, zero failures/errors, 29 skips**, all 150 tasks executed. Native acceptance remains pending. No GUI, AOT training or push.
 
 - **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
   second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.

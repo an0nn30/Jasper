@@ -21,7 +21,10 @@ final class WindowsDesktop implements UserInstall.Desktop, AutoCloseable {
     static Path appData() { return Path.of(Shell32Util.getKnownFolderPath(KnownFolders.FOLDERID_RoamingAppData)); }
     static Path programs() { return Path.of(Shell32Util.getKnownFolderPath(KnownFolders.FOLDERID_Programs)); }
     static boolean reparsePoint(Path path) throws IOException {
-        int attributes = Kernel32.INSTANCE.GetFileAttributes(path.toString());
+        String nativePath = path.toAbsolutePath().normalize().toString();
+        if (!nativePath.startsWith("\\\\?\\"))
+            nativePath = nativePath.startsWith("\\\\") ? "\\\\?\\UNC\\" + nativePath.substring(2) : "\\\\?\\" + nativePath;
+        int attributes = Kernel32.INSTANCE.GetFileAttributes(nativePath);
         if (attributes == WinBase.INVALID_FILE_ATTRIBUTES)
             throw new IOException("Cannot inspect " + path + ": Windows error " + Kernel32.INSTANCE.GetLastError());
         return (attributes & WinNT.FILE_ATTRIBUTE_REPARSE_POINT) != 0;

@@ -137,9 +137,9 @@ Paste. Use the menus or the command palette for those.
 
 ## Find and replace
 
-**Find…** opens the find bar at the bottom of the tab, with the selection as its query when it is one line;
-**Replace…** opens it with a second row for the replacement. The bar has the query field, **Match Case**, **Whole
-Word** and **Regular Expression** (Java's regular expressions) toggles, the match count ("No matches", "1 match",
+**Find…** searches the pane last focused and opens the find bar at the bottom of the tab, with the selection as its
+query when it is one line; **Replace…** opens it with a second row for the replacement, revealing Source in Split
+for a Preview-only Markdown tab. The bar has the query field, **Match Case**, **Whole Word** and **Regular Expression** (Java's regular expressions) toggles, the match count ("No matches", "1 match",
 "*n* matches", or "Invalid pattern"), **Previous Match**, **Next Match** and **Close**. Every match is highlighted, and
 the search wraps around the end of the file. In the replace row, **Replace** replaces the next match after the caret and
 **Replace All** replaces every one and reports "Replaced *n*". With Regular Expression on, `$1`, `$2` and so on in the
@@ -149,7 +149,7 @@ replacement stand for the pattern's groups, `\n` and `\t` for a new line and a t
 |---|---|
 | Enter | Next match |
 | Shift+Enter | Previous match |
-| Escape | Close the bar and return to the text |
+| Escape | Close the bar and return to the searched pane |
 
 The query and toggles are shared by every Editor tab. **Find Next** and **Find Previous** search for the query while the
 bar is closed too.
@@ -203,6 +203,36 @@ Typing also edits around what you type, in every tab:
 - `</` in XML closes the open tag.
 
 With Vim mode on, Enter in Insert mode is Vim's `<CR>`, which only keeps the indent ('autoindent').
+
+## Markdown preview
+
+For Markdown, the document toolbar offers Source, Source and preview, and Preview. Split places the source on the left;
+its divider ratio stays with the tab when it moves. Explicit mode choices save the default for future Markdown tabs;
+existing tabs keep their own modes. The Synchronize scrolling toggle links corresponding source passages in both
+directions and stays local to the tab. Changing the language away from Markdown releases preview work.
+
+Preview renders unsaved text after a 250 ms pause. Source and preview share the same document session and undo history.
+Find searches the pane last focused; preview search includes rendered code and excludes mapping markers. The Find bar
+closes when its tab changes or its pane is hidden. Replace and Go to Line reveal Source in Split without changing the
+saved default. Tab/Shift+Tab select preview links and leave the pane at either end; Enter activates a selected link.
+Save, Save As and close use the existing file and dirty-prompt flow.
+
+Headings, lists, quotes, tables, task marks, strikethrough and syntax-colored fenced code use a native Swing view.
+Raw HTML is escaped and comments are omitted. Body text follows the host UI family at the effective Editor size;
+code follows Editor typography. Theme, selection, glass and line spacing update live. Long code and tables scroll
+horizontally; PNG, JPEG and the first GIF frame scale down to fit.
+
+Relative images and file links resolve through the open document's provider, preserving an SFTP connection's exact
+route and login. Relative Markdown links reuse already-open dirty tabs; fragments navigate to headings. Web links
+open through the host on activation. Web images require **Load external images** for that document and tab lifetime;
+consent survives reload and moves and resets on Save As or close. Failed images retain their alt text and a reason,
+with Retry available. A failed preview retains the previous rendering with an out-of-date label and Retry/Source actions.
+Untitled documents must be saved before relative resources can resolve.
+
+Preview limits are 2,097,152 UTF-16 units, 16 MiB of generated UTF-8 HTML and 50,000 mapped blocks. Exceeding a limit
+shows a Source action. Each image is limited to 8 MiB encoded and 16 million pixels; four loads and 64 MiB of retained
+plus in-flight decoded pixels are shared across the plugin. Hidden tabs cancel preview and image work. See
+[verification](editor-verification.md#fonts-and-markdown-preview) for automated evidence and pending native checks.
 
 ## Encodings and line endings
 
@@ -380,14 +410,19 @@ shown.
 ## Settings
 
 The settings live in `plugins/dev.jasper.editor/dev.jasper.editor.toml` in [Jasper home](getting-started.md#jasper-home)
-and on Settings › Tools › Editor, in the sections Font, Editing, Files and Default editor. Jasper creates the file,
+and on Settings › Tools › Editor, in the sections Font, Markdown, Editing, Files and Default editor. Jasper creates the file,
 with every setting commented out, when it is missing; changes in the file or on the page apply without a restart. A
 bad value is reported and its default used ([Plugin settings](plugins.md#plugin-settings)).
 
 | Key | Default | Values | On the page | Applies to |
 |---|---|---|---|---|
 | `font_family` | The first installed of JetBrains Mono, Menlo, Consolas and DejaVu Sans Mono, else `Monospaced`; IBM Plex Mono under the Enterprise look | An installed font family; the page lists monospaced ones | Font | Every tab, at once |
-| `font_size` | `13` | 8–48 points | Font size | Every tab, at once |
+| `font_size` | `13` | Finite fractional points, 6–72 | Font size | Every tab, at once |
+| `font_fallback` | `[]` | Ordered fallback font families | Fallback fonts | Every tab, at once |
+| `font_ligatures` | `false` | | Font ligatures | Every tab, at once |
+| `font_line_height` | `1.0` | Natural line height multiplied by 0.5–3.0 | Line height | Every tab, at once |
+| `follow_terminal_font` | `false` | | Follow terminal font | Saved terminal typography across windows |
+| `markdown_view_mode` | `"source"` | `source`, `split`, `preview` | Default view | Newly eligible Markdown tabs |
 | `tab_size` | `4` | 1–16 columns | Tab size | Every tab, at once; Vim's 'tabstop' and 'shiftwidth' |
 | `soft_wrap` | `false` | | Soft wrap | Tabs opened afterwards; **Toggle Soft Wrap** changes one tab |
 | `vim` | `false` | | Vim mode | Every tab, at once; the Vim status item and **Toggle Vim Mode** set it |
@@ -397,6 +432,10 @@ bad value is reported and its default used ([Plugin settings](plugins.md#plugin-
 | `custom_command` | `""` | A command line; the file's path is added at the end | Custom command (while Custom command is chosen) | As `default_editor` |
 | `custom_in_terminal` | `true` | | Run in a terminal tab (while Custom command is chosen) | The next file opened |
 | `keep_environment_editor` | `true` | | Keep EDITOR and VISUAL from Jasper's environment | Shells started afterwards |
+
+**Follow terminal font** displays the saved terminal family, size, fallback order, ligatures and line height and disables the independent controls. Turning it off restores the
+Editor values, including look defaults. Temporary terminal zoom stays local to the terminal pane. Tight line heights
+can overlap tall glyphs.
 
 ## Files
 

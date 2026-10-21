@@ -42,9 +42,9 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 
 | Plugin | Id | Version | On by default | Guide |
 |---|---|---|---|---|
-| Remote | `dev.jasper.remote` | 0.15.0 | Yes | [Remote](remote.md) |
+| Remote | `dev.jasper.remote` | 0.15.1 | Yes | [Remote](remote.md) |
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | Yes | [Credential Vault](credential-vault.md) |
-| Editor | `dev.jasper.editor` | 0.10.0 | Yes | [Editor](editor.md) |
+| Editor | `dev.jasper.editor` | 0.11.0 | Yes | [Editor](editor.md) |
 | File Server | `dev.jasper.fileserver` | 0.6.0 | Yes | [File Server](file-server.md) |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | Yes | [Project Index](project-index.md) |
 | Shell History | `dev.jasper.history` | 0.3.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
@@ -52,7 +52,7 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | No | [The Enterprise look](enterprise.md) |
 | Sample | `dev.jasper.sample` | 0.4.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
-Remote, Credential Vault, File Server, Enterprise and Sample declare `sdk = ">=0.18.2, <0.19"`; Editor, Project Index,
+Remote, Credential Vault, File Server, Enterprise and Sample declare `sdk = ">=0.18.2, <0.19"`; Editor declares `sdk = ">=0.18.3, <0.19"`; Project Index,
 Shell History and Snippets declare `sdk = ">=0.18.0, <0.19"`. A plugin uses another plugin it lists under "Uses, when
 present" only while that plugin is running; without it, the features that need it are missing.
 
@@ -270,7 +270,7 @@ badge when there is one, **Enabled** for a running plugin, and otherwise the sta
 | Active | Running |
 | Disabled | Off: "off by default", "disabled by the user", "marked for removal", "safe mode" or "safe mode uses the standard look" |
 | Needs review | Waiting for your review: "not reviewed yet" or "new capabilities: …" |
-| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.18.2", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
+| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.18.3", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
 | Failed | Its classes could not be loaded, or its start failed |
 | Not loaded yet | Not present when this launch began, such as a plugin installed since |
 
@@ -289,11 +289,11 @@ checks it before it asks you anything:
 - Jar names use only letters, digits, spaces and `.`, `_`, `+`, `-`; no name may appear twice.
 - At most 4096 entries, 256 jars and 512 MiB once unpacked.
 - Exactly one jar holds a valid `plugin.toml` at its root, and the plugin's SDK range includes this Jasper's SDK,
-  0.18.2.
+  0.18.3.
 
 A zip that fails is refused on the message line with the reason, for example "The zip holds no jar files", "The zip
 must hold the plugin's jars at its root or in one folder", "Not a Jasper plugin: no plugin.toml in any jar" or "Tool
-1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.18.2", and nothing is installed.
+1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.18.3", and nothing is installed.
 
 A zip that passes opens the **Install *name*** sheet: the plugin's name and version, "From *vendor*", what it
 [asks to do](#capabilities) and the warning that a plugin is not sandboxed. **Install** stages the plugin in

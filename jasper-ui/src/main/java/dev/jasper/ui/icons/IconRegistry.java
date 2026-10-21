@@ -31,7 +31,7 @@ public final class IconRegistry implements AutoCloseable {
     public IconRegistry() { prepareBuiltIns(); artworks.putAll(BUILT_INS); }
     /** Optional off-EDT production prewarm; standalone construction remains self-contained. */
     public static void prepareBuiltIns() { BuiltInArtwork.catalog(); BuiltInArtwork.chrome(); }
-    public synchronized Set<String> names() { requireOpen(); var names = new java.util.HashSet<>(artworks.keySet()); names.addAll(encoded.keySet()); names.addAll(BuiltInArtwork.catalog().keySet()); return Set.copyOf(names); }
+    public synchronized Set<String> names() { requireOpen(); var names = new java.util.HashSet<>(artworks.keySet()); names.addAll(encoded.keySet()); names.addAll(BuiltInArtwork.EDITOR_NAMES); names.addAll(BuiltInArtwork.catalog().keySet()); return Set.copyOf(names); }
     public synchronized IconRegistration register(String name, String pathData) {
         requireOpen(); Objects.requireNonNull(name);
         if (!name.matches("[a-z][a-z0-9.-]*:[a-z][a-z0-9.-]*")) throw new IllegalArgumentException("Icon name must be namespace:name");
@@ -59,7 +59,7 @@ public final class IconRegistry implements AutoCloseable {
     public synchronized boolean authored(String name) { return authored(name,false); }
     /** Whether this ordinary/compact context retains authored ink instead of re-tinting on hover. */
     public synchronized boolean authored(String name, boolean compact) {
-        return encoded.containsKey(name) || (compact ? BuiltInArtwork.IDENTITIES.contains(name) : BuiltInArtwork.catalog().containsKey(name));
+        return encoded.containsKey(name) || BuiltInArtwork.EDITOR_NAMES.contains(name) || (compact ? BuiltInArtwork.IDENTITIES.contains(name) : BuiltInArtwork.catalog().containsKey(name));
     }
     public Icon icon(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
         return ordinary(name, null, palette, tint(palette,hue), logicalSize);
@@ -76,6 +76,8 @@ public final class IconRegistry implements AutoCloseable {
         return painted(name,foreground,null,size,size,false,false,0,false,select(name,theme,palette,true),false);
     }
     private DecodedArtwork select(String name, GeneratedTheme theme, SemanticPalette palette, boolean ordinary) {
+        var editor = BuiltInArtwork.editor(name);
+        if (editor != null) return editor.select(theme != null ? theme.dark() : ColorMath.luminance(palette.color(SemanticColor.SURFACE_PANEL)) < .5);
         var pair=BuiltInArtwork.catalog().get(name);
         // Palette-only compatibility admits identity meanings, preserving the legacy settings/chevron contexts.
         if(pair==null || (!BuiltInArtwork.IDENTITIES.contains(name) && (!ordinary || theme==null)))return null;
@@ -141,6 +143,7 @@ public final class IconRegistry implements AutoCloseable {
             BuiltInArtwork.Pair pair=null;
             if(artwork==ChromeArtwork.CLASSIC)pair=BuiltInArtwork.classicChrome().get(name);
             if(pair==null && artwork!=null)pair=BuiltInArtwork.chrome().get(name);
+            if(pair==null)pair=BuiltInArtwork.editor(name);
             if(pair==null)pair=BuiltInArtwork.catalog().get(name);
             var path=artworks.get(name);
             var registration=encoded.get(name);

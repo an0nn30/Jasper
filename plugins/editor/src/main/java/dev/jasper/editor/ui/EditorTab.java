@@ -1,6 +1,8 @@
 package dev.jasper.editor.ui;
 
 import dev.jasper.editor.session.DocumentSession;
+import dev.jasper.editor.markdown.MarkdownMode;
+import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN;
 import dev.jasper.editor.vim.EditorDefaults;
 import dev.jasper.editor.vim.Vim;
 import dev.jasper.editor.vim.VimEditor;
@@ -34,11 +36,86 @@ public final class EditorTab {
         @Override public void changedUpdate(DocumentEvent event) { }
     };
     private boolean replacing, closed, focusPending;
+    private String navigationNotice = "";
+    private Runnable noticeChanged = () -> {};
+    boolean closed() { return closed; }
+    Optional<String> navigationNotice() { return navigationNotice.isEmpty() ? Optional.empty() : Optional.of(navigationNotice); }
+    void navigationNotice(String value) { navigationNotice = value; noticeChanged.run(); }
+    void noticeChanged(Runnable value) { noticeChanged = value; }
+    Optional<FindTarget> findTarget() {
+        if (closed || !showingText()) return Optional.empty();
+        return Optional.of(focusedContent() == area() ? new FindTarget.Source(area()) : new FindTarget.Preview(document.preview()));
+    }
+
     private Runnable focusArea = () -> area().requestFocusInWindow();
     private VimEditor vim;
     private final VimBar vimBar = new VimBar(this::render, this::reveal);
     private int tabSize = 4;
     private FindBar find;
+    private MarkdownController markdown;
+    private MarkdownPreferences markdownPreferences;
+    private Consumer<Throwable> markdownSaveFailed = failure -> {};
+    private MarkdownMode retainedMarkdownMode;
+    private boolean wasMarkdown;
+    private boolean linkedScrolling = true;
+    private Runnable modeChanged = () -> {};
+    void modeChanged(Runnable value) { modeChanged = value; }
+    private Presentation.Icons icons = Presentation.Icons.NEW_UI;
+    void markdownPreferences(MarkdownPreferences value) { markdownPreferences(value, failure -> {}); }
+    void markdownPreferences(MarkdownPreferences value, Consumer<Throwable> failed) {
+        markdownPreferences = value; markdownSaveFailed = failed; updateMarkdownEligibility(); render();
+    }
+    boolean markdownEligible() { return SYNTAX_STYLE_MARKDOWN.equals(session.style()); }
+    boolean linkedScrolling() { return linkedScrolling; }
+    void markdownMode(MarkdownMode mode, boolean explicit) {
+        if (closed || !showingText() || !markdownEligible() || markdown == null) return;
+        dismissHiddenFind(mode);
+        retainedMarkdownMode = mode;
+        markdown.mode(mode);
+        if (explicit && markdownPreferences != null) markdownPreferences.select(mode).whenComplete((ignored, failure) -> {
+            if (failure != null) markdownSaveFailed.accept(failure);
+        });
+        document.focusSource(mode != MarkdownMode.PREVIEW);
+        focusContent(); render(); modeChanged.run();
+    }
+    /** Reveals the existing source for an explicit command without changing the saved default. */
+    public void revealSource() {
+        if (markdown != null && markdown.mode() == MarkdownMode.PREVIEW) markdownMode(MarkdownMode.SPLIT, false);
+        document.focusSource(true); focusContent();
+    }
+    private void dismissHiddenFind(MarkdownMode mode) {
+        if (find == null) return;
+        if (mode == MarkdownMode.PREVIEW) find.paneHidden(area());
+        else if (mode == MarkdownMode.SOURCE) find.paneHidden(document.preview().editor());
+    }
+    private void updateMarkdownEligibility() {
+        if (markdown == null) return;
+        boolean eligible = markdownEligible();
+        if (eligible && (!wasMarkdown || retainedMarkdownMode == null && markdownPreferences != null)) {
+            if (retainedMarkdownMode == null && markdownPreferences != null) retainedMarkdownMode = markdownPreferences.current();
+            var mode = retainedMarkdownMode == null ? MarkdownMode.SOURCE : retainedMarkdownMode;
+            dismissHiddenFind(mode); markdown.mode(mode);
+        } else if (!eligible && wasMarkdown) {
+            dismissHiddenFind(MarkdownMode.SOURCE);
+            markdown.mode(MarkdownMode.SOURCE); document.focusSource(true);
+        }
+        wasMarkdown = eligible;
+    }
+    javax.swing.text.JTextComponent focusedContent() { return document.focusedContent(); }
+    void copy() { focusedContent().copy(); }
+    void selectAll() { focusedContent().selectAll(); }
+    void paste() { revealSource(); area().paste(); }
+
+    void markdown(MarkdownController value) { markdown = value; updateMarkdownEligibility(); }
+    MarkdownController markdown() { return markdown; }
+    void previews(java.util.concurrent.Executor worker, java.util.concurrent.Executor ui) {
+        new MarkdownController(this, worker, ui, this::render);
+    }
+    void previews(java.util.concurrent.Executor worker, java.util.concurrent.Executor ui,
+                  dev.jasper.editor.markdown.resources.ImageLoader loader) {
+        new MarkdownController(this, worker, ui, this::render, loader);
+    }
+    void active(boolean value) { if (markdown != null) markdown.active(value); }
 
     /** Creates an owned kit view; closing the hosted view ends document refreshes as well. */
     public EditorTab(UiKit kit, DocumentSession session, Consumer<EditorTab> close, boolean debounce) {
@@ -66,29 +143,39 @@ public final class EditorTab {
     private void shutdown() {
         if (closed) return;
         closed = true;
+        if (find != null) find.dismiss();
         focusPending = false;
         edits.stop();
+        if (markdown != null) markdown.close();
         area().getDocument().removeDocumentListener(editListener);
         if (vim != null) { vimBar.detach(); vim.close(); vim = null; }
         document.close();
         find = null;
     }
 
-    void appearance(Appearance appearance) { document.appearance(appearance); }
+    void appearance(Appearance appearance) { icons = appearance.presentation().icons(); document.appearance(appearance); render(); }
     void settings(EditorSettings settings) {
         if (closed) return;
         tabSize = settings.tabSize();
         document.settings(settings);
         if (vim != null) vim.editorDefaults(defaults());
     }
-    void find(FindBar value) { if (closed) return; find = value; render(); }
+    void typography(TerminalTypography value) { if (!closed) document.typography(value); }
+    void find(FindBar value) {
+        if (closed) return;
+        if (find != null && find != value) find.dismiss();
+        find = value; render();
+    }
     void render() { if (!closed) view.update(spec()); }
     private void reveal(String id) { if (!closed) view.reveal(id); }
 
     /** Focuses the document immediately or once its pending read succeeds. A failure drops the request. */
-    public void focusText() {
+    public void focusText() { focusContent(); }
+    /** Restores the last valid source/preview content focus after selection, activation or moves. */
+    public void focusContent() {
         if (closed) return;
-        if (showingText()) focusArea.run(); else focusPending = true;
+        if (showingText()) { if (document.focusedContent() == area()) focusArea.run(); else document.focusedContent().requestFocusInWindow(); }
+        else focusPending = true;
     }
     void focusAction(Runnable value) { focusArea = value; }
 
@@ -121,6 +208,7 @@ public final class EditorTab {
 
     private void edited() {
         if (closed || replacing) return;
+        if (markdown != null) markdown.sourceChanged();
         if (debounce) edits.restart(); else session.textEdited();
     }
     private void replaceText(String text, boolean keepPosition) {
@@ -132,6 +220,7 @@ public final class EditorTab {
         try { area().setCaretPosition(area().getLineStartOffset(Math.min(line, area().getLineCount() - 1))); }
         catch (BadLocationException impossible) { area().setCaretPosition(0); }
         if (vim != null) vim.textReplaced();
+        if (markdown != null) markdown.sourceReloaded();
     }
     private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true, session.wrap()); }
     private void refresh() {
@@ -142,14 +231,24 @@ public final class EditorTab {
         area().setWrapStyleWord(vim == null);
         area().setTabsEmulated(!session.tabs());
         if (vim != null) vim.editorDefaults(defaults());
+        if (markdown != null && wasMarkdown && !markdownEligible()) retainedMarkdownMode = markdown.mode();
+        if (markdown != null) markdown.sessionChanged();
+        updateMarkdownEligibility();
         render();
-        if (showingText() && focusPending) { focusPending = false; focusArea.run(); }
+        if (showingText() && focusPending) { focusPending = false; focusContent(); }
     }
     private void event(UiEvent event) {
         if (closed) return;
         if (find != null && find.event(event)) return;
         if (!(event instanceof UiEvent.Action action)) return;
         switch (action.id()) {
+            case "document.preview.retry" -> { if (markdown != null) markdown.retry(); }
+            case "document.preview.source", "markdown.source" -> markdownMode(MarkdownMode.SOURCE, true);
+            case "markdown.split" -> markdownMode(MarkdownMode.SPLIT, true);
+            case "markdown.preview" -> markdownMode(MarkdownMode.PREVIEW, true);
+            case "markdown.images.allow" -> { if (markdown != null) markdown.allowImages(); }
+            case "markdown.images.retry" -> { if (markdown != null) markdown.retryImages(); }
+            case "markdown.scroll-sync" -> { if (showingText() && markdownEligible()) { linkedScrolling = !linkedScrolling; document.scrollLink.linked(linkedScrolling); render(); } }
             case RETRY -> { if (session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
             case DISMISS -> { session.cancelLoad(); close.accept(this); }
             case FIRST -> { if (session.banner() == DocumentSession.Banner.DELETED) close.accept(this); else if (session.banner() == DocumentSession.Banner.CHANGED) session.reloadFromBanner(); }
@@ -160,6 +259,14 @@ public final class EditorTab {
     private ViewSpec spec() {
         boolean ready = showingText(), failed = session.state() == DocumentSession.State.FAILED;
         var children = new ArrayList<Nodes.Node>();
+        children.add(MarkdownToolbar.node(markdown == null ? MarkdownMode.SOURCE : markdown.mode(), linkedScrolling, ready, markdownEligible(), icons));
+        if (markdown != null) children.add(MarkdownToolbar.resources(markdown.mode(), markdown.needsImageConsent(), markdown.imageFailures()));
+        if (markdown != null && markdown.failure().isPresent() && markdown.mode() != dev.jasper.editor.markdown.MarkdownMode.SOURCE) {
+            children.add(new Nodes.Stack("document.preview.failure", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Text("document.preview.message", ControlState.READY,
+                    (document.preview().installedResult().isPresent() ? "Preview is out of date. " : "") + markdown.failure().orElseThrow(), Nodes.TextRole.BODY),
+                button("document.preview.source", "Source", true), button("document.preview.retry", "Retry", true))));
+        }
         boolean banner = session.banner() != DocumentSession.Banner.NONE;
         boolean deleted = session.banner() == DocumentSession.Banner.DELETED;
         children.add(new Nodes.Stack(BANNER, visible(banner), Nodes.LayoutRole.INLINE, List.of(

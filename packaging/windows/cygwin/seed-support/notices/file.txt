@@ -1,0 +1,129 @@
+Package source: src/release/file/file-5.46-1-src.tar.xz
+License identifier: BSD-2-Clause
+
+--- file-5.46-1.src/file.cygport ---
+inherit python3
+
+NAME="file"
+LICENSE="BSD-2-Clause"
+VERSION=5.46
+RELEASE=1
+CATEGORY="Base"
+SUMMARY="Utility for determining file types"
+DESCRIPTION="\
+The file command is used to identify a particular file according to the
+type of data contained by the file.  File can identify many different
+file types, including ELF binaries, system libraries, RPM packages, and
+different graphics formats."
+HOMEPAGE="http://www.darwinsys.com/file/"
+SRC_URI="ftp://ftp.astron.com/pub/file/${NAME}-${VERSION}.tar.gz"
+
+PKG_NAMES="${NAME} file-devel python3-magic"
+file_CONTENTS="usr/bin/file.exe usr/bin/cygmagic-1.dll usr/share/doc/
+	usr/share/file/ usr/share/magic usr/share/man/man[15]/ usr/share/misc/"
+file_devel_CATEGORY="Devel"
+file_devel_CONTENTS="usr/include/ usr/lib/lib* usr/lib/pkgconfig/libmagic.pc
+	usr/share/man/man3/"
+python3_magic_OBSOLETES="python2-magic python-magic"
+python3_magic_CATEGORY="Python"
+python3_magic_REQUIRES="file-devel"  # ctypes.util.find_library('magic')
+python3_magic_CONTENTS=${PYTHON3_SITELIB#/}
+
+PATCH_URI_BASE=" https://src.fedoraproject.org/rpms/file/raw/rawhide/f"
+
+PATCH_URI="${PATCH_URI_BASE}/file-4.17-rpm-name.patch"
+PATCH_URI+="${PATCH_URI_BASE}/file-5.04-volume_key.patch"
+PATCH_URI+="${PATCH_URI_BASE}/file-5.45-readelf-limit-revert.patch"
+PATCH_URI+="${PATCH_URI_BASE}/file-5.46-fix-tests-rpm-magic.patch"
+
+CYGCONF_ARGS="--enable-fsect-man5"
+
+BUILD_REQUIRES=" \
+  autoconf \
+  automake \
+  gcc-g++ \
+  libbz2-devel \
+  liblzma-devel \
+  libtool \
+  libzstd-devel \
+  make \
+  python3 \
+  zlib-devel \
+"
+src_install() {
+	cd ${B}
+	cyginstall
+
+	# install python bindings
+	dopython3 ${S}/python/magic.py
+
+	# As on Fedora, create the magic file and the usual links to it.
+	set +x
+	cat ${S}/magic/Magdir/* > "${D}/usr/share/misc/magic"
+	ln -s misc/magic "${D}/usr/share/magic"
+	dodir /usr/share/file
+	ln -s ../magic "${D}/usr/share/file/magic"
+}
+
+SCALLYWAG="notest"
+
+Source archive: src/release/file/file-5.46-1-src.tar.xz
+
+--- file-5.46-1.src/file-5.46.tar.gz!/file-5.46/COPYING ---
+$File: COPYING,v 1.2 2018/09/09 20:33:28 christos Exp $
+Copyright (c) Ian F. Darwin 1986, 1987, 1989, 1990, 1991, 1992, 1994, 1995.
+Software written by Ian F. Darwin and others;
+maintained 1994- Christos Zoulas.
+
+This software is not subject to any export provision of the United States
+Department of Commerce, and may be exported to any country or planet.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice immediately at the beginning of the file, without modification,
+   this list of conditions, and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+
+
+--- file-5.46-1.src/file-5.46.tar.gz!/file-5.46/python/LICENSE ---
+Copyright (c) Ian F. Darwin 1986-1995.
+Software written by Ian F. Darwin and others;
+maintained 1995-present by Christos Zoulas and others.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice immediately at the beginning of the file, without modification,
+   this list of conditions, and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.

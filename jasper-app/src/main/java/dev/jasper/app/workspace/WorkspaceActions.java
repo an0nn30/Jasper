@@ -87,6 +87,7 @@ final class WorkspaceActions {
             case FONT_BIGGER -> view.setFontSize(view.fontSize() + 1);
             case FONT_SMALLER -> view.setFontSize(view.fontSize() - 1);
             case FONT_RESET -> view.setFontSize(owner.configuredFontSize());
+            case MANAGE_CYGWIN_PACKAGES -> owner.onManageCygwinPackages.run();
             case OPEN_SETTINGS -> owner.openSettings();
             case RELOAD_CONFIG -> owner.reloadConfiguration();
         }
@@ -118,6 +119,7 @@ final class WorkspaceActions {
                 boolean contentEnabled = content != null && (id == ActionId.CLOSE_TAB || id == ActionId.CLOSE_PANE
                     || id == ActionId.NEXT_TAB || id == ActionId.PREVIOUS_TAB || contentKey != null && content.commands().stream().anyMatch(c -> c.id().equals(contentKey) && c.enabled()));
                 boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
+                    case MANAGE_CYGWIN_PACKAGES -> id.availableOn(System.getProperty("os.name", "")) && owner.onManageCygwinPackages != null;
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
                     case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, OPEN_FILE, QUIT, TOGGLE_ZEN_MODE -> true;

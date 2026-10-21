@@ -28,6 +28,7 @@ listed per type in the API reference; the main ones:</p>
 <tr><td>{@link Platform#openInEditor(Path)}, {@link Platform#browse(URI)}</td><td>They do their work in the background.</td></tr>
 <tr><td>{@link Appearance#variant()}, {@link Appearance#workspaceVariant()}</td><td>Whether the chrome or the workspace is dark or light.</td></tr>
 <tr><td>{@link Appearance#presentation()}</td><td>The look Jasper runs with, the same value until it restarts.</td></tr>
+<tr><td>{@link Appearance#terminalTypography()}</td><td>Saved terminal typography, updated before its UI-thread change notification.</td></tr>
 </tbody>
 </table>
 <p>A few callbacks run off the UI thread, and must not touch Swing or UI-thread-only SDK methods:</p>

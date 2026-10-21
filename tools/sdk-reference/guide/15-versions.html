@@ -14,7 +14,8 @@ member.</p>
 0.18 version has starts its range there: {@link Appearance#presentation()} needs 0.18.2, so Remote, Credential Vault,
 File Server and the Sample, which read it, declare {@code sdk = ">=0.18.2, <0.19"}, and so does Enterprise, whose kit
 file gives the Editor's settings a default that an older Jasper refuses. Icon-only GHOST buttons in a toolbar view and
-the {@code run} and {@code application} icons need 0.18.1. The other bundled plugins declare the range above.</p>
+the {@code run} and {@code application} icons need 0.18.1. Editor uses {@link Appearance#terminalTypography()}, {@link SettingsPanel#pendingChanged()} and document view icons
+from 0.18.3, and declares {@code sdk = ">=0.18.3, <0.19"}. The other bundled plugins declare the range above.</p>
 <table>
 <thead><tr><th>Form</th><th>Meaning</th></tr></thead>
 <tbody>

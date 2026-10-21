@@ -29,7 +29,7 @@ class KeyBindingsTest {
             ActionId.RENAME_TAB, ActionId.FIND, ActionId.FIND_NEXT, ActionId.FIND_PREVIOUS,
             ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT, ActionId.COPY, ActionId.PASTE,
             ActionId.COMMAND_PALETTE, ActionId.CLEAR_SCROLLBACK, ActionId.CLEAR_TERMINAL, ActionId.FONT_BIGGER, ActionId.FONT_SMALLER,
-            ActionId.FONT_RESET, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
+            ActionId.FONT_RESET, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.MANAGE_CYGWIN_PACKAGES, ActionId.QUIT);
         assertThat(ActionId.SPLIT_RIGHT.id()).isEqualTo("split_right");
         assertThat(ActionId.SPLIT_RIGHT.label()).isEqualTo("Split Right");
         assertThat(ActionId.SPLIT_RIGHT.defaultBinding(true)).isEqualTo("cmd+d");

@@ -1,6 +1,7 @@
 package dev.jasper.editor.vim;
 
 import java.awt.Point;
+import java.util.List;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
@@ -156,10 +157,11 @@ class ViewportSyncTest {
             s.scroll().getViewport().doLayout();
             resized(s);
             type(s.editor(), "g$");
-            int width = s.editor().view().width();
-            assertThat(s.editor().cursor().col).isEqualTo(width - 1);
             try {
                 var start = s.area().modelToView2D(0);
+                int width=1;
+                while(s.area().modelToView2D(width).getY()==start.getY()) width++;
+                assertThat(s.editor().cursor().col).isEqualTo(width - 1);
                 var last = s.area().modelToView2D(width - 1);
                 var next = s.area().modelToView2D(width);
                 assertThat(last.getY()).as("g$ stays on the first screen line").isEqualTo(start.getY());
@@ -198,5 +200,56 @@ class ViewportSyncTest {
     private static int yFor(Setup s, int line) {
         try { return s.area().yForLine(line); }
         catch (javax.swing.text.BadLocationException bad) { throw new AssertionError(bad); }
+    }
+    @Test void shapedRowsDriveGjGkAndTypographyRefreshWithUnchangedViewport() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            area.typography(new dev.jasper.sdk.ui.TerminalTypography("Serif",18,List.of(),true,1));
+            area.setText("iiiiiiii WWWWWWWWW iiiiiiiiiii WWWWWWWWW\nsecond\nthird\nfourth\nfifth\nlast");
+            area.setCaretPosition(0);
+            area.setLineWrap(true);
+            var scroll = new JScrollPane(area);
+            scroll.setSize(180,160); scroll.doLayout(); scroll.getViewport().doLayout();
+            var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+            try {
+                type(editor, "gj");
+                try {
+                    assertThat(area.modelToView2D(area.getCaretPosition()).getY()).isEqualTo((double)area.getLineHeight());
+                } catch(javax.swing.text.BadLocationException e) {throw new AssertionError(e);}
+                assertThat(editor.view().plinesNofold(1)).isEqualTo(area.textView().rowsForLine(0));
+                type(editor, "gk"); assertThat(editor.cursor().col).isZero();
+                int before=editor.view().height();
+                area.typography(new dev.jasper.sdk.ui.TerminalTypography("Serif",18,List.of(),true,2));
+                assertThat(editor.view().height()).isLessThan(before);
+                type(editor,"Gzz");
+                assertThat(scroll.getViewport().getViewPosition().y).isEqualTo(yFor(new Setup(area,scroll,editor),editor.view().topline-1));
+            } finally { editor.close(); }
+        });
+    }
+    @Test void proportionalViewportCommandsAndHorizontalScrollUsePhysicalGeometry() throws Exception {
+        onEdt(() -> {
+            var area=new VimTextArea();
+            area.typography(new dev.jasper.sdk.ui.TerminalTypography("Serif",17.5,List.of(),true,1.5));
+            area.setText(("iiiiiiii WWWWWWWWW iiiiiiiiii WWWWWWWWW\n").repeat(40));area.setCaretPosition(0);
+            var scroll=new JScrollPane(area);scroll.setSize(220,280);scroll.doLayout();scroll.getViewport().doLayout();
+            var editor=new VimEditor(new Vim(VimHost.detached()),area,EditorDefaults.VIM);
+            try {
+                for(String keys:List.of("gj","g$","g0","gm","g^","ggM","L","H","<C-f>","<C-b>","<C-d>","<C-u>","Gzz")) {
+                    type(editor,keys);
+                    try {
+                        var cursor=area.modelToView2D(area.getCaretPosition());
+                        var visible=scroll.getViewport().getViewRect();
+                        assertThat(cursor.getY()).as(keys).isGreaterThanOrEqualTo((double)visible.y);
+                        assertThat(cursor.getMaxY()).as(keys).isLessThanOrEqualTo((double)visible.y+visible.height);
+                    } catch(javax.swing.text.BadLocationException e) {throw new AssertionError(e);}
+                }
+                type(editor,":set nowrap<CR>gg$");
+                try {
+                    var cursor=area.modelToView2D(area.getCaretPosition());var visible=scroll.getViewport().getViewRect();
+                    assertThat(cursor.getX()).isGreaterThanOrEqualTo((double)visible.x);
+                    assertThat(cursor.getMaxX()).isLessThanOrEqualTo((double)visible.x+visible.width);
+                } catch(javax.swing.text.BadLocationException e) {throw new AssertionError(e);}
+            } finally {editor.close();}
+        });
     }
 }

@@ -1,0 +1,175 @@
+Package source: x86_64/release/libssh2/libssh2-1.11.0-1-src.tar.xz
+License identifier: LicenseRef-Upstream-libssh2_1
+
+--- libssh2-1.11.0-1.src/libssh2.cygport ---
+#|/usr/bin/cygport
+# libssh2.cygport - libssh2 Cygwin package build control script
+
+NAME=libssh2
+VERSION=1.11.0
+RELEASE=1
+
+CATEGORY="Net"
+SUMMARY="SSH2 protocol library"
+#XARCH=$ARCH
+DESCRIPTION="libssh2 is a library implementing the SSH2 protocol as defined by
+Internet Drafts: SECSH-TRANS, SECSH-USERAUTH, SECSH-CONNECTION,
+SECSH-ARCH, SECSH-FILEXFER, SECSH-DHGEX, SECSH-NUMBERS, and
+SECSH-PUBLICKEY."
+#Mingw packages provide MS VC RT-linked binaries, NOT Cygwin binaries,
+#for use with the mingw64-{x86_64,i686}-gcc cross compilers, installed in
+#/usr/{x86_64,i686}-w64-mingw32/sys-root/mingw/{bin,lib,include}/."
+
+BASE=${NAME##mingw*-*86*-}
+
+HOMEPAGE=https://libssh2.org
+# use snapshot date GMT+5 to ensure available
+#SNAP=$(TZ=GMT+5 /bin/date +%Y%m%d)
+dir=${SNAP:+snapshots}
+dir=${dir:-download}
+SRC_URI=$HOMEPAGE/$dir/$BASE-$VERSION${SNAP+-$SNAP}.tar.gz
+[ -z "$SNAP" ] && SRC_URI+=" $SRC_URI.asc"
+GIT_URI=https://github.com/$BASE/$BASE
+#inherit git
+GIT_ARCHIVE=$GIT_URI/releases/download/$BASE-$VERSION/$BASE-$VERSION.tar.gz
+GIT_ARCHIVE+=" $GIT_ARCHIVE.asc"
+PATCH_URI="
+	libssh2-1.11-configure-ac.patch
+	libssh2-1.11-tests-Makefile-am.patch
+	libssh2-1.11-tests-Makefile-inc.patch
+	libssh2-1.11-tests-CMakeLists-txt.patch
+" # tests: Do not run tests accessing internal functions if --disable-static
+#	cygwin-configure-ac.patch
+#FEDORA=https://src.fedoraproject.org/rpms/$BASE/raw/f34/f
+#	$FEDORA/0001-libssh2-1.9.0-CVE-2019-17498.patch
+
+SRC_DIR=$BASE-$VERSION${SNAP+-$SNAP}
+
+CYGCONF_ARGS=--disable-docker-tests
+#	--with-crypto=openssl
+#	--disable-clear-memory		Disable clearing of memory before being freed
+#	--disable-debug			Disable debug options
+#	 --enable-debug			Enable pedantic and debug options
+#	 --enable-dependency-tracking	do not reject slow dependency extractors
+#	--disable-dependency-tracking	speeds up one-time build
+#	--disable-docker-tests		Do not run tests requiring Docker
+#	 --enable-examples-build	Build example applications (this is the default)
+#	--disable-examples-build	Do not build example applications
+#	 --enable-fast-install[=PKGS]	optimize for fast installation [default=yes]
+#	 --enable-hidden-symbols	Hide internal symbols in library
+#	--disable-hidden-symbols	Leave all symbols with default visibility in library
+#	--disable-largefile		omit support for large files
+#	--disable-libtool-lock		avoid locking (might break parallel builds)
+#	 --enable-maintainer-mode	enable make rules and dependencies not useful (and sometimes confusing) to the casual installer
+#	--disable-option-checking	ignore unrecognized --enable/--with options
+#	 --enable-ossfuzzers		Whether to generate the fuzzers for OSS-Fuzz
+#	--disable-rpath			do not hardcode runtime library paths
+#	 --enable-shared[=PKGS]		build shared libraries [default=yes]
+#	 --enable-silent-rules		less verbose build output (undo: "make V=1")
+#	--disable-silent-rules		verbose build output (undo: "make V=0")
+#	--disable-sshd-tests		Do not run tests requiring sshd
+#	 --enable-static[=PKGS]		build static libraries [default=yes]
+#	--disable-tests			Disable tests [default=enabled]
+#	--disable-werror		Disable compiler warnings as errors
+#	 --enable-werror		Enable compiler warnings as errors
+#	   --with-aix-soname=aix|svr4|both	shared library versioning (aka "SONAME") variant to provide on AIX, [default=aix].
+#	   --with-crypto=auto|openssl|libgcrypt|mbedtls|wincng|wolfssl	Select crypto backend (default: auto)
+#	   --with-gnu-ld		assume the C compiler uses GNU ld [default=no]
+#	--without-libbcrypt-prefix	don't search for libbcrypt in includedir and libdir
+#	   --with-libbcrypt-prefix[=DIR]	search for libbcrypt in DIR/include and DIR/lib
+#	--without-libgcrypt-prefix	don't search for libgcrypt in includedir and libdir
+#	   --with-libgcrypt-prefix[=DIR]	search for libgcrypt in DIR/include and DIR/lib
+#	--without-libmbedcrypto-prefix	don't search for libmbedcrypto in includedir and libdir
+#	   --with-libmbedcrypto-prefix[=DIR]	search for libmbedcrypto in DIR/include and DIR/lib
+#	--without-libssl-prefix		don't search for libssl in includedir and libdir
+#	   --with-libssl-prefix[=DIR]	search for libssl in DIR/include and DIR/lib
+#	--without-libwolfssl-prefix	don't search for libwolfssl in includedir and libdir
+#	   --with-libwolfssl-prefix[=DIR]	search for libwolfssl in DIR/include and DIR/lib
+#	   --with-libz			Use libz for compression
+#	--without-libz-prefix		don't search for libz in includedir and libdir
+#	   --with-libz-prefix[=DIR]	search for libz in DIR/include and DIR/lib
+#	   --with-pic[=PKGS]		try to use only PIC/non-PIC objects [default=use both]
+#	   --with-sysroot[=DIR]		Search for dependent libraries within DIR (or the compiler's sysroot if not specified).
+
+DOCS="AUTHORS ChangeLog COPYING NEWS README RELEASE-NOTES"
+
+DIFF_EXCLUDES=libssh2_config.h
+
+DEPEND="libssl-devel zlib-devel"
+DEPEND+=" binutils gcc-core"
+DEPEND+=" autoconf automake findutils libtool make man-db"
+BUILD_REQUIRES="$DEPEND"
+
+PKG_NAMES="${BASE}_1 ${BASE}-devel"
+
+libssh2_1_CATEGORY="$CATEGORY Libs"
+libssh2_1_SUMMARY="$SUMMARY (binaries)"
+libssh2_1_CONTENTS="usr/bin/cygssh2-1.dll usr/share/doc/"
+
+libssh2_devel_CATEGORY="$CATEGORY Libs Devel"
+libssh2_devel_SUMMARY="$SUMMARY (development)"
+libssh2_devel_CONTENTS="usr/include/ usr/lib/ usr/share/man/man3/"
+#docs/BINDINGS docs/HACKING docs/HACKING.CRYPTO docs/SECURITY.md docs/TODO"
+
+# SPDX-License-Identifier: BSD-3-Clause
+LICENSE=BSD-3-Clause
+LICENSE_SPDX="SPDX-License-Identifier: $LICENSE"
+LICENSE_URI=COPYING
+
+CYGWIN_MAINTAINER="Brian%20Inglis"
+CYGWIN_MAINTAINER_EMAIL="Brian.Inglis@SystematicSW.ab.ca"
+
+UPSTREAM_MAINTAINER="Will Cosgrove"
+UPSTREAM_MAINTAINER_EMAIL="libssh2-devel@cool.haxx.se"
+SUBJECT="${OSTYPE^}%20Package%20$NAME%20$VERSION"
+MAILTO="mailto:$UPSTREAM_MAINTAINER%20%3C$UPSTREAM_MAINTAINER_EMAIL%3E\
+?from=$CYGWIN_MAINTAINER%20%3C$CYGWIN_MAINTAINER_EMAIL%3E\
+\&subject=$SUBJECT\&body=$SUBJECT"
+
+
+Source archive: x86_64/release/libssh2/libssh2-1.11.0-1-src.tar.xz
+
+--- libssh2-1.11.0-1.src/libssh2-1.11.0.tar.gz!/libssh2-1.11.0/COPYING ---
+/* Copyright (c) 2004-2007 Sara Golemon <sarag@libssh2.org>
+ * Copyright (c) 2005,2006 Mikhail Gusarov <dottedmag@dottedmag.net>
+ * Copyright (c) 2006-2007 The Written Word, Inc.
+ * Copyright (c) 2007 Eli Fant <elifantu@mail.ru>
+ * Copyright (c) 2009-2023 Daniel Stenberg
+ * Copyright (C) 2008, 2009 Simon Josefsson
+ * Copyright (c) 2000 Markus Friedl
+ * Copyright (c) 2015 Microsoft Corp.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms,
+ * with or without modification, are permitted provided
+ * that the following conditions are met:
+ *
+ *   Redistributions of source code must retain the above
+ *   copyright notice, this list of conditions and the
+ *   following disclaimer.
+ *
+ *   Redistributions in binary form must reproduce the above
+ *   copyright notice, this list of conditions and the following
+ *   disclaimer in the documentation and/or other materials
+ *   provided with the distribution.
+ *
+ *   Neither the name of the copyright holder nor the names
+ *   of any other contributors may be used to endorse or
+ *   promote products derived from this software without
+ *   specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+ * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+ * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ */

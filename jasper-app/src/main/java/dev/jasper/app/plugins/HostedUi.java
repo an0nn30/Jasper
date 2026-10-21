@@ -89,6 +89,7 @@ final class HostedUi {
     private final AuxiliaryWindows windows;
     private final HostedTerminals terminals;
     private final GlassSource glass;
+    private final HostedTypography typography;
     private final Set<String> ownActions = new HashSet<>();
     private final List<Runnable> closers = new ArrayList<>();
     /**
@@ -118,6 +119,17 @@ final class HostedUi {
              Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
              Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe,
              GlassSource glass) {
+        this(pluginId, model, containment, ui, onUi, open, loader, variant, themeSubscriber, windows, terminals,
+            appearance, subscribe, glass, new HostedTypography());
+    }
+
+    HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
+             BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
+             Function<Consumer<Variant>, Subscription> themeSubscriber, AuxiliaryWindows windows, HostedTerminals terminals,
+             Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
+             Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe,
+             GlassSource glass, HostedTypography typography) {
+        this.typography = java.util.Objects.requireNonNull(typography, "typography");
         this.pluginId = pluginId; this.model = model; this.containment = containment; this.ui = ui; this.onUi = onUi;
         this.open = open; this.variant = variant; this.themeSubscriber = themeSubscriber;
         this.windows = windows;
@@ -411,6 +423,17 @@ final class HostedUi {
                 if(appearanceSnapshot==null)return themeSubscriber.apply(handler);
                 var closed=new AtomicBoolean();Consumer<Variant> guarded=v -> {if(!closed.get())handler.accept(v);};themeHandlers.add(guarded);
                 var removal=tracked(() -> {closed.set(true);themeHandlers.remove(guarded);});return () -> {closed.set(true);removal.close();};
+            }
+            @Override public dev.jasper.sdk.ui.TerminalTypography terminalTypography() {
+                return typography.current();
+            }
+            @Override public Subscription onTerminalTypographyChanged(Consumer<dev.jasper.sdk.ui.TerminalTypography> handler) {
+                guard("onTerminalTypographyChanged"); java.util.Objects.requireNonNull(handler, "handler");
+                var registration = typography.subscribe(value -> {
+                    if (open.getAsBoolean()) containment.run(pluginId, "terminal typography", () -> handler.accept(value));
+                });
+                var removal = tracked(registration::close);
+                return () -> { registration.close(); removal.close(); };
             }
             @Override public dev.jasper.sdk.ui.Presentation presentation() { return presentation.get(); }
         };

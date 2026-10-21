@@ -262,6 +262,13 @@ public final class FakePluginContext implements PluginContext {
             @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {
                 requireOpen();var subscription=host.subscribeAppearance(info.id(),handler);own(subscription);return subscription;
             }
+            @Override public dev.jasper.sdk.ui.TerminalTypography terminalTypography() {
+                return host.terminalTypography();
+            }
+            @Override public Subscription onTerminalTypographyChanged(Consumer<dev.jasper.sdk.ui.TerminalTypography> handler) {
+                requireOpen();
+                var subscription = host.subscribeTypography(info.id(), handler); own(subscription); return subscription;
+            }
             @Override public dev.jasper.sdk.ui.Presentation presentation() { return host.presentation(); }
         };
     }

@@ -1,0 +1,225 @@
+Package source: src/release/tzdata/tzdata-2026e-1-src.tar.xz
+License identifier: LicenseRef-Upstream-tzdata
+
+--- tzdata-2026e-1.src/tzdata.cygport ---
+#!/usr/bin/cygport
+# tzdata.cygport - Time Zone Database Cygwin package build control script definitions
+
+NAME=tzdata
+VERSION=2026e
+RELEASE=1
+
+CATEGORY=Base
+SUMMARY="Time Zone Database"
+DESCRIPTION="The Time Zone Database (often called tz, tzdb, or zoneinfo) contains
+data that represents the history of local time for many locations around
+the world, and supports conversion of UTC time to local time at those
+locations to allow display of those local times.
+It is updated periodically to reflect changes made by political bodies to
+summer daylight saving time rules, UTC offsets, and time zone boundaries.
+Three data packages are available: base '$NAME' is always installed;
+optional '$NAME-right' provides TAI-10s time in the 'right' subtree;
+and optional '$NAME-posix' provides the same zones and times as base
+data in the 'posix' subtree, as an explicit distinction from 'right'."
+
+HOMEPAGE=https://www.iana.org/time-zones
+GIT_URI=git://github.com/eggert/tz.git
+SRC_URI=$HOMEPAGE/repository/releases/$NAME$VERSION.tar.gz
+SRC_URI+=" $SRC_URI.asc"
+# leap-seconds.list is symlink to leap-seconds.NTPtimestamp
+#LS_URI=ftp://tycho.usno.navy.mil/pub/ntp/leap-seconds.list
+LS_URI=ftp://ftp.boulder.nist.gov/pub/time/leap-seconds.list
+LS_URI=ftp://hpiers.obspm.fr/iers/bul/bulc/ntp/leap-seconds.list
+# -rw-r--r-- 1 ftp ftp 5065 Jul 07 09:40 leap-seconds.3960835200
+# lrwxrwxrwx 1 ftp ftp   23 Jul 07 09:43 leap-seconds.list -> leap-seconds.3960835200
+T=${TMPDIR:-${TMP:-${TEMP:-/tmp}}}	# not defined till after sourcing cygport
+# get verbatim symlink and read content
+LS_NTP=$(wget -NqP $T --retr-symlinks=no -- $LS_URI && readlink $T/${LS_URI##*/})
+# suffix to base URI - default next update estimate
+SRC_URI+=" ${LS_URI%/*}/${LS_NTP:-leap-seconds.3976686858}"	# 3992371200 
+PATCH_URI=
+
+SRC_DIR=.
+
+BUILD_REQUIRES="gawk perl tzcode"
+
+ARCH=noarch
+
+MAKEOPTS="
+	DATAFORM=rearguard	\
+	EXPIRES_LINE=1		\
+	PACKRATDATA=backzone	\
+	PACKRATLIST=		\
+	REDO=posix_right	\
+	VERSION_DEPS=		\
+"
+#	PACKRATLIST=zone.tab
+
+PKG_NAMES="$NAME $NAME-posix $NAME-right"
+
+
+declare ${NAME}_posix_CATEGORY=System
+posix=${NAME}_posix_CONTENTS
+declare $posix=usr/share/zoneinfo/posix
+declare ${NAME}_posix_REQUIRES=$NAME
+declare ${NAME}_posix_SUMMARY="$SUMMARY (posix zones subtree)"
+
+
+declare ${NAME}_right_CATEGORY=System
+right=${NAME}_right_CONTENTS
+declare $right=usr/share/zoneinfo/right
+declare ${NAME}_right_REQUIRES=$NAME
+declare ${NAME}_right_SUMMARY="$SUMMARY (TAI-10s right zones subtree)"
+
+
+declare ${NAME}_CATEGORY=Base
+declare ${NAME}_SUMMARY="$SUMMARY (base zones tree)"
+declare ${NAME}_CONTENTS="
+	--exclude=${!posix}
+	--exclude=${!right}
+	usr/share/
+	etc/
+"
+
+
+src_compile() {
+	local zic=/usr/sbin/zic
+
+	lndirs
+	cd $B
+	ln -fsv leap-seconds.{[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*,list}
+	mkdir -pv zoneinfo/ zoneinfo/posix/ zoneinfo/right/
+	cygmake CFLAGS="${CFLAGS} ${cdefs}"			    $NAME.zi
+	$zic -b fat -d zoneinfo		-L /dev/null		 -v $NAME.zi
+	$zic -b fat -d zoneinfo/posix	-L /dev/null		 -v $NAME.zi
+	$zic -b fat -d zoneinfo/right	-L leapseconds		 -v $NAME.zi
+}
+
+
+src_install() {
+	cd $B
+	dodir /usr/share
+	cp -pr zoneinfo $D/usr/share/
+
+	insinto /usr/share/zoneinfo
+	doins *.tab leapseconds leap-seconds.list version
+	doins $S/leap-seconds.list
+
+	dodir /etc/
+	dosym $D/usr/share/zoneinfo/leap-seconds.list /etc/
+
+	dodoc calendars CONTRIBUTING LICENSE NEWS README SECURITY *.html version
+}
+
+
+# invalid zones are non-GMT zones with default GMT time; avoid early error exit
+invalid_zones() {
+    /bin/grep -ve "$GMT_zones" <<< "$*" | /bin/grep -e '\sGMT$' || true
+}
+
+
+# test selected zones from all offsets, countries, continents, oceans
+# missing tested with Europe/Edinburgh; invalid tested with GMT zones
+src_test() {
+    cd $B
+
+    # get files needed to run upstream checks
+#   files=$(awk '/^VERSION_DEPS=/,/^$/' Makefile	| \
+#	    paste -d' ' -s -				| \
+#	    sed 's/^VERSION_DEPS=\s*//;s/\n/ /g;s/\s*\\\s*/ /g;s/\s\s\+/ /g')
+
+    # symlink missing files to /dev/null to pass upstream checks
+#   for f in $files
+#   do	# skip .c and .html files missing
+#	[ ! -s $f ] && [[ $f != *.[1-8ch] ]] && [[ $f != *.html ]] &&
+#	    ln -fsv /dev/null $f
+#   done
+
+#   rm -fv  $B/{zdump,zic,tzselect}
+#   ln -fvt $B /usr/*bin/{zdump,zic,tzselect}
+
+    # run upstream checks
+    cygmake -k check < /dev/null
+
+    GMT_zones="Africa/Abidjan Europe/Dublin Europe/London Greenwich GMT"
+#	Europe/Edinburgh
+    zones="$GMT_zones UTC Etc/Zulu
+	America/Anguilla America/Godthab Antarctica/Davis
+	Antarctica/DumontDUrville Antarctica/Mawson Antarctica/McMurdo
+	Arctic/Longyearbyen Asia/Baku Asia/Bishkek Asia/Calcutta Asia/Rangoon
+	Atlantic/Canary Brazil/East Canada/Newfoundland Chile/EasterIsland
+	Indian/Antananarivo Mexico/BajaNorte Mexico/BajaSur Pacific/Funafuti
+	Pacific/Midway US/Central
+	"
+    zones+=$(grep -v '^\s*#' $B/zonenow.tab | cut -f3)
+    GMT_zones="^${GMT_zones// /\\s\\|^}\\s"   # convert to pattern
+
+    inform "Test selected zones from all offsets, countries, continents, oceans are valid"
+
+    for st in '' posix right
+    do
+	cd $D/usr/share/zoneinfo/$st
+
+	gz=''
+	bz=''
+
+	for z in $zones
+	do
+	    if [ -s $z ]
+	    then
+		gz+=" $z"	# good zones selected
+	    else
+		bz+=" $z"	#  bad zones missing
+	    fi
+	done
+
+	dz=$(/usr/bin/zdump $gz)	# dumped zones
+	echo /usr/share/zoneinfo/$st:
+	echo "$dz"
+	iz=$(invalid_zones "$dz")	# invalid non-GMT zones with default GMT time
+
+	cd -
+
+	# report missing and invalid selected zones
+	if [ -n "$bz" ] || [ -n "$iz" ]
+	then
+	    [ -n "$bz" ] && warning "$NAME: missing /usr/share/zoneinfo/$st zones:$bz"
+	    [ -n "$iz" ] && warning "$NAME: invalid /usr/share/zoneinfo/$st zones:"$'\n'"$NAME:$iz"
+	    exit 2
+	fi
+    done
+
+    inform "$NAME: All tests passed: all selected zones exist and are valid"
+}
+
+
+LICENSE=LicenseRef-IANA-TZ-Public-Domain
+# SPDX-License-Identifier: LicenseRef-IANA-TZ-Public-Domain
+LICENSE_SPDX="SPDX-License-Identifier: $LICENSE"
+LICENSE_URI=LICENSE
+
+CYGWIN_MAINTAINER=Brian%20Inglis
+CYGWIN_MAINTAINER_EMAIL=Brian.Inglis@SystematicSW.ab.ca
+
+UPSTREAM_MAINTAINER=Paul%20Eggert
+UPSTREAM_MAINTAINER_EMAIL=eggert@cs.ucla.edu
+
+UPSTREAM_CO_MAINTAINER=Tim%20Parenti
+UPSTREAM_CO_MAINTAINER_EMAIL=tim@timtimeonline.com
+
+UPSTREAM_EMAIL=tz@IANA.org
+SUBJECT=${OSTYPE^}%20Package%20$NAME%20$VERSION
+MAILTO=mailto:$UPSTREAM_MAINTAINER%20%3C$UPSTREAM_MAINTAINER_EMAIL%3E\
+,$UPSTREAM_CO_MAINTAINER%20%3C$UPSTREAM_CO_MAINTAINER_EMAIL%3E\
+?from=$CYGWIN_MAINTAINER%20%3C$CYGWIN_MAINTAINER_EMAIL%3E\
+\&subject=$SUBJECT\&body=$SUBJECT
+
+
+Source archive: src/release/tzdata/tzdata-2026e-1-src.tar.xz
+
+--- tzdata-2026e-1.src/tzdata2026e.tar.gz!/LICENSE ---
+Unless specified below, all files in the tz code and data (including
+this LICENSE file) are in the public domain.
+
+If the files date.c, newstrftime.3, and strftime.c are present, they
+contain material derived from BSD and use the BSD 3-clause license.

@@ -8,6 +8,7 @@ import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingsPanel;
 import dev.jasper.sdk.settings.SettingsPanelHost;
 import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.Option;
 import dev.jasper.sdk.ui.UiEvent;
@@ -23,7 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The Editor's page in Settings > Tools > Editor: Font, Editing and Files as Settings' standard rows, grouped as the
+ * The Editor's page in Settings > Tools > Editor: Font, Editing, Markdown and Files as Settings' standard rows, grouped as the
  * generated page grouped them, then Default editor: a dropdown of the Jasper Editor, the editors detection found, the
  * system's default app and a custom command, the custom command's rows while it is chosen, and what Jasper's own
  * environment holds for {@code EDITOR} and {@code VISUAL}. Detection runs again each time the page opens, and the page
@@ -31,7 +32,7 @@ import java.util.Optional;
  */
 public final class EditorSettingsPanel implements SettingsPanel {
     static final String PAGE = "editor.settings", FONT = "editor.settings.font", EDITING = "editor.settings.editing",
-        FILES = "editor.settings.files", DEFAULT = "editor.settings.default", CHOICE = "editor.default-editor",
+        MARKDOWN = "editor.settings.markdown", FILES = "editor.settings.files", DEFAULT = "editor.settings.default", CHOICE = "editor.default-editor",
         COMMAND = "editor.custom-command", ENVIRONMENT = "editor.environment";
     /** The note under what Jasper's environment holds. */
     static final String NOTE = "An export in a shell startup file, such as ~/.zshrc, still wins.";
@@ -39,22 +40,26 @@ public final class EditorSettingsPanel implements SettingsPanel {
     static final String NO_COMMAND = "Enter a command; until then files open with your system's default app.";
 
     private final UiKit kit;
+    private final Appearance appearance;
     private final EditorSettings.Declared settings;
     private final DefaultEditor defaults;
     private final Map<String, String> environment;
     private SettingsPanelHost host;
     private UiView view;
     private Subscription detecting = () -> { };
+    private Subscription typography = () -> { };
     private String query = "";
 
     /**
      * @param kit the plugin's kit
+     * @param appearance the saved terminal typography
      * @param settings the Editor's declared settings
      * @param defaults the default editor, whose detection the dropdown lists
      * @param environment Jasper's own environment, for what the page says about {@code EDITOR} and {@code VISUAL}
      */
-    public EditorSettingsPanel(UiKit kit, EditorSettings.Declared settings, DefaultEditor defaults, Map<String, String> environment) {
+    public EditorSettingsPanel(UiKit kit, Appearance appearance, EditorSettings.Declared settings, DefaultEditor defaults, Map<String, String> environment) {
         this.kit = Objects.requireNonNull(kit, "kit");
+        this.appearance = Objects.requireNonNull(appearance, "appearance");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.defaults = Objects.requireNonNull(defaults, "defaults");
         this.environment = Map.copyOf(environment);
@@ -64,6 +69,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
         this.host = host;
         view = kit.create(new ViewSpec(node()), this::event);
         detecting = defaults.onDetected(this::render);
+        typography = appearance.onTerminalTypographyChanged(value -> render());
         defaults.detect();
         return view;
     }
@@ -77,7 +83,11 @@ public final class EditorSettingsPanel implements SettingsPanel {
         render();
     }
 
+    @Override public void pendingChanged() { render(); }
+
     @Override public void dispose() {
+        typography.close();
+        typography = () -> { };
         detecting.close();
         detecting = () -> { };
         view = null;
@@ -115,10 +125,47 @@ public final class EditorSettingsPanel implements SettingsPanel {
         defaultEditor.add(host.row(settings.keepEnvironmentEditor));
         defaultEditor.add(environmentRow());
         return new Nodes.Stack(PAGE, ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, List.of(
-            section(FONT, "Font", List.of(host.row(settings.fontFamily), host.row(settings.fontSize))),
+            section(FONT, "Font", fontRows()),
             section(EDITING, "Editing", List.of(host.row(settings.tabSize), host.row(settings.softWrap), host.row(settings.vim))),
+            section(MARKDOWN, "Markdown", List.of(host.row(settings.markdownViewMode))),
             section(FILES, "Files", List.of(host.row(settings.maxFileMib), host.row(settings.recentFilesDays))),
             section(DEFAULT, "Default editor", defaultEditor)));
+    }
+
+    private List<Nodes.Node> fontRows() {
+        var rows = new ArrayList<Nodes.Node>();
+        rows.add(host.row(settings.followTerminalFont));
+        if (host.pending(settings.followTerminalFont)) {
+            var font = appearance.terminalTypography();
+            rows.add(followed(settings.fontFamily, font.family()));
+            rows.add(followed(settings.fontSize, number(font.size())));
+            rows.add(followed(settings.fontFallback, String.join(", ", font.fallback())));
+            rows.add(followed(settings.fontLigatures, font.ligatures()));
+            rows.add(followed(settings.fontLineHeight, number(font.lineHeight())));
+        } else {
+            rows.add(host.row(settings.fontFamily));
+            rows.add(host.row(settings.fontSize));
+            rows.add(host.row(settings.fontFallback));
+            rows.add(host.row(settings.fontLigatures));
+            rows.add(host.row(settings.fontLineHeight));
+        }
+        return rows;
+    }
+
+    /** Copy the standard row's metadata, with an unbound disabled control; pending values stay in the host. */
+    private Nodes.SettingRow followed(Setting<?> setting, Object value) {
+        var standard = (Nodes.SettingRow) host.row(setting);
+        String id = "editor.followed." + setting.key();
+        var disabled = new ControlState(true, false, false, "");
+        Nodes.Node control = value instanceof Boolean checked
+            ? new Nodes.Toggle(id, disabled, standard.title(), checked, id, false)
+            : new Nodes.Field(id, disabled, Nodes.FieldKind.TEXT, String.valueOf(value), "", standard.title(), "");
+        return new Nodes.SettingRow(id + ":row", standard.state(), standard.title(), standard.description(), control,
+            standard.dependent(), standard.highlighted() || matches(standard.title(), standard.description()), standard.titleNote());
+    }
+
+    private static String number(double value) {
+        return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
     }
 
     /** The dropdown; a saved editor detection did not find is its own option, "(not found)". */

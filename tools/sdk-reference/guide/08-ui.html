@@ -213,6 +213,11 @@ classic layouts when {@link dev.jasper.sdk.ui.Presentation#classic()} is true, a
 the bottom strip under labelled stripes:</p>
 <pre><code class="language-java">boolean classic = context.appearance().presentation().classic();
 Anchor side = context.appearance().presentation().toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;</code></pre>
+<p>{@link Appearance#terminalTypography()} (SDK 0.18.3) reads the saved terminal family, fractional point size,
+ordered fallbacks, ligatures and line height from any thread. Register {@link Appearance#onTerminalTypographyChanged(Consumer)}
+on the UI thread; it delivers changed values there after the getter updates, with no initial replay. Closing the
+subscription or stopping the plugin removes it. Temporary pane zoom leaves this saved value unchanged.
+{@link FakePluginHost#setTerminalTypography(TerminalTypography)} queues a value for the next {@code flush()}.</p>
 <p>{@link Appearance#presentation()} needs SDK 0.18.2. In a test,
 {@link dev.jasper.sdk.testing.FakePluginHost#setPresentation(Presentation)} with
 {@link dev.jasper.sdk.testing.FakePresentations#CLASSIC} runs the plugin under the Enterprise look's values.</p>

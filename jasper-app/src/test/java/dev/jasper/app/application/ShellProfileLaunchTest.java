@@ -83,8 +83,10 @@ class ShellProfileLaunchTest {
      * The first window launches before detection completes: a trusted WSL or PowerShell 7 id waits off the EDT for
      * detection and resolves again, so a missing one starts PowerShell with a warning instead of failing the pane.
      */
-    @Test void aProfileTrustedBeforeDetectionIsCheckedOnceDetectionCompletes() throws Exception {
-        var snapshot = ConfigLoader.parse(directory.resolve("config.toml"), "[terminal.shell]\nprofile = 'wsl:Gone'\n", false).snapshot();
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"wsl:Gone", "cygwin"})
+    void aProfileTrustedBeforeDetectionIsCheckedOnceDetectionCompletes(String savedProfile) throws Exception {
+        var snapshot = ConfigLoader.parse(directory.resolve("config.toml"), "[terminal.shell]\nprofile = '" + savedProfile + "'\n", false).snapshot();
         Queue<Runnable> detection = new ConcurrentLinkedQueue<>();
         Queue<Runnable> pending = new ArrayDeque<>();
         var catalog = new AtomicReference<ShellProfileCatalog>();
@@ -109,11 +111,11 @@ class ShellProfileLaunchTest {
         });
         assertThat(warnings).as("nothing is known to be missing yet").isEmpty();
         assertThat(launches).extracting(ShellLauncher.Launch::profile)
-            .containsExactly(Optional.of("wsl:Gone"), Optional.of("wsl:ubuntu"), Optional.of("cmd"));
+            .containsExactly(Optional.of(savedProfile), Optional.of("wsl:ubuntu"), Optional.of("cmd"));
         while (!detection.isEmpty()) detection.remove().run();
         while (!pending.isEmpty()) pending.remove().run();
         SwingUtilities.invokeAndWait(() -> { });
-        assertThat(warnings).containsExactly("The shell profile \"wsl:Gone\" is not available; new panes start PowerShell instead.");
+        assertThat(warnings).containsExactly("The shell profile \"" + savedProfile + "\" is not available; new panes start PowerShell instead.");
         assertThat(replaced).as("the pane learns what started instead, and the detected spelling; cmd was never trusted")
             .containsExactly(new ShellLauncher.Launch("PowerShell", Optional.of("powershell")),
                 new ShellLauncher.Launch("Ubuntu", Optional.of("wsl:Ubuntu")));

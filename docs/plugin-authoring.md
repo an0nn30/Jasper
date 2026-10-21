@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.18.2, task by task.
+describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.18.3, task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.
@@ -116,7 +116,7 @@ notifications, naming the folder and the problem, for example `Unknown key: colo
 folder, a plugin's folder must be named after its id ("directory *x* holds plugin *y*; rename it to the plugin id").
 
 A plugin whose `sdk` range excludes this Jasper's SDK is skipped and reported as "*name* was not started": "needs SDK
-*range*; this is SDK 0.18.2".
+*range*; this is SDK 0.18.3".
 
 ### requires
 
@@ -1144,7 +1144,10 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
   time Settings opens; `host.row(setting)` gives the standard row for a declared setting (label, control, a Reset while
   the value differs from its default, validation), and `host.stage(setting, value)` sets a value from a control of the
   plugin's own; Settings saves both on Apply. `host.pending(setting)` returns the value Apply would save, and
-  `host.changed()` tells Settings to ask `modified()` again; call it whenever state of the plugin's own changes. Use
+  `host.changed()` tells Settings to ask `modified()` again; call it whenever state of the plugin's own changes.
+  The default `pendingChanged()` callback (SDK 0.18.3) lets you rebuild dependent descriptors after a standard row
+  edit, list action or Reset; the host's pending value and validation are updated before it runs. Invalid edits may
+  leave the pending value unchanged. Plugin calls to `host.stage` leave refreshing to the plugin. Use
   `modified`, `apply` and `reset` only for state of the plugin's own, and `keywords` and `highlight` for search. The
   panel lives as long as the plugin, so Settings calls `reset` before `dispose` whenever it closes a page without a
   successful Apply, as on Cancel. Compose the page as the generated ones are
@@ -1171,6 +1174,10 @@ up by the plugins that require it. Credential Vault, the Editor, Remote and Snip
 - An API may have its callers implement an interface: Remote implements the Editor's `EditorDocument` for SFTP files,
   whose methods the Editor calls on the UI thread and whose futures may complete on any thread. Say in the API which
   thread calls what.
+  Editor 0.11.0 adds the optional `EditorDocument.resolveRelative(String)` hook for Markdown resources and links.
+  Validate the decoded relative path with `RelativePaths.requireValid`; return a handle preserving the original
+  storage, authentication and owner context without I/O. The default returns empty. Local and Remote 0.15.1 implement
+  it; Remote retains compatibility with older Editor APIs. Resource reads use the handle's existing bounded `read` future.
 
 **Using a service.**
 
@@ -1203,7 +1210,7 @@ catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
 | Runs on, or may be called from | What |
 | --- | --- |
 | The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, windows, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
-| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
+| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
 
 - **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
   returns promptly.

@@ -13,6 +13,15 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class LaunchSettingsTest {
+    @Test void cygwinEnvironmentMergesWindowsNamesByLayerPrecedence() {
+        var config = ConfigLoader.parse(Path.of("config.toml"), "[terminal.env]\nPATH = 'configured-path'\nHOME = 'C:/configured-home'\n", false).snapshot();
+        var profile = new ShellProfile("cygwin", "Cygwin Bash", ShellProfile.Kind.LOCAL_SHELL, Optional.empty(), List.of("C:/owned/bash.exe"));
+        var settings = LaunchSettings.resolve(config, profile, "Windows 11", Map.of("Path", "inherited", "Home", "wrong", "jasper_integration_loaded", "1"),
+            80, 24, Path.of("scripts"), inherited -> Map.of("pAtH", "plugin", "hOmE", "plugin-home"));
+        assertThat(settings.environment()).containsEntry("PATH", "configured-path").containsEntry("HOME", "C:/configured-home")
+            .doesNotContainKeys("Path", "pAtH", "Home", "hOmE", "jasper_integration_loaded");
+    }
+
 
 
     private static ConfigSnapshot withShell(String program, List<String> args, ShellIntegrationMode mode) {

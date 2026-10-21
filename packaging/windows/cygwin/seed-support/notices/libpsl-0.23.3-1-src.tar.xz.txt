@@ -1,0 +1,346 @@
+Package source: src/release/libpsl/libpsl-0.23.3-1-src.tar.xz
+License identifier: MIT
+
+--- libpsl-0.23.3-1.src/libpsl.cygport ---
+#|/bin/cygport
+# libpsl.cygport - libpsl Cygwin package build control script definitions
+
+NAME=libpsl
+VERSION=0.23.3
+RELEASE=1
+
+CATEGORY=Net
+SUMMARY="Public Suffix List library"
+DESCRIPTION="A public suffix is a domain suffix under which Internet users could
+or can directly register domain names e.g. .com, .co.uk, and pvt.k12.ma.us.
+The Public Suffix List is a list of all known public suffixes."
+
+HOMEPAGE=https://github.com/rockdaboot/libpsl
+SRC_URI=$HOMEPAGE/releases/download/$VERSION/$NAME-$VERSION.tar.lz
+SRC_URI+=" $SRC_URI.sig"
+PATCH_URI="
+	makefile-am-install-psl-make-dafsa.patch
+	psl-make-dafsa-setlocale.patch
+"
+
+# test-is-public-all fails if not all regenerated at build time
+DISTCLEANFILES="src/suffixes_dafsa.h tests/psl.dafsa tests/psl_ascii.dafsa"
+
+DIFF_EXCLUDES="tests/psl.dafsa tests/psl_ascii.dafsa"
+
+BUILD_REQUIRES="
+	gettext-devel libiconv-devel libicu-devel libidn2-devel libintl-devel
+	libunistring-devel libxslt-devel
+	gtk-doc publicsuffix-list python3
+"
+
+# libpsl is used by curl and wget (which both now use libidn2)
+CYGCONF_ARGS="
+	 --enable-builtin=libicu
+	 --enable-gtk-doc
+	 --enable-man
+	 --enable-runtime=libidn2
+	   --with-psl-distfile=/usr/share/publicsuffix/public_suffix_list.dafsa
+	   --with-psl-file=/usr/share/publicsuffix/public_suffix_list.dat
+	   --with-psl-testfile=/usr/share/publicsuffix/test_psl.txt
+"
+#	 --enable-asan		Address Sanitizer (ASan)
+#	 --enable-cfi		clang's Control Flow Integrity (CFI)
+#	 --enable-fast-install[=PKGS]	optimize for fast installation [default=yes]
+#	 --enable-gtk-doc-html	documentation in html format [[default=yes]]
+#	 --enable-gtk-doc-pdf	documentation in pdf format [[default=no]]
+#	 --enable-runtime=libidn2|libicu|libidn libidn/2=>libunistring/2
+#	 --enable-shared[=PKGS]	shared libraries [default=yes]
+#	 --enable-static[=PKGS]	static libraries [default=yes]
+#	 --enable-ubsan		Undefined Behavior Sanitizer (UBSan)
+#	 --enable-valgrind-tests	enable using Valgrind for tests
+#	   --with-gnu-ld	assume the C compiler uses GNU ld [default=no]
+#	   --with-html-dir=PATH	path to installed docs
+#	--without-libiconv-prefix	don't search for libiconv in includedir and libdir
+#	   --with-libiconv-prefix[=DIR]	search for libiconv in DIR/include and DIR/lib
+#	--without-libintl-prefix	don't search for libintl in includedir and libdir
+#	   --with-libintl-prefix[=DIR]	search for libintl in DIR/include and DIR/lib
+#	   --with-pic[=PKGS]	try to use only PIC/non-PIC objects [default=use both]
+#	   --with-sysroot[=DIR]	dependent libraries in DIR (else compiler's sysroot)
+
+ABI=5
+
+# DAFSA Deterministic Acyclic Finite State Automaton
+PKG_NAMES="libpsl-doc libpsl${ABI} libpsl-devel psl psl-make-dafsa"
+
+
+libpsl_doc_CATEGORY="$CATEGORY Doc"
+libpsl_doc_SUMMARY="$SUMMARY (documentation)"
+libpsl_doc_CONTENTS="usr/share/gtk-doc/html/libpsl/"
+
+
+declare libpsl${ABI}_CATEGORY="$CATEGORY Libs"
+declare libpsl${ABI}_SUMMARY="$SUMMARY (binaries)"
+declare libpsl${ABI}_REQUIRES="publicsuffix-list-dafsa"
+declare libpsl${ABI}_CONTENTS="usr/bin/cygpsl-${ABI}.dll usr/share/doc/"
+
+
+libpsl_devel_CATEGORY="$CATEGORY Libs Devel"
+libpsl_devel_SUMMARY="$SUMMARY (development)"
+libpsl_devel_CONTENTS="
+	usr/include/libpsl.h
+	usr/lib/libpsl.dll.a
+	usr/lib/pkgconfig/libpsl.pc
+	usr/share/man/man3/libpsl.3*
+"
+
+
+psl_CATEGORY="$CATEGORY"
+psl_SUMMARY="$SUMMARY (utility)"
+psl_OBSOLETES="publicsuffix-utils"
+psl_CONTENTS="
+	usr/bin/psl.exe
+	usr/share/man/man1/psl.1*
+"
+
+
+psl_make_dafsa_CATEGORY="Devel"
+psl_make_dafsa_SUMMARY="$SUMMARY optimized DAFSA generator"
+psl_make_dafsa_CONTENTS="
+	usr/bin/psl-make-dafsa
+	usr/share/man/man1/psl-make-dafsa.1*
+"
+
+
+LICENSE="MIT"
+# SPDX-License-Identifier: MIT
+LICENSE_SPDX="SPDX-License-Identifier: $LICENSE"
+LICENSE_URI="LICENSE COPYING"
+
+DOCS+=" $LICENSE_URI"
+
+CYGWIN_MAINTAINER=Brian%20Inglis
+CYGWIN_MAINTAINER_EMAIL=Brian.Inglis@SystematicSW.ab.ca
+
+UPSTREAM_MAINTAINER=Tim%20Rühsen
+UPSTREAM_MAINTAINER_EMAIL=tim.ruehsen@gmx.de
+
+SUBJECT=${OSTYPE^}%20Package%20$NAME%20$VERSION
+MAILTO=mailto:$UPSTREAM_MAINTAINER_EMAIL,$UPSTREAM_EMAIL\
+,$UPSTREAM_CO_MAINTAINER%20%3C$UPSTREAM_CO_MAINTAINER_EMAIL%3E\
+?from=$CYGWIN_MAINTAINER%20%3C$CYGWIN_MAINTAINER_EMAIL%3E\
+\&subject=$SUBJECT\&body=$SUBJECT
+
+
+Source archive: src/release/libpsl/libpsl-0.23.3-1-src.tar.xz
+
+--- libpsl-0.23.3-1.src/libpsl-0.23.3.tar.lz!/libpsl-0.23.3/COPYING ---
+Copyright (C) Tim Rühsen and Libpsl Contributors.
+See Git history for individual modification years.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+
+--- libpsl-0.23.3-1.src/libpsl-0.23.3.tar.lz!/libpsl-0.23.3/src/LICENSE.chromium ---
+* The following License is for the source code files
+  psl-make-dafsa and lookup_string_in_fixed_set.c.
+
+// Copyright 2015 The Chromium Authors. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--- libpsl-0.23.3-1.src/libpsl-0.23.3.tar.lz!/libpsl-0.23.3/LICENSE ---
+Copyright (C) Tim Rühsen and Libpsl Contributors.
+See Git history for individual modification years.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+
+--- libpsl-0.23.3-1.src/libpsl.cygport ---
+#|/bin/cygport
+# libpsl.cygport - libpsl Cygwin package build control script definitions
+
+NAME=libpsl
+VERSION=0.23.3
+RELEASE=1
+
+CATEGORY=Net
+SUMMARY="Public Suffix List library"
+DESCRIPTION="A public suffix is a domain suffix under which Internet users could
+or can directly register domain names e.g. .com, .co.uk, and pvt.k12.ma.us.
+The Public Suffix List is a list of all known public suffixes."
+
+HOMEPAGE=https://github.com/rockdaboot/libpsl
+SRC_URI=$HOMEPAGE/releases/download/$VERSION/$NAME-$VERSION.tar.lz
+SRC_URI+=" $SRC_URI.sig"
+PATCH_URI="
+	makefile-am-install-psl-make-dafsa.patch
+	psl-make-dafsa-setlocale.patch
+"
+
+# test-is-public-all fails if not all regenerated at build time
+DISTCLEANFILES="src/suffixes_dafsa.h tests/psl.dafsa tests/psl_ascii.dafsa"
+
+DIFF_EXCLUDES="tests/psl.dafsa tests/psl_ascii.dafsa"
+
+BUILD_REQUIRES="
+	gettext-devel libiconv-devel libicu-devel libidn2-devel libintl-devel
+	libunistring-devel libxslt-devel
+	gtk-doc publicsuffix-list python3
+"
+
+# libpsl is used by curl and wget (which both now use libidn2)
+CYGCONF_ARGS="
+	 --enable-builtin=libicu
+	 --enable-gtk-doc
+	 --enable-man
+	 --enable-runtime=libidn2
+	   --with-psl-distfile=/usr/share/publicsuffix/public_suffix_list.dafsa
+	   --with-psl-file=/usr/share/publicsuffix/public_suffix_list.dat
+	   --with-psl-testfile=/usr/share/publicsuffix/test_psl.txt
+"
+#	 --enable-asan		Address Sanitizer (ASan)
+#	 --enable-cfi		clang's Control Flow Integrity (CFI)
+#	 --enable-fast-install[=PKGS]	optimize for fast installation [default=yes]
+#	 --enable-gtk-doc-html	documentation in html format [[default=yes]]
+#	 --enable-gtk-doc-pdf	documentation in pdf format [[default=no]]
+#	 --enable-runtime=libidn2|libicu|libidn libidn/2=>libunistring/2
+#	 --enable-shared[=PKGS]	shared libraries [default=yes]
+#	 --enable-static[=PKGS]	static libraries [default=yes]
+#	 --enable-ubsan		Undefined Behavior Sanitizer (UBSan)
+#	 --enable-valgrind-tests	enable using Valgrind for tests
+#	   --with-gnu-ld	assume the C compiler uses GNU ld [default=no]
+#	   --with-html-dir=PATH	path to installed docs
+#	--without-libiconv-prefix	don't search for libiconv in includedir and libdir
+#	   --with-libiconv-prefix[=DIR]	search for libiconv in DIR/include and DIR/lib
+#	--without-libintl-prefix	don't search for libintl in includedir and libdir
+#	   --with-libintl-prefix[=DIR]	search for libintl in DIR/include and DIR/lib
+#	   --with-pic[=PKGS]	try to use only PIC/non-PIC objects [default=use both]
+#	   --with-sysroot[=DIR]	dependent libraries in DIR (else compiler's sysroot)
+
+ABI=5
+
+# DAFSA Deterministic Acyclic Finite State Automaton
+PKG_NAMES="libpsl-doc libpsl${ABI} libpsl-devel psl psl-make-dafsa"
+
+
+libpsl_doc_CATEGORY="$CATEGORY Doc"
+libpsl_doc_SUMMARY="$SUMMARY (documentation)"
+libpsl_doc_CONTENTS="usr/share/gtk-doc/html/libpsl/"
+
+
+declare libpsl${ABI}_CATEGORY="$CATEGORY Libs"
+declare libpsl${ABI}_SUMMARY="$SUMMARY (binaries)"
+declare libpsl${ABI}_REQUIRES="publicsuffix-list-dafsa"
+declare libpsl${ABI}_CONTENTS="usr/bin/cygpsl-${ABI}.dll usr/share/doc/"
+
+
+libpsl_devel_CATEGORY="$CATEGORY Libs Devel"
+libpsl_devel_SUMMARY="$SUMMARY (development)"
+libpsl_devel_CONTENTS="
+	usr/include/libpsl.h
+	usr/lib/libpsl.dll.a
+	usr/lib/pkgconfig/libpsl.pc
+	usr/share/man/man3/libpsl.3*
+"
+
+
+psl_CATEGORY="$CATEGORY"
+psl_SUMMARY="$SUMMARY (utility)"
+psl_OBSOLETES="publicsuffix-utils"
+psl_CONTENTS="
+	usr/bin/psl.exe
+	usr/share/man/man1/psl.1*
+"
+
+
+psl_make_dafsa_CATEGORY="Devel"
+psl_make_dafsa_SUMMARY="$SUMMARY optimized DAFSA generator"
+psl_make_dafsa_CONTENTS="
+	usr/bin/psl-make-dafsa
+	usr/share/man/man1/psl-make-dafsa.1*
+"
+
+
+LICENSE="MIT"
+# SPDX-License-Identifier: MIT
+LICENSE_SPDX="SPDX-License-Identifier: $LICENSE"
+LICENSE_URI="LICENSE COPYING"
+
+DOCS+=" $LICENSE_URI"
+
+CYGWIN_MAINTAINER=Brian%20Inglis
+CYGWIN_MAINTAINER_EMAIL=Brian.Inglis@SystematicSW.ab.ca
+
+UPSTREAM_MAINTAINER=Tim%20Rühsen
+UPSTREAM_MAINTAINER_EMAIL=tim.ruehsen@gmx.de
+
+SUBJECT=${OSTYPE^}%20Package%20$NAME%20$VERSION
+MAILTO=mailto:$UPSTREAM_MAINTAINER_EMAIL,$UPSTREAM_EMAIL\
+,$UPSTREAM_CO_MAINTAINER%20%3C$UPSTREAM_CO_MAINTAINER_EMAIL%3E\
+?from=$CYGWIN_MAINTAINER%20%3C$CYGWIN_MAINTAINER_EMAIL%3E\
+\&subject=$SUBJECT\&body=$SUBJECT
+
+
+
+--- libpsl-0.23.3-1.src/makefile-am-install-psl-make-dafsa.patch ---
+--- origsrc/libpsl-0.16.0/src/Makefile.am	2016-12-06 13:00:23.000000000 -0600
++++ src/libpsl-0.16.0/src/Makefile.am	2016-12-15 04:11:54.570845600 -0600
+@@ -27,4 +27,5 @@ suffixes_dafsa.c: $(PSL_FILE) $(srcdir)/
+ 
+ EXTRA_DIST = psl-make-dafsa LICENSE.chromium
+ 
++bin_SCRIPTS = psl-make-dafsa
+ dist_man_MANS = psl-make-dafsa.1

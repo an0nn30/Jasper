@@ -1,0 +1,612 @@
+Package source: x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst
+License identifier: OLDAP-2.8
+
+--- openldap-2.6.15-1.src/openldap.cygport ---
+# -*- mode: sh; sh-shell: bash -*-
+NAME="openldap"
+VERSION="2.6.15"
+RELEASE="1"
+CATEGORY="Net"
+SUMMARY="Lightweight Directory Access Protocol suite"
+DESCRIPTION="A suite of the Lightweight Directory Access Protocol (v3) servers,
+clients, utilities, and development tools."
+
+HOMEPAGE="https://www.openldap.org/"
+LICENSE="OLDAP-2.8"
+SRC_URI="
+  https://www.openldap.org/software/download/OpenLDAP/openldap-release/${P}.tgz
+  https://www.openldap.org/software/download/OpenLDAP/openldap-release/${P}.tgz.asc
+"
+PATCH_URI="
+  ${P}-cygwin.patch
+"
+
+# Build dependencies only
+BUILD_REQUIRES="libcrypt-devel libiodbc-devel libsasl2-devel libssl-devel libuuid-devel"
+
+ABI24="2_4_2"
+ABI25="2_5_0"
+ABI="2"
+PKG_NAMES="${PN} lib${PN}${ABI24} lib${PN}${ABI25} lib${PN}${ABI} ${PN}-devel"
+eval ${PN}_SUMMARY='"${SUMMARY} (clients)"'
+eval ${PN}_OBSOLETES='"${PN}-server"'
+eval ${PN}_CONTENTS='"
+  --exclude=devel
+  --exclude=drafts
+  --exclude=rfc
+  usr/bin/ldap*
+  usr/share/doc/
+  usr/share/man/man1/
+"'
+eval lib${PN}${ABI}_CATEGORY='"${CATEGORY} Libs"'
+eval lib${PN}${ABI}_SUMMARY='"${SUMMARY} (runtime)"'
+eval lib${PN}${ABI}_CONTENTS='"usr/bin/*[pr]-${ABI//_/-}.dll"'
+eval lib${PN}${ABI24}_CATEGORY='"${CATEGORY} Libs"'
+eval lib${PN}${ABI24}_SUMMARY='"${SUMMARY} (runtime)"'
+eval lib${PN}${ABI24}_CONTENTS='"usr/bin/*-${ABI24//_/-}.dll"'
+eval lib${PN}${ABI25}_CATEGORY='"${CATEGORY} Libs"'
+eval lib${PN}${ABI25}_SUMMARY='"${SUMMARY} (runtime)"'
+eval lib${PN}${ABI25}_CONTENTS='"usr/bin/*-${ABI25//_/-}.dll"'
+eval ${PN}_devel_CATEGORY='"${CATEGORY} Devel Libs"'
+eval ${PN}_devel_SUMMARY='"${SUMMARY} (development)"'
+eval ${PN}_devel_REQUIRES='"libiodbc-devel openssl-devel libsasl2-devel libuuid-devel"'
+eval ${PN}_devel_CONTENTS='"
+  usr/include/
+  usr/lib/*.a
+  usr/lib/pkgconfig/*.pc
+  usr/share/doc/${NAME}/[dr]*/
+  usr/share/man/man3/
+"'
+
+DEPS_PATH="/usr/sbin"
+DIFF_EXCLUDES="include tests"
+DOCS="ANNOUNCEMENT"
+
+#MAKEOPTS="-j1"
+
+CYGCONF_ARGS="
+  --localstatedir=/var/openldap
+  --libexecdir=/usr/sbin
+  --with-cyrus-sasl
+  --enable-dynamic
+  --enable-syslog
+  --enable-ipv6
+  --enable-local
+  --disable-cleartext
+  --disable-slapd
+  --disable-slapi
+  --disable-slp
+  --disable-mdb
+  --disable-relay
+  --with-systemd=no
+  --disable-wrappers
+  --disable-modules
+  --disable-overlays
+"
+
+src_install() {
+    cd ${B}
+    cyginstall STRIP=
+
+    dodir /usr/share/doc/${NAME}
+    cp -r ${S}/doc/{devel,drafts,guide,rfc} ${D}/usr/share/doc/${NAME}/
+
+    rm -rf ${D}/usr/share/doc/${NAME}/guide
+    rm -rf ${D}/etc/openldap
+    rm -rf ${D}/usr/share/man/man[58]
+
+    for l in cyg{ldap,lber} ; do
+	newbin ${D}/usr/bin/${l}-${ABI}.dll ${l}-${ABI24//_/-}.dll
+	[ "cygldap" == "$l" ] && newbin ${D}/usr/bin/${l}-${ABI}.dll ${l}_r-${ABI24//_/-}.dll
+	newbin ${D}/usr/bin/${l}-${ABI}.dll ${l}-${ABI25//_/-}.dll
+    done
+
+}
+
+Source archive: x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/libraries/liblmdb/COPYRIGHT ---
+Copyright 2011-2021 Howard Chu, Symas Corp.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted only as authorized by the OpenLDAP
+Public License.
+
+A copy of this license is available in the file LICENSE in the
+top-level directory of the distribution or, alternatively, at
+<http://www.OpenLDAP.org/license.html>.
+
+OpenLDAP is a registered trademark of the OpenLDAP Foundation.
+
+Individual files and/or contributed packages may be copyright by
+other parties and/or subject to additional restrictions.
+
+This work also contains materials derived from public sources.
+
+Additional information about OpenLDAP can be obtained at
+<http://www.openldap.org/>.
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/libraries/liblmdb/LICENSE ---
+The OpenLDAP Public License
+  Version 2.8, 17 August 2003
+
+Redistribution and use of this software and associated documentation
+("Software"), with or without modification, are permitted provided
+that the following conditions are met:
+
+1. Redistributions in source form must retain copyright statements
+   and notices,
+
+2. Redistributions in binary form must reproduce applicable copyright
+   statements and notices, this list of conditions, and the following
+   disclaimer in the documentation and/or other materials provided
+   with the distribution, and
+
+3. Redistributions must contain a verbatim copy of this document.
+
+The OpenLDAP Foundation may revise this license from time to time.
+Each revision is distinguished by a version number.  You may use
+this Software under terms of this license revision or under the
+terms of any subsequent revision of the license.
+
+THIS SOFTWARE IS PROVIDED BY THE OPENLDAP FOUNDATION AND ITS
+CONTRIBUTORS ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT
+SHALL THE OPENLDAP FOUNDATION, ITS CONTRIBUTORS, OR THE AUTHOR(S)
+OR OWNER(S) OF THE SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+The names of the authors and copyright holders must not be used in
+advertising or otherwise to promote the sale, use or other dealing
+in this Software without specific, written prior permission.  Title
+to copyright in this Software shall at all times remain with copyright
+holders.
+
+OpenLDAP is a registered trademark of the OpenLDAP Foundation.
+
+Copyright 1999-2003 The OpenLDAP Foundation, Redwood City,
+California, USA.  All Rights Reserved.  Permission to copy and
+distribute verbatim copies of this document is granted.
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/libraries/librewrite/Copyright ---
+/******************************************************************************
+ *
+ * Copyright (C) 2000 Pierangelo Masarati, <ando@sys-net.it>
+ * All rights reserved.
+ *
+ * Permission is granted to anyone to use this software for any purpose
+ * on any computer system, and to alter it and redistribute it, subject
+ * to the following restrictions:
+ *
+ * 1. The author is not responsible for the consequences of use of this
+ * software, no matter how awful, even if they arise from flaws in it.
+ *
+ * 2. The origin of this software must not be misrepresented, either by
+ * explicit claim or by omission.  Since few users ever read sources,
+ * credits should appear in the documentation.
+ *
+ * 3. Altered versions must be plainly marked as such, and must not be
+ * misrepresented as being the original software.  Since few users
+ * ever read sources, credits should appear in the documentation.
+ * 
+ * 4. This notice may not be removed or altered.
+ *
+ ******************************************************************************/
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/build/LICENSE-2.0.1 ---
+A number of files contained in OpenLDAP Software contain
+a statement:
+ USE, MODIFICATION, AND REDISTRIBUTION OF THIS WORK IS SUBJECT
+ TO VERSION 2.0.1 OF THE OPENLDAP PUBLIC LICENSE, A COPY OF
+ WHICH IS AVAILABLE AT HTTP://WWW.OPENLDAP.ORG/LICENSE.HTML OR
+ IN THE FILE "LICENSE" IN THE TOP-LEVEL DIRECTORY OF THE
+ DISTRIBUTION.
+
+The following is a verbatim copy of version 2.0.1 of the OpenLDAP
+Public License referenced in the above statement.
+
+
+The OpenLDAP Public License
+
+  Version 2.0.1, 21 December 1999
+  Copyright 1999, The OpenLDAP Foundation, Redwood City, California, USA.
+  All Rights Reserved.
+
+Redistribution and use of this software and associated documentation
+("Software"), with or without modification, are permitted provided
+that the following conditions are met:
+
+1. Redistributions of source code must retain copyright
+statements and notices.  Redistributions must also contain a
+copy of this document.
+
+2. Redistributions in binary form must reproduce the
+above copyright notice, this list of conditions and the
+following disclaimer in the documentation and/or other
+materials provided with the distribution.
+
+3. The name "OpenLDAP" must not be used to endorse or promote
+products derived from this Software without prior written
+permission of the OpenLDAP Foundation.  For written permission,
+please contact foundation@openldap.org.
+
+4. Products derived from this Software may not be called "OpenLDAP"
+nor may "OpenLDAP" appear in their names without prior written
+permission of the OpenLDAP Foundation.  OpenLDAP is a trademark
+of the OpenLDAP Foundation.
+
+5. Due credit should be given to the OpenLDAP Project
+(http://www.openldap.org/).
+
+THIS SOFTWARE IS PROVIDED BY THE OPENLDAP FOUNDATION AND CONTRIBUTORS
+``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT
+NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL
+THE OPENLDAP FOUNDATION OR ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/doc/guide/release/license-plain.sdf ---
+# $OpenLDAP$
+# Copyright 1999-2026 The OpenLDAP Foundation, All Rights Reserved.
+# COPYING RESTRICTIONS APPLY, see COPYRIGHT.
+
+#
+# Plain Copyright for Software Distribution
+#
+!define HTML_TITLE "OpenLDAP Public License"
+!include "../plain.sdf"
+!include "license.sdf"; plain
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/doc/guide/release/copyright.sdf ---
+# $OpenLDAP$
+# Copyright 1999-2026 The OpenLDAP Foundation, All Rights Reserved.
+# COPYING RESTRICTIONS APPLY, see COPYRIGHT.
+
+# This file should match ../../../COPYRIGHT (except in formatting)
+
+!if OPT_PP_HTML
+!define	copyright '[[c]] Copyright'
+!else
+!define copyright 'Copyright'
+!endif
+
+H1: OpenLDAP Software Copyright Notices
+
+H2: OpenLDAP Copyright Notice
+
+!block nofill
+[[copyright]] 1998-2013 The OpenLDAP Foundation.
+{{All rights reserved.}}
+!endblock
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted {{only as authorized}} by the {{SECT:OpenLDAP
+Public License}}.
+
+A copy of this license is available in file {{F:LICENSE}} in the
+top-level directory of the distribution or, alternatively, at
+<{{URL:http://www.OpenLDAP.org/license.html}}>.
+
+OpenLDAP is a registered trademark of the OpenLDAP Foundation.
+
+Individual files and/or contributed packages may be copyright by
+other parties and their use subject to additional restrictions.
+
+This work is derived from the University of Michigan LDAP v3.3
+distribution.  Information concerning this software is available
+at <{{URL:http://www.umich.edu/~dirsvcs/ldap/ldap.html}}>.
+
+This work also contains materials derived from public sources.
+
+Additional information about OpenLDAP software can be obtained at
+<{{URL:http://www.OpenLDAP.org/}}>.
+
+
+H2: Additional Copyright Notices
+
+!block nofill
+Portions [[copyright]] 1998-2013 Kurt D. Zeilenga.
+Portions [[copyright]] 1998-2006 Net Boolean Incorporated.
+Portions [[copyright]] 2001-2006 IBM Corporation.
+{{All rights reserved.}}
+!endblock
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted only as authorized by the {{SECT:OpenLDAP
+Public License}}.
+
+
+!block nofill
+Portions [[copyright]] 1999-2008 Howard Y.H. Chu.
+Portions [[copyright]] 1999-2008 Symas Corporation.
+Portions [[copyright]] 1998-2003 Hallvard B. Furuseth.
+Portions [[copyright]] 2007-2011 Gavin Henry.
+Portions [[copyright]] 2007-2011 Suretec Systems Limited.
+{{All rights reserved.}}
+!endblock
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that this notice is preserved.
+The names of the copyright holders may not be used to endorse or
+promote products derived from this software without their specific
+prior written permission.  This software is provided ``as is''
+without express or implied warranty.
+
+
+H2: University of Michigan Copyright Notice
+
+!block nofill
+Portions [[copyright]] 1992-1996 Regents of the University of Michigan.
+{{All rights reserved.}}
+!endblock
+
+Redistribution and use in source and binary forms are permitted
+provided that this notice is preserved and that due credit is given
+to the University of Michigan at Ann Arbor. The name of the University
+may not be used to endorse or promote products derived from this
+software without specific prior written permission. This software
+is provided ``as is'' without express or implied warranty.
+
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/doc/guide/release/copyright-plain.sdf ---
+# $OpenLDAP$
+# Copyright 1999-2026 The OpenLDAP Foundation, All Rights Reserved.
+# COPYING RESTRICTIONS APPLY, see COPYRIGHT.
+
+#
+# Plain Copyright for Software Distribution
+#
+!define HTML_TITLE "OpenLDAP Copyright Notices"
+!include "../plain.sdf"
+!include "copyright.sdf"; plain
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/doc/guide/release/license.sdf ---
+# $OpenLDAP$
+# Copyright 2000-2026 The OpenLDAP Foundation, All Rights Reserved.
+# COPYING RESTRICTIONS APPLY, see COPYRIGHT.
+
+H1: OpenLDAP Public License
+
+#!block inline
+#<FONT FACE="Courier">
+#!endblock
+
+!include "../../../LICENSE" ; verbatim
+
+#!block inline
+#</FONT>
+#!endblock
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/contrib/ldaptcl/COPYRIGHT ---
+Copyright 1998-2026 The OpenLDAP Foundation.  All rights reserved.
+
+COPYING RESTRICTIONS APPLY.
+
+See COPYRIGHT and LICENSE files in the top-level directory of this
+distribution (i.e., ../../COPYRIGHT and ../../LICENSE, respectively).
+
+---
+NeoSoft Tcl client extensions to Lightweight Directory Access Protocol.
+
+Copyright (c) 1998-1999 NeoSoft, Inc.  
+All Rights Reserved.
+
+This software may be used, modified, copied, distributed, and sold,
+in both source and binary form provided that these copyrights are
+retained and their terms are followed.
+
+Under no circumstances are the authors or NeoSoft Inc. responsible
+for the proper functioning of this software, nor do the authors
+assume any liability for damages incurred with its use.
+
+Redistribution and use in source and binary forms are permitted
+provided that this notice is preserved and that due credit is given
+to NeoSoft, Inc.
+
+NeoSoft, Inc. may not be used to endorse or promote products derived
+from this software without specific prior written permission. This
+software is provided ``as is'' without express or implied warranty.
+
+Requests for permission may be sent to NeoSoft Inc, 1770 St. James Place,
+Suite 500, Houston, TX, 77056.
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/contrib/ldapc++/COPYRIGHT ---
+Copyright 1998-2026 The OpenLDAP Foundation.  All rights reserved.
+
+COPYING RESTRICTIONS APPLY.
+
+See COPYRIGHT and LICENSE files in the top-level directory of this
+distribution (i.e., ../../COPYRIGHT and ../../LICENSE, respectively).
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/contrib/slapd-modules/ppm/LICENSE ---
+OpenLDAP Public License
+
+The OpenLDAP Public License
+  Version 2.8.1, 25 November 2003
+
+Redistribution and use of this software and associated documentation
+("Software"), with or without modification, are permitted provided
+that the following conditions are met:
+
+1. Redistributions in source form must retain copyright statements
+   and notices,
+
+2. Redistributions in binary form must reproduce applicable copyright
+   statements and notices, this list of conditions, and the following
+   disclaimer in the documentation and/or other materials provided
+   with the distribution, and
+
+3. Redistributions must contain a verbatim copy of this document.
+
+The OpenLDAP Foundation may revise this license from time to time.
+Each revision is distinguished by a version number.  You may use
+this Software under terms of this license revision or under the
+terms of any subsequent revision of the license.
+
+THIS SOFTWARE IS PROVIDED BY THE OPENLDAP FOUNDATION AND ITS
+CONTRIBUTORS ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT
+SHALL THE OPENLDAP FOUNDATION, ITS CONTRIBUTORS, OR THE AUTHOR(S)
+OR OWNER(S) OF THE SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+The names of the authors and copyright holders must not be used in
+advertising or otherwise to promote the sale, use or other dealing
+in this Software without specific, written prior permission.  Title
+to copyright in this Software shall at all times remain with copyright
+holders.
+
+OpenLDAP is a registered trademark of the OpenLDAP Foundation.
+
+Copyright 1999-2003 The OpenLDAP Foundation, Redwood City,
+California, USA.  All rights reserved.  Permission to copy and
+distribute verbatim copies of this document is granted.
+
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/COPYRIGHT ---
+Copyright 1998-2026 The OpenLDAP Foundation
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted only as authorized by the OpenLDAP
+Public License.
+
+A copy of this license is available in the file LICENSE in the
+top-level directory of the distribution or, alternatively, at
+<http://www.OpenLDAP.org/license.html>.
+
+OpenLDAP is a registered trademark of the OpenLDAP Foundation.
+
+Individual files and/or contributed packages may be copyright by
+other parties and/or subject to additional restrictions.
+
+This work is derived from the University of Michigan LDAP v3.3
+distribution.  Information concerning this software is available
+at <http://www.umich.edu/~dirsvcs/ldap/ldap.html>.
+
+This work also contains materials derived from public sources.
+
+Additional information about OpenLDAP can be obtained at
+<http://www.openldap.org/>.
+
+---
+
+Portions Copyright 1998-2013 Kurt D. Zeilenga.
+Portions Copyright 1998-2006 Net Boolean Incorporated.
+Portions Copyright 2001-2006 IBM Corporation.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted only as authorized by the OpenLDAP
+Public License.
+
+---
+
+Portions Copyright 1999-2008 Howard Y.H. Chu.
+Portions Copyright 1999-2008 Symas Corporation.
+Portions Copyright 1998-2003 Hallvard B. Furuseth.
+Portions Copyright 2007-2011 Gavin Henry.
+Portions Copyright 2007-2011 Suretec Systems Ltd.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that this notice is preserved.
+The names of the copyright holders may not be used to endorse or
+promote products derived from this software without their specific
+prior written permission.  This software is provided ``as is''
+without express or implied warranty.
+
+---
+
+Portions Copyright (c) 1992-1996 Regents of the University of Michigan.
+All rights reserved.
+
+Redistribution and use in source and binary forms are permitted
+provided that this notice is preserved and that due credit is given
+to the University of Michigan at Ann Arbor.  The name of the
+University may not be used to endorse or promote products derived
+from this software without specific prior written permission.  This
+software is provided ``as is'' without express or implied warranty.
+
+
+
+--- openldap-2.6.15-1.src/openldap-2.6.15.tgz!/openldap-2.6.15/LICENSE ---
+The OpenLDAP Public License
+  Version 2.8, 17 August 2003
+
+Redistribution and use of this software and associated documentation
+("Software"), with or without modification, are permitted provided
+that the following conditions are met:
+
+1. Redistributions in source form must retain copyright statements
+   and notices,
+
+2. Redistributions in binary form must reproduce applicable copyright
+   statements and notices, this list of conditions, and the following
+   disclaimer in the documentation and/or other materials provided
+   with the distribution, and
+
+3. Redistributions must contain a verbatim copy of this document.
+
+The OpenLDAP Foundation may revise this license from time to time.
+Each revision is distinguished by a version number.  You may use
+this Software under terms of this license revision or under the
+terms of any subsequent revision of the license.
+
+THIS SOFTWARE IS PROVIDED BY THE OPENLDAP FOUNDATION AND ITS
+CONTRIBUTORS ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT
+SHALL THE OPENLDAP FOUNDATION, ITS CONTRIBUTORS, OR THE AUTHOR(S)
+OR OWNER(S) OF THE SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+The names of the authors and copyright holders must not be used in
+advertising or otherwise to promote the sale, use or other dealing
+in this Software without specific, written prior permission.  Title
+to copyright in this Software shall at all times remain with copyright
+holders.
+
+OpenLDAP is a registered trademark of the OpenLDAP Foundation.
+
+Copyright 1999-2003 The OpenLDAP Foundation, Redwood City,
+California, USA.  All Rights Reserved.  Permission to copy and
+distribute verbatim copies of this document is granted.
