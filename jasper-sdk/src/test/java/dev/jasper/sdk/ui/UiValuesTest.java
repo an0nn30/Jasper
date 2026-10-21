@@ -13,6 +13,21 @@ class UiValuesTest {
             StandardMenu.TOOLS, StandardMenu.SESSION, StandardMenu.TRANSFER);
     }
 
+    /** Tabs and panes spec 10 and 11 (workspace plan 8b Rulings 3): a split item's id names its two actions. */
+    @Test void aSplitItemsIdNamesItsRightAndDownActions() {
+        var editor = SplitItemSpec.of("dev.jasper.editor.editor", "Editor").withIcon("file");
+        assertThat(editor.rightAction()).isEqualTo("dev.jasper.editor.split_right_editor");
+        assertThat(editor.downAction()).isEqualTo("dev.jasper.editor.split_down_editor");
+        assertThat(editor.icon()).contains("file");
+        var longest = SplitItemSpec.of("dev.x." + "a".repeat(110), "Long");
+        assertThat(ActionSpec.of(longest.rightAction(), "Split Right with Long").id()).as("still an action id").hasSize(128);
+        for (String id : new String[]{"", "nodot", "Upper.case", "dev.x." + "a".repeat(111)})
+            assertThatIllegalArgumentException().as(id).isThrownBy(() -> SplitItemSpec.of(id, "Label"));
+        assertThatIllegalArgumentException().isThrownBy(() -> SplitItemSpec.of("dev.x.notes", " "));
+        assertThatNullPointerException().isThrownBy(() -> new SplitItemSpec("dev.x.notes", "Notes", null));
+        assertThat(SplitChoice.TERMINAL).isEqualTo(new SplitChoice("Terminal", "split_right", "split_down"));
+    }
+
     @Test void actionSpecValidatesAndCopies() {
         var keywords = new ArrayList<>(List.of("connect"));
         ActionSpec spec = ActionSpec.of("dev.x.tool.run", "Run Tool").withKeywords(keywords).withDefaultBinding("cmd+alt+j");

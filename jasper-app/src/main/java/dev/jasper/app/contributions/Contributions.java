@@ -138,6 +138,36 @@ public final class Contributions {
         return status.stream().sorted(Comparator.comparingInt(StatusEntry::priority)).toList();
     }
 
+    private final List<SplitItem> splitItems = new ArrayList<>();
+
+    /**
+     * Lists a split item in every window's Split lists (tabs and panes spec 8; workspace plan 8b Rulings 17); its
+     * contributor registers its two actions with {@link #addAction}. Ids are unique.
+     *
+     * @param item the item
+     * @return removes it from the lists
+     * @throws IllegalArgumentException when an item with its id is listed
+     */
+    public Subscription addSplitItem(SplitItem item) {
+        requireEdt();
+        Objects.requireNonNull(item, "item");
+        for (SplitItem existing : splitItems)
+            if (existing.id().equals(item.id())) throw new IllegalArgumentException("Split item already registered: " + item.id());
+        splitItems.add(item);
+        changed(Kind.MENUS);
+        return new Subscription(() -> { if (splitItems.remove(item)) changed(Kind.MENUS); });
+    }
+
+    /**
+     * The split items in the Split lists' order (workspace plan 8b Rulings 5): the bundled plugins' first, each in the
+     * order it was listed.
+     *
+     * @return the items
+     */
+    public List<SplitItem> splitItems() {
+        return splitItems.stream().sorted(Comparator.comparing((SplitItem item) -> !item.bundled())).toList();
+    }
+
     public Subscription onChanged(Consumer<Kind> listener) {
         requireEdt();
         listeners.add(Objects.requireNonNull(listener, "listener"));

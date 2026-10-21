@@ -17,6 +17,25 @@ class ContributionsTest {
     private final Contributions model = new Contributions();
     private final List<Contributions.Kind> changes = new ArrayList<>();
 
+    /** Workspace plan 8b Rulings 5 and 17: split items are unique, the bundled plugins' first, and a change of the menus. */
+    @Test void splitItemsAreUniqueTheBundledFirstAndChangeTheMenus() {
+        model.onChanged(changes::add);
+        var notes = model.addSplitItem(new SplitItem("com.example.notes.notes", "Notes", null,
+            "com.example.notes.split_right_notes", "com.example.notes.split_down_notes", false));
+        model.addSplitItem(new SplitItem("dev.jasper.editor.editor", "Editor", null,
+            "dev.jasper.editor.split_right_editor", "dev.jasper.editor.split_down_editor", true));
+        model.addSplitItem(new SplitItem("org.example.sketch.sketch", "Sketch", null,
+            "org.example.sketch.split_right_sketch", "org.example.sketch.split_down_sketch", false));
+        assertThatIllegalArgumentException().isThrownBy(() -> model.addSplitItem(new SplitItem("com.example.notes.notes", "Again",
+            null, "com.example.notes.a", "com.example.notes.b", false)));
+        assertThat(model.splitItems()).extracting(SplitItem::label).containsExactly("Editor", "Notes", "Sketch");
+        assertThat(changes).containsExactly(Contributions.Kind.MENUS, Contributions.Kind.MENUS, Contributions.Kind.MENUS);
+        notes.close();
+        notes.close();
+        assertThat(model.splitItems()).extracting(SplitItem::label).containsExactly("Editor", "Sketch");
+        assertThat(changes).hasSize(4);
+    }
+
     @Test void actionsAreUniqueObservableAndInvocable() {
         model.onChanged(changes::add);
         var seen = new ArrayList<Contributions.Invocation>();

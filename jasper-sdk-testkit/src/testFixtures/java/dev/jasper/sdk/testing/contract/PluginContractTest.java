@@ -1745,6 +1745,56 @@ public abstract class PluginContractTest {
         assertThat(h.windowTabs(other)).as("a child window closed with its last tab has none").isEmpty();
     }
 
+    /**
+     * Tabs and panes spec 8 and 11: a split item joins every Split list after the terminal, the bundled plugins' first,
+     * and Jasper registers its right and down actions, which the plugin may place and which call its opener with the
+     * window and the placement.
+     */
+    @Test void aSplitItemJoinsTheSplitListsWithRightAndDownActionsThatCallItsOpener() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "zsh");
+        UUID pane = h.addTerminalPane(tab, "zsh", Path.of("/"));
+        List<String> opened = Collections.synchronizedList(new ArrayList<>());
+        var alpha = new AtomicReference<PluginContext>();
+        var notes = new AtomicReference<Subscription>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            notes.set(context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("test.alpha.notes", "Notes"),
+                (shown, placement) -> opened.add(shown.id() + " " + placement)));
+            context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("test.alpha.boom", "Boom"),
+                (shown, placement) -> { throw new IllegalStateException("opener failure"); });
+            assertThatIllegalArgumentException().as("one item per id").isThrownBy(() -> context.windows().splitItem(
+                dev.jasper.sdk.ui.SplitItemSpec.of("test.alpha.notes", "Again"), (shown, placement) -> { }));
+            assertThatIllegalArgumentException().as("another plugin's namespace").isThrownBy(() -> context.windows().splitItem(
+                dev.jasper.sdk.ui.SplitItemSpec.of("test.beta.notes", "Foreign"), (shown, placement) -> { }));
+            context.menus().standard(StandardMenu.TAB).add("test.alpha.split_right_notes");
+        });
+        h.declareBundled("test.bundled");
+        h.start(info("test.bundled"), Set.of(), Set.of(), context -> context.windows().splitItem(
+            dev.jasper.sdk.ui.SplitItemSpec.of("test.bundled.sketch", "Sketch"), (shown, placement) -> { }));
+        assertThat(h.actions()).containsExactly(
+            "test.alpha.split_right_notes|Split Right with Notes|true", "test.alpha.split_down_notes|Split Down with Notes|true",
+            "test.alpha.split_right_boom|Split Right with Boom|true", "test.alpha.split_down_boom|Split Down with Boom|true",
+            "test.bundled.split_right_sketch|Split Right with Sketch|true", "test.bundled.split_down_sketch|Split Down with Sketch|true");
+        assertThat(h.menu("TAB")).as("the plugin places them as its own").containsExactly("item:test.alpha.split_right_notes");
+        h.ui(() -> assertThat(alpha.get().windows().splitChoices()).as("the terminal, then the bundled plugins' items first")
+            .containsExactly(dev.jasper.sdk.ui.SplitChoice.TERMINAL,
+                new dev.jasper.sdk.ui.SplitChoice("Sketch", "test.bundled.split_right_sketch", "test.bundled.split_down_sketch"),
+                new dev.jasper.sdk.ui.SplitChoice("Notes", "test.alpha.split_right_notes", "test.alpha.split_down_notes"),
+                new dev.jasper.sdk.ui.SplitChoice("Boom", "test.alpha.split_right_boom", "test.alpha.split_down_boom")));
+        h.ui(() -> {
+            assertThat(h.invoke("test.alpha.split_right_notes", window, pane)).isTrue();
+            assertThat(h.invoke("test.alpha.split_down_notes", window, null)).isTrue();
+            assertThat(h.invoke("test.alpha.split_right_boom", window, null)).as("a throwing opener is contained").isTrue();
+        });
+        assertThat(opened).containsExactly(window + " SPLIT_RIGHT", window + " SPLIT_DOWN");
+        h.ui(() -> notes.get().close());
+        assertThat(h.actions()).as("its actions go with it").doesNotContain(
+            "test.alpha.split_right_notes|Split Right with Notes|true", "test.alpha.split_down_notes|Split Down with Notes|true");
+        h.ui(() -> assertThat(alpha.get().windows().splitChoices()).extracting(dev.jasper.sdk.ui.SplitChoice::label)
+            .containsExactly("Terminal", "Sketch", "Boom"));
+        assertThat(h.menu("TAB")).as("a placement of a closed action vanishes").isEmpty();
+    }
+
     @Test void openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane() {
         UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
         var alpha = new AtomicReference<PluginContext>();

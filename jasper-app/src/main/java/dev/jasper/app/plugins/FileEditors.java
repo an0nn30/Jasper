@@ -53,6 +53,9 @@ final class FileEditors {
     /** The plugins that ship with Jasper; set before any plugin starts. */
     void bundled(Set<String> pluginIds) { bundled = Set.copyOf(pluginIds); }
 
+    /** Whether {@code pluginId} ships with Jasper; its split items come first in the Split lists (workspace plan 8b Rulings 5). */
+    boolean bundled(String pluginId) { return bundled.contains(pluginId); }
+
     /**
      * Makes {@code pluginId}'s editor the one Jasper opens files with. UI thread.
      *

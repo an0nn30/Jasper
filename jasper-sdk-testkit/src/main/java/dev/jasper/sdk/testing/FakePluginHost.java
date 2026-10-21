@@ -77,6 +77,10 @@ public final class FakePluginHost implements AutoCloseable {
     /** A {@code [[subcommands]]} declaration. */
     record Declared(String pluginId, String name, String summary) { }
     final Map<String, Declared> subcommands = new LinkedHashMap<>();
+    /** A plugin's split item, as {@code Windows.splitItem} registered it. */
+    record SplitItem(String pluginId, dev.jasper.sdk.ui.SplitItemSpec spec) { }
+    /** Every plugin's split items, in registration order. */
+    final List<SplitItem> splitItems = new CopyOnWriteArrayList<>();
     final Map<String, FakeCommandLine.Registered> subcommandHandlers = new LinkedHashMap<>();
     /** A subcommand call a handler took and has not completed. */
     private record RunningCall(FakePluginContext context, String name, FakeCommandCall call) { }
@@ -1812,11 +1816,11 @@ public final class FakePluginHost implements AutoCloseable {
     /** The editor a plugin provides ({@code Platform.editor}) and the plugin that registered it. */
     record ProvidedEditor(FakePluginContext context, dev.jasper.sdk.ui.FileEditor editor) { }
     private volatile ProvidedEditor providedEditor;
-    private final Set<String> bundledPlugins = ConcurrentHashMap.newKeySet();
+    final Set<String> bundledPlugins = ConcurrentHashMap.newKeySet();
 
     /**
      * Marks a plugin as one that ships with Jasper, before it starts: its {@code Platform.editor} registration replaces
-     * a non-bundled plugin's, as the application's bundled plugins' do.
+     * a non-bundled plugin's, and its split items come first in the Split lists, as the application's bundled plugins' do.
      *
      * @param pluginId the plugin
      * @since 0.17.1

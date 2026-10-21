@@ -157,6 +157,7 @@ final class FakeUi {
         for (var item : status) item.closed = true;
         for (var built : toolbarBuilt.values()) for (var view : built.values()) view.ifPresent(FakeKitView::close);
         toolbarBuilt.clear();
+        host.splitItems.removeIf(item -> item.pluginId().equals(pluginId()));
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
         for (Panel panel : List.copyOf(panels)) if (panel.instance != null) panel.instance.close();
         panels.clear(); railActions.clear();
@@ -176,6 +177,18 @@ final class FakeUi {
             });
         } catch (RuntimeException | LinkageError failure) { host.recordFailure(pluginId() + " action " + actionId + ": " + failure); }
         return true;
+    }
+
+    /** One of a split item's two actions, as the application registers it: no default, the words the palette finds it by. */
+    private Action splitAction(dev.jasper.sdk.ui.SplitItemSpec spec, String id, String side,
+                               java.util.function.BiConsumer<WindowHandle, dev.jasper.sdk.ui.TabPlacement> opener,
+                               dev.jasper.sdk.ui.TabPlacement placement) {
+        var keywords = new ArrayList<>(List.of("split", side.toLowerCase(java.util.Locale.ROOT), "new", "pane"));
+        for (String word : spec.label().toLowerCase(java.util.Locale.ROOT).split(" ")) if (!word.isBlank()) keywords.add(word.strip());
+        var action = new Action(new ActionSpec(id, "Split " + side + " with " + spec.label(), spec.icon(), keywords, Optional.empty()),
+            invoked -> opener.accept(invoked.window(), placement));
+        actions.put(id, action);
+        return action;
     }
 
     Actions actions() {
@@ -537,6 +550,36 @@ final class FakeUi {
                 var entry=new FakeContent(FakeUi.this,spec,owner,component,host.workspace.addTab(shown,dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT,spec.title(),beside));
                 contents.add(entry);entry.select();
                 return entry;
+            }
+            @Override public Subscription splitItem(dev.jasper.sdk.ui.SplitItemSpec spec,
+                    java.util.function.BiConsumer<WindowHandle, dev.jasper.sdk.ui.TabPlacement> opener) {
+                context.requireOpen();
+                java.util.Objects.requireNonNull(spec, "spec");
+                java.util.Objects.requireNonNull(opener, "opener");
+                requireNamespace(spec.id(), "A split item");
+                spec.icon().ifPresent(context.kit()::validateIcon);
+                if (host.splitItems.stream().anyMatch(item -> item.spec().id().equals(spec.id())))
+                    throw new IllegalArgumentException("Split item already registered: " + spec.id());
+                for (String id : List.of(spec.rightAction(), spec.downAction()))
+                    if (actions.containsKey(id)) throw new IllegalArgumentException("Action already registered: " + id);
+                var right = splitAction(spec, spec.rightAction(), "Right", opener, dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+                var down = splitAction(spec, spec.downAction(), "Down", opener, dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN);
+                var listed = new FakePluginHost.SplitItem(pluginId(), spec);
+                host.splitItems.add(listed);
+                return () -> {
+                    actions.remove(spec.rightAction(), right);
+                    actions.remove(spec.downAction(), down);
+                    host.splitItems.remove(listed);
+                };
+            }
+            @Override public List<dev.jasper.sdk.ui.SplitChoice> splitChoices() {
+                context.requireOpen();
+                var choices = new ArrayList<dev.jasper.sdk.ui.SplitChoice>(List.of(dev.jasper.sdk.ui.SplitChoice.TERMINAL));
+                host.splitItems.stream()
+                    .sorted(java.util.Comparator.comparing((FakePluginHost.SplitItem item) -> !host.bundledPlugins.contains(item.pluginId())))
+                    .forEach(item -> choices.add(new dev.jasper.sdk.ui.SplitChoice(item.spec().label(), item.spec().rightAction(),
+                        item.spec().downAction())));
+                return List.copyOf(choices);
             }
             @Override public Subscription onTabsClosing(java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean,java.util.concurrent.CompletableFuture<Boolean>> guard) {
                 context.requireOpen();contentGuard=guard;return ()->{if(contentGuard==guard)contentGuard=(tabs,batch)->java.util.concurrent.CompletableFuture.completedFuture(true);};

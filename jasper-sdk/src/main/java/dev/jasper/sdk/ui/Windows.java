@@ -2,12 +2,14 @@ package dev.jasper.sdk.ui;
 
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.files.FileChoice;
 import dev.jasper.sdk.files.FileLocation;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 /** Application-built windows and dialogs with consistent chrome. */
@@ -44,6 +46,36 @@ public interface Windows {
      * @since 0.20.0
      */
     ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content, TabPlacement placement);
+
+    /**
+     * Registers a split item (tabs and panes spec 8 and 11). Jasper lists it in every Split list (the Tab menu's and the
+     * right-click menus' Split submenus) after the terminal, the bundled plugins' items first and each in the order they
+     * registered, and registers its {@link SplitItemSpec#rightAction()} and {@link SplitItemSpec#downAction()}, which can
+     * be bound under {@code [keybindings]} and placed in the plugin's menus and toolbar as its own actions. Running one
+     * calls {@code opener} on the UI thread with the window it ran in and {@link TabPlacement#SPLIT_RIGHT} or
+     * {@link TabPlacement#SPLIT_DOWN}; the plugin opens its view there, usually with
+     * {@link #openTab(ContentSpec, WindowOwner, UiView, TabPlacement)}. A failing opener is contained.
+     *
+     * @param spec the item
+     * @param opener opens the item's view in the window, at the placement
+     * @return the registration; closing it takes the item out of the lists and removes its two actions
+     * @throws IllegalArgumentException when the id does not start with the plugin's id and a dot, an item with the id is
+     *                                  registered, or one of its actions' ids is in use
+     * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread
+     * @since 0.21.0
+     */
+    Subscription splitItem(SplitItemSpec spec, BiConsumer<WindowHandle, TabPlacement> opener);
+
+    /**
+     * What every Split list offers, in its order (tabs and panes spec 2.10 and 8): {@link SplitChoice#TERMINAL}, then each
+     * registered split item, the bundled plugins' first and each in the order they registered. A plugin that builds its
+     * own menu, as the Editor builds its right-click menu, lists these.
+     *
+     * @return the choices
+     * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread
+     * @since 0.21.0
+     */
+    List<SplitChoice> splitChoices();
 
     /** Registers this plugin's batch closing guard. No requested content closes unless every guard accepts.
      * A pending decision blocks moves; failures refuse close. Runs for tab, window, quit and restart closes.
