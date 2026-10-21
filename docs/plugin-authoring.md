@@ -241,8 +241,8 @@ private static void installPanelAndAboutTab(PluginContext context, long stepMill
             }));
 
     ContentTab[] about = {null};
-    context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(FLASK), invoked -> {
-        // A tab in the window the action ran in, which Jasper draws with its strip; an open About is selected again.
+    // A tab in the given window, which Jasper draws with its strip; an open About is selected again.
+    java.util.function.Consumer<WindowOwner> showAbout = owner -> {
         if (about[0] != null && !about[0].isClosed()) { about[0].select(); return; }
         var content = context.kit().create(new ViewSpec(new Nodes.Empty("sample.about", ControlState.READY,
             new Nodes.Icon("sample.about.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"), "Sample Plugin",
@@ -263,7 +263,15 @@ private static void installPanelAndAboutTab(PluginContext context, long stepMill
             dialog.setContent(body);
             dialog.show();
         });
-        about[0] = context.windows().openTab(new ContentSpec("about", "About Sample"), invoked.window(), content);
+        // Jasper saves the tab with its windows, and the "about" restorer below opens it again (SDK 0.21.0).
+        about[0] = context.windows().openTab(new ContentSpec("about", "About Sample")
+            .withRestore(new RestoreState("about", java.util.Map.of())), owner, content);
+    };
+    context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(FLASK),
+        invoked -> showAbout.accept(invoked.window()));
+    context.windows().restorer("about", request -> {
+        showAbout.accept(request.window());
+        return java.util.Optional.empty();
     });
     context.rail().add("dev.jasper.sample.about");
 }

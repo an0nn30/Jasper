@@ -204,6 +204,25 @@ class SamplePluginTest {
         } });
     }
 
+    /** Workspace tabs spec 13: the About tab gives its restore state and comes back through the sample's restorer. */
+    @Test void theAboutTabComesBackThroughItsRestorer() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.setSetting("dev.jasper.sample", "demo_ui", true);
+            host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
+            start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
+            UUID window = host.addTerminalWindow();
+            assertThat(host.invoke("dev.jasper.sample.about", window, null)).isTrue();
+            var about = host.contentTab("dev.jasper.sample", "About Sample").orElseThrow();
+            var state = new dev.jasper.sdk.RestoreState("about", java.util.Map.of());
+            assertThat(host.restoreState(about)).contains(state);
+            about.close();
+            assertThat(host.restoreTab("dev.jasper.sample", window, "About Sample", state)).isPresent();
+            assertThat(host.contentTab("dev.jasper.sample", "About Sample"))
+                .hasValueSatisfying(tab -> assertThat(tab.window().id()).isEqualTo(window));
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     private static final PluginInfo OBSERVING = new PluginInfo("dev.jasper.sample", "Sample", "0.1.0",
         Set.of(Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_INJECT));
 
