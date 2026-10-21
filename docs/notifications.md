@@ -65,7 +65,7 @@ a group named after it and an activities group, and may declare more.
 
 | Group | Id | What it covers | Default |
 |---|---|---|---|
-| Jasper | `jasper.general` | errors and results of Jasper's own commands, such as a shell that could not start, a theme that could not be applied or Migrate Config | card |
+| Jasper | `jasper.general` | errors and results of Jasper's own commands, such as a shell that could not start, a theme that could not be applied, Migrate Config or, on Windows, Manage Cygwin packages… | card |
 | Configuration | `jasper.config` | problems in `config.toml`, the plugin settings files and theme files | sticky card |
 | Long-running commands | `jasper.commands` | a [command that ran long](#long-running-commands) and finished anywhere but the pane you were typing in | card |
 | Plugin problems | `jasper.plugins` | a plugin that failed while Jasper asked it to do something, or could not be loaded, started or read at launch; a look that did not finish starting or is missing some of its files | card |

@@ -52,9 +52,10 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | No | [The Enterprise look](enterprise.md) |
 | Sample | `dev.jasper.sample` | 0.4.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
-Remote, Credential Vault, File Server, Enterprise and Sample declare `sdk = ">=0.18.2, <0.19"`; Editor declares `sdk = ">=0.18.3, <0.19"`; Project Index,
-Shell History and Snippets declare `sdk = ">=0.18.0, <0.19"`. A plugin uses another plugin it lists under "Uses, when
-present" only while that plugin is running; without it, the features that need it are missing.
+Remote, Credential Vault, File Server, Enterprise and Sample declare `sdk = ">=0.18.2, <0.19"`; Editor declares
+`sdk = ">=0.18.3, <0.19"`; Project Index, Shell History and Snippets declare `sdk = ">=0.18.0, <0.19"`. A plugin uses
+another plugin it lists under "Uses, when present" only while that plugin is running; without it, the features that
+need it are missing.
 
 ### Remote
 
@@ -81,9 +82,10 @@ dialog, once or always; File › Vault Plugin Grants... shows the grants. Secure
 
 ### Editor
 
-Local and remote text files in workspace tabs, with syntax highlighting, find and replace, recent files in the command
-palette and an optional Vim mode. It is the editor Jasper opens files with (or it hands them to another editor you
-choose), it can set `EDITOR` for Jasper's shells, and it adds the `jasper editor` command.
+Local and remote text files in workspace tabs, with syntax highlighting, find and replace, a Markdown preview that
+follows relative links and shows images, its own fonts or the terminal's, recent files in the command palette and an
+optional Vim mode. It is the editor Jasper opens files with (or it hands them to another editor you choose), it can
+set `EDITOR` for Jasper's shells, and it adds the `jasper editor` command.
 
 - **Start with** File › Open in Editor… (Cmd+O / Ctrl+Shift+O).
 - **Capabilities** `palette.contribute`, `terminal.environment`, `editor.provide`, `terminal.open`.
@@ -134,8 +136,8 @@ fields, or edit the file that holds them, `plugins/dev.jasper.snippets/data/snip
 The Enterprise look: IntelliJ Classic's title bar on macOS and Windows, with the menus in the macOS menu bar or the
 Windows title bar (on Linux the system title bar and a menu row in the window), labelled tool window stripes, a 28-pixel
 toolbar with a Search Everywhere button, the Run window in place of the command palette card, classic controls and
-IntelliJ's classic icons, with the IBM Plex fonts (IBM Plex Mono is also the Editor's default font), the Enterprise
-theme (Light and Dark, ports of IntelliJ Light and New UI Dark) and a branded splash screen. It is off by default;
+IntelliJ's classic icons, with the IBM Plex fonts (IBM Plex Mono is also the Editor's default font) and the Enterprise
+theme (Light and Dark, ports of IntelliJ Light and New UI Dark). It is off by default;
 turn it on in Settings › Plugins and restart. The look is data, a kit file with its fonts and theme, and the plugin's
 code does nothing; Credential Vault, Remote and File Server use their classic layouts under it. See
 [looks](#looks-and-plugin-themes).
@@ -416,8 +418,8 @@ Start Jasper with `jasper --safe-mode` (see [the command line](command-line.md))
 working. In safe mode:
 
 - Installed plugins do not load (their state reads "safe mode").
-- No look loads, bundled ones included ("safe mode uses the standard look"), so Jasper uses its default look and shows
-  no splash screen.
+- No look loads, bundled ones included ("safe mode uses the standard look"), so Jasper uses its default look. Safe mode
+  shows no splash screen.
 - Bundled plugins without a look, and a `--plugin-dir` plugin, still load.
 - The launch is standalone: it never hands its window to a Jasper that is already running, and never stays resident.
 

@@ -131,7 +131,11 @@ public final class Nodes {
      * an INLINE stack among them (directly, or as a row of a VERTICAL group) is one compact bar row whose first field or
      * text fills the width the controls after it leave (the rows of one group line their fills up), with the panel search
      * field's look for its fields and the panel action size for its buttons; a group stacks its rows without gaps and
-     * shows a passive (SelectionMode.NONE) list's rows as text lines; a hairline separates neighbouring children.
+     * shows a passive (SelectionMode.NONE) list's rows as text lines; a hairline separates neighbouring children. An
+     * INLINE stack directly in a DOCUMENT split whose first child is an empty CAPTION text, followed by one or more
+     * {@link Button}s and nothing else, is an action bar: the empty text pushes the buttons to the trailing edge, and
+     * while the split is narrower than the buttons the row scrolls sideways, bringing a button into view when it takes
+     * the focus.
      */
     public enum SplitKind { SIDEBAR_DETAIL, THREE_COLUMN, DOCUMENT }
     /**

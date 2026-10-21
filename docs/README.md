@@ -27,8 +27,9 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 - [Remote](remote.md): SSH hosts, WSL distributions, SFTP and transfers, editing remote files, tunnels, host-key
   trust, the Sessions tool window and the API Remote exports to other plugins.
 - [Credential Vault](credential-vault.md): logins, SSH keys and secure notes, grants and key generation.
-- [Editor](editor.md): editing local and remote files in workspace tabs and the `jasper editor` command. Its Vim mode
-  has a list of [supported keys](editor-vim-reference.md) and of [differences from Vim](vim-divergences.md).
+- [Editor](editor.md): editing local and remote files in workspace tabs, previewing Markdown and the `jasper editor`
+  command. Its Vim mode has a list of [supported keys](editor-vim-reference.md) and of
+  [differences from Vim](vim-divergences.md).
 - [File Server](file-server.md): sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP and TFTP.
 - [Project Index](project-index.md): indexing projects and finding their files from the command palette.
 - [Shell History and Snippets](history-and-snippets.md): searching shell history and saving commands.
@@ -82,7 +83,8 @@ user's authorization.
 
 - [Packaging](packaging.md): native images, the DMG, the Windows ZIP, setup wizard and user installation, the Linux
   packages, the release workflow and the acceptance checklists.
-- [Bundled Windows Cygwin](../packaging/windows/cygwin/README.md): seed, provisioning, package management and native acceptance.
+- [Bundled Windows Cygwin](../packaging/windows/cygwin/README.md): the seed, provisioning, package management and
+  native acceptance, and its [prebuilt PTY relay](../packaging/windows/cygwin/relay/README.md).
 - [Benchmarks](benchmarks.md): throughput, memory and start-up measurements and how to compare them.
 - [Launcher](../packaging/launcher/README.md): Jasper's build of the jpackage launcher and its launch watcher.
 - [The `jasper` command](../packaging/cli/README.md): the native client and its protocol.

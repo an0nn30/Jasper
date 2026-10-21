@@ -45,7 +45,7 @@ Use Java 25 on the JetBrains Runtime and the repository wrapper. Every check is 
 ```
 
 `:jasper-ui:check` runs the tests, Javadoc with doclint, the architecture gate `verifyUiArchitecture` and the theme
-converter's tests, which need Python 3.11 or later. The gallery renders every fixture headlessly into
+converter's tests, which need Python 3.11 to 3.13 (`-Pjasper.python=<interpreter>` picks one). The gallery renders every fixture headlessly into
 `jasper-ui/build/gallery/`. `verifyUiDistribution`, which builds the application distribution and is not part of
 `check`, confirms that the application ships the engine jar and that no plugin carries its classes.
 

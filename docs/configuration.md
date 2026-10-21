@@ -192,7 +192,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `terminal.font.fallback` | array of strings | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Family names tried in order for characters the font lacks; may be empty | Live | Font & Colors › Fallback fonts |
 | `terminal.font.ligatures` | boolean | `true` | Draws programming ligatures | Live | Font & Colors › Ligatures |
 | `terminal.font.line_height` | number | `1.0` | 0.5–3: a multiple of the font's own line height | Live | Font & Colors › Line height |
-| `terminal.shell.profile` | string | `""` | `""`, `"login"`, `"powershell"`, `"pwsh"`, `"cmd"`, `"wsl:<name>"`, `"custom"` ([Shell](#shell-environment-and-history)) | New panes | Shell › Shell profile |
+| `terminal.shell.profile` | string | `""` | `""`, `"login"`, `"powershell"`, `"pwsh"`, `"cmd"`, `"cygwin"`, `"wsl:<name>"`, `"custom"` ([Shell](#shell-environment-and-history)) | New panes | Shell › Shell profile |
 | `terminal.shell.program` | string | `""` | For `"custom"`: empty for the platform's default shell, or the program to run | New panes | Shell › Shell program |
 | `terminal.shell.args` | array of strings | `[]` | For `"custom"`: arguments, each passed exactly as written | New panes | Shell › Shell arguments |
 | `terminal.cursor.shape` | string | `"block"` | `"block"`, `"beam"`, `"underline"` | Live | Cursor › Cursor shape |
@@ -276,7 +276,9 @@ as `zen_mode` in [`ui-state.toml`](#ui-statetoml). Its action, `toggle_zen_mode`
 
 `ui.animations.enabled` turns motion on or off in every window: workspace tabs sliding as they open and close, the
 command palette card unrolling as it opens, and modal overlays fading in. Turning it off finishes running transitions
-at once. Under a look without motion, such as Enterprise, nothing moves whatever it says, and Settings hides the row.
+at once. Under a look without motion, such as Enterprise, nothing in the windows moves whatever it says, and Settings
+hides the row. The turtle on the Meadow [splash screen](looks.md#branding) is animated unless the setting is `false`,
+under every look.
 
 ### Window
 
@@ -403,7 +405,8 @@ with `family` when none can; a family that is not installed is replaced by the J
 
 `line_height` above 1 adds room between rows without changing the cell width; below 1, glyphs may overlap neighbouring
 rows. Increase, Decrease and Reset Font Size change one pane for the session; saving a new `size` applies it to every
-pane, and Reset Font Size returns a pane to it.
+pane, and Reset Font Size returns a pane to it. Plugins can read the saved `[terminal.font]`: the Editor uses it with
+its `follow_terminal_font` setting ([Editor settings](editor.md#settings)).
 
 ### Terminal colors
 
@@ -425,12 +428,21 @@ History keeps its settings in its own file, `plugins/dev.jasper.history/dev.jasp
 | `"powershell"` | Windows PowerShell (the Windows default) |
 | `"pwsh"` | PowerShell 7, when installed |
 | `"cmd"` | Command Prompt |
+| `"cygwin"` | Cygwin Bash, from Jasper's own Cygwin, when it is installed |
 | `"wsl:<name>"` | The WSL distribution `<name>` |
 | `"custom"` | `program` with `args` |
 | `""` | `"custom"` when `program` or `args` is set, else the platform's default |
 
 Settings › Terminal › Shell lists the profiles Jasper detected at start; ↻ (**Detect shells again**) looks again. A
 profile that is not installed starts the platform's default, with a warning.
+
+On Windows, the setup wizard and the user installation set up Jasper's own Cygwin in `%LOCALAPPDATA%\Jasper\cygwin`
+(from the ZIP, run `provision-cygwin.cmd` in the extracted folder once), and updating or removing Jasper keeps it
+([Cygwin Bash](terminal.md#cygwin-bash)). Cygwin Bash reads `/etc/profile` and the first of
+`~/.bash_profile`, `~/.bash_login` and `~/.profile`, as a login shell does, and starts in the folder a new tab or split
+asks for, otherwise in your Cygwin home. **Manage Cygwin packages…**, beside ↻ and in the command palette, opens
+Cygwin's Setup on that installation to add or update packages; close Cygwin Bash panes and other programs using it
+first. When Setup ends, Jasper detects the shells again and shows the outcome in a card.
 
 For `"custom"`, an empty `program` runs the platform's default shell (the login shell on macOS and Linux) with `args`
 appended; a named program gets exactly `args`, with no login flag added. Each argument is passed as written: Jasper
@@ -452,7 +464,8 @@ PROJECT_LABEL = "a value with spaces"
 plugins add, such as `TERM_PROGRAM=Jasper` and the Editor's `EDITOR`. `TERM` and `COLORTERM` are always
 `xterm-256color` and `truecolor`: entries for them are ignored with a warning. Jasper sets `JASPER_PANE` and
 `JASPER_COMMAND_SOCKET` after the table, replacing entries for them. Setting `SHELL` here changes only the child's
-environment, not which login shell starts. A WSL shell receives only the variables `WSLENV` names.
+environment, not which login shell starts. A WSL shell receives only the variables `WSLENV` names; Cygwin Bash
+receives every variable's name in capitals.
 [Environment](terminal.md#environment) gives the order in full.
 
 ### Shell integration

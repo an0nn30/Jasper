@@ -51,8 +51,9 @@ The thread that calls the host plays the UI thread. Nothing happens behind the t
 - Kit views need the real Swing event dispatch thread: `FakeKit` and `FakeKitView` throw `IllegalStateException`
   ("Kit requires EDT") elsewhere, so a test of a plugin that builds views runs it inside
   `SwingUtilities.invokeAndWait`. `Appearance`'s colour, palette and opacity calls and its `onChanged` and
-  `onWorkspaceChanged` subscriptions accept the thread that made the host or the event dispatch thread; its variants
-  and presentation answer any thread.
+  `onWorkspaceChanged` subscriptions accept the thread that made the host or the event dispatch thread,
+  `onTerminalTypographyChanged` only the event dispatch thread, and its variants, presentation and terminal
+  typography answer any thread.
 
 ## FakePluginHost
 
@@ -92,7 +93,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `dialogPresentation(pluginId, title)`, `dialogSwatch(pluginId, title)`, `popoverViews(pluginId)` | How an open dialog is presented and the hue of its title square; shown popovers' views |
 | `requestClose(windowId)`, `closeCommand(windowId)` | Closes a window through its closing guards; runs its Close Window command (close-command handlers newest first, then the guards) |
 | `requestQuit()` | Asks the content tabs' close guards, then every plugin window's closing guards, then every quit guard, and closes nothing |
-| `contentTabs()`, `contentPresentation(tab)`, `contentStatus(tab)`, `contentOwner(tab)`, `contentComponent(tab)` | Content tabs and what each shows |
+| `contentTabs()`, `contentPresentation(tab)`, `contentStatus(tab)`, `contentCommands(tab)`, `contentOwner(tab)`, `contentComponent(tab)` | Content tabs and what each shows, including the status items and commands it last published |
 
 ### Terminals and sessions
 
@@ -132,10 +133,11 @@ Jasper's is `<home>/plugins/<id>/data`.
 | --- | --- |
 | `setSetting(id, key, raw)` | Sets a raw value (`String`, `Long`, `Double`, `Boolean` or `List<String>`) as a user editing the file would: before the plugin starts it is part of the file it starts with, afterwards the settings reload and listeners run |
 | `savedSettings(id)`, `settingsReports(id)`, `declared(id)` | The raw values, including what the plugin saved; what the last read reported, as `key: message`; the declared keys |
-| `settingsPanel(id)`, `settingsPanelView(id)`, `highlightSettingsPanel(id, query)`, `pendingSettings(id)`, `settingsPanelChanges(id)`, `applySettingsPanel(id)`, `closeSettingsPanel(id)` | Builds and drives a plugin's own Settings page as Settings would |
+| `settingsPanel(id)`, `settingsPanelView(id)`, `highlightSettingsPanel(id, query)`, `pendingSettings(id)`, `settingsPanelChanges(id)`, `applySettingsPanel(id)`, `closeSettingsPanel(id)` | Builds and drives a plugin's own Settings page as Settings would; an event a standard row handles, emitted on the page's view, then calls the page's `pendingChanged()` |
 | `setKitDefault(id, key, raw)`, `lookDefaultProblems(id)` | Gives a plugin's setting the look's default, as a kit file's `[defaults."<plugin id>"]` table does, before any plugin starts: when the plugin declares the key, a raw value its kind accepts replaces the declared default, and a saved value still wins. The look defaults the plugin could not use, as `<id>: the look's default for <key> is not used: <reason>` and `<id>: the look gives a default for <key>, which the plugin does not declare` |
 | `setPresentation(presentation)`, `presentation()` | Sets what every plugin's `Appearance.presentation()` returns, before any plugin starts (`IllegalStateException` once one has, even if it stopped since); the presentation set, `FakePresentations.STANDARD` until then |
 | `setVariant(variant)`, `setSemanticColors(map)`, `setWorkspace(variant, palette, editor, syntax)`, `setWorkspaceOpacity(opacity)` | Change the chrome variant (which also publishes `AppEvents.THEME_CHANGED`), the chrome colours, the workspace appearance and the workspace opacity; on the next `flush()`, a variant, chrome-colour or workspace change reaches `onChanged` handlers, and a workspace or opacity change reaches `onWorkspaceChanged` handlers (a variant change does too while the workspace follows the chrome) |
+| `setTerminalTypography(value)` | Saves a terminal font, as a change in Settings › Terminal › Font & Colors would, from the thread that made the host or the event dispatch thread: on the next `flush()` every plugin's `Appearance.terminalTypography()` returns it, and then its `onTerminalTypographyChanged` handlers run on the event dispatch thread; an equal value notifies nobody. Until then the plugins read Jasper's defaults (Cousine Nerd Font Mono, 12 points, Symbols Nerd Font Mono and Apple Color Emoji as fallbacks, ligatures on, line height 1) |
 | `notifications()` | The `FakeNotifications` that records what plugins posted |
 
 ## The other public fakes
@@ -143,7 +145,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | Type | Use |
 | --- | --- |
 | [`FakePluginContext`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakePluginContext) | The context `start` returns; its `kit()` is the plugin's `FakeKit` |
-| [`FakeKit`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakeKit) | `new FakeKit(pluginId)` makes views without a host. `create(spec, handler)` returns a `FakeKitView`; `views()`, `icons()` and `failures()` show the live views, registered artwork and contained handler failures. Icon names are checked as Jasper checks them. |
+| [`FakeKit`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakeKit) | `new FakeKit(pluginId)` makes views without a host. `create(spec, handler)` returns a `FakeKitView`; `views()`, `icons()` and `failures()` show the live views, registered artwork and contained handler failures. Icon names are checked as Jasper checks them. Registered custom content gets the kit's content font, plain 13-point `SansSerif` until `contentFont(font)` replaces it and sets it on the content already registered, as a change of the user's interface font would. |
 | [`FakeKitView`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakeKitView) | `spec()` is the current tree. `emit(event)` delivers user input (an edit of a read-only field is dropped); `type(fieldId, text)` types as a person would, and a read-only, hidden, disabled or busy field takes nothing; `setSecret(id, chars)` fills a secret field; `focused()`, `revealed()`, `fieldSelection(id)` and `setComposing(id, composing)` show and script focus, scrolling, selection and input-method composition. |
 | [`FakeNotifications`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakeNotifications) | `lines()` lists posts as `group\|SEVERITY\|title\|content`, with `\|` and the cause's simple class name when there is one; `posts()` gives each post's spec and whether it expired; `groups()` lists `id\|name\|MODE`; `runAction(title, label)` and `click(title)` act as the user would. `new FakeNotifications().group(id)` records for a component that takes a `NotificationGroup`; its actions then run on the caller and what they throw reaches the test. |
 | [`FakeClipboard`](../docs/sdk-reference.html#dev.jasper.sdk.testing.FakeClipboard) | `copies()` lists `copy\|<plugin id>\|<text>` and `secret\|<plugin id>\|<text>`; `text()` and `setText(value)` read and set it as the user would; `failWrites(true)` makes writes fail as when another program holds it; `expireSecrets()` runs the 30-second clear now |
@@ -182,6 +184,9 @@ Jasper's is `<home>/plugins/<id>/data`.
 - The fake has no active tool window: `Panels.toggle` and `PanelHost.show()` from a panel's own toggle action only
   toggle or show it, also under `FakePresentations.CLASSIC`, where Jasper activates a showing panel that is not the
   active tool window instead of hiding it.
+- Custom content's font is set only when it is registered and by `FakeKit.contentFont`; Jasper also sets it at every
+  update of the view and every theme change, so a font a plugin sets on its registered component lasts in the fake but
+  not in Jasper.
 - `requestQuit()` counts a quit guard whose decision is still pending as a refusal, because the fake does not pump
   events.
 - A declared subcommand with no handler fails with a message naming the plugin's id; Jasper names the plugin.

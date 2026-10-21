@@ -25,7 +25,8 @@ these defaults; [changing shortcuts](keyboard-shortcuts.md#changing-shortcuts) e
 History merges your shells' history files with the commands Jasper sees finish.
 
 **History files.** Jasper reads each of these files that exists on this computer, and never writes to them; an SSH
-host's or WSL distribution's history reaches History only through live capture:
+host's or WSL distribution's history, and Cygwin Bash's (its file is in your Cygwin home), reaches History only through
+live capture:
 
 | Shell | Tag | File | What Jasper reads |
 |---|---|---|---|
@@ -43,8 +44,9 @@ shell exits unless set to write sooner (bash `PROMPT_COMMAND="history -a"`, zsh 
 [shell integration](terminal.md#shell-integration) is added at once, from any window. Jasper's scripts report commands
 for zsh, bash and fish; for PowerShell, add the profile code in
 [Terminal panes](terminal.md#wsl-powershell-and-other-shells). A captured command keeps the local folder it ran in, when
-the shell reported one. It is tagged with the pane's shell name: a Windows shell's profile name (such as `PowerShell`),
-a WSL distribution's name, otherwise the shell program's file name (such as `zsh`), or `shell` when there is none; for a
+the shell reported one. It is tagged with the pane's shell name: a Windows shell's profile name (such as `PowerShell`
+or `Cygwin Bash`), a WSL distribution's name, otherwise the shell program's file name (such as `zsh`), or `shell` when
+there is none; for a
 session a plugin provides, such as an SSH pane, it is that session's title. The tag can therefore differ from the
 history file's: a command run in a PowerShell pane and read from PowerShell's history file shows `PowerShell/pwsh`. In
 bash, a command that `HISTCONTROL=ignorespace` or `ignoreboth` keeps out of history is not reported. zsh and fish report

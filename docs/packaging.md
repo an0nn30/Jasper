@@ -3,9 +3,10 @@
 Jasper ships as a native application image that bundles a trimmed JetBrains Runtime, so users need no Java: a
 `Jasper.app` and DMG on macOS, a portable ZIP and a per-user setup wizard on Windows, and `.deb` and `.rpm` packages on
 Linux. Every package carries the application, all nine bundled plugins, Jasper's own launcher with its start-up recovery
-helper `jasper-watch`, and the native [`jasper` command](command-line.md). jpackage builds only for the machine it runs
-on, so each package is built on the operating system and architecture it is for (aarch64 or x64). Installing and
-using a package on the desktop is checked by hand with the [native acceptance checklist](#native-acceptance-checklist).
+helper `jasper-watch`, and the native [`jasper` command](command-line.md); the Windows packages also carry the offline
+[Cygwin starter environment](#bundled-cygwin). jpackage builds only for the machine it runs on, so each package is built
+on the operating system and architecture it is for (aarch64 or x64). Installing and using a package on the desktop is
+checked by hand with the [native acceptance checklist](#native-acceptance-checklist).
 
 ## Requirements
 
@@ -23,6 +24,9 @@ using a package on the desktop is checked by hand with the [native acceptance ch
 - **Linux**: `dpkg-deb` and `fakeroot` for the `.deb`; `rpmbuild` (the `rpm` package on Debian and Ubuntu), `readelf`
   (binutils), `rpm2cpio` and `cpio` for the `.rpm`.
 - **Windows setup wizard**: WiX 3 (`candle.exe` and `light.exe`) on `PATH`. The portable ZIP needs no WiX.
+- **Windows Cygwin seed**: the first Windows build downloads about 500 MB of pinned Cygwin packages from
+  `mirrors.kernel.org` into `jasper-app/build/cygwin/downloads`, unless `-Pjasper.cygwinSnapshot=<folder>` names a
+  complete retained seed ([bundled Cygwin](#bundled-cygwin)).
 
 `./gradlew check` also needs Python 3.11 or later ([building from source](../README.md#building-from-source)); the
 packaging tasks do not.
@@ -33,7 +37,7 @@ All tasks belong to `:jasper-app`. Only those marked in the last column start Ja
 
 | Task | Hosts | What it does | Starts Jasper |
 |---|---|---|---|
-| `stagePackage` | all | Stages the application jar, its runtime libraries, `config.example.toml`, `packaging/README.txt` and the bundled plugins in `jasper-app/build/packaging/input/` (on macOS also the three native bridges) | no |
+| `stagePackage` | all | Stages the application jar, its runtime libraries, `config.example.toml`, `packaging/README.txt` and the bundled plugins in `jasper-app/build/packaging/input/` (on macOS also the three native bridges, on Windows the Cygwin seed and its helper) | no |
 | `packageApp` | all | Builds the application image in `jasper-app/build/packaging/image/` with jpackage and Jasper's launcher | no, unless `-Pjasper.aot=true` |
 | `verifyPackage` | all | Checks the image ([what it checks](#what-verifypackage-checks)); never up to date | no, unless `-Pjasper.aot=true` |
 | `trainAotCache` | macOS | Trains the image's [start-up cache](#training-the-aot-cache) | yes, a window for a few seconds |
@@ -41,8 +45,10 @@ All tasks belong to `:jasper-app`. Only those marked in the last column start Ja
 | `packageDist` | Windows | Verifies the image and builds the portable ZIP | no |
 | `packageInstaller` | Windows | Verifies the image and builds the setup wizard | no |
 | `packageWindowsUser` | Windows | Builds the [user installation's](#user-installation-without-a-compiler) image in `jasper-app/build/packaging/windows-user/image/`, with jpackage's standard launcher | no |
-| `installWindowsUser` | Windows | Builds that image and installs it in `%APPDATA%\JasperApp` with a Start menu shortcut | no |
+| `installWindowsUser` | Windows | Builds that image, installs it in `%APPDATA%\JasperApp` with a Start menu shortcut, and installs the [Cygwin environment](#bundled-cygwin) | no |
 | `uninstallWindowsUser` | Windows | Removes that installation | no |
+| `verifyCygwinDistribution` | all | Checks the staged Cygwin seed and the native acceptance recorded for it and the host architecture ([bundled Cygwin](#bundled-cygwin)) | no |
+| `cygwinSourcesZip` | all | Archives the Cygwin seed's sources and notices | no |
 | `packageDeb`, `packageRpm` | Linux | Verifies the image and builds one package | no |
 | `packageDist` | Linux | Both `packageDeb` and `packageRpm` | no |
 | `installDist`, `distZip`, `distTar` | all | A portable distribution without jpackage or a bundled runtime | no |
@@ -88,6 +94,7 @@ Packages go to `jasper-app/build/packaging/dist/`:
 | macOS DMG | `Jasper-<version>-macos-<aarch64\|x64>.dmg` |
 | Windows portable ZIP | `Jasper-<version>-windows-<x64\|aarch64>.zip` (one folder, `Jasper`) |
 | Windows setup wizard | `Jasper-<version>-windows-<x64\|aarch64>-setup.exe` |
+| Cygwin sources (`cygwinSourcesZip`) | `Jasper-<version>-cygwin-sources-<amd64\|aarch64>.zip` |
 | Debian package | `Jasper-<version>-linux-<amd64\|arm64>.deb` |
 | RPM package | `Jasper-<version>-linux-<x86_64\|aarch64>.rpm` |
 
@@ -107,17 +114,20 @@ or `rpm-work/` under `jasper-app/build/packaging/`) for diagnosis and publishes 
 | Native libraries | `Contents/app/native/`, and the bridges `Contents/app/libjasper-macos.dylib`, `libjasper-glass.dylib`, `libjasper-appearance.dylib` | `app\native\` | none; the libraries extract themselves at run time |
 | Java runtime | `Contents/runtime/Contents/Home` | `runtime` | `lib/runtime` |
 | AOT start-up cache | `Contents/app/jasper.aot` | none | none |
+| Cygwin seed and its helper | none | `app\cygwin-seed\`, `app\cygwin-tool.jar` and `provision-cygwin.cmd` | none |
 | Icon | `Contents/Resources/Jasper.icns` and `Assets.car` | inside `Jasper.exe` | `lib/Jasper.png` |
 
 The `jasper` command has a `bin` folder of its own because the macOS and Windows file systems ignore case, so it
 cannot sit beside the `Jasper` launcher. `README.txt` is the package guide (`packaging/README.txt`);
 `config.example.toml` is a reference copy that is not installed into Jasper home. On Windows, `Jasper.exe`'s file
-description, which Task Manager shows as the process name, is "Jasper DevOps workstation".
+description, which Task Manager shows as the process name, is "Jasper DevOps workstation". The icon is Jasper's Shell
+Prompt icon on every platform ([app icon assets](../packaging/icons/README.md)).
 
 The app folder holds `jasper-app.jar`, `jasper-ui.jar`, `jasper-terminal.jar`, `jasper-buddy.jar`, `jasper-sdk.jar`
-and their libraries. `stagePackage` removes package sealing from any sealed jar (today `jbr-api`) and adds
-`Jasper-Modified: package sealing removed` to its manifest: classes loaded from the AOT cache cannot satisfy package
-sealing once the paths the cache was trained at are gone (JDK-8376576), which would stop the JVM.
+and their libraries, and on Windows `cygwin-tool.jar`, which jpackage puts on the class path too. `stagePackage`
+removes package sealing from any sealed jar (today `jbr-api`) and adds `Jasper-Modified: package sealing removed` to its
+manifest: classes loaded from the AOT cache cannot satisfy package sealing once the paths the cache was trained at are
+gone (JDK-8376576), which would stop the JVM.
 
 ### Bundled plugins
 
@@ -294,9 +304,10 @@ the whole folder and run `Jasper.exe`; the launcher, `jasper-watch.exe`, `bin`, 
 ### Windows setup wizard
 
 `packageInstaller` builds the setup wizard from the same verified image with jpackage and WiX: a per-user installation
-(no administrator rights), an installation folder chooser (`--win-dir-chooser`, default folder `Jasper`), shortcut choices for the Start
-menu (group `Jasper`) and the desktop, and an entry in Windows Installed apps for uninstalling. Build with a JBR SDK 25
-of the target architecture and WiX on `PATH`; users need neither. This path is verified with the portable
+(no administrator rights), an installation folder chooser (`--win-dir-chooser`, default folder
+`%LOCALAPPDATA%\Jasper`), shortcut choices for the Start menu (group `Jasper`) and the desktop, and an entry in Windows
+Installed apps for uninstalling. Build with a JBR SDK 25 of the target architecture and WiX on `PATH`; users need
+neither. This path is verified with the portable
 [WiX 3.14.1 binaries](https://github.com/wixtoolset/wix3/releases/tag/wix3141rtm): extract `wix314-binaries.zip` and
 add the folder holding `candle.exe` and `light.exe` to the build shell's `PATH`.
 
@@ -319,6 +330,15 @@ or `~\.gradle\jdks\jbrsdk*`, and WiX 3 on `PATH`, in `%LOCALAPPDATA%\tauri\WixTo
 | `-Version 1.0.1` | Pass `-PjasperVersion` |
 | `-JavaHome`, `-WixPath` | Name the SDK and the WiX folder instead of finding them |
 
+The setup wizard installs the [Cygwin environment](#bundled-cygwin) too. `packageInstaller` writes the selected JBR's
+own WiX template (`main.wxs`) with one added custom action, `JasperProvisionCygwin`, and passes it to jpackage with
+`--resource-dir`: after the files are installed, on every installation, repair and upgrade (not on removal), and in
+silent installations too, Windows Installer runs `runtime\bin\java.exe … CygwinTool ensure --seed app\cygwin-seed` as
+the installing user, and a failure fails the installation. A JBR whose template has another shape fails the build with
+"Unsupported JBR main.wxs; review the selected JBR template". WiX 3 cannot handle paths of 260 characters or more, so
+the task first copies the image into a new `jpi…` folder in `%TEMP%`, and fails with "WiX 3 requires a shorter TEMP
+directory for: *path*" when a copied path still reaches that length.
+
 The package's architecture is that of the selected JBR SDK, which must match the host's. On Windows on Arm, build the
 ARM64 package: an x64 Jasper there runs entirely under Windows' x64 emulation, including the code the JVM compiles as
 it runs, which makes every launch and every new window markedly slower. Build an x64 package on an ARM64 machine only
@@ -327,9 +347,10 @@ for x64 machines (`-Architecture x64`; Gradle then runs under emulation too).
 Both architectures share one upgrade code (`upgradeUuid` in `gradle/packaging.gradle`; keep it unchanged), so a newer
 setup replaces the program files of an earlier per-user installation, and an ARM64 setup replaces an x64 one. Build
 upgrades with increasing versions (`-PjasperVersion`). Settings, Vault data and plugins live in Jasper home
-(`%APPDATA%\jasper`, or a `JASPER_HOME` outside the installation folder), which the installer neither owns nor removes
-on upgrade or uninstall. Quit Jasper, including its background process, before upgrading or uninstalling. Installing
-the wizard leaves a separately extracted portable copy alone.
+(`%APPDATA%\jasper`, or a `JASPER_HOME` outside the installation folder), and the Cygwin environment in
+`%LOCALAPPDATA%\Jasper\cygwin`, which lies inside the default installation folder but is not part of the installation;
+the installer neither owns nor removes either on upgrade or uninstall. Quit Jasper, including its background process,
+before upgrading or uninstalling. Installing the wizard leaves a separately extracted portable copy alone.
 
 Before it publishes the setup, the task inspects the MSI it embeds with `packaging\windows\Verify-Installer.ps1`,
 without installing it: product name `Jasper`, version and upgrade code, no `ALLUSERS` (per-user), the x64 Windows
@@ -340,7 +361,8 @@ The task never installs or opens Jasper.
 ### User installation without a compiler
 
 `installWindowsUser` installs Jasper for the current user from the source tree with only a JBR SDK 25: no C/C++
-compiler, WiX, installer or administrator rights. In IntelliJ it is **jasper-app › distribution › installWindowsUser**
+compiler, WiX, installer or administrator rights; its first build downloads the [Cygwin seed](#bundled-cygwin) unless
+`-Pjasper.cygwinSnapshot` names a retained one. In IntelliJ it is **jasper-app › distribution › installWindowsUser**
 in the Gradle tool window; from a shell:
 
 ```powershell
@@ -348,29 +370,62 @@ in the Gradle tool window; from a shell:
 .\gradlew.bat :jasper-app:uninstallWindowsUser
 ```
 
-`stageWindowsUser` stages the application jar, its runtime libraries, the bundled plugins and `config.example.toml` in
-`jasper-app/build/packaging/windows-user/input/`, and `packageWindowsUser` builds an app image from them in
-`windows-user/image/Jasper` on every run. It has the trimmed runtime, JVM options, native libraries and plugin-free
-class path of `packageApp`'s image, but jpackage's standard launcher in place of Jasper's, with jpackage's default file
-description (`Jasper`, the name Task Manager shows), and neither `jasper-watch` nor the `jasper` command, so this
-installation ignores `jasper.vmoptions` and has no [start-up recovery](diagnostics.md#start-up-recovery).
+`stageWindowsUser` stages the application jar, its runtime libraries, the bundled plugins, `config.example.toml` and, as
+`stagePackage` does, the Cygwin seed and its helper in `jasper-app/build/packaging/windows-user/input/`, and
+`packageWindowsUser` builds an app image from them in `windows-user/image/Jasper` on every run. It has the trimmed
+runtime, JVM options, native libraries and plugin-free class path of `packageApp`'s image, but jpackage's standard
+launcher in place of Jasper's, with jpackage's default file description (`Jasper`, the name Task Manager shows), and
+neither `jasper-watch` nor the `jasper` command, so this installation ignores `jasper.vmoptions` and has no
+[start-up recovery](diagnostics.md#start-up-recovery).
 
 A Java helper in `packaging/windows/user-install/` (compiled against JNA by `compileWindowsUserInstaller`) then installs
 the image as `%APPDATA%\JasperApp` and creates the Start menu shortcut `Jasper.lnk`, through Windows APIs rather than
 PowerShell, so script execution can stay disabled; Windows must still allow the image's `Jasper.exe` to run. It copies
-the image beside that folder and swaps it in, restoring the previous installation and shortcut if a step fails. It
-refuses while that installation's `Jasper.exe` runs (exit Jasper, including its background process, first), and
-refuses a folder without its `.jasper-user-install` marker, a symbolic link or junction anywhere in the tree, and a
-shortcut that starts another installation. `uninstallWindowsUser` compiles only the helper; it removes the folder, the
-shortcut, and the `Jasper` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` when that value starts this
-installation, and leaves Jasper home (`%APPDATA%\jasper`). Start Jasper from the Start menu;
-`system.run_in_background` decides residency and the login start as in any other installation.
+the image beside that folder and swaps it in; with the new image in place it installs the
+[Cygwin environment](#bundled-cygwin) with that image's Java (`CygwinTool ensure`, for at most 20 minutes), and it
+restores the previous installation and shortcut if any step fails. It refuses while that installation's `Jasper.exe`
+runs (exit Jasper, including its background process, first), and refuses a folder without its `.jasper-user-install`
+marker, a symbolic link or junction anywhere in the tree, and a shortcut that starts another installation.
+`uninstallWindowsUser` compiles only the helper; it removes the folder, the shortcut, and the `Jasper` value under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` when that value starts this installation, and leaves Jasper home
+(`%APPDATA%\jasper`) and the Cygwin environment. Start Jasper from the Start menu; `system.run_in_background` decides
+residency and the login start as in any other installation.
 
 Run `installWindowsUser` in a build of its own: one that also runs `packageApp`, `packageDist`, `buildLauncher`,
-`buildWatcher`, `buildCommandClient`, `trainAotCache` or a `compileMac…` task fails with "Run installWindowsUser
-separately from native build and packaging tasks." `verifyWindowsUserInstall`, part of `check` on every host, tests the
-helper's install, update, rollback, ownership, link and data-preservation rules against a fake desktop, and on Windows
-also real shortcuts, registry values and a junction.
+`buildWatcher`, `buildCommandClient`, `trainAotCache`, `compileCygwinRelayProbe`, `compileConPtyRelayProbe`,
+`refreshCygwinSeed` or a `compileMac…` task fails with "Run installWindowsUser separately from native build and
+packaging tasks." `verifyWindowsUserInstall`, part of `check` on every host, tests the helper's install, update,
+rollback (a failed Cygwin installation included), ownership, link and data-preservation rules against a fake desktop,
+and on Windows also real shortcuts, registry values, a junction, read-only files and paths longer than 260 characters.
+
+### Bundled Cygwin
+
+The Windows images carry an offline Cygwin starter environment, which the setup wizard, `installWindowsUser` and the
+portable ZIP's `provision-cygwin.cmd` install in `%LOCALAPPDATA%\Jasper\cygwin`; [Cygwin Bash](terminal.md#cygwin-bash)
+describes what users get. On a Windows host, `stagePackage` and `stageWindowsUser` add to the app folder:
+
+- `cygwin-seed\`: the seed that `packaging/windows/cygwin/seed.lock.json` pins, with the lock itself: Cygwin Setup 2.937
+  and its signature, the signed repository metadata, every package's binary and source archive, the packages' notices,
+  Setup's sources, and the relay's prebuilt programs, sources and licence;
+- `cygwin-tool.jar`: the headless helper (`CygwinTool`, JDK and JNA only) that installs the seed and, from a copy in
+  each run's `operations` folder, supervises **Manage Cygwin packages…**.
+
+`packageApp` and `packageWindowsUser` put `provision-cygwin.cmd` beside `Jasper.exe`.
+
+| Task | What it does |
+|---|---|
+| `acquireCygwinSeed` | Fills `jasper-app/build/cygwin/downloads` with the lock's files: from `packaging/windows/cygwin/seed-support` when they are there, else downloaded with the JDK from the pinned HTTPS address. Each file must match its size and SHA-512 digest. Skipped with `-Pjasper.cygwinSnapshot` |
+| `verifyCygwinSeed`, `stageCygwinSeed` | Check the retained seed against the lock; `stageCygwinSeed` then copies exactly the locked files to `jasper-app/build/cygwin/seed` |
+| `cygwinToolJar` | Builds `cygwin-tool.jar` |
+| `verifyCygwinDistribution` | As `stageCygwinSeed`, and requires `packaging/windows/cygwin/validation.json` to record native and interactive-program acceptance of this seed on the host's architecture |
+| `cygwinSourcesZip` | Writes the lock, the source archives, the notices, Setup's sources and the relay's sources and licence to `Jasper-<version>-cygwin-sources-<arch>.zip` in `jasper-app/build/packaging/dist/` |
+| `refreshCygwinSeed` | Builds a candidate seed from signed repository metadata, with Python 3 and GnuPG; never changes the committed lock |
+
+A missing or mismatched file fails the build. Apart from `refreshCygwinSeed`, nothing here needs Python, GnuPG,
+PowerShell, a native compiler or a separately installed Cygwin. `check` runs the portable Cygwin checks on every host:
+`verifyCygwinManifest`, `verifyCygwinLifecycle`, `verifyCygwinProvisioning`, `verifyCygwinProbes` and
+`verifyCygwinProbeRuntime`. The [Cygwin README](../packaging/windows/cygwin/README.md) describes the helper, the seed
+and its refresh, the relay, the native probes and the acceptance harnesses.
 
 ## Linux packages
 
@@ -427,21 +482,23 @@ the tag and resolves its commit, then builds that commit on five runners, each w
 
 | Platform | Runner | Builds |
 |---|---|---|
-| Windows x64 | `windows-2025` | ZIP and setup wizard (WiX 3.14.1 downloaded) |
-| Windows ARM64 | `windows-11-arm` | ZIP and setup wizard (WiX 3.14.1 downloaded) |
+| Windows x64 | `windows-2025` | ZIP, setup wizard (WiX 3.14.1 downloaded) and Cygwin sources |
+| Windows ARM64 | `windows-11-arm` | ZIP, setup wizard (WiX 3.14.1 downloaded) and Cygwin sources |
 | Linux x64 | `ubuntu-22.04` | `.deb` and `.rpm`, plus the SDK jars (`sdkRelease verifySdkRelease`) |
 | Linux ARM64 | `ubuntu-22.04-arm` | `.deb` and `.rpm` |
 | macOS Apple silicon | `macos-15`, Xcode 26.3 | the trained DMG |
 
-There is no Intel macOS build. The jobs run `packageDist` (and `packageInstaller` on Windows) with `-PjasperVersion`,
-skipping the launcher's native suites (`testLauncherCore`, `testLauncherWatch`, `testWatcher`) that CI runs; the
-workflow does not run `check`. The publish job refuses to continue if the tag moved during the build, requires exactly
-the nine packages and the five SDK jars (`jasper-sdk-<v>.jar`, `jasper-sdk-<v>-sources.jar`,
-`jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and `jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is
-`JasperSdk.VERSION`, now 0.18.2), and writes `SHA256SUMS`. It creates a draft prerelease titled
-`Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds exactly those files, and
-publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which a rerun finishes; a
-published release for the tag is never overwritten.
+There is no Intel macOS build. The jobs run `packageDist` with `-PjasperVersion`, the Windows jobs
+`verifyCygwinDistribution`, `cygwinSourcesZip`, `packageDist` and `packageInstaller`, skipping the launcher's native
+suites (`testLauncherCore`, `testLauncherWatch`, `testWatcher`) that CI runs; the workflow does not run `check`. A
+Windows job fails while [`validation.json`](#bundled-cygwin) lacks native and interactive acceptance of the seed for its
+architecture. The publish job refuses to continue if the tag moved during the build, requires exactly the nine packages,
+the two Cygwin source archives (`amd64` and `aarch64`) and the five SDK jars (`jasper-sdk-<v>.jar`,
+`jasper-sdk-<v>-sources.jar`, `jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and
+`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.18.3), and writes `SHA256SUMS`. It
+creates a draft prerelease titled `Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds
+exactly those files, and publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which
+a rerun finishes; a published release for the tag is never overwritten.
 
 **sdk-release** ([`sdk-release.yml`](../.github/workflows/sdk-release.yml)) attaches the SDK jars to a release
 published by hand. Releases the Release workflow publishes do not trigger it, so that workflow builds the jars itself.
@@ -528,7 +585,8 @@ cannot mask a packaging problem.
 - [ ] Launch Jasper from the Start menu and the optional desktop shortcut, with no Java installed.
 - [ ] Install a higher version over an existing installation: Installed apps shows one entry, and settings, Vault data
   and plugins are kept.
-- [ ] Uninstall through Installed apps: the program files and shortcuts are removed, and Jasper home remains.
+- [ ] Uninstall through Installed apps: the program files and shortcuts are removed, and Jasper home and
+  `%LOCALAPPDATA%\Jasper\cygwin` remain.
 - [ ] Extract the whole ZIP to a path containing spaces and launch `Jasper.exe` from Explorer.
 - [ ] On a machine without MSVC or WiX and with PowerShell script execution disabled,
   `.\gradlew.bat :jasper-app:installWindowsUser` installs Jasper, which starts from its Start menu shortcut; after
@@ -538,6 +596,11 @@ cannot mask a packaging problem.
   files, and launching Jasper creates no `flatlaf-windows-*` file, `jna*.tmp` file or `pty4j` folder under `%TEMP%`.
 - [ ] The icon in Explorer, the taskbar, Alt+Tab and the title bar is Jasper's at 100%, 150% and 200% display scale.
 - [ ] PowerShell input, Unicode text and resizing work in a terminal tab.
+- [ ] After the setup wizard, `installWindowsUser` or the ZIP's `provision-cygwin.cmd`, Settings › Terminal › Shell
+  offers **Cygwin Bash**. In a Cygwin Bash tab, typing, Unicode text, resizing, Ctrl+C and `less` work, `git`,
+  `ssh` and `curl` run (an `https` download included), and the status bar follows `cd`.
+- [ ] **Manage Cygwin packages…** refuses while a Cygwin Bash tab is open and otherwise opens Cygwin Setup. Add a
+  package, then upgrade, repair, uninstall and reinstall Jasper: the package, the Cygwin home and `/etc` are unchanged.
 - [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off.
 - [ ] Install the `jasper` command from Settings; in a new terminal, `jasper --help` lists the plugin commands.
 - [ ] With the default configuration, a second launch of `Jasper.exe` shows a window in the running Jasper and the

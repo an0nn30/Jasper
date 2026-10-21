@@ -6,8 +6,8 @@ macOS and Windows (the system's on Linux), the classic menus, a classic toolbar 
 Run window in place of the command palette card, and controls are drawn the classic way, in the Enterprise theme or
 any other. Remote, File Server and Credential Vault switch to classic layouts of their own.
 
-The look is data in the plugin's descriptor: a kit file (`presentation/enterprise.kit.toml`), the IBM Plex fonts, the
-Enterprise theme and its branding. Its code does nothing: other plugins learn the look from Jasper
+The look is data in the plugin's descriptor: a kit file (`presentation/enterprise.kit.toml`), the IBM Plex fonts and
+the Enterprise theme. Its code does nothing: other plugins learn the look from Jasper
 ([adapting a plugin to a look](looks.md#adapting-a-plugin-to-a-look)). It has no commands and no settings.
 
 ## Turning it on and off
@@ -42,7 +42,7 @@ Enterprise as skipped: "did not finish starting with this look last time".
 | What you see | Why |
 |---|---|
 | "The Enterprise look is missing some of its files", one line per problem | a font that cannot be used, whose text then uses the platform font, or a default theme that did not load, whose setting keeps its core default. On macOS an installed IBM Plex font hides the bundled one: "…: an installed font named IBM Plex Sans hides it; that text uses the platform font" |
-| Enterprise skipped with "its look could not be installed; Jasper uses its standard look" | the look could not be installed while Jasper started; that session runs the standard look (on Linux keeping the system title bar and the menus in the window that were already set up), without the JasperOps branding or the plugin, so Remote, File Server and Credential Vault keep their default layouts; the next start uses the standard look |
+| Enterprise skipped with "its look could not be installed; Jasper uses its standard look" | the look could not be installed while Jasper started; that session runs the standard look (on Linux keeping the system title bar and the menus in the window that were already set up), without the plugin, so Remote, File Server and Credential Vault keep their default layouts; the next start uses the standard look |
 | Enterprise skipped with "Presentation invalid: …" | the kit file broke a rule; the message names the key |
 
 ## What changes
@@ -108,7 +108,7 @@ Enterprise as skipped: "did not finish starting with this look last time".
 Overlays and sheets, such as Unlock Vault and the Vault's entry sheets, are drawn inside their window as classic
 dialogs: the window dims under a still scrim below its title bar and the dialog has a title strip with its title and,
 when it has one, its colour swatch. Centred dialogs stay separate windows. Dialog bodies take the theme's app surface colour and Settings'
-navigation its card colour. Nothing moves: overlays and tabs appear and go at once, and Settings hides
+navigation its card colour. Nothing in the windows moves: overlays and tabs appear and go at once, and Settings hides
 `ui.animations.enabled`.
 
 Controls are drawn the classic way:
@@ -146,10 +146,10 @@ Plex Mono too ([defaults](#defaults)). Terminal text keeps `[terminal.font]`.
 
 ### Branding
 
-The look is branded **JasperOps**. A start that opens a window (not `--background`, `--no-window` or `--safe-mode`)
-shows a 720 × 440 splash with its art, the name, Jasper's version and copyright, and each plugin as it starts, until the
-first window shows. Its icons replace Jasper's application icon in windows and in the Dock or taskbar. Only the splash
-shows the name.
+The look has no branding of its own: windows, the Dock or taskbar keep Jasper's Shell Prompt icon, and a start that
+opens a window (not `--background`, `--no-window` or `--safe-mode`) shows Jasper's Meadow splash until the first window
+has painted ([branding](looks.md#branding)). Its turtle is animated unless `config.toml` sets
+`ui.animations.enabled = false`, which Settings hides under this look.
 
 ### Defaults
 

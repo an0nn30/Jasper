@@ -202,9 +202,13 @@ public final class FakePluginHost implements AutoCloseable {
         "Cousine Nerd Font Mono", 12, List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true, 1);
     private final List<Entry> typographyHandlers = new CopyOnWriteArrayList<>();
 
-    /** Queues saved terminal typography for publication on the next {@link #flush()}. Equal values do not notify.
-     * Handlers run on the EDT after the getter is updated.
+    /** Queues saved terminal typography for publication on the next {@link #flush()}, as a saved change to Jasper's
+     * terminal font settings would. Until then every plugin reads Jasper's defaults: Cousine Nerd Font Mono at 12
+     * points, falling back to Symbols Nerd Font Mono and Apple Color Emoji, with ligatures and a line height of 1.
+     * The flush updates the getter first and then runs the handlers on the EDT; a value equal to the current one
+     * notifies nobody, and a handler that throws is recorded in {@link #failures()} without stopping the others.
      * @param value the saved terminal typography
+     * @throws IllegalStateException off the thread that made this host and the EDT
      * @since 0.18.3
      */
     public void setTerminalTypography(dev.jasper.sdk.ui.TerminalTypography value) {
@@ -461,7 +465,8 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * Builds a plugin's own settings page as Settings would. {@code SettingsPanelHost.row} gives the standard rows
      * Jasper builds (ids {@code settings:<key>}, {@code settings:<key>:reset}, ...), which {@link #settingsPanelView}
-     * can drive.
+     * can drive; an event one of those rows handles, emitted on that view, then calls the page's
+     * {@code SettingsPanel.pendingChanged()}.
      *
      * @param pluginId the plugin
      * @return the page's component; empty when the plugin gave no page or is not running
@@ -1817,7 +1822,10 @@ public final class FakePluginHost implements AutoCloseable {
      * @return published status descriptors */
     public List<dev.jasper.sdk.ui.ContentStatus> contentStatus(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).status; }
 
-    /** @param tab hosted content handle
+    /**
+     * The commands a content tab last published with {@code setCommands}; empty until it publishes any.
+     *
+     * @param tab hosted content handle
      * @return published command descriptors */
     public List<dev.jasper.sdk.ui.ContentCommand> contentCommands(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).commands; }
 

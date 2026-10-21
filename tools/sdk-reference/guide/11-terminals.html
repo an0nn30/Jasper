@@ -67,8 +67,8 @@ Split repeats the target pane's profile. A profile id Jasper does not list opens
 <h3>Shell profiles</h3>
 <p>{@link Terminals#profiles()} lists the shells Jasper detected for local panes, in the order its settings list them, as
 {@link ShellProfileInfo}s with an id, a name, a {@link ShellProfileInfo.Kind} and a detail. On Windows they are
-{@code powershell}, {@code pwsh} (when PowerShell 7 is installed), {@code cmd} and {@code wsl:<name>} for each WSL
-distribution; elsewhere {@code login}, the login shell; and last {@code custom}, the user's custom command. Detection can
+{@code powershell}, {@code pwsh} (when PowerShell 7 is installed), {@code cmd}, {@code cygwin} (Cygwin Bash, when
+Jasper's own Cygwin is installed) and {@code wsl:<name>} for each WSL distribution; elsewhere {@code login}, the login shell; and last {@code custom}, the user's custom command. Detection can
 finish after the plugin starts: {@link Terminals#onProfilesChanged(Runnable)} runs after the first detection and after each
 later one whose result differs. Both need {@code terminal.open}. Remote lists the WSL distributions this way and opens them
 with {@code localProfile}.</p>

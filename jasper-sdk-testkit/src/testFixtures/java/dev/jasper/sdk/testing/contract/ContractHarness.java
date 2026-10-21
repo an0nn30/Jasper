@@ -182,7 +182,9 @@ public interface ContractHarness extends AutoCloseable {
      */
     void setPresentation(dev.jasper.sdk.ui.Presentation presentation);
 
-    /** Publishes saved terminal typography; delivery completes by flush. */
+    /** Publishes saved terminal typography; its change handlers have run once {@link #flush()} returns.
+     * @param typography the saved terminal typography
+     */
     void setTerminalTypography(dev.jasper.sdk.ui.TerminalTypography typography);
 
     /** Sets independently chosen workspace values.

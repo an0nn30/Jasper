@@ -44,7 +44,7 @@ Everything below ships with Jasper as a bundled plugin, listed in Settings › P
 | --- | --- | --- | --- |
 | Remote | `dev.jasper.remote` | SSH terminals, an SFTP browser with persistent transfers, local, remote and SOCKS tunnels, saved hosts with groups, favourites and jump hosts, host-key trust, Vault or SSH-agent authentication, import from `~/.ssh/config`, and a Sessions tool window that also lists WSL distributions | Yes |
 | Credential Vault | `dev.jasper.vault` | Logins, SSH keys and secure notes in one encrypted file, which can be bound to this device; other plugins fetch credentials under per-plugin grants | Yes |
-| Editor | `dev.jasper.editor` | Local and remote text files in workspace tabs, with syntax highlighting, a Vim mode and the `jasper editor` command | Yes |
+| Editor | `dev.jasper.editor` | Local and remote text files in workspace tabs, with syntax highlighting, a Markdown preview, its own fonts or the terminal's, a Vim mode and the `jasper editor` command | Yes |
 | File Server | `dev.jasper.fileserver` | Shares a local folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP; servers are read-only and reachable from this computer only until you change that | Yes |
 | Project Index | `dev.jasper.indexer` | Offers to index the project a terminal enters, locally or on a saved host, and finds its files from the command palette | Yes |
 | Shell History | `dev.jasper.history` | Searches every shell's history from the command palette, to paste or run a command or save it as a snippet | Yes |
@@ -81,7 +81,8 @@ Start with the [SDK reference](docs/sdk-reference.html) and [writing a plugin](d
 ## Install
 
 Jasper's [GitHub releases](https://github.com/an0nn30/Jasper/releases) are built by the Release workflow from a
-`vX.Y.Z` tag and published as prereleases, with a `SHA256SUMS` file and the SDK jars beside the packages:
+`vX.Y.Z` tag and published as prereleases, with a `SHA256SUMS` file, the SDK jars and the Windows packages' Cygwin
+sources (`Jasper-<version>-cygwin-sources-<amd64|aarch64>.zip`) beside the packages:
 
 | Platform | Package |
 | --- | --- |
@@ -89,9 +90,10 @@ Jasper's [GitHub releases](https://github.com/an0nn30/Jasper/releases) are built
 | Windows x64 / ARM64 | `Jasper-<version>-windows-<x64\|aarch64>-setup.exe`, a per-user setup wizard, or `Jasper-<version>-windows-<x64\|aarch64>.zip`, a portable folder |
 | Linux x64 / ARM64 | `Jasper-<version>-linux-<amd64\|arm64>.deb` or `Jasper-<version>-linux-<x86_64\|aarch64>.rpm`, installing to `/opt/jasper` |
 
-Every package bundles its own Java runtime. The packages are not notarized or signed by a publisher, so macOS and
-Windows may ask you to confirm before opening them. [Getting started](docs/getting-started.md) covers installation,
-first launch and uninstalling on each platform.
+Every package bundles its own Java runtime. On Windows the setup wizard also installs a Cygwin environment, offered as
+the **Cygwin Bash** shell; with the portable ZIP, run `provision-cygwin.cmd` in its folder once. The packages are not
+notarized or signed by a publisher, so macOS and Windows may ask you to confirm before opening them.
+[Getting started](docs/getting-started.md) covers installation, first launch and uninstalling on each platform.
 
 ## Getting started
 
@@ -184,7 +186,9 @@ the image layouts and the acceptance checklists.
   `dpkg-deb`, plus `rpmbuild`, `readelf`, `rpm2cpio` and `cpio` (on Ubuntu:
   `sudo apt-get install fakeroot rpm cpio binutils g++`).
 - **Windows**: `.\gradlew.bat check :jasper-app:packageDist` builds the portable ZIP;
-  `.\gradlew.bat :jasper-app:packageInstaller` builds the setup wizard and needs WiX 3 on the `PATH`.
+  `.\gradlew.bat :jasper-app:packageInstaller` builds the setup wizard and needs WiX 3 on the `PATH`. Both carry the
+  pinned Cygwin seed: Gradle downloads its hash-locked artifacts (about 510 MB) into
+  `jasper-app/build/cygwin/downloads` the first time, or takes a retained copy from `-Pjasper.cygwinSnapshot=<dir>`.
 
 `./gradlew pluginZips` zips every in-repo plugin into `plugins/build/zips/`, and `./gradlew sdkRelease` writes the
 SDK and test-kit jars to `build/sdk-release/`.
@@ -200,8 +204,9 @@ execution can stay disabled; Windows must allow the generated `Jasper.exe` to ru
 the native packaging tasks.
 
 The task also installs the pinned Cygwin starter set in `%LOCALAPPDATA%\Jasper\cygwin`, using bundled Setup and relay
-binaries. Gradle fetches only hash-locked artifacts using Java; installation works offline once staged. Select
-**Cygwin Bash** in the shell settings and use **Manage Cygwin packages…** to add tools. Updates and uninstall preserve
+binaries. Gradle fetches only hash-locked artifacts using Java; installation works offline once staged. Choose
+**Cygwin Bash** as **Shell profile** in Settings › Terminal › Shell, and use **Manage Cygwin packages…** beside it, or
+in the command palette, to add tools. Updates and uninstall preserve
 the Cygwin root, packages and user files. See the [Cygwin guide](packaging/windows/cygwin/README.md) for package
 management and recovery.
 
@@ -222,7 +227,7 @@ start-up recovery and no native `jasper` command.
 | `jasper-sdk/` | The plugin SDK, `dev.jasper.sdk` (JDK only) |
 | `jasper-sdk-testkit/` | The test kit's fake plugin host and the contract suite it shares with the real host |
 | `plugins/` | The bundled plugins, one Gradle module (`:jasper-plugin-<folder>`) per folder |
-| `packaging/` | Jasper's launcher and launch watcher, the native `jasper` command, icons, Buddy sprites, and the Linux and Windows packaging scripts |
+| `packaging/` | Jasper's launcher and launch watcher, the native `jasper` command, icons, Buddy sprites, the Linux and Windows packaging scripts, and the Windows Cygwin seed, PTY relay and installer tools |
 | `tools/` | Benchmark runners, the theme converter, the SDK reference generator, icon and tab previews, and the mock comparison tools |
 | `docs/` | The documentation, the external plugin example, and dated design records |
 | `website/` | Jasper's homepage: static HTML, CSS and JavaScript, its screenshots and the script that packages it for GitHub Pages |
@@ -234,4 +239,4 @@ start-up recovery and no native `jasper` command.
 ## License
 
 Jasper is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). About Jasper › Licenses… lists the
-third-party components Jasper ships and their licenses.
+third-party components Jasper ships and their licences.

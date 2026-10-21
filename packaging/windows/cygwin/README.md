@@ -1,205 +1,257 @@
-# Windows Cygwin integration
+# Bundled Cygwin for Windows
 
-The production integration uses a persistent per-user root and prebuilt POSIX PTY
-relay. `check` runs portable lifecycle and launch checks; native probes are explicit
-tasks and fail on non-Windows hosts. The checked-in seed locks every binary, source
-archive, notice and relay artifact.
+Jasper's Windows packages carry an offline Cygwin starter environment, the seed, which the setup wizard,
+`installWindowsUser` and the portable ZIP's `provision-cygwin.cmd` install once into a persistent per-user folder; the
+**Cygwin Bash** shell profile then runs that environment's Bash on a POSIX pseudo-terminal through a small relay. This
+folder holds the seed's lock and the files the build does not download, the installation helper, the relay's prebuilt
+programs and sources, and the native probes and acceptance harnesses.
 
-## Using the bundled environment
+What users get is in [Cygwin Bash](../../../docs/terminal.md#cygwin-bash), the logs and messages in
+[Cygwin diagnostics](../../../docs/diagnostics.md#cygwin-on-windows), and the packaging tasks in
+[bundled Cygwin](../../../docs/packaging.md#bundled-cygwin). The design is the spec
+`docs/superpowers/specs/2026-10-20-jasper-bundled-cygwin-design.md`.
 
-Both the Windows installer and `installWindowsUser` provision the starter set offline
-in `%LOCALAPPDATA%\Jasper\cygwin\root`. Choose **Cygwin Bash** in terminal shell
-settings. **Manage Cygwin packages…** is available there and in the command palette;
-close Cygwin sessions and other processes using this root before starting it.
-Setup opens with the existing installation selected. Leave packages at **Keep** to
-retain their versions; select additional tools or updates as desired. Downloading
-additional packages requires internet access. The supervisor continues if Jasper exits.
+## Files here
 
-App updates, repair, rollback, reinstall and uninstall preserve the entire Cygwin
-root, including added packages, home files, `/etc` and repositories. An interrupted
-initial install can be retried with its retained seed. Logs are under
-`%LOCALAPPDATA%\Jasper\cygwin\logs`; a damaged ready root is repaired through Setup.
-Portable ZIP users run `provision-cygwin.cmd` once from the extracted app directory.
-To remove the environment deliberately, close all processes using it and remove
-`%LOCALAPPDATA%\Jasper\cygwin` separately; the app uninstaller preserves it.
+| Path | What it is |
+|---|---|
+| `seed.lock.json` | The lock: schema, architecture (`x86_64`), measured installed size, and every artifact's path, HTTPS origin, size and SHA-512 digest; each package's name, version, binary and source archive, notice and dependencies; Cygwin Setup, the signed repository metadata, Setup's sources and the relay's files |
+| `seed-support/` | The locked files the build takes from the tree instead of downloading: the signed `setup.xz` and its signature, `pubring.asc`, `setup-x86_64.exe` and its signature, Setup's sources, the packages' notices, and the relay's programs, sources and licence. The repository's `.gitattributes` keeps their bytes exact (`-text -whitespace`); `notices/` also keeps, for each source package, a copy of its notice named after the source archive (`<source>-src.tar.*.txt`), which the lock does not name |
+| `seed-licenses.json` | The reviewed licence inventory, one entry per package, which a refresh needs |
+| `seed_refresh.py`, `seed_refresh_test.py` | The refresh script and its tests (`python3 seed_refresh_test.py` here) |
+| `validation.json` | The native acceptance recorded for one seed, per architecture, which releases require |
+| `CygwinTool.java` | The installation helper's entry point |
+| `BundleTool.java` | The build's seed tool: `acquire`, `verify`, `stage` and `distribution` |
+| `CygwinInstallerTemplate.java` | Adds the installation custom action to the selected JBR's WiX template and stages the image for WiX |
+| `installer/provision-cygwin.cmd` | The portable ZIP's installation script |
+| `relay/prebuilt/` | The relay's tested programs and `provenance.json` ([relay README](relay/README.md)) |
+| `probe/` | The relay's sources and the native probes |
+| `*Test.java` | The portable checks and the Windows acceptance harnesses |
 
-## Portable verification
+The helper's classes are `dev.jasper.app.cygwin` (JDK and JNA only, shared with the application) and `CygwinTool`;
+`compileCygwinBundle` compiles them with the other Java files here into `jasper-app/build/cygwin/classes`, and
+`cygwinToolJar` packs everything except the tests, `BundleTool` and `CygwinInstallerTemplate`, with JNA, into
+`cygwin-tool.jar`.
 
-```text
-./gradlew :jasper-app:verifyCygwinProbes
-```
-
-The task compiles both probes using JBR 25 and checks rejection of missing or
-contradictory evidence, event deadlines, scratch-directory ownership, and the
-candidate installer action. `verifyCygwinProbeRuntime` additionally builds a small
-runtime and verifies its Java executable; `check` includes both tasks. Passing either task is not Windows acceptance.
-
-## Installer lifecycle probe (Windows)
-
-Use a standard-user Windows test account with JBR 25 and the WiX toolset supported
-by that JBR on PATH. Give each run a new absolute scratch directory whose parent
-already exists. No pre-existing tree is reused or removed.
+## The environment
 
 ```text
-.\gradlew.bat :jasper-app:probeCygwinInstaller -Pjasper.cygwinProbeRoot=C:\probe-work\installer-01
+%LOCALAPPDATA%\Jasper\
+    .cygwin.initialization.lock
+    cygwin\
+        owner.json            # layout 1, product "Jasper Cygwin" and the owner's Windows SID
+        state.json            # INITIALIZING or READY, with the seed's digest
+        operation.lock        # held by installation, launch registration and package management
+        root\                 # Cygwin's /, with etc/setup/installed.db and home
+        manager\<digest>\     # setup.exe, frontend-aarch64.exe, frontend-amd64.exe, backend.exe, seed.lock.json
+        manager\current.json  # the generation launches and package management use
+        cache\seed-<digest>\  # the seed the first installation copied, kept for retries
+        cache\packages\       # Setup's download folder for package management
+        logs\
+        leases\               # one record per running Jasper Cygwin session
+        operations\<id>\      # one folder per package-management run
 ```
 
-This builds a separate randomly named `JasperCygwinProbe-*` MSI product, using a
-fresh upgrade UUID. It tests failed-install rollback, silent install, repair,
-upgrade and uninstall. A small installed Java helper runs as a deferred,
-impersonated, synchronous action after InstallFiles. It records its Windows
-identity, installed-file availability and completion time. Jasper is never
-launched or installed by this probe.
+The folder is under the Windows Local AppData known folder, so it is the same for both installation methods, for every
+Jasper version and for any Jasper home. Jasper creates it only where nothing exists: it fills a staging folder and
+renames it into place. A link or junction anywhere in a control path, or an `owner.json` that does not name this layout,
+product and Windows account, makes the folder foreign: Jasper never adopts, replaces or deletes it. Inside `root`,
+Cygwin's own links are left alone. The digest is the SHA-512 of the seed's `seed.lock.json`.
 
-The probe invokes msiexec through `cmd /d /s /c` to preserve its `PROPERTY="value"`
-syntax. Shell-sensitive characters in scratch paths are rejected.
+`CygwinState` reads the phase without changing anything: absent, initialising, ready (the state says `READY` and the
+package database, `bin\bash.exe`, `bin\cygpath.exe` and `bin\cygwin1.dll` exist), damaged or foreign. The Cygwin Bash
+profile is offered only when it is ready.
 
-The candidate override is derived from the selected JBR's own `main.wxs`.
-Unsupported template shapes fail with the original retained for inspection;
-a successful portable transformation test does not establish JBR/WiX compatibility.
-The generated MSI, template, verbose jpackage output, Windows Installer logs and
-helper records remain in the scratch directory. The task attempts to uninstall
-its probe product on failure. Inspect `cleanupExit`/`cleanupError` in the report;
-1605 means it is already absent. If Windows Installer was interrupted, confirm
-that the randomly named product is uninstalled before removing scratch files.
-Never use these MSI paths to uninstall Jasper.
+## Installation
 
-## Cygwin/ConPTY probe (Windows)
-
-Prepare an official Cygwin offline download cache with Base and the packages in
-the approved design. The payload directory must contain:
+The setup wizard's custom action, `installWindowsUser` and `provision-cygwin.cmd` all run, from the installed image:
 
 ```text
-payload\
-    setup-x86_64.exe
-    cache\                 # complete Setup download tree, including signed metadata
+runtime\bin\java.exe --enable-native-access=ALL-UNNAMED -cp app\cygwin-tool.jar CygwinTool ensure --seed app\cygwin-seed
 ```
 
-Use Setup 2.929 or newer (hidden quiet mode), and verify the Setup executable
-against its official signature before supplying it.
-The probe records its SHA-256 and version but does not implement the future
-release-manifest verifier. Keep the signed upstream repository metadata: Setup
-verification is left enabled. The probe selects local-install mode and disables
-the Setup version check; use a disconnected test machine to establish offline
-acceptance rather than inferring it from flags alone.
+`CygwinTool status` prints the phase and its diagnostic. `ensure` verifies the supplied seed against its lock and then:
+
+- **absent**: creates the layout, takes `operation.lock`, requires free space of twice the archives' size plus twice the
+  installed size, copies the seed to `cache\seed-<digest>` and records `INITIALIZING` with its digest. Unless `root` is
+  empty, it requires that no process of this account runs from the environment or has loaded a file from `root`. It
+  then runs Setup from the kept seed, hidden and offline (`--quiet-mode=hidden --no-admin --local-install
+  --no-version-check --no-shortcuts --no-replaceonreboot --no-write-registry`, the kept cache as `--local-package-dir`,
+  `--root`, and `--packages` with each locked name and version), for at most 10 minutes, with Setup's signature checks
+  on. It requires `etc/setup/installed.db` to list exactly the locked packages and versions, runs `bash --noprofile
+  --norc -c "exit 0"`, `git --version`, `ssh -V` and `curl --version`, installs the manager generation and records
+  `READY`;
+- **initialising**: goes on with the seed recorded in `state.json`, from `cache\seed-<digest>`;
+- **ready**: installs this seed's manager generation when it is new and points `current.json` at it; the packages,
+  `root` and the state stay as they are, so a newer seed only ever applies to a new environment;
+- **damaged** or **foreign**: fails.
+
+The outcome (`CREATED`, `REUSED`, `FAILED` or `RESTART_REQUIRED`, when Setup exits with 118) and its message go to
+standard output and `logs\provision-result.json`. The exit status is 0 for `CREATED` and `REUSED`, 2 for
+`RESTART_REQUIRED` and 1 otherwise.
+
+The setup wizard runs the command as a deferred custom action, `JasperProvisionCygwin`, impersonating the installing
+user, after `InstallFiles` and whenever the product is not being removed, so interactive and silent installations,
+repairs and upgrades all run it and fail when it fails. The folder lies outside the MSI's file ownership, so repair,
+upgrade and uninstall never touch it. `installWindowsUser` runs it after swapping in the new image, for at most 20
+minutes, and rolls the installation back when it fails. Extracting the portable ZIP installs nothing until
+`provision-cygwin.cmd` runs.
+
+## Launch
+
+`CygwinLaunch` prepares a Cygwin Bash pane on the launch worker, never on the EDT or the terminal's reader. It
+requires the ready phase; reads `manager\current.json`; checks that the generation's folder name is its lock's digest
+and that its `backend.exe` and the frontend for the JVM's architecture (`aarch64`, or `amd64` for `amd64` and `x86_64`)
+match the lock; and converts paths with the environment's `cygpath -u`, given as arguments, each within 5 seconds and
+64 KiB of output. The pane's command is:
 
 ```text
-.\gradlew.bat :jasper-app:probeCygwinTerminal -Pjasper.cygwinProbeRoot=C:\probe-work\terminal-01 -Pjasper.cygwinProbePayload=C:\probe-work\payload
+manager\<digest>\frontend-<arch>.exe manager\<digest>\backend.exe root\bin\bash.exe --noprofile --rcfile <cygwin.bash> -i
 ```
 
-The probe installs only into its new scratch root. It records Setup help/version,
-exit status, installed package database, process commands and conversion output.
-It then starts a fresh JVM for interactive Bash with the supported `TerminalSession` facade
-and no Swing window. Tests cover a sourced startup profile, spaces/Unicode in
-paths, explicit cwd, OSC 7, OSC 133 prompt and command-completion events,
-Unicode input/output, initial `stty` dimensions and resize results,
-a Windows command's exit status and Ctrl+C of a foreground child. Each terminal
-event has a 15-second deadline. Setup and MSI operations have a ten-minute timeout.
-No reboot-required outcome counts as success.
+Its environment, start-up files and directory are as [Cygwin Bash](../../../docs/terminal.md#cygwin-bash) describes;
+`cygwin.bash` is in Jasper's shell integration folder. A starting directory or `HOME` on another computer's network
+share is refused. Before it starts, the session registers a lease under `operation.lock`, which fails while package
+management holds the lock or a management run was interrupted; the lease goes when the session ends. A program started
+in place of the shell (`LaunchSettings.withCommand`) skips all of this and runs directly in ConPTY.
 
-Terminal evidence uses decoded OSC title/directory/prompt events. The supported
-session API does not expose raw output bytes, so this harness does not capture a
-raw terminal transcript. Shell startup stderr is retained separately in
-`bash-stderr.log`. This evidence limitation is recorded in the plan. Startup uses a probe rcfile that
-sources `/etc/profile` and an isolated `.bash_profile`; it does not yet validate
-Jasper's production Bash wrapper. The temporary home and Cygwin tree are retained
-for diagnosis. Stop any remaining scratch processes before manually removing it.
+## The relay
 
-## Results and handoff
+Cygwin's console input reader loses characters when the console is resized repeatedly, so Bash never reads the Windows
+console:
 
-JSON summaries are in `jasper-app/build/cygwin-probes/reports/installer.json` and
-`terminal.json`. Both begin as failed and become passed only after all implemented
-checks succeed. Reports include OS, architecture, JBR version and scratch path;
-copy summaries and scratch logs separately for x64 and ARM64 runs, since another
-run of the same task replaces its summary.
+- `probe/ConPtyRelay.cpp`, the frontend, is a native Windows program (ARM64 and x64, MSVC, static runtime) that runs in
+  the pane's ConPTY. It starts the backend detached from the console, suspended and inside a job that kills its whole
+  process tree when the frontend ends, with only two private pipes inherited. It reads console input as UTF-16, keeping
+  surrogate pairs together, and sends it as UTF-8 frames; it checks the console's size every 20 ms and before each
+  input frame and sends a resize frame first when it changed; it copies the backend's output to the console. On a
+  failure it prints `Jasper PTY relay: <operation> (Windows error N)` and exits.
+- `probe/CygwinPtyRelay.c`, the backend, is an x86_64 Cygwin program that starts Bash with `forkpty` and the initial
+  size. Each frame is a type byte, a 32-bit big-endian length and the payload: type 1 is input of at most 4,096 bytes,
+  type 2 is rows and columns as two 16-bit big-endian numbers, applied with `TIOCSWINSZ`. A malformed frame, a broken
+  pipe or the end of its input ends Bash with `SIGHUP`, then `SIGKILL` after a second. The backend exits with 65 after
+  a malformed frame, with 74 after a failed pipe read or write, and otherwise with Bash's status.
 
-A run that fails before allocating scratch storage (wrong OS, missing payload or
-invalid path) fails Gradle directly. Do not interpret an older report as the
-result of a failed new invocation. Native results are recorded in the linked evidence document.
+The seed carries the tested programs of `relay/prebuilt/` (copied to `seed-support/relay/`) with their sources, so
+nothing in a build or an installation compiles native code. [The relay README](relay/README.md) says how to replace
+them.
 
-Sources for the candidate hook and Setup flags:
-- https://github.com/openjdk/jdk/blob/jdk-25-ga/src/jdk.jpackage/windows/classes/jdk/jpackage/internal/resources/main.wxs
-- https://cygwin.com/faq.html#faq.setup.cli
-- https://sourceware.org/pipermail/cygwin-announce/2024-February/011525.html
+## Package management
 
-The terminal probe uses a separate JVM, checks initial dimensions, and waits for
-both command results and the next Bash prompt. It then requires twenty immediate
-resize/write cycles. Native testing reproduces first-character input loss despite
-the initial size query; the production adapter therefore uses the POSIX PTY relay. See
-[the evidence record](../../../docs/superpowers/plans/2026-10-20-jasper-cygwin-probe-results.md).
+`CygwinFeature` runs **Manage Cygwin packages…** on a virtual thread. `CygwinManager` needs a packaged Jasper: it finds
+`app\cygwin-tool.jar` beside the image's launcher, or the file the `jasper.cygwinTool` system property names. It accepts
+a ready or damaged environment, takes the management lock (which fails while a Jasper Cygwin session's lease is live or
+any process uses the environment), records interrupted earlier runs as failed, and copies the running Java runtime and
+the helper into a new `operations\<id>\`. It then starts `CygwinTool manage` from that copy, so an app update cannot
+replace the files it runs from, and releases its lock for the supervisor to take.
 
-The user authorized production integration after relay validation on Windows ARM64
-and x64 emulation. Native x64 Windows and interactive-app acceptance remain release checks.
+The supervisor holds the lock for the whole run and starts the current generation's verified `setup.exe` with the
+wizard shown: `--no-admin --no-shortcuts --no-replaceonreboot --no-write-registry --root <root> --local-package-dir
+<cache\packages>`, for at most 24 hours. It writes `result.json`, from Setup's exit status (118: a restart is needed)
+and the phase that follows, which the application, polling every half second, turns into the **Cygwin package
+management** notification; it then detects the shells again. The supervisor goes on if Jasper exits; a run that ends
+without a result blocks new Cygwin launches until **Manage Cygwin packages…** is opened again. The application never
+upgrades, removes or repairs packages by itself.
 
-## POSIX PTY relay
+## The seed
 
-The user authorized this investigation after direct Cygwin console input lost
-characters during resize. The experiment keeps the existing terminal facade:
-ConPTY runs `ConPtyRelay.cpp` (native ARM64 or x64), which starts
-`CygwinPtyRelay.c` detached from the Windows console. Framed input and resize
-messages travel over private pipes; the Cygwin backend runs Bash on `forkpty`.
-A Windows job owns the backend process tree and terminates it on frontend exit.
+The current seed holds Cygwin Setup 2.937, the Base category plus `bash`, `coreutils`, `findutils`, `grep`, `sed`,
+`gawk`, `diffutils`, `less`, `tar`, `gzip`, `bzip2`, `xz`, `unzip`, `git`, `openssh`, `curl` and `ca-certificates` with
+their dependencies: 114 packages built from 91 source packages, 510,489,120 bytes of artifacts and 831,247,849 bytes
+installed. `seed-licenses.json` records each package's upstream licence declaration and where its notice came from; a
+`LicenseRef-Upstream-*` expression keeps the upstream terms as they are instead of inferring an SPDX expression.
+`_autorebase` declares no licence, so its notice holds its complete scripts and README. Keep each staged seed with the
+release it went into: mirrors drop old versions.
 
-Build the backend explicitly with `:jasper-app:compileCygwinRelayProbe` and
-`-Pjasper.cygwinProbeCompiler=<absolute Cygwin gcc.exe>`. Build the frontend from
-an MSVC developer environment for the target architecture with
-`:jasper-app:compileConPtyRelayProbe` and
-`-Pjasper.cygwinProbeMsvc=<absolute cl.exe>`. Run its `--self-test` for UTF-16
-and Windows argument quoting. These builds are opt-in probe tasks.
+`acquireCygwinSeed` fills `jasper-app/build/cygwin/downloads` from `seed-support` and, for the 205 package archives,
+from the lock's origins on `mirrors.kernel.org`, with the JDK only: it follows no redirect, resolves no version, and
+publishes a file only once its size and digest match. `-Pjasper.cygwinSnapshot=<folder>` uses a complete retained seed
+instead, fully offline. `verifyCygwinSeed` checks the seed; `stageCygwinSeed` copies exactly the locked files with the
+lock into `jasper-app/build/cygwin/seed`, which `stagePackage` and `stageWindowsUser` copy to `app\cygwin-seed`.
 
-Pass `-Pjasper.cygwinProbeRelay=<absolute backend.exe>` and
-`-Pjasper.cygwinProbeFrontend=<absolute frontend.exe>` to the terminal probe.
-`verifyCygwinRelayProtocol` additionally takes
-`-Pjasper.cygwinProbeShell=<absolute POSIX shell>` and checks resize, Unicode,
-exit status, malformed/partial frames and pipe failure. The backend also builds
-on macOS for these protocol checks. `RelayCloseProbe` accepts the backend,
-owned Cygwin `bin` directory and frontend; it checks close under backpressure
-using a unique temporary backend executable.
+### Refreshing it
 
-Production integration requires pinned prebuilt frontends for both Windows
-architectures and one x86_64 Cygwin backend, with hashes, sources and notices.
-The Gradle user installer must consume those artifacts without a native compiler.
-The production `cygwin` shell profile uses the verified manager generation's relay.
-`probeCygwinProduction` takes `jasper.cygwinProbeRoot` (new directory) and
-`jasper.cygwinProbeRuntime` (existing probe Cygwin root). It copies the runtime into
-an isolated fixture, then exercises `CygwinLaunch`, the bundled bootstrap, launch
-leases and exclusion of a renamed external process loading the owned Cygwin DLL.
-Its small fixture manifest tests launch validation; distribution acceptance uses the real seed.
+`refreshCygwinSeed` runs `seed_refresh.py` (with `-Pjasper.python`, else `python3`) and needs GnuPG. It takes seven
+properties, each required:
 
-`verifyCygwinManifest`, `verifyCygwinLifecycle`, and `verifyCygwinProvisioning` run
-portable manifest, ownership, concurrency and preservation checks. `stageCygwinSeed` uses the checked-in seed lock. Its JDK-only acquisition task downloads
-only missing, pinned HTTPS artifacts into `build/cygwin/downloads`; local signed metadata,
-notices, Setup sources and relay binaries come from `seed-support`. No Python, GnuPG,
-PowerShell, native compiler or separately installed Cygwin is needed for ordinary builds
-or `installWindowsUser`. `-Pjasper.cygwinSnapshot=<retained snapshot>` selects a fully
-offline source instead. Missing or mismatched artifacts fail the build. `cygwinToolJar` packages the shared
-helper used by MSI, `installWindowsUser`, and `provision-cygwin.cmd`. Neither installer
-compiles the relay. The Windows settings button and palette action start a copied
-supervisor runtime so app replacement does not interrupt package management.
+| Property | Value |
+|---|---|
+| `jasper.cygwinRefresh.mirror` | The mirror whose metadata was retained |
+| `jasper.cygwinRefresh.snapshot` | A new absolute folder for the candidate |
+| `jasper.cygwinRefresh.metadata` | A folder with the retained `setup.xz`, `setup.xz.sig` and `pubring.asc` |
+| `jasper.cygwinRefresh.licenses` | The reviewed licence inventory (`seed-licenses.json`) |
+| `jasper.cygwinRefresh.relays` | A folder with the relay's programs, sources and `provenance.json` |
+| `jasper.cygwinRefresh.setup-source` | A folder with the tagged Setup source archive, `COPYING` and a `provenance.json` holding its hash |
+| `jasper.cygwinRefresh.installed-bytes` | The measured installed size of this exact selection |
 
-The 2026-10-20 seed contains 114 packages and 91 corresponding package source archives,
-plus Setup 2.937 sources, notices and relay sources. `seed-licenses.json` records upstream
-license declarations and notice provenance; `LicenseRef-Upstream-*` entries retain the
-actual upstream terms instead of inferring an SPDX expression. `_autorebase` supplies no
-explicit declaration in this release, so its notice preserves the complete scripts and README.
-The lock records 510,489,120 artifact bytes and 831,247,849 measured installed bytes.
-Retain the staged seed alongside release artifacts so removed upstream versions remain available.
-Refresh additionally requires `jasper.cygwinRefresh.setup-source` with the tagged Setup
-archive, COPYING and hash-bearing provenance.json.
+It verifies the metadata's signature against Cygwin's key, resolves the Base category and the starter packages with
+their dependencies, downloads Setup 2.937 and every archive checking the metadata's sizes and digests, requires a
+reviewed licence entry and notice for every package of the closure, checks the relay's and Setup's files against their
+provenance, and writes `seed.lock.json` into the candidate. It never changes the committed lock. To adopt a candidate,
+replace `seed.lock.json` and the files it names under `seed-support`, run the native acceptance below, and record it in
+`validation.json`.
 
-`InstallerAcceptanceTest` is an opt-in headless Windows harness compiled by
-`compileCygwinBundle`. It accepts an app image, a new scratch directory, the JBR SDK
-and a cache containing the signed extra `hello` package. It requires an absent system
-Cygwin root, uses the production MSI template, and verifies initial provisioning,
-headless package management, repair, upgrade and uninstall preservation. WiX is needed
-only to build the test MSIs; `installWindowsUser` uses the JBR app-image path.
-`UserInstallAcceptanceTest` brackets actual Gradle install/update/uninstall/reinstall
-runs with a complete root snapshot, including an added package, configuration,
-symlink and repository. Both harnesses require an isolated test account.
-Provisioning outcomes are retained in `logs/provision-result.json` under the owned
-environment, including failures reported by an MSI custom action.
+## Checks
 
-Windows release builds run `verifyCygwinDistribution` and produce a separate
-`cygwinSourcesZip` alongside the application assets. `validation.json` binds native
-and interactive acceptance to the seed digest for each architecture; missing evidence
-blocks publication. Local installation and packaging remain available for validation.
+`check` runs the portable checks on every host:
+
+| Task | What it checks |
+|---|---|
+| `verifyCygwinManifest` (`BundleManifestTest`) | Lock parsing and rejection, artifact sizes and digests, staging, acquisition from local files and downloads, and the release evidence rules |
+| `verifyCygwinLifecycle` (`CygwinToolTest`) | Ownership and foreign folders, interrupted initialisation, launch and management locks within one process and across processes, interrupted management runs, a failed supervisor start and the clean-up of old runtime copies |
+| `verifyCygwinProvisioning` (`CygwinProvisionerTest`), run with `verifyCygwinLifecycle` | A fresh installation, reuse that leaves `root` as it is, a full disk, a failed Setup kept for retry, a restart and a foreign folder |
+| `verifyCygwinProbes` (`ProbeAssertionsTest`) | The probes' own rules: Setup's hidden mode, deadlines, the custom action's scheduling, missing or contradictory evidence and scratch-folder ownership |
+| `verifyCygwinProbeRuntime` | That a runtime built with the installer probe's `jlink` options has a Java executable |
+
+Passing them does not establish Windows behaviour.
+
+### Native probes (Windows)
+
+`probeCygwinInstaller`, `probeCygwinTerminal` and `probeCygwinProduction` run with JBR 25 on Windows, from a
+standard-user account for the installer probe, and fail on other hosts. Each takes a new absolute scratch folder whose
+parent exists (`-Pjasper.cygwinProbeRoot`) and never reuses or removes an existing tree. The installer and terminal
+probes write JSON summaries to `jasper-app/build/cygwin-probes/reports/` (`installer.json`, `terminal.json`), which
+start as failed and become passed only when every check passes, and name the OS, architecture, JBR version and scratch
+folder. A later run of the same probe replaces its summary, so copy the summary and the scratch logs of each
+architecture's run. A run that fails before it has a scratch folder fails Gradle and leaves the previous summary in
+place.
+
+| Task | What it does |
+|---|---|
+| `probeCygwinInstaller` | Builds a separate, randomly named `JasperCygwinProbe-*` MSI with a fresh upgrade code, using the selected JBR's `main.wxs` and the WiX that JBR supports on `PATH`, and tests a failed installation's rollback, silent installation, repair, upgrade and uninstallation; a small Java helper records its identity, the installed files and its timing. It runs `msiexec` through `cmd /d /s /c`, so it rejects scratch paths with characters that `cmd` would interpret. It never installs or starts Jasper, and uninstalls its product when it fails (`cleanupExit` 1605 means it was already gone). Never uninstall Jasper with these MSIs |
+| `probeCygwinTerminal` | Installs a Cygwin offline cache (`-Pjasper.cygwinProbePayload`, a folder with a signature-checked `setup-x86_64.exe` 2.929 or newer and its complete `cache\`) into the scratch folder, then runs interactive Bash through `TerminalSession` in a separate JVM: start-up profile, paths with spaces and Unicode, explicit directory, OSC 7 and OSC 133, Unicode input and output, sizes after twenty immediate resizes, a Windows command's exit status and Ctrl+C. With `-Pjasper.cygwinProbeRelay` and `-Pjasper.cygwinProbeFrontend` it runs Bash through the relay |
+| `probeCygwinProduction` | Copies an existing probe root (`-Pjasper.cygwinProbeRuntime`) into an isolated environment and runs the production `CygwinLaunch`, `cygwin.bash` and leases with the prebuilt relay: shell integration, directory, command status, Unicode, resizes, line wrapping, a Windows command, Ctrl+C, and a renamed external process that loads the environment's `cygwin1.dll` |
+| `verifyCygwinRelayProtocol` | Runs a backend (`-Pjasper.cygwinProbeRelay`) with a POSIX shell (`-Pjasper.cygwinProbeShell`) and checks resizes, Unicode, exit status, malformed and partial frames and pipe failure; the backend builds on macOS too |
+| `compileCygwinRelayProbe` | Builds the backend with `-Pjasper.cygwinProbeCompiler=<absolute Cygwin gcc.exe>` |
+| `compileConPtyRelayProbe` | Builds the frontend from an MSVC developer environment for the target architecture with `-Pjasper.cygwinProbeMsvc=<absolute cl.exe>`; its `--self-test` checks UTF-16 and argument quoting |
+
+Setup and MSI operations have a ten-minute limit, each terminal event 15 seconds, and a reboot-required outcome is a
+failure. The terminal probe keeps Bash's standard error in `bash-stderr.log` and its temporary home and Cygwin tree for
+diagnosis; stop any remaining processes before you remove them. `RelayCloseProbe` (run with the probe classes: backend,
+the environment's `bin` folder and frontend) checks that closing works while output is blocked.
+
+### Acceptance harnesses (Windows)
+
+Both need an isolated test account and run with `jasper-app/build/cygwin/classes` and
+`jasper-app/build/cygwin/cygwin-tool.jar` (for JNA) on the class path, after `cygwinToolJar`:
+
+- `InstallerAcceptanceTest <app image> <new scratch folder> <JBR SDK> <cache with the signed extra hello package>`
+  builds MSIs with the production template (WiX needed) and checks the first installation, package management without
+  a window, repair, upgrade and uninstallation keeping the environment.
+- `UserInstallAcceptanceTest prepare|seeded|record|verify <scratch> [<image> <extra cache>]` brackets real
+  `installWindowsUser`, update, `uninstallWindowsUser` and reinstall runs with a snapshot of the whole root, including
+  an added package, configuration, a link and a git repository.
+
+`InstallerAcceptanceTest` needs the account to have no `%LOCALAPPDATA%\Jasper\cygwin`.
+`UserInstallAcceptanceTest prepare` needs the ready environment such a run leaves, and moves it to
+`<scratch>\preserved-msi-cygwin` so that the next `installWindowsUser` installs afresh.
+
+### Release evidence
+
+`verifyCygwinDistribution` stages the seed, checks that the helper jar holds `CygwinTool`, and requires
+`validation.json` to name this lock's digest as `seed` and to be `true` for the host's architecture both at the top
+level (native acceptance) and under `interactiveApps`. The Release workflow runs it on both Windows runners, so a
+release waits for native and interactive-program acceptance of the seed on x64 and ARM64. Local packaging and
+installation do not check it. `cygwinSourcesZip` publishes the corresponding sources beside the packages:
+`Jasper-<version>-cygwin-sources-<arch>.zip` holds the lock, every package source archive, the notices, Setup's sources
+and the relay's sources and licence.

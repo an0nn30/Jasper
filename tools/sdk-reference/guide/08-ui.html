@@ -152,7 +152,9 @@ ACTIONS stack, first, last or beside another separator;</li>
 {@code arrow.right}, {@code back}, {@code bell}, {@code bookmark}, {@code brightness}, {@code check},
 {@code chevron.down}, {@code chevron.left}, {@code chevron.right}, {@code chevron.up}, {@code clock}, {@code close},
 {@code collapse}, {@code collapse.all}, {@code command-palette}, {@code copy}, {@code cursor}, {@code delete},
-{@code desktop}, {@code download}, {@code edit}, {@code error}, {@code expand.all}, {@code file}, {@code folder},
+{@code desktop}, {@code download}, {@code edit}, {@code editor.preview}, {@code editor.preview.classic},
+{@code editor.scroll-sync}, {@code editor.scroll-sync.classic}, {@code editor.source}, {@code editor.source.classic},
+{@code editor.split}, {@code editor.split.classic}, {@code error}, {@code expand.all}, {@code file}, {@code folder},
 {@code folder.add}, {@code folder.filled}, {@code font}, {@code forward}, {@code help}, {@code hidden}, {@code history},
 {@code home}, {@code import}, {@code info}, {@code key}, {@code keyboard}, {@code laptop}, {@code link}, {@code lock},
 {@code lock.keyhole}, {@code login}, {@code logout}, {@code match.case}, {@code match.word}, {@code menu}, {@code more},
@@ -165,7 +167,12 @@ ACTIONS stack, first, last or beside another separator;</li>
 {@code window}, {@code window.add} and {@code zoom}.
 They follow the theme and the look. {@code run}, IntelliJ's classic Run triangle, and {@code application}, its
 run-configuration icon, are authored artwork: controls draw them in their own colours, and panels, prompts and tiles
-draw a monochrome glyph of the same name. These two names need SDK 0.18.1. Under the Enterprise look a tool
+draw a monochrome glyph of the same name. These two names need SDK 0.18.1. {@code editor.source},
+{@code editor.split}, {@code editor.preview} and {@code editor.scroll-sync} are a document's view controls (source only,
+source and preview, preview only, synchronised scrolling) in IntelliJ's New UI art, and their {@code .classic} names are
+IntelliJ's classic art, for use while {@link dev.jasper.sdk.ui.Presentation#icons()} is
+{@link dev.jasper.sdk.ui.Presentation.Icons#CLASSIC}. All eight are authored light and dark art that Jasper draws in
+its own colours wherever the name appears; they need SDK 0.18.3. Under the Enterprise look a tool
 window's stripe label starts with its icon, and IntelliJ's classic art draws {@code network}, {@code folder},
 {@code tunnel}, {@code download}, {@code server} and {@code bell} there, and {@code add}, {@code split}, {@code zoom},
 {@code settings}, {@code window.add} and {@code search} in the toolbar, toolbar views, the status bar and tool-window
@@ -189,7 +196,9 @@ its {@code lifetime} closes when the node leaves the tree or the view closes. Ja
 (a {@code JScrollPane} is judged by what it scrolls); an {@code EDITOR} may also be a {@code JTextArea},
 {@code JTextPane} or {@code JEditorPane}. Anything else is refused ("Ordinary plugin controls require kit descriptors").
 Jasper sets the component's foreground and background from the theme whenever the theme changes, with the workspace's
-opacity in a translucent window; the component paints the rest from {@link Appearance}.</p>
+opacity in a translucent window, and its font to the interface's body font when it is registered, at every update of
+the view and at every theme or font change, so a font of the plugin's own belongs on a component inside it; the
+component paints the rest from {@link Appearance}.</p>
 
 <h3>Colours</h3>
 <p>Views take their colours from the theme without help. Custom content reads them from {@link PluginContext#appearance()}:
@@ -208,17 +217,25 @@ stripes, the title bar and where the menus are on this platform, whether the too
 field or an icon, the look's UI and data faces (empty for the platform's), its body text size and its default toolbar
 height. Jasper chooses the look at start, so the value is the same for every plugin until it restarts, and it is safe
 from any thread: read it once in {@code start}. It reports the look's own faces, sizes, title bar and menus, not the
-user's font, toolbar height, decoration or view settings. Remote, Credential Vault and File Server compose their
+user's interface font, toolbar height, decoration or view settings. Remote, Credential Vault and File Server compose their
 classic layouts when {@link dev.jasper.sdk.ui.Presentation#classic()} is true, and the Sample starts its tool window in
 the bottom strip under labelled stripes:</p>
 <pre><code class="language-java">boolean classic = context.appearance().presentation().classic();
 Anchor side = context.appearance().presentation().toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;</code></pre>
-<p>{@link Appearance#terminalTypography()} (SDK 0.18.3) reads the saved terminal family, fractional point size,
-ordered fallbacks, ligatures and line height from any thread. Register {@link Appearance#onTerminalTypographyChanged(Consumer)}
-on the UI thread; it delivers changed values there after the getter updates, with no initial replay. Closing the
-subscription or stopping the plugin removes it. Temporary pane zoom leaves this saved value unchanged.
-{@link FakePluginHost#setTerminalTypography(TerminalTypography)} queues a value for the next {@code flush()}.</p>
 <p>{@link Appearance#presentation()} needs SDK 0.18.2. In a test,
 {@link dev.jasper.sdk.testing.FakePluginHost#setPresentation(Presentation)} with
 {@link dev.jasper.sdk.testing.FakePresentations#CLASSIC} runs the plugin under the Enterprise look's values.</p>
+
+<h3>The terminal font</h3>
+<p>Custom content that shows text in the terminal's font, as the Editor does when it follows the terminal font, reads
+{@link Appearance#terminalTypography()} and applies it to a component inside its registered content: a
+{@link TerminalTypography} with the saved family, the size in points (6 to 72, fractions allowed), the fallback families
+in the order they are tried, whether ligatures are on and the line height (a multiple from 0.5 to 3), as Settings ›
+Terminal › Font &amp; Colors saves them. The value is the same for every window and plugin, a pane's temporary zoom does
+not change it, and it is safe from any thread. Register {@link Appearance#onTerminalTypographyChanged(Consumer)} on the
+UI thread: the handler runs there after each saved change, when the getter already returns the new value. An equal value
+notifies nobody and registering delivers no initial value, so read the getter first; the registration closes with the
+plugin. Both need SDK 0.18.3. In a test,
+{@link dev.jasper.sdk.testing.FakePluginHost#setTerminalTypography(TerminalTypography)} publishes a value on the next
+{@code flush()}.</p>
 </section>

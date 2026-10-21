@@ -24,14 +24,15 @@ Install the **JetBrains Runtime (JBR) 25** SDK, with its development tools. The 
 JetBrains vendor and finds the installed runtime itself; the developer Mac's path is in [AGENTS.md](../AGENTS.md). Use
 the wrapper, never a system Gradle. `check` also compiles native code (Jasper's launcher, its recovery watcher, the
 native `jasper` command and, on macOS, the Objective-C bridges), so it needs the host's C/C++ compiler, and it runs the
-theme converter's tests with Python 3.11 or later.
+theme converter's tests with Python 3.11 to 3.13 (`-Pjasper.python=<interpreter>` picks one).
 
 `check` is headless. Besides the tests it runs the bytecode architecture checks (`verifyTerminalArchitecture`,
 `verifyApplicationArchitecture`, `verifySdkArchitecture`, `verifyPluginArchitecture`, `verifyUiArchitecture`),
 Javadoc with doclint, the compiled guide examples, `verifyThirdPartyNotices`, `verifySdkReference`, the packaging and
-build-information fixtures and the native harnesses. Read exact counts from the XML in each module's
-`build/test-results/test/`. Tests that need something the host lacks (fish, another operating system, a particular
-installed font) are skipped through JUnit assumptions.
+build-information fixtures, the portable Cygwin checks (`verifyCygwinProbes`, `verifyCygwinProbeRuntime`,
+`verifyCygwinManifest`, `verifyCygwinLifecycle` and `verifyCygwinProvisioning`) and the native harnesses. Read exact
+counts from the XML in each module's `build/test-results/test/`. Tests that need something the host lacks (fish,
+another operating system, a particular installed font) are skipped through JUnit assumptions.
 
 The entry point is [Main](src/main/java/dev/jasper/app/Main.java), which delegates to
 [ApplicationBootstrap](src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java).
@@ -66,7 +67,8 @@ Building the distribution (`installDist`, `packageApp`) is headless; on macOS, A
   write, test and package one.
 - [Terminal onboarding](../jasper-terminal/README.md), [UI kit](../jasper-ui/README.md) and
   [Buddy embedding](../jasper-buddy/README.md): the libraries' supported surfaces.
-- [Bundled Cygwin](../packaging/windows/cygwin/README.md): Windows provisioning, persistent roots, package management and the PTY relay.
+- [Bundled Cygwin](../packaging/windows/cygwin/README.md): Windows provisioning, the persistent Cygwin root, package
+  management and the PTY relay.
 - [Status](../docs/STATUS.md): current state, open items and decisions.
 
 Starting points by change:
@@ -80,6 +82,8 @@ Starting points by change:
 | Buddy notices | `notifications/CommandNotifier`, `workspace/WorkspaceActivity`, `notifications/ActivityNotifier` |
 | Something plugins can do | `plugins/HostedContext`, `plugins/HostedUi`, `contributions/Contributions`, and the SDK |
 | A look's effect on the chrome | `presentation/Projections`, `workspace/WorkspaceChrome`, `windows/ShellChrome` |
+| The boot splash | `bootstrap/ApplicationBootstrap.openSplash`, `splash/SplashPainter`, `splash/MeadowSplash`, `startup/StartupSteps` |
+| Cygwin Bash on Windows | `cygwin/`, `launch/CygwinLaunch`, `application/CygwinFeature`, `packaging/windows/cygwin/` |
 
 ## Tests
 

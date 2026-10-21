@@ -1,6 +1,6 @@
 # Jasper app icon
 
-Jasper's icon is **Shell Prompt**: a moss turtle shell surrounding a cream terminal prompt.
+Jasper's icon is **Shell Prompt**: a moss turtle shell surrounding a cream terminal prompt on a dark forest face.
 
 ![macOS icon](../../jasper-app/src/main/resources/dev/jasper/app/icons/app/macos/icon-256.png)
 ![Windows icon](../../jasper-app/src/main/resources/dev/jasper/app/icons/app/windows/icon-256.png)
@@ -8,8 +8,9 @@ Jasper's icon is **Shell Prompt**: a moss turtle shell surrounding a cream termi
 
 ## Source and outputs
 
-- `shell-prompt-source.png` is the approved generated raster master. `Jasper.svg`, `macos/Jasper.svg` and the
-  Linux scalable entry embed the raster artwork. `macos/icon.json` turns glass effects off and supplies a forest background.
+- `shell-prompt-source.png` is the raster master. `Jasper.svg` (Windows framing), `macos/Jasper.svg` and the Linux
+  scalable entry embed the framed raster; they are not vector drawings. `macos/icon.json`, the Icon Composer
+  configuration, turns glass effects off and fills the background with the face's forest green.
 - `Jasper.icns`, `Jasper.ico` and `Jasper.png` (512 px) are jpackage's `--icon` inputs on macOS, Windows and Linux.
   macOS also bundles `macos/Assets.car`, the compiled asset catalog, with `CFBundleIconName=Jasper`.
 - `linux/hicolor/<size>x<size>/apps/jasper.png` and `linux/hicolor/scalable/apps/jasper.svg` form the Linux desktop
@@ -22,7 +23,8 @@ Jasper's icon is **Shell Prompt**: a moss turtle shell surrounding a cream termi
   size, the framed SVGs, the native containers, the raster master, the macOS `.iconset`, `Jasper.icon` and `Assets.car`,
   the Linux hicolor tree, a README and a SHA-256 manifest) and the archive `build/Jasper-icon-set.zip`. Build outputs
   are not checked in.
-- `website/assets/jasper.png` matches the shipped Linux 256px icon. The generator updates it with the app assets.
+- `website/assets/jasper.png` is the Linux 256 px icon; the generator updates it with the app assets.
+- `jasper-ember-source.png` is earlier artwork; nothing uses it.
 
 ## Where each icon is used
 
@@ -32,15 +34,17 @@ Jasper's icon is **Shell Prompt**: a moss turtle shell surrounding a cream termi
 | Windows | The ICO frames embedded in `Jasper.exe`; the setup wizard is built with `Jasper.ico` too | Window icons from the runtime PNGs |
 | Linux | `lib/Jasper.png`, the `.deb` and `.rpm` menu entry's icon; the packages do not install the hicolor tree | Window icons from the runtime PNGs |
 
-A look can bring its own application icons, as the [Enterprise look](../../docs/enterprise.md) does. They then replace
-Jasper's in new windows' icon lists and on the Dock or taskbar, in packaged macOS launches too; the icon of the package
-itself, in Finder, Explorer or the desktop menu, stays Jasper's.
+A look can bring its own application icons ([branding](../../docs/looks.md#branding)). They then replace Jasper's in
+new windows' icon lists and on the Dock or taskbar, in packaged macOS launches too; the icon of the package itself, in
+Finder, Explorer or the desktop menu, stays Jasper's. The bundled [Enterprise look](../../docs/enterprise.md) keeps
+Jasper's icon.
 
 ## Platform framing and sizes
 
-The generator crops transparent source padding, then applies optical padding once. Windows and Linux resize the
-raster master; macOS compiles its full-canvas artwork with Icon Composer and exports each size through the native
-icon service. Its ICNS fallback and runtime PNGs have the same native mask and edge treatment. Packaging adds no margin.
+The generator crops the master to its opaque artwork, dropping its transparent padding and soft shadow, then applies
+optical padding once. Windows and Linux resize the raster master; macOS compiles its full-canvas artwork with Icon
+Composer and exports each size through the native icon service. Its ICNS fallback and runtime PNGs have the same native
+mask and edge treatment. Packaging adds no margin.
 
 | Platform | Maximum artwork footprint | Standalone PNG sizes |
 | --- | --- | --- |

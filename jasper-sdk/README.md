@@ -64,16 +64,10 @@ sdk = ">=0.18.0, <0.19"
 
 A plugin that uses something only a later 0.18 version has starts its range there. Remote, Credential Vault, File
 Server and the Sample read `Appearance.presentation()`, which needs SDK 0.18.2, and Enterprise's kit file gives the
-Editor's settings a default, which an older Jasper refuses; all five declare `sdk = ">=0.18.2, <0.19"`.
-
-The Editor declares `sdk = ">=0.18.3, <0.19"`: it uses saved terminal typography, the settings draft callback and
-Markdown document view icons. `Appearance.terminalTypography()` reads the saved terminal family, fractional point
-size, ordered fallback names, ligatures and line height from any thread. Register `onTerminalTypographyChanged`
-on the UI thread; it delivers changes there after the getter updates, skips equal values and stops when closed or
-the plugin stops. Read the initial value explicitly. `FakePluginHost.setTerminalTypography` queues a value for the
-next `flush()`. Source implementations of `Appearance` must implement both new abstract methods; existing compiled
-plugin consumers remain compatible. `SettingsPanel.pendingChanged()` is a default callback after standard row edits,
-list actions and Reset; read the draft through `SettingsPanelHost.pending(setting)`.
+Editor's settings a default, which an older Jasper refuses; all five declare `sdk = ">=0.18.2, <0.19"`. The Editor
+reads the saved terminal font (`Appearance.terminalTypography()`), implements `SettingsPanel.pendingChanged()` and
+draws the `editor.*` view icons, which need SDK 0.18.3, so it declares `sdk = ">=0.18.3, <0.19"`. Shell History,
+Snippets and Project Index declare `sdk = ">=0.18.0, <0.19"`.
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›
 Plugins shows it as Skipped with the reason "needs SDK *range*; this is SDK *version*". Install from Zip… refuses such a

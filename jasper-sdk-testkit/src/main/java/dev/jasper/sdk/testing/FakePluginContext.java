@@ -235,7 +235,7 @@ public final class FakePluginContext implements PluginContext {
     /** Plugin windows and dialogs. */
     @Override public Windows windows() { return ui.windows(); }
 
-    /** The host's semantic colours, variants, presentation, workspace, editor and syntax palettes, opacity, and change notifications. */
+    /** The host's semantic colours, variants, presentation, workspace, editor and syntax palettes, opacity, saved terminal typography and change notifications. */
     @Override public Appearance appearance() {
         return new Appearance() {
             @Override public java.awt.Color color(dev.jasper.sdk.ui.SemanticColor role) { host.requireAppearanceThread(); return host.semanticColor(role); }

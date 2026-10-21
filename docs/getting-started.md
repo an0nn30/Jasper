@@ -39,6 +39,12 @@ Jasper runs there entirely under emulation, which makes every launch and new win
 - **Portable ZIP**, `Jasper-<version>-windows-<x64|aarch64>.zip`: extract the complete `Jasper` folder and run
   `Jasper.exe`. Keep the folder's files together.
 
+The setup wizard also installs a Cygwin environment for [Cygwin Bash](terminal.md#cygwin-bash) in
+`%LOCALAPPDATA%\Jasper\cygwin`, from files it carries, so no download is needed. The first installation needs about
+2.7 GB free on that drive and leaves about 1.3 GB there; when it cannot finish, setup fails, and running it again
+retries. A newer setup keeps the environment as it is. For the portable ZIP, run `provision-cygwin.cmd` in the `Jasper`
+folder once to install the same environment.
+
 ### Linux
 
 Download the package for your distribution and architecture and install it with your package manager:
@@ -55,10 +61,16 @@ desktop menu. The package is named `jasper`. The packages are unsigned.
 ## First launch
 
 Jasper opens one window with one tab running your shell: your login shell on macOS and Linux, PowerShell on Windows
-(Settings › Terminal › Shell chooses another). The first window is sized for 100 columns by 35 rows of the terminal
-font, bundled Cousine Nerd Font Mono at 12 points; after that, new windows take the size and place of the last one you
-closed. On macOS Jasper follows the system's dark or light appearance; on Linux and Windows it shows Dark until you
-choose Light. The default themes are Slate Cobalt in Dark and Jasper Meadow Light in Light.
+(Settings › Terminal › Shell chooses another, such as [Cygwin Bash](terminal.md#cygwin-bash)). The first window is sized
+for 100 columns by 35 rows of the terminal font, bundled Cousine Nerd Font Mono at 12 points; after that, new windows
+take the size and place of the last one you closed. On macOS Jasper follows the system's dark or light appearance; on
+Linux and Windows it shows Dark until you choose Light. The default themes are Slate Cobalt in Dark and Jasper Meadow
+Light in Light.
+
+While Jasper starts, a splash shows a meadow with the [Desk Buddy](notifications.md#desk-buddy), Jasper's version,
+each start-up step and a progress bar, until the window has painted. A look with its own [branding](looks.md#branding)
+shows its own splash instead. With **Enable animations** (`ui.animations.enabled`) off, the Desk Buddy stands still. A
+start with `--safe-mode`, `--background` or `--no-window` shows no splash.
 
 Under the default look the window has:
 
@@ -255,9 +267,11 @@ Then remove the application:
 | Linux `.deb` | `sudo apt remove jasper` |
 | Linux `.rpm` | `sudo dnf remove jasper` or `sudo zypper remove jasper` |
 
-Removing the application leaves [Jasper home](#jasper-home) in place, with your settings, plugins and Vault. Delete
-that folder to remove them too. A vault bound to this device also has an item named "Jasper Credential Vault" in the
-macOS keychain or the Linux secret service; on Windows its device secret is a file in Jasper's home.
+Removing the application leaves [Jasper home](#jasper-home) in place, with your settings, plugins and Vault. Delete that
+folder to remove them too. On Windows it also leaves the Cygwin environment in `%LOCALAPPDATA%\Jasper\cygwin`; close
+every program using it before you delete that folder. A vault bound to this device also has an item named "Jasper
+Credential Vault" in the macOS keychain or the Linux secret service; on Windows its device secret is a file in Jasper's
+home.
 
 ## Where to go next
 

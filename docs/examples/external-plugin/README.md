@@ -17,7 +17,7 @@ Copy this folder to start a plugin of your own.
 
 1. Download `jasper-sdk-<version>.jar` and `jasper-sdk-testkit-<version>.jar` from a Jasper release whose SDK version
    the manifest's `sdk` range admits (`>=0.18.0, <0.19`), and put them in `libs/`. `-PjasperSdkDir=<folder>` reads
-   them from another folder, and `-PjasperSdkVersion=<version>` picks other jars than the default, `0.18.2`. A missing
+   them from another folder, and `-PjasperSdkVersion=<version>` picks other jars than the default, `0.18.3`. A missing
    jar stops the build with a message naming it.
 2. Run the build with Gradle and a Java 25 JDK of any vendor installed. The folder has no Gradle wrapper; `gradle
    wrapper` adds one.

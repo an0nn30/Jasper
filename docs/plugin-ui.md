@@ -233,11 +233,15 @@ row that matches the Settings search, and `SettingRow.titleNote` annotates its t
 
 A document in a content tab is a `Split` with `SplitKind.DOCUMENT`, top to bottom: every visible child takes its
 preferred height except the first visible `Custom`, `Empty` or `Split`, which fills the height left over, and hidden
-children take no space. The other children are the document's bars: an INLINE `Stack` among them, directly or as a row of a
-VERTICAL group, is one compact bar row whose first field or text fills the width the controls after it leave; a group
-stacks its rows without gaps and shows a passive (`SelectionMode.NONE`) list's rows as lines of text; a hairline
-separates neighbouring children. An Editor tab is one: a banner row, its `Custom` text area, a loading `Empty`, the Vim
-bar and the find bar.
+children take no space. The other children are the document's bars: an INLINE `Stack` among them, directly or as a row
+of a VERTICAL group, is one compact bar row whose first field or text fills the width the controls after it leave; a
+group stacks its rows without gaps and shows a passive (`SelectionMode.NONE`) list's rows as lines of text; a hairline
+separates neighbouring children. An INLINE `Stack` directly in the split whose first child is an empty `CAPTION` text,
+followed by one or more `Button`s and nothing else, is an action bar: the empty text pushes the buttons to the trailing
+edge, and while the document is narrower than the buttons the row scrolls sideways, bringing a button into view when it
+takes the focus. An Editor tab is a document: the Markdown view buttons (an action bar, shown for Markdown documents), a
+row offering to load web images or retry failed ones, a preview failure row, a banner row, its `Custom` text area, which
+also holds the Markdown preview, a loading `Empty`, the Vim bar and the find bar.
 
 ## Building blocks
 
@@ -485,8 +489,12 @@ for it with `view.registerContent(new CustomContent(contentId, kind, component, 
   that is not a panel, text component, button, label, list, table, tree, combo box, spinner or slider. A `JScrollPane`
   is judged by its view. A component that already has a parent or an owner, or that the kit owns, is refused.
 - Jasper sets the component's foreground (`text.primary`) and background (`surface.input`, at the workspace opacity) on
-  every theme change and move, and makes it opaque only at full opacity. The `lifetime` closes when the `Custom` node
-  leaves the view or the view closes.
+  every theme change and move, and makes it opaque only at full opacity. It also sets the component's font to the
+  interface's body font when the content is registered, at every update of the view and at every theme or
+  interface-font change, so a font the plugin sets on the registered component itself does not last: give a font of
+  your own to a component inside it, as the Editor's `DocumentArea` does for its text area. A change of the interface
+  font reaches the component as a `font` property change; content whose text should follow it reads `getFont()`. The
+  `lifetime` closes when the `Custom` node leaves the view or the view closes.
 
 ### Colours for custom content
 
@@ -515,8 +523,12 @@ Only custom content reads colours, from [`Appearance`](sdk-reference.html#dev.ja
   carets and bars solid. The Editor's `DocumentArea` is the reference.
 - Content that needs the look's faces reads `appearance().presentation()` (any thread): `uiFace()` and `dataFace()`
   name the look's UI and data faces, empty for the platform's, and `bodySize()` is its body text size in points. They
-  are the look's own; the user's font settings are not reported
+  are the look's own; the user's interface font reaches custom content only as its font (above)
   ([adapting to the look](plugin-authoring.md#adapting-to-the-look)).
+- Content that shows text in the terminal's font, as the Editor can, reads `appearance().terminalTypography()` (any
+  thread): the saved terminal family, size, fallback fonts, ligatures and line height. Apply changes in
+  `onTerminalTypographyChanged(...)` to a component inside the registered one (above)
+  ([the terminal font](plugin-authoring.md#the-terminal-font)).
 
 ## Testing
 
@@ -534,6 +546,8 @@ event dispatch thread, so run the test in `SwingUtilities.invokeAndWait`. A plug
 - [`FakeKit`](sdk-reference.html#dev.jasper.sdk.testing.FakeKit)'s `views()`, `icons()` and `failures()` list its views,
   registered icons and contained handler failures. `FakePluginHost` mounts views where Jasper would: `panelView`,
   `windowView`, `toolbarViews`, `settingsPanelView` and `popoverViews` return them.
+- The fake kit gives registered custom content a plain 13-point `SansSerif` as its font; `contentFont(font)` replaces
+  it and sets the content already registered, as a change of the user's interface font would.
 - Assert on descriptors (which rows exist, which action is primary, which state is enabled), not on pixels; Jasper's own
   tests cover rendering. Both examples above are compiled and tested in
   `jasper-app/src/test/java/dev/jasper/app/documentation/PluginUiExamplesTest.java`.

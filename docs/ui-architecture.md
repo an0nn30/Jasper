@@ -327,7 +327,8 @@ copy of the context, so `route(ThemeRoute)` re-routes only that view.
 - **Specialized content.** `registerContent(contentId, component, lifetime)` fills a `Custom` node by its content id.
   An EDITOR accepts a `JTextArea`, `JTextPane` or `JEditorPane` (optionally in a scroll pane) or a non-standard
   `JComponent` canvas; other kinds accept a canvas only. Panels, ordinary controls and kit-owned components are
-  rejected, so this is not a route for feature forms. A registration is disposed on replacement and on close.
+  rejected, so this is not a route for feature forms. Each refresh gives the component the kit's body font. A
+  registration is disposed on replacement and on close.
 - **Containers.** Containers own semantic layout. Forms consume a host-supplied logical available height
   (`setAvailableHeight`); the host owns window chrome, sheet and scrim lifetime and cancellation cleanup.
 - **Pointer-only views.** `new KitView(context, spec, events, true)` mounts controls that never take keyboard focus but
@@ -511,8 +512,10 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   takes the `DOCUMENT_BAR_*` padding and gaps, its first field or text fills what the controls after it leave (rows of
   one group align their fills), other text holds a stable status width, fields take the panel search field's look and
   buttons the panel action size. A group stacks its rows without gaps and shows a passive list's rows as text lines;
-  the split draws a subtle hairline at each boundary, inside the bar side. The Editor, the Vault's classic manager,
-  Remote's tunnels and File Servers use DOCUMENT splits.
+  the split draws a subtle hairline at each boundary, inside the bar side. A bar's empty caption takes no focus. An
+  INLINE bar that is an empty caption followed only by buttons (the Editor's Markdown view controls) scrolls sideways
+  when the split is narrower than its buttons, and a button that takes the focus scrolls into view. The Editor, the
+  Vault's classic manager, Remote's tunnels and File Servers use DOCUMENT splits.
 
 ### Panels
 
@@ -594,7 +597,7 @@ The built-in path glyphs are original Jasper vectors on a 16-unit grid (89 names
 `search`, `server`, `settings`, `shield`, `sparkle`, `split`, `star`, `star.filled`, `target`, `terminal`,
 `triangle.down`, `tunnel`, `unlock`, `upload`, `user`, `warning`, `window`, `window.add`, `zoom`.
 
-Three sets of byte-identical IntelliJ Platform icons (Apache-2.0; `icons/LICENSE.txt`, `NOTICE.txt`, `ATTRIBUTION.txt`
+Four sets of byte-identical IntelliJ Platform icons (Apache-2.0; `icons/LICENSE.txt`, `NOTICE.txt`, `ATTRIBUTION.txt`
 and `SOURCE.md` beside them, listed in the app's third-party notices as "IntelliJ Platform icons (New UI and Classic)")
 ship as light SVGs with `_dark` siblings (two classic files serve both variants), each file checked against its
 SHA-256 in a manifest:
@@ -619,6 +622,12 @@ SHA-256 in a manifest:
   rows are a table of their own, reached only through `IconRegistry.stripeIcon`, which gives a labelled stripe
   IntelliJ's classic 13 px tool-window icons for `network`, `folder`, `tunnel`, `download`, `server` and `bell`, so the
   classic chrome set is unchanged.
+- **The document actions** (`assets-editor.tsv`, 16 files under `editor/`): `editor.source`, `editor.split`,
+  `editor.preview` and `editor.scroll-sync` are IntelliJ's New UI editor-only, editor-and-preview, preview-only and
+  synchronise-scrolling icons, and the same names with `.classic` its classic ones. Ordinary, panel and native
+  contexts draw them in their own colours, never tinted, with the sibling for the theme's darkness (the panel
+  surface's, given a palette only); they are decoded the first time one is asked for, and `IconRegistry.names()`
+  lists them.
 
 Receiving contexts:
 

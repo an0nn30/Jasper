@@ -31,7 +31,7 @@ tool/
 - Compile against `jasper-sdk` as `compileOnly`: Jasper supplies the SDK at run time, and a jar that holds classes in
   `dev.jasper.sdk` is refused. Put the SDK and `jasper-sdk-testkit` on the test classpath.
 - A library the plugin uses is an `implementation` dependency whose jar ships beside the plugin's own. Snippets bundles
-  tomlj this way, Remote Apache MINA sshd, Credential Vault BouncyCastle and the Editor RSyntaxTextArea.
+  tomlj this way, Remote Apache MINA sshd, Credential Vault BouncyCastle and the Editor RSyntaxTextArea and CommonMark.
 - A `settings.toml` at the root of one of the plugin's jars (at most 1 MiB) becomes the plugin's settings file,
   `<Jasper home>/plugins/<id>/<id>.toml`, the first time Jasper finds the plugin and that file does not exist. Ship your
   keys in it, commented, with their meaning; without one, the file starts as a single comment line. Jasper creates the
@@ -207,7 +207,7 @@ has its own, so every registration is attributed to it.
 | `panels()` | [Tool windows](#tool-windows). |
 | `windows()` | [Windows, dialogs, overlays and popovers](#windows-dialogs-overlays-and-popovers), [content tabs](#content-tabs) and file pickers. |
 | `kit()` | The factory for every view a plugin shows ([Building plugin UI](plugin-ui.md)). |
-| `appearance()` | Theme colours for [custom content](plugin-ui.md#custom-content), and [the look Jasper runs with](#adapting-to-the-look). |
+| `appearance()` | Theme colours for [custom content](plugin-ui.md#custom-content), [the look Jasper runs with](#adapting-to-the-look) and [the terminal font](#the-terminal-font). |
 | `terminals()` | [Terminal windows, tabs and panes](#terminals), [provided sessions](#providing-a-session) and [shell variables](#shell-variables-and-program-tabs). |
 | `palette()` | [Command palette scopes](#palette-scopes). |
 | `fileSources()` | [Places in Jasper's file chooser](#file-sources). |
@@ -824,9 +824,9 @@ private static void installTerminalDemo(PluginContext context) {
   the split pane's.
 - **Shell profiles.** `terminals().profiles()` lists the shells Jasper detected, the platform's default first, as
   [`ShellProfileInfo`](sdk-reference.html#dev.jasper.sdk.terminal.ShellProfileInfo): on macOS and Linux `login`, the
-  login shell; on Windows `powershell`, `pwsh` (PowerShell 7, when found), `cmd` and `wsl:<name>` for each WSL
-  distribution (`kind()` `WSL`, `detail()` `WSL 1` or `WSL 2`, followed by ` · default` for the default
-  distribution); and last, everywhere, `custom`. On Windows, detection
+  login shell; on Windows `powershell`, `pwsh` (PowerShell 7, when found), `cmd`, `cygwin` (Cygwin Bash, when Jasper's
+  own Cygwin is installed) and `wsl:<name>` for each WSL distribution (`kind()` `WSL`, `detail()` `WSL 1` or `WSL 2`,
+  followed by ` · default` for the default distribution); and last, everywhere, `custom`. On Windows, detection
   may finish after the plugin starts: `onProfilesChanged` runs after the first detection and after each later one whose
   result differs. Edits to the Custom shell settings may not be reported, so read `profiles()` again when the current
   list matters.
@@ -1080,10 +1080,38 @@ private static Anchor panelAnchor(PluginContext context) {
 | `uiFace()`, `dataFace()`: the look's faces, empty for the platform's | empty | IBM Plex Sans, IBM Plex Mono |
 | `bodySize()`, `toolbarHeight()`: the body text size in points and the default toolbar height in pixels | 13, 30 | 12, 28 |
 
-The faces, sizes, title bar and menus are the look's own: the user's font, toolbar height, window decoration and view
-mode settings are not reported. Test both looks by calling `FakePluginHost.setPresentation(FakePresentations.CLASSIC)`
-before the plugin starts ([testing](#testing)). `presentation()` needs SDK 0.18.2, so a plugin that reads it declares
-`sdk = ">=0.18.2, <0.19"`.
+The faces, sizes, title bar and menus are the look's own: the user's interface font, toolbar height, window decoration
+and view mode settings are not reported, though custom content gets the interface font as its component's font
+([custom content](plugin-ui.md#custom-content)). Test both looks by calling
+`FakePluginHost.setPresentation(FakePresentations.CLASSIC)` before the plugin starts ([testing](#testing)).
+`presentation()` needs SDK 0.18.2, so a plugin that reads it declares `sdk = ">=0.18.2, <0.19"`.
+
+### The terminal font
+
+`context.appearance().terminalTypography()` returns the saved terminal font as a
+[`TerminalTypography`](sdk-reference.html#dev.jasper.sdk.ui.TerminalTypography), the values of Settings › Terminal ›
+Font & Colors (`terminal.font` in `config.toml`, [configuration](configuration.md)): `family()`, `size()` in points
+(6 to 72, fractions allowed), `fallback()` (family names tried in order for characters the font lacks), `ligatures()`
+and `lineHeight()` (a multiple from 0.5 to 3). It is the same for every window and plugin, a pane's temporary zoom does
+not change it, and it is safe from any thread. It needs no capability.
+
+`onTerminalTypographyChanged(handler)`, registered on the UI thread, runs the handler there each time the saved value
+changes; `terminalTypography()` already returns the new value when it runs. Saving an equal value notifies nobody, and
+registering delivers no initial value, so read the current value first:
+
+```java
+var appearance = context.appearance();
+apply(appearance.terminalTypography());
+appearance.onTerminalTypographyChanged(this::apply);   // closed when the plugin stops
+```
+
+Apply it to a component inside your registered content, as the Editor does for its text area: Jasper sets the
+registered component's own font to the interface font at every update ([custom content](plugin-ui.md#custom-content)).
+
+The Editor shows its text in the terminal font this way while its **Follow terminal font** setting is on
+([Editor](editor.md)). Both methods need SDK 0.18.3, so a plugin that calls them declares `sdk = ">=0.18.3, <0.19"`.
+In a test, `FakePluginHost.setTerminalTypography(value)` publishes a saved value on the next `flush()`; until then the
+fake reports Jasper's defaults.
 
 ## Declared settings
 
@@ -1145,9 +1173,9 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
   the value differs from its default, validation), and `host.stage(setting, value)` sets a value from a control of the
   plugin's own; Settings saves both on Apply. `host.pending(setting)` returns the value Apply would save, and
   `host.changed()` tells Settings to ask `modified()` again; call it whenever state of the plugin's own changes.
-  The default `pendingChanged()` callback (SDK 0.18.3) lets you rebuild dependent descriptors after a standard row
-  edit, list action or Reset; the host's pending value and validation are updated before it runs. Invalid edits may
-  leave the pending value unchanged. Plugin calls to `host.stage` leave refreshing to the plugin. Use
+  `pendingChanged()` runs after a standard row handles the user's edit, choice, list action, Browse… or Reset, once
+  `host.pending` returns the result (an invalid edit leaves it as it was): rebuild there whatever depends on pending
+  values, as the Editor's page does. The plugin's own `host.stage` calls do not trigger it; it needs SDK 0.18.3. Use
   `modified`, `apply` and `reset` only for state of the plugin's own, and `keywords` and `highlight` for search. The
   panel lives as long as the plugin, so Settings calls `reset` before `dispose` whenever it closes a page without a
   successful Apply, as on Cancel. Compose the page as the generated ones are
@@ -1174,10 +1202,9 @@ up by the plugins that require it. Credential Vault, the Editor, Remote and Snip
 - An API may have its callers implement an interface: Remote implements the Editor's `EditorDocument` for SFTP files,
   whose methods the Editor calls on the UI thread and whose futures may complete on any thread. Say in the API which
   thread calls what.
-  Editor 0.11.0 adds the optional `EditorDocument.resolveRelative(String)` hook for Markdown resources and links.
-  Validate the decoded relative path with `RelativePaths.requireValid`; return a handle preserving the original
-  storage, authentication and owner context without I/O. The default returns empty. Local and Remote 0.15.1 implement
-  it; Remote retains compatibility with older Editor APIs. Resource reads use the handle's existing bounded `read` future.
+  The Editor calls a document's `resolveRelative(path)` for a relative image or link in a Markdown preview: answer the
+  document for that path beside this one, with the same storage, login and owner, without I/O. The default answers
+  empty, so the Editor cannot follow such links or load such images ([relative paths](plugin-apis.md#relative-paths)).
 
 **Using a service.**
 
@@ -1249,20 +1276,21 @@ try (var host = new FakePluginHost()) {
 
 | To test | Use |
 | --- | --- |
-| Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView`, `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
-| The look | `setPresentation(presentation)` before any plugin starts, with `FakePresentations.STANDARD` (what the fake reports until told otherwise) or `CLASSIC`; `presentation()` |
+| Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView` (an event a standard row handles there calls `pendingChanged()`), `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
+| The look and the terminal font | `setPresentation(presentation)` before any plugin starts, with `FakePresentations.STANDARD` (what the fake reports until told otherwise) or `CLASSIC`; `presentation()`; `setTerminalTypography(value)`, delivered by `flush()` |
 | Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `status()`, `progress()`, `rail()` |
 | Tool windows and windows | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel`, `panelView`, `panelHeader`, `closePanel`; `windows()`, `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `closeCommand`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
 | Terminals | `addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `focusTerminalPane`, `closeTerminalPane`, `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
 | Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()` |
-| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `browsed()`, `contentTabs()`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor registration wins), `shellEnvironment(map)`, `edit(file, line, windowId)`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
+| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor registration wins), `shellEnvironment(map)`, `edit(file, line, windowId)`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
 
 Where the fake differs from Jasper:
 
 - Background tasks run one at a time on the caller, at `runBackground()`; Jasper runs each on its own thread.
-- Apart from the kit, which requires the event dispatch thread, the fake does not enforce the UI thread, so Jasper's
-  `IllegalStateException` off it is not reproduced.
+- Apart from the kit and `Appearance`'s UI-thread methods, the fake does not enforce the UI thread, so Jasper's
+  `IllegalStateException` off it is not reproduced. The kit and `onTerminalTypographyChanged` need the event dispatch
+  thread; `Appearance`'s other UI-thread methods also accept the thread that made the host.
 - It does not check that a service API is in an exported package, and an absent optional provider's API is still on
   the test classpath, so the `NoClassDefFoundError` path cannot be tested there.
 - It keeps settings in memory and writes no file; a value of the wrong type keeps only that setting's last good value,

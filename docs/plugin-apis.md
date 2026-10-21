@@ -176,7 +176,8 @@ try { reopener = editor.reopener("dev.example.tool:", this::reopen); }
 catch (NoSuchMethodError older) { /* this Editor keeps no recent files */ }
 ```
 
-Remote guards `reopener` and `locationDocuments` this way.
+Remote guards `reopener` and `locationDocuments` this way, and its `EditorDocument` implements `resolveRelative`
+without naming `RelativePaths`, which Editors older than 0.11.0 lack.
 
 ### Testing a consumer
 
@@ -318,14 +319,13 @@ that removes the registration. Their default bodies do nothing, for other implem
 
 | Type | What it is |
 | --- | --- |
-| [`EditorDocument`](sdk-reference.html#dev.jasper.editor.api.EditorDocument) | Implemented by the calling plugin: a file the Editor reads and writes through it. The Editor calls its methods on the UI thread and none may block; its futures may complete on any thread. `key()` is its identity (equal keys are the same file, and **Recent Files** records it), starting with the plugin's own prefix and never `local:`; `name()` the tab title; `location()` the full location for tooltips and the status line, such as `dustin@prod-web:/etc/nginx/nginx.conf`; `host()` the host shown dimmed after the name and in the loading text, empty for a local document. `read(limitBytes)` returns the content, failing with `TooLargeException` before transferring anything when the file is larger; the Editor passes its `max_file_mib` setting in bytes (default 10 MiB). Cancelling the future aborts the transfer. `revision()` returns the current revision, empty when the file no longer exists; the Editor asks for it before each Save (not Save As) and, when it differs from the revision last read or written, lets the user overwrite or reload, or, when the file is gone, save anyway. `write(content)` replaces the content and returns the new revision, following the save contract in its Javadoc: resolve symbolic links; write a hidden sibling with the target's permissions and replace the target atomically; write in place when the sibling cannot be created, would change owner or group, the target has more than one hard link, or atomic replacement is unavailable; create a missing target; then stat it. |
+| [`EditorDocument`](sdk-reference.html#dev.jasper.editor.api.EditorDocument) | Implemented by the calling plugin: a file the Editor reads and writes through it. The Editor calls its methods on the UI thread and none may block; its futures may complete on any thread. `key()` is its identity (equal keys are the same file, and **Recent Files** records it), starting with the plugin's own prefix and never `local:`; `name()` the tab title; `location()` the full location for tooltips and the status line, such as `dustin@prod-web:/etc/nginx/nginx.conf`; `host()` the host shown dimmed after the name and in the loading text, empty for a local document. `read(limitBytes)` returns the content, failing with `TooLargeException` before transferring anything when the file is larger; the Editor passes its `max_file_mib` setting in bytes (default 10 MiB). Cancelling the future aborts the transfer. `revision()` returns the current revision, empty when the file no longer exists; the Editor asks for it before each Save (not Save As) and, when it differs from the revision last read or written, lets the user overwrite or reload, or, when the file is gone, save anyway. `write(content)` replaces the content and returns the new revision, following the save contract in its Javadoc: resolve symbolic links; write a hidden sibling with the target's permissions and replace the target atomically; write in place when the sibling cannot be created, would change owner or group, the target has more than one hard link, or atomic replacement is unavailable; create a missing target; then stat it. `resolveRelative(path)` answers the document a relative path names ([relative paths](#relative-paths)). |
 | [`Content`](sdk-reference.html#dev.jasper.editor.api.Content) | `(bytes, revision)`: the array passes to the receiver, and the provider must not reuse it. |
 | [`Revision`](sdk-reference.html#dev.jasper.editor.api.Revision) | `(modifiedMillis, size)`: two reads with equal revisions are the same content. |
 | [`TooLargeException`](sdk-reference.html#dev.jasper.editor.api.TooLargeException) | An `IOException` with `size()` and `limit()`: "The file is *size* bytes; the limit is *limit* bytes". |
+| [`RelativePaths`](sdk-reference.html#dev.jasper.editor.api.RelativePaths) | `requireValid(path)` returns a relative path unchanged, or throws `IllegalArgumentException` for an empty or absolute path, one starting with a URI scheme or drive letter (`https:`, `C:`), or one holding `?`, `#`, a backslash, a control character or an unpaired surrogate. `%` and `+` are ordinary file-name characters, and `..` segments may leave the folder. Editor 0.11.0. |
 | [`LocationResolver`](sdk-reference.html#dev.jasper.editor.api.LocationResolver) | `document(location, owner)` builds the document for a [`FileLocation.Sourced`](sdk-reference.html#dev.jasper.sdk.files.FileLocation.Sourced) the user picked; `location(documentKey)` says where an open document is in the source, so the chooser starts in its folder. UI thread, no I/O. A `document` that throws posts "Could not open a file", or "Could not save a file" from **Save As…**. |
 | [`OpenRequest`](sdk-reference.html#dev.jasper.editor.api.OpenRequest) | `(window, pane, documentKey)`: the workspace window; the focused terminal pane, empty while another kind of tab is selected; and the active Editor tab's key when no pane is focused. The pane handle is the Editor's and limited by the Editor's capabilities: use its `id()` to find the pane through your own terminals. It is not the SDK's `dev.jasper.sdk.terminal.OpenRequest`. |
-
-`EditorDocument.resolveRelative(path)` (Editor 0.11.0) resolves an already decoded relative path against the document’s parent without I/O or opening a tab, preserving its storage and authentication context. Providers validate paths with `RelativePaths.requireValid`; the default implementation validates and returns empty. Markdown links and relative images use this hook.
 
 **Bundled consumers.** Remote opens SFTP files as `EditorDocument`s with keys `remote:<host id>/<login>[,…]:<path>`,
 registers `reopener("remote:", …)` so **Recent Files** reopens them, and `locationDocuments` for its saved hosts' file
@@ -405,6 +405,23 @@ entries reopenable. Make both calls from a class the plugin creates only once it
 reopener = editor.get().reopener("dev.example.tool:", key -> Optional.of(
     owner -> new StoreDocument(store, key.substring("dev.example.tool:".length()), context.background())));
 ```
+
+### Relative paths
+
+A Markdown preview resolves a relative image or link, such as an image at `images/plan.png` or a link to
+`../setup.md#install`, through the document it shows. The Editor decodes the path's percent escapes, drops any
+`#fragment` and, on the UI thread, calls
+[`resolveRelative(path)`](sdk-reference.html#dev.jasper.editor.api.EditorDocument.resolveRelative(String)), which
+answers the document for that path beside this one, with the same storage, login and owner, built without I/O and
+without opening anything. The Editor then reads an image through the answer's `read`, under its own size limit, or opens
+a linked file in the source's window (selecting its tab when it is already open) and scrolls to the fragment's heading.
+
+The default body checks the path with
+[`RelativePaths.requireValid`](sdk-reference.html#dev.jasper.editor.api.RelativePaths.requireValid(String)) and answers
+empty: the Editor then reports "This document cannot resolve relative links" for a link and leaves a relative image
+unloaded. The Editor's local files and Remote's SFTP files resolve relative paths, normalising `..` segments against
+the file's folder. Remote repeats `requireValid`'s checks instead of calling it, because it also runs with Editors
+older than 0.11.0, which lack `RelativePaths` ([methods newer than the provider](#methods-newer-than-the-provider)).
 
 ## Remote API
 

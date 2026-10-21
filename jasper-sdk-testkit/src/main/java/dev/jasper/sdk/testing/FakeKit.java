@@ -12,7 +12,15 @@ public final class FakeKit implements UiKit, AutoCloseable {
     private final String owner;
     private java.awt.Font contentFont=new java.awt.Font(java.awt.Font.SANS_SERIF,java.awt.Font.PLAIN,13);
     java.awt.Font contentFont(){return contentFont;}
-    /** Simulates the current host UI body font and its normal property changes on specialized content. */
+    /**
+     * Sets the font this kit gives custom content, as Jasper gives it the interface's body font and follows changes
+     * to that font. Content registered from now on receives it, and content already registered in this kit's views
+     * is set to it at once, firing its {@code font} property change. Until this is called the font is plain 13-point
+     * {@code SansSerif}. UI thread only.
+     *
+     * @param font the body font to apply
+     * @throws IllegalStateException off the event dispatch thread or once the kit is closed
+     */
     public void contentFont(java.awt.Font font){guard();contentFont=Objects.requireNonNull(font);for(var view:List.copyOf(views))view.contentFont(font);}
 
     Object anchorHost;

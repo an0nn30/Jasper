@@ -88,6 +88,7 @@ These apply only while a terminal pane (or its find bar) has the focus.
 | Status Bar (Show Status Bar / Hide Status Bar) | `toggle_status_bar` | none | none |
 | Settings | `open_settings` | Cmd+, | Ctrl+Shift+, |
 | Reload Config | `reload_config` | none | none |
+| Manage Cygwin packages… (Windows only; [Cygwin Bash](terminal.md#cygwin-bash)) | `manage_cygwin_packages` | none | none |
 | Quit | `quit` | Cmd+Q | Ctrl+Alt+Shift+Q |
 
 [The workspace](workspace.md) describes what each action does.
@@ -172,6 +173,8 @@ read-only rows.
 | SSH Hosts list (Remote) | Up, Down | Next or previous host or group |
 | Vault entries list (Credential Vault) | Enter | Edits the selected credential |
 | Vault entries list (Credential Vault) | Up, Down | Next or previous credential |
+| Editor's Markdown preview | Tab, Shift+Tab | Selects the next or previous link; from the last or first, moves the focus to the next or previous control |
+| Editor's Markdown preview | Enter | Follows the selected link |
 | File chooser | Enter, Escape | The primary button (Open, Save or Choose), Cancel |
 | File chooser | Option+Left, Option+Right (Alt+Left, Alt+Right) | Back, Forward |
 | File chooser | Option+Up (Alt+Up); Backspace in the listing | Up one folder |

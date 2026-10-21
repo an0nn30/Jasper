@@ -50,6 +50,7 @@ pane, starts a local shell with the configured profile in your home folder; Remo
 | PowerShell | `powershell` | Windows (the default) | `powershell.exe -NoLogo` | PowerShell |
 | PowerShell 7 | `pwsh` | Windows, when it is installed | `pwsh.exe -NoLogo`, by its full path when it is not on `PATH` | PowerShell 7 |
 | Command Prompt | `cmd` | Windows | `%ComSpec%`, or `cmd.exe` when it is unset | Command Prompt |
+| Cygwin Bash | `cygwin` | Windows, once Jasper's Cygwin environment is installed | that environment's `bash.exe`, through Jasper's relay ([Cygwin Bash](#cygwin-bash)) | Cygwin Bash |
 | *the distribution's name* | `wsl:<name>` | Windows, one per installed WSL distribution | `wsl.exe -d <name> --cd <directory>` | the distribution's name |
 | Custom | `custom` | every platform | **Shell program** (`terminal.shell.program`) with **Shell arguments** (`terminal.shell.args`) | the program's file name |
 
@@ -57,12 +58,13 @@ The dropdown adds detail in parentheses: the login or Custom shell's program, or
 with "· default" for the default distribution. PowerShell 7 is found as `pwsh.exe` on `PATH`, under
 `%ProgramFiles%\PowerShell\7` or `7-preview`, or as the Microsoft Store alias in `%LOCALAPPDATA%\Microsoft\WindowsApps`.
 Distributions are read from the registry, with `wsl.exe -l -v` when the registry gives no answer; Docker Desktop's
-distributions and ones that are not fully installed are left out. Jasper detects PowerShell 7 and the distributions at
-start-up and again when you click ↻ (**Detect shells again**) beside the dropdown.
+distributions and ones that are not fully installed are left out. Jasper detects PowerShell 7, Cygwin Bash and the
+distributions at start-up and again when you click ↻ (**Detect shells again**) beside the dropdown.
 
 A profile that is not installed starts the platform default instead, and the configuration problems the status bar
-reports gain `The shell profile "ID" is not available; new panes start NAME instead.` A pane that asks for PowerShell 7
-or a distribution before start-up detection has finished waits for it, at most 12 seconds, showing "Starting terminal…".
+reports gain `The shell profile "ID" is not available; new panes start NAME instead.` A pane that asks for PowerShell 7,
+Cygwin Bash or a distribution before start-up detection has finished waits for it, at most 12 seconds, showing
+"Starting terminal…".
 
 Custom runs **Shell program** with exactly the arguments listed, each one as written: Jasper never splits a string,
 expands variables or adds a login flag. An empty program means the platform's default shell, with the arguments
@@ -89,6 +91,58 @@ shell reports is turned into a Windows path: `/mnt/c/Users/me` becomes `C:\Users
 remote, and an automount root other than `/mnt` is not recognised. Only variables listed in `WSLENV` reach Linux; see
 [Environment](#environment).
 
+### Cygwin Bash
+
+The Windows setup wizard and the [user installation](packaging.md#user-installation-without-a-compiler) install a Cygwin
+environment for your Windows account in `%LOCALAPPDATA%\Jasper\cygwin`, whose `root` folder is Cygwin's `/`; for the
+portable ZIP, run `provision-cygwin.cmd` once ([installing on Windows](getting-started.md#windows)). It starts with
+Cygwin's Base packages and `bash`, `coreutils`, `findutils`, `grep`, `sed`, `gawk`, `diffutils`, `less`, `tar`, `gzip`,
+`bzip2`, `xz`, `unzip`, `git`, `openssh`, `curl` and `ca-certificates`, with everything they depend on. The packages are
+x64 Cygwin, which Windows on Arm runs under emulation.
+
+The **Cygwin Bash** profile is offered while that environment is complete: its package database, `bash.exe`,
+`cygpath.exe` and `cygwin1.dll` are in place. A pane runs `bash.exe` through Jasper's relay: a small Windows program in
+the pane's ConPTY starts Bash on a Cygwin pseudo-terminal, so Cygwin programs get a POSIX terminal for typing, Ctrl+C
+and resizing. When Bash exits or the pane closes, every process started in the pane ends with it, background jobs
+included.
+
+Bash reads `/etc/profile` and the first of `~/.bash_profile`, `~/.bash_login` and `~/.profile` (Cygwin's default
+`~/.bash_profile` reads `~/.bashrc`), then changes to the directory the pane should start in or, when none was asked
+for, to your Cygwin home, `/home/<user>` unless your Cygwin configuration names another, which Cygwin creates at its
+first start. Its environment differs from the other profiles' (see [Environment](#environment)):
+
+- `PATH` starts with the environment's `bin` folder, followed by your Windows `Path`, so Cygwin's tools come first and
+  Windows programs still run. `BASH_ENV` and `ENV` are removed.
+- A `HOME` inherited from Windows is removed, so Cygwin chooses the home; a `HOME` in `[terminal.env]` is kept, with a
+  drive path turned into its Cygwin form.
+- `LANG` is `C.UTF-8` unless it is already set.
+- Variable names arrive in upper case, because Windows ignores their case: a `[terminal.env]` entry `MyTool` arrives as
+  `MYTOOL`.
+- `JASPER_CYGWIN` is `1`, and, unless `terminal.shell_integration` is `"off"`, `JASPER_SHELL_INTEGRATION` holds the
+  script folder's Cygwin path.
+
+Bash does not run as a login shell, so `logout` is unavailable. A program that a plugin or the
+[default editor](editor.md#default-editor) starts in place of the shell runs as a Windows program, without the relay and
+with the Windows `Path`. Cygwin Bash needs Jasper's [shell integration](#shell-integration) folder even when integration
+is off, so it does not start in a run whose scripts could not be written.
+
+**Manage Cygwin packages…** (`manage_cygwin_packages`, no default shortcut), in the command palette on Windows and
+beside **Shell profile** on Settings › Terminal › Shell, opens Cygwin Setup for the environment, without administrator
+rights. It needs a packaged Jasper. Close every Cygwin Bash pane and every other program using the environment first:
+Jasper refuses while one runs, naming the programs other than its own panes. In Setup, choose a download site and the
+packages to add, update or uninstall; packages left at **Keep** stay as they are. Downloading needs an internet
+connection. While Setup runs, new Cygwin Bash panes fail with "Cygwin package management is active; wait for it to
+finish" (the other profiles start as usual), and Setup carries on if Jasper quits. When it ends, a **Cygwin package
+management** notification gives the result, and Jasper detects the shells again.
+
+Jasper never changes the packages itself. Updating, repairing or reinstalling Jasper keeps the whole environment,
+including the packages you added or removed, your Cygwin home and `/etc`; it only adds its own copy of Cygwin Setup and
+the relay to the environment's `manager` folder, and a newer Jasper's starter set applies only to a new environment.
+Uninstalling Jasper keeps the environment too: to remove it, close every program using it and delete
+`%LOCALAPPDATA%\Jasper\cygwin`. While the environment is damaged (Bash, `cygpath.exe`, `cygwin1.dll` or the package
+database is missing), the profile is not offered and installing or updating Jasper fails; **Manage Cygwin packages…**
+still opens Setup to repair it. [Cygwin diagnostics](diagnostics.md#cygwin-on-windows) lists the logs.
+
 ## Environment
 
 A local shell gets Jasper's own environment, changed in this order, later steps winning:
@@ -109,6 +163,7 @@ A local shell gets Jasper's own environment, changed in this order, later steps 
 Shell integration adds its own variables for zsh, bash and fish (see [How Jasper loads it](#how-jasper-loads-it)). A WSL
 pane's `WSLENV` gets `TERM`, `COLORTERM`, `TERM_PROGRAM`, `JASPER_TERMINAL` and, when it is set,
 `JASPER_SHELL_INTEGRATION/p`, after the entries already there; `/p` turns the script folder into its `/mnt/c/...` path.
+A Cygwin Bash pane also changes `PATH`, `HOME`, `LANG` and the variables' names ([Cygwin Bash](#cygwin-bash)).
 Environment changes apply to new panes; a running shell keeps the environment it started with. Sessions a plugin
 provides run elsewhere and get none of this.
 
@@ -346,8 +401,8 @@ run and the failure is logged.
 
 ### How Jasper loads it
 
-Automatic loading applies when the program's file name is exactly `zsh`, `bash`, `fish` or `tmux`; any other program,
-including PowerShell, Command Prompt and `wsl.exe`, gets only the variables.
+Automatic loading applies when the program's file name is exactly `zsh`, `bash`, `fish` or `tmux`, and to the
+Cygwin Bash profile; any other program, including PowerShell, Command Prompt and `wsl.exe`, gets only the variables.
 
 - **zsh** starts with `ZDOTDIR` pointing at Jasper's wrapper files. Each wrapper restores your own `ZDOTDIR` (kept in
   `JASPER_ORIGINAL_ZDOTDIR` while the wrappers run), sources your file of the same name (`.zshenv`, `.zprofile`,
@@ -359,6 +414,9 @@ including PowerShell, Command Prompt and `wsl.exe`, gets only the variables.
   `--noprofile`, it reads `/etc/bash.bashrc` or `/etc/bashrc` and then `~/.bashrc` instead. It then loads `jasper.bash`.
   bash itself does not run as a login shell, so `shopt -q login_shell` is false and `logout` is unavailable. When the
   arguments already hold `--norc`, `--rcfile`, `--init-file` or any form of `-c`, Jasper changes nothing.
+- **Cygwin Bash** always starts with `--noprofile` and `--rcfile` naming Jasper's `cygwin.bash`, which reads the profile
+  files and changes directory as [Cygwin Bash](#cygwin-bash) describes and, in Automatic mode, then loads `jasper.bash`.
+  In Manual mode, add the source line to `~/.bashrc`.
 - **fish** starts with Jasper's `fish` folder first in `XDG_DATA_DIRS` (followed by yours, or
   `/usr/local/share:/usr/share` when it was unset). fish loads Jasper's vendor snippet from there, which loads
   `jasper.fish`.
@@ -428,14 +486,17 @@ one of this machine's names: what `hostname` prints and the `HOSTNAME` and `COMP
 other host is remote: the status bar shows `host:path`, and file links open nothing. A session a plugin provides never
 has a local directory. A pane holds either a local or a remote directory, never both; Jasper's scripts report only when
 the directory changes, so after you leave a remote shell the pane shows the remote directory until you change directory.
+In a Cygwin Bash pane Jasper's script reports the directory's Windows path, which `cygpath` gives, with the host
+`localhost`, so `/home`, `/cygdrive/c` and other mounts report the folder they show; a directory without a drive-letter
+path, such as one on a network share, is not reported.
 
 New tabs, splits and new windows start in the focused pane's local directory; when it has none (before any report, or
 since a remote report), they start in the directory the pane was started in. A pane started without a directory, such as
 the first pane of the window Jasper opens at start-up, or a plugin's session, then passes nothing on, and the new shell
-starts in your home folder (a WSL profile's `~`). New Tab and New Window start the configured profile; a split starts
-the profile of the pane it splits. On Windows, a directory on another computer's network share is never started in or
-looked at: such a report is ignored, and a new pane asked to start there starts where a new shell starts. A pane that is
-not WSL asked to start on a `\\wsl.localhost` share starts in your home folder.
+starts in your home folder (a WSL profile's `~`, Cygwin Bash's Cygwin home). New Tab and New Window start the configured
+profile; a split starts the profile of the pane it splits. On Windows, a directory on another computer's network share
+is never started in or looked at: such a report is ignored, and a new pane asked to start there starts where a new shell
+starts. A pane that is not WSL asked to start on a `\\wsl.localhost` share starts in your home folder.
 
 ## Titles
 

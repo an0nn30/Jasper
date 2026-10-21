@@ -18,7 +18,11 @@ Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core 
 and tool windows), the terminal, the command palette, notifications, Settings, themes and looks; most features are
 bundled plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
 
-- **Branches.** `origin/main` at `c6bb59fdd` has the V1 code fixes (`claude/v1-code-fixes`, the code problems the
+- **Branches.** `origin/main` at `4743469e5` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status
+  Bar Keymap actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise
+  mode), the Editor's own typography and Markdown preview (SDK 0.18.3, Editor 0.11.0, Remote 0.15.1) and the bundled
+  Cygwin on Windows; the Cygwin entry above, which says "merged into local `main`", was written before the push.
+  `c6bb59fdd` has the V1 code fixes (`claude/v1-code-fixes`, the code problems the
   V1 documentation audit found: the package description and Linux menu categories, setting descriptions, Option key as
   Meta shown only on macOS, the Sample's Greetings… shortcut (Cmd+Option+Y; Ctrl+Alt+Shift+Y), the Editor's F3 and
   Shift+F3 off macOS and one Close Tab in its tab menu, Vault's classic Lock Vault caption, the
@@ -35,24 +39,28 @@ bundled plugins on the public plugin SDK. The [documentation index](README.md) l
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
 - **SDK** `0.18.3` (`JasperSdk.VERSION`); Credential Vault, Enterprise, File Server, Remote and Sample declare
-  `sdk = ">=0.18.2, <0.19"`; Editor declares `sdk = ">=0.18.3, <0.19"`, and Project Index, Shell History and Snippets `sdk = ">=0.18.0, <0.19"`.
+  `sdk = ">=0.18.2, <0.19"`, the Editor `sdk = ">=0.18.3, <0.19"`, and Project Index, Shell History and Snippets
+  `sdk = ">=0.18.0, <0.19"`.
 - **Themes.** Built in: Slate Cobalt (Dark and Light; the default Dark theme), Jasper Meadow Light (the default Light
   theme), Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise
   theme. **Looks:** the default look, and the Enterprise look while its plugin is on (Settings › Plugins, then restart;
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** `./gradlew check` with the Rail and Status Bar shortcuts (2026-10-20): 11,630 tests,
-  0 failures, 0 errors, 25 skipped. The Windows user installation entry ran it with Python 3.13 (`-Pjasper.python`), because
-  `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
-  macOS, Ubuntu and every Linux packaging and install check passed, and so did the single-worker Windows check.
+- **Last recorded checks.** `./gradlew check` on local `main` with the Editor's typography and Markdown preview and the
+  bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in
+  Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
+  `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
+  macOS, Ubuntu and every Linux packaging and install check passed, and so did the single-worker Windows check. No
+  check is recorded for the two later commits that share the Shell Prompt icon and the Meadow splash with Enterprise
+  mode (`eb424eeec`, `4743469e5`).
 
 Bundled plugins, all enabled by default except Enterprise:
 
 | Plugin | Id | Version | Exports | Provides |
 | --- | --- | --- | --- | --- |
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
-| Editor | `dev.jasper.editor` | 0.11.0 | `dev.jasper.editor.api` | Local and remote text files in tabs; `jasper editor` |
+| Editor | `dev.jasper.editor` | 0.11.0 | `dev.jasper.editor.api` | Local and remote text files in tabs, with Markdown preview; `jasper editor` |
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
 | File Server | `dev.jasper.fileserver` | 0.6.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
@@ -65,15 +73,21 @@ Open items, as the entries below record them:
 
 - **GUI checks.** No entry from 2026-10-13 on records its "GUI checks for the user" as done. The longest list is the
   Enterprise look's, in the series entry (2026-10-18, spec 16.2); the side stripes entry and plans 13, 14, 15a and 15b
-  add their own, plan 14's starting with the classic title band in the packaged macOS app.
+  add their own, plan 14's starting with the classic title band in the packaged macOS app. The Editor's fonts and
+  Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
+  Meadow splash and the Rail and Status Bar shortcuts (2026-10-20) await theirs.
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
   classic title bar, the boot splash on Windows and Linux (2026-10-19), the Windows network-share checks (2026-10-14),
   the Enterprise look's Windows and Linux checks (series entry) and Ubuntu Yaru's native appearance and window checks
-  (2026-10-17) need those machines.
+  (2026-10-17) need those machines. The bundled Cygwin's native x64 Windows acceptance and its interactive checks in
+  the app on both architectures (2026-10-20) are still to run and block release publication
+  ([verification](superpowers/plans/2026-10-20-jasper-cygwin-verification.md)).
 - **Theme converter.** `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14 (2026-10-17,
   and again on 2026-10-20); that test last changed on 2026-10-13.
+- **Website.** The Shell Prompt and Meadow website changes are not deployed: the Pages workflow runs only by hand and
+  has not been run (2026-10-20).
 - **Rulings awaited.** Plan 12's Rulings 17 (the focused header's guard) and its question on the Run window's row
   count, and plan 13's comparison of the iconed stripes with their icon slices cut out.
 - **Enterprise residuals.** The differences from the mocks that the series entry and plans 13 to 15b list; the

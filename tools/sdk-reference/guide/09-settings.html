@@ -111,8 +111,8 @@ row for a declared setting, bound to the page's unsaved value, and Settings save
 {@link SettingsPanelHost#changed()} says the page's modified state changed. {@link SettingsPanel#modified()},
 {@link SettingsPanel#apply()} and {@link SettingsPanel#reset()} cover only state of the plugin's own beyond its declared
 settings; {@link SettingsPanel#dispose()} runs when Settings closes the page.</p>
-<p>The default {@link SettingsPanel#pendingChanged()} callback (SDK 0.18.3) runs after a standard row edit, list action
-or Reset, with the pending value and validation already updated. Rebuild dependent descriptors here, reading
-{@link SettingsPanelHost#pending(Setting)}. Invalid edits can leave the pending value unchanged; plugin calls to
-{@code host.stage} leave refreshing to the plugin.</p>
+<p>{@link SettingsPanel#pendingChanged()} runs after a standard row handles the user's edit, choice, list action,
+Browse… or Reset, once {@link SettingsPanelHost#pending(Setting)} returns the result and the row shows its validation
+(an invalid edit leaves the pending value as it was). Rebuild there whatever the page shows from pending values, as the
+Editor's page does. The plugin's own {@code stage} calls do not trigger it. It needs SDK 0.18.3.</p>
 </section>

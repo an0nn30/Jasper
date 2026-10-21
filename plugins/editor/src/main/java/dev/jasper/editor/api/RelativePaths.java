@@ -8,7 +8,7 @@ public final class RelativePaths {
 
     /**
      * Validates an already decoded path; percent signs and plus signs are literal filename characters.
-     * Dot segments may leave the source directory and are normalized by the provider.
+     * Dot segments may leave the source directory and are normalised by the provider.
      *
      * @param path a nonempty relative file path, with {@code /} separators
      * @return the unchanged path

@@ -140,3 +140,35 @@ When the last start with a plugin's look, such as [Enterprise](enterprise.md), d
 next start uses the standard look and posts **Jasper started with its standard look** in the Plugin problems group,
 with **Try Again**. [When a look does not start](looks.md#when-a-look-does-not-start) describes the record in
 `presentation-attempt.toml`. [Safe mode](getting-started.md#safe-mode) starts without look plugins.
+
+## Cygwin on Windows
+
+Installing the [Cygwin environment](terminal.md#cygwin-bash) and managing its packages write their own records in
+`%LOCALAPPDATA%\Jasper\cygwin`, not in Jasper home. In its `logs` folder:
+
+| File | Written by |
+|---|---|
+| `provision-result.json` | Each installation (the setup wizard, `installWindowsUser` or `provision-cygwin.cmd`): its outcome, `CREATED`, `REUSED`, `FAILED` or `RESTART_REQUIRED`, and its message |
+| `setup-<milliseconds>.log` | Cygwin Setup during the first installation |
+| `bash.exe.log`, `git.exe.log`, `ssh.exe.log`, `curl.exe.log` | The checks that the installed tools start |
+
+Each **Manage Cygwin packages…** run keeps a folder in `operations` with Setup's output (`setup.log`), the
+supervisor's (`supervisor.log`) and the result (`result.json`). The installation helper also prints its message and
+exits with status 0 when it succeeds, 2 when Windows must restart before Cygwin Setup can finish, and 1 otherwise.
+Jasper's own log records a detection that fails as "Cygwin detection failed".
+
+| Message | Meaning |
+|---|---|
+| `Cygwin Setup requires a Windows restart; initialization remains incomplete` | Restart Windows and install again; the installation goes on with the seed it kept. |
+| `Insufficient space for Cygwin: requires N bytes` | The drive holding `%LOCALAPPDATA%` needs that much free space. |
+| `Foreign Cygwin environment: <folder>` | Jasper did not create that folder for this Windows account, so it neither uses nor changes it; move it away for Jasper to install its own. |
+| `Cygwin Bash or its package database is missing; use Manage Cygwin packages` | The environment is damaged; repair it with **Manage Cygwin packages…**. |
+| `Close Jasper Cygwin sessions before managing packages`, `Close processes using this Cygwin environment: …` | Close them and choose **Manage Cygwin packages…** again. |
+| `Cannot verify whether these processes use Cygwin; close them before package changes: …` | Windows did not let Jasper inspect those processes; close them and try again. |
+| The path of `owner.json` in `%LOCALAPPDATA%\Jasper\cygwin`, alone | **Manage Cygwin packages…** found no Cygwin environment; install it first with the setup wizard, `installWindowsUser` or the ZIP's `provision-cygwin.cmd`. |
+| `Initialization was not completed; provision Cygwin through the Jasper installer first` | **Manage Cygwin packages…** found an installation that did not finish; install again, which goes on with the seed it kept. |
+| `Cygwin management helper is unavailable; use a packaged Jasper installation` | **Manage Cygwin packages…** needs a packaged Jasper with `app\cygwin-tool.jar`. |
+| `Cygwin operation is already active` | An installation or an earlier **Manage Cygwin packages…** run is using the environment; wait for it to finish. |
+| `Cygwin management was interrupted; reopen Manage Cygwin packages before starting Bash`, `Cygwin manager is starting or was interrupted; reopen Manage Cygwin packages` | A Setup run ended without a result; Cygwin Bash starts again once **Manage Cygwin packages…** has been opened. |
+| `Cygwin bootstrap scripts are unavailable` | Shown in a Cygwin Bash pane when Jasper could not write its shell integration folder in this run. |
+| `Jasper PTY relay: <operation> (Windows error N)` | Printed in a Cygwin Bash pane when the relay fails; it ends the pane's shell and every process started in the pane. |

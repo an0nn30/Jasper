@@ -39,7 +39,7 @@ It cannot change:
 
 | Not in a theme | Set by |
 |---|---|
-| Fonts and font sizes | Settings (`ui.font.*`, `terminal.font.*`) and the look |
+| Fonts and font sizes | Settings (`ui.font.*`, `terminal.font.*`, the Editor's [font settings](editor.md#fonts)) and the look |
 | Spacing, sizes, corner radii, control shapes, layout | The look |
 | Icons | Jasper and plugins draw them; roles tint them (`text.secondary` is the default icon tint, the `hue.*` roles colour category icons) |
 | Shadows | Painted black at fixed strengths |
@@ -48,7 +48,7 @@ It cannot change:
 | Which role paints dialog bodies and the Settings navigation | The look's kit file ([Beyond colours](#beyond-colours-building-a-look)) |
 | The 256-colour palette's colours 16 to 255 | Fixed: the standard xterm 6×6×6 cube and grey ramp |
 | The 14 derived colours that are not overridable | Computed from the roles ([Derived roles](#derived-roles)) |
-| The Editor's find and 'hlsearch' match highlight, matched-bracket highlight, occurrence marks and Vim sneak's matches | RSyntaxTextArea's default colours; sneak's matches are a fixed translucent magenta |
+| The Editor's find and 'hlsearch' match highlight in the source text, matched-bracket highlight, occurrence marks and Vim sneak's matches | RSyntaxTextArea's default colours; sneak's matches are a fixed translucent magenta |
 
 ## Quick start
 
@@ -500,6 +500,12 @@ Editor plugin paints with them through RSyntaxTextArea; plugins read them throug
 Referring to the matching terminal scheme keeps the Editor, the terminal and the interface consistent; plain hex is
 fine where the Editor needs a colour of its own. On macOS, with a translucent workspace (`ui.workspace.opacity` below
 100), the Editor's background and gutter are left clear and the current-line highlight takes the workspace's opacity.
+
+The Editor's [Markdown preview](editor.md#markdown-preview) colours its code blocks with these syntax roles, and the
+rest of its page with UI roles: `surface.panel` behind it (at the workspace's opacity), `text.primary` for text,
+`accent` for links, `text.secondary` for block quotes and image placeholders, `surface.card` behind code blocks,
+`border.window` for table borders, `surface.panel.raised` behind table header cells, and `selection.bg` with
+`text.onSelection` for selected text; Find's matches in it are laid on `selection.bg`.
 
 ## Contrast and the token rule
 

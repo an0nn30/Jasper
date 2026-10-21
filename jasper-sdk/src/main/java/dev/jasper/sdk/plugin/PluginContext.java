@@ -124,8 +124,8 @@ public interface PluginContext {
 
     /**
      * Theme colours for custom content and the look Jasper runs with: semantic colours, the chrome and workspace
-     * variants, the workspace, editor and syntax palettes, the workspace opacity, change notifications and the
-     * presentation.
+     * variants, the workspace, editor and syntax palettes, the workspace opacity, change notifications, the
+     * presentation and the saved terminal typography.
      *
      * @return the appearance service
      */

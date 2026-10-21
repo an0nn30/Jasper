@@ -98,8 +98,9 @@ sequenceDiagram
    runtime, so all three see the same plugin set.
 4. `ConfigService` reads `config.toml` (or the `--config` file) with the look's defaults (`DefaultSource`).
 5. `prepareDesktop` installs the shutdown hook (`jasper-log-shutdown`) and the uncaught-exception handler, commits the
-   desktop properties and the title-bar style from the look's `DesktopFlags`, opens the Meadow or branded look's splash
-   (`splash`), prepares the built-in icons and posts the composition to the EDT.
+   desktop properties and the title-bar style from the look's `DesktopFlags`, opens the boot splash (`splash`: a branded
+   look's, else the Meadow splash) on a start that will open a window, prepares the built-in icons and posts the
+   composition to the EDT.
 6. On the EDT the bootstrap composes the application inside `StartupResources`: the palette's command recents
    (`CommandHistory`), then `JasperApplication`, whose constructor registers the bundled fonts and the look's faces,
    installs the theme under the look's kit (falling back to the standard look when the kit is at fault), and builds
@@ -114,7 +115,9 @@ sequenceDiagram
 
 `StartupResources` owns every acquired resource until `transfer()`, and on failure closes them once in reverse
 acquisition order, suppressing cleanup failures onto the original error. The pre-EDT and EDT compositions use separate
-scopes. A splash that is already showing closes when start-up fails.
+scopes. The splash closes once the first window's first paint has reached the screen
+(`TerminalWindow.afterFirstVisiblePaint`, run on the EDT turn after that paint), or earlier when start-up fails, that
+window closes or Jasper quits.
 
 Work that is not needed for the first window waits until start-up settles. The macOS Dock bridge, the menu bar item
 and the Windows notification-area icon arrive when the first output paints, a `--background` warm-up finishes, or 2 s
@@ -170,8 +173,9 @@ operating system does not report the command line.
 
 1. It arms the exit deadline (4 s, the 2 s grace doubled), which needs no EDT to fire: a plugin callback that blocks
    the EDT cannot be abandoned, so then only the deadline ends the process.
-2. It stops session admission and shell-profile detection, closes the command recents, the heap watch and the memory
-   indicator, then stops the plugins in reverse start order; their drained background work joins the wait.
+2. It stops session admission and shell-profile detection, stops reporting Cygwin package management (its supervisor
+   process runs on), closes the command recents, the heap watch and the memory indicator, then stops the plugins in
+   reverse start order; their drained background work joins the wait.
 3. It clears pending clipboard secrets, closes the auxiliary windows, saves `ui-state.toml`, and closes the
    notifiers, the themes, Buddy, the notification views and the configuration, then removes the desktop's application
    handlers.
@@ -190,7 +194,9 @@ the log. Residency does not keep pane sessions; child cleanup may briefly contin
 | --- | --- |
 | Workspace, palette, Settings, notifications, theme subscriptions, Buddy, the plugin runtime's UI and its event bus | EDT |
 | Configuration reads, saves, watching and migration | `ConfigService`'s `jasper-config` worker; states reach the EDT with superseded revisions dropped |
-| Shell launches | `ShellLauncher` workers (`jasper-shell-launch-N`), delivering on the EDT |
+| Shell launches | `ShellLauncher` workers (`jasper-shell-launch-N`), delivering on the EDT; a Cygwin Bash launch prepares its relay and paths there (`CygwinLaunch`) |
+| Shell-profile detection (WSL, PowerShell 7, Jasper's Cygwin) | `jasper-shell-profiles`, a virtual thread, answering on the EDT |
+| Cygwin package management | `jasper-cygwin-manager`, a virtual thread that waits for the supervisor process, answering on the EDT |
 | A plugin's background work | its own virtual threads (`jasper-plugin-<id>-N`), drained at stop |
 | The Plugins page's operations (snapshot, enable, consent, inspect, install, remove) | `jasper-plugin-admin`, one at a time, answering on the EDT |
 | Plugin settings files | `jasper-plugin-settings` checks them for changes every second; saves and opens run on virtual threads |
@@ -235,10 +241,10 @@ options.
 
 `ConfigurationController` sends the appearance (`ui.appearance`, resolved by `AppearancePolicy`; see [themes](#themes))
 and the theme picks and `terminal.scheme` to `ThemeController`. Buddy enablement and the login item follow every saved
-snapshot in `JasperApplication`, and each saved snapshot makes the plugin runtime re-read every plugin's settings file
-and publish `AppEvents.CONFIG_RELOADED`; the bootstrap builds the login-item reconciler and hands it over. Plugin
-settings live in each plugin's own `<home>/plugins/<id>/<id>.toml`, read with the plugin's declared schema, not in
-`config.toml`.
+snapshot in `JasperApplication`, and each saved snapshot makes the plugin runtime publish the saved terminal font to
+plugins (`HostedTypography`), re-read every plugin's settings file and publish `AppEvents.CONFIG_RELOADED`; the
+bootstrap builds the login-item reconciler and hands it over. Plugin settings live in each plugin's own
+`<home>/plugins/<id>/<id>.toml`, read with the plugin's declared schema, not in `config.toml`.
 
 ## Package ownership
 
@@ -256,21 +262,21 @@ settings live in each plugin's own `<home>/plugins/<id>/<id>.toml`, read with th
 | `settingsui` | EDT Settings dialog: the shell, the draft of pending core-setting edits, schema-generated and group pages, editors and the core page tree; the application supplies the Keymap, Plugins and plugin pages (`CorePages.Pages`). `SettingsDialog` owns each opening's pages and disposes them on close. The look's `presentation.SettingsChrome` sets the frame (a native title, the collapsible navigation), Reset inline or in the row's menu, the rows the look implies and the font row's copy; every page's `PageContext` carries it with the `Composition`. |
 | `contributions` | EDT model of what extensions and the application contribute to the chrome (actions, toolbar entries, menu sections, status entries, panels, rail buttons, palette scopes, file-chooser sources, content tabs, quit guards), in app-native types. The application owns the single instance; the plugin runtime writes it and every window renders it. |
 | `appearance` | EDT theme resolution and look-and-feel installation (`ThemeController`, `ThemeManager`), the theme library (`ThemeLibrary`, `PluginThemes`) and the themes folder's imports and removals (`ThemeFolder`). Subscribers own returned cancellation handles. |
-| `launch` | Immutable launch capture, shell profiles (PowerShell, PowerShell 7, Command Prompt, WSL distributions, the login shell, Custom) and shell-integration extraction; `ShellLauncher` starts off the EDT and delivers on the EDT; the EDT-confined `ShellProfileCatalog` detects off the EDT and is closed by the application. The receiving pane owns the session. |
+| `launch` | Immutable launch capture, shell profiles (PowerShell, PowerShell 7, Command Prompt, Cygwin Bash, WSL distributions, the login shell, Custom), Cygwin Bash's launch preparation (`CygwinLaunch`, off the EDT) and shell-integration extraction; `ShellLauncher` starts off the EDT and delivers on the EDT; the EDT-confined `ShellProfileCatalog` detects off the EDT and is closed by the application. The receiving pane owns the session. |
 | `terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane, and the session request and attempt state machine. It backs the SDK's terminals service. The application owns the `TerminalRegistry`; each window closes its own registration. |
 | `windows` | Application-built auxiliary windows, dialogs and in-window overlays: the headless `AuxiliarySurface` core and `NativeShells`, the only class besides `TerminalWindow` that creates native frames. The application owns `AuxiliaryWindows` and closes it at shutdown. |
 | `files` | Jasper's file chooser: the headless `ChooserModel` over `Location`s, `Browser`s and `ChooserSource`s (the local disk is `LocalSource`/`LocalBrowser`; plugin sources are adapted in `plugins`) and the Swing `FileChooserPanel`. `NativeShells` shows it in a dialog and owns that dialog's worker; the model applies worker results on the EDT, drops stale ones and closes the browsers it opened. |
 | `notifications` | EDT notification center (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, and terminal and activity notice production for Buddy. The application owns the center and the incidents and closes notifiers before the companion. |
 | `notificationui` | EDT views of the center: each window's `CardLayer`, the history panel, the Errors window's `ErrorsView`, and their text, style and focus helpers. The application mounts each layer through `WindowContent` and closes it with its window; the Errors window closes its view. |
 | `about` | The About and Licenses windows' views and the third-party notices index read from resources. The application's `AboutWindows` owns both windows and closes each view with its window. |
-| `splash` | The boot splash: `SplashPainter` draws Jasper's Meadow landscape and animated pixel mascot, or a branded look's own files, and `Splash` is its undecorated window, which every paint reaches as one copy from `SplashBuffer`. The bootstrap decodes the files off the EDT, opens the window on it and closes it through `StartupSteps` after the first visible workspace paint or when start-up fails. Meadow animation uses a daemon with serialized painting while startup occupies the EDT and honors the animation preference. |
-| `cygwin` | The JDK/JNA persistent Windows environment, shared with the standalone installer helper. `launch.CygwinLaunch` prepares the verified relay and Bash environment off the EDT; `application.CygwinFeature` owns package-management workers and UI notifications. See [Cygwin lifecycle](../packaging/windows/cygwin/README.md). |
+| `splash` | The boot splash: `SplashPainter` draws the Meadow splash (`MeadowSplash`: `meadow.svg` and the Desk Buddy sprite strip) or a branded look's own files, and `Splash` is its undecorated window, which every paint reaches as one copy from `SplashBuffer`. The bootstrap decodes the files off the EDT, opens the window on the EDT and closes it through `StartupSteps` after the first window's first visible paint or when start-up stops. `SplashAnimation`'s `jasper-splash-animation` daemon paints the Meadow turtle's next frame every 220 ms, so it moves while start-up holds the EDT, under a lock it shares with step painting and closing; it does not start when `ui.animations.enabled` is false. |
+| `cygwin` | Jasper's own Cygwin on Windows (`%LOCALAPPDATA%\Jasper\cygwin`): its layout, ownership and state, the seed manifest, provisioning, launch reservations and the package-management supervisor. JDK and JNA Platform only, because the same sources also build `cygwin-tool.jar`, the helper the installers, `provision-cygwin.cmd` and package management run. `launch.CygwinLaunch` prepares the verified relay and the Bash environment off the EDT; `application.CygwinFeature`, owned and closed by the application, runs one management request at a time and reports it as a notification. See [bundled Cygwin](../packaging/windows/cygwin/README.md). |
 | `residency` | The bounded handoff protocol (`LaunchRequest`) and its endpoint (`HandoffSocket`). The bootstrap transfers endpoint close to application shutdown and the process hook. |
 | `commandline` | The `jasper` command's side: the command socket's wire format (shared with `packaging/cli`) and listener, the calls it dispatches, the subcommand list `jasper --help` reads, and putting the command on `PATH`. The bootstrap binds the listener after plugins start; the application closes it at shutdown. |
 | `platform` | OS adapters (title bars, the Dock, the menu bar item and notification-area icon, login items, Windows process tuning, glass), icons, fonts, logging and system notifications. Callers own registrations and native handles; Swing operations run on the EDT, logging and system notifications each have their own worker, and the macOS title band reads the double-click setting once on a short-lived virtual thread. |
 | `persistence` | Bounded TOML reads and atomic writes (`UiState` for `ui-state.toml`, `BuddyStateFile`); synchronous helpers own short-lived file handles. The caller chooses thread and lifecycle. |
-| `presentation` | The presentation a process runs with, chosen once before Swing: the kit file parser (`KitParser`, `ChromeSpec`, `FontFile`), each provider's `PresentationFacts`, the attempt record (`AttemptStore`, `PresentationAttempt`), the `Projections` (among them `PluginLook`, what plugins learn of the look) and `Presentation`. Values and bounded file stores, no Swing; `PluginSelection` builds it and the application hands each consumer its kit or projection. `Branding` holds a look's product name, icons and splash art as bytes. |
-| `plugins` | The plugin runtime: descriptors, the locked consent state, resolution, per-plugin class loaders, the queued EDT event bus, activities, the service registry, declared plugin settings with the look's defaults for them, the look plugins read (`HostedPresentation`) and plugin lifetimes. The only package that references the SDK. The application owns and stops `PluginRuntime`; `PluginRuntime.settingsPages` gives Settings a page per plugin under Tools. |
+| `presentation` | The presentation a process runs with, chosen once before Swing: the kit file parser (`KitParser`, `ChromeSpec`, `FontFile`), each provider's `PresentationFacts`, the attempt record (`AttemptStore`, `PresentationAttempt`), the `Projections` (among them `PluginLook`, what plugins learn of the look) and `Presentation`. Values and bounded file stores, no Swing; `PluginSelection` builds it and the application hands each consumer its kit or projection. `Branding` holds a look's product name, icons (none for `icons = "@jasper"`, which keeps Jasper's) and splash art as bytes. |
+| `plugins` | The plugin runtime: descriptors, the locked consent state, resolution, per-plugin class loaders, the queued EDT event bus, activities, the service registry, declared plugin settings with the look's defaults for them, the look plugins read (`HostedPresentation`), the saved terminal font they read (`HostedTypography`: published and subscribed on the EDT, read from any thread) and plugin lifetimes. The only package that references the SDK. The application owns and stops `PluginRuntime`; `PluginRuntime.settingsPages` gives Settings a page per plugin under Tools. |
 | `pluginmanager` | The Settings dialog's Plugins page: the plugin list, consent and confirm sheets over Settings, and an EDT controller over `PluginRuntime`'s records that drives the restart conversation; `PluginsPage` maps the look's composition to a `PluginShape`. The application owns the `PluginManager`; `SettingsDialog` owns each `PluginsPage`. |
 | `shortcuthelp` | The Settings dialog's Keymap page: the effective shortcut catalog, the grouped searchable tree, staged binding edits saved on Apply and a window-scoped key recorder; `KeymapPage` maps the look's composition to a `KeymapShape`. `SettingsDialog` owns each `KeymapPage`; disposing it closes its subscription and recorder. |
 | `restart` | Planning the replacement's command line (`RestartCommand`, `RestartMode`), the `ResidentControl` seam and the `RestartFlow` state machine. No owner; worker threads are daemons. |
@@ -427,8 +433,10 @@ font and size. A configured interface font still wins.
 
 Shell-integration scripts keep their class-path paths. `ThemeManager.install` names `SplitDividerBorder` by class
 name, so it must follow package moves. Icons use absolute paths; Buddy loads its sprite relative to `BuddySprite` in
-its own jar. `PackagedResourcesTest` opens the real jars, loads the bundled fonts, checks that the icons, the
-shell-integration scripts and the `SplitDividerBorder` class are present, and rejects test fixtures in production jars.
+its own jar. `processResources` copies the same sprite strip into the application jar as
+`dev/jasper/app/splash/jasper-pixel.png`, beside `meadow.svg`, so the splash uses no Buddy type.
+`PackagedResourcesTest` opens the real jars, loads the bundled fonts, checks that the icons, the shell-integration
+scripts and the `SplitDividerBorder` class are present, and rejects test fixtures in production jars.
 
 Run `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture check :jasper-app:installDist` after a
 boundary change. Neither architecture checker has cycle exemptions. Javadoc and the compiled guide examples are

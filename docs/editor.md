@@ -1,8 +1,9 @@
 # Editor
 
 The bundled Editor plugin (`dev.jasper.editor`) edits local and remote text files in workspace tabs, beside terminal
-tabs: syntax highlighting, find and replace, saves that check for outside changes and replace the file atomically,
-recent files in the command palette, and an optional Vim mode. It is also Jasper's [default editor](#default-editor):
+tabs: syntax highlighting, find and replace, a [Markdown preview](#markdown-preview), [fonts](#fonts) of its own or the
+terminal's, saves that check for outside changes and replace the file atomically, recent files in the command palette,
+and an optional Vim mode. It is also Jasper's [default editor](#default-editor):
 the files Jasper opens itself go to it, or to another editor you choose, and it sets `EDITOR` for Jasper's shells.
 Other plugins open files in it through its API: Remote for files on SFTP hosts, Project Index for the palette's
 **Files** chip. Like every bundled plugin it can be turned off on the Plugins page ([Plugins](plugins.md#editor)).
@@ -21,7 +22,8 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   none.
 - In the command palette's **Files** chip, from [Project Index](project-index.md#finding-files), Enter opens the file.
 - In Remote's SFTP browser, Enter or a double click opens the file; see [Remote files](#remote-files).
-- Drag files from the desktop onto an Editor tab's text: each regular file opens in a tab, and folders are ignored.
+- Drag files from the desktop onto an Editor tab's source text: each regular file opens in a tab, and folders are
+  ignored.
 - Cmd-click (Ctrl-click on Linux and Windows) a file path in a terminal pane, **File › Open File…**, and the files
   Jasper opens itself (`config.toml`, a plugin's settings file, the custom VM options file) go to the
   [default editor](#default-editor), which is this Editor unless you choose another. A click opens only an existing
@@ -49,8 +51,9 @@ Each file is a tab in a workspace window's tab strip ([Plugin tabs](workspace.md
 - a file icon, or a server icon for a remote file. Its tooltip is the file's full location.
 
 Right-click the tab for **Open in Separate Window** (**Move to Main Window** in a separate window), every
-[command](#commands-and-shortcuts) with its shortcut, **Copy**, **Paste** and **Close Tab**. Moving a tab keeps its text,
-undo history and unsaved changes. Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the
+[command](#commands-and-shortcuts) with its shortcut, **Copy**, **Paste**, **Select All**, **Cut**, **Delete**,
+**Undo**, **Redo** and **Close Tab**. Moving a tab keeps its text, undo history, unsaved changes and Markdown view.
+Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the
 **Folding** submenu (Toggle Current Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by
 **Save**, **Find…**, **Go to Line…** and **Toggle Comment**.
 
@@ -68,7 +71,7 @@ these items:
 
 | Item | Shows | Click |
 |---|---|---|
-| `Ln 12, Col 5` | The caret's line and column | |
+| `Ln 12, Col 5` | The caret's line and column; `Source Ln 12, Col 5` in a Markdown tab's Preview view | |
 | Language, such as `Python` | The tab's language | Opens **Language…** |
 | Encoding: `UTF-8`, `UTF-8 BOM`, `UTF-16LE BOM`, `UTF-16BE BOM`, `ISO-8859-1` | How the file is stored | |
 | `LF`, `CRLF` or `CR` | The line endings saves write; `Mixed → LF` (or `CRLF`, `CR`) until a save makes mixed endings one kind | |
@@ -77,7 +80,8 @@ these items:
 | `Vim: On` or `Vim: Off` | [Vim mode](#vim-mode) | Toggles it, in every tab |
 
 Before them, "Saving…" shows while a save runs, and for 3 seconds "Reloaded: changed on disk" after an
-[outside change](#outside-changes) reloaded the file, or "Could not reload: *reason*".
+[outside change](#outside-changes) reloaded the file, "Could not reload: *reason*", or why a
+[Markdown link](#links-in-the-preview) could not be followed.
 
 ## Commands and shortcuts
 
@@ -98,6 +102,9 @@ Vim mode, `:action id` and `<Action>(id)` run them by the id in the last column.
 | Find Previous | Cmd+Shift+G | Shift+F3 | `find-previous` |
 | Go to Line… | Cmd+L | Ctrl+L | `go-to-line` |
 | Toggle Comment | Cmd+/ | Ctrl+/ | `toggle-comment` |
+| Markdown: Source | | | `markdown.source` |
+| Markdown: Source and Preview | | | `markdown.split` |
+| Markdown: Preview | | | `markdown.preview` |
 | Revert to Saved | | | `revert` |
 | Language… | | | `language` |
 | Toggle Soft Wrap | | | `wrap` |
@@ -105,6 +112,9 @@ Vim mode, `:action id` and `<Action>(id)` run them by the id in the last column.
 | Reload vimrc | | | `reload-vimrc` |
 | Copy | Cmd+C | Ctrl+C | |
 | Paste | Cmd+V | Ctrl+V | |
+
+The three Markdown commands are available once a Markdown tab's text has loaded, and are dimmed in other tabs. In Vim
+mode a mapping such as `:nnoremap <Leader>p <Action>(markdown.preview)` gives one a key.
 
 The plugin's actions are in the command palette and can be given other shortcuts in Settings › Keymap or
 `[keybindings]` ([Shortcuts](configuration.md#shortcuts)):
@@ -137,13 +147,16 @@ Paste. Use the menus or the command palette for those.
 
 ## Find and replace
 
-**Find…** searches the pane last focused and opens the find bar at the bottom of the tab, with the selection as its
-query when it is one line; **Replace…** opens it with a second row for the replacement, revealing Source in Split
-for a Preview-only Markdown tab. The bar has the query field, **Match Case**, **Whole Word** and **Regular Expression** (Java's regular expressions) toggles, the match count ("No matches", "1 match",
-"*n* matches", or "Invalid pattern"), **Previous Match**, **Next Match** and **Close**. Every match is highlighted, and
-the search wraps around the end of the file. In the replace row, **Replace** replaces the next match after the caret and
-**Replace All** replaces every one and reports "Replaced *n*". With Regular Expression on, `$1`, `$2` and so on in the
-replacement stand for the pattern's groups, `\n` and `\t` for a new line and a tab, and `\$` for a dollar sign.
+**Find…** opens the find bar at the bottom of the tab, with the selection as its query when it is one line. It searches
+the text, or in a Markdown tab the pane that last had the focus: the source, or the rendered preview
+([Finding in the preview](#finding-in-the-preview)). **Replace…** opens the bar with a second row for the replacement
+and always searches the source; in the Preview view it first switches the tab to Source and preview. The bar has the
+query field, **Match Case**, **Whole Word** and **Regular Expression** (Java's regular expressions) toggles, the match
+count ("No matches", "1 match", "*n* matches", or "Invalid pattern"), **Previous Match**, **Next Match** and **Close**.
+Every match is highlighted, and the search wraps around the end of the file. In the replace row, **Replace** replaces
+the next match after the caret and **Replace All** replaces every one and reports "Replaced *n*". With Regular
+Expression on, `$1`, `$2` and so on in the replacement stand for the pattern's groups, `\n` and `\t` for a new line and
+a tab, and `\$` for a dollar sign.
 
 | Key | In the find bar |
 |---|---|
@@ -152,13 +165,14 @@ replacement stand for the pattern's groups, `\n` and `\t` for a new line and a t
 | Escape | Close the bar and return to the searched pane |
 
 The query and toggles are shared by every Editor tab. **Find Next** and **Find Previous** search for the query while the
-bar is closed too.
+bar is closed too. The bar closes when you select another tab, or when a Markdown view change hides the pane it
+searches.
 
 ## Go to Line and Language
 
 **Go to Line…** asks for a line from 1 to the file's line count, filled in with the caret's line. **Go** (or Enter)
 puts the caret at the start of that line; another value shows "Enter a line from 1 to *n*" and keeps the dialog open.
-Escape cancels.
+Escape cancels. In a Markdown tab's Preview view it first switches the tab to Source and preview.
 
 **Language…**, or a click on the language in the status bar, lists every language with Plain Text first. Type to
 filter, Up and Down to move, Enter or a double click to choose, Escape to cancel. A language you choose stays with the
@@ -204,35 +218,137 @@ Typing also edits around what you type, in every tab:
 
 With Vim mode on, Enter in Insert mode is Vim's `<CR>`, which only keeps the indent ('autoindent').
 
+## Fonts
+
+The Editor has font settings of its own, in the Font section of Settings › Tools › Editor and in its
+[settings file](#settings): **Font** (`font_family`), **Font size** (`font_size`, 6 to 72 points, fractions allowed),
+**Fallback fonts** (`font_fallback`), **Font ligatures** (`font_ligatures`) and **Line height** (`font_line_height`).
+Each character is drawn in the first of the font and the fallback fonts, in their order, that has it, else in the Java
+runtime's default font; a fallback font that is not installed is skipped. **Font ligatures** draws the character
+sequences a font joins, such as `->` or `!=`, as one glyph. **Line height** multiplies the fonts' own line height, from
+0.5 to 3; below 1, tall glyphs can overlap the lines beside them. The line numbers use the same font and line height. A
+change applies to every tab at once.
+
+**Follow terminal font** (`follow_terminal_font`) shows every Editor tab in the terminal's saved font instead: the
+family, size, fallback fonts, ligatures and line height of [`[terminal.font]`](configuration.md#terminal-font), following
+each change to them at once. **Increase Font Size**, **Decrease Font Size** and **Reset Font Size** change a terminal
+pane for the session only and do not reach the Editor. While it is on, the Font section shows the terminal's values in
+place of the Editor's, and they cannot be edited there; the Editor's own values stay saved and apply again when you turn
+it off.
+
 ## Markdown preview
 
-For Markdown, the document toolbar offers Source, Source and preview, and Preview. Split places the source on the left;
-its divider ratio stays with the tab when it moves. Explicit mode choices save the default for future Markdown tabs;
-existing tabs keep their own modes. The Synchronize scrolling toggle links corresponding source passages in both
-directions and stays local to the tab. Changing the language away from Markdown releases preview work.
+A tab whose language is Markdown (a `.md` or `.markdown` file, or Markdown chosen with **Language…**) can show its text
+rendered beside or instead of the source. A bar above the text holds three buttons at its right, named by their
+tooltips:
 
-Preview renders unsaved text after a 250 ms pause. Source and preview share the same document session and undo history.
-Find searches the pane last focused; preview search includes rendered code and excludes mapping markers. The Find bar
-closes when its tab changes or its pane is hidden. Replace and Go to Line reveal Source in Split without changing the
-saved default. Tab/Shift+Tab select preview links and leave the pane at either end; Enter activates a selected link.
-Save, Save As and close use the existing file and dirty-prompt flow.
+| Button | Shows |
+|---|---|
+| **Source** | The source |
+| **Source and preview** | The source on the left and the preview on the right, with a divider you can drag |
+| **Preview** | The preview |
 
-Headings, lists, quotes, tables, task marks, strikethrough and syntax-colored fenced code use a native Swing view.
-Raw HTML is escaped and comments are omitted. Body text follows the host UI family at the effective Editor size;
-code follows Editor typography. Theme, selection, glass and line spacing update live. Long code and tables scroll
-horizontally; PNG, JPEG and the first GIF frame scale down to fit.
+In Source and preview a fourth button, **Synchronize scrolling**, is on in every tab to begin with: scrolling either
+pane brings the other to the same passage. The tab menu's **Markdown: Source**, **Markdown: Source and Preview** and
+**Markdown: Preview** do what the first three buttons do ([Commands and shortcuts](#commands-and-shortcuts)). Under a
+look with IntelliJ's classic icons, such as [Enterprise](enterprise.md), the buttons draw IntelliJ's classic layout
+icons; under the default look, its New UI ones.
 
-Relative images and file links resolve through the open document's provider, preserving an SFTP connection's exact
-route and login. Relative Markdown links reuse already-open dirty tabs; fragments navigate to headings. Web links
-open through the host on activation. Web images require **Load external images** for that document and tab lifetime;
-consent survives reload and moves and resets on Save As or close. Failed images retain their alt text and a reason,
-with Retry available. A failed preview retains the previous rendering with an out-of-date label and Retry/Source actions.
-Untitled documents must be saved before relative resources can resolve.
+Each tab keeps its own view, divider position and Synchronize scrolling, also when it moves to another window. Choosing
+a view with a button or command also saves it as **Default view** (`markdown_view_mode`), the view a tab starts in the
+first time it shows Markdown; tabs already open keep theirs. A choice that cannot be saved posts "Could not save the
+Markdown default view". When **Language…** changes a tab to another language, the bar hides and the tab shows its
+source; changing it back to Markdown brings back the tab's last view.
 
-Preview limits are 2,097,152 UTF-16 units, 16 MiB of generated UTF-8 HTML and 50,000 mapped blocks. Exceeding a limit
-shows a Source action. Each image is limited to 8 MiB encoded and 16 million pixels; four loads and 64 MiB of retained
-plus in-flight decoded pixels are shared across the plugin. Hidden tabs cancel preview and image work. See
-[verification](editor-verification.md#fonts-and-markdown-preview) for automated evidence and pending native checks.
+### What the preview shows
+
+The preview renders CommonMark with GitHub's tables, strikethrough (`~~text~~`) and task lists (☑ and ☐): headings,
+paragraphs, emphasis, block quotes, numbered and bulleted lists, inline code, code blocks, rules, links and images. HTML
+in the text shows as text, tags included, and HTML comments are left out. A fenced code block whose info string starts
+with a language the Editor highlights, by its name in **Language…** (such as `python` or `yaml`) or as `js`, `ts`, `py`,
+`sh`, `bash`, `shell`, `c++` or `c#`, is coloured as the Editor colours that language; other code is plain. Code does
+not wrap: the preview scrolls sideways when a code line or a table is wider than the pane.
+
+Text is in the interface font's family at the Editor's font size, with larger headings; code is in the Editor's font,
+with its fallback fonts and ligatures, and **Line height** spaces the preview's lines too. Colours come from the UI
+theme ([Theme colours](#theme-colours)). A change of theme or font applies to the preview at once.
+
+The preview cannot be edited. Copy copies the text selected in it, and **Select All** in the tab menu selects all of it
+while it has the focus. In the Preview view, the commands that change or locate text (Paste, and **Cut**, **Delete**,
+**Undo** and **Redo** in the tab menu, **Replace…**, **Go to Line…**, **Toggle Comment** and **Revert to Saved**) first
+switch the tab to Source and preview, without changing Default view, and act on the source.
+
+### Live preview
+
+The preview shows the tab's text as it is, saved or not. It renders again 250 ms after the text last changed, whether
+you typed or the file was reloaded; switching to a view with the preview, or back to the tab, renders it at once. Only
+the tab selected in its window renders: a tab you leave stops rendering and loading images, and renders again when you
+return.
+
+When the preview cannot be rendered, a line above the text gives the reason, with **Source**, which switches the tab to
+Source as the button does, and **Retry**. A preview rendered earlier stays in place, and the line then begins "Preview
+is out of date." A document of more than 2,097,152 characters (UTF-16 code units), or one whose rendering would pass
+16 MiB or 50,000 blocks, is not previewed: the line says "This document is too large to preview", and the source stays
+editable.
+
+### Links in the preview
+
+Click a link to follow it. Tab and Shift+Tab select the next and previous link, and leave the preview after the last
+and before the first; Enter follows the selected link.
+
+| Link | Followed by |
+|---|---|
+| `https://…` or `http://…`, with a host | Opening it in your browser |
+| `#heading` | Going to that heading in this document |
+| A relative path, such as `notes.md`, `../README.md` or `guide.md#setup` | Opening the file in an Editor tab in the same window, then going to the heading after `#`, if any. A file that is already open has its tab selected, unsaved changes and all. |
+
+A heading's name is its text in lower case, with each run of spaces made one `-` and every character but letters,
+digits, `-` and `_` left out: `## Getting started` is `#getting-started`. A second heading with the same name gets `-1`
+added, the next `-2`, and a heading with none of those characters is `#section`. In a linked file that shows only its
+source, the caret goes to the heading's line.
+
+A relative path uses `/` and starts in the document's folder; percent escapes such as `%20` are decoded. A remote
+file's links open on its host, over the same connection and login ([Remote files](#remote-files)). A link that cannot
+be followed says why in the status bar for 3 seconds:
+
+| Status bar | When |
+|---|---|
+| "Only absolute HTTP and HTTPS URLs are supported" | Any other scheme, such as `mailto:` or `file:`, or an HTTP(S) URL without a host or with a user name |
+| "Invalid or unsupported destination" | An absolute path, a backslash, a query (`?`) or a bad percent escape |
+| "Empty destination" | A link with no target, such as `[text]()` |
+| "Save this document before opening relative links" | A relative link in an untitled tab |
+| "This document cannot resolve relative links" | A relative link in a document another plugin opened without support for them |
+| "Heading not found" | No heading has that name, or the linked file is not Markdown |
+| "Could not navigate to heading" | The document with the heading could not be previewed, for example because it is too large |
+| "Could not open link in browser", "Could not open linked document" | Opening it failed |
+
+### Images in the preview
+
+Images are PNG, JPEG or GIF (its first frame), drawn at their own size or scaled down to fit the pane's width. A
+relative path loads the image as the document itself is read: from this computer, or for a remote file from its host
+over the same connection; an untitled tab must be saved first. Reloading the file loads its relative images again.
+
+Web images (`https://…` or `http://…`) load only once you click **Load external images** above the text. That allows
+them for this document while its tab is open, including ones you add later; a reload and a move to another window keep
+it, and **Save As…** ends it. Until an image loads, and when it fails, its place shows its alternative text and a
+reason, such as "Load external images to display", "Image exceeds 8 MiB" or "Image server returned 404"; an image
+without alternative text shows "Image" and its file name before the reason. **Retry images**, above the text while an
+image has failed, loads the failed ones again.
+
+| Limit | Value |
+|---|---|
+| One image's file | 8 MiB ("Image exceeds 8 MiB") |
+| One image's size | 16 million pixels ("Image exceeds 16 million pixels") |
+| Images loading at once, across every tab | 4 |
+| Decoded images held, across every tab | 64 MiB ("Image memory budget exhausted") |
+| A web image's request | 20 seconds ("Image request timed out"), at most 3 redirects, none from HTTPS to HTTP |
+
+### Finding in the preview
+
+While the preview has the focus, **Find…** searches its rendered text, code blocks included, with the same **Match
+Case**, **Whole Word** and **Regular Expression** options. Every match is highlighted in the selection colour, Enter
+and Shift+Enter select the next and previous one, and the count follows when the preview renders again. **Replace…**
+works on the source ([Find and replace](#find-and-replace)).
 
 ## Encodings and line endings
 
@@ -326,7 +442,8 @@ Editor…**, whose file chooser lists your saved hosts, and from [Recent files](
 after the file's name and a server icon, and reads "Loading *name* from *host*…" while it loads. Saving writes the file
 back to the host after the same check, which says "*name* changed on *host* since you opened it."; Save As can save it
 to this computer or another host. Remote files are not checked for outside changes; **Revert to Saved** reads them
-again. How Remote writes the file and reconnects: [Remote: editing remote files](remote.md#editing-remote-files).
+again. A remote Markdown file's relative links and images open from the same host, over the same connection and
+login. How Remote writes the file and reconnects: [Remote: editing remote files](remote.md#editing-remote-files).
 
 ## Recent files
 
@@ -410,32 +527,28 @@ shown.
 ## Settings
 
 The settings live in `plugins/dev.jasper.editor/dev.jasper.editor.toml` in [Jasper home](getting-started.md#jasper-home)
-and on Settings › Tools › Editor, in the sections Font, Markdown, Editing, Files and Default editor. Jasper creates the file,
-with every setting commented out, when it is missing; changes in the file or on the page apply without a restart. A
-bad value is reported and its default used ([Plugin settings](plugins.md#plugin-settings)).
+and on Settings › Tools › Editor, in the sections Font, Editing, Markdown, Files and Default editor. Jasper creates the
+file, with every setting commented out, when it is missing; changes in the file or on the page apply without a restart.
+A bad value is reported and its default used ([Plugin settings](plugins.md#plugin-settings)).
 
 | Key | Default | Values | On the page | Applies to |
 |---|---|---|---|---|
+| `follow_terminal_font` | `false` | | Follow terminal font | Every tab, at once ([Fonts](#fonts)) |
 | `font_family` | The first installed of JetBrains Mono, Menlo, Consolas and DejaVu Sans Mono, else `Monospaced`; IBM Plex Mono under the Enterprise look | An installed font family; the page lists monospaced ones | Font | Every tab, at once |
-| `font_size` | `13` | Finite fractional points, 6–72 | Font size | Every tab, at once |
-| `font_fallback` | `[]` | Ordered fallback font families | Fallback fonts | Every tab, at once |
+| `font_size` | `13` | 6–72 points, fractions allowed | Font size | Every tab, at once |
+| `font_fallback` | `[]` | Font family names, tried in order for characters the font lacks | Fallback fonts | Every tab, at once |
 | `font_ligatures` | `false` | | Font ligatures | Every tab, at once |
-| `font_line_height` | `1.0` | Natural line height multiplied by 0.5–3.0 | Line height | Every tab, at once |
-| `follow_terminal_font` | `false` | | Follow terminal font | Saved terminal typography across windows |
-| `markdown_view_mode` | `"source"` | `source`, `split`, `preview` | Default view | Newly eligible Markdown tabs |
+| `font_line_height` | `1.0` | 0.5–3: a multiple of the fonts' own line height | Line height | Every tab, at once |
 | `tab_size` | `4` | 1–16 columns | Tab size | Every tab, at once; Vim's 'tabstop' and 'shiftwidth' |
 | `soft_wrap` | `false` | | Soft wrap | Tabs opened afterwards; **Toggle Soft Wrap** changes one tab |
 | `vim` | `false` | | Vim mode | Every tab, at once; the Vim status item and **Toggle Vim Mode** set it |
+| `markdown_view_mode` | `"source"` | `source`, `split` (Source and preview), `preview` | Default view | Tabs that show Markdown for the first time; choosing a view in a tab sets it ([Markdown preview](#markdown-preview)) |
 | `max_file_mib` | `10` | 1–256 MiB | Largest file (MiB) | The next read |
 | `recent_files_days` | `30` | 0–365 days; 0 keeps none | Keep recent files for (days) | At once |
 | `default_editor` | `"jasper"` | `jasper`, `system`, `custom` or an editor's id from the [table](#default-editor) | Default editor | The next file opened; `EDITOR` in shells started afterwards |
 | `custom_command` | `""` | A command line; the file's path is added at the end | Custom command (while Custom command is chosen) | As `default_editor` |
 | `custom_in_terminal` | `true` | | Run in a terminal tab (while Custom command is chosen) | The next file opened |
 | `keep_environment_editor` | `true` | | Keep EDITOR and VISUAL from Jasper's environment | Shells started afterwards |
-
-**Follow terminal font** displays the saved terminal family, size, fallback order, ligatures and line height and disables the independent controls. Turning it off restores the
-Editor values, including look defaults. Temporary terminal zoom stays local to the terminal pane. Tight line heights
-can overlap tall glyphs.
 
 ## Files
 
@@ -456,7 +569,13 @@ background, text, caret, selection, current line, gutter and line numbers, and a
 syntax role, such as keywords, strings and comments. The terminal scheme (`terminal.scheme`) does not change the
 Editor. A theme change applies to open tabs at once, without touching their text. On macOS a translucent workspace
 (`ui.workspace.opacity`) makes the text and gutter backgrounds translucent too. The find bar's and 'hlsearch' match
-highlight, and Vim sneak's magenta matches, keep their own colours. Writing an editor scheme:
+highlight, and Vim sneak's magenta matches, keep their own colours.
+
+The [Markdown preview](#markdown-preview) takes its page from the UI theme's roles instead: `surface.panel` behind it
+(translucent too, with `ui.workspace.opacity`), `text.primary` for text, `accent` for links, `text.secondary` for block
+quotes and image placeholders, `surface.card` behind code blocks, `border.window` and `surface.panel.raised` for table
+borders and header cells, and `selection.bg` and `text.onSelection` for selected text; Find's matches in it are
+highlighted in `selection.bg`. Its code blocks take the editor scheme's syntax colours. Writing an editor scheme:
 [Creating themes](creating-themes.md); the SDK's view of it:
 [`Appearance.editorPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.editorPalette()) and
 [`Appearance.syntaxPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.syntaxPalette()).
@@ -686,7 +805,11 @@ variables the plugins read to leave out their default keys work: `g:surround_no_
 The Editor exports `dev.jasper.editor.api`. A plugin that requires `dev.jasper.editor` (optionally, as Remote and
 Project Index do) finds the `Editor` service with `services().find(Editor.class)` and, on the UI thread, calls
 `open(Path)` for a local file or `open(EditorDocument)` for a file it reads and writes itself, each also with the
-`WindowOwner` to open it in. `EditorDocument.write` documents the save contract a provider follows. A plugin with a
+`WindowOwner` to open it in. `EditorDocument.write` documents the save contract a provider follows, and
+`EditorDocument.resolveRelative(path)` (Editor 0.11.0) returns the document at a path relative to its folder, on the same
+storage and login, for a Markdown preview's relative links and images; a provider checks the path with
+`RelativePaths.requireValid`, and one that keeps the default, which returns empty, has links that say "This document
+cannot resolve relative links". A plugin with a
 file source calls `locationDocuments(sourceId, resolver)` so that Open in Editor… and Save As… offer the source's places
 and open what the user picks through the `LocationResolver`; `reopener(prefix, resolve)` lets Recent files reopen its
 documents, and `opener(handler)` lets it answer Open in Editor… itself. [Plugin APIs](plugin-apis.md) describes the

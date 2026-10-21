@@ -33,7 +33,9 @@ Start with [ActionId](../jasper-app/src/main/java/dev/jasper/app/commands/Action
 
 1. An `ActionId` entry: its stable id, label, macOS default and Linux/Windows default in the configuration syntax (the
    second names `ctrl`, `alt` and `shift` literally; `"none"` for no default), and its `KeyContext` (`GLOBAL`, or
-   `TERMINAL` for an action that applies only in a terminal pane).
+   `TERMINAL` for an action that applies only in a terminal pane). An action for some platforms only answers false
+   from `ActionId.availableOn` elsewhere, and `WindowCommands` and `ShortcutCatalog` then leave it out, as they do
+   `manage_cygwin_packages` outside Windows.
 2. Its case in `WorkspaceActions.invoke` (an exhaustive switch) and its enablement in `WorkspaceActions.update`.
    Enablement resolves the current pane at dispatch time; never capture the first pane in a long-lived action.
 3. Its palette keywords and icon in `WindowCommands`, and its menu placement in `WindowChrome`.
@@ -476,7 +478,10 @@ touch Swing. Keep the environment order in `LaunchSettings.resolve` (the inherit
 such as `TERM_PROGRAM`, `TMUX`, `ITERM_*` and `JASPER_*`, Jasper's own variables, plugin variables (none for WSL),
 `[terminal.env]`, `LANG` on macOS when unset, then `TERM`/`COLORTERM`), the pane variables
 `JasperApplication.paneVariables` adds last ([environment](terminal.md#environment)), and the terminal library's
-threading contract. This example builds options only; it launches no shell.
+threading contract. `LaunchSettings` writes a Cygwin Bash launch's (`ShellProfiles.CYGWIN`) variable names in
+capitals, and `JasperApplication.startSession` runs it through `launch.CygwinLaunch.prepare` on the launch worker, holding a
+`cygwin.CygwinOperations.registerLaunch` reservation until the session exits, so package management cannot start under
+it ([bundled Cygwin](../packaging/windows/cygwin/README.md)). This example builds options only; it launches no shell.
 
 <!-- example:session -->
 ```java
@@ -502,7 +507,7 @@ The bundled plugins are separate modules, compiled against the SDK only; their c
 | --- | --- | --- | --- |
 | SSH, SFTP and tunnels | `plugins/remote` | `dev.jasper.remote` | [Remote](remote.md) |
 | Accounts, SSH keys and secure notes | `plugins/vault` | `dev.jasper.vault` | [Credential Vault](credential-vault.md) |
-| Local and remote text editing | `plugins/editor` | `dev.jasper.editor` | [Editor](editor.md) |
+| Local and remote text editing and Markdown preview | `plugins/editor` | `dev.jasper.editor` | [Editor](editor.md) |
 | Sharing a folder over HTTP(S), FTP(S), SFTP or TFTP | `plugins/fileserver` | `dev.jasper.fileserver` | [File Server](file-server.md) |
 | Project indexing and file search | `plugins/indexer` | `dev.jasper.indexer` | [Project Index](project-index.md) |
 | Shell history in the palette | `plugins/history` | `dev.jasper.history` | [Shell History](history-and-snippets.md#shell-history) |
@@ -531,8 +536,8 @@ To add a bundled plugin:
 
 ## Packaged runtime, bundled natives and the AOT cache
 
-Bundled Windows Cygwin provisioning, seed refresh, ownership/recovery and native acceptance are documented in the
-[Cygwin guide](../packaging/windows/cygwin/README.md).
+The [bundled Cygwin guide](../packaging/windows/cygwin/README.md) covers Windows Cygwin provisioning, the seed and its
+refresh, ownership and recovery, and native acceptance.
 
 `gradle/packaging-support.gradle` holds what packaging decides: the runtime's modules, the native libraries copied into
 the app and the AOT training launch. `verifyPackagingSupport` (in `check`) tests it with fixtures; `verifyPackage`
@@ -602,7 +607,8 @@ that no longer ships. A font file a bundled plugin ships is listed in its compon
 `<plugin id>/<path in its jar>`, and the check names any that is not. Read the new version's license before updating
 the entry, and look inside the jar for bundled native binaries (DLLs, executables, shared libraries): their own
 licenses need components too. When `stagePackage` logs that it unsealed a jar, record the change in that component's
-notice, as `jbr-api.NOTICE.txt` does. The Licenses window reads the same file.
+notice, as `jbr-api.NOTICE.txt` does. The Licenses window reads the same file. A component's `license` is an SPDX id
+that `about.ThirdPartyNotices` maps to the name the window shows; a new licence needs its entry there.
 
 ## Themes
 
@@ -676,8 +682,9 @@ failure and lifetime tests.
 `assets.tsv`, `SOURCE.md` and the Apache `LICENSE.txt` and `NOTICE.txt` (`IntellijIconsTest` checks the list):
 `terminal/toolwindow/terminal.svg`, the macOS menu bar item's template (`AppIcons.trayArtwork`, used by
 `ResidentTray`), and `nodes/pluginLogo.svg` with its dark sibling. A plugin's identity icon comes from its manifest
-(`pluginmanager.PluginIcons`); missing or malformed artwork shows the kit's `plugin` glyph. Application branding
-(`icons/app/`) is separate.
+(`pluginmanager.PluginIcons`); missing or malformed artwork shows the kit's `plugin` glyph. Jasper's application icon
+(`icons/app/`, the Shell Prompt icon) is separate: `packaging/icons/generate.py` writes it with the package icons
+([app icon assets](../packaging/icons/README.md)), and `ApplicationIcon` loads it.
 
 ## Workspace chrome
 

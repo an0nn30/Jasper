@@ -81,10 +81,11 @@ public interface Terminals {
 
     /**
      * The shell profiles Jasper offers for local panes, platform default first: on Windows PowerShell ({@code powershell}),
-     * PowerShell 7 ({@code pwsh}), Command Prompt ({@code cmd}) and each WSL distribution ({@code wsl:<name>}); on macOS
-     * and Linux the login shell ({@code login}); then Custom ({@code custom}), always last, which runs the program and
-     * arguments the user's settings name, or the platform's default shell when they name none. PowerShell 7 and the WSL
-     * distributions appear once a shell detection has found them. Needs
+     * PowerShell 7 ({@code pwsh}), Command Prompt ({@code cmd}), Cygwin Bash ({@code cygwin}, from Jasper's own Cygwin)
+     * and each WSL distribution ({@code wsl:<name>}); on macOS and Linux the login shell ({@code login}); then Custom
+     * ({@code custom}), always last, which runs the program and arguments the user's settings name, or the platform's
+     * default shell when they name none. PowerShell 7, Cygwin Bash and the WSL distributions appear once a shell
+     * detection has found them. Needs
      * {@code terminal.open}. UI thread only.
      *
      * @return the profiles; empty when the host lists none

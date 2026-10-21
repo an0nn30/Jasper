@@ -283,21 +283,26 @@ that is not a panel, text component, button, label, list, table, tree, combo box
 is judged by its view; kit-owned components and components with an owner or parent are refused. `KitContent` sets
 the component's foreground to `text.primary` and its background to `surface.input` at the workspace opacity (opaque
 only at full opacity) on every theme change and reparenting, and closes its lifetime when the `Custom` node leaves the
-view or the view closes.
+view or the view closes. The kit's `CustomContents.CustomControl` sets the component's font to the kit's body font when
+it is registered and whenever the control refreshes, so the content follows the user's interface font.
 
 `HostedUi.appearance()` reads the presentation's themes: `color` and the variant from the chrome theme, the
 `WorkspacePalette`, `EditorPalette` and `SyntaxPalette` from the workspace theme (`HostedPalettes` maps semantic roles
 and the editor scheme onto SDK values; no SDK value enters `UIManager`). The variant getters are safe from any thread;
-colour and palette getters and listener registration need the UI thread. `onWorkspaceChanged` also fires when the workspace opacity behind a component
-changes: `GlassSource`, built by `JasperApplication` from its windows, answers `workspaceOpacity(component)` (the
-window's opacity inside the centre deck that holds terminal and content tabs, 1.0 for chrome, stripes and tool
-windows), and `WindowContent.setGlassListener` reports opacity changes and content mounting in a translucent window.
+colour and palette getters and listener registration need the UI thread. `onWorkspaceChanged` also fires when the
+workspace opacity behind a component changes: `GlassSource`, built by `JasperApplication` from its windows, answers
+`workspaceOpacity(component)` (the window's opacity inside the centre deck that holds terminal and content tabs, 1.0
+for chrome, stripes and tool windows), and `WindowContent.setGlassListener` reports opacity changes and content
+mounting in a translucent window.
 
-`Appearance.terminalTypography()` and `onTerminalTypographyChanged` (SDK 0.18.3) expose saved terminal typography.
-`HostedTypography` publishes an immutable saved-config value, readable on any thread, before EDT notifications.
-Equal values are skipped, initial state is read explicitly, and subscriptions close with the plugin.
-`JasperApplication` supplies `FontConfig` through `PluginRuntime`; conversion remains in `app.plugins`. The testkit
-mirrors publication and disposal. Temporary pane zoom does not publish a new value.
+`Appearance.terminalTypography()` reads `HostedTypography`, one per runtime and shared by every plugin, which holds the
+current `TerminalTypography` in a volatile field, so any thread can read it. `JasperApplication` passes the
+configuration's `FontConfig` to `PluginRuntime.terminalTypography` before plugins start and with every configuration
+snapshot; the conversion to the SDK value stays in `dev.jasper.app.plugins`. Publishing, on the UI thread, ignores a
+value equal to the current one; otherwise it replaces the value and then runs each `onTerminalTypographyChanged`
+handler, contained, skipping those of a plugin that has stopped. Registering delivers no initial value, and a plugin's
+registrations close when it stops. Only the saved `terminal.font` settings publish, so a pane's temporary zoom never
+does. The testkit's `FakePluginHost.setTerminalTypography` mirrors it, and shared contract cases hold both hosts to it.
 
 `Appearance.presentation()` returns one immutable `Presentation` per run, read from any thread.
 `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)` hands the host the installed kit, the presentation's
@@ -457,11 +462,12 @@ the setting's default, so a saved value wins, then the look's, then the plugin's
 A rejected value, and once `start` returns a key the plugin never declared, is logged at WARNING
 (`PluginHost.lookDefaultProblem`) and ignored. `FakePluginHost.setKitDefault` and `lookDefaultProblems` mirror it.
 
-`PluginRuntime.settingsPages` returns, for each running plugin with settings, a generated page (`PluginSettingsPage`,
-a `SchemaPage` over the plugin's own draft) or the plugin's own (`PluginPanelPage`, every call contained), and a
-`PluginStubPage` with Open in Editor for a plugin the user meant to run that is not running (awaiting consent,
-skipped, failed or disabled by safe mode), at most one page per plugin id. `CorePages` places them under Settings ›
-Tools. Apply writes the plugin's file through `DeclaredSettings.save`.
+`PluginRuntime.settingsPages` returns, for each running plugin with settings, a generated page (`PluginSettingsPage`, a
+`SchemaPage` over the plugin's own draft) or the plugin's own (`PluginPanelPage`, every call contained; after one of its
+standard rows handles an event it re-renders the view with the rows' new state, then calls the panel's
+`pendingChanged`), and a `PluginStubPage` with Open in Editor for a plugin the user meant to run that is not running
+(awaiting consent, skipped, failed or disabled by safe mode), at most one page per plugin id. `CorePages` places them
+under Settings › Tools. Apply writes the plugin's file through `DeclaredSettings.save`.
 
 ## Command-line subcommands
 
