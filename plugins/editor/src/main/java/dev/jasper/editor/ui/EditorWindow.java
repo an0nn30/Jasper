@@ -372,6 +372,14 @@ public final class EditorWindow {
         readVimrcOnce();
     }
 
+    /**
+     * Reload vimrc as an action run in {@code window} does it, from the palette or a key: as {@link #reloadVimrc()}, its
+     * lines running in the file {@link #revert(WindowHandle)} would revert; nothing while the window shows no file.
+     *
+     * @param window the window the action ran in
+     */
+    public void reloadVimrc(WindowHandle window) { fileIn(window).ifPresent(tab -> { activate(tab); reloadVimrc(); }); }
+
     /** @return the vimrc: {@code vimrc} in the Editor's data folder, {@code <home>/plugins/dev.jasper.editor/data} */
     public Path vimrcFile() { return context.dataDirectory().resolve("vimrc"); }
 
@@ -541,6 +549,23 @@ public final class EditorWindow {
     }
 
     public void revert() { selected().ifPresent(tab -> tab.session().revert()); }
+
+    /**
+     * Revert to Saved as an action run in {@code window} does it, from the palette or a key, so that its question shows
+     * there (workspace plan 8b Task 6 review): the window's focused file, else the Editor's selected file while that
+     * window shows it; nothing otherwise.
+     *
+     * @param window the window the action ran in
+     */
+    public void revert(WindowHandle window) { fileIn(window).ifPresent(tab -> { activate(tab); revert(); }); }
+
+    /** The file an action run in {@code window} acts on: its focused file, else the selected file while it shows it. */
+    private Optional<EditorTab> fileIn(WindowHandle window) {
+        var shown = hosted.entrySet().stream()
+            .filter(entry -> !entry.getValue().isClosed() && entry.getValue().window().id().equals(window.id())).toList();
+        return shown.stream().filter(entry -> entry.getValue().isActive()).map(Map.Entry::getKey).findFirst()
+            .or(() -> shown.stream().map(Map.Entry::getKey).filter(tab -> tab == selectedTab).findFirst());
+    }
 
     public List<DocumentSession> sessions() { return model.sessions(); }
 

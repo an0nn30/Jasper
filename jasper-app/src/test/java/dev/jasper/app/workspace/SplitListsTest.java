@@ -125,6 +125,20 @@ class SplitListsTest {
         });
     }
 
+    /** Workspace plan 8b Task 6 review: a plugin's label shows as plain text in both lists, never as HTML. */
+    @Test void aPluginsLabelIsPlainTextInBothLists() throws Exception {
+        var window = window();
+        edt(() -> {
+            item("com.example.bold", "bold", "<html><b>B", false);
+            for (JMenu split : List.of(tabSplit(window), contextSplit(window))) {
+                assertThat(texts(split)).contains("<html><b>B Right", "<html><b>B Down");
+                for (Component child : split.getMenuComponents())
+                    assertThat(((JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
+                        .as("%s renders no HTML", ((JMenuItem) child).getText()).isNull();
+            }
+        });
+    }
+
     /** Review Focus 2: an item that goes leaves both lists at once, and the palette. */
     @Test void anItemThatGoesLeavesEverySplitListAndThePalette() throws Exception {
         var window = window();

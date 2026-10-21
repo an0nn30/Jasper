@@ -127,7 +127,7 @@ public class VimTextArea extends RSyntaxTextArea {
                 event.consume();
             }
             case ANCESTORS, ANCESTORS_RING -> {
-                // Ancestor, window and menu bindings (the app's shortcuts, the Editor's hosted Close Tab) still run;
+                // Ancestor, window and menu bindings (the app's shortcuts, the Editor's hosted Close Pane) still run;
                 // nothing in the text area's own map would, as handled() checked.
                 super.processKeyEvent(event);
                 if (!event.isConsumed() && verdict == Verdict.ANCESTORS_RING) editor.declined();

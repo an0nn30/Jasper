@@ -218,7 +218,7 @@ public final class CommandPalettePreview {
                         new PaletteRow("package","package jasper","cd ~/projects/moray && ./gradlew :jasper-app:packageDist",null,null,true,null),
                         new PaletteRow("main","Main.java","jasper-app/src/main/java/dev/jasper/app/Main.java","moray",null,true,null),
                         new PaletteRow("amp","amp-amp (amp@100.110.65.45:22)",null,null,dev.jasper.app.platform.AppIcons.semantic("network"),true,null),
-                        PaletteRow.of("new","New Editor File"),
+                        PaletteRow.of("new","New Editor Tab"),
                         new PaletteRow("minecraft","minecraft-local (dustin@192.168.1.124:22)",null,null,dev.jasper.app.platform.AppIcons.semantic("network"),true,null),
                         new PaletteRow("vm","dustin-vm (dustin@100.83.72.100:22)",null,null,dev.jasper.app.platform.AppIcons.semantic("network"),true,null),
                         new PaletteRow("open","Open in Editor…",null,"⌘O",dev.jasper.app.platform.AppIcons.named("FILE"),true,null),

@@ -95,6 +95,17 @@ class TabMenuTest {
         });
     }
 
+    /** Workspace plan 8b Task 6 review: a plugin item's command title shows as plain text in its tab's menu, never as HTML. */
+    @Test void anItemsCommandTitleIsPlainText() throws Exception {
+        var window = window(1);
+        edt(() -> {
+            Tab view = beside(window, "notes");
+            view.commands(List.of(new ContentCommand("bold", "<html><b>B", null, true, () -> { })));
+            var entry = item(window.tabMenu(view), "<html><b>B");
+            assertThat(entry.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).as("no HTML view").isNull();
+        });
+    }
+
     /** Review Focus 2: Close Tab asks the guards of the tab's plugin items once, and a refusal closes nothing. */
     @Test void closeTabAsksTheGuardsFirstAndARefusalClosesNothing() throws Exception {
         var window = window(2);

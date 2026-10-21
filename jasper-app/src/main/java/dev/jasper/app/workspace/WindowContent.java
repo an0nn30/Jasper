@@ -1413,7 +1413,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             menu.add(tabMenuItem(ActionId.CLOSE_TAB.label(), ActionId.CLOSE_TAB, () -> closeParentTab(parent)));
             if (!item.commands().isEmpty()) menu.addSeparator();
             for (var command : item.commands()) {
-                var entry = new JMenuItem(command.title()); entry.putClientProperty("html.disable", true);
+                // Plain text: html.disable before the title, as the UI reads it only when the text changes.
+                var entry = new JMenuItem(); entry.putClientProperty("html.disable", true); entry.setText(command.title());
                 entry.setEnabled(command.enabled()); entry.setAccelerator(command.shortcut());
                 entry.addActionListener(event -> command.run().run());
                 menu.add(entry);

@@ -437,7 +437,7 @@ class VimEditorTest {
             var closeTab = pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_W);
             area.processKeyEvent(closeTab);
             area.processKeyEvent(typed(area, InputEvent.CTRL_DOWN_MASK, (char) 23));
-            assertThat(newTab).as("Ctrl+W reaches the hosted Close Tab binding").hasValue(2);
+            assertThat(newTab).as("Ctrl+W reaches the hosted Close Pane binding").hasValue(2);
             assertThat(editor.bells()).as("a key an ancestor handled does not ring").isEqualTo(bells);
             area.processKeyEvent(pressed(area, 0, KeyEvent.VK_TAB));
             area.processKeyEvent(typed(area, 0, '\t'));

@@ -4,7 +4,9 @@ import java.util.Optional;
 import javax.swing.KeyStroke;
 
 /**
- * An Editor window command: listed in the ⋯ menu, and bound in the text areas when {@code bound}.
+ * An Editor window command: listed in the menu of its file's tab while the window shows its tab strip (Save, Find…, Go to
+ * Line…, Toggle Comment and Revert to Saved in an editor's right-click menu too), and bound in the text areas when
+ * {@code bound}.
  *
  * @param id the action-map key
  * @param title the menu title

@@ -119,11 +119,11 @@ public final class EditorPlugin implements Plugin {
             invoked -> window().newUntitled(invoked.window(), dev.jasper.sdk.ui.TabPlacement.NEW_TAB));
         context.windows().splitItem(SPLIT, (shown, placement) -> window().newUntitled(shown, placement));
         // Workspace plan 8b Rulings 20: the tab strip's menu, which hides with one tab, was these two's only place; as
-        // actions with no default key they reach the palette and the keymap.
+        // actions with no default key they reach the palette and the keymap. Each acts on the window it runs in.
         context.actions().register(ActionSpec.of(REVERT, "Revert to Saved").withKeywords(List.of("editor", "revert", "saved", "discard")),
-            invoked -> window().revert());
+            invoked -> window().revert(invoked.window()));
         context.actions().register(ActionSpec.of(RELOAD_VIMRC, "Reload vimrc").withKeywords(List.of("editor", "vim", "vimrc", "reload")),
-            invoked -> window().reloadVimrc());
+            invoked -> window().reloadVimrc(invoked.window()));
         // Workspace tabs spec 6.5: an untitled document in a child window of its own; no default key. Its icon is the toolbar button's.
         context.actions().register(ActionSpec.of(NEW_WINDOW, "New Editor Window").withIcon("file")
                 .withKeywords(List.of("editor", "new", "window", "untitled")),

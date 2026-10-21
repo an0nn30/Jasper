@@ -249,6 +249,42 @@ class EditorPluginTest {
         }
     }
 
+    /**
+     * Workspace plan 8b Task 6 review: the palette's Revert to Saved acts on the window it runs in. A dirty file in another
+     * window is neither asked about nor reverted; run in that window, it asks over that file and reverts it.
+     */
+    @Test void revertToSavedActsOnTheFileOfTheWindowItRunsIn() throws Exception {
+        var asked = new ArrayList<WindowOwner>();
+        var plugin = new EditorPlugin(Runnable::run, (context, settings) -> new EditorEnvironment(context, Runnable::run,
+            owner -> question -> { asked.add(owner); return question.choices().getFirst(); },
+            owner -> (message, saves) -> saves.getNow(false), settings::current, settings::saveVim, false));
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            UUID main = host.addTerminalWindow(), other = host.addTerminalWindow();
+            host.addTerminalTab(main, "zsh");
+            host.addTerminalTab(other, "zsh");
+            var editor = consumer.get().services().require(Editor.class);
+            var terminals = consumer.get().terminals();
+            editor.open(Files.writeString(home.resolve("b.txt"), "b\n"), terminals.window(main).orElseThrow());
+            editor.open(Files.writeString(home.resolve("a.txt"), "a\n"), terminals.window(other).orElseThrow());
+            drain(host);
+            var windowField = EditorPlugin.class.getDeclaredField("window"); windowField.setAccessible(true);
+            RSyntaxTextArea a = ((EditorWindow) windowField.get(plugin)).selected().orElseThrow().area();
+            a.append("edit");
+            assertThat(host.invoke("dev.jasper.editor.revert", main, null)).isTrue();
+            drain(host);
+            assertThat(asked).as("no prompt for the other window's file").isEmpty();
+            assertThat(a.getText()).as("its edits kept").contains("edit");
+            assertThat(host.invoke("dev.jasper.editor.revert", other, null)).isTrue();
+            drain(host);
+            assertThat(asked).as("asked over its own window's file").singleElement()
+                .satisfies(owner -> assertThat(((dev.jasper.sdk.ui.ContentTab) owner).window().id()).isEqualTo(other));
+            assertThat(a.getText()).as("reverted").doesNotContain("edit");
+        }
+    }
+
     /** Workspace tabs spec 6.5: New Editor Window, with no default key, opens an untitled document in a new child window. */
     @Test void newEditorWindowOpensAnUntitledDocumentInANewChildWindow() throws Exception {
         try (var host = host()) {

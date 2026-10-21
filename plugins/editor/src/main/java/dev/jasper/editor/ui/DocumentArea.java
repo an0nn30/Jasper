@@ -160,8 +160,10 @@ final class DocumentArea extends JComponent implements AutoCloseable {
      * @return a submenu for the vendor popup
      */
     static JMenu submenu(String title) {
-        var menu = new JMenu(title);
+        // The text goes in after html.disable: the UI reads the property only when the text, font or foreground changes.
+        var menu = new JMenu();
         menu.putClientProperty("html.disable", true);
+        menu.setText(title);
         return menu;
     }
 
@@ -171,8 +173,9 @@ final class DocumentArea extends JComponent implements AutoCloseable {
      * @return a menu item for the vendor popup, running {@code run}
      */
     static JMenuItem plainItem(String title, Runnable run) {
-        var item = new JMenuItem(title);
+        var item = new JMenuItem();
         item.putClientProperty("html.disable", true);
+        item.setText(title);
         item.addActionListener(event -> run.run());
         return item;
     }

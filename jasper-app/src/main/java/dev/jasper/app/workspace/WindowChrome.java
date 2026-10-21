@@ -512,8 +512,9 @@ final class WindowChrome {
         for (var entry : entries) {
             JMenuItem built = item.apply(entry.getValue());
             built.setHideActionText(true);
-            built.setText(entry.getKey());
+            // A plugin's label is plain text: html.disable first, as the UI reads it only when the text changes.
             built.putClientProperty("html.disable", true);
+            built.setText(entry.getKey());
             built.setIcon(null);
             split.add(built);
         }

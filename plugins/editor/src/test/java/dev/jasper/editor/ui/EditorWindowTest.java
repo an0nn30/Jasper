@@ -801,13 +801,34 @@ class EditorWindowTest {
         item(submenu(popup, "Split").getMenuComponents(), "Editor Right").doClick();
         UUID editor = host.windowTabs(main).get(1).getFirst();
         assertThat(host.windowTabs(main).get(1)).as("an untitled editor beside it, in its tab").hasSize(2);
+        UUID untitled = host.windowTabs(main).get(1).getLast();
         item(submenu(popup, "Split").getMenuComponents(), "Terminal Down").doClick();
-        assertThat(host.windowTabs(main).get(1)).as("a terminal beside it").hasSize(3).startsWith(editor);
+        var split = host.windowTabs(main).get(1);
+        assertThat(split).as("a terminal right after the right-clicked file, not after the focused untitled editor")
+            .hasSize(3).startsWith(editor).endsWith(untitled);
+        UUID terminal = split.get(1);
         opened(popup);
         assertThat(item(popup.getComponents(), "Move Pane to New Tab").isEnabled()).isTrue();
         item(popup.getComponents(), "Move Pane to New Tab").doClick();
         assertThat(host.windowTabs(main)).as("its own tab, right after its old one").hasSize(3);
+        assertThat(host.windowTabs(main).get(1)).containsExactly(terminal, untitled);
         assertThat(host.windowTabs(main).get(2)).containsExactly(editor);
+    }
+
+    /** Workspace plan 8b Task 6 review: another plugin's split item label shows as plain text, never as HTML. */
+    @Test void anEditorsRightClickMenuShowsAPluginsLabelAsPlainText() throws Exception {
+        context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("dev.jasper.editor.bold", "<html><b>B"), (shown, placement) -> { });
+        UUID main = host.addTerminalWindow();
+        host.addTerminalTab(main, "zsh");
+        window.openLocal(file("a.txt", "a\n"), context.terminals().window(main).orElseThrow());
+        drain();
+        var popup = window.selected().orElseThrow().area().getPopupMenu();
+        opened(popup);
+        var split = submenu(popup, "Split");
+        assertThat(texts(split)).contains("<html><b>B Right", "<html><b>B Down");
+        for (var child : split.getMenuComponents())
+            assertThat(((javax.swing.JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
+                .as("%s renders no HTML", ((javax.swing.JMenuItem) child).getText()).isNull();
     }
 
     /** The menu opening, as a right-click shows it: the Editor's pane entries are built again. */
