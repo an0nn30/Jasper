@@ -25,8 +25,8 @@ grow with what you need: the bundled plugins use the same API as any plugin you 
   notifications while Jasper is in the background. See [notifications](docs/notifications.md).
 - **Settings**: a searchable Settings dialog over `config.toml`, a Keymap page where every action can be rebound, and
   most changes applied without a restart. See [configuration](docs/configuration.md).
-- **Themes and looks**: Slate Cobalt in the Dark appearance and Jasper Meadow Light in the Light appearance by default;
-  Slate Cobalt's Light variant, Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru built in; import further
+- **Themes and looks**: Jasper Meadow in both Dark and Light appearances by default;
+  Slate Cobalt, Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru built in; import further
   Jasper theme files. A *look* sets the chrome and controls: the default look, or a plugin's look such as Enterprise. See
   [themes](docs/themes.md) and [looks](docs/looks.md).
 - **The `jasper` command**: open a window, start Jasper with options, or run plugin commands such as

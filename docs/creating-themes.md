@@ -71,8 +71,7 @@ It cannot change:
    changed theme that is on show is applied again at once.
 6. **Fix problems.** A file that does not load is skipped: the status bar's configuration cell reads
    **Config warnings**, and clicking it lists the problem as `<file>: warning: <message>` (with `:<line>:1` after the
-   file for a JSON syntax error). A pick of the skipped theme falls back to Slate Cobalt in Dark or Jasper Meadow
-   Light in Light, with a warning on the setting.
+   file for a JSON syntax error). A pick of the skipped theme falls back to Jasper Meadow in either appearance, with a warning on the setting.
    [Validation and error messages](#validation-and-error-messages) explains every message.
 
 ## The file format
@@ -784,8 +783,7 @@ themes = ["themes/harbour.json"]
 - **Reserved ids.** Every theme id a discovered plugin declares is reserved, whether the plugin is on or not: no
   themes-folder file or import can take it.
 - **While the plugin does not load** (off, waiting for review, or skipped in safe mode, which loads no installed
-  plugin and no look), a setting that names one of its themes shows Slate Cobalt in Dark or Jasper Meadow Light in
-  Light, and one that names one of its schemes uses `match`, without a warning, and the setting keeps its value for
+  plugin and no look), a setting that names one of its themes shows Jasper Meadow in either appearance, and one that names one of its schemes uses `match`, without a warning, and the setting keeps its value for
   when the plugin is back.
 - **Two plugins, one id.** A `--plugin-dir` plugin wins over a bundled one, which wins over an installed one; then the
   lowest plugin id. The others' files are ignored with a message.

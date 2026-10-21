@@ -11,7 +11,7 @@ boot splash's `SplashColors` ([maintenance](ui-maintenance.md#rules-the-tests-en
 
 | Package | Allowed outgoing UI packages | Ownership |
 | --- | --- | --- |
-| `theme` | none | Jasper theme files (the built-in Slate Cobalt, Catppuccin, Ubuntu Yaru and Jasper Meadow Light themes and installed themes), semantic palettes and derived roles, terminal and editor schemes, syntax styles, glass, FlatLaf colour keys and paint-time contrast guards; EDT appearance binding |
+| `theme` | none | Jasper theme files (the built-in Slate Cobalt, Catppuccin, Ubuntu Yaru and Jasper Meadow themes and installed themes), semantic palettes and derived roles, terminal and editor schemes, syntax styles, glass, FlatLaf colour keys and paint-time contrast guards; EDT appearance binding |
 | `model` | none | Immutable descriptors and events; no secret values |
 | `metrics` | `theme` | Logical geometry catalogs (`DesignMetrics`, `DEFAULT` and `CLASSIC`) and the 11 public `MetricTokens` a kit file tunes, type scales and faces, central typography and the motion policy |
 | `kit` | `metrics`, `theme` | The look: `Kit` names a metric catalog, type scale, faces, control variants (`ControlVariants`), colour slots (`ColorSlots`) and FlatLaf key set; `Kit.DEFAULT` is the default look and `Kit.CLASSIC` the classic base |
@@ -34,8 +34,8 @@ checks that no plugin runtime or staged plugin jar carries `dev/jasper/ui/`.
 
 A theme supplies colours only. `JasperTheme` reads a Jasper theme file with the JDK-only `ThemeJson` reader.
 `JasperTheme.builtIns()` holds the seven built-ins in their order (Slate Cobalt, Catppuccin Latte, Catppuccin Frappé,
-Catppuccin Macchiato, Catppuccin Mocha, Ubuntu Yaru, Jasper Meadow Light), `builtIn(id)` finds one,
-`LIGHT_DEFAULT_ID` is Jasper Meadow Light's id (`jasper-meadow`, the Light default) and `bundled()` is Slate Cobalt
+Catppuccin Macchiato, Catppuccin Mocha, Ubuntu Yaru, Jasper Meadow), `builtIn(id)` finds one,
+`LIGHT_DEFAULT_ID` and `DARK_DEFAULT_ID` are Jasper Meadow’s id (`jasper-meadow`, both appearance defaults) and `bundled()` is Slate Cobalt
 (`slate-cobalt.json`, kept identical to the machine-readable block of
 [`slate-cobalt.md`](design/theme-engine/slate-cobalt.md) by `SlateCobaltFileTest`). `parse(json, id)` reads any other
 file; the app reads installed and plugin theme files through it. [Themes](themes.md) describes the file format.

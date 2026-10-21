@@ -22,11 +22,11 @@ class SettingsAppearanceTest {
         Files.writeString(themes.resolve("cobalt-ii.json"), ThemeTestSupport.terminalThemeJson("Slate Cobalt"));
         var choices = SettingsAppearance.themeChoices(ThemeLibrary.read(themes, ThemeLibrary.bundledOnly()));
         assertThat(choices.dark()).extracting(InstalledThemes.ThemeOption::id)
-            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "ocean");
+            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "jasper-meadow", "ocean");
         assertThat(choices.light()).extracting(InstalledThemes.ThemeOption::id).containsExactly("slate-cobalt", "catppuccin-latte", "ubuntu-yaru", "jasper-meadow", "ocean");
         assertThat(choices.names()).containsOnly(Map.entry("slate-cobalt", "Slate Cobalt (slate-cobalt)"), Map.entry("cobalt-ii", "Slate Cobalt (cobalt-ii)"),
             Map.entry("catppuccin-latte", "Catppuccin Latte"), Map.entry("catppuccin-frappe", "Catppuccin Frapp\u00e9"),
             Map.entry("catppuccin-macchiato", "Catppuccin Macchiato"), Map.entry("catppuccin-mocha", "Catppuccin Mocha"),
-            Map.entry("ubuntu-yaru", "Ubuntu Yaru"), Map.entry("jasper-meadow", "Jasper Meadow Light"), Map.entry("ocean", "Ocean"), Map.entry("zenburn", "Zenburn"));
+            Map.entry("ubuntu-yaru", "Ubuntu Yaru"), Map.entry("jasper-meadow", "Jasper Meadow"), Map.entry("ocean", "Ocean"), Map.entry("zenburn", "Zenburn"));
     }
 }

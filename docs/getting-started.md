@@ -58,7 +58,7 @@ Jasper opens one window with one tab running your shell: your login shell on mac
 (Settings › Terminal › Shell chooses another). The first window is sized for 100 columns by 35 rows of the terminal
 font, bundled Cousine Nerd Font Mono at 12 points; after that, new windows take the size and place of the last one you
 closed. On macOS Jasper follows the system's dark or light appearance; on Linux and Windows it shows Dark until you
-choose Light. The default themes are Slate Cobalt in Dark and Jasper Meadow Light in Light.
+choose Light. The default is Jasper Meadow in both Dark and Light.
 
 Under the default look the window has:
 

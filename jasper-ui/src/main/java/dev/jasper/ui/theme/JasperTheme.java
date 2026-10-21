@@ -32,10 +32,12 @@ import java.util.regex.Pattern;
  * {@link ThemeFileException} naming the file and the entry. Immutable.
  */
 public final class JasperTheme {
-    /** Slate Cobalt's id; the default Dark appearance. */
+    /** Slate Cobalt's stable built-in id. */
     public static final String BUNDLED_ID = "slate-cobalt";
-    /** The default Light appearance; Slate Cobalt remains the default Dark appearance. */
+    /** The default theme for the Light appearance. */
     public static final String LIGHT_DEFAULT_ID = "jasper-meadow";
+    /** The default theme for the Dark appearance. */
+    public static final String DARK_DEFAULT_ID = "jasper-meadow";
     /** The format this Jasper reads: {@code "jasper-theme": 1}. */
     public static final long FORMAT = 1;
     static final String RESOURCE = "/dev/jasper/ui/theme/slate-cobalt.json";

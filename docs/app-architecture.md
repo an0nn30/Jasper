@@ -374,11 +374,11 @@ under `[look."<provider id>"]`, and the application's Notifications panel become
 
 ## Themes
 
-The built-in themes are Slate Cobalt, Catppuccin's four flavours, Ubuntu Yaru and Jasper Meadow Light; installed themes
+The built-in themes are Slate Cobalt, Catppuccin's four flavours, Ubuntu Yaru and Jasper Meadow; installed themes
 are Jasper theme files in `<home>/themes/`, and plugins can bundle more ([themes](themes.md)).
 
 `JasperTheme` (jasper-ui) reads a theme file into one `GeneratedTheme` per variant and its terminal schemes;
-`JasperTheme.bundled()` is Slate Cobalt, the Dark default, `LIGHT_DEFAULT_ID` (`jasper-meadow`) the Light default, and
+`JasperTheme.bundled()` is Slate Cobalt, `LIGHT_DEFAULT_ID` and `DARK_DEFAULT_ID` (`jasper-meadow`) select the appearance defaults, and
 `builtIns()` every built-in theme. `appearance.ThemeLibrary` holds the
 built-in themes, the plugin themes (`PluginThemes`) and every valid `<home>/themes/*.json`, reusing the parsed theme of
 an unchanged file and keeping a problem for each file it skips. `appearance.ThemeSelection` is the Dark and Light theme

@@ -14,13 +14,15 @@ import org.junit.jupiter.api.Test;
 /** spec 4.1: the tiles write ui.appearance and preview each appearance's pick; the Dark and Light theme rows list the installed themes. */
 class AppearanceSelectionTest {
     static final Option.Palette DARK = new Option.Palette(1, 2, 3, 4, 5), LIGHT = new Option.Palette(6, 7, 8, 9, 10),
+        MEADOW_DARK = new Option.Palette(21, 22, 23, 24, 25),
         OCEAN = new Option.Palette(11, 12, 13, 14, 15), MEADOW = new Option.Palette(16, 17, 18, 19, 20);
-    /** Slate Cobalt, and Ocean with a Dark variant only. */
+    /** Slate Cobalt and Meadow pairs, and Ocean with a Dark variant only. */
     static final InstalledThemes THEMES = new InstalledThemes(
-        List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", DARK), new InstalledThemes.ThemeOption("ocean", "Ocean", OCEAN)),
+        List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", DARK), new InstalledThemes.ThemeOption("ocean", "Ocean", OCEAN),
+            new InstalledThemes.ThemeOption("jasper-meadow", "Jasper Meadow", MEADOW_DARK)),
         List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", LIGHT),
-            new InstalledThemes.ThemeOption("jasper-meadow", "Jasper Meadow Light", MEADOW)),
-        InstalledThemes.slateCobalt(DARK, LIGHT).schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "jasper-meadow", "Jasper Meadow Light"));
+            new InstalledThemes.ThemeOption("jasper-meadow", "Jasper Meadow", MEADOW)),
+        InstalledThemes.slateCobalt(DARK, LIGHT).schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "jasper-meadow", "Jasper Meadow"));
 
     static SettingsDraft draft(String config) { return new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values()); }
     static AppearanceSelection editor(SettingsDraft draft) {
@@ -42,14 +44,14 @@ class AppearanceSelectionTest {
         assertThat(tiles.options()).extracting(Option::id).containsExactly("dark", "light", "system");
         assertThat(tiles.options()).extracting(Option::label).containsExactly("Dark", "Light", "Match System");
         assertThat(tiles.selectedId()).isEqualTo("system");
-        assertThat(tiles.options().get(0).description()).isEqualTo("Slate Cobalt");
-        assertThat(tiles.options().get(2).preview()).contains(new Option.Preview(DARK, Optional.of(MEADOW)));
+        assertThat(tiles.options().get(0).description()).isEqualTo("Jasper Meadow");
+        assertThat(tiles.options().get(2).preview()).contains(new Option.Preview(MEADOW_DARK, Optional.of(MEADOW)));
         assertThat(tiles.options().get(2).description()).isEqualTo("System appearance: Light");
         assertThat(((Nodes.SettingRow) parts(editor).get(1)).title()).isEqualTo("Dark theme");
         assertThat(((Nodes.SettingRow) parts(editor).get(2)).title()).isEqualTo("Light theme");
         assertThat(pick(editor, 1).kind()).isEqualTo(Nodes.ChoiceKind.DROPDOWN);
-        assertThat(pick(editor, 1).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Ocean");
-        assertThat(pick(editor, 2).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Jasper Meadow Light");
+        assertThat(pick(editor, 1).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Ocean", "Jasper Meadow");
+        assertThat(pick(editor, 2).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Jasper Meadow");
         var reset = (Nodes.Button) ((Nodes.Stack) ((Nodes.SettingRow) parts(editor).get(1)).control()).children().get(1);
         assertThat(reset.state().visible()).as("Reset hidden at the defaults").isFalse();
         assertThat(reset.action()).isEqualTo("ui.appearance:reset");
@@ -76,7 +78,7 @@ class AppearanceSelectionTest {
         var editor = editor(draft("[ui.theme]\ndark = \"ocean\"\nlight = \"dawn\"\n"));
         assertThat(editor.companionValues()).as("untouched picks stage what the file holds")
             .containsEntry(CoreSettings.UI_THEME_DARK, Optional.of("ocean")).containsEntry(CoreSettings.UI_THEME_LIGHT, Optional.of("dawn"));
-        assertThat(pick(editor, 2).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Jasper Meadow Light", "dawn (not installed)");
+        assertThat(pick(editor, 2).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Jasper Meadow", "dawn (not installed)");
         assertThat(pick(editor, 2).selectedId()).isEqualTo("dawn");
         var tiles = (Nodes.Choice) parts(editor).get(0);
         assertThat(tiles.options().get(1).preview()).as("Meadow is shown instead").contains(new Option.Preview(MEADOW, Optional.empty()));
@@ -85,18 +87,18 @@ class AppearanceSelectionTest {
 
     @Test void aPickedThemeThatLacksTheVariantIsNamedAsSuchNotCalledUninstalled() {
         var themes = new InstalledThemes(THEMES.dark(), List.of(THEMES.light().getFirst(), THEMES.light().get(1), new InstalledThemes.ThemeOption("dawn", "Dawn", OCEAN)),
-            THEMES.schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "dawn", "Dawn", "jasper-meadow", "Jasper Meadow Light"));
+            THEMES.schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "dawn", "Dawn", "jasper-meadow", "Jasper Meadow"));
         var editor = new AppearanceSelection(new AppearanceChoices(100f, false, () -> Optional.of(false),
             ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> themes, Optional.empty()),
             PageKit.context(draft("[ui.theme]\ndark = \"dawn\"\nlight = \"ocean\"\n"), id -> { }, () -> { }));
-        assertThat(pick(editor, 1).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Ocean", "Dawn (no Dark variant)");
+        assertThat(pick(editor, 1).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Ocean", "Jasper Meadow", "Dawn (no Dark variant)");
         assertThat(pick(editor, 1).selectedId()).isEqualTo("dawn");
-        assertThat(pick(editor, 2).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Jasper Meadow Light", "Dawn", "Ocean (no Light variant)");
+        assertThat(pick(editor, 2).options()).extracting(Option::label).containsExactly("Slate Cobalt", "Jasper Meadow", "Dawn", "Ocean (no Light variant)");
         assertThat(pick(editor, 2).selectedId()).isEqualTo("ocean");
         var tiles = (Nodes.Choice) parts(editor).get(0);
         assertThat(tiles.options().get(0).description()).isEqualTo("Dawn (no Dark variant)");
         assertThat(tiles.options().get(1).description()).isEqualTo("Ocean (no Light variant)");
-        assertThat(tiles.options().get(0).preview()).as("Slate Cobalt is shown instead").contains(new Option.Preview(DARK, Optional.empty()));
+        assertThat(tiles.options().get(0).preview()).as("Meadow is shown instead").contains(new Option.Preview(MEADOW_DARK, Optional.empty()));
         assertThat(tiles.options().get(1).preview()).contains(new Option.Preview(MEADOW, Optional.empty()));
         assertThat(editor.companionValues()).as("the picks stay as the file holds them")
             .containsEntry(CoreSettings.UI_THEME_DARK, Optional.of("dawn")).containsEntry(CoreSettings.UI_THEME_LIGHT, Optional.of("ocean"));
@@ -131,16 +133,16 @@ class AppearanceSelectionTest {
         var reset = (Nodes.Button) ((Nodes.Stack) ((Nodes.SettingRow) parts(editor).get(1)).control()).children().get(1);
         assertThat(reset.state().visible()).as("at the effective defaults").isFalse();
         assertThat(editor.companionValues()).containsEntry(CoreSettings.UI_THEME_DARK, Optional.empty());
-        assertThat(editor.event("ui.appearance", new UiEvent.Selected("ui.appearance:dark-theme", java.util.Set.of("slate-cobalt")))).isTrue();
-        assertThat(editor.companionValues()).containsEntry(CoreSettings.UI_THEME_DARK, Optional.of("slate-cobalt"));
+        assertThat(editor.event("ui.appearance", new UiEvent.Selected("ui.appearance:dark-theme", java.util.Set.of("jasper-meadow")))).isTrue();
+        assertThat(editor.companionValues()).containsEntry(CoreSettings.UI_THEME_DARK, Optional.of("jasper-meadow"));
     }
 
     /** Spec 7.4: a plugin's theme is captioned with its provider. */
     @Test void aPluginThemeIsCaptionedWithItsProvider() {
-        var themes = new InstalledThemes(List.of(THEMES.dark().getFirst(), new InstalledThemes.ThemeOption("enterprise", "Enterprise", OCEAN, "Enterprise")),
-            THEMES.light(), THEMES.schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "enterprise", "Enterprise"));
+        var themes = new InstalledThemes(List.of(THEMES.dark().getFirst(), THEMES.dark().get(2), new InstalledThemes.ThemeOption("enterprise", "Enterprise", OCEAN, "Enterprise")),
+            THEMES.light(), THEMES.schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "enterprise", "Enterprise", "jasper-meadow", "Jasper Meadow"));
         var editor = new AppearanceSelection(new AppearanceChoices(100f, false, () -> Optional.of(false),
             ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> themes, Optional.empty()), PageKit.context(draft(""), id -> { }, () -> { }));
-        assertThat(pick(editor, 1).options()).extracting(Option::description).containsExactly("", "From the Enterprise plugin");
+        assertThat(pick(editor, 1).options()).extracting(Option::description).containsExactly("", "", "From the Enterprise plugin");
     }
 }

@@ -78,8 +78,8 @@ class PresentationConformanceTest {
         assertThat(parsed.classicBase()).isTrue();
         assertThat(parsed.chrome().icons()).isEqualTo(ChromeSpec.Icons.CLASSIC);
         assertThat(parsed.dropped()).as("the [defaults] themes resolve").isEmpty();
-        assertThat(parsed.defaults().value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("enterprise");
-        assertThat(parsed.defaults().value(CoreSettings.UI_THEME_DARK)).isEqualTo("enterprise");
+        assertThat(parsed.defaults().value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("jasper-meadow");
+        assertThat(parsed.defaults().value(CoreSettings.UI_THEME_DARK)).isEqualTo("jasper-meadow");
         assertThat(parsed.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(8);
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.
         assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR_HEIGHT)).isEqualTo(28);

@@ -607,8 +607,8 @@ notice, as `jbr-api.NOTICE.txt` does. The Licenses window reads the same file.
 ## Themes
 
 `JasperTheme.builtIns()` lists the built-in theme files ([architecture](app-architecture.md#themes),
-[themes](themes.md)), Slate Cobalt, the Dark default, first; Jasper Meadow Light (`jasper-meadow.json`,
-`JasperTheme.LIGHT_DEFAULT_ID`) is the Light default. The Catppuccin files are the theme converter's output for the plugin jar
+[themes](themes.md)), Slate Cobalt first; Jasper Meadow (`jasper-meadow.json`,
+`JasperTheme.LIGHT_DEFAULT_ID` and `DARK_DEFAULT_ID`) is the default for both appearances. The Catppuccin files are the theme converter's output for the plugin jar
 vendored in `tools/themes/catppuccin/`, with the hand-picked roles in its `roles.json` (its `SOURCE.md` says how to
 regenerate them); a converter test fails when they differ. The Enterprise plugin's `enterprise.json` is likewise the
 converter's port (`convert_port`) of IntelliJ's own IntelliJ Light and New UI Dark files in `tools/themes/intellij/`

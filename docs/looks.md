@@ -492,8 +492,8 @@ dialog_surface = "surface.app"
 navigation_surface = "surface.card"
 
 [defaults]
-"ui.theme.light" = "enterprise"
-"ui.theme.dark" = "enterprise"
+"ui.theme.light" = "jasper-meadow"
+"ui.theme.dark" = "jasper-meadow"
 "palette.visible_rows" = 8
 "window.toolbar_height" = 28
 "window.toolbar" = "icons"
@@ -506,7 +506,7 @@ font_family = "IBM Plex Mono"
   base's values, except `title_bar` (`classic` for the base's `native`), `window_title` and `toolbar_search` (`icon`
   for the base's `field`).
 - The fonts sit in `presentation/fonts/`, inside the kit file’s folder. Enterprise shares Jasper’s Shell Prompt icon and animated Meadow splash.
-- `[defaults]` makes the plugin's own `enterprise` theme the default for both appearances, shows 8 Run window rows,
+- `[defaults]` uses Jasper Meadow for both appearances, shows 8 Run window rows,
   makes the toolbar 28 pixels high, IntelliJ's, and shows its buttons as icons only; its Editor table draws the
   Editor's documents in IBM Plex Mono, the look's data face.
 

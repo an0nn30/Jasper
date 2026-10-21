@@ -26,7 +26,7 @@ several are enabled. `jasper --safe-mode` always starts with the standard look
 
 The Enterprise look keeps its own tool window layout in `ui-state.toml` (under `[look."dev.jasper.enterprise"]`), apart
 from the standard look's, so each comes back as you left it. After turning Enterprise off, a theme pick you saved as
-`enterprise` shows the appearance's default theme (Jasper Meadow Light in Light, Slate Cobalt in Dark), without a
+`enterprise` shows the appearance's default theme (Jasper Meadow in both appearances), without a
 warning, until Enterprise is on again.
 
 ### If the look does not start
@@ -146,20 +146,17 @@ Plex Mono too ([defaults](#defaults)). Terminal text keeps `[terminal.font]`.
 
 ### Branding
 
-The look is branded **JasperOps**. A start that opens a window (not `--background`, `--no-window` or `--safe-mode`)
-shows a 720 × 440 splash with its art, the name, Jasper's version and copyright, and each plugin as it starts, until the
-first window shows. Its icons replace Jasper's application icon in windows and in the Dock or taskbar. Only the splash
-shows the name.
+Enterprise uses Jasper’s Shell Prompt icon and animated Meadow splash, which stays visible until the workspace’s first visible paint.
 
 ### Defaults
 
-The look gives five core settings and one Editor setting other defaults. A value you saved in `config.toml`, the
+The look sets the same Meadow themes as the standard look, with three other core defaults and one Editor default. A value you saved in `config.toml`, the
 Editor's settings file or Settings wins, and **Reset to Default** returns to the look's value.
 
 | Setting | Under Enterprise | Standard look |
 |---|---|---|
-| `ui.theme.light` | `enterprise` | `jasper-meadow` |
-| `ui.theme.dark` | `enterprise` | `slate-cobalt` |
+| `ui.theme.light` | `jasper-meadow` | `jasper-meadow` |
+| `ui.theme.dark` | `jasper-meadow` | `jasper-meadow` |
 | `palette.visible_rows` | `8` | `5` |
 | `window.toolbar_height` | `28` | `30` |
 | `window.toolbar` | `"icons"` | `"icons_and_labels"` |

@@ -27,7 +27,7 @@ class SystemThemeApplicationTest {
         var controller = new ConfigurationController(themes, service, path -> {}, Observation.dark());
         var states = new ArrayList<ConfigService.State>(); controller.onState(states::add);
         try {
-            assertThat(themes.current().chrome()).isSameAs(COBALT.generated(true));
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
             // Plan 2 finding 9: an open Settings draft keeps its unsaved edit through the flip.
             var draft = new dev.jasper.app.settingsui.SettingsDraft(service.initialState().values());
             draft.stage(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT, java.util.Optional.of(44));
@@ -39,9 +39,9 @@ class SystemThemeApplicationTest {
             assertThat(draft.modified()).isTrue();
             assertThat(draft.value(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(44);
             controller.systemAppearanceChanged(Observation.unavailable("temporarily unavailable"));
-            assertThat(themes.current().chrome()).as("unavailable: Dark").isSameAs(COBALT.generated(true));
+            assertThat(themes.current().chrome()).as("unavailable: Dark").isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
             controller.close(); controller.systemAppearanceChanged(Observation.light());
-            assertThat(themes.current().chrome()).as("closed: no longer follows").isSameAs(COBALT.generated(true));
+            assertThat(themes.current().chrome()).as("closed: no longer follows").isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
         } finally { controller.close(); themes.close(); }
     }
 
@@ -51,11 +51,11 @@ class SystemThemeApplicationTest {
         var themes = new ThemeController(false, TerminalSchemeChoice.MATCH);
         var controller = new ConfigurationController(themes, service, path -> {}, Observation.light());
         try {
-            assertThat(themes.current().chrome()).isSameAs(COBALT.generated(true));
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
             assertThat(themes.schemeChoice()).isEqualTo(TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow());
             controller.systemAppearanceChanged(Observation.dark());
             controller.systemAppearanceChanged(Observation.light());
-            assertThat(themes.current().chrome()).isSameAs(COBALT.generated(true));
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
         } finally { controller.close(); themes.close(); }
     }
 }

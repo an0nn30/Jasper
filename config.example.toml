@@ -140,13 +140,12 @@ blink = true
 appearance = "system"
 
 [ui.theme]
-# The themes the Dark and Light appearances show, live: a built-in theme ("slate-cobalt" or "ubuntu-yaru" for either,
-# "jasper-meadow" or "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or "catppuccin-mocha" for Dark),
+# The themes the Dark and Light appearances show, live: a built-in theme ("jasper-meadow", "slate-cobalt" or "ubuntu-yaru" for either,
+# "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or "catppuccin-mocha" for Dark),
 # a plugin's theme such as "enterprise", or an imported theme's id (its file name in the themes folder without .json).
-# A theme without that variant is reported and the appearance's default is used: Slate Cobalt for Dark, Jasper Meadow
-# Light for Light.
-# The default depends on the active look ("enterprise" under Enterprise); these lines override it.
-dark = "slate-cobalt"
+# A theme without that variant is reported and the appearance's default is used: Jasper Meadow for Dark and Light.
+# Both standard and Enterprise looks default to Meadow; these lines save an explicit choice.
+dark = "jasper-meadow"
 light = "jasper-meadow"
 
 [ui.font]

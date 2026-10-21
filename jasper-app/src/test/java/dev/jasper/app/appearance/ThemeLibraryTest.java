@@ -15,7 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 class ThemeLibraryTest {
     static final List<String> BUILT_IN = List.of("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "jasper-meadow");
     static final List<String> BUILT_IN_SCHEMES = List.of("slate-cobalt/dark", "slate-cobalt/light", "slate-cobalt/high-contrast",
-        "catppuccin-latte/light", "catppuccin-frappe/dark", "catppuccin-macchiato/dark", "catppuccin-mocha/dark", "ubuntu-yaru/dark", "ubuntu-yaru/light", "jasper-meadow/light");
+        "catppuccin-latte/light", "catppuccin-frappe/dark", "catppuccin-macchiato/dark", "catppuccin-mocha/dark", "ubuntu-yaru/dark", "ubuntu-yaru/light", "jasper-meadow/dark", "jasper-meadow/light");
     @TempDir Path home;
 
     static List<String> builtInAnd(String... more) {
@@ -35,7 +35,7 @@ class ThemeLibraryTest {
         assertThat(library.themes()).containsExactlyElementsOf(JasperTheme.builtIns());
         assertThat(library.themes().getFirst()).isSameAs(JasperTheme.bundled());
         assertThat(library.themes(true)).extracting(JasperTheme::id)
-            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru");
+            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "jasper-meadow");
         assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-cobalt", "catppuccin-latte", "ubuntu-yaru", "jasper-meadow");
         assertThat(library.imported()).isEmpty();
         assertThat(library.problems()).isEmpty();
@@ -53,7 +53,7 @@ class ThemeLibraryTest {
         assertThat(library.problems()).isEmpty();
         assertThat(library.themes()).extracting(JasperTheme::id).containsExactlyElementsOf(builtInAnd("abyss", "ocean", "zenburn"));
         assertThat(library.themes(true)).extracting(JasperTheme::id)
-            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "abyss", "ocean");
+            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "jasper-meadow", "abyss", "ocean");
         assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-cobalt", "catppuccin-latte", "ubuntu-yaru", "jasper-meadow", "abyss", "ocean");
         assertThat(library.theme("zenburn")).get().extracting(JasperTheme::name).isEqualTo("Zenburn");
         assertThat(library.theme("nord")).isEmpty();
