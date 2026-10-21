@@ -46,7 +46,7 @@ class RemoteDocumentTest {
     final ExecutorService ui = Executors.newSingleThreadExecutor();
     final ExecutorService background = Executors.newCachedThreadPool();
     final List<TestEndpoint> opened = new CopyOnWriteArrayList<>();
-    final EditChannels channels = new EditChannels((identity, owner) -> {
+    final EditChannels channels = EditChannelsTest.channels((identity, owner) -> {
         var endpoint = new TestEndpoint(new LocalEndpoint());
         opened.add(endpoint);
         return CompletableFuture.completedFuture(endpoint);
@@ -144,7 +144,7 @@ class RemoteDocumentTest {
         try (var fixture = new SftpFixture(temp)) {
             Path file = Files.writeString(fixture.files.resolve("site.yaml"), "port: 80\n");
             var endpoints = new EndpointFactory(fixture.connections, fixture.background, fixture.ui, () -> Duration.ofSeconds(5));
-            var sftp = new EditChannels((identity, owner) -> endpoints.open(Optional.of(identity), owner.orElse(null), status -> {}),
+            var sftp = EditChannelsTest.channels((identity, owner) -> endpoints.open(Optional.of(identity), owner.orElse(null), status -> {}),
                 fixture.connections::authenticated, fixture.background, fixture.ui);
             try (var held = fixture.lease()) {
                 var document = new RemoteDocument(held.identity(), "/site.yaml", sftp, Optional::empty);
@@ -169,7 +169,7 @@ class RemoteDocumentTest {
         try (var fixture = new SftpFixture(temp, refusingSiblingWrites(refused))) {
             Path file = Files.writeString(fixture.files.resolve("site.yaml"), "port: 80\n");
             var endpoints = new EndpointFactory(fixture.connections, fixture.background, fixture.ui, () -> Duration.ofSeconds(5));
-            var sftp = new EditChannels((identity, owner) -> endpoints.open(Optional.of(identity), owner.orElse(null), status -> {}),
+            var sftp = EditChannelsTest.channels((identity, owner) -> endpoints.open(Optional.of(identity), owner.orElse(null), status -> {}),
                 fixture.connections::authenticated, fixture.background, fixture.ui);
             try (var held = fixture.lease()) {
                 var document = new RemoteDocument(held.identity(), "/site.yaml", sftp, Optional::empty);

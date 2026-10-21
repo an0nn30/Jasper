@@ -39,7 +39,7 @@ class RemoteEditingTest {
     final ExecutorService background = Executors.newCachedThreadPool();
     final List<Optional<WindowHandle>> owners = new CopyOnWriteArrayList<>();
     volatile boolean connected = true;
-    final EditChannels channels = new EditChannels((identity, owner) -> {
+    final EditChannels channels = EditChannelsTest.channels((identity, owner) -> {
         owners.add(owner);
         return CompletableFuture.completedFuture(new LocalEndpoint());
     }, identity -> connected, background, ui);
@@ -59,8 +59,11 @@ class RemoteEditingTest {
         }
     };
     volatile Optional<WindowHandle> active = Optional.empty();
-    final RemoteEditing editing = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"));
-    final RemoteEditing reopening = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"), id -> Optional.ofNullable(saved.get(id)));
+    // As Remote makes it once its saved hosts have loaded, where signing in to a route may ask.
+    final RemoteEditing editing = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+        id -> Optional.empty(), () -> CompletableFuture.completedFuture(null), ui, route -> false);
+    final RemoteEditing reopening = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+        id -> Optional.ofNullable(saved.get(id)), () -> CompletableFuture.completedFuture(null), ui, route -> false);
     final ConnectionIdentity prod = EditChannelsTest.identity("prod");
     final TestWindow origin = new TestWindow(UUID.randomUUID(), new AtomicBoolean(true));
 

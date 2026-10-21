@@ -30,7 +30,7 @@ class EditChannelsTest {
     final List<Optional<WindowHandle>> owners = new CopyOnWriteArrayList<>();
     final List<TestEndpoint> opened = new CopyOnWriteArrayList<>();
     volatile boolean connected = true;
-    EditChannels channels = new EditChannels((identity, owner) -> {
+    EditChannels channels = channels((identity, owner) -> {
         owners.add(owner);
         var endpoint = new TestEndpoint(new LocalEndpoint());
         opened.add(endpoint);
@@ -40,6 +40,13 @@ class EditChannelsTest {
     @AfterEach void stop() throws Exception {
         onUi(() -> { channels.close(); return null; });
         ui.shutdownNow(); background.shutdownNow();
+    }
+
+    /** Channels through the full constructor, as Remote makes them; here quiet jobs open with the same opener. */
+    static EditChannels channels(java.util.function.BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>> opener,
+                                 java.util.function.Predicate<ConnectionIdentity> authenticated, java.util.concurrent.Executor background,
+                                 java.util.concurrent.Executor ui) {
+        return new EditChannels(opener, opener, authenticated, background, ui);
     }
 
     static ConnectionIdentity identity(String name) {
@@ -163,7 +170,7 @@ class EditChannelsTest {
         onUi(() -> { channels.close(); return null; });
         var opening = new CompletableFuture<FileEndpoint>();
         var asked = new AtomicInteger();
-        channels = new EditChannels((identity, owner) -> { asked.incrementAndGet(); return opening; }, identity -> true, background, ui);
+        channels = channels((identity, owner) -> { asked.incrementAndGet(); return opening; }, identity -> true, background, ui);
         var prod = identity("prod");
         var reads = List.of(submit(prod, endpoint -> "a"), submit(prod, endpoint -> "b"), submit(prod, endpoint -> "c"));
         onUi(() -> opening.completeExceptionally(new IOException("Permission denied (publickey)")));
@@ -194,7 +201,7 @@ class EditChannelsTest {
         var firstOpening = new CompletableFuture<FileEndpoint>();
         var secondEndpoint = new TestEndpoint(new LocalEndpoint());
         var attempts = new AtomicInteger();
-        var direct = new EditChannels((identity, owner) -> attempts.incrementAndGet() == 1
+        var direct = channels((identity, owner) -> attempts.incrementAndGet() == 1
             ? firstOpening : CompletableFuture.completedFuture(secondEndpoint), identity -> true, background, Runnable::run);
         var first = direct.submit(prod, Optional::empty, endpoint -> "first");
         var second = direct.submit(prod, Optional::empty, endpoint -> "second");

@@ -239,6 +239,31 @@ class EditorWindowTest {
         assertThat(recorded).as("opening it as usual is recorded").containsExactly(LocalDocument.key(file));
     }
 
+    /**
+     * Workspace plan 6b's final review M4: a document restored into a window the user did not choose leaves the window the
+     * Editor was used from as it was, for its prompts while no Editor tab is selected and for its own open command.
+     */
+    @Test void aRestoredDocumentLeavesTheWindowTheEditorWasUsedFrom() throws Exception {
+        WindowHandle used = context.terminals().window(host.addTerminalWindow()).orElseThrow();
+        UUID other = host.addTerminalWindow();
+        // A shell keeps the window being restored open once the restored document's tab has closed.
+        host.addTerminalTab(other, "zsh");
+        WindowHandle restored = context.terminals().window(other).orElseThrow();
+        window.openLocal(file("used.txt", "used\n"), used);
+        drain();
+        host.contentTabs().getLast().close();
+        assertThat(window.openRestored(new LocalDocument(file("restored.txt", "restored\n"), context.background()), restored)).isTrue();
+        drain();
+        assertThat(host.contentOwner(host.contentTabs().getLast())).as("restored where it was saved").isEqualTo(restored);
+        host.contentTabs().getLast().close();
+        assertThat(window.selected()).as("no Editor tab is selected").isEmpty();
+        host.queueFileChoice(List.of());
+        window.openChooser();
+        assertThat(host.fileChoices().getLast().owner()).as("its open command").isEqualTo(used);
+        window.newUntitled();
+        assertThat(host.contentOwner(host.contentTabs().getLast())).as("a new document").isEqualTo(used);
+    }
+
     @Test void filesUseHostedTabsAndMovingPreservesDirtyTextAndUndo() throws Exception {
         var tab = opened(file("hosted.txt", "before"));
         assertThat(host.windows()).isEmpty();

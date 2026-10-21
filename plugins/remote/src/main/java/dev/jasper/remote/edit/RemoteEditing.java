@@ -45,28 +45,6 @@ public final class RemoteEditing {
      * @param channels where documents queue their operations
      * @param activeWindow the Jasper window used last, for sign-in prompts once the origin window has closed
      * @param notifications where a file the Editor cannot open is posted
-     */
-    public RemoteEditing(Editor editor, EditChannels channels, Supplier<Optional<WindowHandle>> activeWindow, NotificationGroup notifications) {
-        this(editor, channels, activeWindow, notifications, id -> Optional.empty());
-    }
-
-    /**
-     * @param editor the Editor's service
-     * @param channels where documents queue their operations
-     * @param activeWindow the Jasper window used last, for sign-in prompts once the origin window has closed
-     * @param notifications where a file the Editor cannot open is posted
-     * @param hosts finds a saved host by id, in memory, for reopening recent files
-     */
-    public RemoteEditing(Editor editor, EditChannels channels, Supplier<Optional<WindowHandle>> activeWindow, NotificationGroup notifications,
-                         Function<UUID, Optional<RemoteHost>> hosts) {
-        this(editor, channels, activeWindow, notifications, hosts, () -> CompletableFuture.completedFuture(null), Runnable::run, route -> false);
-    }
-
-    /**
-     * @param editor the Editor's service
-     * @param channels where documents queue their operations
-     * @param activeWindow the Jasper window used last, for sign-in prompts once the origin window has closed
-     * @param notifications where a file the Editor cannot open is posted
      * @param hosts finds a saved host by id, in memory, for reopening recent files
      * @param hostsLoaded completes once the saved hosts have been read at start: before that a recorded key reopens a
      *     document that finds them when it is first used (workspace tabs spec 13)

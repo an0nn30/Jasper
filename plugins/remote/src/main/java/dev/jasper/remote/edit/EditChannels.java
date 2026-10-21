@@ -40,17 +40,6 @@ public final class EditChannels implements AutoCloseable {
 
     /**
      * @param opener opens an endpoint, on the UI thread; the window, when present, owns sign-in prompts
-     * @param authenticated whether an authenticated connection exists, so opening needs no prompt
-     * @param background where operations run
-     * @param ui the UI thread
-     */
-    public EditChannels(BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>> opener,
-                        Predicate<ConnectionIdentity> authenticated, Executor background, Executor ui) {
-        this(opener, opener, authenticated, background, ui);
-    }
-
-    /**
-     * @param opener opens an endpoint, on the UI thread; the window, when present, owns sign-in prompts
      * @param quietOpener opens one for a quiet job ({@link #submitQuietly}), asking nothing
      * @param authenticated whether an authenticated connection exists, so opening needs no prompt
      * @param background where operations run

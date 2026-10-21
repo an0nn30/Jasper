@@ -195,10 +195,14 @@ public final class EditorWindow {
      */
     public boolean openRestored(EditorDocument document, WindowOwner owner) {
         if (model.find(document.key()).isPresent()) return false;
-        origin = owner;
         var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
         var created = new DocumentSession(document, sessionEnvironment(ref));
-        add(created, ref);
+        // The tab opens in the window being restored, which the user did not choose: the Editor's prompts and its own
+        // open command keep the window they used before (workspace plan 6b's final review, M4).
+        WindowOwner chosen = origin;
+        origin = owner;
+        try { add(created, ref); }
+        finally { origin = chosen; }
         if (document.host().isPresent()) created.defer(); else created.load();
         return true;
     }
