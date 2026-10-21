@@ -1,134 +1,154 @@
 # Workspace tabs 6b: plugins' tabs come back Implementation Plan
 
-**Status: not executed.** Re-planned in place on 2026-10-20 on top of plans 7a, 7b, 7c and the re-planned 6a (see
-Workspace); the first version's Rulings stand except where "Superseded" says otherwise.
+**Status: not executed.** Re-planned in place on 2026-10-21 on the tabs-and-panes model (plans 8a-8c) and the
+re-planned plan 6a (see Workspace); the earlier versions' Rulings stand except where "Superseded" says otherwise.
+Record every deviation from this text here and in `docs/STATUS.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A plugin's tab comes back when Jasper restores its windows, in its saved parent tab and pane of whichever
-window kind held it (the main window, a full window or a pane window): the plugin gives restore state (a restorer kind
-and a few strings) when it opens the tab, and the restorer it registered rebuilds the tab there. The Editor reopens its
-files, Remote's SSH tabs come back and reconnect or wait for Reconnect, and the sample's About comes back; a tab whose
-plugin is missing, turned off or failed comes back as a placeholder that says why, with Close and, while its plugin
-runs, Retry. The Credential Vault's manager is a dialog over the main window and does not come back.
+**Goal:** A plugin's item comes back when Jasper restores its windows, in its saved tab and pane of the main window or a
+full window: the plugin gives restore state (a restorer kind and a few strings) when it opens the item, and the restorer
+it registered rebuilds the item there. The Editor reopens its files, in a tab of their own or in a pane beside a
+terminal, as they were; Remote's SSH tabs come back and reconnect or wait for Reconnect, and picking a host whose
+restored tab still waits shows that tab; the sample's About comes back. An item whose plugin is missing, turned off or
+failed comes back as a placeholder in its pane that says why, with Close and, while its plugin runs, Retry, which puts
+the rebuilt item in that pane. The Credential Vault's manager is a dialog over the main window and does not come back.
 
 **Architecture:** The SDK (still 0.21.0, plan 6a's) gains `dev.jasper.sdk.RestoreState`, an optional restore state on
 `ContentSpec` and `SessionSpec`, `ContentTab.setRestore`, `Windows.restorer(kind, TabRestorer)` (a restorer may decline
-with a reason) and `RestoreRequest`. In the application a tab carries its restore state (`Tab.restore()`, the app's twin
-`layout.TabRestore`), and the `TabRegistry` keeps each plugin's restorers and, while one runs, a slot: the next content
-tab that plugin opens (`TabRegistry.open`), or the next session it opens in the window being restored
+with a reason) and `RestoreRequest`. In the application an item carries its restore state (`Tab.restore()`, the app's
+twin `layout.TabRestore`), and the `TabRegistry` keeps each plugin's restorers and, while one runs, a slot: the next
+content item that plugin opens (`TabRegistry.open`), or the next session it opens in the window being restored
 (`WindowContent.openTerminal`), takes the saved id and that window, unshown, before any placement or wait for a main
-window applies, and that window places it with its other saved tabs; meanwhile the window takes no other tab. Plan 6a's `WindowContent.restore` asks the window manager for each
-`TabRecord.Content` of a window's `WindowRecord` (`WindowContent.savedTabs`) and places what comes back through
-`ParentTabsView.restore` or a pane window's `WorkspaceView.restore`, exactly where it was saved. `WindowManager` saves a
-plugin's tab as `TabRecord.Content` while its plugin has a restorer for its kind, never Jasper's own tabs, within the
-size a read accepts, rebuilds it through the registry, and otherwise makes a `Tab.Kind.PLACEHOLDER` tab
+window applies, and that window places it with its other saved items; meanwhile the window takes no other item. Plan
+6a's `WindowContent.restore` asks the window manager for each `TabRecord.Content` of a window's `WindowRecord`
+(`WindowContent.savedTabs`) and places what comes back through `ParentTabsView.restore`, in its saved tab and pane.
+`WindowManager` saves a plugin's item as `TabRecord.Content` while its plugin has a restorer for its kind, never Jasper's
+own, within the size a read accepts, rebuilds it through the registry, and otherwise makes a `Tab.Kind.PLACEHOLDER` item
 (`workspace.PlaceholderContent`) that says why from how its plugin stands, which is saved again as it was and whose
-Retry rebuilds the tab in the placeholder's pane of whichever parent tab and window hold it then. The testkit's fakes
-restore as Jasper does (the tab placed, a session waiting until shown), and the contract suite runs on both runtimes.
-The Editor defers a restored remote document until its tab is active and reads it with the Editor API's new quiet
-read; Remote reopens remote documents before its hosts have loaded and connects restored SSH tabs one at a time per
-window, quietly: a host-key question then is answered Cancel, and the tab offers Reconnect.
+Retry rebuilds the item in the placeholder's pane (`Layout.replaceTab`, `WorkspaceView.replace`) of whichever tab and
+window hold it then. The testkit's fakes restore as Jasper does (the item placed in a new tab, unshown, a session waiting
+until shown), and the contract suite runs on both runtimes. The Editor defers a restored remote document until its tab
+is active and reads it with the Editor API's new quiet read; Remote reopens remote documents before its hosts have loaded
+and connects restored SSH tabs that the SSH agent signs in one at a time per window, quietly: a host-key question then
+is answered Cancel, and the tab offers Reconnect, as it does for a Vault login.
 
 **Tech Stack:** Java 25 on JetBrains Runtime 25, Swing and FlatLaf, Gradle 9.7 (Kotlin DSL), JUnit 6.1.3 and AssertJ
 3.27.7, Python 3.11+ standard library for the edit scripts (always `python3 -I`).
 
-**Spec:** [`docs/superpowers/specs/2026-10-19-jasper-parent-tabs-design.md`](../specs/2026-10-19-jasper-parent-tabs-design.md)
-(sections 4's encoding, 9, 10 and 11's quit row), which amends and wins over
-[`docs/superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md`](../specs/2026-10-16-jasper-workspace-tabs-design.md)
+**Spec:** [`docs/superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md`](../specs/2026-10-20-jasper-tabs-and-panes-design.md)
+(decisions 2.2, 2.7 and 2.9, sections 3's terms, 4, 8's Editor rows, 11, 12 and 16), the binding authority, which amends
+and wins over [`docs/superpowers/specs/2026-10-19-jasper-parent-tabs-design.md`](../specs/2026-10-19-jasper-parent-tabs-design.md)
+(sections 9 and 10) and [`docs/superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md`](../specs/2026-10-16-jasper-workspace-tabs-design.md)
 (sections 1 decision 5, 9.2's placeholder, 13's content tabs, 14's `ContentSpec`, `SessionSpec` (amended in
-`27874bf7d`) and `Windows.restorer` rows and its plugin list, 15's disabled-plugin row, 17's SDK line and 18). The
-second half of section 18's plan 6; [6a](2026-10-18-workspace-6a-save-restore.md) (saving, restoring windows and
-terminal tabs, SDK 0.21.0) executes first, after plans [1](2026-10-17-workspace-1-single-instance.md) to
-[5](2026-10-18-workspace-5-tear-out.md) and [7a](2026-10-19-workspace-7a-parent-tabs.md),
-[7b](2026-10-19-workspace-7b-pop-out.md) and [7c](2026-10-19-workspace-7c-parent-tab-drag.md).
+`27874bf7d`) and `Windows.restorer` rows and its plugin list, 15's disabled-plugin row, 17's SDK line and 18). Where the
+specs are silent, the industry standard: VS Code and IntelliJ reopen an editor's files where they were, and a
+placeholder for what cannot come back (VS Code's "could not be restored" editor) keeps its place. The second half of
+section 18's plan 6; [6a](2026-10-18-workspace-6a-save-restore.md) (saving, restoring windows and terminals, SDK 0.21.0)
+executes first, after plans [8a](2026-10-20-workspace-8a-tabs-hold-panes.md), [8b](2026-10-20-workspace-8b-split-with.md)
+and [8c](2026-10-20-workspace-8c-moving-panes.md).
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch
-`claude/workspace-tabs`, after plan 6a's last commit. Run every command from the worktree root. This plan was first
-written on `22b702456` with plans 1 to 6a's first version applied; it was re-planned for parent tabs on `ec41c97db`
-("Docs: workspace tabs plan 6a re-planned on parent tabs"). Every anchor below was matched at its stated count, and
-every edit script of Tasks 1-6 replayed in order, on `git archive` copies of `ec41c97db` and of `e80f2c322` ("Plan 7b:
-refresh anchors for execution", after plan 7a's final fixes), where plan 7a is executed, after plan 7b (its refreshed
-copy), 7c and the re-planned 6a; and on a copy of `8e129ff34` ("Docs: workspace tabs plan 7a, parent tabs") after plan
-7a's, plan 7b's (as committed in `8dcdf4f0a`), plan 7c's and plan 6a's file creations and edit scripts, where every
-block matched but Task 4's manifest edit: Remote is 0.14.0 there and 0.15.0 from `0ca6d3c51` on, which the edit quotes
-(Rulings 18). Line numbers are the first two replays' (they agree). Nothing was compiled or run. Every edit quotes the text it replaces, and the scripts stop with a message when
-that text is not found the stated number of times: re-find the quoted text (a plan before this one may have reworded
-it), adjust the anchor, re-run, and record it in this plan's banner; never edit around a missing anchor. No anchor
-here is in the drag code plans 5 and 7c wrote, nor in `ParentTabsView.openParentTab`. Later tasks anchor on text
-earlier tasks of this plan wrote, and quote it as those tasks leave it.
+`claude/workspace-tabs`, after plan 6a's last commit. Run every command from the worktree root. Every anchor below was
+matched at its stated count, and every file creation and edit script of Tasks 1-6 replayed in order with no failure, on
+a `git archive` copy of `81f80c1af` (plan 8c's final-review fixes) after plan 6a's Tasks 6-10, both with their plan
+review's fixes. On that copy JBR 25's `javac` compiled the main and test sources of `jasper-sdk`, `jasper-ui`,
+`jasper-buddy`, `jasper-terminal`, `jasper-app`, the testkit and its fixtures, and the Enterprise, Vault, Editor, Remote,
+sample and Project Index plugins with their tests (Snippets, History and File Server for staging);
+`-Xlint:all` warned of nothing in the files the two plans touch but a dangling comment `JasperApplication` already had,
+and doclint found no new error in the application, the SDK or the testkit. A plain JUnit launcher then ran, headless
+(`-Djava.awt.headless=true`, no Gradle, no window), every test class of the SDK and the testkit (316, all passing), of
+the application's `workspace`, `persistence`, `application`, `plugins`, `contributions`, `layout`, `terminals`,
+`appearance` and `documentation` packages (2,360: 2,278 passing, 12 skipped and 82 failing, the very 82 that fail on
+`81f80c1af` itself under that launcher, of 2,314 there; plan 6a's Verified facts 11), and of the Editor (4,924), Remote
+(553), sample (15), Vault (221, one aborted as on `81f80c1af`), Enterprise (3) and Project Index (99) plugins, all
+passing; among them `PluginTabRestoreTest` (11), `WorkspaceRestoreTest` (13), `JasperApplicationWorkspaceTest` (8),
+`SessionPaneTest` (10), `RestoreStateTest` and the restore contract cases on both runtimes. Those 82 hide what they
+test, `BundledSamplePluginTest` (Task 5's version pin) among them, so the whole application suite also ran with the
+bundled plugins staged as Gradle's test task stages them (each plugin's jar built from its compiled classes and
+resources, with its third-party jars; `-Djasper.stagedPlugins` and `-Djasper.plugins.bundled`): 4,166 tests after both
+plans, 4,120 passing, 17 skipped, 28 failing and 18 aborted, against 4,120 on `81f80c1af` (4,072 passing, 30 failing, 18
+aborted) and 4,144 after plan 6a; no test fails after this plan that does not fail on `81f80c1af`, and
+`BundledSamplePluginTest` passes. The two `SessionLaunchCoordinatorTest` cases that failed on `81f80c1af`, and the two
+staged transfer tests that failed after plan 6a, fail only under load (three such runs shared the machine): run alone,
+they passed twice in each state. The earlier versions were written on `22b702456` and `ec41c97db` and never compiled. Line numbers are those of `81f80c1af` with plan
+6a applied. Every edit quotes the text it replaces, and the scripts stop with a message when that
+text is not found the stated number of times. Then re-find the quoted text (a change since may have reworded it),
+adjust the anchor, re-run, and record it in this plan's banner. Never edit around a missing anchor. Later tasks anchor
+on text earlier tasks of this plan wrote, and quote it as they leave it.
 
 **Hand-offs absorbed** (`.superpowers/sdd/workspace-tabs-series.md`, plan 6a's ledger
-`.superpowers/sdd/2026-10-18-workspace-6a-save-restore/progress.md` and STATUS template, and the plan-writing ledger
-`.superpowers/sdd/plan-writing/progress.md`):
-- Plan 6a's ledger and plan 4b's final review: restored content tabs never go through `TabRegistry.open`'s way into a
-  window (a random id, a placement, a wait for the main window being composed). The slot is checked in `open` before it
-  makes an id or looks for a window, once an open tab of the same key has been selected as always: the plugin's tab is
-  registered under its saved id straight into the window being restored, as `TabRegistry.add` registers a restored
-  terminal tab, and that window places it (Task 1; Rulings 4 and 23).
-- Plan 6a's ledger: content records skip `TabRegistry.APP_OWNER`. The snapshot never saves Jasper's own tabs (Rulings
-  3), and a saved record that names `jasper`, which only a file this build did not write could hold, is left out at
-  restore, never a placeholder (Task 2; Rulings 22).
-- Plan 6a's ledger: `ContentTab.window()` returns `UUID(0,0)` while a tab waits for the main window, which now waits
-  through every child window's restore. A restored tab never waits: it takes the window being restored at once, so its
-  `window()` names that window even while the main window is still being composed; a tab a restorer opens besides the
-  saved one waits as an owner-less tab does and names no window until it shows, as `ContentTab.window()`'s Javadoc
-  says (Task 2's `aRestoredTabNamesItsWindowAtOnceAndARestorersOtherTabOpensOnceTheWindowShows`; Rulings 23 and 24).
-- The series notes, plan 4b's final review: `AppContractTest`'s `emptyWindow` makes the main window when none is open,
-  where the application opens the main window and then a child window. Task 1 fixes it, with a contract case on both
-  runtimes (Rulings 25).
-- The series notes, plan 4b's Task 5 and final review: `FakeWorkspace.closeWindow` closing and nulling `Panel.instance`
-  with `AppContractTest` clearing its panel caches "when a fake main window can close", and `AppContractTest`'s panel
-  routing. They close without code: neither runtime's harness can close a main window, panels live in the main window
-  only, and no contract case toggles a panel, so neither change could be observed or tested (Rulings 26). The STATUS
-  entry says so.
-- Plan 6a's STATUS template, "Left for plan 6b": plugins' tabs (restore state, restorers, placeholders) within SDK
-  0.21.0 (Tasks 1 and 2; Rulings 27), restored with their saved ids straight into their windows and parent tabs (Rulings
-  4 and 19), never Jasper's own (Rulings 3 and 22), the never-open window (Rulings 23), the two `AppContractTest` and
-  `FakeWorkspace` items (Rulings 25 and 26), and THD Sourcing Crypto rebuilt once after this plan, against 0.21.0 (Task
-  6; Rulings 14).
-- The plan-writing ledger, plan 7c's review: `WindowManager.moveToNewWindow` is gone in every form after 7c; Task 2's
-  tests move a placeholder to another window with plan 7b's `WindowManager.popOutTab(Tab)`, which makes a pane window.
-- The series notes' version rule: each plugin bumps to the next minor from its version at execution (Rulings 18).
-- The user's decision of 2026-10-19 (series notes): the Vault manager is a modeless dialog over the main window
-  (`144ff89f1`, `7b3149ab4`, `8f1b36f22`), so the first version's Vault restorer goes (Spec issues 1; Rulings 10
-  superseded).
+`.superpowers/sdd/2026-10-18-workspace-6a-save-restore/progress.md` and its STATUS template):
+- Restored items never go through `TabRegistry.open`'s way into a window (plan 4b; a random id, a placement, a wait for
+  the main window being composed): the slot is checked in `open` before it makes an id or looks for a window, once an
+  open item of the same key has been selected as always, and the plugin's item is registered under its saved id
+  straight into the window being restored, as `TabRegistry.add` registers a restored terminal (Task 1; Rulings 4 and 23).
+- Jasper's own items (`TabRegistry.APP_OWNER`) are never saved, and a saved record naming `jasper`, which only a file
+  this build did not write could hold, is left out at restore, never a placeholder (Task 2; Rulings 3 and 22). A full
+  window holding only Jasper's own items is left out of the snapshot (plan 6a Task 4's pin stands).
+- `ContentTab.window()` names a never-open window (`UUID(0,0)`) while an item waits for the main window, which now waits
+  through every full window's restore: a restored item never waits, it takes the window being restored at once; an item
+  a restorer opens besides the saved one waits as an owner-less one does (Task 2's
+  `aRestoredItemNamesItsWindowAtOnceAndARestorersOtherItemOpensOnceTheWindowShows`; Rulings 23 and 24).
+- Remote's `NOT_STARTED` panes (plan 6a Task 1's hand-off: `RemotePlugin.distroSessions` counts a local pane that is not
+  `EXITED`, `activateHost` focuses only a `RUNNING` one): a restored SSH tab is not one of Remote's attached panes until
+  its session attaches, so `activateHost` shows a restored tab of the host that still waits, `NOT_STARTED`, instead of
+  opening a second (Task 4), and `distroSessions` needs nothing, since it reads only distribution panes Remote opened in
+  this process, never a restored one (Rulings 41).
+- Plan 4b's harness hand-offs: `AppContractTest`'s `emptyWindow` opens the main window first when none is open, with a
+  contract case on both runtimes (Task 1; Rulings 25); `FakeWorkspace.closeWindow` nulling `Panel.instance` with
+  `AppContractTest` clearing its panel caches, and `AppContractTest`'s panel routing, close without code: neither harness
+  can close a main window, panels live in the main window only, and no contract case toggles a panel (Rulings 26).
+- The Vault manager is a modeless dialog over the main window (the user's decision of 2026-10-19): it has no restorer,
+  and dialogs are not restored (Rulings 28).
+- Plan 6a's re-plan: its Task 8 restores every window through `ParentTabsView.restore`, so a plugin's item comes back in
+  its saved tab and pane by the same route as a terminal (Rulings 19); its Task 1 fix round keeps a held pane's snapshot
+  in `FakeWorkspace.Pane.held` (a `PaneInfo`), which a held session's pane keeps too (Rulings 35).
+- Plan 8b's SDK: `TabPlacement.NEW_TAB` and the split items; the testkit's `FakeWorkspace` holds tabs of panes and
+  `windowTabs` shows them. A restorer opens its item as the plugin always does, `NEW_TAB` or a split, and the slot takes it
+  whatever it named (Rulings 4); the fake places a restored item in a new tab at the end of the strip, unshown (Rulings
+  34). The Editor is 0.12.0 after plan 8b, so this plan's bump is 0.13.0 (Rulings 37).
+- The series' version rule: each plugin bumps to the next minor from its version at execution (Rulings 37).
+- `docs/sdk-reference.html` is not on this branch (main generates it): the merge with main regenerates it, as plan 8b's
+  STATUS entry says, and this plan's SDK Javadoc goes into it then (Rulings 39).
 
 ## Spec issues
 
 1. Workspace tabs spec decision 2 and section 14's plugin list make the Credential Vault manager a content tab that
-   comes back with the windows. The user decided on 2026-10-19 (series notes) that it is a modeless dialog over the main
-   window, and `144ff89f1` made it one; a dialog is not part of the workspace and closes with its window (`7b3149ab4`;
-   6a's Verified facts 10). This plan follows the user: the Vault keeps no restorer and its version (Rulings 10
-   superseded, Rulings 28).
-2. None open besides. Spec 14's `SessionSpec` row (amended in `27874bf7d`, "sessions carry restore state") gives a
-   session's tab restore state, so Remote's SSH tabs come back through Remote like content tabs (Rulings 2). Section
-   15's disabled-plugin row ("Its tabs close; at the next start they restore as placeholders") holds without code:
-   turning a plugin off takes effect at the next start, so Quit saves its open tabs, and the next start, where it does
-   not run, makes them placeholders (Rulings 7). Parent tabs spec 10 keeps parent tabs out of the SDK: a restorer sees
-   only the window being restored, and Jasper puts the tab in its parent tab and pane (Rulings 19).
+   comes back with the windows. The user decided on 2026-10-19 that it is a modeless dialog over the main window; a
+   dialog is not part of the workspace (Rulings 28). This plan follows the user.
+2. Spec 14's `SessionSpec` row (amended in `27874bf7d`) gives a session's tab restore state, so Remote's SSH tabs come
+   back through Remote like content items (Rulings 2). Section 15's disabled-plugin row holds without code: turning a
+   plugin off takes effect at the next start, so Quit saves its open items, and the next start, where it does not run,
+   makes them placeholders (Rulings 7).
+3. **Tabs and panes decision 9 lets a plugin choose whether its view opens as a tab or a pane; at restore the saved
+   layout chooses.** Read as spec 12 ("each pane saves its one item"): the restorer opens its item as it always does,
+   and Jasper puts it in its saved tab and pane, whatever placement it named (Rulings 4 and 38). Cost if wrong: none a
+   person sees; a plugin that reads its placement at restore sees the one it asked for.
+4. **Spec 9.2's placeholder "Retry" in a pane that holds one item.** The first versions put the rebuilt tab at the
+   placeholder's index in its group; a pane holds one item, so Retry puts it in the placeholder's place in that pane
+   (Rulings 32).
 
 ## Superseded
 
-What the parent-tabs model, the user's Vault decision or the controller's brief for this re-plan makes moot in the first
-version. Rulings 1 to 9, 11 and 13 to 17 stand, their numbers kept, 4 and 15 narrowed as below; their fact numbers
-follow the new Verified facts (Rulings 7, 9 and 17 cite facts 10, 7 and 7); 18 to 31 are this re-plan's.
+What the tabs-and-panes model makes moot or rewords in the earlier versions. Rulings 1-5, 7-9, 11, 13, 14, 16, 17, 21-31
+stand, their numbers kept, read with tab for parent tab, pane for group and item for tab where they name them; 32 to 50
+are this re-plan's (42 to 50 its review's, which restate 9, 16, 29 and 31).
 
-- **Rulings 10 (the Vault's manager comes back) is superseded** by the user's decision of 2026-10-19: the manager is a
-  modeless dialog over the main window (`144ff89f1`), and dialogs are not restored (Spec issues 1, Rulings 28). Task 5's
-  Vault part, its test and the credential-vault guide's edit go.
-- **Rulings 12 (Editor 0.11.0, Remote 0.14.0, Vault 0.7.0, sample 0.4.0) is superseded** by the series rule (next minor
-  from each plugin's version at execution): plan 4b already took those numbers and `0ca6d3c51` moved Remote to 0.15.0,
-  so Rulings 18 gives Editor 0.12.0, Remote 0.16.0 and sample 0.5.0, and the Vault, which changes nothing here, keeps
-  0.7.0.
-- **Rulings 4 and 15 are narrowed for sessions**, as the application always did (`TabRegistry.slot` names the window):
-  the first content tab the plugin opens takes the slot whatever window it names, and a session only when it opens in
-  the window being restored; the fake now does the same (the plan's review, I2).
-- **The tests' window records are parent tabs.** Plan 6a's `WindowRecord` holds a `WindowLayout`; every saved window
-  here is `ParentTabs` or a pane window's `PaneLayout`, and Task 2's tests move a placeholder with `popOutTab` (7c's
-  review) instead of the first version's `moveToNewWindow`.
-- **The Review Focus, Verified facts and File structure are rewritten** for the parent-tabs code; the first version's
-  Review Focus items stand inside the new list.
+- **Rulings 6 is reworded** for a pane's one item: Retry rebuilds the item in the placeholder's pane, in its place,
+  selected (Rulings 32), not at its index of a group's tabs.
+- **Rulings 15 is reworded:** the fake puts a restored item in a new tab at the end of the window's strip, unshown, where
+  Jasper puts it in its saved tab and pane (Rulings 34); the fake's two levels are plan 8b's.
+- **Rulings 18 is superseded** by Rulings 37 (Editor 0.13.0, Remote 0.16.0, sample 0.5.0).
+- **Rulings 19 and 20 are narrowed to the main window and full windows:** pane windows are gone (plan 8a). A full window
+  holding only a missing plugin's items comes back with their placeholders.
+- **Rulings 10 and 12** stay superseded, as the parent-tabs re-plan ruled.
+- **Task 2's tests** restore into the main window and a full window, with one item per pane: a saved tab of two panes
+  where the earlier versions stacked two tabs in a group, a hidden tab where they hid a tab behind another, and a
+  placeholder moved with `WindowManager.moveToNewWindow` where they popped one out to a pane window.
+- **Task 4's host-key test** asks the question directly while the restored tab's connect waits on the fake's background
+  executor, instead of a real handshake with an unknown key (Rulings 36).
+- **The Goal, Architecture, Review Focus, Verified facts and File structure are rewritten.**
 
 ## Global Constraints
 
@@ -137,41 +157,43 @@ follow the new Verified facts (Rulings 7, 9 and 17 cite facts 10, 7 and 7); 18 t
 - One commit per task, in the worktree above, each message ending with exactly the two lines
   `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` (a blank line
   between). No push, no merge.
-- The SDK stays 0.21.0 (plan 6a's bump; 6a's Rulings 2; Rulings 27): every SDK and testkit addition here carries
-  `@since 0.21.0`, and no manifest range changes. The Editor (0.11.0 to 0.12.0), Remote (0.15.0 to 0.16.0) and the
-  sample (0.4.0 to 0.5.0) bump their versions because their behaviour changes; the Vault and the other plugins keep
-  theirs (Rulings 18). Should a manifest hold another version at execution, take the next minor from it, adjust the
-  edit, and record it in the banner. The Editor's API (`dev.jasper.editor.api`) gains one default method,
-  `EditorDocument.readQuietly`, which older callers never see.
-- Plan 2's `WorkspaceFile` changes only as Task 2 says: `MAX_BYTES` becomes public and `encodedBytes(Snapshot)` is new,
-  so a snapshot can stay within what a read accepts. Plan 6a's records, reader, writer and `keeping` stay as they are:
-  a content record already rides in a window's `WindowRecord.tabs` beside its terminal records.
+- The SDK stays 0.21.0 (plan 6a's bump; Rulings 27): every SDK and testkit addition here carries `@since 0.21.0`, and no
+  manifest range changes. The Editor (0.12.0 to 0.13.0), Remote (0.15.0 to 0.16.0) and the sample (0.4.0 to 0.5.0) bump
+  their versions because their behaviour changes; the Vault and the other plugins keep theirs (Rulings 37). Should a
+  manifest hold another version at execution, take the next minor from it, adjust the edit and
+  `BundledSamplePluginTest`'s pinned sample version, and record it in the banner.
+  The Editor's API (`dev.jasper.editor.api`) gains one default method, `EditorDocument.readQuietly`, which older callers
+  never see.
+- Plan 6a's `WorkspaceFile` changes only as Task 2 says: `MAX_BYTES` becomes public and `encodedBytes(Snapshot)` is new,
+  so a snapshot can stay within what a read accepts. Its records, reader, writer and `keeping` stay as they are: a
+  content record rides in a window's `WindowRecord.tabs` beside its terminal records, written under `[[windows.items]]`.
 - Clean break: `ContentSpec` and `SessionSpec` gain a component, and their old constructors stay as the ordinary way to
   make a spec that does not come back; no deprecation.
 - Package edges (package-info "Allowed outgoing" lists; `verifySdkArchitecture`, `verifyApplicationArchitecture`,
   `verifyPluginArchitecture`): nothing gains an edge. `RestoreState` is in the SDK's root package, which `ui` and
   `terminal` already reach and which reaches neither; `TabRestore` is in `layout`, which `contributions`, `terminals`,
   `workspace` and `plugins` already reach; `workspace` learns how a plugin stands through `WindowManager.PluginState`,
-  never `plugins`.
+  never `plugins`. `dev.jasper.app.layout` stays JDK-only (`Layout.replaceTab`).
 - Plugins' code runs contained: a restorer runs through `Containment.attempt` on the EDT; a reason it returns is a
   placeholder's, with no incident, and what it throws is a placeholder's reason and the plugin's failure, never an
   exception out of a window's restore.
-- No motion (spec 4; AGENTS.md): a placeholder, a restored plugin's tab and a tab Retry rebuilds appear at once.
-- Dialogs are not restored: no restorer here opens one, and nothing asks for a password, or about a host key, while
-  windows come back (Rulings 29).
+- No motion (AGENTS.md): a placeholder, a restored plugin's item and an item Retry rebuilds appear at once.
+- Dialogs are not restored: no restorer here opens one, and nothing asks for a password, a Vault grant or about a host
+  key while windows come back (Rulings 29 and 43).
 - A restore state is saved in plain text in `workspace.toml`: no plugin here puts a secret in it (a host id, a name, a
   folder, a document key, the word "about").
 - The theme-migration ledger (`docs/design/theme-engine/migration.csv`, checked by `ThemeMigrationCoverageTest`): a new
   Java file under `jasper-app/src`, `jasper-sdk/src`, `jasper-sdk-testkit/src` or a plugin's `src` whose text matches its
-  `CANDIDATE` pattern (a Swing or AWT import, the word "appearance", `new J…`, `new …List`, `…Panel`, `…View`,
-  `…Window`, …) gets a row in the task that creates it, with the `ledger.py` helper: `PlaceholderContent` and
+  `CANDIDATE` pattern gets a row in the task that creates it, with the `ledger.py` helper: `PlaceholderContent` and
   `PluginTabRestoreTest` (Task 2). Every other new file was checked against the pattern with a Python copy of the test
   and matches none: `RestoreState`, `TabRestorer`, `RestoreRequest`, `TabRestore`, `RestoreStateTest` and
   `SavedRemoteDocument`; keep it so.
 - Javadoc is part of `check` (`-Xdoclint:all`, fail on error): no raw `<`, `>` or `&` in a comment, every `{@link}`
   resolves, every new public member has a comment, and an SDK addition carries `@since 0.21.0`.
 - `WindowContent` and its tests import both `java.awt.*` and `java.util.*`: write `java.util.List` in full there.
-- Source hygiene (AGENTS.md): no raw control, private-use or unpaired surrogate characters; Java escapes only.
+- Source hygiene (AGENTS.md): no raw control, private-use or unpaired surrogate characters; Java escapes only. A Java
+  `\n` inside a script's Python string is written `\\n`, so the Java source holds the escape (Task 3's `"hi\\n"`).
+- User-facing text says tab and pane (tabs and panes spec 3); the SDK keeps its names (`TabHandle` is an item).
 - Documentation edits are the smallest that make a document accurate (AGENTS.md "Documentation edits").
   `AppDocumentationTest` checks every guide's links and that a guide's `<!-- example:… -->` snippet equals its source
   between the `// example:…:start` and `:end` markers (Task 5 changes the sample's `pluginpanels` block and the guide's
@@ -186,128 +208,132 @@ plan 3a's helpers, unchanged:
 
 ```bash
 mkdir -p build/plan6b
-cp build/plan6a/edits.py build/plan6a/ledger.py build/plan6b/ 2>/dev/null || cp build/plan7a/edits.py build/plan7a/ledger.py build/plan6b/ 2>/dev/null || echo "the helpers are gone: recreate them from plan 3a's 'The two helper scripts', with build/plan6b in place of build/plan3a"
+cp build/plan7c/edits.py build/plan7c/ledger.py build/plan6b/
 ls build/plan6b/edits.py build/plan6b/ledger.py
 ```
 
 `edits.py` gives `edit(path, [(old, new, count), ...])`, `span(path, start, end, new)` and `regex(path, pattern,
 replacement, count)`; `ledger.py` gives `add`, `rename` and `drop`. Every script below runs as `python3 -I - <<'PY'`
 from the worktree root and starts with `import sys; sys.path.insert(0, "build/plan6b")`. Java text inside a script is in
-triple-quoted strings, so `\n` and `…` in Java source stay as written.
+triple-quoted strings. A file a task creates or replaces whole is written from the plan's code block.
 
 ## Review Focus
 
-1. **The slot.** While a restorer runs, the first content tab its plugin opens, whatever window or placement it named,
-   or the first session it opens in the window being restored, takes the saved id (while it is free) and that window,
-   is not shown, and the window places it where it was saved; one restore runs at a time, only a tab still open in that
-   window counts, and the window being restored takes no other tab meanwhile, a waiting tab of the same key included,
-   on both runtimes. Task 1: `TabRegistryTest.aRestorerRebuildsASavedTabWithItsIdAndWindowOrSaysWhyNot`, the four restore
-   contract tests on both runtimes, `FakeContractTest.whileARestorerRunsTheWindowBeingRestoredOpensNoOtherSession` and
-   `HostedUiTest.aSavedStateTheSdkRefusesRestoresNothingAndRaisesNoIncident`; Task 2:
-   `PluginTabRestoreTest.aSessionsTabComesBackThroughItsPluginAndConnectsWhenFirstShown`,
-   `aRestoredTabNamesItsWindowAtOnceAndARestorersOtherTabOpensOnceTheWindowShows`.
-2. **Where it comes back.** A plugin's tab comes back in its saved parent tab (a hidden one too) and pane, in the main
-   window, a full window or a pane window, and saving straight after the restore writes what was read. Task 2:
-   `aPluginsTabComesBackInItsSavedParentTabAndPaneInEveryKindOfWindow`; plan 6a's
-   `WorkspaceRestoreTest.aChildWindowHoldingOnlyAMissingPluginsTabsComesBackWithTheirPlaceholders`.
-3. **What is saved.** A plugin's tab only while its plugin restores its kind, a placeholder exactly as it was saved,
-   never Jasper's own tab (the Errors tab), going or coming, and never more than a read accepts. Task 2:
-   `aPluginsTabWithoutRestoreStateOrRestorerIsNotSavedAndJaspersOwnTabsNeverAre`, `aSavedTabNamingJasperItselfIsLeftOut`,
-   `aTabWhosePluginIsNotRunningComesBackAsAPlaceholderAndIsSavedAgainAsItWas`,
-   `aWorkspaceTooLargeToReadBackLeavesOutPluginsTabsLargestFirst`.
-4. **Placeholders.** The reason follows how the plugin stands (asked again when it shows and on Retry), Retry only while
-   it runs, Retry puts the rebuilt tab in the placeholder's pane and place, and Retry and Close act in the window that
-   holds it after a pop-out. Task 2: `aRestorerThatFailsLeavesAPlaceholderAndRetryPutsItsTabInThePlaceholdersPlace`,
-   `aPlaceholderSaysHowItsPluginStandsAndOffersRetryOnlyWhileItRuns`, `aPlaceholderPoppedOutToAPaneWindowRetriesThere`,
-   `aPlaceholderInAPaneWindowClosesFromTheWindowThatHoldsItNow`.
-5. **Nothing asks, and expected misses raise no incident.** A restored SSH tab connects only when first shown, after
-   the hosts have loaded, when every hop signs in alone, one after another in a window; a restored remote document reads
-   only when its tab is first active (or Load), asking nothing; neither asks about a host key; restorers that miss
-   decline. Task 4: `RemotePluginTest.anSshTabComesBackAndConnectsOnlyWhenSigningInAsksNothing`,
-   `restoredSshTabsShownTogetherInOneWindowAllConnect`, `aRestoredSshTabWhoseHostKeyIsUnknownAsksNothingAndOffersReconnect`,
-   `aRestoredSshTabClosedWhileItWaitsPassesItsTurnOn`, `RemoteEditingTest
-   .aKeyReopensBeforeTheSavedHostsHaveLoadedAndFindsThemWhenRead`, `aQuietReadSignsInOnlyWhenNothingWouldBeAsked`,
-   `SessionPaneTest.aRestoredSessionLeftNotConnectedOffersReconnect`; Task 3:
-   `EditorPluginTest.aRestoredRemoteDocumentReadsQuietlyOnlyOnceItsTabIsActive`,
-   `EditorTabTest.aDeferredDocumentOffersLoadReadsQuietlyFirstAndAsUsualOnRetry`.
-6. **The Editor.** Its untitled buffer is not saved, a saved document comes back by its key, and a key nothing opens
-   declines with why, telling a missing plugin from a missing file. Task 3: `EditorPluginTest.aDocumentComesBackFromItsKeyAndAnUntitledOneIsNotSaved`.
-7. **The hand-offs.** `AppContractTest` opens the main window and then a child for a tab placed in a new window while
-   none is open, as the application does. Task 1:
-   `PluginContractTest.aTabPlacedInANewWindowWhileNoWindowIsOpenOpensTheMainWindowAndAChildForIt` on both runtimes.
+1. **Where it comes back, and saving straight after.** A plugin's item comes back in its saved tab (a hidden one too) and
+   pane, in the main window and in a full window, and saving straight after the restore writes what was read. Task 2:
+   `PluginTabRestoreTest.aPluginsItemComesBackInItsSavedTabAndPaneInTheMainWindowAndAFullWindow`; plan 6a's
+   `WorkspaceRestoreTest.aFullWindowHoldingOnlyAMissingPluginsItemComesBackWithItsPlaceholder`.
+2. **Retry in a pane that holds one item.** Retry puts the rebuilt item in the placeholder's pane, which keeps its place,
+   weight and maximize, and opens no tab; Retry and Close act in the window that holds the placeholder after a move.
+   Task 2: `aRestorerThatFailsLeavesAPlaceholderAndRetryPutsItsItemInThePlaceholdersPane`,
+   `aPlaceholderMovedToAFullWindowRetriesThere`, `aPlaceholderInAFullWindowClosesFromTheWindowThatHoldsItNow`,
+   `LayoutOperationsTest.replaceTabPutsAnotherTabInTheSamePane`.
+3. **The slot.** While a restorer runs, the first content item its plugin opens, whatever window or placement it named,
+   or the first session it opens in the window being restored, takes the saved id and that window, unshown; the window
+   being restored takes no other item meanwhile, on both runtimes. Task 1: `TabRegistryTest
+   .aRestorerRebuildsASavedTabWithItsIdAndWindowOrSaysWhyNot`, the restore contract cases on both runtimes,
+   `FakeContractTest.whileARestorerRunsTheWindowBeingRestoredOpensNoOtherSession`; Task 2:
+   `aSessionsItemComesBackThroughItsPluginAndConnectsWhenItsTabFirstShows`,
+   `aRestoredItemNamesItsWindowAtOnceAndARestorersOtherItemOpensOnceTheWindowShows`.
+4. **Nothing asks at start.** A restored SSH tab connects only when its tab first shows and the SSH agent signs in
+   every host on its route, one after another in a window; a Vault login never connects alone, locked or not, and asks
+   the Vault for no credential (Rulings 9 and 43); its first connect answers a host-key question Cancel and leaves
+   Reconnect, which asks; a quiet connect that fails says why; Cancel keeps a restored session's pane, with Reconnect;
+   picking its host while it still waits shows it; a restored remote document reads quietly only once its tab is active,
+   and only over an open connection or the agent. Task 4:
+   `RemotePluginTest.anSshTabComesBackAndConnectsOnlyWhenSigningInAsksNothing`,
+   `aVaultSignedSshTabRestoredWhileTheVaultIsUnlockedAsksForNoCredentialAndOffersReconnect`,
+   `aRestoredSshTabWhoseHostKeyIsUnknownAsksNothingAndOffersReconnect`, `aQuietConnectThatFailsSaysWhyAndOffersReconnect`,
+   `activatingAHostShowsItsRestoredTabThatWaitsToBeShown`, `aRestoredSshTabClosedWhileItWaitsPassesItsTurnOn`,
+   `RemoteEditingTest.aQuietReadSignsInOnlyWhenNothingWouldBeAsked`,
+   `SessionPaneTest.cancellingARestoredSessionsFirstConnectKeepsItsPaneWithReconnect`; Task 3:
+   `EditorPluginTest.aRestoredRemoteDocumentReadsQuietlyOnlyOnceItsTabIsActive`.
+5. **What is saved.** A plugin's item only while its plugin restores its kind, a placeholder exactly as it was saved,
+   never Jasper's own item, and never more than a read accepts (a tab its only item leaves goes with it); an untitled
+   Editor buffer is not kept. Task 2: `aPluginsItemWithoutRestoreStateOrRestorerIsNotSavedAndJaspersOwnItemsNeverAre`,
+   `aSavedItemNamingJasperItselfIsLeftOut`, `anItemWhosePluginIsNotRunningComesBackAsAPlaceholderAndIsSavedAgainAsItWas`,
+   `aWorkspaceTooLargeToReadBackLeavesOutPluginsItemsLargestFirst` (each item left out logged once); Task 3:
+   `EditorPluginTest.aDocumentComesBackFromItsKeyAndAnUntitledOneIsNotSaved`,
+   `aDeletedLocalFileComesBackAsAFailedReadWithRetry`; Task 5: `BundledSamplePluginTest` (the sample's pinned version).
 
 ## Verified facts
 
-From the replays of plans 7a, 7b, 7c and 6a (see Workspace); line numbers are the replays' on `ec41c97db` and `e80f2c322`.
+From `81f80c1af` with plan 6a applied (see Workspace).
 
-1. `ContentSpec(String key, String title)` (`jasper-sdk/…/ui/ContentSpec.java:8`) and `SessionSpec(String title,
-   Optional<String> icon, ExitPolicy onExit, Consumer<PendingSession> connector)` (`terminal/SessionSpec.java:18`) are
-   records; `Windows.openTab(spec, owner, content, placement)` is abstract with a three-argument default
-   (`ui/Windows.java:28`, `:46`); `ContentTab` and `Windows` have one implementation each in the application
-   (`plugins/HostedUi.java`, `OwnedContent` and `windows()`) and in the testkit (`FakeContent`, `FakeUi.windows()`). The
-   SDK's root package reaches no other SDK package; `ui` and `terminal` reach it, and `terminal` may not reach `ui`.
-2. `TabRegistry.open(plugin, key, title, owner, component[, placement])` (`contributions/TabRegistry.java:207`, `:217`)
-   first selects an open tab of the same plugin and key, then makes a tab with a random id and attaches it through a
-   window's host: a `NEW_WINDOW` placement through `Windows.emptyWindow`, and an owner-less tab, or one whose owner has no
-   host, through the main window, waiting (`waitForMain`, `:285`) while it is being composed (`Windows.main` is then
-   null); `TabRegistry.add(TabId, …)` (`:167`) registers a tab under a given id with no host call and refuses
-   `Tab.Kind.HOSTED`. `HostedUi.openComponent` (`plugins/HostedUi.java:652`) passes a window only while
-   `HostedTerminals.ownsOpenWindow` holds, which a window being restored already does (its content is connected before
-   its restore), and `OwnedContent.window()` (`:546-549`) names `new UUID(0, 0)` for a tab with no window.
-3. Plan 6a's `WindowContent.restore(WindowRecord)` (`workspace/WindowContent.java:1325`) rebuilds only
-   `TabRecord.Terminal` records (`restoredTerminal`, `:1354`, through `TabRegistry.add`), takes the others out as
-   closing them would (`WorkspaceFile.keeping`), mounts every restored tab (`mount`, `:1376`) and places them in one
-   change: a main or full window's through `ParentTabsView.restore(ParentTabs, Map<TabId, Tab>)`
-   (`ParentTabsView.java:228`), a pane window's through `WorkspaceView.restore(Layout, List<Tab>)` (`WorkspaceView.java
-   :104`), each requiring exactly the tabs its layout names; it returns how many tabs came back, and the window manager
-   leaves out a child window that restores none (`WindowManager.restoreChild`, `:297`). A restored terminal tab's pane
-   waits (`TerminalPane.restored()`) and starts once a pane of its window's shown parent tab shows it at the end of an
-   EDT turn (`startShown`, `:1301`); a provided session's pane connects then. `WindowManager.tabRecord` (`:730`) saves
-   only local terminal tabs; `TerminalContent.record()` is empty for a provided session.
-4. `WindowManager.ensureMain` (`:217`) keeps `openingMain` true through the main window's restore and every child
-   window's (`openMain`, `:250`); the main window is the manager's (`main`, so `window(UUID)` finds it) from its `make`
-   on, before it restores. Every window opens through `open(Opening, make, prepare)` (`:663`), where the content is
-   composed and connected, then prepared (a restore) before its frame exists. Plan 7b's `popOutTab(Tab)` (`:333`) moves a
-   tab into a new pane window; a child window, a pane window included, closes when its last tab closes.
-5. A tab is active while it is the selected tab of the active pane of its window's shown parent tab
-   (`WindowContent.update`, `:2079`); a placeholder's tab kind matters only where the code names `HOSTED` or
-   `TERMINAL`: `WindowContent.closeTab` (`:1967`) asks a guard for `HOSTED` tabs only, the theme loop (`:2204`) themes
-   `HOSTED` tabs, and `WindowTerminals` (`:50`) reports every non-terminal tab to plugins as `TabEntry.Kind.CONTENT`.
-6. Plan 4b's Errors tab is app-owned: owner `TabRegistry.APP_OWNER` (`jasper`, `TabRegistry.java:39`), key `errors`.
-   Plan 2's codec reads `kind = "content:<plugin id>:<kind>"` for any plugin id with no colon, `jasper` included
-   (`persistence/WorkspaceFile.java:93`).
-7. Remote opens an SSH tab with `new SessionSpec(host.name(), …)` (`plugins/remote/…/RemotePlugin.java:448`) and reads
-   its hosts in the background at start (`store.load()`, `:256`; `HostStore.reload()` returns a future,
-   `hosts/HostStore.java:53`); `Auth` is `Agent`, `Vault` or `VaultKeys`. A window shows one connection attempt at a
-   time: `connect` refuses a second with "Another connection is already in progress" (`:369`, `focusExistingAttempt`,
-   `:436`). Its reopener for Recent Files (`edit/RemoteEditing.java:97`) needs the saved hosts in memory, and an edit
-   channel with no owner window fails rather than prompt (`edit/EditChannels.java:94`). Remote is 0.15.0
-   (`0ca6d3c51`).
-8. The Editor (0.11.0) opens a document's tab with `new ContentSpec("document:" + UUID, name)`
-   (`plugins/editor/…/ui/EditorWindow.java:769`) and reads it at once (`:191`); Recent Files reopens a document by its
-   key through `Reopeners.resolve(String)` (`recent/Reopeners.java:48`): `local:` itself, other prefixes through the
-   plugin that registered them (Remote's `remote:`).
-9. The sample (0.4.0) opens its About with `new ContentSpec("about", "About Sample")`
-   (`plugins/sample/…/SamplePlugin.java:147`), inside the `pluginpanels` example the authoring guide copies. The Vault's
-   manager is `ui/VaultManagerDialog`, a modeless plugin dialog over the main window (`144ff89f1`); a plugin dialog
-   closes with its Jasper window (`7b3149ab4`).
-10. Turning a plugin off writes its state for the next launch (`plugins/PluginAdmin.setEnabled`); the running plugin keeps
-    running. `PluginRuntime` keeps each plugin's `PluginStatus` (`ACTIVE`, `DISABLED`, `NEEDS_CONSENT`, `SKIPPED`,
-    `FAILED`; `statuses`, `PluginRuntime.java:424`) and has no public accessor for it. `Containment.attempt`
-    (`plugins/Containment.java:34`) records what a plugin's code throws as its failure. Plugins start
-    (`JasperApplication.startPlugins`) before the first window opens (`ApplicationBootstrap`'s `openFirstWindow`).
-11. `WorkspaceFile.read` sets aside a file over `MAX_BYTES` (256 KiB, package-private, `persistence/WorkspaceFile
-    .java:210`); `encode(Snapshot)` (`:597`) is the text `write` writes.
-12. `AppContractTest`'s `TabRegistry.Windows` gives its window-making supplier as `emptyWindow`
-    (`jasper-app/src/test/…/plugins/AppContractTest.java:172`), which makes the main window first when none is open;
-    `WindowManager.emptyWindow` (`:764`) opens the main window and then a child window. Neither harness can close a main
-    window (`FakeWorkspace` closes only a child window; `TerminalFixture` likewise), panels open in the main window only,
-    and no contract case toggles a panel.
+1. **The SDK.** `ContentSpec(String key, String title)` (`jasper-sdk/…/ui/ContentSpec.java:8`) and `SessionSpec(String
+   title, Optional<String> icon, ExitPolicy onExit, Consumer<PendingSession> connector)` (`terminal/SessionSpec.java`)
+   are records; `Windows.openTab(spec, owner, content, placement)` is abstract with a three-argument default that opens
+   `NEW_TAB` (plan 8b); `ContentTab` and `Windows` have one implementation each in the application (`plugins/HostedUi
+   .java`, `OwnedContent` and `windows()`) and in the testkit (`FakeContent`, `FakeUi.windows()`). The SDK's root package
+   reaches no other SDK package; `ui` and `terminal` reach it, and `terminal` may not reach `ui`.
+2. **The registry.** `TabRegistry.open(plugin, key, title, owner, component[, placement])` (`contributions/TabRegistry
+   .java:207`, `:217`) first selects an open item of the same plugin and key, then makes one with a random id and
+   attaches it through a window's host: `NEW_WINDOW` through `Windows.emptyWindow`, an owner-less item, or one whose owner
+   has no host, through the main window, waiting (`waitForMain`, `:285`) while it is being composed; `TabRegistry.add(TabId,
+   …)` (`:167`) registers an item under a given id with no host call and refuses `Tab.Kind.HOSTED`; `APP_OWNER` is
+   `jasper` (`:39`). `HostedUi.openComponent` (`plugins/HostedUi.java:705`) passes a window only while
+   `HostedTerminals.ownsOpenWindow` holds (`:712`), which a window being restored already does (its content is connected
+   before its restore).
+3. **Plan 6a's restore** (its Task 8). `WindowContent.restore(WindowRecord)` (`workspace/WindowContent.java:1368`)
+   rebuilds only `TabRecord.Terminal` records (`restoredTerminal`, `:1392`, through `TabRegistry.add`), takes the others
+   out as closing them would (`WorkspaceFile.keeping`), mounts every restored item (`mount`) and places them in one
+   change through `ParentTabsView.restore(ParentTabs, Map<TabId, Tab>)`, which requires exactly the items the tabs name;
+   it returns how many came back, and `WindowManager.restoreChild` (`:295`) leaves out a full window that restores none.
+   A restored terminal's pane waits (`TerminalPane.restored()`) and starts once its tab is the one its window shows at
+   the end of an EDT turn (`startShown`, `:1347`); a provided session's pane connects then. `WindowManager.tabRecord`
+   (`:699`) saves only local terminals; `TerminalContent.record()` is empty for a provided session.
+4. **The opening point.** `WindowManager.ensureMain` keeps `openingMain` true through the main window's restore and every
+   full window's (`openMain`); the main window is the manager's from its `make` on, before it restores; every window opens
+   through `open(Opening, make, prepare)`, where the content is composed and connected, then prepared before its frame
+   exists. `moveToNewWindow(Tab)` (`:328`) gives an item a full window of its own; a full window closes with its last
+   item.
+5. **What a placeholder's kind touches.** An item is active while it is the active pane's item of its window's shown tab
+   (`WindowContent.update`); a kind matters only where the code names `HOSTED` or `TERMINAL`: `WindowContent.closeTab`
+   (`:2009`) asks a guard for `HOSTED` items only, the theme loop (`:2235`) themes `HOSTED` items, and `WindowTerminals`
+   reports every item but a terminal to plugins as `TabEntry.Kind.CONTENT`.
+6. **A pane holds one item** (plan 8a Rulings 2): `Layout` (`layout/Layout.java`) has no operation that puts another item
+   in a pane; its private `replace(Node, GroupId, Function<Group, Node>)` rebuilds one pane in place, as `select` uses it.
+   `WorkspaceView` (`workspace/WorkspaceView.java`) keeps its items by id and renders a layout over them (`apply`).
+7. **Remote** (0.15.0) opens an SSH tab with `new SessionSpec(host.name(), …)` (`plugins/remote/…/RemotePlugin.java`) and
+   reads its hosts in the background at start (`store.load()`; `HostStore.reload()` returns a future); `Auth` is
+   `Agent`, `Vault` or `VaultKeys`. A window shows one connection attempt at a time (`connect` refuses a second). Its
+   `panes` map holds attached SSH panes only (`attach`), `activateHost` focuses one of them only while it is `RUNNING`,
+   and `distroSessions` counts distribution panes `openDistro` opened in this process that are not `EXITED`. A Vault
+   login (`Auth.Vault`, `Auth.VaultKeys`) takes its credential through `VaultApi.credential`, which shows the Vault's grant
+   prompt (`GrantPrompt`) unless Remote holds an "Always" grant for it, even while the Vault is unlocked; the tests'
+   `FakeVault` never prompts. `ConnectAttempt.start` shows a failure's `message(failure)`; a host-key question answered
+   Cancel fails the handshake (`HostKeyVerifier`: "Host key not trusted"). `TerminalPane.cancelAttempt` closes a pane
+   whose first attempt is cancelled (`view == null`). The tests' `FakeAgent`, given as `new AgentClient(agent::handle)`,
+   signs in to the `LoopbackServer` with a key it `allow`s. Its
+   reopener for Recent Files (`edit/RemoteEditing.java`) needs the saved hosts in memory. The fake host runs its
+   background work inline, on the thread that drains it (`FakePluginHost.runBackground`, from the tests' `settle`, on the
+   EDT), so a connect's handshake that waits for an answer from the EDT cannot get one there before it times out.
+8. **The Editor** (0.12.0) opens a document's tab with `new ContentSpec("document:" + UUID, name)` in
+   `EditorWindow.add(…, placement)` (`plugins/editor/…/ui/EditorWindow.java:801`), `NEW_TAB` or a split (plan 8b), and
+   reads it at once; its New Editor Tab action is `dev.jasper.editor.new_editor_tab`; Recent Files reopens a document by
+   its key through `Reopeners.resolve(String)` (`recent/Reopeners.java`): `local:` itself, whether or not the file still
+   exists, so a deleted file opens and fails its read, with Retry; other prefixes through the plugin that registered them
+   (Remote's `remote:`).
+9. **The sample** (0.4.0) opens its About with `new ContentSpec("about", "About Sample")`
+   (`plugins/sample/…/SamplePlugin.java`), inside the `pluginpanels` example the authoring guide copies. The Vault's
+   manager is a modeless plugin dialog over the main window.
+10. **How a plugin stands.** Turning a plugin off writes its state for the next launch (`plugins/PluginAdmin.setEnabled`).
+    `PluginRuntime` keeps each plugin's `PluginStatus` (`ACTIVE`, `DISABLED`, `NEEDS_CONSENT`, `SKIPPED`, `FAILED`) and has
+    no public accessor for it. `Containment.attempt` (`plugins/Containment.java`) records what a plugin's code throws as
+    its failure. Plugins start (`JasperApplication.startPlugins`) before the first window opens.
+11. **The codec's size.** `WorkspaceFile.read` sets aside a file over `MAX_BYTES` (256 KiB, package-private,
+    `persistence/WorkspaceFile.java:204`); `encode(Snapshot)` is the text `write` writes.
+12. **The harnesses.** `AppContractTest`'s `TabRegistry.Windows` gives its window-making supplier as `emptyWindow`, which
+    makes the main window first when none is open only by accident of its order; `WindowManager.emptyWindow` (`:733`)
+    opens the main window and then a child window. Neither harness can close a main window, panels open in the main window
+    only, and no contract case toggles a panel. The testkit's `FakePluginHost.holdPane` keeps a held pane's snapshot in
+    `FakeWorkspace.Pane.held` and `FakeWorkspace.start` restores it (plan 6a Task 1's fix round).
 
 ## Rulings
 
-Record them in `docs/STATUS.md` (Task 6). "What — why". Rulings 1 to 17 are the first version's, their numbers kept
-(see Superseded); 18 to 28 are this re-plan's.
+Record them in `docs/STATUS.md` (Task 6). Rulings 1 to 17 are the first version's and 18 to 31 the parent-tabs
+re-plan's, their numbers kept, as "What — why" (see Superseded for those the model makes moot or rewords); 32 to 50 are
+this re-plan's, each as "What. Reason. Cost if wrong"; 9, 16, 29 and 31 are restated by its review (42 to 50).
 
 1. **Restore state is `dev.jasper.sdk.RestoreState(kind, values)`: a kind of 1 to 64 letters, digits, dots, underscores
    or hyphens, at most 32 values of at most 4096 characters in all, in the SDK's root package** — spec 14 ("a restorer
@@ -343,11 +369,12 @@ Record them in `docs/STATUS.md` (Task 6). "What — why". Rulings 1 to 17 are th
    plugin opens, or a file already open, declines with why** — spec 13; a start must not sign in to every remote
    document, nor prompt.
 9. **Remote saves an SSH tab's host id, name and folder (`ssh`); the restored tab waits until first shown, then, once
-   the hosts have loaded, connects when every hop signs in through the agent or the unlocked Vault, after any connection
-   in progress in its window (`connectWhenFree`), and otherwise shows "Not connected: Reconnect to sign in" with
-   Reconnect; a state naming no host, or a host gone once the hosts have loaded, declines "it names no saved host"** —
-   spec 13 ("chooses between reconnecting and a Reconnect state"); a start must not ask for a password, and a window
-   shows one connection attempt at a time (fact 7).
+   the hosts have loaded, connects when every hop signs in through the SSH agent, after any connection in progress in
+   its window (`connectWhenFree`), and otherwise (a Vault login, locked or not) shows "Not connected: Reconnect to sign
+   in" with Reconnect; a state naming no host, or a host gone once the hosts have loaded, declines "it names no saved
+   host"** — spec 13 ("chooses between reconnecting and a Reconnect state"); a start must not ask for a password or a
+   Vault grant, which even the unlocked Vault may show (Rulings 43), and a window shows one connection attempt at a time
+   (fact 7).
 10. *Superseded by Rulings 28:* the Vault's manager is a modeless dialog over the main window (`144ff89f1`), which is
     not restored. (Was: "The Vault's manager (`manager`) comes back as the Vault is, locked or not, asking nothing".)
 11. **The sample's About (`about`) comes back through the one method its action uses; the sample's echo session is not
@@ -365,7 +392,7 @@ Record them in `docs/STATUS.md` (Task 6). "What — why". Rulings 1 to 17 are th
     `declinedRestores()`, never `failures()`. It puts the tab at the end of the window's active group, where Jasper puts
     it where it was saved** — plugin tests must see the lazy start and the declines they ship with.
 16. **A snapshot that `WorkspaceFile.encodedBytes` finds larger than `MAX_BYTES` leaves out tabs until it fits:
-    plugins' tabs first, the largest restore state first, then terminal tabs; each is logged** — a file a read would set
+    plugins' tabs first, the largest restore state first, then terminal tabs; each is logged once (Rulings 46)** — a file a read would set
     aside loses every window at the next start, while a restore state holds at most 4096 characters, so this takes many
     plugin tabs.
 17. **Remote's reopener answers before its saved hosts have loaded: a recorded key reopens a document
@@ -417,10 +444,13 @@ Record them in `docs/STATUS.md` (Task 6). "What — why". Rulings 1 to 17 are th
     (the sample's Details sheet) close with their window and do not come back** — the user's decision of 2026-10-19 and
     the controller's ruling that a plugin dialog closes with its window (Spec issues 1); a restore must open nothing that
     asks.
-29. **A restored SSH tab's first connect and a restored remote document's quiet read are quiet: while one runs in a
-    window, Remote answers a host-key question there Cancel (`ConnectAttempt.quiet`, set by `connectWhenFree`'s connect;
-    `EditChannels.submitQuietly`, whose channel opens through `RemotePlugin.quietly`); a quiet connect that fails closes
-    its overlay and leaves the tab "Not connected: Reconnect to sign in"; Reconnect and Retry ask as usual** — the
+29. **A restored SSH tab's first connect and a restored remote document's quiet read are quiet, and run only when
+    signing in asks nothing: the SSH agent for every hop, or, for a document's read, an open connection (Rulings 43).
+    While one runs in a window, Remote answers a host-key question there Cancel (`ConnectAttempt.quiet`, set by
+    `connectWhenFree`'s connect; `EditChannels.submitQuietly`, whose channel opens through `RemotePlugin.quietly`); a quiet
+    connect that fails closes its overlay and leaves the tab "Not connected: <why>" (Rulings 45), or "Not connected:
+    Reconnect to sign in" when it was cancelled or its host-key question answered Cancel; Reconnect and Retry ask as
+    usual** — the
     controller's ruling: `HostKeyVerifier.Decision.ONCE` trusts without saving, so a host accepted Once is unknown again
     at the next start, and a start must not ask before the user does.
 30. **Only a tab still open in the window being restored is the saved tab, and a saved state the SDK refuses (a file
@@ -428,8 +458,86 @@ Record them in `docs/STATUS.md` (Task 6). "What — why". Rulings 1 to 17 are th
     — a restorer that closes or moves its tab has not rebuilt it in its place, and contained plugin code never sees
     values the SDK would refuse.
 31. **The Editor's decline says which: "no running plugin opens remote: documents" (the key's own prefix) when no
-    running plugin handles the key's prefix (`Reopeners.handles`), else "its file can no longer be opened"** — Remote running without the host a key
+    running plugin handles the key's prefix (`Reopeners.handles`), "no running plugin opens this document" for a key with
+    no prefix (Rulings 50), else "its file can no longer be opened"** — Remote running without the host a key
     names is not Remote missing, and the placeholder should say so.
+
+32. **Retry puts the rebuilt item in the placeholder's pane, in its place, selected (`Layout.replaceTab`,
+    `WorkspaceView.replace`):** the pane keeps its id and weight, and the active pane and the maximize stay; no tab opens
+    for it. Reason: a pane holds one item (tabs and panes spec 2), so the first versions' "at the placeholder's index of
+    its group" has no meaning, and spec 9.2's Retry brings the item back where the placeholder stands. Cost if wrong: none.
+33. **Everything restores into the main window or a full window; a placeholder moves to a full window as any item does
+    (`WindowManager.moveToNewWindow`, `ContentTab.moveToNewWindow()`'s path), and its Retry and Close act there.** Reason:
+    pane windows are gone (plan 8a). Cost if wrong: none.
+34. **The fake places a restored item in a new tab at the end of the window's strip, not selected and not shown
+    (`FakeWorkspace.placeTab`, over plan 8b's two-level `announceTab`); Jasper places it in its saved tab and pane.**
+    Reason: the fake holds no saved layout, and a new tab is where its `NEW_TAB` puts an item. Cost if wrong: a plugin's
+    test sees its restored item in a tab of its own where Jasper would put it beside another pane.
+35. **A restored session's pane in the fake is held as `holdPane` holds a local one: `Pane.held` keeps the snapshot it
+    starts with, and when its tab is shown it connects through the plugin's connector (`FakeWorkspace.start`).** Reason:
+    plan 6a Task 1's fix round made `held` the snapshot (the earlier versions set a flag). Cost if wrong: none.
+36. **Remote's quiet host-key test asks the question while the restored tab's connect waits on the fake's background
+    executor, instead of a real handshake with an unknown key.** Reason: the fake runs background work inline on the EDT
+    (Verified facts 7), where a real handshake's question cannot be answered before the connect times out (30 s); what
+    is under test is `quiet(owner)` and the quiet close, which the test drives directly. Cost if wrong: the path from a
+    handshake to the question stays untested headless, as it was before this plan (`hostKeyPromptIsAWindowModalDialog`
+    asks directly too).
+37. **Editor 0.13.0, Remote 0.16.0 and sample 0.5.0, each the next minor from its version now (0.12.0 after plan 8b,
+    0.15.0, 0.4.0); the Vault (0.7.0) and the other plugins keep theirs.** Reason: the series rule (next minor at
+    execution); plan 8b already took 0.12.0 for the Editor. Cost if wrong: a version one minor higher than needed.
+38. **The Editor's restorer opens its document as New Editor Tab does, and Jasper puts it in its saved tab and pane,
+    whether it opened as a tab of its own or as Split Right with Editor's pane.** Reason: spec 12 ("each pane saves its
+    one item"): the saved layout, not the plugin's placement, says where; the slot takes the item whatever it named
+    (Rulings 4). Cost if wrong: none.
+39. **No `docs/sdk-reference.html` change here:** the branch has none; the merge with main regenerates it with this
+    plan's SDK Javadoc, as plan 8b's STATUS entry says. Reason: `verifySdkReference` runs where the page exists. Cost if
+    wrong: the merge's `sdkReference` run takes these additions too.
+40. **A restored SSH tab joins Remote's attached panes when its session attaches, as every SSH tab does; until then
+    Remote keeps it in `restoredPanes`, with its host.** Reason: `panes` means attached (fact 7), and a restored tab may
+    never attach (Not connected). Cost if wrong: none.
+41. **Plan 6a Task 1's `NOT_STARTED` hand-off: `activateHost` shows a restored tab of the host that still waits,
+    `NOT_STARTED`, which then connects or offers Reconnect, instead of opening a second; `distroSessions` stays as it is,
+    since it counts only distribution panes `openDistro` opened in this process, never a restored one.** Reason: picking
+    a host whose tab came back should bring that tab forward, as `activateHost` does for a running one; a waiting tab is
+    the user's to see. Cost if wrong: one fewer new tab where a user wanted a second connection; Split with Same Host and
+    New Tab still open one.
+42. **Task 5 moves `BundledSamplePluginTest`'s pinned sample version (`:81`) with the manifest, and its Step 4 runs that
+    test.** Reason: the test pins 0.4.0 and is among the 82 tests a plain launcher fails, so only a staged run sees the
+    bump break it (6b review C1). Cost if wrong: none.
+43. **At restore only the SSH agent, or an open connection, signs in alone:** `signsInAlone(RemoteHost)` counts
+    `Auth.Agent` only, so a Vault-signed host's restored tab comes back Not connected, with Reconnect, and asks the Vault
+    for no credential; a remote document's quiet read reads over an open connection or the agent, and otherwise says so,
+    with Retry. An SSH tab counts no open connection: its shell may open one of its own (a followed directory's), which
+    signs in again. Reason: a restore asks the user nothing (Rulings 9 and 29), and `VaultApi.credential` shows the
+    Vault's grant prompt unless Remote holds an "Always" grant (fact 7); the Vault is locked at every start anyway, so
+    little is lost, where a check of the grant would need a new `VaultApi` method and a Vault 0.8.0 (the controller's
+    option (b), 6b review I1). Cost if wrong: after a same-process reopen with the Vault unlocked and an Always grant, the
+    user presses Reconnect once.
+44. **Cancel on a restored session's first connect keeps its pane, which shows "Connection cancelled" with Reconnect**
+    (`TerminalPane.cancelAttempt` closes the pane only while it is not restored). Reason: its tab came back to be
+    reconnected, and closing it would lose what was saved for it (6b review M1). Cost if wrong: a pane the user meant to
+    close takes a Close.
+45. **A quiet connect that fails keeps its reason: "Not connected: <why>", with Reconnect;** only a cancel and the
+    host-key question it answered Cancel say "Not connected: Reconnect to sign in" (`ConnectAttempt.reason`,
+    `refusedQuietly`). Reason: an agent with no usable key, or a host that is down, should say so as a connect's failure
+    does (6b review M3). Cost if wrong: none.
+46. **The size limit logs each item it leaves out once per window manager, which is once per process**
+    (`WindowManager.leftOut`), not at every save. Reason: a save runs within a second of every change, so the warnings
+    would repeat for as long as the windows stay too large (6b review M4). Cost if wrong: a log line fewer.
+47. **A local file deleted since its tab was saved comes back as the Editor's failed read, with Retry, and keeps its
+    restore state.** Reason: `Reopeners.resolve` answers a `local:` key whether or not its file exists (fact 8), and a
+    file that comes back later is the user's to retry; a placeholder would say the same with less (6b review M5). Cost if
+    wrong: none.
+48. **Restorers ask nothing:** `TabRestorer`'s Javadoc and the authoring guide say "Ask the user nothing here (no dialog,
+    sign-in or prompt); a tab that needs one opens waiting, as a session that offers Reconnect does." Reason: Rulings 28
+    and 29 hold the bundled plugins to it, and plugin authors need the same rule (6b review M6). Cost if wrong: none.
+49. **A placeholder's Retry and Close are focusable, and its tab's focus target is Retry while it shows, otherwise
+    Close** (`PlaceholderContent.action`, `focusAction`). Reason: a placeholder must be usable from the keyboard (6b
+    review M7). Cost if wrong: none.
+50. **Wording (6b review M8):** a key with no prefix declines "no running plugin opens this document"; a remote document
+    reopened before Remote's hosts have loaded names its host "a remote host" until they have; the authoring guide's
+    testkit paragraph names `restoreTab`, `restoreState` and `declinedRestores`. Reason: the decline read "opens
+    documents" with no prefix, and "a saved host" named nothing. Cost if wrong: none.
 
 ## File structure
 
@@ -440,7 +548,7 @@ Record them in `docs/STATUS.md` (Task 6). "What — why". Rulings 1 to 17 are th
 - Application:
   - Task 1: `layout.TabRestore` (new), `layout/package-info`, `contributions.Tab`, `TabRegistry`,
     `terminals.SessionRequest`, `plugins.HostedSessions`, `HostedUi`, `workspace.WindowContent`;
-  - Task 2: `workspace.PlaceholderContent` (new), `contributions.Tab`, `persistence.WorkspaceFile`,
+  - Task 2: `workspace.PlaceholderContent` (new), `contributions.Tab`, `layout.Layout`, `persistence.WorkspaceFile`,
     `workspace.WorkspaceView`, `WindowContent`, `WindowManager`, `plugins.PluginRuntime`, `application.JasperApplication`;
   - Task 4: `workspace.TerminalPane`.
 - Plugins: the Editor's `api/EditorDocument`, `session/DocumentSession`, `ui/EditorTab`, `ui/EditorWindow`,
@@ -448,13 +556,13 @@ Record them in `docs/STATUS.md` (Task 6). "What — why". Rulings 1 to 17 are th
   `edit/EditChannels`, `edit/package-info`, `edit/SavedRemoteDocument` (new) and `AGENTS.md`'s line on them (Task 4); the
   sample's `SamplePlugin` (Task 5); their `plugin.toml` files.
 - Tests: `RestoreStateTest` (new), `TabRegistryTest`, `TerminalFixture`, `AppContractTest`, `HostedUiTest`,
-  `FakeContractTest` (Task 1);
-  `PluginTabRestoreTest` (new), `WorkspaceRestoreTest` (one case), `PluginRuntimeTest`, `JasperApplicationWorkspaceTest`
-  (Task 2); `EditorPluginTest`, `EditorTabTest` (Task 3); `RemotePluginTest`, `RemoteEditingTest`, `SessionPaneTest`
-  (Task 4); `SamplePluginTest` (Task 5).
+  `FakeContractTest` (Task 1); `PluginTabRestoreTest` (new), `WorkspaceRestoreTest` (one case), `PluginRuntimeTest`,
+  `JasperApplicationWorkspaceTest`, `LayoutOperationsTest` (Task 2); `EditorPluginTest`, `EditorTabTest` (Task 3);
+  `RemotePluginTest`, `RemoteEditingTest`, `SessionPaneTest` (Task 4); `SamplePluginTest`, `BundledSamplePluginTest`
+  (Task 5).
 - Documents (Task 6): `jasper-sdk/README.md`, `docs/plugin-authoring.md` (and its `pluginpanels` snippet in Task 5),
-  `docs/sdk-architecture.md`, `docs/app-architecture.md`, `docs/configuration.md`, `docs/editor.md`, `docs/remote.md`, `docs/STATUS.md`; the ledger
-  in Task 2.
+  `docs/sdk-architecture.md`, `docs/app-architecture.md`, `docs/configuration.md`, `docs/editor.md`, `docs/remote.md`,
+  `docs/STATUS.md`; the ledger in Task 2.
 
 ## Before you start
 
@@ -465,11 +573,12 @@ git log --oneline -1 --grep "Workspace tabs: documentation and status for saving
 grep -c 'VERSION = "0.21.0";' jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java                                         # 1
 grep -c 'public record ContentSpec(String key, String title) {' jasper-sdk/src/main/java/dev/jasper/sdk/ui/ContentSpec.java   # 1
 grep -c 'public Optional<WorkspaceFile.Snapshot> snapshot()' jasper-app/src/main/java/dev/jasper/app/workspace/WindowManager.java  # 1
-grep -c 'public Optional<ChildWindow> popOutTab(Tab tab) {' jasper-app/src/main/java/dev/jasper/app/workspace/WindowManager.java  # 1
+grep -c 'public Optional<ChildWindow> moveToNewWindow(Tab tab) {' jasper-app/src/main/java/dev/jasper/app/workspace/WindowManager.java  # 1
 grep -c 'int restore(WorkspaceFile.WindowRecord record)' jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java  # 1
 grep -c 'void restore(ParentTabs saved, Map<TabId, Tab> tabs)' jasper-app/src/main/java/dev/jasper/app/workspace/ParentTabsView.java  # 1
 grep -c 'public static final String APP_OWNER = "jasper";' jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java  # 1
-grep -h '^version' plugins/editor/src/main/resources/plugin.toml plugins/remote/src/main/resources/plugin.toml plugins/sample/src/main/resources/plugin.toml  # 0.11.0, 0.15.0, 0.4.0
+grep -c 'PaneInfo held;' jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeWorkspace.java          # 1
+grep -h '^version' plugins/editor/src/main/resources/plugin.toml plugins/remote/src/main/resources/plugin.toml plugins/sample/src/main/resources/plugin.toml  # 0.12.0, 0.15.0, 0.4.0
 ```
 
 Every command prints the stated result (the `git log` one commit). Plan 6a's `docs/STATUS.md` entry is the newest; this
@@ -481,10 +590,11 @@ plan's goes above it. Create the two helper scripts (Global Constraints).
 
 Spec 14's `ContentSpec`/`SessionSpec` and `Windows.restorer` rows (sessions since the spec amendment `27874bf7d`): a
 plugin says how its tab comes back and registers the restorer that rebuilds it, which may decline with a reason (Rulings
-5); the application keeps the state on the tab and, while a restorer runs, gives the first tab the plugin opens the saved
-id and the window being restored (Rulings 4), and the window being restored takes no other tab meanwhile (Rulings 24).
-The contract suite holds both runtimes to it, and the testkit's fake restores as Jasper does: the tab takes the window
-being restored, placed and not shown, and a session waits until its tab is shown. `AppContractTest` opens the main
+5); the application keeps the state on the item and, while a restorer runs, gives the first item the plugin opens the
+saved id and the window being restored (Rulings 4), and the window being restored takes no other item meanwhile (Rulings
+24). The contract suite holds both runtimes to it, and the testkit's fake restores as Jasper does: the item takes the
+window being restored, placed in a new tab and not shown (Rulings 34), and a session waits, its pane held as plan 6a's
+fake holds one (Rulings 35), until its tab is shown. `AppContractTest` opens the main
 window and then a child for a tab placed in a new window while none is open, as the application does (plan 4b's
 hand-off; Rulings 25).
 
@@ -601,8 +711,11 @@ edit(C + "ContractHarness.java", [("""    /** UI thread: moves a tab the test ad
     /** UI thread: the restore state a tab gives, a content tab's or a provided session's; empty when it does not come back. */
     java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(java.util.UUID tabId);
 """, 1)])
-edit(C + "PluginContractTest.java", [("""    /** Workspace tabs spec 14's TabPlacement: the end of the active group, a new group after it, or a new child window. */
-    @Test void aPlacementPutsANewContentTabInTheActiveGroupBesideItOrInANewWindow() {""",
+edit(C + "PluginContractTest.java", [("""    /**
+     * Tabs and panes spec 11's TabPlacement: NEW_TAB opens a new tab at the end of the window's strip, SPLIT_RIGHT and
+     * SPLIT_DOWN a new pane right after the focused pane, in its tab, and NEW_WINDOW a new child window.
+     */
+    @Test void aPlacementOpensANewTabANewPaneBesideTheFocusedOneOrANewWindow() {""",
 """    /** Workspace tabs spec 13 and 14: a content tab saved with restore state comes back through its plugin's restorer. */
     @Test void aRestorerOpensItsSavedContentTabAgainInTheWindowBeingRestored() {
         UUID main = h.addTerminalWindow();
@@ -731,8 +844,11 @@ edit(C + "PluginContractTest.java", [("""    /** Workspace tabs spec 14's TabPla
         });
     }
 
-    /** Workspace tabs spec 14's TabPlacement: the end of the active group, a new group after it, or a new child window. */
-    @Test void aPlacementPutsANewContentTabInTheActiveGroupBesideItOrInANewWindow() {""", 1)])
+    /**
+     * Tabs and panes spec 11's TabPlacement: NEW_TAB opens a new tab at the end of the window's strip, SPLIT_RIGHT and
+     * SPLIT_DOWN a new pane right after the focused pane, in its tab, and NEW_WINDOW a new child window.
+     */
+    @Test void aPlacementOpensANewTabANewPaneBesideTheFocusedOneOrANewWindow() {""", 1)])
 F = "jasper-sdk-testkit/src/test/java/dev/jasper/sdk/testing/FakeContractTest.java"
 edit(F, [("""            @Override public void moveTab(java.util.UUID tabId, java.util.UUID windowId) { host.moveTab(tabId, windowId); }
 """, """            @Override public void moveTab(java.util.UUID tabId, java.util.UUID windowId) { host.moveTab(tabId, windowId); }
@@ -855,13 +971,17 @@ edit(T + "contributions/TabRegistryTest.java", [("    @Test void aHostedTabHasAn
 
     @Test void aHostedTabHasAnIdItsKindAndItsContent() {""", 1)])
 edit(T + "plugins/TerminalFixture.java", [(
-    """    /** The pane waits, as a restored terminal tab not yet shown does (workspace tabs spec 13). */""",
+    """    /**
+     * The local pane waits, as a restored terminal tab not yet shown does (workspace tabs spec 13): it starts on its tab's
+""",
     """    /** How a provided session's tab comes back, as its request carries it (workspace tabs spec 13). */
     Optional<dev.jasper.app.layout.TabRestore> sessionRestore(UUID tabId) {
         return Optional.ofNullable(tabs.get(tabId)).map(tab -> tab.pane).map(pane -> pane.request).flatMap(SessionRequest::restore);
     }
 
-    /** The pane waits, as a restored terminal tab not yet shown does (workspace tabs spec 13). */""", 1)])
+    /**
+     * The local pane waits, as a restored terminal tab not yet shown does (workspace tabs spec 13): it starts on its tab's
+""", 1)])
 edit(T + "plugins/AppContractTest.java", [(
     """            @Override public void moveTab(UUID tabId, UUID windowId) { onEdt(() -> terminalFixture.moveTab(tabId, windowId)); }
 """, """            @Override public void moveTab(UUID tabId, UUID windowId) { onEdt(() -> terminalFixture.moveTab(tabId, windowId)); }
@@ -1033,7 +1153,8 @@ public interface TabRestorer {
      * tab, whatever window or placement it names, and so is the first session it opens in {@code request.window()}; Jasper
      * puts it where it was saved, with the selection it had, and a session's tab connects when it is first shown. Open only
      * that tab: while the restorer runs, the window being restored takes no other, so another content tab opens where an
-     * owner-less one would, and another session does not open. When the tab
+     * owner-less one would, and another session does not open. Ask the user nothing here (no dialog, sign-in or prompt);
+     * a tab that needs one opens waiting, as a session that offers Reconnect does. When the tab
      * cannot come back now for a reason the plugin expects (its file or host is gone), return why: a placeholder in its
      * place says so, with Retry, and nothing is reported as the plugin's failure. Opening nothing without a reason, or
      * throwing, also leaves a placeholder; a throw is the plugin's failure.
@@ -1186,10 +1307,11 @@ PY
 
 A fake content tab keeps its restore state, `FakeUi` keeps the plugin's restorers by kind, and `FakePluginHost` reads a
 tab's state and runs a restorer for a test as Jasper does (Rulings 15): the first tab the plugin opens meanwhile takes
-the window being restored and is placed at the end of its active group, neither selected nor shown
-(`FakeWorkspace.placeTab`), once the fake has checked the owner, as the application's `HostedUi` does, and before it
+the window being restored and is placed in a new tab at the end of its strip, neither selected nor shown
+(`FakeWorkspace.placeTab`, Rulings 34), once the fake has checked the owner, as the application's `HostedUi` does, and before it
 resolves one, so it never opens a window of its own; a session's waits,
-`NOT_STARTED`, until its tab is shown; a reason the restorer gives is kept in `declinedRestores()`, never in
+`NOT_STARTED`, its pane holding the snapshot it starts with as `holdPane`'s does, and connects when its tab is shown
+(`FakeWorkspace.start`); a reason the restorer gives is kept in `declinedRestores()`, never in
 `failures()`:
 
 ```bash
@@ -1262,16 +1384,26 @@ edit(T + "FakeWorkspace.java", [
     Optional<Slot> takeSlot(FakePluginContext context) {
         return slot != null && slot.taken == null && slot.owner == context ? Optional.of(slot) : Optional.empty();
     }
-""", 1), ("""    private Tab announceTab(Window window, TabHandle.Kind kind, String title, Group beside) {
-""", """    /** A tab of {@code kind} at the end of {@code window}'s active group, announced and not selected: a restored tab. */
+""", 1), ("""    private Tab announceTab(Window window, TabHandle.Kind kind, String title, Tab beside) {
+""", """    /** An item of {@code kind} in a new tab at the end of {@code window}'s strip, announced and not selected: a restored one. */
     Tab placeTab(Window window, TabHandle.Kind kind, String title) { return announceTab(window, kind, title, null); }
 
-    /** A terminal tab with its one pane, placed as {@link #placeTab} places a tab: a restored session's. */
+    /** A terminal item with its one pane, placed as {@link #placeTab} places an item: a restored session's. */
     Pane placeTerminal(Window window, String title, PaneInfo info) {
         return addPane(announceTab(window, TabHandle.Kind.TERMINAL, title, null), info);
     }
 
-    private Tab announceTab(Window window, TabHandle.Kind kind, String title, Group beside) {
+    private Tab announceTab(Window window, TabHandle.Kind kind, String title, Tab beside) {
+""", 1), ("""    /** A held pane starts: its local shell runs, with the grid it had before it was held. */
+    private void start(Pane pane) {
+""", """    /** A held pane starts: a provided session connects; a local shell runs, with the grid it had before it was held. */
+    private void start(Pane pane) {
+        if (pane.session != null) {
+            pane.info = pane.held;
+            pane.held = null;
+            sessions.connect(pane.session.owner, pane, pane.session.spec);
+            return;
+        }
 """, 1)])
 edit(T + "FakeTerminals.java", [(
     """        return workspace.window(window.id()).map(target -> switch (request) {""",
@@ -1309,8 +1441,8 @@ edit(T + "FakeSessions.java", [(
     void hold(FakePluginContext owner, FakeWorkspace.Pane pane, SessionSpec spec) {
         pane.session = new Session(owner, spec);
         pane.session.state = "NOT_STARTED";
-        pane.held = true;
-        pane.info = FakeTerminals.withState(pane.info, SessionState.NOT_STARTED, OptionalInt.empty());
+        pane.held = pane.info;
+        pane.info = FakeTerminals.notStarted(pane.info);
     }
 
     String state(FakeWorkspace.Pane paneOrNull) {""", 1)])
@@ -1344,8 +1476,8 @@ edit(T + "FakePluginHost.java", [("""    /** A {@code Terminals.environment} con
      * window {@code windowId} whatever window or placement it named. A content tab is placed there, not shown: it is
      * neither selected nor active until the test shows it. A session's tab waits as Jasper's does, {@code NOT_STARTED} with
      * no connection attempt, until its tab is shown ({@link #focusTerminalPane} or its {@code TabHandle.select()}). Jasper
-     * places the tab where it was saved; this fake puts it at the end of the window's active group. Call it on the UI
-     * thread.
+     * places the tab where it was saved, in its tab and pane; this fake puts it in a new tab at the end of the window's
+     * strip. Call it on the UI thread.
      *
      * @param pluginId the plugin that saved the tab
      * @param windowId the window being restored
@@ -1436,9 +1568,18 @@ python3 -I - <<'PY'
 import sys; sys.path.insert(0, "build/plan6b"); from edits import edit
 A = "jasper-app/src/main/java/dev/jasper/app/"
 edit(A + "layout/package-info.java", [(
-    " * The workspace layout model (workspace tabs spec, section 7): tab and group ids, a workspace's tab groups in nested",
-    " * The workspace layout model (workspace tabs spec, section 7): tab and group ids, how a plugin's tab comes back\n"
-    " * ({@code TabRestore}, section 13), a workspace's tab groups in nested", 1)])
+    """ * The workspace layout model (workspace tabs spec, section 7; tabs and panes spec 4): tab and group ids, a tab's panes
+ * (groups, one tab each) in nested weighted splits, its active and maximized pane and the panes' order of use, the
+ * operations that return a new {@code Layout}, each group's region of the unit square, and what a window holds: its
+ * tabs ({@code ParentTabs}). JDK-only: nothing from Swing, AWT or a file format; {@code verifyApplicationArchitecture}
+ * enforces it. Immutable values, safe on any thread; whoever holds a layout owns replacing it.
+""", """ * The workspace layout model (workspace tabs spec, section 7; tabs and panes spec 4): tab and group ids, how a plugin's
+ * item comes back ({@code TabRestore}, section 13), a tab's panes (groups, one tab each) in nested weighted splits, its
+ * active and maximized pane and the panes' order of use, the operations that return a new {@code Layout}, each group's
+ * region of the unit square, and what a window holds: its tabs ({@code ParentTabs}). JDK-only: nothing from Swing, AWT
+ * or a file format; {@code verifyApplicationArchitecture} enforces it. Immutable values, safe on any thread; whoever
+ * holds a layout owns replacing it.
+""", 1)])
 C = A + "contributions/"
 edit(C + "Tab.java", [
     ("import dev.jasper.app.layout.TabId;\n", "import dev.jasper.app.layout.TabId;\nimport dev.jasper.app.layout.TabRestore;\n", 1),
@@ -1446,7 +1587,11 @@ edit(C + "Tab.java", [
      "    private List<ContentStatus> status = List.of();\n    private Optional<TabRestore> restore = Optional.empty();\n", 1),
     ("    public List<ContentStatus> status() { return status; }\n",
      """    public List<ContentStatus> status() { return status; }
-    /** @return how the tab comes back when the windows are restored; empty while it does not (workspace tabs spec 13) */
+    /**
+     * How the item comes back when the windows are restored (workspace tabs spec 13).
+     *
+     * @return its plugin's restorer kind and restore state; empty while it does not come back
+     */
     public Optional<TabRestore> restore() { return restore; }
 
     /**
@@ -1638,7 +1783,16 @@ edit(A + "terminals/SessionRequest.java", [
      "                             Executor cleanup, Icon icon, Optional<TabRestore> restore) {", 1),
     ("        Objects.requireNonNull(cleanup, \"cleanup\");\n    }\n",
      "        Objects.requireNonNull(cleanup, \"cleanup\");\n        Objects.requireNonNull(restore, \"restore\");\n    }\n\n"
-     "    /** A request whose tab does not come back when the windows are restored. */\n"
+     "    /**\n"
+     "     * A request whose tab does not come back when the windows are restored.\n"
+     "     *\n"
+     "     * @param providerId who provides the session, for display and diagnostics\n"
+     "     * @param title the pane's title until the program sets one\n"
+     "     * @param closeOnExit close the pane when the session ends instead of offering Reconnect\n"
+     "     * @param connector starts one connection attempt\n"
+     "     * @param cleanup where closes and cancellation handlers run\n"
+     "     * @param icon the provider's tab icon, or {@code null} for the host terminal icon\n"
+     "     */\n"
      "    public SessionRequest(String providerId, String title, boolean closeOnExit, Consumer<SessionAttempt> connector,\n"
      "                          Executor cleanup, Icon icon) {\n"
      "        this(providerId, title, closeOnExit, connector, cleanup, icon, Optional.empty());\n    }\n", 1)])
@@ -1775,38 +1929,41 @@ EOF
 
 ---
 
-### Task 2: Plugins' tabs saved and restored in every kind of window, and placeholders
+### Task 2: Plugins' items saved and restored in their tab and pane, and placeholders
 
-Spec 9.2 and 13, parent tabs spec 9 and 10: a plugin's tab is saved while its plugin restores its kind (Rulings 3) and
-comes back through its restorer in its saved parent tab and pane of whichever window kind held it (Rulings 19); a tab
-whose plugin does not run, or whose restorer declines or fails, comes back as a placeholder that says why (not
-installed, turned off, waiting for review, could not start, or the restorer's reason), with Close and, while the plugin
-runs, Retry, both acting in whatever window holds it then (Rulings 5, 6 and 7). A saved record naming Jasper itself is
-left out (Rulings 22), the window being restored takes no other tab while a restorer runs (Rulings 24), and a workspace
-that would be too large to read back leaves out plugins' tabs, largest first, as closing them would (Rulings 16 and
-21). Plan 6a's test of a full and a pane window left out for holding only plugins' tabs now expects both back, holding
-placeholders (Rulings 20).
+Spec 9.2 and 13, tabs and panes spec 12: a plugin's item is saved while its plugin restores its kind (Rulings 3) and
+comes back through its restorer in its saved tab and pane of the main window or a full window (Rulings 19); an item
+whose plugin does not run, or whose restorer declines or fails, comes back as a placeholder in its pane that says why
+(not installed, turned off, waiting for review, could not start, or the restorer's reason), with Close and, while the
+plugin runs, Retry, which puts the rebuilt item in the placeholder's place in that pane (Rulings 32), both acting in
+whatever window holds it then (Rulings 5, 6 and 7). A saved record naming Jasper itself is left out (Rulings 22), the
+window being restored takes no other item while a restorer runs (Rulings 24), and a workspace that would be too large
+to read back leaves out plugins' items, largest first, as closing them would, logging each once (Rulings 16, 21 and
+46). A placeholder's Retry and Close are reached by keyboard (Rulings 49). Plan 6a's test of a
+full window left out for holding only a plugin's item now expects it back, holding the placeholder (Rulings 20).
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/workspace/PlaceholderContent.java`,
   `jasper-app/src/test/java/dev/jasper/app/workspace/PluginTabRestoreTest.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/contributions/Tab.java`, `persistence/WorkspaceFile.java`,
-  `workspace/WorkspaceView.java`, `workspace/WindowContent.java`, `workspace/WindowManager.java`,
-  `plugins/PluginRuntime.java`, `application/JasperApplication.java`, `docs/design/theme-engine/migration.csv` (two rows)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/contributions/Tab.java`, `layout/Layout.java` (before `remove`),
+  `persistence/WorkspaceFile.java`, `workspace/WorkspaceView.java`, `workspace/WindowContent.java`,
+  `workspace/WindowManager.java`, `plugins/PluginRuntime.java`, `application/JasperApplication.java`,
+  `docs/design/theme-engine/migration.csv` (two rows)
 - Test: `workspace/WorkspaceRestoreTest.java` (one case), `plugins/PluginRuntimeTest.java`,
-  `application/JasperApplicationWorkspaceTest.java`
+  `application/JasperApplicationWorkspaceTest.java`, `layout/LayoutOperationsTest.java` (one case)
 
 **Interfaces:**
 - Consumes: Task 1's `Tab.restore()`, `TabRegistry.restore`, `restores`, `restoring`, `onRestoreChanged`, `Restoring`,
   `Restored`, `TabRestore`; plan 6a's `WindowContent.restore`, `mount`, `startShown`, `WindowManager.snapshot`,
-  `windowRecord`, `changed`, `open(…, prepare)`, `WorkspaceFile.keeping`, `TestWindows`, `WorkspaceStore`; plan 7a's
-  `ParentTabsView.holding(Tab)`, `WindowContent.workspace()`, `parentTabs()`; plan 7b's `WindowManager.popOutTab(Tab)`,
-  `WindowContent.isPaneWindow()`; plan 4b's `TabRegistry.APP_OWNER`.
+  `windowRecord`, `changed`, `open(…, prepare)`, `WorkspaceFile.keeping`, `TestWindows`, `WorkspaceStore`,
+  `WorkspaceRestoreTest`, `JasperApplicationWorkspaceTest`'s `quit`; plan 7a's `ParentTabsView.holding(Tab)`,
+  `WindowContent.workspace()`, `parentTabs()`; plan 8a's `WindowManager.moveToNewWindow(Tab)`; plan 4b's
+  `TabRegistry.APP_OWNER`.
 - Produces: `Tab.Kind.PLACEHOLDER`; package `final class PlaceholderContent(WorkspaceFile.TabRecord.Content saved, String
   why, boolean retryable, Runnable onRetry, Runnable onClose, Runnable onShown)` (`saved()`, `reason()`, `retryable()`,
-  `failed(String, boolean)`, `shown()`, `retryButton()`, `closeButton()`); package `BiFunction<TabId,
+  `failed(String, boolean)`, `shown()`, `action()`, `focusAction()`, `retryButton()`, `closeButton()`); package `BiFunction<TabId,
   WorkspaceFile.TabRecord.Content, Optional<Tab>> WindowContent.savedTabs`, `void WindowContent.retry(Tab)`, `void
-  WorkspaceView.openAt(Tab, GroupId, int)`; `public record WindowManager.PluginState(String name, Kind kind)` with
+  WorkspaceView.replace(Tab placeholder, Tab rebuilt)`, `public Layout Layout.replaceTab(TabId tab, TabId by)`; `public record WindowManager.PluginState(String name, Kind kind)` with
   `Kind { RUNNING, NOT_INSTALLED, TURNED_OFF, NEEDS_CONSENT, FAILED }`; `public void
   WindowManager.plugins(Function<String, PluginState> states)`; `public record PluginRuntime.Standing(String name, Kind
   kind)` with `Kind { RUNNING, NEEDS_CONSENT, TURNED_OFF, FAILED }` and `public Optional<Standing>
@@ -1832,8 +1989,6 @@ import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Orientation;
-import dev.jasper.app.layout.Origin;
-import dev.jasper.app.layout.PaneLayout;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
@@ -1858,8 +2013,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Workspace tabs spec 9.2 and 13, parent tabs spec 9: a plugin's saved tab comes back through its restorer in its saved
- * parent tab and pane, in every kind of window, or as a placeholder that says why.
+ * Workspace tabs spec 9.2 and 13, tabs and panes spec 12: a plugin's saved item comes back through its restorer in its
+ * saved tab and pane, in the main window and in a full window, or as a placeholder that says why.
  */
 class PluginTabRestoreTest {
     private static final String NOTES = "dev.example.notes";
@@ -1895,16 +2050,16 @@ class PluginTabRestoreTest {
     private static final WorkspaceFile.TabRecord.Content NOTE = note("todo");
     private static final WorkspaceFile.TabRecord.Terminal SHELL = new WorkspaceFile.TabRecord.Terminal("", HOME.toString(), "");
 
-    /** The main window, saved without a place, holding {@code parents}, the first one shown. */
-    private static WorkspaceFile.WindowRecord main(Map<TabId, WorkspaceFile.TabRecord> tabs, ParentTab... parents) {
-        return new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN, Optional.empty(), 0, new ParentTabs(List.of(parents), parents[0].id()), tabs);
+    /** The main window, saved without a place, holding {@code tabs}, the first one shown. */
+    private static WorkspaceFile.WindowRecord main(Map<TabId, WorkspaceFile.TabRecord> items, ParentTab... tabs) {
+        return new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN, Optional.empty(), 0, new ParentTabs(List.of(tabs), tabs[0].id()), items);
     }
 
-    /** The main window with one parent tab whose one pane holds a terminal tab, then {@code record}'s tab, selected. */
+    /** The main window with one tab of two panes side by side: a terminal, then {@code record}'s item, whose pane is active. */
     private static WorkspaceFile.Snapshot mainWith(TabId shell, TabId saved, WorkspaceFile.TabRecord record) {
-        Group group = new Group(GroupId.random(), List.of(shell, saved), Optional.of(saved));
+        Layout one = Layout.of(shell);
         return new WorkspaceFile.Snapshot(List.of(main(Map.of(shell, SHELL, saved, record),
-            new ParentTab(ParentTabId.random(), new Layout(group, group.id(), Optional.empty())))));
+            new ParentTab(ParentTabId.random(), one.split(saved, one.activeGroup(), Side.RIGHT)))));
     }
 
     /** The notes plugin's restorer: it opens the note its state names, under the saved title, in the window being restored. */
@@ -1917,8 +2072,8 @@ class PluginTabRestoreTest {
         }));
     }
 
-    @Test void aPluginsTabComesBackInItsSavedParentTabAndPaneInEveryKindOfWindow() throws Exception {
-        TabId shell = TabId.random(), left = TabId.random(), right = TabId.random(), away = TabId.random(), popped = TabId.random();
+    @Test void aPluginsItemComesBackInItsSavedTabAndPaneInTheMainWindowAndAFullWindow() throws Exception {
+        TabId shell = TabId.random(), left = TabId.random(), right = TabId.random(), away = TabId.random();
         Group leftPane = new Group(GroupId.random(), List.of(left), Optional.of(left));
         Group rightPane = new Group(GroupId.random(), List.of(right), Optional.of(right));
         ParentTab shown = new ParentTab(ParentTabId.random(), Layout.of(shell));
@@ -1927,30 +2082,26 @@ class PluginTabRestoreTest {
         var mainRecord = main(Map.of(shell, SHELL, left, note("left"), right, note("right")), shown, hidden);
         var full = new WorkspaceFile.WindowRecord(WorkspaceFile.Role.CHILD, Optional.empty(), 0,
             ParentTabs.of(new ParentTab(ParentTabId.random(), Layout.of(away))), Map.of(away, note("away")));
-        var pane = new WorkspaceFile.WindowRecord(WorkspaceFile.Role.CHILD, Optional.empty(), 0,
-            new PaneLayout(Layout.of(popped), new Origin(hidden.id(), leftPane.id(), Side.RIGHT, 0.5)), Map.of(popped, note("popped")));
-        var saved = new WorkspaceFile.Snapshot(List.of(mainRecord, full, pane));
+        var saved = new WorkspaceFile.Snapshot(List.of(mainRecord, full));
         windows(saved, Map.of(NOTES, "Notes"));
         notesRestorer();
         edt(() -> {
             MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
-            assertThat(main.content().windowLayout()).as("the notes in the hidden parent tab's two panes, under their saved ids")
+            assertThat(main.content().windowLayout()).as("the notes in the hidden tab's two panes, under their saved ids")
                 .isEqualTo(mainRecord.layout());
-            for (TabId note : List.of(left, right, away, popped))
+            for (TabId note : List.of(left, right, away))
                 assertThat(windows.model.tabs().tab(note)).as("rebuilt by its plugin")
                     .hasValueSatisfying(tab -> assertThat(tab.kind()).isEqualTo(Tab.Kind.HOSTED));
             List<ChildWindow> children = windows.manager.children();
-            assertThat(children).hasSize(2);
-            assertThat(children.get(0).content().windowLayout()).as("a full window").isEqualTo(full.layout());
-            assertThat(children.get(1).content().isPaneWindow()).isTrue();
-            assertThat(children.get(1).content().windowLayout()).as("a pane window, with its origin").isEqualTo(pane.layout());
-            assertThat(windows.model.tabs().tab(popped).orElseThrow().window()).isEqualTo(children.get(1).id());
+            assertThat(children).hasSize(1);
+            assertThat(children.getFirst().content().windowLayout()).as("a full window").isEqualTo(full.layout());
+            assertThat(windows.model.tabs().tab(away).orElseThrow().window()).isEqualTo(children.getFirst().id());
             assertThat(windows.manager.snapshot()).as("saved again, it is what was read").contains(saved);
         });
         windows.launch();
     }
 
-    @Test void aTabWhosePluginIsNotRunningComesBackAsAPlaceholderAndIsSavedAgainAsItWas() throws Exception {
+    @Test void anItemWhosePluginIsNotRunningComesBackAsAPlaceholderAndIsSavedAgainAsItWas() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         windows(mainWith(shell, saved, NOTE), Map.of());
         edt(() -> {
@@ -1962,8 +2113,10 @@ class PluginTabRestoreTest {
             var content = (PlaceholderContent) placeholder.content();
             assertThat(content.reason()).isEqualTo("The plugin dev.example.notes is not installed.");
             assertThat(content.retryable()).as("no Retry without its plugin").isFalse();
+            assertThat(content.closeButton().isFocusable()).as("reached by keyboard").isTrue();
+            assertThat(content.action()).as("its focus target, with no Retry").isSameAs(content.closeButton());
             assertThat(windows.manager.snapshot().orElseThrow().main().tabs().get(saved)).as("saved again as it was").isEqualTo(NOTE);
-            assertThat(windows.terminals.tab(saved.value()).orElseThrow().kind()).as("a content tab to plugins")
+            assertThat(windows.terminals.tab(saved.value()).orElseThrow().kind()).as("a content item to plugins")
                 .isEqualTo(dev.jasper.app.terminals.TabEntry.Kind.CONTENT);
             content.closeButton().doClick();
             assertThat(placeholder.closed()).isTrue();
@@ -1972,7 +2125,7 @@ class PluginTabRestoreTest {
         windows.launch();
     }
 
-    @Test void aRestorerThatFailsLeavesAPlaceholderAndRetryPutsItsTabInThePlaceholdersPlace() throws Exception {
+    @Test void aRestorerThatFailsLeavesAPlaceholderAndRetryPutsItsItemInThePlaceholdersPane() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         windows(mainWith(shell, saved, NOTE), Map.of(NOTES, "Notes"));
         boolean[] works = {false};
@@ -1989,6 +2142,8 @@ class PluginTabRestoreTest {
             var content = (PlaceholderContent) placeholder.content();
             assertThat(content.reason()).isEqualTo("Notes could not restore this tab: the note is locked.");
             assertThat(content.retryable()).isTrue();
+            assertThat(content.retryButton().isFocusable()).isTrue();
+            assertThat(content.action()).as("its focus target while Retry shows").isSameAs(content.retryButton());
             content.retryButton().doClick();
             assertThat(placeholder.closed()).as("still failing: the placeholder stays").isFalse();
             assertThat(main.content().tabs()).hasSize(2);
@@ -2000,6 +2155,7 @@ class PluginTabRestoreTest {
             assertThat(note.title()).isEqualTo("todo.md");
             assertThat(main.content().tabs()).as("in the placeholder's place").extracting(Tab::id).containsExactly(shell, note.id());
             assertThat(main.content().workspace().model().groupOf(note.id())).as("in the placeholder's pane").contains(pane);
+            assertThat(main.content().parentTabCount()).as("no tab opened for it").isEqualTo(1);
             assertThat(windows.manager.snapshot().orElseThrow().main().tabs().get(note.id())).isEqualTo(NOTE);
         });
         windows.launch();
@@ -2035,8 +2191,8 @@ class PluginTabRestoreTest {
         windows.launch();
     }
 
-    /** Parent tabs spec 5: a placeholder moves like any tab, and its Retry rebuilds the tab in the window that holds it then. */
-    @Test void aPlaceholderPoppedOutToAPaneWindowRetriesThere() throws Exception {
+    /** Tabs and panes spec 13: a placeholder moves like any item, and its Retry rebuilds the item in the window that holds it then. */
+    @Test void aPlaceholderMovedToAFullWindowRetriesThere() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         windows(mainWith(shell, saved, NOTE), Map.of(NOTES, "Notes"));
         boolean[] works = {false};
@@ -2048,55 +2204,75 @@ class PluginTabRestoreTest {
         edt(() -> {
             MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
             Tab placeholder = main.content().selectedTab();
-            ChildWindow pane = windows.manager.popOutTab(placeholder).orElseThrow();
-            assertThat(pane.content().isPaneWindow()).isTrue();
-            assertThat(placeholder.window()).isEqualTo(pane.id());
+            ChildWindow full = windows.manager.moveToNewWindow(placeholder).orElseThrow();
+            assertThat(placeholder.window()).isEqualTo(full.id());
             works[0] = true;
             ((PlaceholderContent) placeholder.content()).retryButton().doClick();
             assertThat(placeholder.closed()).isTrue();
-            assertThat(pane.closed()).as("it holds the rebuilt tab").isFalse();
-            assertThat(pane.content().selectedTab().kind()).as("rebuilt in the window that held it").isEqualTo(Tab.Kind.HOSTED);
+            assertThat(full.closed()).as("it holds the rebuilt item").isFalse();
+            assertThat(full.content().selectedTab().kind()).as("rebuilt in the window that held it").isEqualTo(Tab.Kind.HOSTED);
             assertThat(main.content().tabs()).extracting(Tab::id).containsExactly(shell);
         });
         windows.launch();
     }
 
-    @Test void aPlaceholderInAPaneWindowClosesFromTheWindowThatHoldsItNow() throws Exception {
+    @Test void aPlaceholderInAFullWindowClosesFromTheWindowThatHoldsItNow() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         windows(mainWith(shell, saved, NOTE), Map.of());
         edt(() -> {
             MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
             Tab placeholder = main.content().selectedTab();
-            ChildWindow pane = windows.manager.popOutTab(placeholder).orElseThrow();
+            ChildWindow full = windows.manager.moveToNewWindow(placeholder).orElseThrow();
             ((PlaceholderContent) placeholder.content()).closeButton().doClick();
             assertThat(placeholder.closed()).isTrue();
-            assertThat(pane.closed()).as("its last tab closed").isTrue();
+            assertThat(full.closed()).as("its last item closed").isTrue();
             assertThat(main.content().tabs()).extracting(Tab::id).containsExactly(shell);
         });
         windows.launch();
     }
 
-    @Test void aWorkspaceTooLargeToReadBackLeavesOutPluginsTabsLargestFirst() throws Exception {
+    @Test void aWorkspaceTooLargeToReadBackLeavesOutPluginsItemsLargestFirst() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         windows(mainWith(shell, saved, NOTE), Map.of(NOTES, "Notes"));
         notesRestorer();
         edt(() -> windows.model.tabs().restorer(NOTES, "big", restoring -> Optional.empty()));
-        edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
-            for (int index = 0; index < 80; index++) {
-                Tab big = windows.model.tabs().open(NOTES, "big:" + index, "Big " + index, main.id(), new javax.swing.JPanel());
-                big.restore(Optional.of(new TabRestore("big", Map.of("text", "x".repeat(4000 + index)))));
-            }
-            WorkspaceFile.Snapshot snapshot = windows.manager.snapshot().orElseThrow();
-            assertThat(WorkspaceFile.encodedBytes(snapshot)).as("a read never sets it aside").isLessThanOrEqualTo(WorkspaceFile.MAX_BYTES);
-            assertThat(snapshot.main().tabs()).as("terminal tabs and the smaller plugins' tabs stay").containsKeys(shell, saved);
-            assertThat(snapshot.main().tabs()).hasSizeLessThan(82).hasSizeGreaterThan(40);
-            assertThat(snapshot.main().tabs().values()).noneSatisfy(record -> assertThat(record.title()).isEqualTo("Big 79"));
-        });
+        // The window manager's warnings are recorded, not printed: each item left out is logged once (Rulings 16).
+        var log = java.util.logging.Logger.getLogger(WindowManager.class.getName());
+        var warned = new java.util.ArrayList<String>();
+        var recorder = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { warned.add(record.getMessage()); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        boolean parents = log.getUseParentHandlers();
+        log.setUseParentHandlers(false);
+        log.addHandler(recorder);
+        try {
+            edt(() -> {
+                MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+                for (int index = 0; index < 80; index++) {
+                    Tab big = windows.model.tabs().open(NOTES, "big:" + index, "Big " + index, main.id(), new javax.swing.JPanel());
+                    big.restore(Optional.of(new TabRestore("big", Map.of("text", "x".repeat(4000 + index)))));
+                }
+                windows.manager.snapshot().orElseThrow();
+                WorkspaceFile.Snapshot snapshot = windows.manager.snapshot().orElseThrow();
+                assertThat(WorkspaceFile.encodedBytes(snapshot)).as("a read never sets it aside").isLessThanOrEqualTo(WorkspaceFile.MAX_BYTES);
+                assertThat(snapshot.main().tabs()).as("terminals and the smaller plugins' items stay").containsKeys(shell, saved);
+                assertThat(snapshot.main().tabs()).hasSizeLessThan(82).hasSizeGreaterThan(40);
+                assertThat(snapshot.main().tabs().values()).noneSatisfy(record -> assertThat(record.title()).isEqualTo("Big 79"));
+                assertThat(snapshot.main().layout().parentTabs()).as("a tab its only item leaves goes with it")
+                    .hasSize(snapshot.main().tabs().size() - 1);
+                assertThat(warned).as("two saves: each item left out logged once").doesNotHaveDuplicates()
+                    .hasSize(82 - snapshot.main().tabs().size()).allSatisfy(line -> assertThat(line).startsWith("Not saving the tab Big "));
+            });
+        } finally {
+            log.removeHandler(recorder);
+            log.setUseParentHandlers(parents);
+        }
         windows.launch();
     }
 
-    @Test void aPluginsTabWithoutRestoreStateOrRestorerIsNotSavedAndJaspersOwnTabsNeverAre() throws Exception {
+    @Test void aPluginsItemWithoutRestoreStateOrRestorerIsNotSavedAndJaspersOwnItemsNeverAre() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         windows(mainWith(shell, saved, SHELL), Map.of(NOTES, "Notes"));
         edt(() -> {
@@ -2114,8 +2290,8 @@ class PluginTabRestoreTest {
         windows.launch();
     }
 
-    /** Workspace plan 6b Rulings 22: a saved tab naming Jasper itself, which only a file this build did not write holds, is left out. */
-    @Test void aSavedTabNamingJasperItselfIsLeftOut() throws Exception {
+    /** Workspace plan 6b Rulings 22: a saved item naming Jasper itself, which only a file this build did not write holds, is left out. */
+    @Test void aSavedItemNamingJasperItselfIsLeftOut() throws Exception {
         TabId shell = TabId.random(), errors = TabId.random();
         windows(mainWith(shell, errors, new WorkspaceFile.TabRecord.Content("Errors", TabRegistry.APP_OWNER, "errors", Map.of())), Map.of());
         edt(() -> {
@@ -2127,12 +2303,12 @@ class PluginTabRestoreTest {
         windows.launch();
     }
 
-    @Test void aSessionsTabComesBackThroughItsPluginAndConnectsWhenFirstShown() throws Exception {
+    @Test void aSessionsItemComesBackThroughItsPluginAndConnectsWhenItsTabFirstShows() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         var record = new WorkspaceFile.TabRecord.Content("build-host", "dev.example.ssh", "ssh", Map.of("host", "build-host"));
-        Group group = new Group(GroupId.random(), List.of(shell, saved), Optional.of(shell));
         windows(new WorkspaceFile.Snapshot(List.of(main(Map.of(shell, SHELL, saved, record),
-            new ParentTab(ParentTabId.random(), new Layout(group, group.id(), Optional.empty()))))), Map.of("dev.example.ssh", "SSH"));
+            new ParentTab(ParentTabId.random(), Layout.of(shell)), new ParentTab(ParentTabId.random(), Layout.of(saved))))),
+            Map.of("dev.example.ssh", "SSH"));
         Queue<SessionAttempt> attempts = new ArrayDeque<>();
         boolean[] refused = {false};
         edt(() -> windows.model.tabs().restorer("dev.example.ssh", "ssh", restoring -> {
@@ -2140,7 +2316,7 @@ class PluginTabRestoreTest {
                 Optional.of(restoring.state()));
             WindowContent window = windows.manager.window(restoring.window()).orElseThrow().content();
             window.openTab(HOME, request);
-            // The window being restored takes no other tab while the restorer runs (workspace plan 6b Rulings 24).
+            // The window being restored takes no other item while the restorer runs (workspace plan 6b Rulings 24).
             refused[0] = window.openTab(HOME, new SessionRequest("dev.example.ssh", "other", false, attempts::add, Runnable::run)) == null;
             return Optional.empty();
         }));
@@ -2155,20 +2331,20 @@ class PluginTabRestoreTest {
                 .isEqualTo(new WorkspaceFile.TabRecord.Content(session.title(), "dev.example.ssh", "ssh", Map.of("host", "build-host")));
         });
         edt(() -> {
-            assertThat(attempts).as("not shown: it has not connected").isEmpty();
+            assertThat(attempts).as("its tab hidden: it has not connected").isEmpty();
             WindowContent content = windows.manager.main().orElseThrow().content();
             content.selectTab(content.tabs().get(1));
         });
-        edt(() -> assertThat(attempts).as("shown, it connects once that EDT turn ends").hasSize(1));
+        edt(() -> assertThat(attempts).as("its tab shown, it connects once that EDT turn ends").hasSize(1));
         windows.launch();
     }
 
     /**
-     * Workspace plan 6b Rulings 23 and 24: the saved tab names the window being restored at once, though the main window is
-     * still being composed; another tab its restorer opens there waits for that window, naming none, and opens in it once
-     * it shows.
+     * Workspace plan 6b Rulings 23 and 24: the saved item names the window being restored at once, though the main window
+     * is still being composed; another item its restorer opens there waits for that window, naming none, and opens in it,
+     * in a new tab, once it shows.
      */
-    @Test void aRestoredTabNamesItsWindowAtOnceAndARestorersOtherTabOpensOnceTheWindowShows() throws Exception {
+    @Test void aRestoredItemNamesItsWindowAtOnceAndARestorersOtherItemOpensOnceTheWindowShows() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         windows(mainWith(shell, saved, NOTE), Map.of(NOTES, "Notes"));
         var during = new ArrayList<UUID>();
@@ -2182,18 +2358,20 @@ class PluginTabRestoreTest {
         }));
         edt(() -> {
             MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
-            assertThat(during).as("the saved tab's window at once; none for the other while it waits").containsExactly(main.id(), null);
+            assertThat(during).as("the saved item's window at once; none for the other while it waits").containsExactly(main.id(), null);
             assertThat(other[0].window()).isEqualTo(main.id());
-            assertThat(main.content().tabs()).as("the other at the end of the shown parent tab's active pane")
+            assertThat(main.content().tabs()).as("the other in a new tab after the restored one")
                 .extracting(Tab::id).containsExactly(shell, saved, other[0].id());
+            assertThat(main.content().parentTabOf(other[0])).isNotEqualTo(main.content().parentTabOf(main.content().tabs().getFirst()));
         });
         windows.launch();
     }
 }
 ```
 
-The runtime says which plugins run; plan 6a's full and pane windows holding only plugins' tabs come back holding their
-placeholders; through the application, a saved tab of a plugin that does not run is a placeholder:
+The runtime says which plugins run; a layout puts another item in a pane in its place; plan 6a's full window holding
+only a plugin's item comes back holding its placeholder; through the application, a saved item of a plugin that does
+not run is a placeholder:
 
 ```bash
 python3 -I - <<'PY'
@@ -2215,46 +2393,53 @@ edit(T + "plugins/PluginRuntimeTest.java", [(
         });
         assertThat(runtime.standing("dev.example.absent")).as("not installed").isEmpty();
 """, 1)])
-# Plan 6a left a full and a pane window holding only plugins' tabs out; with placeholders both come back (Rulings 20).
+edit(T + "layout/LayoutOperationsTest.java", [(
+    """    @Test void activateMovesTheGroupToTheFrontOfTheOrderOfUse() {""",
+    """    /** Workspace plan 6b Rulings 6: a placeholder's Retry puts the rebuilt tab in its pane, which keeps its place. */
+    @Test void replaceTabPutsAnotherTabInTheSamePane() {
+        Layout replaced = pair().toggleMaximize(groupId(2)).replaceTab(tab(3), tab(9));
+        assertThat(replaced.root()).isEqualTo(h(child(group(1), 0.5), child(group(2, 9), 0.5)));
+        assertThat(replaced.activeGroup()).isEqualTo(groupId(2));
+        assertThat(replaced.maximized()).as("the maximize stays").contains(groupId(2));
+        assertThat(pair().replaceTab(tab(1), tab(9)).activeGroup()).as("the active pane stays").isEqualTo(groupId(2));
+        assertThatIllegalArgumentException().isThrownBy(() -> pair().replaceTab(tab(8), tab(9)));
+        assertThatIllegalArgumentException().isThrownBy(() -> pair().replaceTab(tab(1), tab(3)));
+    }
+
+    @Test void activateMovesTheGroupToTheFrontOfTheOrderOfUse() {""", 1)])
+# Plan 6a left a full window holding only a plugin's item out; with a placeholder it comes back (Rulings 20).
 edit(T + "workspace/WorkspaceRestoreTest.java", [(
     """    @Test void aChildWindowWithNothingToRestoreIsLeftOut() throws Exception {""",
-    """    @Test void aChildWindowHoldingOnlyAMissingPluginsTabsComesBackWithTheirPlaceholders() throws Exception {""", 1), (
-    """            assertThat(windows.manager.children()).as("a full window and a pane window holding only plugins' tabs (6b restores those)").isEmpty();
+    """    @Test void aFullWindowHoldingOnlyAMissingPluginsItemComesBackWithItsPlaceholder() throws Exception {""", 1), (
+    """            assertThat(windows.manager.children()).as("a full window holding only a plugin's item (plan 6b restores those)").isEmpty();
             assertThat(windows.events).doesNotContain("show child");
-""", """            List<ChildWindow> children = windows.manager.children();
-            assertThat(children).as("a full window and a pane window, each holding its plugin's tab as a placeholder").hasSize(2);
-            assertThat(children.get(0).content().tabs()).extracting(Tab::id, Tab::kind)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple(document, Tab.Kind.PLACEHOLDER));
-            assertThat(children.get(1).content().isPaneWindow()).isTrue();
-            assertThat(children.get(1).content().tabs()).extracting(Tab::id, Tab::kind)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple(notes, Tab.Kind.PLACEHOLDER));
+""", """            assertThat(windows.manager.children()).as("a full window holding its plugin's item as a placeholder").singleElement()
+                .satisfies(child -> assertThat(child.content().tabs()).extracting(Tab::id, Tab::kind)
+                    .containsExactly(org.assertj.core.groups.Tuple.tuple(document, Tab.Kind.PLACEHOLDER)));
 """, 1)])
 edit(T + "application/JasperApplicationWorkspaceTest.java", [(
     """    @Test void theWarmUpNeverReadsOrWritesTheWorkspace() throws Exception {""",
-    """    @Test void aSavedTabOfAPluginThatDoesNotRunComesBackAsAPlaceholder() throws Exception {
+    """    @Test void aSavedItemOfAPluginThatDoesNotRunComesBackAsAPlaceholder() throws Exception {
         var shell = dev.jasper.app.layout.TabId.random();
         var note = dev.jasper.app.layout.TabId.random();
-        var group = new dev.jasper.app.layout.Group(dev.jasper.app.layout.GroupId.random(), List.of(shell, note), java.util.Optional.of(note));
-        var parent = new dev.jasper.app.layout.ParentTab(dev.jasper.app.layout.ParentTabId.random(),
-            new dev.jasper.app.layout.Layout(group, group.id(), java.util.Optional.empty()));
+        var one = dev.jasper.app.layout.Layout.of(shell);
+        var tab = new dev.jasper.app.layout.ParentTab(dev.jasper.app.layout.ParentTabId.random(), one.split(note, one.activeGroup(), Side.RIGHT));
         WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN,
-            java.util.Optional.empty(), 0, ParentTabs.of(parent),
+            java.util.Optional.empty(), 0, dev.jasper.app.layout.ParentTabs.of(tab),
             java.util.Map.of(shell, new WorkspaceFile.TabRecord.Terminal("", home.toString(), ""),
                 note, new WorkspaceFile.TabRecord.Content("todo.md", "dev.example.notes", "note", java.util.Map.of("name", "todo")))))));
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
                 MainWindow main = application.openFirstWindow(List.of()).orElseThrow();
-                var tab = application.contributions().tabs().tab(note).orElseThrow();
-                assertThat(tab.kind()).isEqualTo(dev.jasper.app.contributions.Tab.Kind.PLACEHOLDER);
-                assertThat(tab.title()).isEqualTo("todo.md");
-                assertThat(tab.window()).isEqualTo(main.id());
+                var item = application.contributions().tabs().tab(note).orElseThrow();
+                assertThat(item.kind()).isEqualTo(dev.jasper.app.contributions.Tab.Kind.PLACEHOLDER);
+                assertThat(item.title()).isEqualTo("todo.md");
+                assertThat(item.window()).isEqualTo(main.id());
             });
             launch();
         } finally {
-            edt(application::quitNow);
-            // Quit's save lands in the temporary home on a virtual thread: it ends before JUnit deletes the home.
-            application.workspaceStore().written().get(5, TimeUnit.SECONDS);
+            quit(application);
         }
     }
 
@@ -2266,7 +2451,7 @@ PY
 
 Run: `./gradlew :jasper-app:compileTestJava`
 Expected: FAIL: `cannot find symbol` for `PlaceholderContent`, `Tab.Kind.PLACEHOLDER`, `PluginState`, `plugins(…)`,
-`standing(…)`, `encodedBytes` and `MAX_BYTES` (not public).
+`standing(…)`, `replaceTab`, `encodedBytes` and `MAX_BYTES` (not public).
 
 - [ ] **Step 3: The placeholder**
 
@@ -2329,7 +2514,6 @@ final class PlaceholderContent extends JPanel implements TabContent {
         NativeStyles.installed().label(reason, Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY, () -> ThemeZone.theme(reason));
         for (JButton button : new JButton[]{retry, close}) {
             button.setName("workspace.placeholder." + button.getText().toLowerCase(java.util.Locale.ROOT));
-            button.setFocusable(false);
             NativeStyles.installed().button(button, () -> ThemeZone.theme(button));
         }
         retry.addActionListener(event -> onRetry.run());
@@ -2367,6 +2551,12 @@ final class PlaceholderContent extends JPanel implements TabContent {
         repaint();
     }
 
+    /** The button the keyboard reaches first, the tab's focus target: Retry while it shows, otherwise Close. */
+    JButton action() { return retry.isVisible() ? retry : close; }
+
+    /** Focuses {@link #action()}, as the tab's focus target does when the tab is focused. */
+    void focusAction() { action().requestFocusInWindow(); }
+
     /** It shows: what it says follows how its plugin stands now. */
     void shown() { onShown.run(); }
 
@@ -2394,11 +2584,12 @@ ledger.add(T + "PluginTabRestoreTest.java", "app.workspace", "PluginTabRestoreTe
 PY
 ```
 
-- [ ] **Step 4: A window restores plugins' tabs**
+- [ ] **Step 4: A window restores plugins' items**
 
-`Tab.Kind` gains `PLACEHOLDER`; a window's restore asks `savedTabs` for each plugin's tab, so it places plugins' tabs
-with its terminal tabs in their saved parent tabs and panes; Retry puts the rebuilt tab in the placeholder's place in
-the pane of whichever parent tab holds it; a placeholder takes the theme as a plugin's tab does:
+`Tab.Kind` gains `PLACEHOLDER`; a window's restore asks `savedTabs` for each plugin's item, so it places plugins' items
+with its terminals in their saved tabs and panes; `Layout.replaceTab` puts another item in a pane in its place, and
+Retry puts the rebuilt item in the placeholder's pane (`WorkspaceView.replace`), in whichever tab holds it, selected; a
+placeholder takes the theme as a plugin's item does:
 
 ```bash
 python3 -I - <<'PY'
@@ -2409,14 +2600,44 @@ edit(A + "contributions/Tab.java", [(
         HOSTED
 """, """        /** A plugin's view. */
         HOSTED,
-        /** A plugin's tab that could not come back when the windows were restored, saying why (workspace tabs spec 9.2). */
+        /** A plugin's item that could not come back when the windows were restored, saying why (workspace tabs spec 9.2). */
         PLACEHOLDER
 """, 1)])
+edit(A + "layout/Layout.java", [(
+    """    /**
+     * Removes {@code tab}, closing it or moving it out, and its pane with it:""",
+    """    /**
+     * Puts {@code by} in {@code tab}'s pane in its place: the pane keeps its id and its weight, and the active pane and
+     * the maximize stay (a placeholder's Retry, workspace plan 6b Rulings 6).
+     *
+     * @param tab a tab of the layout
+     * @param by a tab not in the layout
+     * @return the new layout
+     * @throws IllegalArgumentException when {@code tab} is not in the layout or {@code by} is
+     */
+    public Layout replaceTab(TabId tab, TabId by) {
+        Objects.requireNonNull(by, "by");
+        GroupId group = requireGroupOf(tab);
+        if (contains(by)) throw new IllegalArgumentException("Tab " + by + " is already in the layout");
+        return new Layout(replace(root, group, found -> new Group(found.id(), List.of(by), Optional.of(by))), activeGroup, maximized, recent);
+    }
+
+    /**
+     * Removes {@code tab}, closing it or moving it out, and its pane with it:""", 1)])
 W = A + "workspace/"
 edit(W + "WorkspaceView.java", [(
     """    private void place(Tab tab, Layout next) {""",
-    """    /** Opens {@code tab} at {@code index} of {@code group}, selected: a placeholder's Retry puts the rebuilt tab in its place. */
-    void openAt(Tab tab, GroupId group, int index) { place(tab, layout.open(tab.id(), group, index)); }
+    """    /**
+     * {@code rebuilt} takes {@code placeholder}'s pane in its place, selected: a placeholder's Retry (workspace plan 6b
+     * Rulings 6). The placeholder leaves this workspace; its window closes it.
+     */
+    void replace(Tab placeholder, Tab rebuilt) {
+        if (!contains(placeholder)) return;
+        Layout next = layout.replaceTab(placeholder.id(), rebuilt.id()).select(rebuilt.id());
+        tabs.remove(placeholder.id());
+        tabs.put(rebuilt.id(), rebuilt);
+        apply(next);
+    }
 
     private void place(Tab tab, Layout next) {""", 1)])
 edit(W + "WindowContent.java", [
@@ -2425,15 +2646,15 @@ edit(W + "WindowContent.java", [
 """, """    /** What {@code workspace.toml} saves of this window changed: its layout, or a terminal tab's name or directory (spec 13). */
     Runnable onLayoutChanged = () -> {};
     /**
-     * How a plugin's saved tab comes back in this window (workspace tabs spec 13): its plugin's restorer rebuilds it with
+     * How a plugin's saved item comes back in this window (workspace tabs spec 13): its plugin's restorer rebuilds it with
      * the saved id, else it is a placeholder; empty leaves it out, as closing it would. The window manager gives it.
      */
     java.util.function.BiFunction<TabId, WorkspaceFile.TabRecord.Content, Optional<Tab>> savedTabs = (tabId, saved) -> Optional.empty();
 """, 1),
     ("""            for (TabId saved : record.layout().tabs())
                 if (record.tabs().get(saved) instanceof WorkspaceFile.TabRecord.Terminal terminal) restored.put(saved, restoredTerminal(saved, terminal));
-""", """            // A plugin's tab comes back through its plugin, or as a placeholder (workspace tabs spec 13; workspace plan 6b
-            // Rulings 19): every tab takes its saved parent tab and pane below, terminal tabs and plugins' alike.
+""", """            // A plugin's item comes back through its plugin, or as a placeholder (workspace tabs spec 13; workspace plan 6b
+            // Rulings 19): every item takes its saved tab and pane below, terminals and plugins' items alike.
             for (TabId saved : record.layout().tabs()) {
                 Optional<Tab> tab = switch (record.tabs().get(saved)) {
                     case WorkspaceFile.TabRecord.Terminal terminal -> Optional.of(restoredTerminal(saved, terminal));
@@ -2442,11 +2663,11 @@ edit(W + "WindowContent.java", [
                 tab.ifPresent(found -> restored.put(saved, found));
             }
 """, 1),
-    ("""    /** A saved terminal tab whose shell waits until it first shows (workspace tabs spec 13). */""",
+    ("""    /** A saved terminal whose shell waits until its tab first shows (workspace tabs spec 13). */""",
      """    /**
-     * Retry on a placeholder (workspace tabs spec 9.2): its plugin's restorer runs again, and the tab it opens takes the
-     * placeholder's place in its pane, in whichever parent tab holds it, selected; a placeholder that fails again says
-     * why (workspace plan 6b Rulings 6 and 19).
+     * Retry on a placeholder (workspace tabs spec 9.2): its plugin's restorer runs again, and the item it opens takes the
+     * placeholder's pane, in whichever tab holds it, selected; a placeholder that fails again says why (workspace plan 6b
+     * Rulings 6 and 19).
      */
     void retry(Tab placeholder) {
         if (closed || !(placeholder.content() instanceof PlaceholderContent saved)) return;
@@ -2459,17 +2680,15 @@ edit(W + "WindowContent.java", [
             rebuilt.get().close();
             return;
         }
-        GroupId pane = view.get().model().groupOf(placeholder.id()).orElseThrow();
-        int index = view.get().model().group(pane).orElseThrow().tabs().indexOf(placeholder.id());
         Runnable replace = () -> {
             mount(rebuilt.get());
-            view.get().openAt(rebuilt.get(), pane, index);
+            view.get().replace(placeholder, rebuilt.get());
             placeholder.close();
         };
         if (terminals != null) terminals.atomically(replace); else replace.run();
     }
 
-    /** A saved terminal tab whose shell waits until it first shows (workspace tabs spec 13). */""", 1),
+    /** A saved terminal whose shell waits until its tab first shows (workspace tabs spec 13). */""", 1),
     ("            if (tab.kind() == Tab.Kind.HOSTED) WorkspaceTheme.apply(tab.component(), theme, () -> tabListeners.containsKey(tab));",
      "            if (tab.kind() != Tab.Kind.TERMINAL) WorkspaceTheme.apply(tab.component(), theme, () -> tabListeners.containsKey(tab));", 1)])
 PY
@@ -2477,9 +2696,9 @@ PY
 
 - [ ] **Step 5: The window manager saves and rebuilds them**
 
-The snapshot saves a plugin's tab, content or session, while its plugin restores that kind, and a placeholder as it was
-saved; an app-owned tab never, going or coming; a snapshot too large for the codec's limit leaves out tabs, plugins'
-first and largest first, as closing them would (`WorkspaceFile.keeping`). `savedTab` rebuilds through the registry or
+The snapshot saves a plugin's item, content or session, while its plugin restores that kind, and a placeholder as it
+was saved; an app-owned item never, going or coming; a snapshot too large for the codec's limit leaves out items,
+plugins' first and largest first, as closing them would (`WorkspaceFile.keeping`: a tab its only item leaves goes). `savedTab` rebuilds through the registry or
 makes the placeholder, whose Retry and Close find the window that holds it when pressed and which asks how its plugin
 stands whenever it shows and on Retry; a restore state that changes is saved as a layout change is; the application says
 how each plugin stands:
@@ -2495,8 +2714,8 @@ edit(A + "persistence/WorkspaceFile.java", [
      """    /** The largest file read, in bytes: {@code ui-state.toml}'s cap (workspace plan 2, Rulings 15); a larger one is set aside. */
     public static final int MAX_BYTES = 256 * 1024;""", 1),
     ("""    /**
-     * The file's text: the windows in order; a main or full window's parent tabs in bar order, each with its nodes parents
-     * first, or a pane window's origin and nodes; then the window's tabs in window order.
+     * The file's text: the windows in order; each window's tabs in strip order, each with its nodes, parents first; then
+     * the window's items in window order.
      */
     static String encode(Snapshot snapshot) {""",
      """    /**
@@ -2511,8 +2730,8 @@ edit(A + "persistence/WorkspaceFile.java", [
     }
 
     /**
-     * The file's text: the windows in order; a main or full window's parent tabs in bar order, each with its nodes parents
-     * first, or a pane window's origin and nodes; then the window's tabs in window order.
+     * The file's text: the windows in order; each window's tabs in strip order, each with its nodes, parents first; then
+     * the window's items in window order.
      */
     static String encode(Snapshot snapshot) {""", 1)])
 M = A + "workspace/WindowManager.java"
@@ -2554,6 +2773,8 @@ edit(M, [
     private WorkspaceStore store;
     /** How each plugin stands, by id: without the application's answer, none is installed. */
     private Function<String, PluginState> plugins = id -> new PluginState(id, PluginState.Kind.NOT_INSTALLED);
+    /** The items the size limit has left out of a save so far, each logged once (workspace plan 6b Rulings 16). */
+    private final java.util.Set<TabId> leftOut = new java.util.HashSet<>();
 """, 1),
     ("""        model.panelRoute(this::routePanel);
     }
@@ -2579,19 +2800,19 @@ edit(M, [
                 : Optional.of(savedTab(content, tabId, saved));
             if (!prepare.test(window)) {""", 1),
     ("""        var records = new ArrayList<WorkspaceFile.WindowRecord>();
-        for (JasperWindow window : windows()) windowRecord(window).ifPresent(records::add);
+        for (JasperWindow window : windows()) if (!window.content().closed()) windowRecord(window).ifPresent(records::add);
         return Optional.of(new WorkspaceFile.Snapshot(records));
     }
 """, """        var records = new ArrayList<WorkspaceFile.WindowRecord>();
-        for (JasperWindow window : windows()) windowRecord(window).ifPresent(records::add);
+        for (JasperWindow window : windows()) if (!window.content().closed()) windowRecord(window).ifPresent(records::add);
         return Optional.of(fitted(records));
     }
 
     /**
-     * The windows as {@code records} save them, with tabs taken out until the file fits {@link WorkspaceFile#MAX_BYTES}, which
-     * a read would otherwise set aside (workspace plan 6b Rulings 16): plugins' tabs first, the largest first, then terminal
-     * tabs; each is logged, and taken out as closing it would (Rulings 21): a parent tab left with none goes, and a child
-     * window left with none is left out.
+     * The windows as {@code records} save them, with items taken out until the file fits {@link WorkspaceFile#MAX_BYTES},
+     * which a read would otherwise set aside (workspace plan 6b Rulings 16): plugins' items first, the largest first, then
+     * terminals; each is logged the first time, not at every save, and taken out as closing it would (Rulings 21): a tab
+     * left with none goes, and a full window left with none is left out.
      */
     private WorkspaceFile.Snapshot fitted(List<WorkspaceFile.WindowRecord> records) {
         var windows = new ArrayList<>(records);
@@ -2612,9 +2833,9 @@ edit(M, [
             if (largest == null) break;
             WorkspaceFile.WindowRecord window = windows.get(holder);
             TabId out = largest;
-            LOG.log(System.Logger.Level.WARNING, "Not saving the tab " + window.tabs().get(out).title()
+            if (leftOut.add(out)) LOG.log(System.Logger.Level.WARNING, "Not saving the tab " + window.tabs().get(out).title()
                 + ": the saved windows would pass workspace.toml's size limit");
-            Optional<WindowLayout> kept = WorkspaceFile.keeping(window.layout(), tab -> !tab.equals(out), window.role() == WorkspaceFile.Role.MAIN);
+            Optional<ParentTabs> kept = WorkspaceFile.keeping(window.layout(), tab -> !tab.equals(out), window.role() == WorkspaceFile.Role.MAIN);
             var tabs = new HashMap<>(window.tabs());
             tabs.remove(out);
             if (kept.isEmpty()) windows.remove(holder);
@@ -2689,6 +2910,8 @@ edit(M, [
             () -> window(tab[0].window()).ifPresent(holder -> holder.content().closeTab(tab[0])), () -> standing(tab[0]));
         tab[0] = model.tabs().add(id, Tab.Kind.PLACEHOLDER, placeholder, content.id());
         tab[0].presentation(saved.title(), "", null, false, "", "");
+        // Focusing the tab from the keyboard reaches its action: Retry while it shows, otherwise Close.
+        tab[0].focusTarget(placeholder::focusAction);
         return tab[0];
     }
 
@@ -2785,26 +3008,26 @@ PY
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.application.JasperApplicationWorkspaceTest' --tests 'dev.jasper.app.plugins.PluginRuntimeTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.application.JasperApplicationWorkspaceTest' --tests 'dev.jasper.app.plugins.PluginRuntimeTest' --tests 'dev.jasper.app.layout.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
 Expected: PASS: `PluginTabRestoreTest`'s eleven cases, `WorkspaceRestoreTest` with its renamed case, the new
-`JasperApplicationWorkspaceTest` case, `PluginRuntimeTest` and the ledger's test; every other workspace test as
-before.
+`JasperApplicationWorkspaceTest` case, `LayoutOperationsTest.replaceTabPutsAnotherTabInTheSamePane`, `PluginRuntimeTest`
+and the ledger's test; every other workspace test as before.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add -A jasper-app docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
-Workspace tabs: plugins' tabs come back, or a placeholder says why
+Workspace tabs: plugins' items come back, or a placeholder says why
 
-A plugin's tab is saved while its plugin restores that kind and is
-rebuilt by the plugin's restorer in its saved parent tab and pane, in
-the main, a full or a pane window. A tab whose plugin does not run, or
-whose restorer declines or fails, comes back as a placeholder that says
-why, with Close and, while the plugin runs, Retry, in whatever window
-holds it; it is saved again as it was. Jasper's own tabs are neither
-saved nor restored, and a workspace too large to read back leaves out
-plugins' tabs.
+A plugin's item is saved while its plugin restores that kind and is
+rebuilt by the plugin's restorer in its saved tab and pane, in the main
+window or a full window. An item whose plugin does not run, or whose
+restorer declines or fails, comes back as a placeholder in its pane that
+says why, with Close and, while the plugin runs, Retry, which puts the
+item in that pane, in whatever window holds it; it is saved again as it
+was. Jasper's own items are neither saved nor restored, and a workspace
+too large to read back leaves out plugins' items.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -2820,14 +3043,16 @@ Spec 13: "the Editor reopens files (an unsaved untitled buffer is not kept)". A 
 (`document` restorer, Rulings 8); the restorer reopens it through the same reopeners Recent Files uses, local files
 itself and other plugins' documents (Remote's `remote:`) through theirs. A document on another host waits until its tab
 is first active or Load is pressed and then reads asking nothing; a key nothing opens declines with why (Rulings 5),
-saying whether no running plugin handles its prefix or its file can no longer be opened (Rulings 31). A tab is active
-while it is the selected tab of the active pane of its window's shown parent tab (fact 5), so a remote
-document restored in a hidden parent tab reads once that parent tab shows it.
+saying whether no running plugin handles its prefix or its file can no longer be opened (Rulings 31 and 50); a local
+file deleted since comes back as a failed read with Retry, keeping its restore state (Rulings 47). A document
+comes back in its saved tab and pane whether it opened as a tab of its own or as a pane beside another (Rulings 38). A
+tab is active while it is the active pane's item of its window's shown tab (fact 5), so a remote document restored in a
+hidden tab reads once that tab shows it.
 
 **Files:**
 - Modify: `plugins/editor/src/main/java/dev/jasper/editor/ui/EditorWindow.java`, `ui/EditorTab.java`,
   `session/DocumentSession.java`, `api/EditorDocument.java`, `recent/Reopeners.java`, `EditorPlugin.java`,
-  `src/main/resources/plugin.toml` (0.11.0 to 0.12.0, Rulings 18)
+  `src/main/resources/plugin.toml` (0.12.0 to 0.13.0, Rulings 37)
 - Test: `plugins/editor/src/test/java/dev/jasper/editor/EditorPluginTest.java`, `ui/EditorTabTest.java`
 
 **Interfaces:**
@@ -2867,7 +3092,7 @@ edit("plugins/editor/src/test/java/dev/jasper/editor/EditorPluginTest.java", [(
             var back = host.contentTab("dev.jasper.editor", "notes.md").orElseThrow();
             assertThat(back.window().id()).isEqualTo(main);
             assertThat(host.restoreState(back)).contains(state);
-            assertThat(host.invoke("dev.jasper.editor.new", main, null)).isTrue();
+            assertThat(host.invoke("dev.jasper.editor.new_editor_tab", main, null)).isTrue();
             var untitled = host.contentTabs().stream().filter(open -> host.contentPresentation(open).title().startsWith("Untitled"))
                 .findFirst().orElseThrow();
             assertThat(host.restoreState(untitled)).as("an unsaved untitled buffer is not kept").isEmpty();
@@ -2881,6 +3106,30 @@ edit("plugins/editor/src/test/java/dev/jasper/editor/EditorPluginTest.java", [(
                 "dev.jasper.editor document: no running plugin opens remote: documents",
                 "dev.jasper.editor document: its file can no longer be opened");
             assertThat(host.failures()).as("expected outcomes, no failure").isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b's review: a local file deleted since its tab was saved comes back as a failed read with Retry, and
+     * keeps its restore state, so it comes back again while it stays open.
+     */
+    @Test void aDeletedLocalFileComesBackAsAFailedReadWithRetry() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow();
+            Path gone = home.resolve("gone.md");
+            var state = dev.jasper.sdk.RestoreState.of("document", "key", "local:" + gone.toAbsolutePath().normalize());
+            assertThat(host.restoreTab("dev.jasper.editor", main, "gone.md", state)).isPresent();
+            drain(host);
+            var tab = host.contentTab("dev.jasper.editor", "gone.md").orElseThrow();
+            var retry = dev.jasper.editor.testsupport.Kits.button(host.contentView("dev.jasper.editor", "gone.md").orElseThrow(), "document.retry");
+            assertThat(retry.state().visible()).as("a failed read, with Retry").isTrue();
+            assertThat(host.restoreState(tab)).contains(state);
+            assertThat(host.declinedRestores()).isEmpty();
+            assertThat(host.restoreTab("dev.jasper.editor", main, "notes", dev.jasper.sdk.RestoreState.of("document", "key", "notes")))
+                .as("a key with no prefix").isEmpty();
+            assertThat(host.declinedRestores()).containsExactly("dev.jasper.editor document: no running plugin opens this document");
+            assertThat(host.failures()).isEmpty();
         }
     }
 
@@ -2945,7 +3194,7 @@ edit("plugins/editor/src/test/java/dev/jasper/editor/ui/EditorTabTest.java", [(
             @Override public Optional<String> host() { return Optional.of("box"); }
             @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> read(long limitBytes) {
                 loud.incrementAndGet();
-                return java.util.concurrent.CompletableFuture.completedFuture(new dev.jasper.editor.api.Content("hi\n".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                return java.util.concurrent.CompletableFuture.completedFuture(new dev.jasper.editor.api.Content("hi\\n".getBytes(java.nio.charset.StandardCharsets.UTF_8),
                     new dev.jasper.editor.api.Revision(1, 3)));
             }
             @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> readQuietly(long limitBytes) {
@@ -2984,8 +3233,8 @@ PY
 - [ ] **Step 2: Run it to verify it fails**
 
 Run: `./gradlew :jasper-plugin-editor:test --tests 'dev.jasper.editor.EditorPluginTest'`
-Expected: FAIL: `cannot find symbol` for `readQuietly`, `defer()` and `declinedRestores` (the Editor's tests compile
-against Task 1's testkit), then, once compiled, the document's tab gives no restore state.
+Expected: FAIL: `cannot find symbol` for `readQuietly` and `defer()` (the Editor's tests compile against Task 1's
+testkit, which has `restoreTab` and `declinedRestores`).
 
 - [ ] **Step 3: The document's restore state and the restorer**
 
@@ -3002,11 +3251,9 @@ E = "plugins/editor/src/main/java/dev/jasper/editor/"
 W = E + "ui/EditorWindow.java"
 edit(W, [
     ("""public final class EditorWindow {
-    private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment");
 """, """public final class EditorWindow {
     /** The restorer kind of a document tab, and the key its restore state names the document by (workspace tabs spec 13). */
     public static final String RESTORE_KIND = "document", RESTORE_KEY = "key";
-    private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment");
 """, 1),
     ("""        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab.view(), placement);""",
      """        var spec = new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name());
@@ -3061,8 +3308,9 @@ edit(E + "EditorPlugin.java", [
             String key = request.state().values().getOrDefault(EditorWindow.RESTORE_KEY, "");
             var document = reopeners.resolve(key);
             // Which miss it is (workspace plan 6b Rulings 31): no running plugin for the key's prefix, or its file is gone.
+            int prefix = key.indexOf(':');
             if (document.isEmpty()) return Optional.of(reopeners.handles(key) ? "its file can no longer be opened"
-                : "no running plugin opens " + key.substring(0, key.indexOf(':') + 1) + " documents");
+                : prefix < 1 ? "no running plugin opens this document" : "no running plugin opens " + key.substring(0, prefix + 1) + " documents");
             return window().openRestored(document.get().apply(request.window()), request.window())
                 ? Optional.empty() : Optional.of("the file is open in another tab");
         });
@@ -3081,7 +3329,7 @@ edit(E + "recent/Reopeners.java", [(
 
     /**
      * @param listener runs when a registration is added or removed""", 1)])
-edit("plugins/editor/src/main/resources/plugin.toml", [('version = "0.11.0"', 'version = "0.12.0"', 1)])
+edit("plugins/editor/src/main/resources/plugin.toml", [('version = "0.12.0"', 'version = "0.13.0"', 1)])
 # The Editor's API: a read that asks nothing, which a restored remote document uses first.
 E2 = "plugins/editor/src/main/java/dev/jasper/editor/"
 edit(E2 + "api/EditorDocument.java", [(
@@ -3162,7 +3410,7 @@ Workspace tabs: the Editor reopens its files
 A document's tab is saved with its document's key, and the Editor's
 restorer reopens it as Recent Files does; a document on another host
 waits until its tab is first active and then reads asking nothing. An
-untitled document that was never saved is not kept. Editor 0.12.0.
+untitled document that was never saved is not kept. Editor 0.13.0.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -3176,21 +3424,25 @@ EOF
 
 Spec 13: "Remote chooses between reconnecting and a Reconnect state". An SSH tab's session carries its host, the host's
 name and its folder (`ssh` restorer); the restored tab waits until it is first shown, as every restored terminal tab
-does, and then Remote reconnects when signing in asks nothing, after any connection in progress in its window, and
-otherwise leaves it not connected with Reconnect; a missing host declines (Rulings 9). An SSH tab restored in a hidden
-parent tab, or behind another tab of its pane, waits until it shows there (plan 6a Rulings 4). The pane says Reconnect
+does, and then Remote reconnects when the SSH agent signs in every host on its route, after any connection in progress
+in its window, and otherwise (a Vault login, locked or not, which may ask the Vault for a grant) leaves it not connected
+with Reconnect, asking the Vault for nothing; a missing host declines (Rulings 9 and 43). An SSH tab restored in a hidden
+tab waits until that tab shows (plan 6a Rulings 37), and picking its host meanwhile shows it rather than opening a
+second (Rulings 41). The pane says Reconnect
 rather than Retry for a restored session (Rulings 13). Remote's remote documents reopen before its hosts have loaded and
-read quietly only when signing in asks nothing (Rulings 17). Both are quiet (Rulings 29): while a restored tab's first
+read quietly only over an open connection or the agent (Rulings 17 and 43). Both are quiet (Rulings 29): while a restored tab's first
 connect, or a restored document's quiet read, runs in a window, a host-key question there is answered Cancel, as a host
 accepted "Once" is unknown again at the next start, and a quiet connect that fails closes its overlay and leaves the tab
-Not connected with Reconnect; Reconnect and Retry ask as usual. A restored tab cancelled while it waits for its window's
-connection passes its turn on.
+Not connected, saying why (Rulings 45), with Reconnect; Reconnect and Retry ask as usual (the test asks the question while the connect waits on the
+fake's background executor, Rulings 36). A restored tab cancelled while it waits for its window's connection passes its
+turn on, and Cancel on a restored session's first connect keeps its pane, with Reconnect (Rulings 44). The tests sign in
+through the `FakeAgent` of Remote's tests wherever a restored tab must connect.
 
 **Files:**
 - Create: `plugins/remote/src/main/java/dev/jasper/remote/edit/SavedRemoteDocument.java`
 - Modify: `plugins/remote/src/main/java/dev/jasper/remote/RemotePlugin.java`, `edit/RemoteEditing.java`,
   `edit/RemoteDocument.java`, `edit/EditChannels.java`, `edit/package-info.java`, `src/main/resources/plugin.toml` (0.15.0
-  to 0.16.0, Rulings 18); `jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java`; `AGENTS.md` (Remote's
+  to 0.16.0, Rulings 37); `jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java`; `AGENTS.md` (Remote's
   Editor API names)
 - Test: `plugins/remote/src/test/java/dev/jasper/remote/RemotePluginTest.java`, `edit/RemoteEditingTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/workspace/SessionPaneTest.java`
@@ -3199,7 +3451,8 @@ connection passes its turn on.
 - Consumes: Task 1's `SessionSpec.withRestore`, `Windows.restorer`, `RestoreRequest`, `RestoreState`; plan 6a's
   `TerminalPane.restored()`.
 - Produces: `RemotePlugin.SSH_TAB` (`"ssh"`); package `static RestoreState RemotePlugin.sshTab(UUID hostId, String name,
-  Optional<String> folder)` and `Optional<String> restoreHost(RestoreRequest)`; `public RemoteEditing(Editor,
+  Optional<String> folder)`, `Optional<String> restoreHost(RestoreRequest)` and its private `restoredPanes` (a restored
+  SSH tab's pane and host until its session attaches), which `activateHost` reads; `public RemoteEditing(Editor,
   EditChannels, Supplier<Optional<WindowHandle>>, NotificationGroup, Function<UUID, Optional<RemoteHost>>,
   Supplier<CompletableFuture<Void>> hostsLoaded, Executor ui, Predicate<ConnectionIdentity> silent)`; `public
   RemoteDocument(ConnectionIdentity, String, EditChannels, Supplier<Optional<WindowHandle>>, Predicate<ConnectionIdentity>
@@ -3217,18 +3470,34 @@ python3 -I - <<'PY'
 import sys; sys.path.insert(0, "build/plan6b"); from edits import edit
 edit("plugins/remote/src/test/java/dev/jasper/remote/RemotePluginTest.java", [(
     """    @Test void renamesDefaultGroupThroughThePanel(@TempDir Path dir) throws Exception {""",
-    """    /**
+    """    /** An SSH agent holding one RSA key, which {@code server} accepts. */
+    private static dev.jasper.remote.agent.FakeAgent agent(LoopbackServer server) throws Exception {
+        var generator = java.security.KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        var pair = generator.generateKeyPair();
+        server.allow(pair.getPublic());
+        return new dev.jasper.remote.agent.FakeAgent(pair);
+    }
+
+    /** {@link #plugin(Path)}, signing in through {@code agent} as the SSH agent. */
+    RemotePlugin plugin(Path sshDir, dev.jasper.remote.agent.FakeAgent agent) {
+        return new TestRemotePlugin(Kits.UI, context -> Optional.of(new dev.jasper.remote.agent.AgentClient(agent::handle)),
+            (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
+    }
+
+    /**
      * Workspace tabs spec 13: an SSH tab gives its host and comes back through Remote's restorer, waiting until it is
-     * shown; then not connected while signing in would ask (the Vault is locked), and connected when nothing has to be
-     * asked. A state naming no host declines, which is no failure.
+     * shown; then not connected while signing in would ask (a Vault login), and connected when nothing has to be asked
+     * (the SSH agent, workspace plan 6b Rulings 9). A state naming no host declines, which is no failure.
      */
     @Test void anSshTabComesBackAndConnectsOnlyWhenSigningInAsksNothing(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
-            var plugin = plugin(dir);
+            var plugin = plugin(dir, agent(server));
             var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
             var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(vault.password("p", "deploy", "s3cret")), "", Optional.empty());
-            plugin.store().put(saved); settle(host);
+            var signed = RemoteHost.create("build", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(saved); plugin.store().put(signed); settle(host);
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
             UUID window = host.addTerminalWindow();
             Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), saved)); settle(host);
@@ -3251,12 +3520,14 @@ edit("plugins/remote/src/test/java/dev/jasper/remote/RemotePluginTest.java", [(
             Kits.edt(() -> host.reconnectSession(waiting)); settle(host);
             assertThat(host.sessionState(waiting)).isEqualTo("RUNNING|");
 
-            Optional<UUID> unlocked = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state));
+            // The SSH agent signs in asking nothing: restored, its tab connects once it is first shown.
+            var agentState = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", signed.id().toString(), "name", "build"));
+            Optional<UUID> alone = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "build", agentState));
             settle(host);
-            UUID connected = Kits.value(() -> context.terminals().tab(unlocked.orElseThrow()).orElseThrow().terminal().orElseThrow().id());
+            UUID connected = Kits.value(() -> context.terminals().tab(alone.orElseThrow()).orElseThrow().terminal().orElseThrow().id());
             Kits.edt(() -> host.focusTerminalPane(connected));
             Kits.await(host, () -> host.sessionState(connected).equals("RUNNING|"), "the restored tab to connect");
-            assertThat(Kits.value(() -> host.restoreState(unlocked.get()))).contains(state);
+            assertThat(Kits.value(() -> host.restoreState(alone.get()))).contains(agentState);
 
             assertThat(Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "gone",
                 new dev.jasper.sdk.RestoreState("ssh", Map.of("host", "not-a-host"))))).isEmpty();
@@ -3267,13 +3538,66 @@ edit("plugins/remote/src/test/java/dev/jasper/remote/RemotePluginTest.java", [(
         }
     }
 
-    /** Workspace tabs spec 13: restored SSH tabs shown together in one window connect one after another, none refused. */
-    @Test void restoredSshTabsShownTogetherInOneWindowAllConnect(@TempDir Path dir) throws Exception {
+    /**
+     * Workspace plan 6b Rulings 9: a Vault login never signs in alone at restore, even while the Vault is unlocked, since
+     * the Vault may ask to grant Remote the credential: the restored tab asks for none and offers Reconnect, which signs in.
+     */
+    @Test void aVaultSignedSshTabRestoredWhileTheVaultIsUnlockedAsksForNoCredentialAndOffersReconnect(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
             var plugin = plugin(dir);
             var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
-            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(vault.password("p", "deploy", "s3cret")), "", Optional.empty());
+            UUID login = vault.password("p", "deploy", "s3cret");
+            var secret = vault.secrets.get(login);
+            var asked = new java.util.concurrent.atomic.AtomicInteger();
+            vault.secrets.put(login, () -> { asked.incrementAndGet(); return secret.get(); });
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(login), "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            assertThat(vault.state).isEqualTo(dev.jasper.vault.api.LockState.UNLOCKED);
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> host.focusTerminalPane(pane));
+            Kits.await(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the restored tab to decide");
+            assertThat(host.sessionState(pane)).isEqualTo("EXITED|Not connected: Reconnect to sign in");
+            assertThat(asked).as("no credential asked for at restore").hasValue(0);
+            assertThat(host.windows()).as("nothing asks at restore").isEmpty();
+            Kits.edt(() -> host.reconnectSession(pane)); settle(host);
+            assertThat(host.sessionState(pane)).as("Reconnect signs in through the Vault").isEqualTo("RUNNING|");
+            assertThat(asked.get()).isPositive();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace plan 6b's review: a restored tab's quiet connect that fails says why, asks nothing and offers Reconnect. */
+    @Test void aQuietConnectThatFailsSaysWhyAndOffersReconnect(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var plugin = plugin(dir, new dev.jasper.remote.agent.FakeAgent());
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> host.focusTerminalPane(pane));
+            Kits.await(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the quiet connect to fail");
+            assertThat(host.sessionState(pane)).as("why, with Reconnect").startsWith("EXITED|Not connected: ").contains("no usable keys");
+            assertThat(host.windows()).as("its overlay closed, nothing asked").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace tabs spec 13: restored SSH tabs shown together in one window connect one after another, none refused. */
+    @Test void restoredSshTabsShownTogetherInOneWindowAllConnect(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
             plugin.store().put(saved); settle(host);
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
             UUID window = host.addTerminalWindow();
@@ -3296,24 +3620,34 @@ edit("plugins/remote/src/test/java/dev/jasper/remote/RemotePluginTest.java", [(
     @Test void aRestoredSshTabWhoseHostKeyIsUnknownAsksNothingAndOffersReconnect(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
-            var plugin = plugin(dir);
+            var plugin = plugin(dir, agent(server));
             var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
-            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(vault.password("p", "deploy", "s3cret")), "", Optional.empty());
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
             plugin.store().put(saved); settle(host);
             UUID window = host.addTerminalWindow();
             var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
             UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
             UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
-            Kits.edt(() -> host.focusTerminalPane(pane));
-            Kits.await(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the quiet connect to end");
-            assertThat(host.sessionState(pane)).isEqualTo("EXITED|Not connected: Reconnect to sign in");
-            assertThat(host.windows()).as("no host-key question asked, the overlay closed").isEmpty();
-            Kits.edt(() -> host.reconnectSession(pane));
-            Kits.await(host, () -> host.windows().stream().anyMatch(line -> line.startsWith("dialog|Verify host key")),
-                "Reconnect to ask as usual");
-            Kits.edt(() -> host.requestClose("dialog"));
-            settle(host);
-            Kits.edt(() -> cancel(plugin.currentConnectionPanel()));
+            // The host's key is unknown: the question it raises mid-handshake is the one asked here. The fake's background
+            // work is left queued, so each connect stays in progress while its question is asked.
+            var question = new HostKeyVerifier.Question("127.0.0.1", server.port(), "ssh-ed25519", "SHA256:unknown");
+            Kits.edt(() -> {
+                host.focusTerminalPane(pane);
+                assertThat(host.windows()).as("its first connect runs").containsExactly("overlay|Connecting to prod|true");
+                var asked = plugin.askHostKey(context.terminals().window(window).orElseThrow(), question);
+                assertThat(asked).as("a quiet connect runs there: Cancel, unasked").isCompletedWithValue(HostKeyVerifier.Decision.CANCEL);
+                assertThat(host.windows()).as("no host-key question shown").containsExactly("overlay|Connecting to prod|true");
+                // The handshake fails on that Cancel: the quiet connect closes its overlay and leaves Reconnect.
+                cancel(plugin.currentConnectionPanel());
+                assertThat(host.sessionState(pane)).isEqualTo("EXITED|Not connected: Reconnect to sign in");
+                assertThat(host.windows()).as("the overlay closed").isEmpty();
+                host.reconnectSession(pane);
+                var again = plugin.askHostKey(context.terminals().window(window).orElseThrow(), question);
+                assertThat(host.windows()).as("Reconnect asks as usual").contains("dialog|Verify host key 127.0.0.1|true");
+                host.requestClose("dialog");
+                assertThat(again).isCompletedWithValue(HostKeyVerifier.Decision.CANCEL);
+                cancel(plugin.currentConnectionPanel());
+            });
             assertThat(host.failures()).isEmpty();
         }
     }
@@ -3322,9 +3656,9 @@ edit("plugins/remote/src/test/java/dev/jasper/remote/RemotePluginTest.java", [(
     @Test void aRestoredSshTabClosedWhileItWaitsPassesItsTurnOn(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
-            var plugin = plugin(dir);
+            var plugin = plugin(dir, agent(server));
             var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
-            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(vault.password("p", "deploy", "s3cret")), "", Optional.empty());
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
             plugin.store().put(saved); settle(host);
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
             UUID window = host.addTerminalWindow();
@@ -3340,6 +3674,30 @@ edit("plugins/remote/src/test/java/dev/jasper/remote/RemotePluginTest.java", [(
             Kits.edt(() -> host.closeTerminalPane(one));
             Kits.edt(() -> cancel(plugin.currentConnectionPanel()));
             Kits.await(host, () -> host.sessionState(two).equals("RUNNING|"), "the second waiting tab to connect");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6a Task 1's hand-off (Rulings 41): picking a host whose restored SSH tab still waits to be shown,
+     * NOT_STARTED, shows that tab, which then decides how to connect, instead of opening a second one.
+     */
+    @Test void activatingAHostShowsItsRestoredTabThatWaitsToBeShown(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(vault.password("p", "deploy", "s3cret")), "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", saved.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            assertThat(host.sessionState(pane)).isEqualTo("NOT_STARTED|");
+            Kits.edt(() -> plugin.activateHost(context.terminals().window(window).orElseThrow(), saved));
+            Kits.await(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the shown tab to decide");
+            assertThat(host.terminalPanes()).as("no second tab for the host").containsExactly(pane);
+            assertThat(host.sessionState(pane)).as("shown, it decides as any restored tab").startsWith("EXITED|Not connected");
             assertThat(host.failures()).isEmpty();
         }
     }
@@ -3428,6 +3786,27 @@ edit("jasper-app/src/test/java/dev/jasper/app/workspace/SessionPaneTest.java", [
         });
     }
 
+    /** Workspace plan 6b's review: cancelling a restored session's first connect keeps its pane, which offers Reconnect. */
+    @Test void cancellingARestoredSessionsFirstConnectKeepsItsPaneWithReconnect() throws Exception {
+        int[] closes = new int[1];
+        edt(() -> {
+            var request = new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run);
+            pane = new TerminalPane(HOME, launcher(new ArrayDeque<>()), request);
+            pane.onClose = () -> closes[0]++;
+            pane.restored();
+            pane.start();
+        });
+        edt(() -> {
+            assertThat(pane.noticeSecondary().getText()).isEqualTo("Cancel");
+            pane.noticeSecondary().doClick();
+            assertThat(attempts.get(0).isCancelled()).isTrue();
+            assertThat(closes[0]).as("its pane stays").isZero();
+            assertThat(pane.noticeText()).isEqualTo("Connection cancelled");
+            assertThat(pane.noticePrimary().getText()).isEqualTo("Reconnect");
+            pane.close();
+        });
+    }
+
     @Test void aFailedTransportSaysWhyAndClosePaneOnExitClosesIt() throws Exception {""", 1)])
 PY
 ```
@@ -3436,12 +3815,15 @@ PY
 
 Run: `./gradlew :jasper-plugin-remote:test --tests 'dev.jasper.remote.RemotePluginTest' --tests 'dev.jasper.remote.edit.RemoteEditingTest' :jasper-app:test --tests 'dev.jasper.app.workspace.SessionPaneTest' --continue`
 Expected: FAIL: `cannot find symbol` for the eight-argument `RemoteEditing`, then the SSH tab gives no restore state,
-the restored pane offers Retry, and a restored tab with an unknown host key asks about it.
+the restored pane offers Retry, a host-key question during a restored tab's first connect shows its dialog, and picking
+a host whose restored tab waits opens a second tab; `SessionPaneTest.cancellingARestoredSessionsFirstConnectKeepsItsPaneWithReconnect`
+fails (`[its pane stays] expected: 0 but was: 1`).
 
 - [ ] **Step 3: The SSH tab's restore state, the restorer and Reconnect**
 
-The restorer declines a missing host, waits for the tab to show, and connects one restored tab at a time per window;
-Remote's editing gets the hosts' loading, the UI thread and the silent sign-in test:
+The restorer declines a missing host, waits for the tab to show, and connects one restored tab at a time per window
+when the SSH agent signs it in; a quiet connect that fails says why; `activateHost` shows a restored tab of the host that
+still waits; Remote's editing gets the hosts' loading, the UI thread and the silent sign-in test:
 
 ```bash
 python3 -I - <<'PY'
@@ -3460,7 +3842,9 @@ edit(R, [
      "    /** Restored SSH tabs waiting, per window, for the connection in progress there (workspace tabs spec 13). */\n"
      "    private final Map<UUID, java.util.ArrayDeque<Runnable>> waitingConnects = new HashMap<>();\n"
      "    /** Windows where a restored document's quiet read opens its channel, how many: their host-key questions answer Cancel. */\n"
-     "    private final Map<UUID, Integer> quietWindows = new HashMap<>();\n", 1),
+     "    private final Map<UUID, Integer> quietWindows = new HashMap<>();\n"
+     "    /** Restored SSH tabs' panes and their hosts, until their session attaches (workspace plan 6b Rulings 41). */\n"
+     "    private final Map<UUID, UUID> restoredPanes = new HashMap<>();\n", 1),
     ("""        context.palette().register(scope);
 """, """        context.palette().register(scope);
         // Workspace tabs spec 13: an SSH tab saved with the workspace comes back to its host and folder.
@@ -3472,6 +3856,17 @@ edit(R, [
             });""", """                if (first == null) connect(pending, host.id(), folder);
                 else ui.execute(() -> attach(pending, first));
             }).withRestore(sshTab(host.id(), host.name(), folder));""", 1),
+    ("""    void activateHost(WindowHandle window, RemoteHost host) {
+        for (UUID id : recentPanes.sequencedKeySet().reversed()) {""", """    void activateHost(WindowHandle window, RemoteHost host) {
+        // A restored tab of the host that still waits to be shown, NOT_STARTED, shows: it then connects, or offers
+        // Reconnect, as every restored SSH tab does (workspace plan 6a Task 1's hand-off; Rulings 41).
+        restoredPanes.keySet().removeIf(id -> context.terminals().pane(id).isEmpty());
+        for (var entry : restoredPanes.entrySet()) {
+            if (!host.id().equals(entry.getValue())) continue;
+            var pane = context.terminals().pane(entry.getKey());
+            if (pane.isPresent() && pane.get().info().state() == dev.jasper.sdk.terminal.SessionState.NOT_STARTED) { pane.get().focus(); return; }
+        }
+        for (UUID id : recentPanes.sequencedKeySet().reversed()) {""", 1),
     ("""    void activateHost(WindowHandle window, RemoteHost host) {""",
      """    /** How an SSH tab comes back (workspace tabs spec 13): its saved host, that host's name for its title, and its folder. */
     static dev.jasper.sdk.RestoreState sshTab(UUID hostId, String name, Optional<String> folder) {
@@ -3485,9 +3880,9 @@ edit(R, [
     /**
      * Opens a saved SSH tab again (workspace tabs spec 13), waiting, as every restored terminal tab does, until it is first
      * shown. Then Remote chooses: it reconnects when every host on the route signs in with nothing to ask (through the SSH
-     * agent, or the Vault while it is unlocked), after any connection already in progress in that window, and otherwise
-     * leaves the tab not connected with Reconnect, so restoring windows never asks for a password before the user does. A
-     * state that names no host, or a host gone from the saved hosts once they have loaded, declines.
+     * agent), after any connection already in progress in that window, and otherwise leaves the tab not connected with
+     * Reconnect, so restoring windows never asks for a password, or the Vault for a grant, before the user does. A state
+     * that names no host, or a host gone from the saved hosts once they have loaded, declines.
      *
      * @return empty once the tab is open; else why it does not come back
      */
@@ -3512,7 +3907,7 @@ edit(R, [
                 else pending.fail("Not connected: Reconnect to sign in");
             }));
         }).withRestore(sshTab(hostId, name, folder));
-        context.terminals().openTab(request.window(), OpenRequest.session(spec));
+        context.terminals().openTab(request.window(), OpenRequest.session(spec)).ifPresent(pane -> restoredPanes.put(pane.id(), hostId));
         return Optional.empty();
     }
 
@@ -3556,7 +3951,7 @@ edit(R, [
             || attempts.stream().anyMatch(attempt -> attempt.quiet && attempt.window.id().equals(owner.id())));
     }
 
-    /** Whether every host on {@code hostId}'s route signs in without asking: through the SSH agent, or the unlocked Vault. */
+    /** Whether every host on {@code hostId}'s route signs in without asking: through the SSH agent (workspace plan 6b Rulings 9). */
     private boolean signsInAlone(UUID hostId) {
         var seen = new java.util.HashSet<UUID>();
         Optional<RemoteHost> current = store.host(hostId);
@@ -3569,9 +3964,12 @@ edit(R, [
         return true;
     }
 
-    /** Whether {@code host} signs in without asking: through the SSH agent, or the Vault while it is unlocked. */
+    /**
+     * Whether {@code host} signs in without asking: through the SSH agent. A Vault login does not, even while the Vault is
+     * unlocked: the Vault may ask to grant Remote the credential (workspace plan 6b Rulings 9).
+     */
     private boolean signsInAlone(RemoteHost host) {
-        return host.auth() instanceof Auth.Agent || vault.isPresent() && vault.get().lockState() == LockState.UNLOCKED;
+        return host.auth() instanceof Auth.Agent;
     }
 
     /** Whether signing in to every host of {@code identity}'s route asks nothing: an open connection, or each signs in alone. */
@@ -3601,20 +3999,34 @@ edit(R, [
         var host = store.host(hostId);""", 1),
     ("""        attempt.cancelled = () -> { if (!stopped) pending.fail("Cancelled"); };""",
      """        attempt.quiet = quiet;
-        attempt.cancelled = () -> { if (!stopped) pending.fail(quiet ? "Not connected: Reconnect to sign in" : "Cancelled"); };""", 1),
+        attempt.cancelled = () -> {
+            if (stopped) return;
+            // A quiet connect that failed says why, but for the host-key question it answered Cancel (Rulings 29).
+            if (quiet) pending.fail("Not connected: " + attempt.reason.orElse("Reconnect to sign in"));
+            else pending.fail("Cancelled");
+        };""", 1),
     ("""        boolean closed, delivered;
         Runnable cancelled = () -> {}, finished = () -> {};""", """        boolean closed, delivered;
         /** A restored tab's first connect: it asks nothing, and a failure leaves the tab not connected (Rulings 29). */
         boolean quiet;
+        /** Why a quiet connect failed, for its notice; empty when it was cancelled or its host-key question answered Cancel. */
+        Optional<String> reason = Optional.empty();
+        /** A host-key question this quiet connect raised was answered Cancel: its failure is that, not a reason to show. */
+        boolean refusedQuietly;
         Runnable cancelled = () -> {}, finished = () -> {};""", 1),
     ("""                if (failure != null) { panel.failed(message(failure)); return; }""",
-     """                // A quiet connect that fails asks nothing more: its overlay closes and the tab offers Reconnect (Rulings 29).
-                if (failure != null && quiet) { close(); return; }
+     """                // A quiet connect that fails asks nothing more: its overlay closes and the tab offers Reconnect, saying why
+                // unless the failure is the host-key question it answered Cancel (Rulings 29).
+                if (failure != null && quiet) { if (!refusedQuietly) reason = Optional.of(message(failure)); close(); return; }
                 if (failure != null) { panel.failed(message(failure)); return; }""", 1),
     ("""            if (decision.isDone() || stopped) { decision.cancel(true); return; }
             questions.add(decision);""", """            if (decision.isDone() || stopped) { decision.cancel(true); return; }
             // A quiet connect there, a restored tab's, asks nothing: it fails, and Reconnect or Retry asks (Rulings 29).
-            if (quiet(owner)) { decision.complete(HostKeyVerifier.Decision.CANCEL); return; }
+            if (quiet(owner)) {
+                for (ConnectAttempt attempt : attempts) if (attempt.quiet && attempt.window.id().equals(owner.id())) attempt.refusedQuietly = true;
+                decision.complete(HostKeyVerifier.Decision.CANCEL);
+                return;
+            }
             questions.add(decision);""", 1),
     ("""                editChannels=new dev.jasper.remote.edit.EditChannels((identity,owner)->endpoints.open(Optional.of(identity),owner.orElse(null),status->{}),connections::authenticated,transferBackground,ui);""",
      """                // A restored document's quiet read opens its channel asking nothing (workspace plan 6b Rulings 29).
@@ -3627,6 +4039,11 @@ edit(R, [
                 var editing=new dev.jasper.remote.edit.RemoteEditing(editor.orElseThrow(),editChannels,()->context.terminals().activeWindow(),context.notifications().group(),
                     id->store.hosts().stream().filter(host->host.id().equals(id)).findFirst(),()->hostsLoaded,ui,this::signsInAlone);""", 1)])
 edit("plugins/remote/src/main/resources/plugin.toml", [('version = "0.15.0"', 'version = "0.16.0"', 1)])
+# Attached, a restored tab is an SSH tab like any other: activateHost finds it among the attached panes.
+edit(R, [("""        attachedPanes.put(paneId, pending);
+""", """        attachedPanes.put(paneId, pending);
+        restoredPanes.remove(paneId);
+""", 1)])
 PY
 ```
 
@@ -3680,8 +4097,8 @@ final class SavedRemoteDocument implements EditorDocument {
     @Override public String key() { return key; }
     @Override public String name() { return parsed.path().equals("/") ? parsed.path() : parsed.path().substring(parsed.path().lastIndexOf('/') + 1); }
     @Override public String location() { return now().map(RemoteDocument::location).orElse(parsed.path()); }
-    /** The saved host's name once it is known; until then a remote document whose host is not known yet. */
-    @Override public Optional<String> host() { return now().map(RemoteDocument::host).orElse(Optional.of("a saved host")); }
+    /** The saved host's name once it is known; until then "a remote host", as the Editor's "notes.md on a remote host" reads. */
+    @Override public Optional<String> host() { return now().map(RemoteDocument::host).orElse(Optional.of("a remote host")); }
 
     @Override public CompletableFuture<Content> read(long limitBytes) { return use(found -> found.read(limitBytes)); }
     @Override public CompletableFuture<Content> readQuietly(long limitBytes) { return use(found -> found.readQuietly(limitBytes)); }
@@ -3729,7 +4146,7 @@ edit(E + "RemoteDocument.java", [
      * @param path the absolute path as browsed
      * @param channels where its operations queue
      * @param owner the window for sign-in prompts when reconnecting
-     * @param silent whether signing in to a route asks nothing (an open connection, the SSH agent, the unlocked Vault):
+     * @param silent whether signing in to a route asks nothing (an open connection, or the SSH agent for every host):
      *     only then does {@link #readQuietly} read
      */
     public RemoteDocument(ConnectionIdentity identity, String path, EditChannels channels, Supplier<Optional<WindowHandle>> owner,
@@ -3910,7 +4327,12 @@ edit("jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java", [(
         showNotice(message, view == null ? "Retry" : "Reconnect", this::connect, "Close", () -> onClose.run());""",
     """    private void showDisconnected(String message) {
         // A restored session was connected when its tab was saved: connecting it again is a Reconnect (workspace tabs spec 13).
-        showNotice(message, view == null && !restored ? "Retry" : "Reconnect", this::connect, "Close", () -> onClose.run());""", 1)])
+        showNotice(message, view == null && !restored ? "Retry" : "Reconnect", this::connect, "Close", () -> onClose.run());""", 1),
+    ("""        // Nothing was ever shown in a pane whose first attempt is cancelled; a reconnect returns to the banner.
+        if (view == null) onClose.run(); else showDisconnected("Connection cancelled");""",
+     """        // Nothing was ever shown in a pane whose first attempt is cancelled; a reconnect returns to the banner, and so does
+        // a restored session's first attempt: its tab came back to be reconnected (workspace tabs spec 13).
+        if (view == null && !restored) onClose.run(); else showDisconnected("Connection cancelled");""", 1)])
 PY
 ```
 
@@ -3927,13 +4349,15 @@ git commit -F - <<'EOF'
 Workspace tabs: Remote's SSH tabs come back
 
 An SSH tab is saved with its host and folder; restored, it waits until
-it is shown and then reconnects when signing in asks nothing (the SSH
-agent, or the unlocked Vault), one tab after another in a window, and
-otherwise shows Not connected with Reconnect; a missing host declines.
+it is shown and then reconnects when the SSH agent signs it in, one tab
+after another in a window, and otherwise, a Vault login included, shows
+Not connected with Reconnect, asking nothing; a quiet connect that fails
+says why, and Cancel keeps a restored tab. A missing host declines.
 Remote documents reopen before the saved hosts have loaded and read
 quietly. A restored tab's first connect and a quiet read answer a
 host-key question Cancel, so nothing asks; Reconnect asks as usual.
-Remote 0.16.0.
+Picking a host whose restored tab still waits shows that tab. Remote
+0.16.0.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -3952,8 +4376,10 @@ here.
 
 **Files:**
 - Modify: `plugins/sample/src/main/java/dev/jasper/sample/SamplePlugin.java`, `src/main/resources/plugin.toml` (0.4.0 to
-  0.5.0, Rulings 18); `docs/plugin-authoring.md` (the `pluginpanels` snippet)
-- Test: `plugins/sample/src/test/java/dev/jasper/sample/SamplePluginTest.java`
+  0.5.0, Rulings 37); `docs/plugin-authoring.md` (the `pluginpanels` snippet)
+- Test: `plugins/sample/src/test/java/dev/jasper/sample/SamplePluginTest.java`;
+  `jasper-app/src/test/java/dev/jasper/app/plugins/BundledSamplePluginTest.java` (`:81`, the sample's pinned version,
+  Rulings 42)
 
 **Interfaces:**
 - Consumes: Task 1's `ContentSpec.withRestore`, `Windows.restorer`, `RestoreState`.
@@ -3996,7 +4422,8 @@ Expected: FAIL: the About tab gives no restore state.
 
 - [ ] **Step 3: The restorer**
 
-The sample's About opens through one consumer, for the action and for the restorer; the guide shows the same block:
+The sample's About opens through one consumer, for the action and for the restorer; the guide shows the same block; the
+version moves to 0.5.0 with the test that pins it:
 
 ```bash
 python3 -I - <<'PY'
@@ -4024,6 +4451,7 @@ edit(S, [
         });
 """, 1)])
 edit("plugins/sample/src/main/resources/plugin.toml", [('version = "0.4.0"', 'version = "0.5.0"', 1)])
+edit("jasper-app/src/test/java/dev/jasper/app/plugins/BundledSamplePluginTest.java", [('.anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.4.0", "BUNDLED", "ACTIVE"))', '.anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.5.0", "BUNDLED", "ACTIVE"))', 1)])
 # The guide shows the same block, indented as a method.
 source = pathlib.Path(S).read_text(encoding="utf-8")
 block = source.split("// example:pluginpanels:start\n", 1)[1].split("// example:pluginpanels:end", 1)[0]
@@ -4040,13 +4468,13 @@ PY
 
 - [ ] **Step 4: Run it to verify it passes**
 
-Run: `./gradlew :jasper-plugin-sample:test :jasper-app:test --tests 'dev.jasper.app.documentation.AppDocumentationTest' --continue`
-Expected: PASS (the guide's `pluginpanels` snippet equals the sample's source).
+Run: `./gradlew :jasper-plugin-sample:test :jasper-app:test --tests 'dev.jasper.app.documentation.AppDocumentationTest' --tests 'dev.jasper.app.plugins.BundledSamplePluginTest' --continue`
+Expected: PASS (the guide's `pluginpanels` snippet equals the sample's source; the staged sample reports 0.5.0).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -A plugins/sample docs/plugin-authoring.md
+git add -A plugins/sample docs/plugin-authoring.md jasper-app/src/test/java/dev/jasper/app/plugins/BundledSamplePluginTest.java
 git commit -F - <<'EOF'
 Workspace tabs: the sample's About comes back
 
@@ -4074,8 +4502,8 @@ EOF
 
 Each edit is the smallest that makes its sentences true (AGENTS.md "Documentation edits"): the SDK README's 0.21
 section and package table gain restore state and restorers, the authoring guide shows how a content tab and a session
-come back, the SDK architecture names the slot and the placeholder, and the user guides say which tabs come back and
-where. The Credential Vault's guide already says its manager is a dialog over the main window, and nothing here changes
+come back, the SDK architecture names the slot and the placeholder, and the user guides say which items come back and
+where: in their tab and pane. The Credential Vault's guide already says its manager is a dialog over the main window, and nothing here changes
 it:
 
 ```bash
@@ -4083,13 +4511,13 @@ python3 -I - <<'PY'
 import sys; sys.path.insert(0, "build/plan6b"); from edits import edit
 R = "jasper-sdk/README.md"
 edit(R, [
-    ("`ContentTab`, `TabPlacement`, `ContentSpec`,", "`ContentTab`, `TabPlacement`, `ContentSpec`, `TabRestorer`, `RestoreRequest`,", 1),
+    ("`SplitChoice`, `ContentSpec`,", "`SplitChoice`, `ContentSpec`, `TabRestorer`, `RestoreRequest`,", 1),
     ("| `dev.jasper.sdk` | `JasperSdk.VERSION`, `PluginInfo`, `Variant`, `Subscription`, `WindowOwner`, `Capabilities`, `MissingCapabilityException` |",
      "| `dev.jasper.sdk` | `JasperSdk.VERSION`, `PluginInfo`, `Variant`, `Subscription`, `WindowOwner`, `RestoreState`, `Capabilities`, `MissingCapabilityException` |", 1),
-    ("""pane's `info().state()` is `SessionState.NOT_STARTED` until the tab is first shown, and text sent to it is dropped; then
-its shell starts as a new tab's does.
-""", """pane's `info().state()` is `SessionState.NOT_STARTED` until the tab is first shown, and text sent to it is dropped; then
-its shell starts, or its session connects, as a new tab's does.
+    ("""shown yet has not started: its pane's `info().state()` is `SessionState.NOT_STARTED` until its tab first shows, and text
+sent to it is dropped; then its shell starts as a new terminal's does.
+""", """shown yet has not started: its pane's `info().state()` is `SessionState.NOT_STARTED` until its tab first shows, and text
+sent to it is dropped; then its shell starts, or its session connects, as a new terminal's does.
 
 A plugin's tab comes back when the plugin says how: a `RestoreState` (`dev.jasper.sdk`: a restorer kind and at most 32
 strings, which Jasper writes into `workspace.toml`, so never a secret) in its `ContentSpec` or `SessionSpec`
@@ -4097,7 +4525,7 @@ strings, which Jasper writes into `workspace.toml`, so never a secret) in its `C
 `Windows.restorer(kind, restorer)`. The restorer gets a `RestoreRequest` (the window being restored, the saved title, the
 state) and opens the tab the way the plugin opens it, before it returns `Optional.empty()`; the first content tab it
 opens is the saved tab, whatever window or placement it names, and so is the first session it opens in
-`request.window()`; Jasper puts it where it was saved, in its window's pane. When the
+`request.window()`; Jasper puts it where it was saved, in its tab and pane of that window. When the
 tab cannot come back for a reason the plugin expects (its file or host is gone), the restorer returns that reason
 instead, which is no failure. A tab whose plugin is not installed, turned off, waiting for review or failed to start, has
 no restorer for its kind, or whose restorer declines, throws or opens nothing comes back as a placeholder that says why,
@@ -4119,11 +4547,19 @@ comes to stand for something else, and register the restorer for the kind in `st
 `context.windows().restorer("document", request -> openDocument(request.state().values().get("path"), request.window()))`,
 where `openDocument` returns empty once the tab is open, or why it could not open it.
 The restorer opens the tab the way your action does, with the same restore state, and returns `Optional.empty()`; Jasper
-places it where it was saved, in whichever window and pane held it. When it cannot come back now (its file is gone),
+places it where it was saved, in whichever window, tab and pane held it. When it cannot come back now (its file is gone),
 return why instead, `Optional.of("its file is gone")`: its placeholder says so with Retry, and nothing reports a failure.
 A restore state is saved in `workspace.toml`: keep it small, and never put a secret in it. A tab without one is not
 saved, and one whose restorer throws or opens nothing comes back as a placeholder with Retry too. Open only that tab: the
 window being restored takes no other while your restorer runs, so another tab opens where an owner-less one would.
+Ask the user nothing here (no dialog, sign-in or prompt); a tab that needs one opens waiting, as a session that offers
+Reconnect does.
+""", 1),
+    ("""`flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory.
+""", """`flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory.
+`host.restoreState(tab)` reads the restore state a tab gives, `host.restoreTab(pluginId, windowId, title, state)` runs
+your restorer as Jasper does when it restores its windows (the tab placed in that window, not shown; a session's tab
+waits, `NOT_STARTED`, until it is shown), and `host.declinedRestores()` lists the reasons your restorers gave.
 """, 1),
     ("""- `PipedInputStream` fails once the thread that wrote last has ended. The sample uses a queue.
 """, """- `PipedInputStream` fails once the thread that wrote last has ended. The sample uses a queue.
@@ -4141,36 +4577,38 @@ tabs, plugins' first, when the file would pass `WorkspaceFile.MAX_BYTES`. Restor
 asks the window manager for each such record; `TabRegistry.restore` runs the restorer with a slot set (one at a time),
 and the first content tab the plugin opens meanwhile (`TabRegistry.open`), or the first session it opens in the window
 being restored (`WindowContent.openTerminal`), takes the saved id, while it is free, and that window, before any
-placement applies; the window then places it in its saved parent tab and pane with its other tabs, and takes no other tab while the
-restorer runs. A reason the restorer returns is the placeholder's and no incident; what it throws is both. Otherwise
+placement applies; the window then places it in its saved tab and pane with its other items, and takes no other item
+while the restorer runs. A reason the restorer returns is the placeholder's and no incident; what it throws is both. Otherwise
 the tab is a `Tab.Kind.PLACEHOLDER` (`workspace.PlaceholderContent`) that says why, from `WindowManager.PluginState` (the
 application's reading of `PluginRuntime.standing`), saved again as it was; its Retry and Close act in the window that
 holds it then, and it asks how its plugin stands whenever it shows and on Retry.
 """, 1)])
-edit("docs/configuration.md", [("""tab shows starts its shell at once, the others when first shown. Scrollback and running programs do not come back. A
-""", """tab shows starts its shell at once, the others when first shown. A plugin's tab comes back in its parent tab and pane
-when its plugin can restore it (the Editor's files, Remote's SSH tabs), and otherwise as a placeholder that says why (the
-plugin is not installed, turned off, waiting for your review or could not start, or it could not restore that tab), with
-Close and, while its plugin runs, Retry. Scrollback and running programs do not come back. A
+edit("docs/configuration.md", [("""start at once, the others when their tab first shows. Scrollback and running programs do not come back. A file Jasper
+""", """start at once, the others when their tab first shows. A plugin's view comes back in its tab and pane when its plugin
+can restore it (the Editor's files, Remote's SSH tabs), and otherwise as a placeholder that says why (the plugin is not
+installed, turned off, waiting for your review or could not start, or it could not restore that view), with Close and,
+while its plugin runs, Retry. Scrollback and running programs do not come back. A file Jasper
 """, 1)])
 edit("docs/editor.md", [("""indentation and Wrap (click to toggle soft wrap for the tab).
 """, """indentation and Wrap (click to toggle soft wrap for the tab).
 
-When Jasper restores its windows, each tab comes back with its file, in its parent tab and pane: a local file is read at
-once; a remote one, through Remote, waits until its tab is first active or you press Load, and then reads only if
-signing in asks nothing (an open connection, the SSH agent, or the unlocked Vault); otherwise it says so, and Retry signs
-in. An untitled tab that was never saved does not come back.
+When Jasper restores its windows, each file comes back in its tab and pane: a local file is read at once, and one deleted
+since comes back as a failed read with Retry; a remote one, through Remote, waits until its tab is first active or you press Load, and then reads only if
+signing in asks nothing (an open connection, or the SSH agent); otherwise it says so, and Retry signs in. An untitled
+file that was never saved does not come back.
 """, 1)])
 edit("docs/remote.md", [("""shows the disconnected banner and Reconnect makes a new connection. The status bar shows how many
 SSH sessions are open; clicking it toggles the panel.""", """shows the disconnected banner and Reconnect makes a new connection. When Jasper restores its windows, each SSH tab
 comes back to its host and folder and waits until it is first shown; then it connects at once when signing in asks
-nothing (every host on its route signs in through the SSH agent, or through the Vault while it is unlocked), after any
-connection in progress in that window, and otherwise, or when its host's key is not trusted yet, it shows Not connected
-with Reconnect, which asks as usual. The status bar shows how many
+nothing (every host on its route signs in through the SSH agent), after any connection in progress in that window, and
+otherwise (a Vault login, locked or not), or when its host's key is not trusted yet, it shows Not connected with
+Reconnect, which asks as usual. The status bar shows how many
 SSH sessions are open; clicking it toggles the panel.""", 1)])
-edit("docs/app-architecture.md", [("""window's shown parent tab first shows it, and until then its pane reports `NOT_STARTED`.
-""", """window's shown parent tab first shows it, and until then its pane reports `NOT_STARTED`; a plugin's tab comes back through
-its plugin's restorer or as a placeholder (see [SDK architecture](sdk-architecture.md)).
+edit("docs/app-architecture.md", [("""items, before it shows; a restored terminal's shell starts when its tab first shows, and until then its pane reports
+`NOT_STARTED`.
+""", """items, before it shows; a restored terminal's shell starts when its tab first shows, and until then its pane reports
+`NOT_STARTED`; a plugin's item comes back through its plugin's restorer or as a placeholder (see
+[SDK architecture](sdk-architecture.md)).
 """, 1)])
 PY
 ```
@@ -4217,13 +4655,12 @@ entry), in the style of the earlier entries:
 **Workspace tabs, plan 6b: plugins' tabs come back — <date>** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `<first>..<last>`, then this documentation commit;
 [plan](superpowers/plans/2026-10-18-workspace-6b-plugin-restorers.md),
-[spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md), amending
-[the workspace tabs spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). SDK 0.21.0 (plan 6a's bump; no
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). SDK 0.21.0 (plan 6a's bump; no
 bump of this plan's own) gains `dev.jasper.sdk.RestoreState` (a restorer kind and at most 32 strings, 4096 characters in
 all), restore state on `ContentSpec` and `SessionSpec` (`withRestore`), `ContentTab.setRestore`,
 `Windows.restorer(kind, TabRestorer)` (a restorer returns empty, or why the tab cannot come back, which raises no
 incident) and `RestoreRequest`; the testkit gains `FakePluginHost.restoreState`, `restoreTab` (the restored tab takes the
-window being restored, placed, not shown; a session waits `NOT_STARTED` until shown) and `declinedRestores`, and
+window being restored, placed, not shown; a session waits `NOT_STARTED` until shown) and `declinedRestores` (a restored item goes in a new tab of the window, unshown), and
 `PluginContractTest` checks restorers on the fake and on the application. In the application a tab carries its restore
 state (`Tab.restore()`, `layout.TabRestore`); `TabRegistry` keeps each plugin's restorers and, while one runs (one at a
 time), a slot whose saved id (while free) and window the next content tab that plugin opens takes, or the next session
@@ -4232,42 +4669,50 @@ at once; the window being restored takes no other tab meanwhile (another content
 another session is refused). `WindowManager` saves a plugin's tab as `TabRecord.Content` of its window's `WindowRecord`
 while its plugin restores that kind (never Jasper's own tabs, going or coming), leaving out tabs, plugins' first and as
 closing them would, if the file would pass `WorkspaceFile.MAX_BYTES`; restoring, plan 6a's `WindowContent.restore` asks
-it for each record (`savedTabs`), so a plugin's tab comes back in its saved parent tab and pane of the main window, a
-full window or a pane window, or as a `Tab.Kind.PLACEHOLDER` tab (`workspace.PlaceholderContent`) that says why from how
+it for each record (`savedTabs`), so a plugin's item comes back in its saved tab and pane of the main window or a full
+window, or as a `Tab.Kind.PLACEHOLDER` item (`workspace.PlaceholderContent`) in its pane that says why from how
 its plugin stands (`PluginRuntime.standing`, given as `WindowManager.PluginState`: not installed, turned off, waiting for
 review, could not start, or "… could not restore this tab: …" with Retry), asks again when it shows and on
-Retry, and acts in whatever window holds it; a placeholder is saved again as it was, and a full or pane window holding
-only plugins' tabs comes back with them. The Editor (<0.12.0>) saves a document's key and reopens it through its
+Retry (`Layout.replaceTab`: the rebuilt item takes the placeholder's pane), and acts in whatever window holds it; a
+placeholder is saved again as it was, and a full window holding only plugins' items comes back with them. The Editor
+(<0.13.0>) saves a document's key and reopens it through its
 reopeners (`openRestored`): a remote document waits until its tab is first active or Load, then reads with the Editor
 API's new `EditorDocument.readQuietly`, asking nothing. Remote (<0.16.0>) reopens remote documents before its hosts have
 loaded (`SavedRemoteDocument`) and saves an SSH tab's host and folder; when the tab is first shown it reconnects, one tab
-after another per window, if signing in asks nothing (an open connection, the agent, or the unlocked Vault), else shows
-Not connected with Reconnect; a missing host declines. A restored tab's first connect and a restored document's quiet
+after another per window, if the SSH agent signs it in, else (a Vault login, locked or not: the Vault may ask for a
+grant) shows Not connected with Reconnect, asking nothing; a quiet connect that fails says why, Cancel keeps a restored
+tab, and a missing host declines; a remote document's quiet read reads over an open connection or the agent. A restored tab's first connect and a restored document's quiet
 read answer a host-key question Cancel (`ConnectAttempt.quiet`, `EditChannels.submitQuietly`), so a host accepted Once
-comes back Not connected with Reconnect, which asks. The sample's About (<0.5.0>) comes back; the Vault's manager, a
+comes back Not connected with Reconnect, which asks; picking a host whose restored tab still waits shows that tab
+(`restoredPanes`, plan 6a's `NOT_STARTED` hand-off). The sample's About (<0.5.0>) comes back; the Vault's manager, a
 dialog over the main window, does not, and the Vault keeps 0.7.0. `AppContractTest` now opens the main window and then a
 child for a tab placed in a new window while none is open (plan 4b's hand-off), and the two other harness hand-offs
 (`FakeWorkspace.closeWindow` nulling `Panel.instance` with `AppContractTest`'s panel caches, and `AppContractTest`'s panel
 routing) closed without code: no harness can close a main window and no contract case toggles a panel; they belong to the
-plan that first adds such a case. Rulings (plan, "Rulings"): <one clause each, 1 to 31; 10 and 12 superseded>.
+plan that first adds such a case. Rulings (plan, "Rulings"): <one clause each, 1 to 50; 10, 12 and 18 superseded, 6, 15, 19 and 20 reworded, 9, 16, 29 and 31 restated by the review>.
 Deviations: <none, or each with its reason>. THD Sourcing Crypto (`~/projects/thd-sourcing-crypto-jasper-plugin`, branch
 `jasper-sdk-0.17.1` at `3740e4e`): SDK 0.21.0 is the series' last bump and the one to rebuild it against, once, with the
 jars `sdkRelease` publishes; plan 4b's entry lists what 0.18, 0.19 and 0.20 need, and its `plugin.toml` and
 `PluginPackagingTest.java:49` take `sdk = ">=0.21.0, <0.22"` and `build.gradle.kts:8` and `README.md:28` name 0.21.0;
 0.21 needs nothing more (it names `SessionState.RUNNING` in one fixture and switches over no `SessionState`, and it
-opens only a dialog, which is not saved). `./gradlew check --continue`: **<counts>**. GUI checks for the user: two parent
-tabs in the main window, an Editor tab in the hidden one beside a terminal, a Remote SSH tab (one host through the agent,
-one with a password in the Vault, locked), and, with the sample on, its About popped out to a pane window; an Editor tab
-in a full window; quit and start: each comes back in its window, parent tab and pane, the agent's SSH tab connects when
-shown, the other says Not connected with Reconnect, and the hidden parent tab's remote file loads only when that parent
-tab shows; the Vault's manager, if it was open, stays closed; under the Enterprise look the parent-tab bar shows as
-before; turn the sample off in Manage Plugins, restart: its About is a placeholder without Retry in its pane window, and
-Close closes that window; turn Remote off with a remote file open in the Editor, restart: that tab is a placeholder with
+opens only a dialog, which is not saved). `docs/sdk-reference.html` is main's: the merge with main regenerates it
+with this plan's SDK Javadoc. `./gradlew check --continue`: **<counts>**. GUI checks for the user: two tabs in the main
+window, an Editor file in a pane of the hidden one beside a terminal (Split Right with Editor), a Remote SSH tab (one host
+through the agent, one with a password in the Vault, locked), and, with the sample on, its About moved to a full window
+(Move Tab to New Window); an Editor tab in a full window; quit and start: each comes back in its window, tab and pane,
+the agent's SSH tab connects when shown, the other says Not connected with Reconnect, and the hidden tab's remote file
+loads only when that tab shows; the Vault's manager, if it was open, stays closed; under the Enterprise look the tab
+strip shows as before; turn the sample off in Manage Plugins, restart: its About is a placeholder without Retry in its
+full window, and Close closes that window; turn Remote off with a remote file open in the Editor, restart: that tab is a placeholder with
 Retry ("Editor could not restore this tab: no running plugin opens remote: documents."), and turning Remote on again and
 restarting brings it back; a remote file open in the Editor comes back without asking for anything, loads when its tab
-is clicked if the agent or the unlocked Vault signs in, and otherwise says so with Retry; two SSH tabs restored side by
-side in one window both connect; an Editor tab whose file was deleted comes back as the Editor's failed read; pop a
-placeholder out, then Bring Back: it returns to its pane, and Retry works there; connect an SSH host whose key you
+is clicked if an open connection or the agent signs in, and otherwise says so with Retry; with residency and the Vault
+unlocked, close the main window and reopen it from the Dock: the Vault-signed SSH tab comes back Not connected with
+Reconnect and no grant prompt; press Cancel while a restored SSH tab connects: the tab stays with Reconnect; tab to a
+placeholder's Retry and Close with the keyboard; two SSH tabs restored side by
+side in one window both connect; with a restored SSH tab still hidden, pick its host in Remote's Sessions: that tab
+shows instead of a new one; an Editor tab whose file was deleted comes back as the Editor's failed read, with Retry; drag a
+placeholder's pane into another tab and press Retry there: the file comes back in that pane; connect an SSH host whose key you
 accept Once, quit and start: its tab comes back Not connected with Reconnect, asking nothing, and Reconnect asks about
 the key; start in safe mode with a user plugin's tab saved: its placeholder says the plugin is turned off. Not merged,
 not pushed.
@@ -4295,10 +4740,13 @@ EOF
 
 ## Self-review
 
-- Spec coverage, parent tabs spec: 9's "covers every window kind" for plugins' tabs (Task 2: the main window's hidden
-  parent tab and its panes, a full window, a pane window); 10's plugins seeing windows only (Task 1's `RestoreRequest`
-  names the window; Task 2 places the tab in its parent tab and pane); 4's encoding (content records ride in plan 6a's
-  `WindowRecord.tabs`) and invariants (the size limit takes tabs out through `keeping`). Workspace tabs spec: 9.2's
+- Spec coverage, tabs and panes spec: 12's "plugins' tabs saved and restored in their tab and pane" (Task 2: the main
+  window's hidden tab and its two panes, a full window), each pane's one item (Retry in the pane, Rulings 32), the
+  Editor in a tab or a pane (Task 3; Rulings 38), 11's `NEW_TAB` and split items (a restorer opens its item as it always
+  does, the slot takes it, Rulings 4); parent tabs spec 10's plugins seeing windows only (Task 1's `RestoreRequest` names
+  the window; Task 2 places the item in its tab and pane); plan 6a's encoding (content records ride in its
+  `WindowRecord.tabs`, written under `[[windows.items]]`) and invariants (the size limit takes items out through
+  `keeping`). Workspace tabs spec: 9.2's
   placeholder (Task 2); 13's content tabs: rebuilt by their plugin's restorer from the state given when the tab opened
   (Tasks 1 and 2), the Editor reopening files and not keeping an unsaved untitled buffer (Task 3), Remote choosing
   between reconnecting and a Reconnect state (Task 4), a tab whose plugin is missing or whose restorer fails becoming a
@@ -4308,19 +4756,19 @@ EOF
   (Task 6); 15's disabled-plugin row (Rulings 7, Task 2's placeholder); 17's SDK line: contract tests on the app and the
   testkit (Task 1).
 - Hand-offs: each in "Hand-offs absorbed" is met by the task or Ruling it names; none is left without a disposition.
-- Every quoted anchor was matched, at its stated count, in a replay of plans 7a, 7b, 7c and 6a and of Tasks 1-6 in order,
-  on `git archive` copies of `ec41c97db` and `e80f2c322`, and of `8e129ff34` but for Remote's manifest version there (see
-  Workspace); nothing was compiled. The ledger after Task 2 was checked with a Python copy of
-  `ThemeMigrationCoverageTest`'s two path checks, and this plan's and the edited documents' links and the
-  `pluginpanels` snippet with a Python copy of `AppDocumentationTest`'s rules.
+- Every quoted anchor was matched, at its stated count, in a replay of plan 6a's Tasks 6-10 and of Tasks 1-6 in order on
+  a `git archive` copy of `81f80c1af`, which then compiled with JBR 25's `javac` and passed the suites Workspace names,
+  headless, `ThemeMigrationCoverageTest` and `AppDocumentationTest` (the `pluginpanels` snippet and the guides' links)
+  among them.
 - Type consistency: `RestoreState`, `ContentSpec.withRestore`, `SessionSpec.withRestore`, `ContentTab.setRestore`,
   `TabRestorer` (returning `Optional<String>`), `RestoreRequest`, `Windows.restorer`, `FakePluginHost.restoreState`/
   `restoreTab`/`declinedRestores`, `FakeWorkspace.Slot`/`takeSlot`/`placeTab`/`placeTerminal`, `FakeSessions.hold`,
   `TabRestore`, `Tab.restore`, `TabRegistry.Restoring`/`Restored`/`restorer`/`restores`/`restore`/`slot`/`restored`/
-  `restoring`/`onRestoreChanged`, `SessionRequest.restore`, `Tab.Kind.PLACEHOLDER`, `PlaceholderContent`,
-  `WindowContent.savedTabs`/`retry`, `WorkspaceView.openAt`, `WindowManager.PluginState`/`plugins`,
+  `restoring`/`onRestoreChanged`, `SessionRequest.restore`, `Tab.Kind.PLACEHOLDER`, `PlaceholderContent` (`action`,
+  `focusAction`),
+  `WindowContent.savedTabs`/`retry`, `WorkspaceView.replace`, `Layout.replaceTab`, `WindowManager.PluginState`/`plugins`,
   `PluginRuntime.Standing`/`standing`, `WorkspaceFile.MAX_BYTES`/`encodedBytes`, `EditorWindow.RESTORE_KIND`/
   `RESTORE_KEY`/`openRestored`, `DocumentSession.defer`/`deferred`, `EditorDocument.readQuietly`,
-  `RemotePlugin.SSH_TAB`/`sshTab`/`restoreHost`, `SavedRemoteDocument`, the eight-argument `RemoteEditing`,
+  `RemotePlugin.SSH_TAB`/`sshTab`/`restoreHost`/`restoredPanes`, `SavedRemoteDocument`, the eight-argument `RemoteEditing`,
   `EditChannels.submitQuietly` and its five-argument constructor, `Reopeners.handles` and `TabRegistry.restoring` keep one
   name and one signature from the task that creates them to the last task that uses them.
