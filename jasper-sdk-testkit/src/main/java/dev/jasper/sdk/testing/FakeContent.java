@@ -52,6 +52,25 @@ final class FakeContent implements ContentTab {
         if(!movable()||tab.window.main)return;
         moveTo(ui.host.workspace.main().orElseGet(ui.host.workspace::addWindow));
     }
+    /** Tabs and panes spec 9: its tab's only pane, a pinned item and one waiting on a close decision stay. */
+    public boolean mayMoveToNewTab(){return movable()&&tab.group.recent.size()>1;}
+    public void moveToNewTab(){if(!mayMoveToNewTab())return;ui.host.workspace.moveToNewTab(tab);select();}
+    /** Spec 8: selected first, then the terminal beside it, or the split item's action, as the application runs them. */
+    public void split(SplitChoice choice,dev.jasper.sdk.terminal.Direction direction){
+        Objects.requireNonNull(choice,"choice");Objects.requireNonNull(direction,"direction");
+        if(!ui.windows().splitChoices().contains(choice))throw new IllegalArgumentException("Not one of Jasper's split choices: "+choice.label());
+        if(closed)return;
+        boolean terminal=choice.equals(SplitChoice.TERMINAL);
+        // Rulings 19: a local shell needs terminal.open, refused before anything is selected or opens.
+        if(terminal)ui.context.terminals.require(dev.jasper.sdk.Capabilities.TERMINAL_OPEN);
+        select();
+        if(terminal){
+            var local=(dev.jasper.sdk.terminal.OpenRequest.Local)dev.jasper.sdk.terminal.OpenRequest.local();
+            ui.host.workspace.focus(ui.host.workspace.openTerminal(tab.window,"opened",FakeTerminals.openedInfo(local),tab));
+            return;
+        }
+        ui.host.invoke(direction==dev.jasper.sdk.terminal.Direction.RIGHT?choice.rightAction():choice.downAction(),tab.window.id,null);
+    }
     private void moveTo(FakeWorkspace.Window window){
         active(false);
         ui.host.workspace.move(tab, window);

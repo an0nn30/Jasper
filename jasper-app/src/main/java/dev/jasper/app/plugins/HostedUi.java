@@ -88,6 +88,11 @@ final class HostedUi {
     private final List<Runnable> closers = new ArrayList<>();
     /** Whether this plugin ships with Jasper, which puts its split items first (workspace plan 8b Rulings 5); its context sets it. */
     BooleanSupplier bundled = () -> false;
+    /**
+     * Requires {@code terminal.open}, then audits {@code what}: a terminal a content tab opens beside itself (workspace
+     * plan 8b Rulings 19). Its context sets it.
+     */
+    java.util.function.Consumer<String> terminalOpen = what -> { };
 
     HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
              BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
@@ -545,6 +550,27 @@ final class HostedUi {
         public void select() { requireUi("select content"); entry.select(); }
         public void moveToNewWindow() { requireUi("move content"); entry.moveToNewWindow(); }
         public void moveToMainWindow() { requireUi("move content"); entry.moveToMainWindow(); }
+        public void moveToNewTab() { requireUi("move content"); model.tabs().moveToNewTab(entry); }
+        public boolean mayMoveToNewTab() { requireUi("move content"); return model.tabs().mayMoveToNewTab(entry); }
+        public void split(dev.jasper.sdk.ui.SplitChoice choice, dev.jasper.sdk.terminal.Direction direction) {
+            requireUi("split content");
+            java.util.Objects.requireNonNull(choice, "choice");
+            java.util.Objects.requireNonNull(direction, "direction");
+            if (!splitChoices().contains(choice)) throw new IllegalArgumentException("Not one of Jasper's split choices: " + choice.label());
+            if (entry.closed()) return;
+            boolean right = direction == dev.jasper.sdk.terminal.Direction.RIGHT;
+            if (choice.equals(dev.jasper.sdk.ui.SplitChoice.TERMINAL)) {
+                // A local shell, as Terminals.split opens one: terminal.open first (workspace plan 8b Rulings 19).
+                terminalOpen.accept("opened a terminal beside content tab " + entry.id().value());
+                model.tabs().splitTerminal(entry, right ? dev.jasper.app.layout.Side.RIGHT : dev.jasper.app.layout.Side.DOWN);
+                return;
+            }
+            // A plugin's choice opens beside the focused pane, so the item is selected first (workspace plan 8b Rulings 18).
+            model.tabs().select(entry);
+            java.util.UUID window = entry.window();
+            String action = right ? choice.rightAction() : choice.downAction();
+            if (window != null) model.action(action).ifPresent(found -> found.invoke(new Contributions.Invocation(window, Optional.empty())));
+        }
         public WindowHandle window() {
             requireUi("content window");
             // A tab no window could take back (its move failed everywhere) names no window.

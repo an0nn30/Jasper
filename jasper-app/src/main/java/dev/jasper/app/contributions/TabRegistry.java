@@ -385,6 +385,44 @@ public final class TabRegistry {
     }
 
     /**
+     * Split with a choice's Terminal Right and Terminal Down beside {@code tab}, as {@code ContentTab.split} asks (tabs
+     * and panes spec 8; workspace plan 8b Rulings 18): its window selects it and opens a terminal in a new pane on
+     * {@code side} of its pane. A closed tab, or one no window holds, opens nothing.
+     *
+     * @param tab the tab
+     * @param side where the new pane goes
+     */
+    public void splitTerminal(Tab tab, Side side) {
+        requireEdt();
+        Objects.requireNonNull(side, "side");
+        var host = tabs.contains(tab) && !tab.closed() ? hosts.get(tab.window()) : null;
+        if (host != null) host.splitTerminal().accept(tab, side);
+    }
+
+    /**
+     * Whether Move Pane to New Tab would move {@code tab} (tabs and panes spec 9): a tab that may move ({@link #movable})
+     * whose window's tab holds another pane.
+     *
+     * @param tab the tab
+     * @return whether it would move
+     */
+    public boolean mayMoveToNewTab(Tab tab) {
+        requireEdt();
+        var host = movable(tab) ? hosts.get(tab.window()) : null;
+        return host != null && host.mayMoveToNewTab().test(tab);
+    }
+
+    /**
+     * {@code ContentTab.moveToNewTab()} (tabs and panes spec 9): the tab's pane leaves its tab for a new tab right after
+     * it, in its window, which shows it; nothing when {@link #mayMoveToNewTab} says no.
+     *
+     * @param tab the tab
+     */
+    public void moveToNewTab(Tab tab) {
+        if (mayMoveToNewTab(tab)) hosts.get(tab.window()).moveToNewTab().accept(tab);
+    }
+
+    /**
      * Moves a tab of any kind to {@code window}, in a new tab of that window, and selects it there; its
      * content and session are untouched. A pinned tab, one being closed or one already there stays.
      *

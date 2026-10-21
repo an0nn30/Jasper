@@ -69,7 +69,8 @@ public interface Windows {
     /**
      * What every Split list offers, in its order (tabs and panes spec 2.10 and 8): {@link SplitChoice#TERMINAL}, then each
      * registered split item, the bundled plugins' first and each in the order they registered. A plugin that builds its
-     * own menu, as the Editor builds its right-click menu, lists these.
+     * own menu, as the Editor builds its right-click menu, lists these and runs one beside an item with
+     * {@link ContentTab#split(SplitChoice, dev.jasper.sdk.terminal.Direction)}.
      *
      * @return the choices
      * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread

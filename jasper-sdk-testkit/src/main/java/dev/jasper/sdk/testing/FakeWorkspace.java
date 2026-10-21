@@ -238,6 +238,27 @@ final class FakeWorkspace {
         refreshActive();
     }
 
+    /**
+     * Move Pane to New Tab (tabs and panes spec 9): {@code tab} leaves its tab, which keeps its other panes, for a new tab
+     * right after it, where it is selected. A tab's only pane stays.
+     */
+    void moveToNewTab(Tab tab) {
+        Window window = tab.window;
+        Group from = tab.group;
+        if (!tab.open || from.recent.size() < 2) return;
+        int end = 0;
+        for (int i = 0; i < window.tabs.size(); i++) if (window.tabs.get(i).group == from) end = i;
+        window.tabs.remove(tab);
+        from.recent.remove(tab);
+        var group = new Group();
+        window.recent.add(group);
+        tab.group = group;
+        group.recent.add(tab);
+        // The tab's old run of items ends one place earlier now: the new tab's item goes right after it.
+        window.tabs.add(end, tab);
+        select(tab);
+    }
+
     /** A pane closes with its item. */
     void close(Pane pane) { if (pane.open) close(pane.tab); }
 

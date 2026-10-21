@@ -109,18 +109,40 @@ class MovePaneToNewTabTest {
         });
     }
 
-    /** A plugin's item moves the same way, and stays in its window. */
+    /** A plugin's item moves the same way, through the registry as {@code ContentTab.moveToNewTab} asks. */
     @Test void aPluginsItemMovesToANewTabToo() throws Exception {
         var window = window();
         edt(() -> {
             Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel(),
                 TabRegistry.Placement.SPLIT_DOWN);
             assertThat(window.parentTabOf(view)).isEqualTo(window.parentTabOf(window.tabs().getFirst()));
-            window.moveToNewTab(view);
+            assertThat(model.tabs().mayMoveToNewTab(view)).isTrue();
+            model.tabs().moveToNewTab(view);
             assertThat(window.parentTabCount()).isEqualTo(3);
             assertThat(window.windowLayout().parentTabs().get(1).layout().tabs()).containsExactly(view.id());
             assertThat(window.selectedTab()).isSameAs(view);
             assertThat(view.closed()).isFalse();
+        });
+    }
+
+    /**
+     * Workspace plan 8b Rulings 18: Terminal Right beside a plugin's item, as {@code ContentTab.split} asks, opens right
+     * after the item in its tab, focused, though another pane had the focus.
+     */
+    @Test void aTerminalOpensBesideAPluginsItemThoughAnotherPaneWasFocused() throws Exception {
+        var window = window();
+        edt(() -> {
+            Tab left = window.tabs().get(0), right = window.tabs().get(1);
+            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel(),
+                TabRegistry.Placement.SPLIT_DOWN);
+            window.selectTab(left);
+            assertThat(window.selectedTab()).isSameAs(left);
+            model.tabs().splitTerminal(view, Side.RIGHT);
+            Tab terminal = window.selectedTab();
+            assertThat(terminal).as("the new terminal, focused").isNotIn(left, right, view);
+            assertThat(terminal.kind()).isEqualTo(Tab.Kind.TERMINAL);
+            assertThat(tabs(window).getFirst()).as("right after the item, in its tab")
+                .containsExactly(left.id(), right.id(), view.id(), terminal.id());
         });
     }
 

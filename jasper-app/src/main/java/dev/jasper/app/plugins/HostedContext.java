@@ -91,6 +91,7 @@ final class HostedContext implements PluginContext {
         this.kit = new HostedKit(id, () -> state != State.CLOSED, ui::kitThemes, ui.appearance(), host.containment, () -> host.animations.getAsBoolean(), action -> host.shortcuts.apply(action), () -> host.kit.get());
         ui.kit(kit);
         ui.bundled = () -> host.fileEditors.bundled(id);
+        ui.terminalOpen = what -> { gate.require(Capabilities.TERMINAL_OPEN); gate.audit(Capabilities.TERMINAL_OPEN, what); };
         this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals, hosted.iconHue());
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,

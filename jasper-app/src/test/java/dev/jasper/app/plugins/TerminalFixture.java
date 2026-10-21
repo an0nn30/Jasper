@@ -312,6 +312,39 @@ final class TerminalFixture {
     }
     List<String> opened() { return List.copyOf(opened); }
 
+    /**
+     * A terminal in a new pane right after the item {@code tabId}, in its tab, focused, as Split with a choice's Terminal
+     * Right and Terminal Down open one beside a plugin's item (tabs and panes spec 8): either side lists it right after.
+     */
+    void splitBeside(UUID tabId) {
+        Tab beside = tabs.get(tabId);
+        if (beside != null) focusPane(openTerminal(beside.window.id, "split", null, beside));
+    }
+
+    /** Whether Move Pane to New Tab would move the item {@code tabId}: its tab holds another pane (tabs and panes spec 9). */
+    boolean mayMoveToNewTab(UUID tabId) {
+        Tab tab = tabs.get(tabId);
+        return tab != null && tab.group.recent.size() > 1;
+    }
+
+    /** Move Pane to New Tab: the item {@code tabId} leaves its tab for a new tab right after it, where it is selected. */
+    void moveToNewTab(UUID tabId) {
+        if (!mayMoveToNewTab(tabId)) return;
+        Tab tab = tabs.get(tabId);
+        Window window = tab.window;
+        Group from = tab.group;
+        int end = 0;
+        for (int i = 0; i < window.tabs.size(); i++) if (window.tabs.get(i).group == from) end = i;
+        window.tabs.remove(tab);
+        from.recent.remove(tab);
+        var group = new Group();
+        window.recent.add(group);
+        tab.group = group;
+        group.recent.add(tab);
+        window.tabs.add(end, tab);
+        select(tab);
+    }
+
     /** A window's tabs in strip order, each its items' ids pane by pane (tabs and panes spec 4); empty for a closed window. */
     List<List<UUID>> windowTabs(UUID windowId) {
         Window window = windows.get(windowId);

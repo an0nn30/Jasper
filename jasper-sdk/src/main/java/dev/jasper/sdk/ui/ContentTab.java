@@ -37,6 +37,34 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     void moveToMainWindow();
     /**
+     * Move Pane to New Tab (tabs and panes spec 9): the pane showing this item leaves its tab for a new tab right after it,
+     * which shows; nothing closes or leaves the window. Its tab's only pane, a tab with a modal prompt open and a tab
+     * being closed stay where they are ({@link #mayMoveToNewTab()}).
+     *
+     * @since 0.21.0
+     */
+    void moveToNewTab();
+    /**
+     * Whether {@link #moveToNewTab()} would move this item, for a menu entry that shows disabled otherwise.
+     *
+     * @return false for its tab's only pane, a tab with a modal prompt open, a tab being closed and a closed one
+     * @since 0.21.0
+     */
+    boolean mayMoveToNewTab();
+    /**
+     * Split with a choice beside this item (tabs and panes spec 8): selects it, then opens {@code choice} in a new pane on
+     * {@code direction}'s side of its pane, as the Split lists' entries do: a terminal for {@link SplitChoice#TERMINAL},
+     * else the split item's view, through its action. A closed tab opens nothing.
+     *
+     * @param choice one of {@link Windows#splitChoices()}
+     * @param direction the new pane's side
+     * @throws IllegalArgumentException when {@code choice} is not one of {@link Windows#splitChoices()}
+     * @throws dev.jasper.sdk.MissingCapabilityException when {@code choice} is {@link SplitChoice#TERMINAL} and the plugin
+     *     lacks {@code terminal.open}
+     * @since 0.21.0
+     */
+    void split(SplitChoice choice, dev.jasper.sdk.terminal.Direction direction);
+    /**
      * The window that holds the tab; {@link dev.jasper.sdk.terminal.WindowHandle#isMain()} tells the main window from a
      * child window.
      *

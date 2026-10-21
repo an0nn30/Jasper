@@ -243,7 +243,7 @@ final class FakeTerminals implements Terminals {
         return local.spec().command().map(command -> "|run:" + String.join(" ", command)).orElse("");
     }
 
-    private static PaneInfo openedInfo(OpenRequest.Local local) {
+    static PaneInfo openedInfo(OpenRequest.Local local) {
         PaneInfo blank = PaneInfo.unknown();
         return new PaneInfo("", local.spec().workingDirectory(), Optional.empty(), 80, 24, false, blank.kind(), Optional.empty(),
             SessionState.RUNNING, blank.exitStatus(), "sh");

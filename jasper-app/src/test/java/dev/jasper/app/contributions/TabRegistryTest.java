@@ -27,6 +27,30 @@ class TabRegistryTest {
         return new TabRegistry.Windows(() -> main, main::equals, tab -> registry.move(tab, separate));
     }
 
+    /** Workspace plan 8b Rulings 18: a tab reaches its window for a terminal beside it and for Move Pane to New Tab. */
+    @Test void aTabReachesItsWindowForATerminalBesideItAndMovePaneToNewTab() {
+        var heard = new ArrayList<String>();
+        boolean[] shares = {true};
+        registry.addHost(new WorkspaceHost(main, tab -> {}, tab -> {}, tab -> {}, () -> {}, tab -> Optional.empty(),
+            (tab, group, side) -> {}, (tab, side) -> heard.add("terminal " + side + " of " + tab.title()),
+            tab -> shares[0], tab -> heard.add("new tab " + tab.title())));
+        Tab notes = registry.open("dev.example.editor", "notes", "Notes", main, new JPanel());
+        registry.splitTerminal(notes, Side.DOWN);
+        assertThat(registry.mayMoveToNewTab(notes)).isTrue();
+        registry.moveToNewTab(notes);
+        shares[0] = false;
+        assertThat(registry.mayMoveToNewTab(notes)).as("its tab's only pane").isFalse();
+        registry.moveToNewTab(notes);
+        shares[0] = true;
+        var pin = notes.pin();
+        assertThat(registry.mayMoveToNewTab(notes)).as("a pinned tab").isFalse();
+        pin.close();
+        notes.close();
+        registry.splitTerminal(notes, Side.RIGHT);
+        registry.moveToNewTab(notes);
+        assertThat(heard).as("a closed tab reaches nothing").containsExactly("terminal DOWN of Notes", "new tab Notes");
+    }
+
     /**
      * Workspace plan 4a: the window a move leaves hears of it only after the move has reported itself, so a failed attach
      * can still go back to it; the window manager then closes a child window the move left empty.

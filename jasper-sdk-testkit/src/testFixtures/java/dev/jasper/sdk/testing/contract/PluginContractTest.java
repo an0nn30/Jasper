@@ -1795,6 +1795,89 @@ public abstract class PluginContractTest {
         assertThat(h.menu("TAB")).as("a placement of a closed action vanishes").isEmpty();
     }
 
+    /**
+     * Tabs and panes spec 8 and 9: a content tab splits beside its own pane with any Split choice, the terminal's
+     * included, whichever pane was focused, and Move Pane to New Tab gives its pane a tab of its own right after its tab;
+     * its tab's only pane and a pinned one stay.
+     */
+    @Test void aContentTabSplitsBesideItsOwnPaneAndMovesItToANewTab() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("test.alpha.sketch", "Sketch"), (window, placement) ->
+                context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("sketch", "Sketch"), window, kitView(context), placement));
+        });
+        var notes = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        var ids = new AtomicReference<List<UUID>>();
+        h.ui(() -> {
+            var windows = alpha.get().windows();
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            notes.set(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), owner, kitView(alpha.get())));
+            UUID note = owner.activeTab().orElseThrow().id();
+            assertThat(notes.get().mayMoveToNewTab()).as("its tab's only pane").isFalse();
+            notes.get().moveToNewTab();
+            alpha.get().terminals().tab(shell).orElseThrow().select();
+            notes.get().split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, Direction.RIGHT);
+            var terminal = owner.activeTab().orElseThrow();
+            assertThat(terminal.kind()).as("Terminal Right").isEqualTo(TabHandle.Kind.TERMINAL);
+            alpha.get().terminals().tab(shell).orElseThrow().select();
+            notes.get().split(windows.splitChoices().get(1), Direction.DOWN);
+            UUID sketch = owner.activeTab().orElseThrow().id();
+            ids.set(List.of(note, terminal.id(), sketch));
+            assertThatIllegalArgumentException().as("not one of Jasper's choices").isThrownBy(() -> notes.get().split(
+                new dev.jasper.sdk.ui.SplitChoice("Other", "test.alpha.split_right_other", "test.alpha.split_down_other"), Direction.RIGHT));
+        });
+        UUID note = ids.get().get(0), terminal = ids.get().get(1), sketch = ids.get().get(2);
+        assertThat(h.windowTabs(main)).as("beside its own pane, whichever pane was focused")
+            .containsExactly(List.of(shell), List.of(note, sketch, terminal));
+        h.ui(() -> {
+            assertThat(notes.get().mayMoveToNewTab()).isTrue();
+            notes.get().moveToNewTab();
+            assertThat(alpha.get().terminals().window(main).orElseThrow().activeTab().map(TabHandle::id)).as("its new tab shows")
+                .contains(note);
+        });
+        assertThat(h.windowTabs(main)).as("a tab of its own, right after its old tab")
+            .containsExactly(List.of(shell), List.of(sketch, terminal), List.of(note));
+        h.ui(() -> {
+            notes.get().split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, Direction.DOWN);
+            var prompt = alpha.get().windows().dialog(new DialogSpec("Question", notes.get(), true));
+            assertThat(notes.get().mayMoveToNewTab()).as("a pane with a modal prompt stays").isFalse();
+            notes.get().moveToNewTab();
+            prompt.close();
+        });
+        assertThat(h.windowTabs(main)).hasSize(3);
+        assertThat(h.windowTabs(main).get(2)).hasSize(2).startsWith(note);
+    }
+
+    /**
+     * Workspace plan 8b Rulings 19: Terminal Right and Terminal Down beside a content tab open a local shell, so they need
+     * {@code terminal.open}, as {@code Terminals.split} does; without it the call is refused, and nothing opens or is
+     * selected.
+     */
+    @Test void aContentTabsTerminalSplitNeedsTerminalOpen() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        var note = new AtomicReference<UUID>();
+        h.ui(() -> {
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            var notes = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), owner, kitView(alpha.get()));
+            note.set(owner.activeTab().orElseThrow().id());
+            alpha.get().terminals().tab(shell).orElseThrow().select();
+            for (Direction direction : List.of(Direction.RIGHT, Direction.DOWN))
+                assertThatThrownBy(() -> notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, direction))
+                    .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> {
+                        assertThat(failure.pluginId()).isEqualTo("test.alpha");
+                        assertThat(failure.capability()).isEqualTo(Capabilities.TERMINAL_OPEN);
+                    });
+            assertThat(owner.activeTab().map(TabHandle::id)).as("nothing is selected").contains(shell);
+        });
+        assertThat(h.windowTabs(main)).as("nothing opens").containsExactly(List.of(shell), List.of(note.get()));
+    }
+
     @Test void openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane() {
         UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
         var alpha = new AtomicReference<PluginContext>();
