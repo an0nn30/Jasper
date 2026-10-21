@@ -148,6 +148,17 @@ public final class EditorPlugin implements Plugin {
         }
         context.settings().page(new EditorSettingsPanel(context.kit(), settings, defaults, System.getenv()));
         context.palette().register(scope);
+        // Workspace tabs spec 13: a saved document tab comes back from its key, as Recent Files reopens it, local or not.
+        context.windows().restorer(EditorWindow.RESTORE_KIND, request -> {
+            String key = request.state().values().getOrDefault(EditorWindow.RESTORE_KEY, "");
+            var document = reopeners.resolve(key);
+            // Which miss it is (workspace plan 6b Rulings 31): no running plugin for the key's prefix, or its file is gone.
+            int prefix = key.indexOf(':');
+            if (document.isEmpty()) return Optional.of(reopeners.handles(key) ? "its file can no longer be opened"
+                : prefix < 1 ? "no running plugin opens this document" : "no running plugin opens " + key.substring(0, prefix + 1) + " documents");
+            return window().openRestored(document.get().apply(request.window()), request.window())
+                ? Optional.empty() : Optional.of("the file is open in another tab");
+        });
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);
         file.add(NEW_TAB);

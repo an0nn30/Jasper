@@ -150,7 +150,7 @@ public final class EditorTab {
         if (find != null && find.event(event)) return;
         if (!(event instanceof UiEvent.Action action)) return;
         switch (action.id()) {
-            case RETRY -> { if (session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
+            case RETRY -> { if (session.deferred() || session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
             case DISMISS -> { session.cancelLoad(); close.accept(this); }
             case FIRST -> { if (session.banner() == DocumentSession.Banner.DELETED) close.accept(this); else if (session.banner() == DocumentSession.Banner.CHANGED) session.reloadFromBanner(); }
             case SECOND -> { if (session.banner() == DocumentSession.Banner.DELETED) session.keepDeleted(); else if (session.banner() == DocumentSession.Banner.CHANGED) session.keepMine(); }
@@ -158,7 +158,7 @@ public final class EditorTab {
         }
     }
     private ViewSpec spec() {
-        boolean ready = showingText(), failed = session.state() == DocumentSession.State.FAILED;
+        boolean ready = showingText(), failed = session.state() == DocumentSession.State.FAILED, waiting = session.deferred();
         var children = new ArrayList<Nodes.Node>();
         boolean banner = session.banner() != DocumentSession.Banner.NONE;
         boolean deleted = session.banner() == DocumentSession.Banner.DELETED;
@@ -169,9 +169,10 @@ public final class EditorTab {
         // The canonical full-body empty state: a short title over one sentence, the secondary action, then the one primary.
         children.add(new Nodes.Empty(STATE, visible(!ready), new Nodes.Icon("document.state.icon", ControlState.READY,
             failed ? "error" : "file", Nodes.Hue.NONE, Nodes.IconSize.EMPTY, failed ? "Load failed" : "Loading"),
-            failed ? FAILED_TITLE : "Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…", failed ? session.failure() : "",
-            List.of(button(DISMISS, failed ? "Close" : "Cancel", true),
-                new Nodes.Button(RETRY, visible(failed && session.retryable()), "Retry", "", Nodes.ButtonKind.PRIMARY, RETRY, ""))));
+            failed ? FAILED_TITLE : waiting ? session.name() + session.host().map(host -> " on " + host).orElse("") + " loads when you open it"
+                : "Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…", failed ? session.failure() : "",
+            List.of(button(DISMISS, failed || waiting ? "Close" : "Cancel", true),
+                new Nodes.Button(RETRY, visible(waiting || failed && session.retryable()), waiting ? "Load" : "Retry", "", Nodes.ButtonKind.PRIMARY, RETRY, ""))));
         children.add(vimBar.node(ready));
         if (find != null) children.add(find.node());
         return new ViewSpec(new Nodes.Split("document.tab", ControlState.READY, Nodes.SplitKind.DOCUMENT, children));

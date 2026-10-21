@@ -234,6 +234,49 @@ class EditorTabTest {
         assertThat(button(binary, EditorTab.RETRY).state().visible()).isFalse();
     }
 
+    /** Workspace tabs spec 13: a restored remote document waits with Load, reads first asking nothing, then as usual on Retry. */
+    @Test void aDeferredDocumentOffersLoadReadsQuietlyFirstAndAsUsualOnRetry() {
+        var quiet = new java.util.concurrent.atomic.AtomicInteger();
+        var loud = new java.util.concurrent.atomic.AtomicInteger();
+        dev.jasper.editor.api.EditorDocument remote = new dev.jasper.editor.api.EditorDocument() {
+            @Override public String key() { return "test:/srv/notes.md"; }
+            @Override public String name() { return "notes.md"; }
+            @Override public String location() { return "box:/srv/notes.md"; }
+            @Override public Optional<String> host() { return Optional.of("box"); }
+            @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> read(long limitBytes) {
+                loud.incrementAndGet();
+                return java.util.concurrent.CompletableFuture.completedFuture(new dev.jasper.editor.api.Content("hi\n".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                    new dev.jasper.editor.api.Revision(1, 3)));
+            }
+            @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> readQuietly(long limitBytes) {
+                quiet.incrementAndGet();
+                return java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("Not signed in to box; Retry signs in"));
+            }
+            @Override public java.util.concurrent.CompletableFuture<Optional<dev.jasper.editor.api.Revision>> revision() {
+                return java.util.concurrent.CompletableFuture.completedFuture(Optional.empty());
+            }
+            @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Revision> write(byte[] content) {
+                return java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("read only"));
+            }
+        };
+        var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), new DocumentSession(remote, environment), closed::add, false);
+        tab.session().defer();
+        assertThat(stateText(tab)).isEqualTo("notes.md on box loads when you open it");
+        assertThat(button(tab, EditorTab.RETRY).label()).isEqualTo("Load");
+        assertThat(button(tab, EditorTab.RETRY).state().visible()).isTrue();
+        assertThat(quiet.get() + loud.get()).isZero();
+        click(tab, EditorTab.RETRY);
+        drain();
+        assertThat(quiet).hasValue(1);
+        assertThat(tab.session().state()).isEqualTo(DocumentSession.State.FAILED);
+        assertThat(button(tab, EditorTab.RETRY).label()).isEqualTo("Retry");
+        click(tab, EditorTab.RETRY);
+        drain();
+        assertThat(loud).as("Retry reads as usual, which may sign in").hasValue(1);
+        assertThat(tab.session().state()).isEqualTo(DocumentSession.State.READY);
+        tab.dispose();
+    }
+
     @Test void theBannerOffersReloadOrKeepMineAndCloseOrKeep() throws Exception {
         Path file = Files.writeString(folder.resolve("b.yaml"), "a: 1\n");
         var tab = open(file);

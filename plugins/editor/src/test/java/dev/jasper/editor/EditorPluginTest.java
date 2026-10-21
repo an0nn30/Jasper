@@ -285,6 +285,116 @@ class EditorPluginTest {
         }
     }
 
+    /**
+     * Workspace tabs spec 13: a document's tab gives its file's key and comes back through the Editor's restorer; an
+     * untitled one is not saved, and a key nothing can open now restores nothing.
+     */
+    @Test void aDocumentComesBackFromItsKeyAndAnUntitledOneIsNotSaved() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow();
+            Path notes = Files.writeString(home.resolve("notes.md"), "# notes\n");
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            consumer.get().services().require(Editor.class).open(notes);
+            drain(host);
+            var tab = host.contentTab("dev.jasper.editor", "notes.md").orElseThrow();
+            var state = dev.jasper.sdk.RestoreState.of("document", "key", "local:" + notes.toAbsolutePath().normalize());
+            assertThat(host.restoreState(tab)).contains(state);
+            tab.close();
+            assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", state)).isPresent();
+            drain(host);
+            var back = host.contentTab("dev.jasper.editor", "notes.md").orElseThrow();
+            assertThat(back.window().id()).isEqualTo(main);
+            assertThat(host.restoreState(back)).contains(state);
+            assertThat(host.invoke("dev.jasper.editor.new_editor_tab", main, null)).isTrue();
+            var untitled = host.contentTabs().stream().filter(open -> host.contentPresentation(open).title().startsWith("Untitled"))
+                .findFirst().orElseThrow();
+            assertThat(host.restoreState(untitled)).as("an unsaved untitled buffer is not kept").isEmpty();
+            assertThat(host.restoreTab("dev.jasper.editor", main, "gone.txt",
+                dev.jasper.sdk.RestoreState.of("document", "key", "remote:gone"))).isEmpty();
+            // A prefix a running plugin handles, whose reopener cannot open the key now: the file, not the plugin, is gone.
+            consumer.get().services().require(Editor.class).reopener("test:", key -> Optional.empty());
+            assertThat(host.restoreTab("dev.jasper.editor", main, "kept.txt",
+                dev.jasper.sdk.RestoreState.of("document", "key", "test:kept"))).isEmpty();
+            assertThat(host.declinedRestores()).containsExactly(
+                "dev.jasper.editor document: no running plugin opens remote: documents",
+                "dev.jasper.editor document: its file can no longer be opened");
+            assertThat(host.failures()).as("expected outcomes, no failure").isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b's review: a local file deleted since its tab was saved comes back as a failed read with Retry, and
+     * keeps its restore state, so it comes back again while it stays open.
+     */
+    @Test void aDeletedLocalFileComesBackAsAFailedReadWithRetry() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow();
+            Path gone = home.resolve("gone.md");
+            var state = dev.jasper.sdk.RestoreState.of("document", "key", "local:" + gone.toAbsolutePath().normalize());
+            assertThat(host.restoreTab("dev.jasper.editor", main, "gone.md", state)).isPresent();
+            drain(host);
+            var tab = host.contentTab("dev.jasper.editor", "gone.md").orElseThrow();
+            var retry = dev.jasper.editor.testsupport.Kits.button(host.contentView("dev.jasper.editor", "gone.md").orElseThrow(), "document.retry");
+            assertThat(retry.state().visible()).as("a failed read, with Retry").isTrue();
+            assertThat(host.restoreState(tab)).contains(state);
+            assertThat(host.declinedRestores()).isEmpty();
+            assertThat(host.restoreTab("dev.jasper.editor", main, "notes", dev.jasper.sdk.RestoreState.of("document", "key", "notes")))
+                .as("a key with no prefix").isEmpty();
+            assertThat(host.declinedRestores()).containsExactly("dev.jasper.editor document: no running plugin opens this document");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace tabs spec 13: a restored document on another host waits until its tab is first active, then reads asking
+     * nothing; a document already open restores no second tab.
+     */
+    @Test void aRestoredRemoteDocumentReadsQuietlyOnlyOnceItsTabIsActive() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            var quiet = new java.util.concurrent.atomic.AtomicInteger();
+            var loud = new java.util.concurrent.atomic.AtomicInteger();
+            dev.jasper.editor.api.EditorDocument remote = new dev.jasper.editor.api.EditorDocument() {
+                @Override public String key() { return "test:/srv/notes.md"; }
+                @Override public String name() { return "notes.md"; }
+                @Override public String location() { return "box:/srv/notes.md"; }
+                @Override public Optional<String> host() { return Optional.of("box"); }
+                @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> read(long limitBytes) {
+                    loud.incrementAndGet();
+                    return java.util.concurrent.CompletableFuture.completedFuture(new dev.jasper.editor.api.Content(new byte[0], new dev.jasper.editor.api.Revision(1, 0)));
+                }
+                @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> readQuietly(long limitBytes) {
+                    quiet.incrementAndGet();
+                    return java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("Not signed in to box; Retry signs in"));
+                }
+                @Override public java.util.concurrent.CompletableFuture<Optional<dev.jasper.editor.api.Revision>> revision() {
+                    return java.util.concurrent.CompletableFuture.completedFuture(Optional.empty());
+                }
+                @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Revision> write(byte[] content) {
+                    return java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("read only"));
+                }
+            };
+            consumer.get().services().require(Editor.class).reopener("test:", key -> Optional.of(owner -> remote));
+            var state = dev.jasper.sdk.RestoreState.of("document", "key", remote.key());
+            assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", state)).isPresent();
+            drain(host);
+            assertThat(quiet.get() + loud.get()).as("not read while its tab is not active").isZero();
+            var tab = host.contentTab("dev.jasper.editor", "notes.md").orElseThrow();
+            tab.select();
+            drain(host);
+            assertThat(quiet).as("read once it is active, asking nothing").hasValue(1);
+            assertThat(loud).hasValue(0);
+            assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", state)).as("already open").isEmpty();
+            assertThat(host.declinedRestores()).singleElement().asString().contains("the file is open in another tab");
+        }
+    }
+
     /** Workspace tabs spec 6.5: New Editor Window, with no default key, opens an untitled document in a new child window. */
     @Test void newEditorWindowOpensAnUntitledDocumentInANewChildWindow() throws Exception {
         try (var host = host()) {

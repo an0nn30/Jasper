@@ -48,6 +48,8 @@ import org.fife.ui.rsyntaxtextarea.RSyntaxTextAreaEditorKit;
 
 /** Document sessions and commands for app-owned tabs, including closing and quitting. UI thread only. */
 public final class EditorWindow {
+    /** The restorer kind of a document tab, and the key its restore state names the document by (workspace tabs spec 13). */
+    public static final String RESTORE_KIND = "document", RESTORE_KEY = "key";
     // Revert to Saved too: the tab strip's menu, its other place, hides with one tab (workspace plan 8b Rulings 20).
     private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment", "revert");
 
@@ -177,6 +179,25 @@ public final class EditorWindow {
             finally { promptOwner = null; }
         });
         if (environment.timers()) ticker.start();
+    }
+
+    /**
+     * Opens a document Jasper restores with its windows (workspace tabs spec 13): its tab is placed where it was saved, not
+     * selected. A document on another host waits until its tab is first active, or Load is pressed, and then reads without
+     * asking anything ({@code EditorDocument.readQuietly}); Retry then reads it as usual, which may sign in.
+     *
+     * @param document the saved document
+     * @param owner the window being restored
+     * @return false when the document is open already, and no tab opened
+     */
+    public boolean openRestored(EditorDocument document, WindowOwner owner) {
+        if (model.find(document.key()).isPresent()) return false;
+        origin = owner;
+        var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
+        var created = new DocumentSession(document, sessionEnvironment(ref));
+        add(created, ref); reportWhenLoaded(created);
+        if (document.host().isPresent()) created.defer(); else created.load();
+        return true;
     }
 
     /** @param document opened in a new tab, or its open tab selected; the window comes to the front */
@@ -798,10 +819,12 @@ public final class EditorWindow {
         });
         model.add(session);
         numbers.put(session, nextNumber++);
-        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab.view(), placement);
+        var spec = new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name());
+        var handle = context.windows().openTab(restoreState(session).map(spec::withRestore).orElse(spec), origin, tab.view(), placement);
         hosted.put(tab, handle); ownerRef.set(handle);
         handle.setFocusTarget(tab::focusText);
-        handle.onActive(active -> { if (active) activate(tab); });
+        // A restored document on another host reads when its tab is first active (workspace tabs spec 13).
+        handle.onActive(active -> { if (active) { activate(tab); if (session.deferred()) session.load(); } });
         handle.onClosed(() -> remove(tab));
         // Tabs and panes spec 2.10 and 9: the right-click menu's Split submenu and Move Pane to New Tab.
         PaneItems.install(tab.area().getPopupMenu(), context.windows()::splitChoices, handle);
@@ -853,6 +876,8 @@ public final class EditorWindow {
             DocumentSession session = entry.getKey().session();
             entry.getValue().setPresentation(new ContentPresentation(session.name(), model.detail(session),
                 session.host().isPresent() ? serverIcon : fileIcon, session.dirty(), session.location(), session.host().orElse("")));
+            // A document saved under a new name, or an untitled one saved for the first time, comes back as that file.
+            entry.getValue().setRestore(restoreState(session));
         }
     }
 
@@ -871,6 +896,14 @@ public final class EditorWindow {
 
     private static Command command(String id, String title, int keyCode, int extraModifiers, Runnable run) {
         return new Command(id, title, Optional.of(KeyNames.stroke(keyCode, extraModifiers)), true, run);
+    }
+
+    /**
+     * How a document's tab comes back when Jasper restores its windows (workspace tabs spec 13): by its document's key, as
+     * Recent Files reopens it. An untitled document has none: an unsaved untitled buffer is not kept.
+     */
+    private static Optional<dev.jasper.sdk.RestoreState> restoreState(DocumentSession session) {
+        return session.document().map(document -> dev.jasper.sdk.RestoreState.of(RESTORE_KIND, RESTORE_KEY, document.key()));
     }
 
     private static Optional<Path> localFile(DocumentSession session) {

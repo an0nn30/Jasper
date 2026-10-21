@@ -66,6 +66,15 @@ public final class Reopeners {
     }
 
     /**
+     * @param key a recorded document key
+     * @return whether the key's prefix is one the Editor ({@code local:}) or a running plugin handles, though it may not
+     *     reopen the key now
+     */
+    public boolean handles(String key) {
+        return key.startsWith(LOCAL) || byPrefix.keySet().stream().anyMatch(key::startsWith);
+    }
+
+    /**
      * @param listener runs when a registration is added or removed
      * @return removes the listener
      */
