@@ -155,6 +155,18 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: moves a tab the test added to another open window, where it is selected; a child window left with no tab closes. */
     void moveTab(java.util.UUID tabId, java.util.UUID windowId);
 
+    /**
+     * UI thread: restores one saved tab through its plugin's restorer, as Jasper does when it restores its windows (workspace
+     * tabs spec 13).
+     *
+     * @return the tab the restorer opened in the window; empty when the plugin has no restorer for the kind, or it threw or
+     *     opened nothing
+     */
+    java.util.Optional<java.util.UUID> restoreTab(String pluginId, java.util.UUID windowId, String title, dev.jasper.sdk.RestoreState state);
+
+    /** UI thread: the restore state a tab gives, a content tab's or a provided session's; empty when it does not come back. */
+    java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(java.util.UUID tabId);
+
     /** UI thread: closes a tab the test added, of either kind, its pane with it; a child window's last tab takes the window with it. */
     void closeTab(java.util.UUID tabId);
 

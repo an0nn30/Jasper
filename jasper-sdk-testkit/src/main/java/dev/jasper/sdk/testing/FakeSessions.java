@@ -128,6 +128,14 @@ final class FakeSessions {
         }
     }
 
+    /** A restored session waits, not started, until its tab is shown, when the workspace connects it. */
+    void hold(FakePluginContext owner, FakeWorkspace.Pane pane, SessionSpec spec) {
+        pane.session = new Session(owner, spec);
+        pane.session.state = "NOT_STARTED";
+        pane.held = pane.info;
+        pane.info = FakeTerminals.notStarted(pane.info);
+    }
+
     String state(FakeWorkspace.Pane paneOrNull) {
         if (paneOrNull == null || !paneOrNull.open) return "CLOSED|";
         return paneOrNull.session == null ? "LOCAL|" : paneOrNull.session.state + "|" + paneOrNull.session.status;

@@ -78,6 +78,9 @@ class FakeContractTest extends PluginContractTest {
             @Override public java.util.UUID addTerminalTab(java.util.UUID windowId, String title) { return host.addTerminalTab(windowId, title); }
             @Override public java.util.UUID addContentTab(java.util.UUID windowId, String title) { return host.addContentTab(windowId, title); }
             @Override public void moveTab(java.util.UUID tabId, java.util.UUID windowId) { host.moveTab(tabId, windowId); }
+            @Override public java.util.Optional<java.util.UUID> restoreTab(String pluginId, java.util.UUID windowId, String title,
+                    dev.jasper.sdk.RestoreState state) { return host.restoreTab(pluginId, windowId, title, state); }
+            @Override public java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(java.util.UUID tabId) { return host.restoreState(tabId); }
             @Override public void closeTab(java.util.UUID tabId) { host.closeTab(tabId); }
             @Override public List<List<java.util.UUID>> windowTabs(java.util.UUID windowId) { return host.windowTabs(windowId); }
             @Override public List<String> scopes() { return host.scopes(); }
@@ -148,6 +151,29 @@ class FakeContractTest extends PluginContractTest {
             @Override public void commandClient(java.nio.file.Path client) { host.setCommandClient(client); }
             @Override public void close() { host.close(); }
         };
+    }
+
+    /**
+     * Workspace plan 6b Rulings 24, the fake alone: while a restorer runs, the window being restored opens no session but
+     * the saved one. The application pins it in {@code PluginTabRestoreTest}.
+     */
+    @org.junit.jupiter.api.Test void whileARestorerRunsTheWindowBeingRestoredOpensNoOtherSession() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            java.util.UUID window = host.addTerminalWindow();
+            var other = new java.util.concurrent.atomic.AtomicReference<java.util.Optional<dev.jasper.sdk.terminal.PaneHandle>>();
+            host.start(new PluginInfo("test.alpha", "Alpha", "1.0.0", Set.of(dev.jasper.sdk.Capabilities.SESSION_PROVIDE)), Set.of(), Set.of(),
+                context -> context.windows().restorer("ssh", request -> {
+                    var terminals = context.terminals();
+                    terminals.openTab(request.window(), dev.jasper.sdk.terminal.OpenRequest.session(
+                        dev.jasper.sdk.terminal.SessionSpec.of("saved", pending -> { }).withRestore(request.state())));
+                    other.set(terminals.openTab(request.window(), dev.jasper.sdk.terminal.OpenRequest.session(
+                        dev.jasper.sdk.terminal.SessionSpec.of("other", pending -> { }))));
+                    return java.util.Optional.empty();
+                }));
+            org.assertj.core.api.Assertions.assertThat(host.restoreTab("test.alpha", window, "saved",
+                new dev.jasper.sdk.RestoreState("ssh", java.util.Map.of()))).isPresent();
+            org.assertj.core.api.Assertions.assertThat(other.get()).as("the window being restored takes only the saved tab").isEmpty();
+        } });
     }
 
     /** The contract's line for a fake post. */

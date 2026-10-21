@@ -455,6 +455,19 @@ class HostedUiTest {
                     .isEqualTo(each.slot()));
     }
 
+    /** Workspace plan 6b Rulings 30: a saved state the SDK refuses restores nothing, runs no restorer and raises no incident. */
+    @Test void aSavedStateTheSdkRefusesRestoresNothingAndRaisesNoIncident() {
+        int[] restored = {0};
+        ui.windows().restorer("note", request -> { restored[0]++; return java.util.Optional.empty(); });
+        var outcome = model.tabs().restore(dev.jasper.app.layout.TabId.random(), "dev.x.tool",
+            new dev.jasper.app.contributions.TabRegistry.Restoring(java.util.UUID.randomUUID(), "Too long",
+                new dev.jasper.app.layout.TabRestore("note", java.util.Map.of("text", "x".repeat(dev.jasper.sdk.RestoreState.MAX_CHARACTERS)))));
+        assertThat(outcome.tab()).isEmpty();
+        assertThat(outcome.problem()).isEqualTo("its saved state is not valid");
+        assertThat(restored[0]).as("the plugin never sees it").isZero();
+        assertThat(containment.failures("dev.x.tool")).as("no incident").isZero();
+    }
+
     @Test void dialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {
         var owner = terminals.windowHandle(terminalFixture.addWindow());
         List<String> events = new ArrayList<>();

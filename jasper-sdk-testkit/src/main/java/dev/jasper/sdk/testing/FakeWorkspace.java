@@ -71,6 +71,19 @@ final class FakeWorkspace {
     private UUID reportedActive;
 
     final FakeSessions sessions;
+    /** The saved tab a plugin's restorer is rebuilding, while it runs (workspace tabs spec 13). */
+    Slot slot;
+
+    /** A saved tab being rebuilt: the first tab its plugin opens takes it, in the window being restored. */
+    static final class Slot {
+        final Window window; final FakePluginContext owner; Tab taken;
+        Slot(Window window, FakePluginContext owner) { this.window = window; this.owner = owner; }
+    }
+
+    /** @return the slot, while {@code context}'s plugin has not opened its tab yet; the caller sets what took it */
+    Optional<Slot> takeSlot(FakePluginContext context) {
+        return slot != null && slot.taken == null && slot.owner == context ? Optional.of(slot) : Optional.empty();
+    }
 
     FakeWorkspace(FakePluginHost host) { this.host = host; this.sessions = new FakeSessions(host, this); }
 
@@ -138,6 +151,14 @@ final class FakeWorkspace {
         return pane;
     }
 
+    /** An item of {@code kind} in a new tab at the end of {@code window}'s strip, announced and not selected: a restored one. */
+    Tab placeTab(Window window, TabHandle.Kind kind, String title) { return announceTab(window, kind, title, null); }
+
+    /** A terminal item with its one pane, placed as {@link #placeTab} places an item: a restored session's. */
+    Pane placeTerminal(Window window, String title, PaneInfo info) {
+        return addPane(announceTab(window, TabHandle.Kind.TERMINAL, title, null), info);
+    }
+
     private Tab announceTab(Window window, TabHandle.Kind kind, String title, Tab beside) {
         var tab = new Tab(window, kind, title);
         everyTab.add(tab);
@@ -187,8 +208,14 @@ final class FakeWorkspace {
         if (tab.pane != null && tab.pane.held != null) start(tab.pane);
     }
 
-    /** A held pane starts: its local shell runs, with the grid it had before it was held. */
+    /** A held pane starts: a provided session connects; a local shell runs, with the grid it had before it was held. */
     private void start(Pane pane) {
+        if (pane.session != null) {
+            pane.info = pane.held;
+            pane.held = null;
+            sessions.connect(pane.session.owner, pane, pane.session.spec);
+            return;
+        }
         pane.info = FakeTerminals.withState(pane.held, dev.jasper.sdk.terminal.SessionState.RUNNING, java.util.OptionalInt.empty());
         pane.held = null;
         host.publishApp(TerminalEvents.SESSION_STATE_CHANGED,

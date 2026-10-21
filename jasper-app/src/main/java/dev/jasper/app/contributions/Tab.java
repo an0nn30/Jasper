@@ -2,6 +2,7 @@ package dev.jasper.app.contributions;
 
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.TabId;
+import dev.jasper.app.layout.TabRestore;
 import dev.jasper.app.lifecycle.Subscription;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +48,7 @@ public final class Tab implements AutoCloseable {
     private Runnable focus;
     private List<ContentCommand> commands = List.of();
     private List<ContentStatus> status = List.of();
+    private Optional<TabRestore> restore = Optional.empty();
 
     Tab(TabRegistry registry, TabId id, Kind kind, String plugin, String key, String title, TabContent content) {
         this.registry = registry;
@@ -94,6 +96,25 @@ public final class Tab implements AutoCloseable {
     public UUID window() { return window; }
     public List<ContentCommand> commands() { return commands; }
     public List<ContentStatus> status() { return status; }
+    /**
+     * How the item comes back when the windows are restored (workspace tabs spec 13).
+     *
+     * @return its plugin's restorer kind and restore state; empty while it does not come back
+     */
+    public Optional<TabRestore> restore() { return restore; }
+
+    /**
+     * How the tab comes back when the windows are restored, as its plugin says; a change is saved as a layout change is.
+     * Ignored once the tab has closed.
+     *
+     * @param value the restorer kind and restore state, or empty
+     */
+    public void restore(Optional<TabRestore> value) {
+        Objects.requireNonNull(value, "value");
+        if (closed || value.equals(restore)) return;
+        restore = value;
+        registry.restoreChanged.run();
+    }
 
     /**
      * The group that holds the tab in its window's layout.

@@ -94,6 +94,8 @@ public final class FakePluginHost implements AutoCloseable {
     final FakeNotifications notifications = new FakeNotifications(this);
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
+    /** Why restorers declined, in order (workspace tabs spec 13). */
+    private final List<String> declines = new CopyOnWriteArrayList<>();
     final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<String, List<String>> settingsReports = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<UUID, FakeUi.FakeWindow> overlays = new HashMap<>();
@@ -1758,6 +1760,77 @@ public final class FakePluginHost implements AutoCloseable {
     public java.util.Optional<FakeKitView> contentView(String pluginId, String title) {
         return contentTab(pluginId, title).map(tab -> ((FakeContent) tab).view);
     }
+
+    /**
+     * The restore state a tab gives (workspace tabs spec 13): a plugin's content tab's, or the one a plugin's provided
+     * session carries. Call it on the UI thread.
+     *
+     * @param tabId a tab of the scripted workspace
+     * @return its restore state; empty when the tab does not come back
+     * @since 0.21.0
+     */
+    public java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(UUID tabId) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeContent content : context.ui.contents) if (content.tab.id.equals(tabId)) return content.restore;
+        return workspace.tab(tabId).map(tab -> tab.pane).map(pane -> pane.session).flatMap(session -> session.spec.restore());
+    }
+
+    /**
+     * The restore state a plugin's content tab gives (workspace tabs spec 13). Call it on the UI thread.
+     *
+     * @param tab a content tab from this host
+     * @return its restore state; empty when the tab does not come back
+     * @since 0.21.0
+     */
+    public java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent) tab).restore; }
+
+    /**
+     * Restores one saved tab as Jasper does when it restores its windows (workspace tabs spec 13): the plugin's restorer for
+     * {@code state}'s kind runs, and the first tab it opens, a content tab or a provided session's, is the saved tab, in
+     * window {@code windowId} whatever window or placement it named. A content tab is placed there, not shown: it is
+     * neither selected nor active until the test shows it. A session's tab waits as Jasper's does, {@code NOT_STARTED} with
+     * no connection attempt, until its tab is shown ({@link #focusTerminalPane} or its {@code TabHandle.select()}). Jasper
+     * places the tab where it was saved, in its tab and pane; this fake puts it in a new tab at the end of the window's
+     * strip. Call it on the UI thread.
+     *
+     * @param pluginId the plugin that saved the tab
+     * @param windowId the window being restored
+     * @param title the tab's saved title
+     * @param state its saved restore state
+     * @return the tab the restorer opened, content or terminal, while it is open in that window; empty when the plugin is
+     *     not running or has no restorer for the kind, or its restorer declined (recorded in {@link #declinedRestores()}),
+     *     threw before it opened a tab (recorded in {@link #failures()}) or opened nothing, where Jasper shows a placeholder
+     * @since 0.21.0
+     */
+    public java.util.Optional<UUID> restoreTab(String pluginId, UUID windowId, String title, dev.jasper.sdk.RestoreState state) {
+        FakeWorkspace.Window window = workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No window " + windowId));
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null || context.state != FakePluginContext.State.ACTIVE) return java.util.Optional.empty();
+        dev.jasper.sdk.ui.TabRestorer restorer = context.ui.restorers.get(state.kind());
+        if (restorer == null || workspace.slot != null) return java.util.Optional.empty();
+        var slot = new FakeWorkspace.Slot(window, context);
+        workspace.slot = slot;
+        java.util.Optional<String> declined;
+        try {
+            declined = restorer.restore(new dev.jasper.sdk.ui.RestoreRequest(context.terminals.windowHandle(windowId), title, state));
+        } catch (RuntimeException | LinkageError failure) {
+            failures.add(pluginId + " restorer " + state.kind() + ": " + failure);
+            return java.util.Optional.ofNullable(slot.taken).filter(tab -> tab.open && tab.window == window).map(tab -> tab.id);
+        } finally {
+            workspace.slot = null;
+        }
+        if (declined != null && declined.isPresent()) declines.add(pluginId + " " + state.kind() + ": " + declined.get());
+        // As Jasper's: only a tab still open in the window being restored is the saved tab.
+        return java.util.Optional.ofNullable(slot.taken).filter(tab -> tab.open && tab.window == window).map(tab -> tab.id);
+    }
+
+    /**
+     * Why restorers declined to restore a tab, in order: an expected outcome a placeholder shows, which is no failure.
+     *
+     * @return lines of the form {@code <plugin id> <kind>: <reason>}
+     * @since 0.21.0
+     */
+    public List<String> declinedRestores() { return List.copyOf(declines); }
 
     /** A {@code Terminals.environment} contributor and the plugin that registered it. */
     record ShellContributor(FakePluginContext context, Function<Map<String, String>, Map<String, String>> contributor) { }

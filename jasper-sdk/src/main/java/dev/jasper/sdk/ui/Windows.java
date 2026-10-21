@@ -48,6 +48,22 @@ public interface Windows {
     ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content, TabPlacement placement);
 
     /**
+     * Registers how this plugin rebuilds its tabs saved with restore state of {@code kind} (workspace tabs spec 13 and 14).
+     * Register it in {@code start()}: Jasper restores its windows once every plugin has started, and again whenever the
+     * main window opens after it closed. A tab is saved only while its plugin has a restorer for its kind; a saved tab
+     * whose plugin is missing or disabled, or has no restorer for its kind any more, comes back as a placeholder that
+     * says why.
+     *
+     * @param kind the restorer kind, as {@link dev.jasper.sdk.RestoreState} allows it
+     * @param restorer opens one saved tab again
+     * @return the registration; closing it ends this restorer
+     * @throws IllegalArgumentException when the kind is not valid, or this plugin already has a restorer for it
+     * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread
+     * @since 0.21.0
+     */
+    Subscription restorer(String kind, TabRestorer restorer);
+
+    /**
      * Registers a split item (tabs and panes spec 8 and 11). Jasper lists it in every Split list (the Tab menu's and the
      * right-click menus' Split submenus) after the terminal, the bundled plugins' items first and each in the order they
      * registered, and registers its {@link SplitItemSpec#rightAction()} and {@link SplitItemSpec#downAction()}, which can

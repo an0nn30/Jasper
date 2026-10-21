@@ -548,6 +548,7 @@ final class HostedUi {
         public void setStatus(List<dev.jasper.sdk.ui.ContentStatus> values) { requireUi("content status"); entry.status(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentStatus(v.text(), v.tooltip(), v.run() == null ? null : () -> containment.run(pluginId, "content status", v.run()))).toList()); }
         public void setFocusTarget(Runnable focus) { requireUi("content focus"); entry.focusTarget(() -> containment.run(pluginId, "content focus", focus)); }
+        public void setRestore(Optional<dev.jasper.sdk.RestoreState> state) { requireUi("content restore"); entry.restore(state.map(HostedUi::restore)); }
         public void select() { requireUi("select content"); entry.select(); }
         public void moveToNewWindow() { requireUi("move content"); entry.moveToNewWindow(); }
         public void moveToMainWindow() { requireUi("move content"); entry.moveToMainWindow(); }
@@ -587,6 +588,17 @@ final class HostedUi {
         public Subscription onClosed(Runnable listener) { requireUi("content disposal"); return wrap(entry.onClosed(()->containment.run(pluginId,"content disposal",listener))); }
         public void close() { subscription(entry::close).close(); }
     }
+    /** The application's twin of a plugin's restore state (workspace tabs spec 13). */
+    private static dev.jasper.app.layout.TabRestore restore(dev.jasper.sdk.RestoreState state) {
+        return new dev.jasper.app.layout.TabRestore(state.kind(), state.values());
+    }
+
+    /** Why a restorer that threw restored nothing, as a placeholder words it. */
+    private static String problem(Throwable failure) {
+        String message = failure.getMessage();
+        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+    }
+
     private WindowOwner resolveContentOwner(WindowOwner owner) {
         if (owner instanceof OwnedContent content) {
             if (ownedContent.get(content.entry) != content || content.entry.closed()) throw new IllegalArgumentException("Closed or foreign content owner");
@@ -720,6 +732,7 @@ final class HostedUi {
                 });
                 var existing = ownedContent.get(entry); if (existing != null) return existing;
                 var owned = new OwnedContent(entry); ownedContent.put(entry, owned);
+                entry.restore(spec.restore().map(HostedUi::restore));
                 Runnable cleanup = entry::close;
                 closers.add(cleanup);
                 entry.onClosed(() -> { ownedContent.remove(entry); closers.remove(cleanup); });
@@ -768,6 +781,32 @@ final class HostedUi {
                     });
                     if (!invoked) result.complete(false);
                     return result;
+                });
+                return tracked(registration::close);
+            }
+            @Override public Subscription restorer(String kind, dev.jasper.sdk.ui.TabRestorer restorer) {
+                HostedUi.this.guard("tab restorer");
+                java.util.Objects.requireNonNull(restorer, "restorer");
+                // The kind's rules are the restore state's (workspace tabs spec 14).
+                new dev.jasper.sdk.RestoreState(kind, java.util.Map.of());
+                var registration = model.tabs().restorer(pluginId, kind, saved -> {
+                    dev.jasper.sdk.RestoreState state;
+                    try {
+                        state = new dev.jasper.sdk.RestoreState(saved.state().kind(), saved.state().state());
+                    } catch (IllegalArgumentException | NullPointerException invalid) {
+                        // A file this build did not write may hold a state the SDK refuses: no restorer sees it, and it
+                        // is no failure (workspace plan 6b Rulings 30).
+                        return Optional.of("its saved state is not valid");
+                    }
+                    var request = new dev.jasper.sdk.ui.RestoreRequest(terminals.windowHandle(saved.window()), saved.title(), state);
+                    // A reason the restorer gives is expected, and no failure; what it throws is the plugin's failure.
+                    var said = new java.util.concurrent.atomic.AtomicReference<Optional<String>>(Optional.empty());
+                    Throwable thrown = containment.attempt(pluginId, "tab restorer", () -> {
+                        Optional<String> declined = restorer.restore(request);
+                        said.set(declined == null ? Optional.empty() : declined.filter(reason -> !reason.isBlank()));
+                        return null;
+                    });
+                    return thrown == null ? said.get() : Optional.of(problem(thrown));
                 });
                 return tracked(registration::close);
             }

@@ -3,6 +3,7 @@ package dev.jasper.app.contributions;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
+import dev.jasper.app.layout.TabRestore;
 import dev.jasper.app.lifecycle.Subscription;
 import java.awt.Toolkit;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.swing.JComponent;
@@ -41,6 +43,43 @@ public final class TabRegistry {
     private List<Tab> pending = List.of();
     private CompletableFuture<Boolean> decision;
     private CompletableFuture<Boolean> closing;
+    /** Each plugin's restorers by kind (workspace tabs spec 13). */
+    private final Map<String, Map<String, Function<Restoring, Optional<String>>>> restorers = new HashMap<>();
+    /** The saved tab being rebuilt: the next tab its plugin opens takes its id and window. */
+    private Slot slot;
+    /** Told when a tab's restore state changes, which is saved as a layout change is. */
+    Runnable restoreChanged = () -> { };
+
+    /** A saved tab being rebuilt, and the tab its plugin opened for it so far. */
+    private static final class Slot {
+        final TabId id; final UUID window; final String plugin; Tab taken;
+        Slot(TabId id, UUID window, String plugin) { this.id = id; this.window = window; this.plugin = plugin; }
+    }
+
+    /**
+     * A saved tab its plugin rebuilds (workspace tabs spec 13).
+     *
+     * @param window the window being restored
+     * @param title the tab's title when it was saved
+     * @param state the plugin's restorer kind and the tab's restore state
+     */
+    public record Restoring(UUID window, String title, TabRestore state) {
+        /** Requires every value. */
+        public Restoring {
+            Objects.requireNonNull(window, "window"); Objects.requireNonNull(title, "title"); Objects.requireNonNull(state, "state");
+        }
+    }
+
+    /**
+     * What rebuilding a saved tab gave (workspace tabs spec 13).
+     *
+     * @param tab the tab its plugin opened, with the saved id, in the window being restored, which places it
+     * @param problem why there is no tab, as its placeholder words it after the plugin's name; empty with a tab
+     */
+    public record Restored(Optional<Tab> tab, String problem) {
+        /** Requires both values. */
+        public Restored { Objects.requireNonNull(tab, "tab"); Objects.requireNonNull(problem, "problem"); }
+    }
 
     /** Where {@link #open} puts a new plugin's tab: the app's twin of the SDK's {@code TabPlacement} (workspace tabs spec 14). */
     public enum Placement {
@@ -219,7 +258,8 @@ public final class TabRegistry {
         Objects.requireNonNull(placement, "placement");
         for (var tab : tabs) if (tab.kind() == Tab.Kind.HOSTED && tab.plugin().equals(plugin) && tab.key().equals(key)) {
             if (tab.window() == null) {
-                WorkspaceHost retry = owner != null ? hosts.get(owner) : null;
+                // While a saved tab is rebuilt there, the window being restored takes no other tab (workspace plan 6b Rulings 24).
+                WorkspaceHost retry = owner != null && !restoring(owner) ? hosts.get(owner) : null;
                 if (retry == null) retry = main();
                 if (retry == null) { waitForMain(tab); return tab; }
                 tab.window(retry.id());
@@ -233,8 +273,21 @@ public final class TabRegistry {
             select(tab);
             return tab;
         }
+        if (slot != null && slot.taken == null && slot.plugin.equals(plugin) && tab(slot.id).isEmpty()) {
+            // A saved tab its plugin's restorer rebuilds (workspace tabs spec 13): under its saved id, straight into the
+            // window being restored, as add registers a restored terminal tab; that window places it with its other saved
+            // tabs. No placement applies, and it never waits for a main window being composed (workspace plan 6b Rulings 4
+            // and 23).
+            var restored = new Tab(this, slot.id, Tab.Kind.HOSTED, plugin, key, title, new HostedContent(Objects.requireNonNull(component)));
+            tabs.add(restored);
+            restored.window(slot.window);
+            slot.taken = restored;
+            return restored;
+        }
         var tab = new Tab(this, TabId.random(), Tab.Kind.HOSTED, plugin, key, title, new HostedContent(Objects.requireNonNull(component)));
-        WorkspaceHost host = owner != null ? hosts.get(owner) : null;
+        // While a saved tab is rebuilt there, the window being restored takes no other tab: it goes where an owner-less
+        // tab goes (workspace plan 6b Rulings 24).
+        WorkspaceHost host = owner != null && !restoring(owner) ? hosts.get(owner) : null;
         // A new child window of its own, opened empty for the tab: the owner's window is not touched (workspace tabs plan 4b).
         UUID child = placement == Placement.NEW_WINDOW && windows != null ? windows.emptyWindow().get() : null;
         if (child != null) host = Objects.requireNonNull(hosts.get(child), "The new window registered no workspace");
@@ -535,6 +588,101 @@ public final class TabRegistry {
         }
         Tab.rethrow(failure);
     }
+
+    /**
+     * Registers how {@code plugin} rebuilds its saved tabs of {@code kind} (workspace tabs spec 13).
+     *
+     * @param plugin the plugin
+     * @param kind the restorer kind
+     * @param restorer runs the plugin's restorer and gives back why it did not restore the tab, if it said or threw why
+     * @return the registration
+     * @throws IllegalArgumentException when the plugin already has a restorer for {@code kind}
+     */
+    public Subscription restorer(String plugin, String kind, Function<Restoring, Optional<String>> restorer) {
+        requireEdt();
+        Objects.requireNonNull(restorer, "restorer");
+        var byKind = restorers.computeIfAbsent(plugin, ignored -> new HashMap<>());
+        if (byKind.putIfAbsent(kind, restorer) != null) throw new IllegalArgumentException(plugin + " already restores " + kind + " tabs");
+        return new Subscription(() -> {
+            var current = restorers.get(plugin);
+            if (current != null && current.remove(kind, restorer) && current.isEmpty()) restorers.remove(plugin);
+        });
+    }
+
+    /**
+     * Whether {@code plugin} rebuilds saved tabs of {@code kind} now: only such a tab is saved (workspace plan 2 Rulings 20).
+     *
+     * @param plugin the plugin
+     * @param kind the restorer kind
+     * @return true while its restorer is registered
+     */
+    public boolean restores(String plugin, String kind) { return restorers.getOrDefault(plugin, Map.of()).containsKey(kind); }
+
+    /**
+     * Tells {@code listener} whenever a tab's restore state changes (workspace tabs spec 13).
+     *
+     * @param listener told on the EDT; it replaces the one before
+     */
+    public void onRestoreChanged(Runnable listener) { restoreChanged = Objects.requireNonNull(listener, "listener"); }
+
+    /**
+     * Rebuilds one saved tab through its plugin's restorer (workspace tabs spec 13). The tab the plugin opens meanwhile
+     * takes {@code id} and the window being restored, whatever window it named, and is not shown: that window places it.
+     *
+     * @param id the saved tab's id
+     * @param plugin the plugin that saved it
+     * @param saved the window, the saved title and the restore state
+     * @return the tab, or why there is none: a restore already running (a restorer that restores again), an id already
+     *     taken, no restorer for the kind, what the restorer said or threw, or that it opened no tab
+     */
+    public Restored restore(TabId id, String plugin, Restoring saved) {
+        requireEdt();
+        if (slot != null) return new Restored(Optional.empty(), "another tab is being restored");
+        if (tab(id).isPresent()) return new Restored(Optional.empty(), "a tab with its id is already open");
+        var restorer = restorers.getOrDefault(plugin, Map.of()).get(saved.state().kind());
+        if (restorer == null) return new Restored(Optional.empty(), "it does not restore " + saved.state().kind() + " tabs");
+        slot = new Slot(id, saved.window(), plugin);
+        Optional<String> problem;
+        Tab taken;
+        try {
+            problem = restorer.apply(saved);
+        } finally {
+            taken = slot.taken;
+            slot = null;
+        }
+        // Only a tab still open in the window being restored is the saved tab (workspace plan 6b Rulings 30).
+        if (taken != null && !taken.closed() && saved.window().equals(taken.window())) return new Restored(Optional.of(taken), "");
+        return new Restored(Optional.empty(), problem.orElse("it opened no tab"));
+    }
+
+    /**
+     * The saved tab being rebuilt, while {@code plugin} has not opened its tab in {@code window} yet: a session the plugin
+     * opens there now takes its id (workspace tabs spec 13).
+     *
+     * @param plugin the plugin opening a session
+     * @param window the window it opens in
+     * @return the saved id, or empty when no saved tab of that plugin waits there
+     */
+    public Optional<TabId> slot(String plugin, UUID window) {
+        return slot != null && slot.taken == null && slot.plugin.equals(plugin) && slot.window.equals(window) && tab(slot.id).isEmpty()
+            ? Optional.of(slot.id) : Optional.empty();
+    }
+
+    /**
+     * A window opened the saved tab being rebuilt itself, as a session's terminal tab: the restore hands it back.
+     *
+     * @param tab the tab, registered with the saved id
+     */
+    public void restored(Tab tab) { if (slot != null && slot.taken == null && slot.id.equals(tab.id())) slot.taken = tab; }
+
+    /**
+     * Whether a saved tab is being rebuilt in {@code window} now: while its restorer runs, that window takes no other tab
+     * (workspace plan 6b Rulings 24).
+     *
+     * @param window a window's id
+     * @return true while a restore's slot names it
+     */
+    public boolean restoring(UUID window) { return slot != null && slot.window.equals(window); }
 
     /**
      * Disposes the tab at once, without asking a guard, and takes it out of its window. Whatever a listener or the content

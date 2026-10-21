@@ -42,7 +42,8 @@ final class HostedSessions {
             track(attempt);
             Throwable failure = containment.attempt(pluginId, "session connector", () -> { spec.connector().accept(new Pending(attempt)); return null; });
             if (failure != null) attempt.fail(failure.getMessage() == null ? failure.toString() : failure.getMessage());
-        }, contained, spec.icon().map(icons).orElse(null));
+        }, contained, spec.icon().map(icons).orElse(null),
+            spec.restore().map(state -> new dev.jasper.app.layout.TabRestore(state.kind(), state.values())));
     }
 
     private void track(SessionAttempt attempt) {

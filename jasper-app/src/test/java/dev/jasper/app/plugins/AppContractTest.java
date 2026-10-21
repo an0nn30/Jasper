@@ -175,7 +175,12 @@ class AppContractTest extends PluginContractTest {
                 boolean only = terminalFixture.registry.window(tab.window()).map(window -> window.tabs().get().size() == 1).orElse(false);
                 if (!tab.window().equals(main[0]) && only) return;
                 contributions.tabs().move(tab, workspace.get());
-            }, window -> { }, workspace)));
+            }, window -> { }, () -> {
+                // A tab placed in a new window while none is open: the main window first, then the tab's own, as the window
+                // manager's emptyWindow does (workspace plan 6b Rulings 25).
+                if (main[0] == null) workspace.get();
+                return workspace.get();
+            })));
         var notifications = new NotificationsFixture();
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();
@@ -414,6 +419,21 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> { UUID id = UUID.randomUUID(); terminalFixture.addContentTab(windowId, id, () -> title); return id; });
             }
             @Override public void moveTab(UUID tabId, UUID windowId) { onEdt(() -> terminalFixture.moveTab(tabId, windowId)); }
+            @Override public Optional<UUID> restoreTab(String pluginId, UUID windowId, String title, dev.jasper.sdk.RestoreState state) {
+                return onEdtValue(() -> {
+                    var restored = contributions.tabs().restore(dev.jasper.app.layout.TabId.random(), pluginId,
+                        new dev.jasper.app.contributions.TabRegistry.Restoring(windowId, title,
+                            new dev.jasper.app.layout.TabRestore(state.kind(), state.values())));
+                    // The window being restored places the tab; here the scripted workspace shows it in that window.
+                    restored.tab().ifPresent(tab -> terminalFixture.addContentTab(windowId, tab.id().value(), tab::title));
+                    return restored.tab().map(tab -> tab.id().value());
+                });
+            }
+            @Override public Optional<dev.jasper.sdk.RestoreState> restoreState(UUID tabId) {
+                return onEdtValue(() -> contributions.tabs().tab(new dev.jasper.app.layout.TabId(tabId))
+                    .flatMap(dev.jasper.app.contributions.Tab::restore).or(() -> terminalFixture.sessionRestore(tabId))
+                    .map(saved -> new dev.jasper.sdk.RestoreState(saved.kind(), saved.state())));
+            }
             @Override public void closeTab(UUID tabId) { onEdt(() -> terminalFixture.closeTab(tabId)); }
             @Override public List<List<UUID>> windowTabs(UUID windowId) { return onEdtValue(() -> terminalFixture.windowTabs(windowId)); }
             @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }

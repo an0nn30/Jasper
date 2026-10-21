@@ -438,6 +438,11 @@ final class TerminalFixture {
         } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
 
+    /** How a provided session's tab comes back, as its request carries it (workspace tabs spec 13). */
+    Optional<dev.jasper.app.layout.TabRestore> sessionRestore(UUID tabId) {
+        return Optional.ofNullable(tabs.get(tabId)).map(tab -> tab.pane).map(pane -> pane.request).flatMap(SessionRequest::restore);
+    }
+
     /**
      * The local pane waits, as a restored terminal tab not yet shown does (workspace tabs spec 13): it starts on its tab's
      * next selection or focus. A pane that shows a provided session is refused, as the testkit's fake refuses it.

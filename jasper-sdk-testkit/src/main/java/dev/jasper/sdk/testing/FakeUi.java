@@ -112,6 +112,8 @@ final class FakeUi {
 
     final List<FakeContent> contents = new ArrayList<>();
     final List<java.util.function.Supplier<java.util.concurrent.CompletableFuture<Boolean>>> quitGuards = new ArrayList<>();
+    /** This plugin's restorers by kind (workspace tabs spec 13). */
+    final java.util.Map<String, dev.jasper.sdk.ui.TabRestorer> restorers = new java.util.LinkedHashMap<>();
     java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean, java.util.concurrent.CompletableFuture<Boolean>> contentGuard = (tabs,batch) -> java.util.concurrent.CompletableFuture.completedFuture(true);
     java.util.concurrent.CompletableFuture<Boolean> pendingContent;
     List<FakeContent> pendingTabs = List.of();
@@ -549,6 +551,20 @@ final class FakeUi {
                 }
                 if (owner != null && (!(owner instanceof WindowHandle handle) || !context.terminals.ownsWindow(handle)))
                     throw new IllegalArgumentException("Content requires a workspace owner");
+                // A saved tab being restored comes back in the window being restored, whatever window or placement it named,
+                // placed and not shown: Jasper shows it where it was saved (workspace tabs spec 13).
+                var slot = host.workspace.takeSlot(context);
+                if (slot.isPresent()) {
+                    var window = slot.get().window;
+                    var restored = new FakeContent(FakeUi.this, spec, context.terminals.windowHandle(window.id), component,
+                        host.workspace.placeTab(window, dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT, spec.title()));
+                    contents.add(restored);
+                    slot.get().taken = restored.tab;
+                    return restored;
+                }
+                // Meanwhile the window being restored takes no other tab: it goes where an owner-less one goes (workspace
+                // plan 6b Rulings 24).
+                if (owner != null && host.workspace.slot != null && ((WindowHandle) owner).id().equals(host.workspace.slot.window.id)) owner = null;
                 if (owner == null || !((WindowHandle)owner).isOpen()) {
                     // The main window, as the application restores it first when none is open (workspace tabs spec 6.4).
                     var window = host.workspace.main().orElseGet(host.workspace::addWindow);
@@ -599,6 +615,14 @@ final class FakeUi {
                 java.util.Objects.requireNonNull(guard, "guard");
                 quitGuards.add(guard);
                 return () -> quitGuards.remove(guard);
+            }
+            @Override public Subscription restorer(String kind, dev.jasper.sdk.ui.TabRestorer restorer) {
+                context.requireOpen();
+                java.util.Objects.requireNonNull(restorer, "restorer");
+                // The kind's rules are the restore state's.
+                new dev.jasper.sdk.RestoreState(kind, java.util.Map.of());
+                if (restorers.putIfAbsent(kind, restorer) != null) throw new IllegalArgumentException("This plugin already restores " + kind);
+                return () -> restorers.remove(kind, restorer);
             }
 
             @Override public List<java.nio.file.Path> chooseFiles(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {

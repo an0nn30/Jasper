@@ -21,6 +21,14 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
     void setStatus(List<ContentStatus> items);
     /** @param focus UI-thread callback focusing the editable content */
     void setFocusTarget(Runnable focus);
+    /**
+     * How the tab comes back when Jasper restores its windows, in place of what its {@link ContentSpec#restore()} said:
+     * a document saved under a new name names its new file. Empty: the tab is not saved.
+     *
+     * @param state the restore state, or empty
+     * @since 0.21.0
+     */
+    void setRestore(java.util.Optional<dev.jasper.sdk.RestoreState> state);
     /** Selects and raises the current host, focusing its content. */
     void select();
     /**

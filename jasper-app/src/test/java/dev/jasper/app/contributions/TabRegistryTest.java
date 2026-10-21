@@ -476,6 +476,83 @@ class TabRegistryTest {
         assertThat(registry.hosted()).hasSize(2);
     }
 
+    /** Workspace tabs spec 13: a plugin's restorer rebuilds a saved tab, which takes the saved id and window, not yet shown. */
+    @Test void aRestorerRebuildsASavedTabWithItsIdAndWindowOrSaysWhyNot() {
+        hosts();
+        TabId saved = TabId.random();
+        var state = new dev.jasper.app.layout.TabRestore("note", Map.of("name", "todo"));
+        var registration = registry.restorer("plugin.notes", "note", restoring -> {
+            registry.open("plugin.notes", "note:todo", restoring.title(), null, new JPanel());
+            return Optional.empty();
+        });
+        assertThat(registry.restores("plugin.notes", "note")).isTrue();
+        TabRegistry.Restored restored = registry.restore(saved, "plugin.notes", new TabRegistry.Restoring(detached, "Todo", state));
+        Tab tab = restored.tab().orElseThrow();
+        assertThat(tab.id()).isEqualTo(saved);
+        assertThat(tab.window()).as("the window being restored, whatever the plugin named").isEqualTo(detached);
+        assertThat(tab.title()).isEqualTo("Todo");
+        assertThat(mounted).as("that window places it").isEmpty();
+        assertThat(registry.tab(saved)).contains(tab);
+        assertThat(registry.slot("plugin.notes", detached)).as("taken").isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> registry.restorer("plugin.notes", "note", restoring -> Optional.empty()));
+        var other = new TabRegistry.Restoring(main, "Other", new dev.jasper.app.layout.TabRestore("other", Map.of()));
+        assertThat(registry.restore(TabId.random(), "plugin.notes", other).problem()).isEqualTo("it does not restore other tabs");
+        registry.restorer("plugin.notes", "broken", restoring -> Optional.of("the file is gone"));
+        assertThat(registry.restore(TabId.random(), "plugin.notes",
+            new TabRegistry.Restoring(main, "x", new dev.jasper.app.layout.TabRestore("broken", Map.of()))).problem()).isEqualTo("the file is gone");
+        registry.restorer("plugin.notes", "again", restoring -> {
+            assertThat(registry.restore(TabId.random(), "plugin.notes", restoring).problem()).as("one restore at a time")
+                .isEqualTo("another tab is being restored");
+            return Optional.of("declined");
+        });
+        assertThat(registry.restore(TabId.random(), "plugin.notes",
+            new TabRegistry.Restoring(main, "x", new dev.jasper.app.layout.TabRestore("again", Map.of()))).problem()).isEqualTo("declined");
+        assertThat(registry.restore(saved, "plugin.notes", new TabRegistry.Restoring(main, "x", state)).problem())
+            .as("an id already open is never taken twice").isEqualTo("a tab with its id is already open");
+        registry.restorer("plugin.notes", "nothing", restoring -> {
+            assertThat(registry.slot("plugin.notes", main)).as("a session opened in that window would take it").isPresent();
+            assertThat(registry.slot("plugin.other", main)).isEmpty();
+            return Optional.empty();
+        });
+        assertThat(registry.restore(TabId.random(), "plugin.notes",
+            new TabRegistry.Restoring(main, "x", new dev.jasper.app.layout.TabRestore("nothing", Map.of()))).problem()).isEqualTo("it opened no tab");
+        // Workspace plan 6b Rulings 24: while it runs, the window being restored takes only the saved tab.
+        Tab[] extra = new Tab[1];
+        registry.restorer("plugin.notes", "pair", restoring -> {
+            assertThat(registry.restoring(detached)).isTrue();
+            registry.open("plugin.notes", "pair:one", "One", restoring.window(), new JPanel());
+            extra[0] = registry.open("plugin.notes", "pair:two", "Two", restoring.window(), new JPanel());
+            return Optional.empty();
+        });
+        Tab pair = registry.restore(TabId.random(), "plugin.notes",
+            new TabRegistry.Restoring(detached, "Pair", new dev.jasper.app.layout.TabRestore("pair", Map.of()))).tab().orElseThrow();
+        assertThat(pair.window()).isEqualTo(detached);
+        assertThat(extra[0].window()).as("where an owner-less tab goes: the main window").isEqualTo(main);
+        assertThat(mounted).containsExactly(extra[0]);
+        assertThat(registry.restoring(detached)).as("only while the restorer runs").isFalse();
+        // So does a tab of the same key that waits for its window: it keeps waiting, out of the window being restored.
+        registry.windows(new TabRegistry.Windows(() -> null, main::equals, ignored -> { }));
+        Tab waiting = registry.open("plugin.notes", "wait", "Wait", null, new JPanel());
+        registry.restorer("plugin.notes", "wait", restoring -> {
+            registry.open("plugin.notes", "wait", "Wait", restoring.window(), new JPanel());
+            return Optional.empty();
+        });
+        assertThat(registry.restore(TabId.random(), "plugin.notes",
+            new TabRegistry.Restoring(detached, "Wait", new dev.jasper.app.layout.TabRestore("wait", Map.of()))).problem())
+            .as("its open key is selected as always: no tab opened").isEqualTo("it opened no tab");
+        assertThat(waiting.window()).as("still waiting, not in the window being restored").isNull();
+        assertThat(mounted).doesNotContain(waiting);
+        registry.windows(windows(main, detached));
+        registration.close();
+        assertThat(registry.restores("plugin.notes", "note")).isFalse();
+        int[] changed = {0};
+        registry.onRestoreChanged(() -> changed[0]++);
+        tab.restore(Optional.of(state));
+        tab.restore(Optional.of(state));
+        assertThat(changed[0]).as("told once per change").isEqualTo(1);
+        assertThat(tab.restore()).contains(state);
+    }
+
     @Test void aHostedTabHasAnIdItsKindAndItsContent() {
         hosts();
         var panel = new JPanel();

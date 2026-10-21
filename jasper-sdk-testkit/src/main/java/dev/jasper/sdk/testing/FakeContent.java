@@ -23,6 +23,8 @@ final class FakeContent implements ContentTab {
     ContentPresentation presentation;
     List<ContentCommand> commands=List.of();
     List<ContentStatus> status=List.of();
+    /** How the tab comes back when Jasper restores its windows; empty while it does not (workspace tabs spec 13). */
+    Optional<dev.jasper.sdk.RestoreState> restore;
     WindowOwner owner;
     /** The owned view the tab shows; null for raw content. */
     FakeKitView view;
@@ -34,11 +36,13 @@ final class FakeContent implements ContentTab {
     FakeContent(FakeUi ui,ContentSpec spec,WindowOwner owner,JComponent component,FakeWorkspace.Tab tab){
         this.ui=ui;this.key=spec.key();this.owner=owner;this.component=component;this.tab=tab;
         presentation=new ContentPresentation(spec.title(),"",null,false,"","");
+        restore=spec.restore();
     }
     public void setPresentation(ContentPresentation value){if(!closed){ui.context.kit().validateIcon(value.icon());presentation=value;tab.title=value.title();}}
     public void setCommands(List<ContentCommand> values){if(!closed)commands=List.copyOf(values);}
     public void setStatus(List<ContentStatus> values){if(!closed)status=List.copyOf(values);}
     public void setFocusTarget(Runnable value){if(!closed)focus=value;}
+    public void setRestore(Optional<dev.jasper.sdk.RestoreState> value){Objects.requireNonNull(value,"value");if(!closed)restore=value;}
     public void select(){if(closed)return;ui.host.workspace.select(tab);active(true);focus.run();}
     void active(boolean value){if(active==value)return;active=value;for(var listener:List.copyOf(activated))listener.accept(value);}
     /**

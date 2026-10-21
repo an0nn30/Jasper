@@ -1874,10 +1874,21 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private TerminalContent openTerminal(Path directory, SessionRequest requestOrNull, Optional<String> profile,
                                          Optional<java.util.List<String>> program, GroupId beside, Side side) {
         if (closed) return null;
-        TabId tabId = TabId.random();
+        // A plugin's session opened while its saved tab is rebuilt here takes that tab's place (workspace tabs spec 13); any
+        // other terminal tab is refused until the restorer is done (workspace plan 6b Rulings 24).
+        Optional<TabId> saved = requestOrNull == null ? Optional.empty() : registry.slot(requestOrNull.providerId(), id);
+        if (saved.isEmpty() && registry.restoring(id)) return null;
+        TabId tabId = saved.orElseGet(TabId::random);
         TerminalContent terminal = new TerminalContent(tabId, directory, launcher, requestOrNull, profile, program);
         Tab tab = registry.add(tabId, Tab.Kind.TERMINAL, terminal, id);
         tab.focusTarget(terminal::focusTerminal);
+        if (requestOrNull != null) tab.restore(requestOrNull.restore());
+        if (saved.isPresent()) {
+            // The restore places it with the window's other tabs; its session connects when it is first shown.
+            terminal.pane().restored();
+            registry.restored(tab);
+            return terminal;
+        }
         try {
             attach(tab, true, beside, side);
         } catch (RuntimeException | Error failure) {

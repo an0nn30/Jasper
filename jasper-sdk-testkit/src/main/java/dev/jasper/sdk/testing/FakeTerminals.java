@@ -162,16 +162,31 @@ final class FakeTerminals implements Terminals {
         requireFor(request);
         context.requireOpen();
         if (!knownProfile(request)) return Optional.empty();
-        return workspace.window(window.id()).map(target -> switch (request) {
+        return workspace.window(window.id())
+            // While a restorer runs, the window being restored takes only the saved tab (workspace plan 6b Rulings 24).
+            .filter(target -> workspace.slot == null || workspace.slot.window != target
+                || request instanceof OpenRequest.Session && workspace.slot.taken == null && workspace.slot.owner == context)
+            .map(target -> switch (request) {
             case OpenRequest.Local local -> {
                 workspace.openRequests.add("tab|" + target.id + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-") + profile(local) + program(local));
                 FakeWorkspace.Pane pane = workspace.openTerminal(target, "opened", openedInfo(local));
                 yield new Pane(pane.id, pane.tab.id);
             }
             case OpenRequest.Session session -> {
-                workspace.openRequests.add("session-tab|" + target.id + "|" + session.spec().title());
-                FakeWorkspace.Pane pane = workspace.openTerminal(target, session.spec().title(), sessionInfo(session));
-                workspace.sessions.connect(context, pane, session.spec());
+                // A session a restorer opens in the window being restored is the saved tab: it comes back there, placed and
+                // not shown, and waits, not started, until its tab is shown (workspace tabs spec 13).
+                var slot = workspace.takeSlot(context).filter(found -> found.window == target);
+                FakeWorkspace.Window into = target;
+                workspace.openRequests.add("session-tab|" + into.id + "|" + session.spec().title());
+                FakeWorkspace.Pane pane;
+                if (slot.isPresent()) {
+                    pane = workspace.placeTerminal(into, session.spec().title(), sessionInfo(session));
+                    slot.get().taken = pane.tab;
+                    workspace.sessions.hold(context, pane, session.spec());
+                } else {
+                    pane = workspace.openTerminal(target, session.spec().title(), sessionInfo(session));
+                    workspace.sessions.connect(context, pane, session.spec());
+                }
                 yield new Pane(pane.id, pane.tab.id);
             }
         });

@@ -1649,6 +1649,134 @@ public abstract class PluginContractTest {
         });
     }
 
+    /** Workspace tabs spec 13 and 14: a content tab saved with restore state comes back through its plugin's restorer. */
+    @Test void aRestorerOpensItsSavedContentTabAgainInTheWindowBeingRestored() {
+        UUID main = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        var requests = new ArrayList<dev.jasper.sdk.ui.RestoreRequest>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.windows().restorer("note", request -> {
+                requests.add(request);
+                // Whatever window or placement it names, the saved tab comes back in the window being restored.
+                context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("note:" + request.state().values().get("name"), request.title())
+                    .withRestore(request.state()), null, kitView(context), dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW);
+                return Optional.empty();
+            });
+        });
+        var state = new dev.jasper.sdk.RestoreState("note", java.util.Map.of("name", "todo"));
+        h.ui(() -> {
+            var window = alpha.get().terminals().window(main).orElseThrow();
+            var first = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("note:first", "First").withRestore(state), window,
+                kitView(alpha.get()));
+            UUID firstTab = window.activeTab().orElseThrow().id();
+            assertThat(h.restoreState(firstTab)).contains(state);
+            first.setRestore(Optional.empty());
+            assertThat(h.restoreState(firstTab)).as("a tab that gives no restore state is not saved").isEmpty();
+            Optional<UUID> back = h.restoreTab("test.alpha", main, "Todo", state);
+            assertThat(back).isPresent();
+            assertThat(requests).singleElement().satisfies(request -> {
+                assertThat(request.window().id()).isEqualTo(main);
+                assertThat(request.title()).isEqualTo("Todo");
+                assertThat(request.state()).isEqualTo(state);
+            });
+            var reopened = alpha.get().terminals().tab(back.get()).orElseThrow();
+            assertThat(reopened.kind()).isEqualTo(TabHandle.Kind.CONTENT);
+            assertThat(reopened.window().id()).as("the window being restored, not a new one").isEqualTo(main);
+            assertThat(alpha.get().terminals().windows()).hasSize(1);
+            assertThat(reopened.title()).isEqualTo("Todo");
+            assertThat(h.restoreState(back.get())).contains(state);
+        });
+    }
+
+    /**
+     * Workspace tabs spec 13: a restorer that declines, throws or opens nothing restores no tab; a plugin has one restorer
+     * per kind.
+     */
+    @Test void aRestorerThatFailsRestoresNothingAndAKindHasOneRestorer() {
+        UUID main = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var windows = alpha.get().windows();
+            windows.restorer("broken", request -> { throw new IllegalStateException("the file is gone"); });
+            windows.restorer("declined", request -> Optional.of("its file is gone"));
+            Subscription empty = windows.restorer("empty", request -> Optional.empty());
+            assertThatIllegalArgumentException().as("one restorer per kind").isThrownBy(() -> windows.restorer("empty", request -> Optional.empty()));
+            assertThatIllegalArgumentException().as("not a kind").isThrownBy(() -> windows.restorer("no:colons", request -> Optional.empty()));
+            assertThat(h.restoreTab("test.alpha", main, "Gone", new dev.jasper.sdk.RestoreState("broken", java.util.Map.of()))).isEmpty();
+            assertThat(h.restoreTab("test.alpha", main, "Declined", new dev.jasper.sdk.RestoreState("declined", java.util.Map.of()))).isEmpty();
+            assertThat(h.restoreTab("test.alpha", main, "Nothing", new dev.jasper.sdk.RestoreState("empty", java.util.Map.of()))).isEmpty();
+            assertThat(h.restoreTab("test.alpha", main, "Unknown", new dev.jasper.sdk.RestoreState("unknown", java.util.Map.of()))).isEmpty();
+            empty.close();
+            windows.restorer("empty", request -> {
+                windows.openTab(new dev.jasper.sdk.ui.ContentSpec("again", request.title()), request.window(), kitView(alpha.get()));
+                return Optional.empty();
+            });
+            assertThat(h.restoreTab("test.alpha", main, "Again", new dev.jasper.sdk.RestoreState("empty", java.util.Map.of())))
+                .as("a closed registration frees its kind").isPresent();
+            assertThat(alpha.get().terminals().window(main).orElseThrow().tabs()).hasSize(1);
+        });
+    }
+
+    /** Workspace tabs spec 13 and 14: a provided session's tab gives the restore state its spec carries. */
+    @Test void aSessionsTabGivesTheRestoreStateOfItsSpec() {
+        UUID main = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE, Capabilities.SESSION_PROVIDE), Set.of(), Set.of(), alpha::set);
+        var state = new dev.jasper.sdk.RestoreState("ssh", java.util.Map.of("host", "build-host"));
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            PaneHandle saved = terminals.openTab(terminals.window(main).orElseThrow(),
+                OpenRequest.session(dev.jasper.sdk.terminal.SessionSpec.of("build-host", pending -> { }).withRestore(state))).orElseThrow();
+            PaneHandle plain = terminals.openTab(terminals.window(main).orElseThrow(),
+                OpenRequest.session(dev.jasper.sdk.terminal.SessionSpec.of("other", pending -> { }))).orElseThrow();
+            assertThat(h.restoreState(saved.tab().id())).contains(state);
+            assertThat(h.restoreState(plain.tab().id())).isEmpty();
+        });
+    }
+
+    /**
+     * Workspace plan 6b Rulings 24: while a restorer runs, the window being restored takes only the saved tab; another
+     * content tab the restorer opens there lands where an owner-less tab would, in the main window.
+     */
+    @Test void aRestorersOtherContentTabLandsWhereAnOwnerlessTabWouldNotInTheWindowBeingRestored() {
+        UUID main = h.addTerminalWindow(), child = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        var other = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.windows().restorer("note", request -> {
+                context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("note:saved", request.title()), request.window(), kitView(context));
+                other.set(context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("note:other", "Other"), request.window(), kitView(context)));
+                return Optional.empty();
+            });
+        });
+        h.ui(() -> {
+            Optional<UUID> back = h.restoreTab("test.alpha", child, "Saved", new dev.jasper.sdk.RestoreState("note", java.util.Map.of()));
+            assertThat(back).isPresent();
+            assertThat(alpha.get().terminals().tab(back.get()).orElseThrow().window().id()).as("the saved tab").isEqualTo(child);
+            assertThat(other.get().window().id()).as("where an owner-less tab goes").isEqualTo(main);
+        });
+    }
+
+    /**
+     * Workspace tabs spec 6.4 and 14: a content tab placed in a new window while no window is open opens the main window
+     * first, then a child window of its own for the tab.
+     */
+    @Test void aTabPlacedInANewWindowWhileNoWindowIsOpenOpensTheMainWindowAndAChildForIt() {
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var tab = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("away", "Away"), null, kitView(alpha.get()),
+                dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW);
+            var windows = alpha.get().terminals().windows();
+            assertThat(windows).as("the main window, then the tab's own").hasSize(2);
+            assertThat(windows).filteredOn(window -> window.isMain()).hasSize(1);
+            assertThat(tab.window().isMain()).as("a child window of its own").isFalse();
+        });
+    }
+
     /**
      * Tabs and panes spec 11's TabPlacement: NEW_TAB opens a new tab at the end of the window's strip, SPLIT_RIGHT and
      * SPLIT_DOWN a new pane right after the focused pane, in its tab, and NEW_WINDOW a new child window.
