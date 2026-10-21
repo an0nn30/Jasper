@@ -26,8 +26,7 @@ several are enabled. `jasper --safe-mode` always starts with the standard look
 
 The Enterprise look keeps its own tool window layout in `ui-state.toml` (under `[look."dev.jasper.enterprise"]`), apart
 from the standard look's, so each comes back as you left it. After turning Enterprise off, a theme pick you saved as
-`enterprise` shows the appearance's default theme (Jasper Meadow Light in Light, Slate Cobalt in Dark), without a
-warning, until Enterprise is on again.
+`enterprise` shows the appearance's default theme, Jasper Meadow, without a warning, until Enterprise is on again.
 
 ### If the look does not start
 
@@ -41,7 +40,7 @@ Enterprise as skipped: "did not finish starting with this look last time".
 
 | What you see | Why |
 |---|---|
-| "The Enterprise look is missing some of its files", one line per problem | a font that cannot be used, whose text then uses the platform font, or a default theme that did not load, whose setting keeps its core default. On macOS an installed IBM Plex font hides the bundled one: "…: an installed font named IBM Plex Sans hides it; that text uses the platform font" |
+| "The Enterprise look is missing some of its files", one line per problem | a font that cannot be used, whose text then uses the platform font. On macOS an installed IBM Plex font hides the bundled one: "…: an installed font named IBM Plex Sans hides it; that text uses the platform font" |
 | Enterprise skipped with "its look could not be installed; Jasper uses its standard look" | the look could not be installed while Jasper started; that session runs the standard look (on Linux keeping the system title bar and the menus in the window that were already set up), without the plugin, so Remote, File Server and Credential Vault keep their default layouts; the next start uses the standard look |
 | Enterprise skipped with "Presentation invalid: …" | the kit file broke a rule; the message names the key |
 
@@ -147,19 +146,20 @@ Plex Mono too ([defaults](#defaults)). Terminal text keeps `[terminal.font]`.
 ### Branding
 
 The look has no branding of its own: windows, the Dock or taskbar keep Jasper's Shell Prompt icon, and a start that
-opens a window (not `--background`, `--no-window` or `--safe-mode`) shows Jasper's Meadow splash until the first window
-has painted ([branding](looks.md#branding)). Its turtle is animated unless `config.toml` sets
+opens a window (not `--background`, `--no-window` or `--safe-mode`) shows Jasper's Meadow splash until the first
+workspace window has painted ([branding](looks.md#branding)). Its turtle is animated unless `config.toml` sets
 `ui.animations.enabled = false`, which Settings hides under this look.
 
 ### Defaults
 
-The look gives five core settings and one Editor setting other defaults. A value you saved in `config.toml`, the
-Editor's settings file or Settings wins, and **Reset to Default** returns to the look's value.
+The look sets five core settings and one Editor setting: both themes stay Jasper Meadow, as in the standard look, and
+the others take values of their own. A value you saved in `config.toml`, the Editor's settings file or Settings wins,
+and **Reset to Default** returns to the look's value.
 
 | Setting | Under Enterprise | Standard look |
 |---|---|---|
-| `ui.theme.light` | `enterprise` | `jasper-meadow` |
-| `ui.theme.dark` | `enterprise` | `slate-cobalt` |
+| `ui.theme.light` | `jasper-meadow` | `jasper-meadow` |
+| `ui.theme.dark` | `jasper-meadow` | `jasper-meadow` |
 | `palette.visible_rows` | `8` | `5` |
 | `window.toolbar_height` | `28` | `30` |
 | `window.toolbar` | `"icons"` | `"icons_and_labels"` |

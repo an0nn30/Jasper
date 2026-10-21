@@ -238,12 +238,12 @@ public final class CoreSettings {
             + "Switches live across windows.").build();
     static final String THEME_ID = "Use a theme id such as \"slate-cobalt\"; using the default.";
     public static final Setting<String> UI_THEME_DARK = Setting.of("ui.theme.dark",
-            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.BUNDLED_ID)
-        .label("Dark theme").keywords("theme", "dark", "appearance", "slate cobalt", "imported")
-        .description("The theme the Dark appearance shows: \"slate-cobalt\" (the default unless the look sets its own), the\n"
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.DARK_DEFAULT_ID)
+        .label("Dark theme").keywords("theme", "dark", "appearance", "jasper meadow", "slate cobalt", "imported")
+        .description("The theme the Dark appearance shows: \"jasper-meadow\" (the default unless the look sets its own), the\n"
             + "built-in \"ubuntu-yaru\" or a Catppuccin flavour such as \"catppuccin-mocha\", a theme a plugin ships, or an\n"
             + "imported theme's id, its file name in the themes folder without .json. A theme without a Dark variant is\n"
-            + "reported and Slate Cobalt is used. Switches live.").build();
+            + "reported and Jasper Meadow Dark is used. Switches live.").build();
     public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
             SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID)
         .label("Light theme").keywords("theme", "light", "appearance", "jasper meadow", "slate cobalt", "imported")

@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 /**
  * A Jasper theme file ({@code docs/themes.md}): a name, an optional author, a Dark and/or Light UI variant, terminal
  * schemes and an editor scheme for each UI variant. The built-in themes are {@code <id>.json} beside this class: Slate
- * Cobalt, Jasper Meadow Light, Catppuccin's flavours ({@code tools/themes/catppuccin}), and Ubuntu Yaru. A UI
+ * Cobalt, Jasper Meadow, Catppuccin's flavours ({@code tools/themes/catppuccin}), and Ubuntu Yaru. A UI
  * variant lists every role except those that follow fixed rules, never colour values: {@code border.focus} is
  * {@code accent}, {@code surface.status} is {@code surface.app}, {@code border.identity} is {@code border.control} and
  * each {@code hue.<name>.surface} is its hue (the kit applies the tile alpha). A variant may leave out the title bar's
@@ -32,10 +32,12 @@ import java.util.regex.Pattern;
  * {@link ThemeFileException} naming the file and the entry. Immutable.
  */
 public final class JasperTheme {
-    /** Slate Cobalt's id; the default Dark appearance. */
+    /** Slate Cobalt's stable built-in id. */
     public static final String BUNDLED_ID = "slate-cobalt";
-    /** The default Light appearance; Slate Cobalt remains the default Dark appearance. */
+    /** The default theme for the Light appearance. */
     public static final String LIGHT_DEFAULT_ID = "jasper-meadow";
+    /** The default theme for the Dark appearance. */
+    public static final String DARK_DEFAULT_ID = "jasper-meadow";
     /** The format this Jasper reads: {@code "jasper-theme": 1}. */
     public static final long FORMAT = 1;
     static final String RESOURCE = "/dev/jasper/ui/theme/slate-cobalt.json";
@@ -104,7 +106,7 @@ public final class JasperTheme {
         light = ui.containsKey(LIGHT) ? build(false) : null;
     }
 
-    /** The default theme, Slate Cobalt, read once. */
+    /** Slate Cobalt, read once: the theme ThemeController falls back to, in Dark, when the chosen theme cannot be installed. */
     public static JasperTheme bundled() { return Bundled.THEME; }
 
     /** Every built-in theme, Slate Cobalt first, read once on first use; no installed theme may use their ids. */

@@ -113,8 +113,8 @@ first start. Its environment differs from the other profiles' (see [Environment]
 
 - `PATH` starts with the environment's `bin` folder, followed by your Windows `Path`, so Cygwin's tools come first and
   Windows programs still run. `BASH_ENV` and `ENV` are removed.
-- A `HOME` inherited from Windows is removed, so Cygwin chooses the home; a `HOME` in `[terminal.env]` is kept, with a
-  drive path turned into its Cygwin form.
+- A `HOME` inherited from Windows or added by a plugin is removed, so Cygwin chooses the home; a `HOME` in
+  `[terminal.env]` is kept, with a drive path turned into its Cygwin form.
 - `LANG` is `C.UTF-8` unless it is already set.
 - Variable names arrive in upper case, because Windows ignores their case: a `[terminal.env]` entry `MyTool` arrives as
   `MYTOOL`.
@@ -163,7 +163,8 @@ A local shell gets Jasper's own environment, changed in this order, later steps 
 Shell integration adds its own variables for zsh, bash and fish (see [How Jasper loads it](#how-jasper-loads-it)). A WSL
 pane's `WSLENV` gets `TERM`, `COLORTERM`, `TERM_PROGRAM`, `JASPER_TERMINAL` and, when it is set,
 `JASPER_SHELL_INTEGRATION/p`, after the entries already there; `/p` turns the script folder into its `/mnt/c/...` path.
-A Cygwin Bash pane also changes `PATH`, `HOME`, `LANG` and the variables' names ([Cygwin Bash](#cygwin-bash)).
+A Cygwin Bash pane also changes `PATH`, `HOME`, `LANG`, `BASH_ENV`, `ENV` and the variables' names, whichever step set
+them ([Cygwin Bash](#cygwin-bash)).
 Environment changes apply to new panes; a running shell keeps the environment it started with. Sessions a plugin
 provides run elsewhere and get none of this.
 

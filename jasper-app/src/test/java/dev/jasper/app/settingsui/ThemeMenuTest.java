@@ -247,7 +247,7 @@ class ThemeMenuTest {
         assertThat(asked).singleElement().satisfies(question -> {
             assertThat(question.question()).isEqualTo("Remove Ocean?");
             assertThat(question.consequence()).isEqualTo("Its file, ocean.json, is deleted from the themes folder. "
-                + "It is your Dark theme; Slate Cobalt will be used instead. It is your Light theme; Jasper Meadow Light will be used instead. "
+                + "It is your Dark theme; Jasper Meadow will be used instead. It is your Light theme; Jasper Meadow will be used instead. "
                 + "Its scheme is your terminal scheme; Same as UI theme will be used instead.");
         });
         assertThat(folder().resolve("ocean.json")).doesNotExist();

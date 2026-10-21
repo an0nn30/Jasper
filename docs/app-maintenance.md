@@ -613,13 +613,13 @@ that `about.ThirdPartyNotices` maps to the name the window shows; a new licence 
 ## Themes
 
 `JasperTheme.builtIns()` lists the built-in theme files ([architecture](app-architecture.md#themes),
-[themes](themes.md)), Slate Cobalt, the Dark default, first; Jasper Meadow Light (`jasper-meadow.json`,
-`JasperTheme.LIGHT_DEFAULT_ID`) is the Light default. The Catppuccin files are the theme converter's output for the plugin jar
-vendored in `tools/themes/catppuccin/`, with the hand-picked roles in its `roles.json` (its `SOURCE.md` says how to
-regenerate them); a converter test fails when they differ. The Enterprise plugin's `enterprise.json` is likewise the
-converter's port (`convert_port`) of IntelliJ's own IntelliJ Light and New UI Dark files in `tools/themes/intellij/`
-with the choices in `tools/themes/enterprise/port.json` (its `SOURCE.md` says how to regenerate it), and the Licenses
-window credits it as "IntelliJ Platform themes (the Enterprise theme)". Slate Cobalt's colours live only in jasper-ui's
+[themes](themes.md)), Slate Cobalt first; Jasper Meadow (`jasper-meadow.json`, `JasperTheme.DARK_DEFAULT_ID` and
+`LIGHT_DEFAULT_ID`) is the default for both appearances. The Catppuccin files are the theme converter's output for the
+plugin jar vendored in `tools/themes/catppuccin/`, with the hand-picked roles in its `roles.json` (its `SOURCE.md` says
+how to regenerate them); a converter test fails when they differ. The Enterprise plugin's `enterprise.json` is
+likewise the converter's port (`convert_port`) of IntelliJ's own IntelliJ Light and New UI Dark files in
+`tools/themes/intellij/` with the choices in `tools/themes/enterprise/port.json` (its `SOURCE.md` says how to
+regenerate it), and the Licenses window credits it as "IntelliJ Platform themes (the Enterprise theme)". Slate Cobalt's colours live only in jasper-ui's
 `slate-cobalt.json`, the machine-readable block of [the Slate Cobalt record](design/theme-engine/slate-cobalt.md)
 (`SlateCobaltFileTest` keeps the two identical); Ubuntu Yaru's sources and mapping are in [its
 record](design/theme-engine/ubuntu-yaru.md). `JasperTheme` reads a file once: the semantic palettes, the terminal

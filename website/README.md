@@ -8,23 +8,11 @@ Platform screenshots refreshed from running installed Jasper apps on macOS, Wind
 
 The matching demo script and config used for capture are in `/tmp/jasper-homepage-demo` on the host and Linux VM, and `C:\Users\dustin\vmtask\homepage-demo` in Windows. Original VM desktop captures are retained in the host temporary folder. For publication, review final copy, exact platform support, license and release availability with the owner.
 
-The built-in plugins section uses two captures of the same running Jasper window: Editor plus Remote sessions, and terminal plus Remote sessions. Only the OS title/toolbar is cropped; the actual workspace, tabs and panels are untouched. Sample `.example.test` hosts are saved entries, not connected servers; the YAML file is local. The section presents Remote editing as a capability, not as what this screenshot demonstrates. Demo profile: `/tmp/jasper-plugins-demo`. Its synthetic terminal program and YAML sample are preserved in `demo/session.py` and `demo/deployment.yaml`.
+The built-in plugins section uses two captures of the same running Jasper window: Editor plus Remote sessions, and terminal plus Remote sessions. Only the OS title/toolbar is cropped; the actual workspace, tabs and panels are untouched. Sample `.example.test` hosts are saved entries, not connected servers; the YAML file is local. The section presents Remote editing as a capability, not as what this screenshot demonstrates. Demo profile: `/tmp/jasper-plugins-demo`.
 
 Jasper welcomes visitors in the opening meadow scene; the platformless Editor/Remote workspace follows, with OS screenshots further down. Credential Vault leads the feature tour. Sessions, SFTP, Tunnels and Vault are 3× renders of the production plugin components through the existing real-host test harness using the bundled Meadow theme, populated with synthetic data. Remote previews use 18 px demo fonts; Vault uses 16 px. Tunnels shows two saved local forwards, and SFTP shows four sample entries. File Sharing is a refreshed 1504 × 1610 native Retina capture with an 18 px demo UI font. SFTP shows a sample directory and simulated transfer; Vault stores three fictional logins in a temporary demo vault and selects one with its password masked. The harness makes no network connections. Native title bars, rounded outer-window remnants and the Vault's temporary-path footer are excluded from the tour assets.
 
-To regenerate the populated views from the repository root:
-
-```sh
-./gradlew :jasper-app:test --tests dev.jasper.app.plugins.HomepageCaptureTest --init-script website/demo/capture.gradle
-cp jasper-app/build/homepage-demo/sessions.png website/assets/tour-sessions.png
-cp jasper-app/build/homepage-demo/sftp.png website/assets/tour-sftp.png
-cp jasper-app/build/homepage-demo/tunnels.png website/assets/tour-tunnels.png
-swift website/demo/crop.swift jasper-app/build/homepage-demo/vault.png website/assets/tour-vault.png 0 0 3600 990
-```
-
-The opt-in fixture lives in `website/demo`, outside the normal test source set. It asserts the sample file rows and clean plugin shutdown; screenshots still require visual review. No production app code changes are needed.
-
-The refreshed workspace and all five feature previews use warm cream surfaces and moss #52643F actions, matching the bundled Meadow theme and `demo/jasper-meadow.json`. The platform captures retain native OS chrome. The palette is also bundled as the app’s default light theme in this local branch; explicit saved selections stay intact.
+The refreshed workspace and all five feature previews use warm cream surfaces and moss #52643F actions, matching the bundled Meadow theme. The platform captures retain native OS chrome.
 
 The turtle Jasper’s homepage concept is `assets/buddy-dimensional-v1.png`, generated with the built-in image tool from the existing turtle artwork and a user-supplied dimensional pet reference. Prompt: preserve the olive turtle, round glasses, cream segmented belly and tan shell; add sculpted pixel-art depth, upper-left highlights and a welcoming wave on transparency. This sibling concept leaves the shipped sprite sheet unchanged.
 
@@ -40,7 +28,7 @@ The workspace walkthrough uses genuine character-by-character app captures and a
 
 Before the first deployment, merge the website and workflow into `main`, set repository **Settings → Pages → Source** to **GitHub Actions**, and restrict the `github-pages` environment’s deployment branches to `main`. Then run **Deploy website** from `main` when ready to publish. Preparing these files locally does not deploy the site.
 
-`build_site.py` publishes only its explicit `PUBLIC_FILES` allowlist: the homepage, its styles/scripts, selected images, animation frames and the cursor license. Demo code, README, build/test helpers, experimental assets and preview pages stay outside the artifact. Add new public assets to that allowlist when the homepage needs them.
+`build_site.py` publishes only its explicit `PUBLIC_FILES` allowlist: the homepage, its styles/scripts, selected images, animation frames and the cursor license. The README and build/test helpers stay outside the artifact. Add new public assets to that allowlist when the homepage needs them.
 
 To validate and inspect the exact bundle locally (use a new output directory):
 

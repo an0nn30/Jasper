@@ -1,49 +1,41 @@
 # Jasper — Status and Handoff
 
-**Bundled Cygwin implementation complete — 2026-10-20** (merged into local `main`): The approved [design](superpowers/specs/2026-10-20-jasper-bundled-cygwin-design.md) and [plan](superpowers/plans/2026-10-20-jasper-bundled-cygwin.md) now include the locked 114-package seed, corresponding sources/notices, production PTY relay, Cygwin Bash discovery, Manage Cygwin packages, and persistent provisioning through both Windows install routes. Default Gradle acquisition/install uses Java and bundled artifacts without PowerShell or separately installed tooling. Disconnected Windows ARM64 acceptance passes real MSI install/add-package/repair/upgrade/uninstall and actual Gradle install/update/uninstall/reinstall; all 8,275 Cygwin root entries survive the Gradle lifecycle unchanged. Native validation fixed WiX/source path limits, MSI empty-root process inspection and read-only launcher cleanup. Independent review and the full merged headless check pass: 11,878 tests, zero failures/errors and 29 skips. Native x64 Windows and interactive-app acceptance remain outstanding and block release publication. [Verification evidence](superpowers/plans/2026-10-20-jasper-cygwin-verification.md).
-
-**Shell Prompt icon and Meadow website — 2026-10-20**: The approved moss shell/terminal artwork replaces package and runtime icons on all three platforms, including the native macOS catalog. The website header, footer and favicon match. Enterprise shares the Shell Prompt platform icon and animated Meadow splash with normal mode. The icon generator uses the tracked raster master, retains platform framing and exports native containers plus a manifest. The local merge also includes the animated Meadow splash and visible-workspace handoff, Meadow website scenery, welcome section and shared tab transitions. Full headless check and macOS package verification pass (11,633 tests, zero failures/errors, 25 existing skips). Pages remains manual-only; deployment has not been run.
-
-**Local Meadow splash — 2026-10-20** (`codex/meadow-splash-preview`): Standard windowed launches show
-Jasper in a pixel meadow with the Meadow palette, build version and actual startup steps. A daemon animates
-blink/wave frames while startup occupies the EDT; painting is serialized and the first visible workspace paint (or startup failure) cancels
-animation before closing the window. The saved app-wide animation preference is honored. Custom branded looks
-retain their own splash, and background/headless/safe-mode launches stay silent. Sprite resources are packaged
-from the companion's approved source artwork. The browser study remains local and outside the public site bundle.
-Independent review passed after correcting the animation preference; native desktop testing remains with the user.
-
 ## Current state — 2026-10-20
 
 Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (windows, tabs, panes
-and tool windows), the terminal, the command palette, notifications, Settings, themes and looks; most features are
-bundled plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
+and tool windows), the terminal (with the bundled Cygwin environment's Cygwin Bash on Windows), the command palette,
+notifications, Settings, themes and looks; most features, the Editor and its Markdown preview among them, are bundled
+plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
 
-- **Branches.** `origin/main` at `4743469e5` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status
-  Bar Keymap actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise
-  mode), the Editor's own typography and Markdown preview (SDK 0.18.3, Editor 0.11.0, Remote 0.15.1) and the bundled
-  Cygwin on Windows; the Cygwin entry above, which says "merged into local `main`", was written before the push.
-  `c6bb59fdd` has the V1 code fixes (`claude/v1-code-fixes`, the code problems the
-  V1 documentation audit found: the package description and Linux menu categories, setting descriptions, Option key as
-  Meta shown only on macOS, the Sample's Greetings… shortcut (Cmd+Option+Y; Ctrl+Alt+Shift+Y), the Editor's F3 and
-  Shift+F3 off macOS and one Close Tab in its tab menu, Vault's classic Lock Vault caption, the
+- **Branches.** `origin/main` at `427321de4` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status
+  Bar Keymap actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise mode),
+  the Editor's own typography and Markdown preview (SDK 0.18.3, Editor 0.11.0, Remote 0.15.1), the bundled Cygwin on
+  Windows, Jasper Meadow as the default theme of both appearances in both looks, with a new Dark variant (`73c2b8f61`),
+  and the website without its demo fixtures and preview pages (`375615bbf`); the Cygwin entry below, which says "merged
+  into local `main`", was written before the push. `c6bb59fdd` has the V1 code fixes (`claude/v1-code-fixes`, the code
+  problems the V1 documentation audit found: the package description and Linux menu categories, setting descriptions,
+  Option key as Meta shown only on macOS, the Sample's Greetings… shortcut (Cmd+Option+Y; Ctrl+Alt+Shift+Y), the
+  Editor's F3 and Shift+F3 off macOS and one Close Tab in its tab menu, Vault's classic Lock Vault caption, the
   `shellHistorySearchMeasurement` task's removal and the vimrc byte order mark written as a Java escape), Enterprise
-  plans 13 (stripe icons), 14 (IntelliJ Classic's title bar), 15a (the look query) and 15b (look polish), Jasper Meadow
-  Light, the Windows user installation, Desk Buddy's shaded pixel sprites, the boot splash fix and PR #1's CI, Windows
-  and Linux fixes; entries below that end "merged to local `main`, not pushed" were written before the push, and the
-  Ubuntu Yaru, plan 10b, series and side-stripes entries, which end "Not merged", before their merge (the side stripes
-  as the rebased `e8ecfdcf2` to `faeec76f3`, which plan 15a's E15 leaves to confirm). The V1 documentation overhaul
-  (`claude/v1-docs`, with `origin/main` at `c6bb59fdd` merged in) is merged into `main`; its entry below, which ends
-  "Not merged into `main`", was written before the merge. Unmerged: `claude/workspace-tabs` (workspace tabs and single
-  instance, in progress; its STATUS entries are on that branch, and plan 14's entry says what it must reconcile with
-  the classic title bar) and `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
+  plans 13 (stripe icons), 14 (IntelliJ Classic's title bar), 15a (the look query) and 15b (look polish), Jasper
+  Meadow's Light variant, the Windows user installation, Desk Buddy's shaded pixel sprites, the boot splash fix and
+  PR #1's CI, Windows and Linux fixes; entries below that end "merged to local `main`, not pushed" were written before
+  the push, and the Ubuntu Yaru, plan 10b, series and side-stripes entries, which end "Not merged", before their merge
+  (the side stripes as the rebased `e8ecfdcf2` to `faeec76f3`, which plan 15a's E15 leaves to confirm). The V1
+  documentation overhaul (`claude/v1-docs`, with `origin/main` at `c6bb59fdd` merged in) is merged into `main`; its entry below, which
+  ends "Not merged into `main`", was written before the merge. Since then `claude/v1-docs` has brought the guides up to
+  `427321de4`. Unmerged: `claude/workspace-tabs` (workspace tabs and single instance, in progress; its STATUS entries
+  are on that branch, and plan 14's entry says what it must reconcile with the classic title bar) and
+  `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
 - **SDK** `0.18.3` (`JasperSdk.VERSION`); Credential Vault, Enterprise, File Server, Remote and Sample declare
   `sdk = ">=0.18.2, <0.19"`, the Editor `sdk = ">=0.18.3, <0.19"`, and Project Index, Shell History and Snippets
   `sdk = ">=0.18.0, <0.19"`.
-- **Themes.** Built in: Slate Cobalt (Dark and Light; the default Dark theme), Jasper Meadow Light (the default Light
-  theme), Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise
-  theme. **Looks:** the default look, and the Enterprise look while its plugin is on (Settings › Plugins, then restart;
+- **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
+  either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
+  Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.
+  **Looks:** the default look, and the Enterprise look while its plugin is on (Settings › Plugins, then restart;
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
@@ -52,8 +44,9 @@ bundled plugins on the public plugin SDK. The [documentation index](README.md) l
   Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
   `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
   macOS, Ubuntu and every Linux packaging and install check passed, and so did the single-worker Windows check. No
-  check is recorded for the two later commits that share the Shell Prompt icon and the Meadow splash with Enterprise
-  mode (`eb424eeec`, `4743469e5`).
+  check is recorded for the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode
+  (`eb424eeec`, `4743469e5`), the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the
+  Javadoc rename (`427321de4`).
 
 Bundled plugins, all enabled by default except Enterprise:
 
@@ -97,6 +90,20 @@ Open items, as the entries below record them:
 ## Handoff log
 
 Newest first. Each entry describes its change as it stood when the entry was written.
+
+**Meadow theme pair — 2026-10-20**: Normal and Enterprise first-run defaults use Jasper Meadow in both appearances. Dark pairs moonlit blue-green surfaces with sage accents and ivory text across the UI, terminal and Editor; Light colours are unchanged. Saved picks take precedence. Implemented as a bounded theme update with an in-chat approved design and independent review.
+
+**Bundled Cygwin implementation complete — 2026-10-20** (merged into local `main`): The approved [design](superpowers/specs/2026-10-20-jasper-bundled-cygwin-design.md) and [plan](superpowers/plans/2026-10-20-jasper-bundled-cygwin.md) now include the locked 114-package seed, corresponding sources/notices, production PTY relay, Cygwin Bash discovery, Manage Cygwin packages, and persistent provisioning through both Windows install routes. Default Gradle acquisition/install uses Java and bundled artifacts without PowerShell or separately installed tooling. Disconnected Windows ARM64 acceptance passes real MSI install/add-package/repair/upgrade/uninstall and actual Gradle install/update/uninstall/reinstall; all 8,275 Cygwin root entries survive the Gradle lifecycle unchanged. Native validation fixed WiX/source path limits, MSI empty-root process inspection and read-only launcher cleanup. Independent review and the full merged headless check pass: 11,878 tests, zero failures/errors and 29 skips. Native x64 Windows and interactive-app acceptance remain outstanding and block release publication. [Verification evidence](superpowers/plans/2026-10-20-jasper-cygwin-verification.md).
+
+**Shell Prompt icon and Meadow website — 2026-10-20**: The approved moss shell/terminal artwork replaces package and runtime icons on all three platforms, including the native macOS catalog. The website header, footer and favicon match. Enterprise shares the Shell Prompt platform icon and animated Meadow splash with normal mode. The icon generator uses the tracked raster master, retains platform framing and exports native containers plus a manifest. The local merge also includes the animated Meadow splash and visible-workspace handoff, Meadow website scenery, welcome section and shared tab transitions. Full headless check and macOS package verification pass (11,633 tests, zero failures/errors, 25 existing skips). Pages remains manual-only; deployment has not been run.
+
+**Local Meadow splash — 2026-10-20** (`codex/meadow-splash-preview`): Standard windowed launches show
+Jasper in a pixel meadow with the Meadow palette, build version and actual startup steps. A daemon animates
+blink/wave frames while startup occupies the EDT; painting is serialized and the first visible workspace paint (or startup failure) cancels
+animation before closing the window. The saved app-wide animation preference is honored. Custom branded looks
+retain their own splash, and background/headless/safe-mode launches stay silent. Sprite resources are packaged
+from the companion's approved source artwork. The browser study remains local and outside the public site bundle.
+Independent review passed after correcting the animation preference; native desktop testing remains with the user.
 
 **Rail and Status Bar shortcuts — 2026-10-20** (`claude/rail-status-keys`): View › Show/Hide › Rail and Status Bar
 are Keymap actions `toggle_rail` and `toggle_status_bar` (keymap spec rows 57 and 59): Global, unbound by default and

@@ -60,7 +60,7 @@ public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme
     }
 
     private static JasperTheme defaultTheme(boolean dark) {
-        return dark ? JasperTheme.bundled() : JasperTheme.builtIn(JasperTheme.LIGHT_DEFAULT_ID).orElseThrow();
+        return JasperTheme.builtIn(dark ? JasperTheme.DARK_DEFAULT_ID : JasperTheme.LIGHT_DEFAULT_ID).orElseThrow();
     }
 
     /** The theme shown with the Dark or Light appearance. */

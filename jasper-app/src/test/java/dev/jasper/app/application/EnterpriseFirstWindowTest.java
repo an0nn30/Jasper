@@ -39,9 +39,9 @@ class EnterpriseFirstWindowTest {
                 assertThat(first.visibleRows()).isEqualTo(8);
                 // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.
                 assertThat(first.toolbarHeight()).isEqualTo(28);
-                assertThat(first.lightTheme()).isEqualTo("enterprise");
-                assertThat(first.darkTheme()).isEqualTo("enterprise");
-                assertThat(application[0].themes().current().chrome().name()).as("the window's theme is the kit's pick").startsWith("Enterprise");
+                assertThat(first.lightTheme()).isEqualTo("jasper-meadow");
+                assertThat(first.darkTheme()).isEqualTo("jasper-meadow");
+                assertThat(application[0].themes().current().chrome().name()).as("the window's theme is the kit's pick").startsWith("Jasper Meadow");
                 assertThat(application[0].themes().kit()).isSameAs(selection.presentation().kit());
                 var log = application[0].contributions().panels().stream()
                     .filter(entry -> entry.id().equals(NotificationsFeature.PANEL_ID)).findFirst().orElseThrow();

@@ -319,7 +319,7 @@ default ([look-dependent defaults](configuration.md#look-dependent-defaults)).
 | Key | Value | Core default |
 |---|---|---|
 | `"ui.theme.light"` | a theme id with a Light variant | `jasper-meadow` |
-| `"ui.theme.dark"` | a theme id with a Dark variant | `slate-cobalt` |
+| `"ui.theme.dark"` | a theme id with a Dark variant | `jasper-meadow` |
 | `"palette.visible_rows"` | integer, 1–20 | `5` |
 | `"window.toolbar_height"` | integer, 28–64 | `30` |
 | `"window.toolbar"` | `"icons_and_labels"`, `"icons"` or `"hidden"` | `"icons_and_labels"` |
@@ -367,10 +367,10 @@ All three keys are required when the table is present.
 | `splash_art` | an `.svg` path | The art at the top of the splash screen. |
 
 A start that opens a window (not `--background`, `--no-window` or `--safe-mode`) shows a 720 × 440 splash screen until
-the first window has painted, or until start-up stops. It names each step as start-up reaches it ("Starting Java
-runtime…", "Reading configuration…", "Loading plugin: *name*" for each plugin, "Restoring workspace…", then "Starting
-*product* Workstation…", *product* being `[branding] product` or else Jasper), and a progress bar along its bottom
-edge fills with each step. A splash that cannot be drawn is skipped and logged.
+the first workspace window has painted, or until start-up stops. It names each step as start-up reaches it ("Starting
+Java runtime…", "Reading configuration…", "Loading plugin: *name*" for each plugin, "Restoring workspace…", then
+"Starting *product* Workstation…", *product* being `[branding] product` or else Jasper), and a progress bar along its
+bottom edge fills with each step. A splash that cannot be drawn is skipped and logged.
 
 With `[branding]` the splash is the look's: the art drawn into its top 718 × 250 pixels, the 64-pixel icon (128 on a 2×
 screen), the product name in the interface face's semibold, Jasper's version in the data face, the step and the
@@ -382,10 +382,10 @@ The splash art must be an `svg` document without a DOCTYPE, processing instructi
 `animate`, `animateTransform` or `set` elements, `on…` or `base` attributes, links or CSS `url()` other than to `#id`
 fragments in the file, `\` or `@` in an attribute value or a `<style>` element, or nesting deeper than 128 elements.
 
-A look without `[branding]`, such as the default look or Enterprise, keeps Jasper's icon and shows Jasper's Meadow
-splash, the same in every theme: a meadow landscape with the Desk Buddy turtle, "Jasper", "Make yourself at
-127.0.0.1", the version, the step and "Your infrastructure. One workspace.", over a moss progress bar. The turtle is
-animated unless `ui.animations.enabled = false`, whatever the look's `motion` says.
+A look without `[branding]`, such as the default look or Enterprise, keeps Jasper's Shell Prompt icon and shows
+Jasper's Meadow splash, the same in every theme: a meadow landscape with the Desk Buddy turtle, "Jasper", "Make
+yourself at 127.0.0.1", the version, the step and "Your infrastructure. One workspace.", over a moss progress bar. The
+turtle is animated unless `ui.animations.enabled = false`, whatever the look's `motion` says.
 
 ### Messages
 
@@ -501,8 +501,8 @@ dialog_surface = "surface.app"
 navigation_surface = "surface.card"
 
 [defaults]
-"ui.theme.light" = "enterprise"
-"ui.theme.dark" = "enterprise"
+"ui.theme.light" = "jasper-meadow"
+"ui.theme.dark" = "jasper-meadow"
 "palette.visible_rows" = 8
 "window.toolbar_height" = 28
 "window.toolbar" = "icons"
@@ -515,10 +515,10 @@ font_family = "IBM Plex Mono"
   base's values, except `title_bar` (`classic` for the base's `native`), `window_title` and `toolbar_search` (`icon`
   for the base's `field`).
 - The fonts sit in `presentation/fonts/`, inside the kit file's folder. There is no `[branding]`, so the look keeps
-  Jasper's icon and Meadow splash.
-- `[defaults]` makes the plugin's own `enterprise` theme the default for both appearances, shows 8 Run window rows,
-  makes the toolbar 28 pixels high, IntelliJ's, and shows its buttons as icons only; its Editor table draws the
-  Editor's documents in IBM Plex Mono, the look's data face.
+  Jasper's Shell Prompt icon and Meadow splash.
+- `[defaults]` makes Jasper Meadow (`jasper-meadow`) the theme for both appearances, as the core defaults do, shows 8
+  Run window rows, makes the toolbar 28 pixels high, IntelliJ's, and shows its buttons as icons only; its Editor table
+  draws the Editor's documents in IBM Plex Mono, the look's data face.
 
 [The Enterprise look](enterprise.md) describes the result.
 

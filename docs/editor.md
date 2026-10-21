@@ -809,8 +809,8 @@ Project Index do) finds the `Editor` service with `services().find(Editor.class)
 `EditorDocument.resolveRelative(path)` (Editor 0.11.0) returns the document at a path relative to its folder, on the same
 storage and login, for a Markdown preview's relative links and images; a provider checks the path with
 `RelativePaths.requireValid`, and one that keeps the default, which returns empty, has links that say "This document
-cannot resolve relative links". A plugin with a
-file source calls `locationDocuments(sourceId, resolver)` so that Open in Editor… and Save As… offer the source's places
-and open what the user picks through the `LocationResolver`; `reopener(prefix, resolve)` lets Recent files reopen its
+cannot resolve relative links" ([relative paths](plugin-apis.md#relative-paths)). A plugin with a file source calls
+`locationDocuments(sourceId, resolver)` so that Open in Editor… and Save As… offer the source's places and open what
+the user picks through the `LocationResolver`; `reopener(prefix, resolve)` lets Recent files reopen its
 documents, and `opener(handler)` lets it answer Open in Editor… itself. [Plugin APIs](plugin-apis.md) describes the
 package.

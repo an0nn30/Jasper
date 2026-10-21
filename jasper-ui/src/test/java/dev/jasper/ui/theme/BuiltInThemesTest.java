@@ -10,7 +10,7 @@ class BuiltInThemesTest {
         assertThat(JasperTheme.builtIns()).extracting(JasperTheme::id)
             .containsExactly("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "jasper-meadow");
         assertThat(JasperTheme.builtIns()).extracting(JasperTheme::name)
-            .containsExactly("Slate Cobalt", "Catppuccin Latte", "Catppuccin Frappé", "Catppuccin Macchiato", "Catppuccin Mocha", "Ubuntu Yaru", "Jasper Meadow Light");
+            .containsExactly("Slate Cobalt", "Catppuccin Latte", "Catppuccin Frappé", "Catppuccin Macchiato", "Catppuccin Mocha", "Ubuntu Yaru", "Jasper Meadow");
         assertThat(JasperTheme.builtIns().getFirst()).isSameAs(JasperTheme.bundled());
     }
 

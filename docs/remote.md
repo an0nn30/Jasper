@@ -466,9 +466,11 @@ second, so a change within the same second that keeps the size goes unnoticed. R
 Saved** reads them again.
 
 The Editor's reads and writes for one host and login go one at a time over one SFTP channel of the shared connection,
-opened for the first and closed when none are left. When the connection has closed, the next one reconnects and asks
-you to sign in in the window the file was opened from, or the active one; with no terminal window open it fails
-("Reconnecting to prod-web needs an open terminal window for the sign-in prompt.").
+opened for the first and closed when none are left. In the Editor's [Markdown preview](editor.md#markdown-preview), a
+remote file's relative links and images open from the same host, over that channel and with the same login. When the
+connection has closed, the next one reconnects and asks you to sign in in the window the file was opened from, or the
+active one; with no terminal window open it fails ("Reconnecting to prod-web needs an open terminal window for the
+sign-in prompt.").
 
 Remote files also reopen from the Editor's recent files, and Jasper's file chooser lists your saved hosts under
 **Remote**, so **Open in Editor…** can open a file on a host and Save As can save there. Choosing a host connects to
@@ -591,7 +593,7 @@ the Jasper home. Jasper reads the file live; a value outside its range is report
 
 Remote's messages (a host that could not be saved, a file that could not be opened) are posted in the Remote
 [notification group](notifications.md#groups) (`dev.jasper.remote`), and tunnel failures in the Tunnels group
-(`dev.jasper.remote.tunnels`); change how each shows in Settings › Notifications › Groups.
+(`dev.jasper.remote.tunnels`); change how each shows in Settings › Appearance & Behavior › Notifications › Groups.
 
 ## Files
 
@@ -617,11 +619,12 @@ Under a classic look, one whose [kit file starts from the classic base](looks.md
 [Enterprise look](enterprise.md)'s does, Remote's tool windows take their classic layout. Remote chooses its layout
 when it starts, so it follows a change of look at the next start of Jasper.
 
-- **Toolbar**: the session combo, drawn as IntelliJ's run-configuration combo: the application icon and the chosen
-  row's name (a long one cut with an ellipsis), over a list of your hosts ("prod-web (web1.example.com)"), then the WSL
-  distributions ("No saved sessions" when there are neither), then **Manage Sessions…**, which shows the Sessions
-  panel. Beside it the Run button, a green triangle with the tooltip **Connect**, goes to the chosen host's most
-  recently used running pane or opens one, or opens the distribution; it is disabled while there is nothing to run.
+- **Toolbar**: the session combo, drawn as IntelliJ's run-configuration combo: IntelliJ's Application
+  run-configuration icon and the chosen row's name (a long one cut with an ellipsis), over a list of your hosts
+  ("prod-web (web1.example.com)"), then the WSL distributions ("No saved sessions" when there are neither), then
+  **Manage Sessions…**, which shows the Sessions panel. Beside it the Run button, a green triangle with the tooltip
+  **Connect**, goes to the chosen host's most recently used running pane or opens one, or opens the distribution; it is
+  disabled while there is nothing to run.
   The combo and the window's Sessions tree share the chosen row; until you choose, it is the current SSH pane's host,
   else the first.
 - **Sessions** starts on the right, with its count beside the title: **Filter sessions** over a Name, Host and Port tree

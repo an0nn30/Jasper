@@ -25,10 +25,10 @@ grow with what you need: the bundled plugins use the same API as any plugin you 
   notifications while Jasper is in the background. See [notifications](docs/notifications.md).
 - **Settings**: a searchable Settings dialog over `config.toml`, a Keymap page where every action can be rebound, and
   most changes applied without a restart. See [configuration](docs/configuration.md).
-- **Themes and looks**: Slate Cobalt in the Dark appearance and Jasper Meadow Light in the Light appearance by default;
-  Slate Cobalt's Light variant, Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru built in; import further
-  Jasper theme files. A *look* sets the chrome and controls: the default look, or a plugin's look such as Enterprise. See
-  [themes](docs/themes.md) and [looks](docs/looks.md).
+- **Themes and looks**: Jasper Meadow in both the Dark and the Light appearance by default; Slate Cobalt, Catppuccin
+  Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru built in; import further Jasper theme files. A *look* sets the
+  chrome and controls: the default look, or a plugin's look such as Enterprise. See [themes](docs/themes.md) and
+  [looks](docs/looks.md).
 - **The `jasper` command**: open a window, start Jasper with options, or run plugin commands such as
   `jasper editor FILE:LINE` from any shell. See [the command line](docs/command-line.md).
 - **Background residency**: by default on macOS and Windows, Jasper keeps running when its last window closes, so the
@@ -49,7 +49,7 @@ Everything below ships with Jasper as a bundled plugin, listed in Settings › P
 | Project Index | `dev.jasper.indexer` | Offers to index the project a terminal enters, locally or on a saved host, and finds its files from the command palette | Yes |
 | Shell History | `dev.jasper.history` | Searches every shell's history from the command palette, to paste or run a command or save it as a snippet | Yes |
 | Snippets | `dev.jasper.snippets` | Saved commands with fill-in placeholders, from the command palette | Yes |
-| Enterprise | `dev.jasper.enterprise` | The Enterprise look: IntelliJ Classic's title bar on macOS and Windows, labelled tool-window stripes led by their icons, the Run window, classic controls and icons, IBM Plex fonts and the Enterprise theme | No |
+| Enterprise | `dev.jasper.enterprise` | The Enterprise look: IntelliJ Classic's title bar on macOS and Windows, labelled tool-window stripes led by their icons, the Run window, classic controls and icons and IBM Plex fonts, in Jasper Meadow by default; it also ships the Enterprise theme | No |
 | Sample | `dev.jasper.sample` | Exercises the plugin runtime for plugin authors; does nothing until one of its `demo_*` settings is set | Yes |
 
 See [plugins](docs/plugins.md) for managing plugins and a guide to each one.
@@ -206,9 +206,9 @@ the native packaging tasks.
 The task also installs the pinned Cygwin starter set in `%LOCALAPPDATA%\Jasper\cygwin`, using bundled Setup and relay
 binaries. Gradle fetches only hash-locked artifacts using Java; installation works offline once staged. Choose
 **Cygwin Bash** as **Shell profile** in Settings › Terminal › Shell, and use **Manage Cygwin packages…** beside it, or
-in the command palette, to add tools. Updates and uninstall preserve
-the Cygwin root, packages and user files. See the [Cygwin guide](packaging/windows/cygwin/README.md) for package
-management and recovery.
+in the command palette, to add tools. Updates and uninstall preserve the Cygwin root, packages and user files. See
+[Cygwin Bash](docs/terminal.md#cygwin-bash) for the environment, its packages and repairing it, and
+[Cygwin on Windows](docs/diagnostics.md#cygwin-on-windows) for its logs and messages.
 
 Exit Jasper, including its background process, before installing an update or running
 `.\gradlew.bat :jasper-app:uninstallWindowsUser`, which does not build the application; it removes the installation,

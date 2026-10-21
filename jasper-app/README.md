@@ -6,10 +6,10 @@ that loads every plugin against the public SDK (`jasper-sdk`). The application o
 panes, tool windows and the dock), the terminal panes, commands and the command palette, notifications, Settings,
 themes and looks, background residency, the `jasper` command and native desktop integration.
 
-Remote (SSH, SFTP, tunnels), Credential Vault, Editor, File Server, Project Index, Shell History, Snippets and the
-Enterprise look are bundled plugins under the repository's `plugins/` directory. They compile against the SDK only and
-reach the application through the same API a third-party plugin uses; [plugins](../docs/plugins.md#bundled-plugins)
-lists them.
+Remote (SSH, SFTP, tunnels), Credential Vault, Editor, File Server, Project Index, Shell History, Snippets, Sample and
+the Enterprise look are bundled plugins under the repository's `plugins/` directory. They compile against the SDK and
+the API packages of the bundled plugins they require, never against the application, and reach the application through
+the same API a third-party plugin uses; [plugins](../docs/plugins.md#bundled-plugins) lists them.
 
 ## First checkout
 
@@ -68,7 +68,7 @@ Building the distribution (`installDist`, `packageApp`) is headless; on macOS, A
 - [Terminal onboarding](../jasper-terminal/README.md), [UI kit](../jasper-ui/README.md) and
   [Buddy embedding](../jasper-buddy/README.md): the libraries' supported surfaces.
 - [Bundled Cygwin](../packaging/windows/cygwin/README.md): Windows provisioning, the persistent Cygwin root, package
-  management and the PTY relay.
+  management and the PTY relay; [Cygwin Bash](../docs/terminal.md#cygwin-bash) is its user guide.
 - [Status](../docs/STATUS.md): current state, open items and decisions.
 
 Starting points by change:

@@ -136,10 +136,10 @@ fields, or edit the file that holds them, `plugins/dev.jasper.snippets/data/snip
 The Enterprise look: IntelliJ Classic's title bar on macOS and Windows, with the menus in the macOS menu bar or the
 Windows title bar (on Linux the system title bar and a menu row in the window), labelled tool window stripes, a 28-pixel
 toolbar with a Search Everywhere button, the Run window in place of the command palette card, classic controls and
-IntelliJ's classic icons, with the IBM Plex fonts (IBM Plex Mono is also the Editor's default font) and the Enterprise
-theme (Light and Dark, ports of IntelliJ Light and New UI Dark). It is off by default;
-turn it on in Settings › Plugins and restart. The look is data, a kit file with its fonts and theme, and the plugin's
-code does nothing; Credential Vault, Remote and File Server use their classic layouts under it. See
+IntelliJ's classic icons, with the IBM Plex fonts (IBM Plex Mono is also the Editor's default font), in Jasper Meadow
+by default. It also ships the Enterprise theme (Light and Dark, ports of IntelliJ Light and New UI Dark). It is off by
+default; turn it on in Settings › Plugins and restart. The look is data, a kit file with its fonts and theme, and the
+plugin's code does nothing; Credential Vault, Remote and File Server use their classic layouts under it. See
 [looks](#looks-and-plugin-themes).
 
 - **Capabilities** `presentation.provide`.
@@ -506,9 +506,9 @@ describes it and [looks](looks.md) the kit file.
   with its standard look" with **Try Again**, which forgets the record and restarts.
 - Safe mode always uses the default look.
 
-Any plugin can also ship themes. They are listed in Settings › Appearance after the built-in themes, captioned "From the
-*name* plugin", and are available only while that plugin can load; switching the plugin on or off takes a restart. A
-theme setting that names a theme of a plugin that is off uses the default theme, without a warning. See
+Any plugin can also ship themes. They are listed in Settings › Appearance & Behavior › Appearance after the built-in themes,
+captioned "From the *name* plugin", and are available only while that plugin can load; switching the plugin on or off
+takes a restart. A theme setting that names a theme of a plugin that is off uses the default theme, without a warning. See
 [creating themes](creating-themes.md).
 
 ## Plugin commands
@@ -529,7 +529,8 @@ standalone, like `--safe-mode`. A bundled or installed copy with a higher versio
 id you disabled in Settings › Plugins stays off, from `--plugin-dir` too ("disabled by the user"); enable it there
 first.
 
-Plugins for this Jasper declare `sdk = ">=0.18.0, <0.19"` in `plugin.toml`;
+Plugins for this Jasper (SDK 0.18.3) declare a range such as `sdk = ">=0.18.0, <0.19"` in `plugin.toml`, raising the
+floor to the SDK version that added the newest API they use ([the manifest](plugin-authoring.md#the-manifest));
 [building the in-repo plugins](plugin-authoring.md#building-the-in-repo-plugins) and
 [running a plugin in Jasper](plugin-authoring.md#running-a-plugin-in-jasper) give the build tasks and the source
 launch's own Jasper home.

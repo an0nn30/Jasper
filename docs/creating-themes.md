@@ -71,9 +71,8 @@ It cannot change:
    changed theme that is on show is applied again at once.
 6. **Fix problems.** A file that does not load is skipped: the status bar's configuration cell reads
    **Config warnings**, and clicking it lists the problem as `<file>: warning: <message>` (with `:<line>:1` after the
-   file for a JSON syntax error). A pick of the skipped theme falls back to Slate Cobalt in Dark or Jasper Meadow
-   Light in Light, with a warning on the setting.
-   [Validation and error messages](#validation-and-error-messages) explains every message.
+   file for a JSON syntax error). A pick of the skipped theme falls back to Jasper Meadow in either appearance, with a
+   warning on the setting. [Validation and error messages](#validation-and-error-messages) explains every message.
 
 ## The file format
 
@@ -185,8 +184,8 @@ are ignored. The seven surfaces take no style, and a trailing comma is an error.
 
 Each UI variant lists all 60 roles of the eight tables below, and may add the 2 [title bar roles](#title-bar-roles)
 and the 9 overridable [derived roles](#derived-roles). Eight more roles always follow another role and must not be
-listed ([Roles you do not list](#roles-you-do-not-list)). The Slate Cobalt columns are the values of Slate Cobalt, the
-default Dark theme, as a guide to how the roles relate.
+listed ([Roles you do not list](#roles-you-do-not-list)). The Slate Cobalt columns are the values of the built-in Slate Cobalt
+theme, as a guide to how the roles relate.
 
 Plugins see the same roles through the SDK ([`SemanticColor`](sdk-reference.html#dev.jasper.sdk.ui.SemanticColor),
 read with [`Appearance.color`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.color(SemanticColor))), so a theme
@@ -790,24 +789,24 @@ themes = ["themes/harbour.json"]
 - **Reserved ids.** Every theme id a discovered plugin declares is reserved, whether the plugin is on or not: no
   themes-folder file or import can take it.
 - **While the plugin does not load** (off, waiting for review, or skipped in safe mode, which loads no installed
-  plugin and no look), a setting that names one of its themes shows Slate Cobalt in Dark or Jasper Meadow Light in
-  Light, and one that names one of its schemes uses `match`, without a warning, and the setting keeps its value for
-  when the plugin is back.
+  plugin and no look), a setting that names one of its themes shows Jasper Meadow in either appearance, and one that
+  names one of its schemes uses `match`, without a warning, and the setting keeps its value for when the plugin is
+  back.
 - **Two plugins, one id.** A `--plugin-dir` plugin wins over a bundled one, which wins over an installed one; then the
   lowest plugin id. The others' files are ignored with a message.
-- A look's kit file may make one of its own plugin's themes the default for either appearance (Enterprise makes
-  `enterprise` the default for both). A setting the user saved wins.
+- A look's kit file may make one of its own plugin's themes, or a built-in theme, the default for either appearance
+  (Enterprise keeps Jasper Meadow for both). A setting the user saved wins.
 
 ## Beyond colours: building a look
 
 A theme changes colours only. The shape of the interface, its window chrome (title bar, menus, tool window stripes,
 status bar, command palette or Run window), its controls, metrics, fonts and branding, is a look, which a plugin
 provides with a kit file (`presentation` in its descriptor, with the `presentation.provide` capability). A kit file
-holds no colours, but it can name its plugin's themes as the defaults ([`[defaults]`](looks.md#defaults)
-`"ui.theme.dark"` and `"ui.theme.light"`) and choose which role paints dialog bodies ([`[colors]`](looks.md#colors)
-`dialog_surface`: `surface.dialog` or `surface.app`) and the Settings navigation (`navigation_surface`:
-`surface.sidebar` or `surface.card`). [Looks](looks.md) is the kit file reference, and [Enterprise](enterprise.md) is a
-look and theme shipped together.
+holds no colours, but it can name a built-in theme or its plugin's themes as the defaults
+([`[defaults]`](looks.md#defaults) `"ui.theme.dark"` and `"ui.theme.light"`) and choose which role paints dialog bodies
+([`[colors]`](looks.md#colors) `dialog_surface`: `surface.dialog` or `surface.app`) and the Settings navigation
+(`navigation_surface`: `surface.sidebar` or `surface.card`). [Looks](looks.md) is the kit file reference, and
+[Enterprise](enterprise.md) is a look and theme shipped together.
 
 ## Worked example: Harbour
 

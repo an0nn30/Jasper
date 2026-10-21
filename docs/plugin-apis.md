@@ -187,7 +187,7 @@ requirements:
 
 ```java
 try (var host = new FakePluginHost()) {
-    host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.10.0", Set.of()), Set.of(), Set.of(),
+    host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.11.0", Set.of()), Set.of(), Set.of(),
         context -> context.services().publish(Editor.class, fakeEditor));
     host.start(TOOL, Set.of(), Set.of("dev.jasper.editor"), new ToolPlugin());
     // drive the plugin, then assert on what fakeEditor received

@@ -199,12 +199,12 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `terminal.cursor.blink` | boolean | `true` | | Live | Cursor › Blinking cursor |
 | `terminal.env` | table | `{}` | Environment variables for new shells ([Shell](#shell-environment-and-history)) | New panes | Shell › Environment variables |
 | `ui.appearance` | string | `"system"` | `"system"`, `"dark"`, `"light"` ([Theme](#theme)) | Live | Appearance › Dark, Light, Match System |
-| `ui.theme.dark` | string | `"slate-cobalt"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Dark theme |
+| `ui.theme.dark` | string | `"jasper-meadow"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Dark theme |
 | `ui.theme.light` | string | `"jasper-meadow"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Light theme |
 | `ui.font.family` | string | `"system"` | `"system"` or a font family name ([Interface font](#interface-font)) | Live | Appearance › Font |
 | `ui.font.size` | number | Not set: the look's size | 8–32 points | Live | Appearance › Use platform font size, Font size |
-| `ui.workspace.opacity` | number | Not set: opaque | 10–100 percent: the opacity of terminal and editor backgrounds; macOS only | Live | Appearance › Enable opacity, Opacity (macOS) |
-| `ui.workspace.blur` | string | `"theme"` | `"theme"` (the theme's choice; Slate Cobalt does not blur), `"on"`, `"off"`: blurs the desktop behind a translucent workspace; macOS only | Live | Appearance › Background blur (macOS) |
+| `ui.workspace.opacity` | number | Not set: opaque | 10–100 percent: the opacity of terminal and editor backgrounds, the Editor's Markdown preview included; macOS only | Live | Appearance › Enable opacity, Opacity (macOS) |
+| `ui.workspace.blur` | string | `"theme"` | `"theme"` (the theme's choice; no theme blurs), `"on"`, `"off"`: blurs the desktop behind a translucent workspace; macOS only | Live | Appearance › Background blur (macOS) |
 | `ui.animations.enabled` | boolean | `true` | `false` stops motion; running transitions finish at once | Live | Appearance › Enable animations; hidden under a look without motion, such as Enterprise |
 
 Choices made outside Settings save here too, at once: View › Show/Hide › Toolbar and Status Bar, and the command
@@ -219,8 +219,8 @@ The active look can give five settings defaults of its own (the [`defaults` tabl
 file): `ui.theme.dark`, `ui.theme.light`, `palette.visible_rows`, `window.toolbar_height` and `window.toolbar`. A
 value you set wins; a value that is invalid falls back to the look's default. The kit file can also default plugins'
 settings, in one `[defaults."<plugin id>"]` table per plugin: a value saved in the plugin's settings file wins, and
-Reset returns to the look's. The Enterprise look ([Enterprise](enterprise.md#defaults)) uses the `enterprise` theme for
-both appearances, 8 palette rows and a 28-pixel toolbar of icons only (`"icons"`), and sets the Editor's font to IBM
+Reset returns to the look's. The Enterprise look ([Enterprise](enterprise.md#defaults)) keeps Jasper Meadow for both
+appearances, uses 8 palette rows and a 28-pixel toolbar of icons only (`"icons"`), and sets the Editor's font to IBM
 Plex Mono. A look can also hide Settings rows it makes meaningless: `window.native_decorations`,
 `ui.animations.enabled` and `window.rail_width`, as the table says.
 
@@ -233,11 +233,10 @@ Plex Mono. A look can also hide Settings rows it makes meaningless: `window.nati
 `ui.theme.dark` and `ui.theme.light` name a theme by id: a built-in one (`slate-cobalt`, `ubuntu-yaru`,
 `jasper-meadow`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha`), one a plugin
 provides (such as `enterprise`), or one you imported into `themes/` (its file name without `.json`). Unless the look
-sets its own, the Dark appearance shows Slate Cobalt (`slate-cobalt`) and the Light appearance Jasper Meadow Light
-(`jasper-meadow`). An id is lowercase letters and digits in words joined by `-`, at most 64 characters. A theme
-without the variant asked for is reported and the appearance's default is used: Slate Cobalt for Dark, Jasper Meadow
-Light for Light. A theme that fails to apply keeps the current appearance, is reported on `ui.appearance`, and is
-tried again by Reload Config.
+sets its own, both appearances use Jasper Meadow (`jasper-meadow`): moonlit blue-green for Dark and warm cream for
+Light. An id is lowercase letters and digits in words joined by `-`, at most 64 characters. A theme without the variant
+asked for is reported and the appearance's default is used: Jasper Meadow for both Dark and Light. A theme that fails
+to apply keeps the current appearance, is reported on `ui.appearance`, and is tried again by Reload Config.
 
 The Appearance page shows the three appearances as tiles. Its Dark theme, Light theme and Terminal scheme menus list the
 installed themes and schemes; each has a gear (a ⋯ button under Enterprise) with **Import Theme…** and **Remove
@@ -438,11 +437,11 @@ profile that is not installed starts the platform's default, with a warning.
 
 On Windows, the setup wizard and the user installation set up Jasper's own Cygwin in `%LOCALAPPDATA%\Jasper\cygwin`
 (from the ZIP, run `provision-cygwin.cmd` in the extracted folder once), and updating or removing Jasper keeps it
-([Cygwin Bash](terminal.md#cygwin-bash)). Cygwin Bash reads `/etc/profile` and the first of
-`~/.bash_profile`, `~/.bash_login` and `~/.profile`, as a login shell does, and starts in the folder a new tab or split
-asks for, otherwise in your Cygwin home. **Manage Cygwin packages…**, beside ↻ and in the command palette, opens
-Cygwin's Setup on that installation to add or update packages; close Cygwin Bash panes and other programs using it
-first. When Setup ends, Jasper detects the shells again and shows the outcome in a card.
+([Cygwin Bash](terminal.md#cygwin-bash)). Cygwin Bash reads `/etc/profile` and the first of `~/.bash_profile`,
+`~/.bash_login` and `~/.profile`, but is not a login shell (`logout` does not end it), and starts in the folder a new
+tab or split asks for, otherwise in your Cygwin home. **Manage Cygwin packages…**, beside ↻ and in the command palette,
+opens Cygwin's Setup on that installation to add or update packages; close Cygwin Bash panes and other programs using
+it first. When Setup ends, Jasper detects the shells again and shows the outcome in a card.
 
 For `"custom"`, an empty `program` runs the platform's default shell (the login shell on macOS and Linux) with `args`
 appended; a named program gets exactly `args`, with no login flag added. Each argument is passed as written: Jasper
@@ -465,7 +464,7 @@ plugins add, such as `TERM_PROGRAM=Jasper` and the Editor's `EDITOR`. `TERM` and
 `xterm-256color` and `truecolor`: entries for them are ignored with a warning. Jasper sets `JASPER_PANE` and
 `JASPER_COMMAND_SOCKET` after the table, replacing entries for them. Setting `SHELL` here changes only the child's
 environment, not which login shell starts. A WSL shell receives only the variables `WSLENV` names; Cygwin Bash
-receives every variable's name in capitals.
+receives every variable's name in capitals, without `BASH_ENV` and `ENV`, and with Cygwin's `bin` first on `PATH`.
 [Environment](terminal.md#environment) gives the order in full.
 
 ### Shell integration

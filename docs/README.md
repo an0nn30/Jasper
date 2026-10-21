@@ -10,7 +10,8 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
   uninstalling.
 - [Workspace](workspace.md): windows, tabs, panes, tool windows and the dock, menus, the toolbar, the status bar, view
   modes and the file chooser.
-- [Terminal](terminal.md): terminal panes, selection, links, search and shell integration.
+- [Terminal](terminal.md): terminal panes, shell profiles (WSL and [Cygwin Bash](terminal.md#cygwin-bash) among them),
+  selection, links, search and shell integration.
 - [Command palette](command-palette.md): commands, scopes, recents and the Run window.
 - [Notifications](notifications.md): cards, the Notifications tool window, groups, the Errors window, system
   notifications and Desk Buddy.
@@ -71,8 +72,8 @@ Windows user without a C/C++ compiler. Use the Gradle wrapper with a JetBrains R
 
 This runs the headless checks, doclint, the compiled documentation examples and the architecture guards, then
 assembles the application distribution. It opens no window. `:jasper-app:run`, the benchmarks and, on macOS,
-`:jasper-app:packageDist` and `:jasper-app:trainAotCache` open a window, so a coding agent runs them only with the
-user's authorization.
+`:jasper-app:packageDist`, `:jasper-app:trainAotCache` and any packaging task run with `-Pjasper.aot=true` open a
+window, so a coding agent runs them only with the user's authorization.
 
 | Module | Start here | Architecture | Maintenance and extensions |
 | --- | --- | --- | --- |

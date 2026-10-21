@@ -106,8 +106,9 @@ shell_integration = "auto"
 scheme = "match"
 
 [terminal.shell]
-# New panes only. The shell new tabs start: "powershell", "pwsh" (PowerShell 7) or "cmd" on Windows,
-# "wsl:<name>" for a WSL distribution, "login" on macOS and Linux, or "custom" (program and args below).
+# New panes only. The shell new tabs start: "powershell", "pwsh" (PowerShell 7), "cmd" or "cygwin" (Jasper's
+# Cygwin Bash) on Windows, "wsl:<name>" for a WSL distribution, "login" on macOS and Linux, or "custom" (program and
+# args below).
 # Empty means "custom" when program or args are set, otherwise the platform default. A split starts the
 # shell of the pane it splits; a profile that is not installed starts the default with a warning.
 profile = ""
@@ -140,13 +141,13 @@ blink = true
 appearance = "system"
 
 [ui.theme]
-# The themes the Dark and Light appearances show, live: a built-in theme ("slate-cobalt" or "ubuntu-yaru" for either,
-# "jasper-meadow" or "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or "catppuccin-mocha" for Dark),
-# a plugin's theme such as "enterprise", or an imported theme's id (its file name in the themes folder without .json).
-# A theme without that variant is reported and the appearance's default is used: Slate Cobalt for Dark, Jasper Meadow
-# Light for Light.
-# The default depends on the active look ("enterprise" under Enterprise); these lines override it.
-dark = "slate-cobalt"
+# The themes the Dark and Light appearances show, live: a built-in theme ("jasper-meadow", "slate-cobalt" or
+# "ubuntu-yaru" for either, "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or
+# "catppuccin-mocha" for Dark), a plugin's theme such as "enterprise", or an imported theme's id (its file name in the
+# themes folder without .json). A theme without that variant is reported and the appearance's default is used:
+# Jasper Meadow for Dark and Light. The standard and Enterprise looks both default to Jasper Meadow; these lines
+# save an explicit choice.
+dark = "jasper-meadow"
 light = "jasper-meadow"
 
 [ui.font]
@@ -162,7 +163,7 @@ family = "system"
 # macOS only (ignored on other platforms), live: translucent terminal and editor backgrounds. Omit opacity to keep the terminal area opaque.
 # Opacity: 10-100 percent.
 # opacity = 95
-# Blur behind a translucent workspace: "theme" (Slate Cobalt does not blur), "on" or "off".
+# Blur behind a translucent workspace: "theme" (no theme blurs), "on" or "off".
 blur = "theme"
 
 [ui.animations]

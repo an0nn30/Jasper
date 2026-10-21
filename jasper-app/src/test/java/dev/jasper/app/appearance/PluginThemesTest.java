@@ -86,7 +86,7 @@ class PluginThemesTest {
         var library = ThemeLibrary.of(PluginThemes.of(List.of(declared("dev.jasper.enterprise", "Enterprise", 1, false, "enterprise", null))));
         var problems = new ArrayList<String>();
         var selection = ThemeSelection.of(library, "enterprise", "nowhere", TerminalSchemeChoice.MATCH, (key, message) -> problems.add(key));
-        assertThat(selection.theme(true).id()).isEqualTo("slate-cobalt");
+        assertThat(selection.theme(true).id()).isEqualTo("jasper-meadow");
         assertThat(selection.theme(false).id()).isEqualTo("jasper-meadow");
         assertThat(problems).as("only the unknown pick is reported").containsExactly("ui.theme.light");
         problems.clear();

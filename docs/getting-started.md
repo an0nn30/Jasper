@@ -43,7 +43,8 @@ The setup wizard also installs a Cygwin environment for [Cygwin Bash](terminal.m
 `%LOCALAPPDATA%\Jasper\cygwin`, from files it carries, so no download is needed. The first installation needs about
 2.7 GB free on that drive and leaves about 1.3 GB there; when it cannot finish, setup fails, and running it again
 retries. A newer setup keeps the environment as it is. For the portable ZIP, run `provision-cygwin.cmd` in the `Jasper`
-folder once to install the same environment.
+folder once to install the same environment. Each release also carries that environment's source code as
+`Jasper-<version>-cygwin-sources-<amd64|aarch64>.zip`, which installing does not need.
 
 ### Linux
 
@@ -64,8 +65,7 @@ Jasper opens one window with one tab running your shell: your login shell on mac
 (Settings › Terminal › Shell chooses another, such as [Cygwin Bash](terminal.md#cygwin-bash)). The first window is sized
 for 100 columns by 35 rows of the terminal font, bundled Cousine Nerd Font Mono at 12 points; after that, new windows
 take the size and place of the last one you closed. On macOS Jasper follows the system's dark or light appearance; on
-Linux and Windows it shows Dark until you choose Light. The default themes are Slate Cobalt in Dark and Jasper Meadow
-Light in Light.
+Linux and Windows it shows Dark until you choose Light. The default theme is Jasper Meadow in both Dark and Light.
 
 While Jasper starts, a splash shows a meadow with the [Desk Buddy](notifications.md#desk-buddy), Jasper's version,
 each start-up step and a progress bar, until the window has painted. A look with its own [branding](looks.md#branding)

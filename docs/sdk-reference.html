@@ -773,8 +773,8 @@ preferred size (<code>java.awt.Dimension</code>), a component's workspace opacit
 <h3>The bundled plugins</h3>
 <p>Each bundled plugin is an ordinary plugin on this SDK: it declares capabilities, requires other plugins and exports
 packages exactly as yours would, and each can be turned off in Settings › Plugins. Remote, Credential Vault, File
-Server, Enterprise and Sample declare <code>sdk = &quot;&gt;=0.18.2, &lt;0.19&quot;</code>; Editor declares
-<code>sdk = &quot;&gt;=0.18.3, &lt;0.19&quot;</code>; the others declare <code>sdk = &quot;&gt;=0.18.0, &lt;0.19&quot;</code>.</p>
+Server, Enterprise and Sample declare <code>sdk = &quot;&gt;=0.18.2, &lt;0.19&quot;</code>; the Editor declares
+<code>sdk = &quot;&gt;=0.18.3, &lt;0.19&quot;</code>; Project Index, Shell History and Snippets declare <code>sdk = &quot;&gt;=0.18.0, &lt;0.19&quot;</code>.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Plugin</th><th>Id</th><th>Capabilities</th><th>Exports</th><th>Requires (optional)</th></tr></thead>
 <tbody>
@@ -1213,7 +1213,7 @@ deadline. See <a href="#threading">Threading</a> for the shutdown order.</p>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.notifications()"><code>PluginContext.notifications()</code></a></td><td>Its notification groups.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.actions()"><code>PluginContext.actions()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.menus()"><code>PluginContext.menus()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.toolbar()"><code>PluginContext.toolbar()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.statusBar()"><code>PluginContext.statusBar()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.rail()"><code>PluginContext.rail()</code></a></td><td>Commands and where they appear; see <a href="#contributions">Contributions</a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.panels()"><code>PluginContext.panels()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.windows()"><code>PluginContext.windows()</code></a></td><td>Tool windows, windows, dialogs, overlays, popovers, content tabs and file choosers.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.kit()"><code>PluginContext.kit()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.appearance()"><code>PluginContext.appearance()</code></a></td><td>Its <a href="#ui">view kit</a>, the current theme's colours and the look Jasper runs with.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.kit()"><code>PluginContext.kit()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.appearance()"><code>PluginContext.appearance()</code></a></td><td>Its <a href="#ui">view kit</a>, the current theme's colours, the look Jasper runs with and the saved terminal font.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.terminals()"><code>PluginContext.terminals()</code></a></td><td>Windows, tabs and panes; see <a href="#terminals">Terminals</a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.palette()"><code>PluginContext.palette()</code></a></td><td>Command palette scopes; see <a href="#palette">Palette</a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.fileSources()"><code>PluginContext.fileSources()</code></a></td><td>Places in Jasper's file chooser.</td></tr>
@@ -1281,7 +1281,7 @@ listed per type in the API reference; the main ones:</p>
 <tr><td><a href="#dev.jasper.sdk.ui.Platform.openInEditor(Path)"><code>Platform.openInEditor(Path)</code></a>, <a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>Platform.browse(URI)</code></a></td><td>They do their work in the background.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Appearance.variant()"><code>Appearance.variant()</code></a>, <a href="#dev.jasper.sdk.ui.Appearance.workspaceVariant()"><code>Appearance.workspaceVariant()</code></a></td><td>Whether the chrome or the workspace is dark or light.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Appearance.presentation()"><code>Appearance.presentation()</code></a></td><td>The look Jasper runs with, the same value until it restarts.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a></td><td>Saved terminal typography, updated before its UI-thread change notification.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a></td><td>The saved terminal font; it already returns a new value when its change handlers run.</td></tr>
 </tbody>
 </table></div>
 <p>A few callbacks run off the UI thread, and must not touch Swing or UI-thread-only SDK methods:</p>
@@ -1841,7 +1841,9 @@ ACTIONS stack, first, last or beside another separator;</li>
 <code>arrow.right</code>, <code>back</code>, <code>bell</code>, <code>bookmark</code>, <code>brightness</code>, <code>check</code>,
 <code>chevron.down</code>, <code>chevron.left</code>, <code>chevron.right</code>, <code>chevron.up</code>, <code>clock</code>, <code>close</code>,
 <code>collapse</code>, <code>collapse.all</code>, <code>command-palette</code>, <code>copy</code>, <code>cursor</code>, <code>delete</code>,
-<code>desktop</code>, <code>download</code>, <code>edit</code>, <code>error</code>, <code>expand.all</code>, <code>file</code>, <code>folder</code>,
+<code>desktop</code>, <code>download</code>, <code>edit</code>, <code>editor.preview</code>, <code>editor.preview.classic</code>,
+<code>editor.scroll-sync</code>, <code>editor.scroll-sync.classic</code>, <code>editor.source</code>, <code>editor.source.classic</code>,
+<code>editor.split</code>, <code>editor.split.classic</code>, <code>error</code>, <code>expand.all</code>, <code>file</code>, <code>folder</code>,
 <code>folder.add</code>, <code>folder.filled</code>, <code>font</code>, <code>forward</code>, <code>help</code>, <code>hidden</code>, <code>history</code>,
 <code>home</code>, <code>import</code>, <code>info</code>, <code>key</code>, <code>keyboard</code>, <code>laptop</code>, <code>link</code>, <code>lock</code>,
 <code>lock.keyhole</code>, <code>login</code>, <code>logout</code>, <code>match.case</code>, <code>match.word</code>, <code>menu</code>, <code>more</code>,
@@ -1854,7 +1856,12 @@ ACTIONS stack, first, last or beside another separator;</li>
 <code>window</code>, <code>window.add</code> and <code>zoom</code>.
 They follow the theme and the look. <code>run</code>, IntelliJ's classic Run triangle, and <code>application</code>, its
 run-configuration icon, are authored artwork: controls draw them in their own colours, and panels, prompts and tiles
-draw a monochrome glyph of the same name. These two names need SDK 0.18.1. Under the Enterprise look a tool
+draw a monochrome glyph of the same name. These two names need SDK 0.18.1. <code>editor.source</code>,
+<code>editor.split</code>, <code>editor.preview</code> and <code>editor.scroll-sync</code> are a document's view controls (source only,
+source and preview, preview only, synchronised scrolling) in IntelliJ's New UI art, and their <code>.classic</code> names are
+IntelliJ's classic art, for use while <a href="#dev.jasper.sdk.ui.Presentation.icons()"><code>Presentation.icons()</code></a> is
+<a href="#dev.jasper.sdk.ui.Presentation.Icons.CLASSIC"><code>Presentation.Icons.CLASSIC</code></a>. All eight are authored light and dark art that Jasper draws in
+its own colours wherever the name appears; they need SDK 0.18.3. Under the Enterprise look a tool
 window's stripe label starts with its icon, and IntelliJ's classic art draws <code>network</code>, <code>folder</code>,
 <code>tunnel</code>, <code>download</code>, <code>server</code> and <code>bell</code> there, and <code>add</code>, <code>split</code>, <code>zoom</code>,
 <code>settings</code>, <code>window.add</code> and <code>search</code> in the toolbar, toolbar views, the status bar and tool-window
@@ -1878,7 +1885,9 @@ its <code>lifetime</code> closes when the node leaves the tree or the view close
 (a <code>JScrollPane</code> is judged by what it scrolls); an <code>EDITOR</code> may also be a <code>JTextArea</code>,
 <code>JTextPane</code> or <code>JEditorPane</code>. Anything else is refused ("Ordinary plugin controls require kit descriptors").
 Jasper sets the component's foreground and background from the theme whenever the theme changes, with the workspace's
-opacity in a translucent window; the component paints the rest from <a href="#dev.jasper.sdk.ui.Appearance"><code>Appearance</code></a>.</p>
+opacity in a translucent window, and its font to the interface's body font when it is registered, at every update of
+the view and at every theme or font change, so a font of the plugin's own belongs on a component inside it; the
+component paints the rest from <a href="#dev.jasper.sdk.ui.Appearance"><code>Appearance</code></a>.</p>
 
 <h3>Colours</h3>
 <p>Views take their colours from the theme without help. Custom content reads them from <a href="#dev.jasper.sdk.plugin.PluginContext.appearance()"><code>PluginContext.appearance()</code></a>:
@@ -1897,19 +1906,27 @@ stripes, the title bar and where the menus are on this platform, whether the too
 field or an icon, the look's UI and data faces (empty for the platform's), its body text size and its default toolbar
 height. Jasper chooses the look at start, so the value is the same for every plugin until it restarts, and it is safe
 from any thread: read it once in <code>start</code>. It reports the look's own faces, sizes, title bar and menus, not the
-user's font, toolbar height, decoration or view settings. Remote, Credential Vault and File Server compose their
+user's interface font, toolbar height, decoration or view settings. Remote, Credential Vault and File Server compose their
 classic layouts when <a href="#dev.jasper.sdk.ui.Presentation.classic()"><code>Presentation.classic()</code></a> is true, and the Sample starts its tool window in
 the bottom strip under labelled stripes:</p>
 <pre class="code" data-language="java"><code><span class="k">boolean</span> classic = context.appearance().presentation().classic();
 <span class="t">Anchor</span> side = context.appearance().presentation().toolWindows() == <span class="t">Presentation</span>.<span class="t">ToolWindows</span>.<span class="t">STRIPES</span> ? <span class="t">Anchor</span>.<span class="t">BOTTOM</span> : <span class="t">Anchor</span>.<span class="t">LEFT</span>;</code></pre>
-<p><a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a> (SDK 0.18.3) reads the saved terminal family, fractional point size,
-ordered fallbacks, ligatures and line height from any thread. Register <a href="#dev.jasper.sdk.ui.Appearance.onTerminalTypographyChanged(Consumer)"><code>Appearance.onTerminalTypographyChanged(Consumer)</code></a>
-on the UI thread; it delivers changed values there after the getter updates, with no initial replay. Closing the
-subscription or stopping the plugin removes it. Temporary pane zoom leaves this saved value unchanged.
-<a href="#dev.jasper.sdk.testing.FakePluginHost.setTerminalTypography(TerminalTypography)"><code>FakePluginHost.setTerminalTypography(TerminalTypography)</code></a> queues a value for the next <code>flush()</code>.</p>
 <p><a href="#dev.jasper.sdk.ui.Appearance.presentation()"><code>Appearance.presentation()</code></a> needs SDK 0.18.2. In a test,
 <a href="#dev.jasper.sdk.testing.FakePluginHost.setPresentation(Presentation)"><code>FakePluginHost.setPresentation(Presentation)</code></a> with
 <a href="#dev.jasper.sdk.testing.FakePresentations.CLASSIC"><code>FakePresentations.CLASSIC</code></a> runs the plugin under the Enterprise look's values.</p>
+
+<h3>The terminal font</h3>
+<p>Custom content that shows text in the terminal's font, as the Editor does when it follows the terminal font, reads
+<a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a> and applies it to a component inside its registered content: a
+<a href="#dev.jasper.sdk.ui.TerminalTypography"><code>TerminalTypography</code></a> with the saved family, the size in points (6 to 72, fractions allowed), the fallback families
+in the order they are tried, whether ligatures are on and the line height (a multiple from 0.5 to 3), as Settings ›
+Terminal › Font &amp; Colors saves them. The value is the same for every window and plugin, a pane's temporary zoom does
+not change it, and it is safe from any thread. Register <a href="#dev.jasper.sdk.ui.Appearance.onTerminalTypographyChanged(Consumer)"><code>Appearance.onTerminalTypographyChanged(Consumer)</code></a> on the
+UI thread: the handler runs there after each saved change, when the getter already returns the new value. An equal value
+notifies nobody and registering delivers no initial value, so read the getter first; the registration closes with the
+plugin. Both need SDK 0.18.3. In a test,
+<a href="#dev.jasper.sdk.testing.FakePluginHost.setTerminalTypography(TerminalTypography)"><code>FakePluginHost.setTerminalTypography(TerminalTypography)</code></a> publishes a value on the next
+<code>flush()</code>.</p>
 </section>
 
 <section class="guide" id="settings">
@@ -2025,10 +2042,10 @@ row for a declared setting, bound to the page's unsaved value, and Settings save
 <a href="#dev.jasper.sdk.settings.SettingsPanelHost.changed()"><code>SettingsPanelHost.changed()</code></a> says the page's modified state changed. <a href="#dev.jasper.sdk.settings.SettingsPanel.modified()"><code>SettingsPanel.modified()</code></a>,
 <a href="#dev.jasper.sdk.settings.SettingsPanel.apply()"><code>SettingsPanel.apply()</code></a> and <a href="#dev.jasper.sdk.settings.SettingsPanel.reset()"><code>SettingsPanel.reset()</code></a> cover only state of the plugin's own beyond its declared
 settings; <a href="#dev.jasper.sdk.settings.SettingsPanel.dispose()"><code>SettingsPanel.dispose()</code></a> runs when Settings closes the page.</p>
-<p>The default <a href="#dev.jasper.sdk.settings.SettingsPanel.pendingChanged()"><code>SettingsPanel.pendingChanged()</code></a> callback (SDK 0.18.3) runs after a standard row edit, list action
-or Reset, with the pending value and validation already updated. Rebuild dependent descriptors here, reading
-<a href="#dev.jasper.sdk.settings.SettingsPanelHost.pending(Setting)"><code>SettingsPanelHost.pending(Setting)</code></a>. Invalid edits can leave the pending value unchanged; plugin calls to
-<code>host.stage</code> leave refreshing to the plugin.</p>
+<p><a href="#dev.jasper.sdk.settings.SettingsPanel.pendingChanged()"><code>SettingsPanel.pendingChanged()</code></a> runs after a standard row handles the user's edit, choice, list action,
+Browse… or Reset, once <a href="#dev.jasper.sdk.settings.SettingsPanelHost.pending(Setting)"><code>SettingsPanelHost.pending(Setting)</code></a> returns the result and the row shows its validation
+(an invalid edit leaves the pending value as it was). Rebuild there whatever the page shows from pending values, as the
+Editor's page does. The plugin's own <code>stage</code> calls do not trigger it. It needs SDK 0.18.3.</p>
 </section>
 
 <section class="guide" id="services">
@@ -2128,7 +2145,7 @@ of this reference; how each behaves for its users is in <a href="plugin-apis.md"
 <thead><tr><th>Package</th><th>Service</th><th>What it offers</th><th>Requires line</th></tr></thead>
 <tbody>
 <tr><td><a href="#package-dev.jasper.vault.api"><code>dev.jasper.vault.api</code></a></td><td><a href="#dev.jasper.vault.api.VaultApi"><code>VaultApi</code></a>, one instance per consumer</td><td>The vault's lock state and its topic; unlocking; the credentials' descriptors, without secrets; a credential once the user allows the consumer to use it, once or always; a credential picker anchored on a control; importing SSH keys as managed keys</td><td><code>{ id = "dev.jasper.vault", version = "&gt;=0.2", optional = true }</code></td></tr>
-<tr><td><a href="#package-dev.jasper.editor.api"><code>dev.jasper.editor.api</code></a></td><td><a href="#dev.jasper.editor.api.Editor"><code>Editor</code></a></td><td>Opening a local file, or a document the consumer reads and writes (<a href="#dev.jasper.editor.api.EditorDocument"><code>EditorDocument</code></a>), in an editor tab; reopening the consumer's documents from Recent Files; answering Open in Editor… first; offering a file source's places in the Editor's chooser</td><td><code>{ id = "dev.jasper.editor", version = "&gt;=0.7", optional = true }</code></td></tr>
+<tr><td><a href="#package-dev.jasper.editor.api"><code>dev.jasper.editor.api</code></a></td><td><a href="#dev.jasper.editor.api.Editor"><code>Editor</code></a></td><td>Opening a local file, or a document the consumer reads and writes (<a href="#dev.jasper.editor.api.EditorDocument"><code>EditorDocument</code></a>), in an editor tab; reopening the consumer's documents from Recent Files; answering Open in Editor… first; offering a file source's places in the Editor's chooser; resolving the relative images and links of a Markdown preview through the consumer's document (<a href="#dev.jasper.editor.api.EditorDocument.resolveRelative(String)"><code>EditorDocument.resolveRelative(String)</code></a>)</td><td><code>{ id = "dev.jasper.editor", version = "&gt;=0.7", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.remote.api"><code>dev.jasper.remote.api</code></a></td><td><a href="#dev.jasper.remote.api.RemoteProjects"><code>RemoteProjects</code></a></td><td>The saved host and folder of an SSH pane; whether a host is connected; listing a remote work tree; looking for marker files; opening a remote file in the Editor or a terminal in a remote folder</td><td><code>{ id = "dev.jasper.remote", version = "&gt;=0.12", optional = true }</code></td></tr>
 <tr><td><a href="#package-dev.jasper.snippets.api"><code>dev.jasper.snippets.api</code></a></td><td><a href="#dev.jasper.snippets.api.SnippetService"><code>SnippetService</code></a></td><td>Looking a snippet up by name; appending a snippet; the Snippets palette scope's id and row ids, for reopening the palette on a snippet</td><td><code>{ id = "dev.jasper.snippets", version = "&gt;=0.1", optional = true }</code></td></tr>
 </tbody>
@@ -2208,8 +2225,8 @@ Split repeats the target pane's profile. A profile id Jasper does not list opens
 <h3>Shell profiles</h3>
 <p><a href="#dev.jasper.sdk.terminal.Terminals.profiles()"><code>Terminals.profiles()</code></a> lists the shells Jasper detected for local panes, in the order its settings list them, as
 <a href="#dev.jasper.sdk.terminal.ShellProfileInfo"><code>ShellProfileInfo</code></a>s with an id, a name, a <a href="#dev.jasper.sdk.terminal.ShellProfileInfo.Kind"><code>ShellProfileInfo.Kind</code></a> and a detail. On Windows they are
-<code>powershell</code>, <code>pwsh</code> (when PowerShell 7 is installed), <code>cmd</code> and <code>wsl:&lt;name&gt;</code> for each WSL
-distribution; elsewhere <code>login</code>, the login shell; and last <code>custom</code>, the user's custom command. Detection can
+<code>powershell</code>, <code>pwsh</code> (when PowerShell 7 is installed), <code>cmd</code>, <code>cygwin</code> (Cygwin Bash, when
+Jasper's own Cygwin is installed) and <code>wsl:&lt;name&gt;</code> for each WSL distribution; elsewhere <code>login</code>, the login shell; and last <code>custom</code>, the user's custom command. Detection can
 finish after the plugin starts: <a href="#dev.jasper.sdk.terminal.Terminals.onProfilesChanged(Runnable)"><code>Terminals.onProfilesChanged(Runnable)</code></a> runs after the first detection and after each
 later one whose result differs. Both need <code>terminal.open</code>. Remote lists the WSL distributions this way and opens them
 with <code>localProfile</code>.</p>
@@ -2575,8 +2592,8 @@ handlers, factories and background tasks) as a line; assert it is empty.</p>
 <thead><tr><th>Area</th><th>Script</th><th>Read</th></tr></thead>
 <tbody>
 <tr><td>Actions and chrome</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.invoke(String,UUID,UUID)"><code>FakePluginHost.invoke(String, UUID, UUID)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.actions()"><code>FakePluginHost.actions()</code></a> (<code>id|title|enabled</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.actionSpec(String)"><code>FakePluginHost.actionSpec(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.toolbar()"><code>FakePluginHost.toolbar()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.menu(String)"><code>FakePluginHost.menu(String)</code></a> (<code>FILE</code> … <code>TRANSFER</code>, <code>context</code>, <code>top:&lt;menu id&gt;</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.status()"><code>FakePluginHost.status()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.progress()"><code>FakePluginHost.progress()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.rail()"><code>FakePluginHost.rail()</code></a></td></tr>
-<tr><td>Tool windows and windows</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.openPanel(String,UUID)"><code>FakePluginHost.openPanel(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closePanel(String,UUID)"><code>FakePluginHost.closePanel(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.requestClose(String)"><code>FakePluginHost.requestClose(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeCommand(String)"><code>FakePluginHost.closeCommand(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.requestQuit()"><code>FakePluginHost.requestQuit()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeToolbarViews(UUID)"><code>FakePluginHost.closeToolbarViews(UUID)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.panels()"><code>FakePluginHost.panels()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.panelView(String,UUID)"><code>FakePluginHost.panelView(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.panelHeader(String,UUID)"><code>FakePluginHost.panelHeader(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windows()"><code>FakePluginHost.windows()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windowView(String,String)"><code>FakePluginHost.windowView(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.dialogPresentation(String,String)"><code>FakePluginHost.dialogPresentation(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.popoverViews(String)"><code>FakePluginHost.popoverViews(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentTabs()"><code>FakePluginHost.contentTabs()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentPresentation(ContentTab)"><code>FakePluginHost.contentPresentation(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentStatus(ContentTab)"><code>FakePluginHost.contentStatus(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentOwner(ContentTab)"><code>FakePluginHost.contentOwner(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentComponent(ContentTab)"><code>FakePluginHost.contentComponent(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windowContent(String,String)"><code>FakePluginHost.windowContent(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.dialogSwatch(String,String)"><code>FakePluginHost.dialogSwatch(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.toolbarViews(UUID)"><code>FakePluginHost.toolbarViews(UUID)</code></a></td></tr>
-<tr><td>Views</td><td><a href="#dev.jasper.sdk.testing.FakeKitView.emit(UiEvent)"><code>FakeKitView.emit(UiEvent)</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.type(String,String)"><code>FakeKitView.type(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.setSecret(String,char[])"><code>FakeKitView.setSecret(String, char[])</code></a></td><td><a href="#dev.jasper.sdk.ui.UiView.spec()"><code>UiView.spec()</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.focused()"><code>FakeKitView.focused()</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.revealed()"><code>FakeKitView.revealed()</code></a></td></tr>
+<tr><td>Tool windows and windows</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.openPanel(String,UUID)"><code>FakePluginHost.openPanel(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closePanel(String,UUID)"><code>FakePluginHost.closePanel(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.requestClose(String)"><code>FakePluginHost.requestClose(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeCommand(String)"><code>FakePluginHost.closeCommand(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.requestQuit()"><code>FakePluginHost.requestQuit()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeToolbarViews(UUID)"><code>FakePluginHost.closeToolbarViews(UUID)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.panels()"><code>FakePluginHost.panels()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.panelView(String,UUID)"><code>FakePluginHost.panelView(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.panelHeader(String,UUID)"><code>FakePluginHost.panelHeader(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windows()"><code>FakePluginHost.windows()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windowView(String,String)"><code>FakePluginHost.windowView(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.dialogPresentation(String,String)"><code>FakePluginHost.dialogPresentation(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.popoverViews(String)"><code>FakePluginHost.popoverViews(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentTabs()"><code>FakePluginHost.contentTabs()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentPresentation(ContentTab)"><code>FakePluginHost.contentPresentation(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentStatus(ContentTab)"><code>FakePluginHost.contentStatus(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentCommands(ContentTab)"><code>FakePluginHost.contentCommands(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentOwner(ContentTab)"><code>FakePluginHost.contentOwner(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentComponent(ContentTab)"><code>FakePluginHost.contentComponent(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windowContent(String,String)"><code>FakePluginHost.windowContent(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.dialogSwatch(String,String)"><code>FakePluginHost.dialogSwatch(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.toolbarViews(UUID)"><code>FakePluginHost.toolbarViews(UUID)</code></a></td></tr>
+<tr><td>Views</td><td><a href="#dev.jasper.sdk.testing.FakeKitView.emit(UiEvent)"><code>FakeKitView.emit(UiEvent)</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.type(String,String)"><code>FakeKitView.type(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.setSecret(String,char[])"><code>FakeKitView.setSecret(String, char[])</code></a>, <a href="#dev.jasper.sdk.testing.FakeKit.contentFont(Font)"><code>FakeKit.contentFont(Font)</code></a> for the interface font custom content receives</td><td><a href="#dev.jasper.sdk.ui.UiView.spec()"><code>UiView.spec()</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.focused()"><code>FakeKitView.focused()</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.revealed()"><code>FakeKitView.revealed()</code></a></td></tr>
 <tr><td>Terminals</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalWindow()"><code>FakePluginHost.addTerminalWindow()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalTab(UUID,String)"><code>FakePluginHost.addTerminalTab(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalPane(UUID,PaneInfo)"><code>FakePluginHost.addTerminalPane(UUID, PaneInfo)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.activateTerminalWindow(UUID)"><code>FakePluginHost.activateTerminalWindow(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.focusTerminalPane(UUID)"><code>FakePluginHost.focusTerminalPane(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeTerminalPane(UUID)"><code>FakePluginHost.closeTerminalPane(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setPaneInfo(UUID,PaneInfo)"><code>FakePluginHost.setPaneInfo(UUID, PaneInfo)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setSelection(UUID,String)"><code>FakePluginHost.setSelection(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setForegroundJob(UUID,String)"><code>FakePluginHost.setForegroundJob(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setShellProfiles(List)"><code>FakePluginHost.setShellProfiles(List)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.sent(UUID)"><code>FakePluginHost.sent(UUID)</code></a> (<code>write:&lt;text&gt;</code>, <code>paste:&lt;text&gt;</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.openRequests()"><code>FakePluginHost.openRequests()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.terminalPanes()"><code>FakePluginHost.terminalPanes()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.shellEnvironment(Map)"><code>FakePluginHost.shellEnvironment(Map)</code></a></td></tr>
 <tr><td>Terminal events</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.commandStarted(UUID,String)"><code>FakePluginHost.commandStarted(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.commandFinished(UUID,String,OptionalInt,Duration)"><code>FakePluginHost.commandFinished(UUID, String, OptionalInt, Duration)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.titleChanged(UUID,String)"><code>FakePluginHost.titleChanged(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.cwdChanged(UUID,Path)"><code>FakePluginHost.cwdChanged(UUID, Path)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.remoteCwdChanged(UUID,String,String)"><code>FakePluginHost.remoteCwdChanged(UUID, String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.sessionExited(UUID,OptionalInt)"><code>FakePluginHost.sessionExited(UUID, OptionalInt)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.bell(UUID)"><code>FakePluginHost.bell(UUID)</code></a>, then <a href="#dev.jasper.sdk.testing.FakePluginHost.flush()"><code>FakePluginHost.flush()</code></a></td><td></td></tr>
 <tr><td>Provided sessions</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.cancelSession(UUID)"><code>FakePluginHost.cancelSession(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.reconnectSession(UUID)"><code>FakePluginHost.reconnectSession(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.typeIntoSession(UUID,String)"><code>FakePluginHost.typeIntoSession(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.pumpSessions()"><code>FakePluginHost.pumpSessions()</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.sessionState(UUID)"><code>FakePluginHost.sessionState(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.sessionOutput(UUID)"><code>FakePluginHost.sessionOutput(UUID)</code></a></td></tr>
@@ -2585,7 +2602,7 @@ handlers, factories and background tasks) as a line; assert it is empty.</p>
 <tr><td>Notifications and activity</td><td><a href="#dev.jasper.sdk.testing.FakeNotifications.runAction(String,String)"><code>FakeNotifications.runAction(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakeNotifications.click(String)"><code>FakeNotifications.click(String)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.notifications()"><code>FakePluginHost.notifications()</code></a>: <a href="#dev.jasper.sdk.testing.FakeNotifications.lines()"><code>FakeNotifications.lines()</code></a> (<code>group|SEVERITY|title|content</code>, then the cause's class), <a href="#dev.jasper.sdk.testing.FakeNotifications.groups()"><code>FakeNotifications.groups()</code></a>; <a href="#dev.jasper.sdk.testing.FakePluginHost.activityLog()"><code>FakePluginHost.activityLog()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.connectionLog()"><code>FakePluginHost.connectionLog()</code></a></td></tr>
 <tr><td>Command line</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.declareSubcommand(String,String,String)"><code>FakePluginHost.declareSubcommand(String, String, String)</code></a> before the start, then <a href="#dev.jasper.sdk.testing.FakePluginHost.call(String,List,Path)"><code>FakePluginHost.call(String, List, Path)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakeCommandCall.exit()"><code>FakeCommandCall.exit()</code></a>, <a href="#dev.jasper.sdk.testing.FakeCommandCall.out()"><code>FakeCommandCall.out()</code></a>, <a href="#dev.jasper.sdk.testing.FakeCommandCall.err()"><code>FakeCommandCall.err()</code></a>; <a href="#dev.jasper.sdk.testing.FakeCommandCall.cancel()"><code>FakeCommandCall.cancel()</code></a> plays Ctrl+C</td></tr>
 <tr><td>Files</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.queueFileChoice(List)"><code>FakePluginHost.queueFileChoice(List)</code></a> (what <a href="#dev.jasper.sdk.ui.Windows.choose(FileChoice)"><code>Windows.choose(FileChoice)</code></a> returns), <a href="#dev.jasper.sdk.testing.FakePluginHost.queuePathSelection(List)"><code>FakePluginHost.queuePathSelection(List)</code></a> (the local <code>choose*</code> calls), <a href="#dev.jasper.sdk.testing.FakePluginHost.queueFileSelection(Optional)"><code>FakePluginHost.queueFileSelection(Optional)</code></a> (<a href="#dev.jasper.sdk.ui.WindowSurface.chooseFile(String,Optional)"><code>WindowSurface.chooseFile(String, Optional)</code></a> and a settings row's Browse), <a href="#dev.jasper.sdk.testing.FakePluginHost.duringPathSelection(Runnable)"><code>FakePluginHost.duringPathSelection(Runnable)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.locateFile(String,UUID)"><code>FakePluginHost.locateFile(String, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.connectFileSource(String,String,UUID)"><code>FakePluginHost.connectFileSource(String, String, UUID)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.fileChoices()"><code>FakePluginHost.fileChoices()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.fileSources()"><code>FakePluginHost.fileSources()</code></a> (<code>id|heading</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.fileRoots(String)"><code>FakePluginHost.fileRoots(String)</code></a> (<code>id|label|connected</code>)</td></tr>
-<tr><td>Desktop and appearance</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.setPresentation(Presentation)"><code>FakePluginHost.setPresentation(Presentation)</code></a> before any plugin starts, with <a href="#dev.jasper.sdk.testing.FakePresentations.STANDARD"><code>FakePresentations.STANDARD</code></a> (the default) or <a href="#dev.jasper.sdk.testing.FakePresentations.CLASSIC"><code>FakePresentations.CLASSIC</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.publishApp(Topic,Object)"><code>FakePluginHost.publishApp(Topic, Object)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setVariant(Variant)"><code>FakePluginHost.setVariant(Variant)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setSemanticColors(Map)"><code>FakePluginHost.setSemanticColors(Map)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setWorkspace(Variant,WorkspacePalette,EditorPalette,SyntaxPalette)"><code>FakePluginHost.setWorkspace(Variant, WorkspacePalette, EditorPalette, SyntaxPalette)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setWorkspaceOpacity(double)"><code>FakePluginHost.setWorkspaceOpacity(double)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.edit(Path,OptionalInt,Optional)"><code>FakePluginHost.edit(Path, OptionalInt, Optional)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.declareBundled(String)"><code>FakePluginHost.declareBundled(String)</code></a> before the start, <a href="#dev.jasper.sdk.testing.FakePluginHost.setCommandClient(Path)"><code>FakePluginHost.setCommandClient(Path)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.clipboard()"><code>FakePluginHost.clipboard()</code></a>: <a href="#dev.jasper.sdk.testing.FakeClipboard.copies()"><code>FakeClipboard.copies()</code></a> (<code>copy|&lt;plugin id&gt;|&lt;text&gt;</code>, <code>secret|…</code>); <a href="#dev.jasper.sdk.testing.FakePluginHost.browsed()"><code>FakePluginHost.browsed()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.openedInEditor()"><code>FakePluginHost.openedInEditor()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.editorPlugin()"><code>FakePluginHost.editorPlugin()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.active(String)"><code>FakePluginHost.active(String)</code></a></td></tr>
+<tr><td>Desktop and appearance</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.setPresentation(Presentation)"><code>FakePluginHost.setPresentation(Presentation)</code></a> before any plugin starts, with <a href="#dev.jasper.sdk.testing.FakePresentations.STANDARD"><code>FakePresentations.STANDARD</code></a> (the default) or <a href="#dev.jasper.sdk.testing.FakePresentations.CLASSIC"><code>FakePresentations.CLASSIC</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.publishApp(Topic,Object)"><code>FakePluginHost.publishApp(Topic, Object)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setVariant(Variant)"><code>FakePluginHost.setVariant(Variant)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setSemanticColors(Map)"><code>FakePluginHost.setSemanticColors(Map)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setWorkspace(Variant,WorkspacePalette,EditorPalette,SyntaxPalette)"><code>FakePluginHost.setWorkspace(Variant, WorkspacePalette, EditorPalette, SyntaxPalette)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setWorkspaceOpacity(double)"><code>FakePluginHost.setWorkspaceOpacity(double)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setTerminalTypography(TerminalTypography)"><code>FakePluginHost.setTerminalTypography(TerminalTypography)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.edit(Path,OptionalInt,Optional)"><code>FakePluginHost.edit(Path, OptionalInt, Optional)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.declareBundled(String)"><code>FakePluginHost.declareBundled(String)</code></a> before the start, <a href="#dev.jasper.sdk.testing.FakePluginHost.setCommandClient(Path)"><code>FakePluginHost.setCommandClient(Path)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.clipboard()"><code>FakePluginHost.clipboard()</code></a>: <a href="#dev.jasper.sdk.testing.FakeClipboard.copies()"><code>FakeClipboard.copies()</code></a> (<code>copy|&lt;plugin id&gt;|&lt;text&gt;</code>, <code>secret|…</code>); <a href="#dev.jasper.sdk.testing.FakePluginHost.browsed()"><code>FakePluginHost.browsed()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.openedInEditor()"><code>FakePluginHost.openedInEditor()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.editorPlugin()"><code>FakePluginHost.editorPlugin()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.active(String)"><code>FakePluginHost.active(String)</code></a></td></tr>
 </tbody>
 </table></div>
 <p><code>new FakeNotifications().group(id)</code> is a <a href="#dev.jasper.sdk.notifications.NotificationGroup"><code>NotificationGroup</code></a> for a class under test that takes one, without
@@ -2596,10 +2613,11 @@ a host.</p>
 <li>Background tasks run one at a time when the test asks; in Jasper each runs at once on a virtual thread of its own,
 so tasks can overlap.</li>
 <li>The fake checks the calling thread only for the kit's views, which need the event dispatch thread, and for
-<a href="#dev.jasper.sdk.ui.Appearance"><code>Appearance</code></a>'s colours, palettes, workspace opacity and change subscriptions, which need the thread that made the
-host or the event dispatch thread (<a href="#dev.jasper.sdk.ui.Appearance.variant()"><code>Appearance.variant()</code></a>, <a href="#dev.jasper.sdk.ui.Appearance.workspaceVariant()"><code>Appearance.workspaceVariant()</code></a> and
-<a href="#dev.jasper.sdk.ui.Appearance.presentation()"><code>Appearance.presentation()</code></a> and <a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a> answer any thread). Calls Jasper refuses off the
-UI thread with <code>IllegalStateException</code> (registrations, subscribing, publishing services, handling subcommands,
+<a href="#dev.jasper.sdk.ui.Appearance"><code>Appearance</code></a>'s colours, palettes, workspace opacity and theme subscriptions, which need the thread that made the
+host or the event dispatch thread (<a href="#dev.jasper.sdk.ui.Appearance.variant()"><code>Appearance.variant()</code></a>, <a href="#dev.jasper.sdk.ui.Appearance.workspaceVariant()"><code>Appearance.workspaceVariant()</code></a>,
+<a href="#dev.jasper.sdk.ui.Appearance.presentation()"><code>Appearance.presentation()</code></a> and <a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a> answer any thread), and
+<a href="#dev.jasper.sdk.ui.Appearance.onTerminalTypographyChanged(Consumer)"><code>Appearance.onTerminalTypographyChanged(Consumer)</code></a>, which needs the event dispatch thread. Calls Jasper refuses off
+the UI thread with <code>IllegalStateException</code> (registrations, subscribing, publishing services, handling subcommands,
 terminal queries, the clipboard) succeed in the fake from any thread.</li>
 <li>Services: the fake does not check that a service's interface is in one of the provider's exported packages, and an
 absent optional provider's classes are still on the test classpath, so the <code>NoClassDefFoundError</code> path cannot be
@@ -2709,8 +2727,10 @@ member.</p>
 0.18 version has starts its range there: <a href="#dev.jasper.sdk.ui.Appearance.presentation()"><code>Appearance.presentation()</code></a> needs 0.18.2, so Remote, Credential Vault,
 File Server and the Sample, which read it, declare <code>sdk = &quot;&gt;=0.18.2, &lt;0.19&quot;</code>, and so does Enterprise, whose kit
 file gives the Editor's settings a default that an older Jasper refuses. Icon-only GHOST buttons in a toolbar view and
-the <code>run</code> and <code>application</code> icons need 0.18.1. Editor uses <a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a>, <a href="#dev.jasper.sdk.settings.SettingsPanel.pendingChanged()"><code>SettingsPanel.pendingChanged()</code></a> and document view icons
-from 0.18.3, and declares <code>sdk = &quot;&gt;=0.18.3, &lt;0.19&quot;</code>. The other bundled plugins declare the range above.</p>
+the <code>run</code> and <code>application</code> icons need 0.18.1. The Editor reads <a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>Appearance.terminalTypography()</code></a>,
+implements <a href="#dev.jasper.sdk.settings.SettingsPanel.pendingChanged()"><code>SettingsPanel.pendingChanged()</code></a> and draws the <code>editor.*</code> view icons, which need 0.18.3, so it
+declares <code>sdk = &quot;&gt;=0.18.3, &lt;0.19&quot;</code>. Project Index, Shell History and Snippets declare
+<code>sdk = &quot;&gt;=0.18.0, &lt;0.19&quot;</code>.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Form</th><th>Meaning</th></tr></thead>
 <tbody>
@@ -3042,8 +3062,8 @@ already accepted are interrupted when the shutdown wait elapses, or at once afte
 <div class="member" id="dev.jasper.sdk.plugin.PluginContext.appearance()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.plugin.PluginContext.appearance()" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.Appearance">Appearance</a> <b>appearance</b>()</code></pre>
 <div class="doc"><p>Theme colours for custom content and the look Jasper runs with: semantic colours, the chrome and workspace
-variants, the workspace, editor and syntax palettes, the workspace opacity, change notifications and the
-presentation.</p></div>
+variants, the workspace, editor and syntax palettes, the workspace opacity, change notifications, the
+presentation and the saved terminal typography.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the appearance service</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.plugin.PluginContext.panels()">
@@ -5164,10 +5184,11 @@ state of the plugin's own.</p></div>
 <div class="member" id="dev.jasper.sdk.settings.SettingsPanel.pendingChanged()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.settings.SettingsPanel.pendingChanged()" aria-label="Link to this member">#</a><code><span class="kw">default</span> <span class="kw">void</span> <b>pendingChanged</b>()</code></pre>
 <p class="badges"><span class="since">since 0.18.3</span></p>
-<div class="doc"><p>A standard row processed an edit, list action or Reset. Its pending value and validation are available through
-the host before this callback runs; rebuild dependent descriptors here. Invalid edits can leave the pending
-value unchanged. Calling <a href="#dev.jasper.sdk.settings.SettingsPanelHost.stage(Setting,Object)"><code>SettingsPanelHost.stage</code></a> from plugin code does not trigger this callback.
-Runs on the UI thread while the page is mounted.</p></div>
+<div class="doc"><p>Called after a standard row from <a href="#dev.jasper.sdk.settings.SettingsPanelHost.row(Setting)"><code>SettingsPanelHost.row</code></a> handles the user's input: a typed edit, a
+switch, a choice, a list action, a file from Browse… or Reset. <a href="#dev.jasper.sdk.settings.SettingsPanelHost.pending(Setting)"><code>SettingsPanelHost.pending</code></a> already returns
+the resulting value and the row shows its validation; an invalid edit leaves the pending value as it was.
+Rebuild the descriptors that depend on pending values here. The plugin's own <a href="#dev.jasper.sdk.settings.SettingsPanelHost.stage(Setting,Object)"><code>SettingsPanelHost.stage</code></a>
+calls do not trigger it. Runs on the UI thread while the page is shown.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.settings.SettingsPanel.modified()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.settings.SettingsPanel.modified()" aria-label="Link to this member">#</a><code><span class="kw">default</span> <span class="kw">boolean</span> <b>modified</b>()</code></pre>
@@ -5659,7 +5680,7 @@ on <code>context.background()</code>. A connector that throws fails that attempt
 <h5>Constants</h5>
 <dl class="constants">
 <dt id="dev.jasper.sdk.terminal.ShellProfileInfo.Kind.LOGIN_SHELL"><code>LOGIN_SHELL</code></dt><dd>The platform's login shell, which Jasper starts when nothing else is configured (macOS and Linux, id <code>login</code>).</dd>
-<dt id="dev.jasper.sdk.terminal.ShellProfileInfo.Kind.LOCAL_SHELL"><code>LOCAL_SHELL</code></dt><dd>A shell installed on this machine, such as PowerShell, PowerShell 7 or Command Prompt.</dd>
+<dt id="dev.jasper.sdk.terminal.ShellProfileInfo.Kind.LOCAL_SHELL"><code>LOCAL_SHELL</code></dt><dd>A shell installed on this machine, such as PowerShell, PowerShell 7, Command Prompt or Cygwin Bash.</dd>
 <dt id="dev.jasper.sdk.terminal.ShellProfileInfo.Kind.WSL"><code>WSL</code></dt><dd>A Windows Subsystem for Linux distribution.</dd>
 <dt id="dev.jasper.sdk.terminal.ShellProfileInfo.Kind.CUSTOM"><code>CUSTOM</code></dt><dd>The program and arguments the user configured in Jasper's settings.</dd>
 </dl>
@@ -6051,10 +6072,11 @@ environment, and its pane closes when the program exits with status 0.</p></div>
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.terminal.Terminals.profiles()" aria-label="Link to this member">#</a><code><span class="kw">default</span> <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.terminal.ShellProfileInfo">ShellProfileInfo</a>&gt; <b>profiles</b>()</code></pre>
 <p class="badges"><span class="since">since 0.9.1</span></p>
 <div class="doc"><p>The shell profiles Jasper offers for local panes, platform default first: on Windows PowerShell (<code>powershell</code>),
-PowerShell 7 (<code>pwsh</code>), Command Prompt (<code>cmd</code>) and each WSL distribution (<code>wsl:&lt;name&gt;</code>); on macOS
-and Linux the login shell (<code>login</code>); then Custom (<code>custom</code>), always last, which runs the program and
-arguments the user's settings name, or the platform's default shell when they name none. PowerShell 7 and the WSL
-distributions appear once a shell detection has found them. Needs
+PowerShell 7 (<code>pwsh</code>), Command Prompt (<code>cmd</code>), Cygwin Bash (<code>cygwin</code>, from Jasper's own Cygwin)
+and each WSL distribution (<code>wsl:&lt;name&gt;</code>); on macOS and Linux the login shell (<code>login</code>); then Custom
+(<code>custom</code>), always last, which runs the program and arguments the user's settings name, or the platform's
+default shell when they name none. PowerShell 7, Cygwin Bash and the WSL distributions appear once a shell
+detection has found them. Needs
 <code>terminal.open</code>. UI thread only.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the profiles; empty when the host lists none</dd></dl>
 </div>
@@ -6132,7 +6154,7 @@ looks like built-in chrome. Depends on <code>dev.jasper.sdk</code>, <code>dev.ja
 <tr><td><a href="#dev.jasper.sdk.ui.ActionSpec"><code>ActionSpec</code></a></td><td><span class="kind kind-record">record</span></td><td>An action as the user sees it in the command palette, menus and toolbar.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Actions"><code>Actions</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Registers actions.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Anchor"><code>Anchor</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Where a panel appears by default; the user may move it.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.Appearance"><code>Appearance</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Host-owned appearance values and the look Jasper runs with.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.Appearance"><code>Appearance</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Host-owned appearance values, the look Jasper runs with and the saved terminal typography.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Column"><code>Column</code></a></td><td><span class="kind kind-record">record</span></td><td>Immutable column descriptor of a <a href="#dev.jasper.sdk.ui.Nodes.Table"><code>Nodes.Table</code></a> or a <a href="#dev.jasper.sdk.ui.Nodes.Tree"><code>Nodes.Tree</code></a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ContentCommand"><code>ContentCommand</code></a></td><td><span class="kind kind-record">record</span></td><td>Command belonging only to an active content tab.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ContentPresentation"><code>ContentPresentation</code></a></td><td><span class="kind kind-record">record</span></td><td>Host-rendered document metadata; all text is literal.</td></tr>
@@ -6322,8 +6344,8 @@ its spec says <a href="#dev.jasper.sdk.ui.PanelSpec.withSplit()"><code>PanelSpec
 <article class="type" id="dev.jasper.sdk.ui.Appearance">
 <header class="type-head"><span class="kind kind-interface">interface</span><h4><a class="self" href="#dev.jasper.sdk.ui.Appearance">Appearance</a></h4><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">interface</span> <b>Appearance</b></code></pre>
-<div class="doc"><p>Host-owned appearance values and the look Jasper runs with. Declarative views follow these automatically; specialized
-content subscribes to refresh its domain palettes.</p></div>
+<div class="doc"><p>Host-owned appearance values, the look Jasper runs with and the saved terminal typography. Declarative views follow
+these automatically; specialized content subscribes to refresh its domain palettes.</p></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.sdk.ui.Appearance.color(SemanticColor)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.Appearance.color(SemanticColor)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/Color.html" title="java.awt.Color">Color</a> <b>color</b>(<a class="tl" href="#dev.jasper.sdk.ui.SemanticColor">SemanticColor</a> role)</code></pre>
@@ -6390,15 +6412,18 @@ color changes within the same variant. Workspace opacity changes use onWorkspace
 <div class="member" id="dev.jasper.sdk.ui.Appearance.terminalTypography()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.Appearance.terminalTypography()" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.TerminalTypography">TerminalTypography</a> <b>terminalTypography</b>()</code></pre>
 <p class="badges"><span class="since">since 0.18.3</span></p>
-<div class="doc"><p>Saved terminal typography shared across windows; safe from any thread.</p></div>
-<dl class="tags"><dt>Returns</dt><dd>the current saved font settings, independent of temporary pane zoom</dd></dl>
+<div class="doc"><p>The saved terminal typography: the font, size, fallback fonts, ligatures and line height of Settings ›
+ Terminal › Font &amp; Colors (<code>terminal.font</code> in <code>config.toml</code>), the same for every window and
+ plugin. A terminal pane's temporary zoom does not change it. Safe from any thread.</p></div>
+<dl class="tags"><dt>Returns</dt><dd>the current saved typography</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.Appearance.onTerminalTypographyChanged(Consumer)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.Appearance.onTerminalTypographyChanged(Consumer)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.Subscription">Subscription</a> <b>onTerminalTypographyChanged</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Consumer.html" title="java.util.function.Consumer">Consumer</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.TerminalTypography">TerminalTypography</a>&gt; handler)</code></pre>
 <p class="badges"><span class="since">since 0.18.3</span></p>
-<div class="doc"><p>Registers on the UI thread for saved terminal typography changes. The getter exposes the new value before
- handlers run on the UI thread. Equal values emit no notification; registration does not emit an initial value.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>handler</code> receives the newly published typography</dd><dt>Returns</dt><dd>registration removed when closed or the plugin stops; safe to close from any thread</dd></dl>
+<div class="doc"><p>Runs the handler on the UI thread each time the saved terminal typography changes; <a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>terminalTypography()</code></a>
+ already returns the new value when it runs. A saved value equal to the current one notifies nobody, and
+ registering delivers no initial value, so read <a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><code>terminalTypography()</code></a> first.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>handler</code> receives the newly saved typography</dd><dt>Returns</dt><dd>the registration, removed when closed or when the plugin stops; safe to close from any thread</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> off the UI thread, or once the plugin has stopped</dd></dl>
 </div>
 </article>
 <article class="type" id="dev.jasper.sdk.ui.Column">
@@ -6640,7 +6665,11 @@ busy or has an error.</p></div>
 <article class="type" id="dev.jasper.sdk.ui.CustomContent">
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.ui.CustomContent">CustomContent</a></h4><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>CustomContent</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> id, <a class="tl" href="#dev.jasper.sdk.ui.Nodes.CustomKind">Nodes.CustomKind</a> kind, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JComponent.html" title="javax.swing.JComponent">JComponent</a> component, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/AutoCloseable.html" title="java.lang.AutoCloseable">AutoCloseable</a> lifetime)</code></pre>
-<div class="doc"><p>Explicit specialized widget registration; appearance subscriptions refresh domain palettes.</p></div>
+<div class="doc"><p>Explicit specialized widget registration; appearance subscriptions refresh domain palettes. Jasper sets the
+ component's foreground (<code>text.primary</code>) and background (<code>surface.input</code>, at the workspace opacity) on
+ every theme change and move, and its font to the interface's body font when it is registered, at every update of the
+ view and at every theme or font change, replacing a font set on the component itself; give a font of your own to a
+ component inside it. The lifetime closes when the Custom node leaves the view or the view closes.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.CustomContent.id()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>id</b></code></td><td>Custom contentId</td></tr>
@@ -7184,7 +7213,11 @@ Split child, which fills the height left over; hidden children take no space. Th
 an INLINE stack among them (directly, or as a row of a VERTICAL group) is one compact bar row whose first field or
 text fills the width the controls after it leave (the rows of one group line their fills up), with the panel search
 field's look for its fields and the panel action size for its buttons; a group stacks its rows without gaps and
-shows a passive (SelectionMode.NONE) list's rows as text lines; a hairline separates neighbouring children.</p></div>
+shows a passive (SelectionMode.NONE) list's rows as text lines; a hairline separates neighbouring children. An
+INLINE stack directly in a DOCUMENT split whose first child is an empty CAPTION text, followed by one or more
+<a href="#dev.jasper.sdk.ui.Nodes.Button"><code>Button</code></a>s and nothing else, is an action bar: the empty text pushes the buttons to the trailing edge, and
+while the split is narrower than the buttons the row scrolls sideways, bringing a button into view when it takes
+the focus.</p></div>
 <h5>Constants</h5>
 <dl class="constants">
 <dt id="dev.jasper.sdk.ui.Nodes.SplitKind.SIDEBAR_DETAIL"><code>SIDEBAR_DETAIL</code></dt><dd></dd>
@@ -10345,8 +10378,11 @@ caller goes away.</p></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.sdk.testing.FakeKit.contentFont(Font)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakeKit.contentFont(Font)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>contentFont</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/Font.html" title="java.awt.Font">Font</a> font)</code></pre>
-<div class="doc"><p>Simulates the current host UI body font and its normal property changes on specialized content.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>font</code></dd></dl>
+<div class="doc"><p>Sets the font this kit gives custom content, as Jasper gives it the interface's body font and follows changes
+to that font. Content registered from now on receives it, and content already registered in this kit's views
+is set to it at once, firing its <code>font</code> property change. Until this is called the font is plain 13-point
+<code>SansSerif</code>. UI thread only.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>font</code> the body font to apply</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> off the event dispatch thread or once the kit is closed</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakeKit.views()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakeKit.views()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.testing.FakeKitView">FakeKitView</a>&gt; <b>views</b>()</code></pre>
@@ -10542,7 +10578,7 @@ when it carried a cause.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginContext.appearance()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginContext.appearance()" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.Appearance">Appearance</a> <b>appearance</b>()</code></pre>
-<div class="doc"><p>The host's semantic colours, variants, presentation, workspace, editor and syntax palettes, opacity, and change notifications.</p></div>
+<div class="doc"><p>The host's semantic colours, variants, presentation, workspace, editor and syntax palettes, opacity, saved terminal typography and change notifications.</p></div>
 </div>
 </article>
 <article class="type" id="dev.jasper.sdk.testing.FakePluginHost">
@@ -10595,9 +10631,12 @@ host never deletes.</p></div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.setTerminalTypography(TerminalTypography)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.setTerminalTypography(TerminalTypography)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>setTerminalTypography</b>(<a class="tl" href="#dev.jasper.sdk.ui.TerminalTypography">TerminalTypography</a> value)</code></pre>
 <p class="badges"><span class="since">since 0.18.3</span></p>
-<div class="doc"><p>Queues saved terminal typography for publication on the next <a href="#dev.jasper.sdk.testing.FakePluginHost.flush()"><code>flush()</code></a>. Equal values do not notify.
- Handlers run on the EDT after the getter is updated.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>value</code> the saved terminal typography</dd></dl>
+<div class="doc"><p>Queues saved terminal typography for publication on the next <a href="#dev.jasper.sdk.testing.FakePluginHost.flush()"><code>flush()</code></a>, as a saved change to Jasper's
+ terminal font settings would. Until then every plugin reads Jasper's defaults: Cousine Nerd Font Mono at 12
+ points, falling back to Symbols Nerd Font Mono and Apple Color Emoji, with ligatures and a line height of 1.
+ The flush updates the getter first and then runs the handlers on the EDT; a value equal to the current one
+ notifies nobody, and a handler that throws is recorded in <a href="#dev.jasper.sdk.testing.FakePluginHost.failures()"><code>failures()</code></a> without stopping the others.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>value</code> the saved terminal typography</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> off the thread that made this host and the EDT</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.start(PluginInfo,Set,Set,Plugin)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.start(PluginInfo,Set,Set,Plugin)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.testing.FakePluginContext">FakePluginContext</a> <b>start</b>(
@@ -10691,7 +10730,8 @@ is part of the file it starts with; afterwards its declared settings reload and 
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.settingsPanel(String)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JComponent.html" title="javax.swing.JComponent">JComponent</a>&gt; <b>settingsPanel</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> pluginId)</code></pre>
 <div class="doc"><p>Builds a plugin's own settings page as Settings would. <code>SettingsPanelHost.row</code> gives the standard rows
 Jasper builds (ids <code>settings:&lt;key&gt;</code>, <code>settings:&lt;key&gt;:reset</code>, ...), which <a href="#dev.jasper.sdk.testing.FakePluginHost.settingsPanelView(String)"><code>settingsPanelView</code></a>
-can drive.</p></div>
+can drive; an event one of those rows handles, emitted on that view, then calls the page's
+<code>SettingsPanel.pendingChanged()</code>.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>pluginId</code> the plugin</dd><dt>Returns</dt><dd>the page's component; empty when the plugin gave no page or is not running</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.settingsPanelView(String)">
@@ -11294,7 +11334,7 @@ that no tab was moved out to, or a new one when there is none.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.contentCommands(ContentTab)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.contentCommands(ContentTab)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.ContentCommand">ContentCommand</a>&gt; <b>contentCommands</b>(<a class="tl" href="#dev.jasper.sdk.ui.ContentTab">ContentTab</a> tab)</code></pre>
-<div class="doc"></div>
+<div class="doc"><p>The commands a content tab last published with <code>setCommands</code>; empty until it publishes any.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>tab</code> hosted content handle</dd><dt>Returns</dt><dd>published command descriptors</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.shellEnvironment(Map)">
@@ -11563,7 +11603,7 @@ throws counts as not knowing.</p></div>
 <div class="member" id="dev.jasper.editor.api.RelativePaths.requireValid(String)">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.RelativePaths.requireValid(String)" aria-label="Link to this member">#</a><code><span class="kw">static</span> <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> <b>requireValid</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> path)</code></pre>
 <div class="doc"><p>Validates an already decoded path; percent signs and plus signs are literal filename characters.
-Dot segments may leave the source directory and are normalized by the provider.</p></div>
+Dot segments may leave the source directory and are normalised by the provider.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>path</code> a nonempty relative file path, with <code>/</code> separators</dd><dt>Returns</dt><dd>the unchanged path</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> for absolute/drive paths, URI schemes, queries, fragments,
     backslashes, control characters or unpaired surrogates</dd></dl>
 </div>
