@@ -9,6 +9,7 @@ import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
+import dev.jasper.app.layout.TabRestore;
 import dev.jasper.app.persistence.WorkspaceFile;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -54,6 +55,32 @@ public final class WindowManager {
             if (bounds.isPresent() != cursor.isPresent())
                 throw new IllegalArgumentException("A child window's bounds come with the cursor");
         }
+    }
+
+    /**
+     * How a plugin stands when the windows restore its tabs (workspace tabs spec 13): its name, and whether it runs or
+     * why not, which a placeholder says.
+     *
+     * @param name its display name; its id when it is not installed
+     * @param kind whether it runs, or why not
+     */
+    public record PluginState(String name, Kind kind) {
+        /** Whether a plugin runs, or why not. */
+        public enum Kind {
+            /** It started at this launch: its restorers rebuild its tabs. */
+            RUNNING,
+            /** No plugin with that id is installed. */
+            NOT_INSTALLED,
+            /** The user turned it off. */
+            TURNED_OFF,
+            /** It waits for the user's review of what it asks to do. */
+            NEEDS_CONSENT,
+            /** It could not start at this launch. */
+            FAILED
+        }
+
+        /** Requires both values. */
+        public PluginState { Objects.requireNonNull(name, "name"); Objects.requireNonNull(kind, "kind"); }
     }
 
     /**
@@ -107,6 +134,10 @@ public final class WindowManager {
     private boolean openingMain;
     /** Where the windows are saved; none in a test that does not save. */
     private WorkspaceStore store;
+    /** How each plugin stands, by id: without the application's answer, none is installed. */
+    private Function<String, PluginState> plugins = id -> new PluginState(id, PluginState.Kind.NOT_INSTALLED);
+    /** The items the size limit has left out of a save so far, each logged once (workspace plan 6b Rulings 16). */
+    private final java.util.Set<TabId> leftOut = new java.util.HashSet<>();
     /** While {@link #closeAll()} runs: no window opens, so no child window outlives the main window and no fresh one opens. */
     private boolean closingAll;
 
@@ -127,7 +158,18 @@ public final class WindowManager {
             .orElseThrow(() -> new IllegalStateException("The main window is closing or Jasper is quitting")), this::isMain,
             this::moveToNewWindow, this::movedOut, this::emptyWindow));
         model.panelRoute(this::routePanel);
+        // A plugin's tab giving new restore state changes what is saved (workspace tabs spec 13).
+        model.tabs().onRestoreChanged(this::changed);
     }
+
+    /**
+     * How the plugins stand (workspace tabs spec 13): a saved tab of a plugin that runs is rebuilt by its restorer, else it
+     * is a placeholder that says why, with Retry while its plugin runs; asked again whenever a placeholder shows or its
+     * Retry is pressed.
+     *
+     * @param states a plugin's standing by its id
+     */
+    public void plugins(Function<String, PluginState> states) { plugins = Objects.requireNonNull(states, "states"); }
 
     /**
      * Where the windows are saved and restored from (workspace tabs spec 13): the application gives it once it knows the
@@ -665,6 +707,10 @@ public final class WindowManager {
             content.manager(this);
             window = make.apply(content);
             content.onLayoutChanged = this::changed;
+            // A plugin's saved tab comes back through its plugin, or as a placeholder; one naming Jasper itself is left out
+            // (workspace plan 6b Rulings 3 and 22).
+            content.savedTabs = (tabId, saved) -> saved.pluginId().equals(TabRegistry.APP_OWNER) ? Optional.empty()
+                : Optional.of(savedTab(content, tabId, saved));
             if (!prepare.test(window)) {
                 window.discard();
                 return Optional.empty();
@@ -706,7 +752,53 @@ public final class WindowManager {
         if (main == null || openingMain || main.content().closed()) return Optional.empty();
         var records = new ArrayList<WorkspaceFile.WindowRecord>();
         for (JasperWindow window : windows()) if (!window.content().closed()) windowRecord(window).ifPresent(records::add);
-        return Optional.of(new WorkspaceFile.Snapshot(records));
+        return Optional.of(fitted(records));
+    }
+
+    /**
+     * The windows as {@code records} save them, with items taken out until the file fits {@link WorkspaceFile#MAX_BYTES},
+     * which a read would otherwise set aside (workspace plan 6b Rulings 16): plugins' items first, the largest first, then
+     * terminals; each is logged the first time, not at every save, and taken out as closing it would (Rulings 21): a tab
+     * left with none goes, and a full window left with none is left out.
+     */
+    private WorkspaceFile.Snapshot fitted(List<WorkspaceFile.WindowRecord> records) {
+        var windows = new ArrayList<>(records);
+        var snapshot = new WorkspaceFile.Snapshot(windows);
+        while (WorkspaceFile.encodedBytes(snapshot) > WorkspaceFile.MAX_BYTES) {
+            int holder = -1;
+            TabId largest = null;
+            long largestSize = -1;
+            boolean largestContent = false;
+            for (int index = 0; index < windows.size(); index++)
+                for (var entry : windows.get(index).tabs().entrySet()) {
+                    boolean content = entry.getValue() instanceof WorkspaceFile.TabRecord.Content;
+                    long size = size(entry.getValue());
+                    if (largest == null || content && !largestContent || content == largestContent && size > largestSize) {
+                        holder = index; largest = entry.getKey(); largestSize = size; largestContent = content;
+                    }
+                }
+            if (largest == null) break;
+            WorkspaceFile.WindowRecord window = windows.get(holder);
+            TabId out = largest;
+            if (leftOut.add(out)) LOG.log(System.Logger.Level.WARNING, "Not saving the tab " + window.tabs().get(out).title()
+                + ": the saved windows would pass workspace.toml's size limit");
+            Optional<ParentTabs> kept = WorkspaceFile.keeping(window.layout(), tab -> !tab.equals(out), window.role() == WorkspaceFile.Role.MAIN);
+            var tabs = new HashMap<>(window.tabs());
+            tabs.remove(out);
+            if (kept.isEmpty()) windows.remove(holder);
+            else windows.set(holder, new WorkspaceFile.WindowRecord(window.role(), window.bounds(), window.extendedState(), kept.get(), tabs));
+            snapshot = new WorkspaceFile.Snapshot(windows);
+        }
+        return snapshot;
+    }
+
+    /** About how much of the file a tab's record takes. */
+    private static long size(WorkspaceFile.TabRecord record) {
+        return switch (record) {
+            case WorkspaceFile.TabRecord.Terminal terminal -> terminal.title().length() + terminal.directory().length() + terminal.profile().length();
+            case WorkspaceFile.TabRecord.Content content -> content.title().length() + content.state().entrySet().stream()
+                .mapToLong(value -> value.getKey().length() + value.getValue().length()).sum();
+        };
     }
 
     private Optional<WorkspaceFile.WindowRecord> windowRecord(JasperWindow window) {
@@ -719,10 +811,83 @@ public final class WindowManager {
             placement.bounds(), placement.extendedState(), kept.get(), tabs));
     }
 
-    /** What a tab needs to come back: a terminal tab's name, directory and profile; any other tab is not saved. */
+    /**
+     * What a tab needs to come back (workspace tabs spec 13): a terminal tab's name, directory and profile; a plugin's tab,
+     * content or session, its restore state while its plugin restores that kind; a placeholder what was saved for it. An
+     * app-owned tab and any other plugin's tab is not saved.
+     */
     private Optional<WorkspaceFile.TabRecord> tabRecord(Tab tab) {
-        if (tab.content() instanceof TerminalContent terminal) return terminal.record().map(WorkspaceFile.TabRecord.class::cast);
-        return Optional.empty();
+        if (tab.content() instanceof PlaceholderContent placeholder) return Optional.of(placeholder.saved());
+        Optional<String> plugin = tab.content() instanceof TerminalContent terminal ? terminal.pane().snapshot().providerId()
+            : Optional.of(tab.plugin()).filter(id -> !id.isEmpty());
+        if (plugin.isEmpty())
+            return tab.content() instanceof TerminalContent terminal ? terminal.record().map(WorkspaceFile.TabRecord.class::cast) : Optional.empty();
+        if (plugin.get().equals(TabRegistry.APP_OWNER)) return Optional.empty();
+        return tab.restore().filter(state -> model.tabs().restores(plugin.get(), state.kind()))
+            .map(state -> new WorkspaceFile.TabRecord.Content(tab.title(), plugin.get(), state.kind(), state.state()));
+    }
+
+    /**
+     * A plugin's saved tab for {@code content}'s window, with the saved id: rebuilt by its plugin's restorer, else a
+     * placeholder that says why (workspace tabs spec 9.2 and 13).
+     */
+    private Tab savedTab(WindowContent content, TabId id, WorkspaceFile.TabRecord.Content saved) {
+        PluginState state = plugins.apply(saved.pluginId());
+        if (state.kind() != PluginState.Kind.RUNNING) return placeholder(content, id, saved, reason(state), false);
+        TabRegistry.Restored restored = model.tabs().restore(id, saved.pluginId(),
+            new TabRegistry.Restoring(content.id(), saved.title(), new TabRestore(saved.restorer(), saved.state())));
+        if (restored.tab().isPresent()) return restored.tab().get();
+        String problem = restored.problem().endsWith(".") ? restored.problem() : restored.problem() + ".";
+        return placeholder(content, id, saved, state.name() + " could not restore this tab: " + problem, true);
+    }
+
+    /** Why a plugin that does not run restores nothing, as a placeholder says it. */
+    private static String reason(PluginState state) {
+        return switch (state.kind()) {
+            case NOT_INSTALLED -> "The plugin " + state.name() + " is not installed.";
+            case TURNED_OFF -> state.name() + " is turned off.";
+            case NEEDS_CONSENT -> state.name() + " waits for your review in Manage Plugins.";
+            case FAILED -> state.name() + " could not start.";
+            case RUNNING -> state.name() + " runs.";
+        };
+    }
+
+    /**
+     * A placeholder tab in {@code content}'s window, titled as the saved tab was. Its Retry and Close act in whatever window
+     * holds it when they are pressed, and it asks how its plugin stands again when it shows and on Retry.
+     */
+    private Tab placeholder(WindowContent content, TabId id, WorkspaceFile.TabRecord.Content saved, String why, boolean retryable) {
+        Tab[] tab = new Tab[1];
+        var placeholder = new PlaceholderContent(saved, why, retryable, () -> retry(tab[0]),
+            () -> window(tab[0].window()).ifPresent(holder -> holder.content().closeTab(tab[0])), () -> standing(tab[0]));
+        tab[0] = model.tabs().add(id, Tab.Kind.PLACEHOLDER, placeholder, content.id());
+        tab[0].presentation(saved.title(), "", null, false, "", "");
+        // Focusing the tab from the keyboard reaches its action: Retry while it shows, otherwise Close.
+        tab[0].focusTarget(placeholder::focusAction);
+        return tab[0];
+    }
+
+    /** Retry on a placeholder: its plugin's restorer runs again in the window that holds it, while the plugin runs. */
+    private void retry(Tab placeholder) {
+        if (placeholder.closed() || !standing(placeholder)) return;
+        window(placeholder.window()).ifPresent(holder -> holder.content().retry(placeholder));
+    }
+
+    /**
+     * Says again how a placeholder's plugin stands: why it does not run, without Retry, or, for one that came back as not
+     * running and runs now, that Retry brings the tab back.
+     *
+     * @return whether the plugin runs
+     */
+    private boolean standing(Tab placeholder) {
+        if (placeholder.closed() || !(placeholder.content() instanceof PlaceholderContent content)) return false;
+        PluginState state = plugins.apply(content.saved().pluginId());
+        if (state.kind() != PluginState.Kind.RUNNING) {
+            content.failed(reason(state), false);
+            return false;
+        }
+        if (!content.retryable()) content.failed(state.name() + " runs now: Retry brings this tab back.", true);
+        return true;
     }
 
     /**

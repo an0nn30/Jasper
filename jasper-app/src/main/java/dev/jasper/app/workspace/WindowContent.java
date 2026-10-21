@@ -185,6 +185,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     Runnable onCloseWindow = () -> {};
     /** What {@code workspace.toml} saves of this window changed: its layout, or a terminal tab's name or directory (spec 13). */
     Runnable onLayoutChanged = () -> {};
+    /**
+     * How a plugin's saved item comes back in this window (workspace tabs spec 13): its plugin's restorer rebuilds it with
+     * the saved id, else it is a placeholder; empty leaves it out, as closing it would. The window manager gives it.
+     */
+    java.util.function.BiFunction<TabId, WorkspaceFile.TabRecord.Content, Optional<Tab>> savedTabs = (tabId, saved) -> Optional.empty();
     static final int DEFAULT_TAB_HEIGHT = 30;
     static final int MIN_TAB_HEIGHT = 20;
     static final int MAX_TAB_HEIGHT = 72;
@@ -1376,8 +1381,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         setPreferredSize(null);
         var restored = new LinkedHashMap<TabId, Tab>();
         try {
-            for (TabId saved : record.layout().tabs())
-                if (record.tabs().get(saved) instanceof WorkspaceFile.TabRecord.Terminal terminal) restored.put(saved, restoredTerminal(saved, terminal));
+            // A plugin's item comes back through its plugin, or as a placeholder (workspace tabs spec 13; workspace plan 6b
+            // Rulings 19): every item takes its saved tab and pane below, terminals and plugins' items alike.
+            for (TabId saved : record.layout().tabs()) {
+                Optional<Tab> tab = switch (record.tabs().get(saved)) {
+                    case WorkspaceFile.TabRecord.Terminal terminal -> Optional.of(restoredTerminal(saved, terminal));
+                    case WorkspaceFile.TabRecord.Content content -> savedTabs.apply(saved, content);
+                };
+                tab.ifPresent(found -> restored.put(saved, found));
+            }
             Optional<ParentTabs> shown = WorkspaceFile.keeping(record.layout(), restored::containsKey, isMain());
             if (shown.isEmpty()) return 0;
             Runnable show = () -> {
@@ -1393,6 +1405,30 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             throw failure;
         }
         return restored.size();
+    }
+
+    /**
+     * Retry on a placeholder (workspace tabs spec 9.2): its plugin's restorer runs again, and the item it opens takes the
+     * placeholder's pane, in whichever tab holds it, selected; a placeholder that fails again says why (workspace plan 6b
+     * Rulings 6 and 19).
+     */
+    void retry(Tab placeholder) {
+        if (closed || !(placeholder.content() instanceof PlaceholderContent saved)) return;
+        Optional<WorkspaceView> view = parentTabs.holding(placeholder);
+        if (view.isEmpty()) return;
+        Optional<Tab> rebuilt = savedTabs.apply(TabId.random(), saved.saved());
+        if (rebuilt.isEmpty()) return;
+        if (rebuilt.get().content() instanceof PlaceholderContent again) {
+            saved.failed(again.reason(), again.retryable());
+            rebuilt.get().close();
+            return;
+        }
+        Runnable replace = () -> {
+            mount(rebuilt.get());
+            view.get().replace(placeholder, rebuilt.get());
+            placeholder.close();
+        };
+        if (terminals != null) terminals.atomically(replace); else replace.run();
     }
 
     /** A saved terminal whose shell waits until its tab first shows (workspace tabs spec 13). */
@@ -2250,7 +2286,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // A group the maximize keeps out of the tree updates its delegates there; split positions follow the weights.
         parentTabs.applyTheme(theme, updateDelegates);
         for (Tab tab : new ArrayList<>(tabListeners.keySet()))
-            if (tab.kind() == Tab.Kind.HOSTED) WorkspaceTheme.apply(tab.component(), theme, () -> tabListeners.containsKey(tab));
+            if (tab.kind() != Tab.Kind.TERMINAL) WorkspaceTheme.apply(tab.component(), theme, () -> tabListeners.containsKey(tab));
         if (updateDelegates && contributed != null) contributed.refreshTheme();
         for (TerminalContent terminal : terminalTabs()) {
             WorkspaceTheme.apply(terminal, theme);

@@ -441,6 +441,14 @@ class PluginRuntimeTest {
                 assertThat(problem.cause()).as("no exception lies behind it").isEmpty();
             });
         assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
+        // Workspace tabs spec 13: only a plugin that runs rebuilds its saved tabs; the others' placeholders say why.
+        assertThat(runtime.standing("dev.example.probe")).hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.RUNNING));
+        assertThat(runtime.standing("dev.example.future")).as("it needs another SDK").hasValueSatisfying(standing -> {
+            assertThat(standing.name()).isEqualTo("Future");
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.FAILED);
+        });
+        assertThat(runtime.standing("dev.example.absent")).as("not installed").isEmpty();
         stopAndWait(runtime);
     }
 

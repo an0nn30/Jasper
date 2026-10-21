@@ -27,7 +27,9 @@ public final class Tab implements AutoCloseable {
         /** One terminal pane. */
         TERMINAL,
         /** A plugin's view. */
-        HOSTED
+        HOSTED,
+        /** A plugin's item that could not come back when the windows were restored, saying why (workspace tabs spec 9.2). */
+        PLACEHOLDER
     }
 
     /** The registry this tab lives in; a window's own until the window joins the application's. */

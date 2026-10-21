@@ -49,6 +49,17 @@ class LayoutOperationsTest {
         assertThatIllegalArgumentException().isThrownBy(() -> pair().select(tab(9))).withMessageContaining(tab(9).toString());
     }
 
+    /** Workspace plan 6b Rulings 6: a placeholder's Retry puts the rebuilt tab in its pane, which keeps its place. */
+    @Test void replaceTabPutsAnotherTabInTheSamePane() {
+        Layout replaced = pair().toggleMaximize(groupId(2)).replaceTab(tab(3), tab(9));
+        assertThat(replaced.root()).isEqualTo(h(child(group(1), 0.5), child(group(2, 9), 0.5)));
+        assertThat(replaced.activeGroup()).isEqualTo(groupId(2));
+        assertThat(replaced.maximized()).as("the maximize stays").contains(groupId(2));
+        assertThat(pair().replaceTab(tab(1), tab(9)).activeGroup()).as("the active pane stays").isEqualTo(groupId(2));
+        assertThatIllegalArgumentException().isThrownBy(() -> pair().replaceTab(tab(8), tab(9)));
+        assertThatIllegalArgumentException().isThrownBy(() -> pair().replaceTab(tab(1), tab(3)));
+    }
+
     @Test void activateMovesTheGroupToTheFrontOfTheOrderOfUse() {
         Layout three = layout(h(child(group(1), 0.25), child(group(2), 0.25), child(group(3), 0.5)), 1);
         assertThat(three.recent()).containsExactly(groupId(1), groupId(2), groupId(3));

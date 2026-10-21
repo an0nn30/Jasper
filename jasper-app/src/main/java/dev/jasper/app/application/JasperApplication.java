@@ -464,6 +464,18 @@ public final class JasperApplication {
         workspaceStore = new WorkspaceStore(file, windows::snapshot, JasperApplication::afterDelay, workspaceWriter,
             this::workspaceSetAside);
         windows.workspace(workspaceStore);
+        // A saved tab of a plugin that does not run comes back as a placeholder that says why (workspace tabs spec 13).
+        windows.plugins(id -> {
+            PluginRuntime running = plugins;
+            return (running == null ? Optional.<PluginRuntime.Standing>empty() : running.standing(id))
+                .map(found -> new WindowManager.PluginState(found.name(), switch (found.kind()) {
+                    case RUNNING -> WindowManager.PluginState.Kind.RUNNING;
+                    case NEEDS_CONSENT -> WindowManager.PluginState.Kind.NEEDS_CONSENT;
+                    case TURNED_OFF -> WindowManager.PluginState.Kind.TURNED_OFF;
+                    case FAILED -> WindowManager.PluginState.Kind.FAILED;
+                }))
+                .orElseGet(() -> new WindowManager.PluginState(id, WindowManager.PluginState.Kind.NOT_INSTALLED));
+        });
     }
 
     /** The store {@link #workspace(Path)} made; null before it. Tests. */

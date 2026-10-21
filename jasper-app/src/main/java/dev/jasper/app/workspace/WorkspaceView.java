@@ -100,6 +100,18 @@ final class WorkspaceView extends JPanel {
         apply(saved);
     }
 
+    /**
+     * {@code rebuilt} takes {@code placeholder}'s pane in its place, selected: a placeholder's Retry (workspace plan 6b
+     * Rulings 6). The placeholder leaves this workspace; its window closes it.
+     */
+    void replace(Tab placeholder, Tab rebuilt) {
+        if (!contains(placeholder)) return;
+        Layout next = layout.replaceTab(placeholder.id(), rebuilt.id()).select(rebuilt.id());
+        tabs.remove(placeholder.id());
+        tabs.put(rebuilt.id(), rebuilt);
+        apply(next);
+    }
+
     private void place(Tab tab, Layout next) {
         tabs.put(tab.id(), tab);
         apply(next);

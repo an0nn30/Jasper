@@ -235,6 +235,22 @@ public final class Layout {
     }
 
     /**
+     * Puts {@code by} in {@code tab}'s pane in its place: the pane keeps its id and its weight, and the active pane and
+     * the maximize stay (a placeholder's Retry, workspace plan 6b Rulings 6).
+     *
+     * @param tab a tab of the layout
+     * @param by a tab not in the layout
+     * @return the new layout
+     * @throws IllegalArgumentException when {@code tab} is not in the layout or {@code by} is
+     */
+    public Layout replaceTab(TabId tab, TabId by) {
+        Objects.requireNonNull(by, "by");
+        GroupId group = requireGroupOf(tab);
+        if (contains(by)) throw new IllegalArgumentException("Tab " + by + " is already in the layout");
+        return new Layout(replace(root, group, found -> new Group(found.id(), List.of(by), Optional.of(by))), activeGroup, maximized, recent);
+    }
+
+    /**
      * Removes {@code tab}, closing it or moving it out, and its pane with it: the pane's weight goes to the sibling before
      * it (after it when it was first), a split left with one child collapses into that child and nesting is flattened
      * again, and the active pane becomes the most recently used remaining pane. The maximize stays while the maximized

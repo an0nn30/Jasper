@@ -174,6 +174,30 @@ class JasperApplicationWorkspaceTest {
         }
     }
 
+    @Test void aSavedItemOfAPluginThatDoesNotRunComesBackAsAPlaceholder() throws Exception {
+        var shell = dev.jasper.app.layout.TabId.random();
+        var note = dev.jasper.app.layout.TabId.random();
+        var one = dev.jasper.app.layout.Layout.of(shell);
+        var tab = new dev.jasper.app.layout.ParentTab(dev.jasper.app.layout.ParentTabId.random(), one.split(note, one.activeGroup(), Side.RIGHT));
+        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN,
+            java.util.Optional.empty(), 0, dev.jasper.app.layout.ParentTabs.of(tab),
+            java.util.Map.of(shell, new WorkspaceFile.TabRecord.Terminal("", home.toString(), ""),
+                note, new WorkspaceFile.TabRecord.Content("todo.md", "dev.example.notes", "note", java.util.Map.of("name", "todo")))))));
+        JasperApplication application = application(() -> { });
+        try {
+            edt(() -> {
+                MainWindow main = application.openFirstWindow(List.of()).orElseThrow();
+                var item = application.contributions().tabs().tab(note).orElseThrow();
+                assertThat(item.kind()).isEqualTo(dev.jasper.app.contributions.Tab.Kind.PLACEHOLDER);
+                assertThat(item.title()).isEqualTo("todo.md");
+                assertThat(item.window()).isEqualTo(main.id());
+            });
+            launch();
+        } finally {
+            quit(application);
+        }
+    }
+
     @Test void theWarmUpNeverReadsOrWritesTheWorkspace() throws Exception {
         Files.writeString(file(), "version = 1\n[[windows]]\nrole = ");
         byte[] before = Files.readAllBytes(file());

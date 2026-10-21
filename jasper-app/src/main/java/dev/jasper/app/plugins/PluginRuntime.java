@@ -798,6 +798,50 @@ public final class PluginRuntime {
             new AppEvents.ThemeChanged(dark ? Variant.DARK : Variant.LIGHT));
     }
 
+    /**
+     * How a discovered plugin stands at this launch (workspace tabs spec 13): its name, and whether it runs or why not.
+     *
+     * @param name its display name
+     * @param kind whether it runs, or why not
+     */
+    public record Standing(String name, Kind kind) {
+        /** Whether it runs, or why not; earlier is better, so a copy that runs wins over one that lost. */
+        public enum Kind {
+            /** It started at this launch. */
+            RUNNING,
+            /** It waits for the user's review of its capabilities. */
+            NEEDS_CONSENT,
+            /** The user turned it off. */
+            TURNED_OFF,
+            /** It was skipped or failed to load or start. */
+            FAILED
+        }
+
+        /** Requires both values. */
+        public Standing { Objects.requireNonNull(name, "name"); Objects.requireNonNull(kind, "kind"); }
+    }
+
+    /**
+     * How the plugin with {@code id} stands at this launch. UI thread.
+     *
+     * @param id the plugin
+     * @return its name and standing; empty when no plugin with that id was discovered
+     */
+    public Optional<Standing> standing(String id) {
+        Standing found = null;
+        for (PluginStatus status : statuses) {
+            if (!status.id().equals(id)) continue;
+            Standing.Kind kind = switch (status.state()) {
+                case ACTIVE -> Standing.Kind.RUNNING;
+                case NEEDS_CONSENT -> Standing.Kind.NEEDS_CONSENT;
+                case DISABLED -> Standing.Kind.TURNED_OFF;
+                case SKIPPED, FAILED -> Standing.Kind.FAILED;
+            };
+            if (found == null || kind.ordinal() < found.kind().ordinal()) found = new Standing(status.name(), kind);
+        }
+        return Optional.ofNullable(found);
+    }
+
     /** Discovered plugin display names, without performing file I/O. */
     public Map<String, String> pluginNames() {
         var names = new java.util.LinkedHashMap<String, String>();

@@ -238,7 +238,7 @@ class WorkspaceRestoreTest {
         assertThat(windows.started).as("the request's tab alone: the restored tabs wait to be shown").containsExactly(asked);
     }
 
-    @Test void aChildWindowWithNothingToRestoreIsLeftOut() throws Exception {
+    @Test void aFullWindowHoldingOnlyAMissingPluginsItemComesBackWithItsPlaceholder() throws Exception {
         TabId item = TabId.random(), document = TabId.random();
         var plugin = (WorkspaceFile.TabRecord) new WorkspaceFile.TabRecord.Content("notes.md", "dev.example.editor", "document", Map.of("path", "/notes.md"));
         var full = new WorkspaceFile.WindowRecord(WorkspaceFile.Role.CHILD, Optional.empty(), 0, ParentTabs.of(tab(Layout.of(document))),
@@ -247,8 +247,9 @@ class WorkspaceRestoreTest {
         windows();
         edt(() -> {
             windows.manager.ensureMain("cold", null).orElseThrow();
-            assertThat(windows.manager.children()).as("a full window holding only a plugin's item (plan 6b restores those)").isEmpty();
-            assertThat(windows.events).doesNotContain("show child");
+            assertThat(windows.manager.children()).as("a full window holding its plugin's item as a placeholder").singleElement()
+                .satisfies(child -> assertThat(child.content().tabs()).extracting(Tab::id, Tab::kind)
+                    .containsExactly(org.assertj.core.groups.Tuple.tuple(document, Tab.Kind.PLACEHOLDER)));
         });
     }
 

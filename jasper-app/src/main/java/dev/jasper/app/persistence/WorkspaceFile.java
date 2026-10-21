@@ -201,8 +201,8 @@ public final class WorkspaceFile {
         }
     }
 
-    /** The largest file read: {@code ui-state.toml}'s cap (workspace plan 2, Rulings 15). */
-    static final int MAX_BYTES = 256 * 1024;
+    /** The largest file read, in bytes: {@code ui-state.toml}'s cap (workspace plan 2, Rulings 15); a larger one is set aside. */
+    public static final int MAX_BYTES = 256 * 1024;
     /** The deepest a saved tree may nest (workspace plan 2, Rulings 14); it bounds the reader's recursion. */
     static final int MAX_DEPTH = 64;
     private static final System.Logger LOG = System.getLogger(WorkspaceFile.class.getName());
@@ -549,6 +549,17 @@ public final class WorkspaceFile {
      */
     public static void write(Path file, Snapshot snapshot) throws IOException {
         TomlStateFile.writeAtomically(file, ".workspace-", encode(snapshot));
+    }
+
+    /**
+     * How many bytes {@link #write} writes for {@code snapshot}: more than {@link #MAX_BYTES} and the next read sets the file
+     * aside (workspace plan 6b Rulings 16).
+     *
+     * @param snapshot the windows
+     * @return the encoded size in UTF-8 bytes
+     */
+    public static int encodedBytes(Snapshot snapshot) {
+        return encode(snapshot).getBytes(StandardCharsets.UTF_8).length;
     }
 
     /**
