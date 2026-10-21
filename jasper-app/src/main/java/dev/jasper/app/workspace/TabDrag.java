@@ -353,8 +353,12 @@ final class TabDrag {
     /** Ends a running drag or a pending press without a drop. */
     void cancel() { finish(); }
 
-    /** {@code window} lost the focus or closed: a press or a drag from it ends without a drop. */
+    /**
+     * {@code window} lost the focus or closed: a press or a drag from it ends without a drop, and the rest of an Esc
+     * keystroke that ended a drag is claimed no longer, as its release has gone elsewhere.
+     */
     void cancelFrom(WindowContent window) {
+        endEscape();
         if (window != null && from == window) cancel();
     }
 

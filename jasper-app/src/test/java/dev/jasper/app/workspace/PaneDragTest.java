@@ -383,6 +383,20 @@ class PaneDragTest {
         });
     }
 
+    /** Workspace plan 8c's final review: a window losing the focus after Esc ended its drag leaves a later Esc alone. */
+    @Test void aWindowLosingTheFocusAfterEscClaimsNoLaterEsc() throws Exception {
+        edt(() -> {
+            Point low = inside(pane(owner, a.group().orElseThrow()), 0.5, 0.8);
+            Component source = startPane(owner, a, low);
+            assertThat(keys.send(key(KeyEvent.KEY_PRESSED, PANE, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).isTrue();
+            mouse(source, MouseEvent.MOUSE_RELEASED, low, PANE);
+            owner.setActive(false);
+            assertThat(keys.dispatchers).as("its release went elsewhere").isEmpty();
+            assertThat(keys.send(key(KeyEvent.KEY_PRESSED, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).as("a later Esc").isFalse();
+            owner.setActive(true);
+        });
+    }
+
     /**
      * Workspace plan 8c Rulings 2 and Review Focus 1: every event of a pane's gesture, to its release, is the pane drag's,
      * whatever ends the drag: here Esc, after which the rest of the gesture still reaches no listener of the item unconsumed.

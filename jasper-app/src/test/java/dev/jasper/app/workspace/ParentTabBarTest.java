@@ -118,7 +118,6 @@ class ParentTabBarTest {
         });
     }
 
-    /** Spec 5: an entry shows its tab's active pane's item, and its tip carries Select Tab's shortcut. */
     /**
      * Workspace plan 8c Rulings 9 (its final review, T3 M2): the strip takes changes at once only while
      * {@code atOnce} runs, and moves again after a change that throws.
@@ -138,6 +137,7 @@ class ParentTabBarTest {
         });
     }
 
+    /** Spec 5: an entry shows its tab's active pane's item, and its tip carries Select Tab's shortcut. */
     @Test void eachTabShowsAsItsActivePanesItem() throws Exception {
         edt(() -> {
             var owner = content(idleLauncher(pending));

@@ -8,7 +8,8 @@ and one that fails to land goes back where it was (Rulings 17; Tasks 2 and 3). I
 Tab is Task 2's, with the hold, because that command announces its old tab's next pane before this plan: that RED exists
 before Task 3. Deviations from the plan's text: (1) amendment 1, above; Tasks 1-3 ran their text verbatim. (2) The
 final-review fix wave: the Esc keystroke that ends a drag is swallowed whole, its typed ESC and its release too, so
-Ctrl+Alt+Esc sends a terminal nothing; a pane press is the left button's own (`getButton`, as `SwingUtilities` already
+Ctrl+Alt+Esc sends a terminal nothing, and a window losing the focus ends
+the swallow; a pane press is the left button's own (`getButton`, as `SwingUtilities` already
 reads a press on JBR 25), so a second button's press mid-drag ends the drag and starts none; a modifier press focuses
 its pane; a drop that does nothing or fails shows the earlier tab again; each restore of a failed move runs on its own;
 the classic strip has no dead zones (a divider is the place between its tabs, and the row below them theirs); the new

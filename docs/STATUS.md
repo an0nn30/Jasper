@@ -35,7 +35,8 @@ and no "+"; ruled by the controller: an entry's outer quarters are new-tab place
 amendment 1, from plan 8b's final review (I2, left for this plan): plan 8b's Move Pane to New Tab announced its old
 tab's next pane on the way; Task 2 holds it with the pane drops, so its case comes before Task 3; Tasks 1-3 ran their
 text verbatim. (2) The final-review fix wave: the Esc keystroke that ends a drag is swallowed whole, its typed ESC and
-its release too, so Ctrl+Alt+Esc sends a terminal nothing; a pane press is the left button's own (`getButton`, as
+its release too, so Ctrl+Alt+Esc sends a terminal nothing, and a window losing the focus ends
+the swallow; a pane press is the left button's own (`getButton`, as
 `SwingUtilities` already reads a press on JBR 25), so a second button's press mid-drag ends the drag and starts none; a
 modifier press focuses its pane; a drop that does nothing or fails shows the earlier tab again; each restore of a failed
 move runs on its own; the classic strip has no dead zones (a divider is the place between its tabs, and the row below
