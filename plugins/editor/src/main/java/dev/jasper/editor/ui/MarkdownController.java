@@ -87,7 +87,10 @@ final class MarkdownController implements AutoCloseable {
         debounce = new Timer(250, event -> flushDebounce());
         debounce.setRepeats(false);
         hierarchy = event -> {
-            if ((event.getChangeFlags() & (HierarchyEvent.SHOWING_CHANGED | HierarchyEvent.PARENT_CHANGED)) != 0) {
+            // DISPLAYABILITY_CHANGED too: a view realized hidden (a restored tab that is not the shown one) gets no
+            // SHOWING_CHANGED, and must not render until it shows.
+            if ((event.getChangeFlags() & (HierarchyEvent.SHOWING_CHANGED | HierarchyEvent.PARENT_CHANGED
+                    | HierarchyEvent.DISPLAYABILITY_CHANGED)) != 0) {
                 if (tab.surface().isDisplayable()) requiresShowing = true;
                 invalidate();
                 if (eligible()) flushDebounce();

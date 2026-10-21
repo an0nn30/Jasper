@@ -206,6 +206,34 @@ class MarkdownAcceptanceTest {
      * Puts a document's surface where a person sees it, in a holder its window shows, as Jasper's kit mounts it in the
      * tab's view; this fake host's kit mounts no content. UI thread.
      */
+    @Test void aPreviewMountedHiddenWaitsUntilItShows() throws Exception {
+        // A restored tab that is not the shown one is realized hidden: it must not render (or hold images) until shown.
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3,2,java.awt.image.BufferedImage.TYPE_INT_ARGB),"png",home.resolve("picture.png").toFile());
+        var notes=Files.writeString(home.resolve("notes.md"),"# Notes\n\n![picture](picture.png)\n");
+        try (var started=new Started(home,"preview")) {
+            var host=started.host;
+            var handle=started.open(notes);
+            var tab=started.tab(handle);
+            javax.swing.JPanel[] holder={null};
+            edt(() -> {
+                var hidden=new javax.swing.JPanel(new java.awt.BorderLayout());
+                hidden.setVisible(false);
+                hidden.add(tab.surface());hidden.setSize(800,600);hidden.addNotify();hidden.doLayout();
+                assertThat(tab.surface().isDisplayable()).isTrue();
+                assertThat(tab.surface().isShowing()).isFalse();
+                holder[0]=hidden;
+            });
+            drain(host);
+            edt(() -> {
+                assertThat(tab.markdown().currentResult()).as("nothing renders while hidden").isEmpty();
+                assertThat(images(tab)).as("no pixels held while hidden").isEmpty();
+            });
+            edt(() -> holder[0].setVisible(true));
+            started.until(() -> tab.markdown().currentResult().isPresent() && !images(tab).isEmpty(),"the preview once shown");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
     private static javax.swing.JPanel mount(DocumentArea surface) {
         var holder=new javax.swing.JPanel(new java.awt.BorderLayout());
         holder.add(surface);holder.setSize(800,600);holder.addNotify();holder.doLayout();

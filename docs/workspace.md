@@ -306,7 +306,7 @@ next start uses the last saved layout.
 The header, toolbar and tabs stay. A tool window you open while in Zen shows in its slot as usual, without the
 rails. Leaving Zen hides those and shows the remembered ones again. View › Show/Hide › Status Bar and Rail, and their
 shortcuts, are unavailable in Zen. Zen is the main window's: the main window opens in the Zen saved in
-`ui-state.toml` and saves it when it closes, and a child window has no Zen. The saved layout keeps the tool windows that
+`ui-state.toml` and saves it each time you toggle it, and a child window has no Zen. The saved layout keeps the tool windows that
 showed before Zen, so one opened in Zen is not saved as showing.
 
 **Compact** (Settings › Appearance › View mode, `window.view_mode = "compact"`, after a restart) uses the system's

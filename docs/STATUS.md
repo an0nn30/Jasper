@@ -40,7 +40,7 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** This branch after the second sync's fix wave (2026-10-21): 12,604 tests, 0 failures, 0
+- **Last recorded checks.** This branch after the second sync's fix wave (2026-10-21): 12,606 tests, 0 failures, 0
   errors, 29 skipped. `./gradlew check` on local `main` with the Editor's typography and Markdown preview and the
   bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in
   Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
@@ -72,7 +72,7 @@ Open items, as the entries below record them:
   Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
   Meadow splash and the Rail and Status Bar shortcuts (2026-10-20) await theirs. The workspace tabs series awaits the
   checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only tab, plans 7a to 8c, 6a and 6b; plan 2 had
-  none), and so does its second sync's merge entry (2026-10-21).
+  none), and so do its two merge entries ("local main merged in", 2026-10-19, and the second sync, 2026-10-21).
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
@@ -111,8 +111,8 @@ in Zen; (3) a tab menu's command item runs the command of the content active whe
 commands) in the branch's `WindowContent.tabMenu`; (4) main's `activatingToggle` and the panel's own toggle action's
 `ACTIVATING_SHOW` join the branch's child-window routing; (5) main's Cygwin hook (`onManageCygwinPackages`) is wired on
 every `WindowContent`; (6) the Editor keeps the branch's restore, deferred Load, Split submenu and Move Pane to New Tab
-with main's Markdown surface, preview, typography and focus-safe content commands, and publishes Close Pane without a
-shortcut (main's fix of the shortcut the Editor showed but did not bind); (7) main's Javadoc pass on the SDK and its
+with main's Markdown surface, preview, typography and focus-safe content commands, and (after the fix wave below)
+publishes no Close Pane of its own, as main's fix of the shortcut the Editor showed but did not bind has it; (7) main's Javadoc pass on the SDK and its
 SDK reference guide pages are worded for the branch's API (no plugin windows, items in panes, split items, restorers).
 Main's new guides (`workspace.md`, `command-line.md`, `getting-started.md`, `plugins.md`, `terminal.md`, `editor.md`,
 `configuration.md`, `plugin-authoring.md` and the rest) keep main's structure and describe the branch's model: the main
@@ -137,8 +137,9 @@ reviews): a Markdown preview follows whether its pane shows, not the focus (`Edi
 active and `MarkdownController` suspends a view that does not show), so one beside a focused terminal keeps its images
 and one restored into a pane without the focus renders; the Editor no longer publishes Close Pane (main's rule; the
 host's Close Pane closes the pane, and Vim's `:action close-pane` still runs it); the guides, the SDK reference guide
-pages and the `jasper` usage text match the merged code; `./gradlew check --continue`: **12,604 tests, 0 failures, 0
-errors, 29 skipped**. Not merged into `main`, not pushed.
+pages and the `jasper` usage text match the merged code; its re-review's residuals: Dismiss Cards run from a child
+window closes the main window's cards, a preview realized hidden (a restored tab that is not the shown one) waits until
+it shows, and Zen saves when toggled; `./gradlew check --continue`: **12,606 tests, 0 failures, 0 errors, 29 skipped**. Not merged into `main`, not pushed.
 
 **Workspace tabs, plan 6b: plugins' tabs come back — 2026-10-21** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `eefe0324e..b22836d14`, then this documentation commit and its final-review fix

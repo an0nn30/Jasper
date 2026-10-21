@@ -300,8 +300,8 @@ switch the tab to Source and preview, without changing Default view, and act on 
 
 The preview shows the tab's text as it is, saved or not. It renders again 250 ms after the text last changed, whether
 you typed or the file was reloaded; switching to a view with the preview, or back to the tab, renders it at once. Only
-the tab selected in its window renders: a tab you leave stops rendering and loading images, and renders again when you
-return.
+a preview that shows renders, beside a focused pane or not: one in a tab you leave stops rendering and loading images,
+and renders again when its tab shows.
 
 When the preview cannot be rendered, a line above the text gives the reason, with **Source**, which switches the tab to
 Source as the button does, and **Retry**. A preview rendered earlier stays in place, and the line then begins "Preview
