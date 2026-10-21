@@ -108,7 +108,8 @@ class WindowChromeMenusTest {
             var window = items(menu(owner, "Window"));
             assertThat(window.getFirst()).isEqualTo("submenu:Split");
             assertThat(window).as("the Tab menu's Split list, pane, prompt and tab items with the plugin's Tab section, then the toggles")
-                .containsSubsequence("submenu:Split", "Move Pane to New Tab", "Next Prompt", "---", "Next Tab", "Previous Tab", "---",
+                .containsSubsequence("submenu:Split", "Move Pane to New Tab", "submenu:Move Pane to Tab", "Next Prompt", "---", "Next Tab",
+                    "Previous Tab", "---",
                     "split", "---", "Toggle Hosts");
             assertThat(window.getLast()).as("the tool-window toggles close the menu").isEqualTo("Toggle Hosts");
             var split = (JMenu) menu(owner, "Window").getMenuComponent(0);

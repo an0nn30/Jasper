@@ -49,6 +49,15 @@ class KeymapDefaultsTest {
         new Row("split_down", KeyContext.GLOBAL, "cmd+shift+d", "ctrl+alt+shift+d"),           // 33
         new Row("maximize_pane", KeyContext.GLOBAL, "cmd+shift+enter", "ctrl+alt+shift+enter"), // 35, parent tabs spec 8
         new Row("move_pane_to_new_tab", KeyContext.GLOBAL, "alt+cmd+t", "ctrl+alt+shift+t"),  // tabs and panes spec 9 and 10
+        new Row("move_pane_to_tab_1", KeyContext.GLOBAL, "none", "none"),                      // pane flexibility spec 4
+        new Row("move_pane_to_tab_2", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_3", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_4", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_5", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_6", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_7", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_8", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_9", KeyContext.GLOBAL, "none", "none"),
         new Row("toggle_zen_mode", KeyContext.GLOBAL, "none", "none"),                       // Zen follow-up
         new Row("toggle_rail", KeyContext.GLOBAL, "none", "none"),                           // 57
         new Row("toggle_status_bar", KeyContext.GLOBAL, "none", "none"),                     // 59

@@ -16,6 +16,7 @@ import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.contributions.OtherTab;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.contributions.WorkspaceHost;
@@ -1592,6 +1593,57 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (!mayMoveToNewTab(tab)) return;
         parentTabs.bar().atOnce(() -> parentTabs.moveToNewTab(tab, index));
         selectTab(tab);
+    }
+
+    /**
+     * The tabs Move Pane to Tab offers {@code item} (pane flexibility spec 4): this window's other tabs, in strip order;
+     * none for an item a pane drag may not move (pinned, being closed, a restorer's; workspace plan 9a Rulings 7), and
+     * none in a window of one tab.
+     *
+     * @param item an item, or null
+     * @return the tabs, each numbered as Select Tab numbers it
+     */
+    java.util.List<OtherTab> paneTargets(Tab item) {
+        if (closed || item == null || !registry.movable(item)) return java.util.List.of();
+        return parentTabOf(item).map(this::otherTabs).orElse(java.util.List.of());
+    }
+
+    /** This window's tabs but {@code own}, numbered from 1 in strip order, each titled as the strip's tab list titles it. */
+    private java.util.List<OtherTab> otherTabs(ParentTabId own) {
+        var others = new ArrayList<OtherTab>();
+        java.util.List<WorkspaceView> views = parentTabs.views();
+        for (int i = 0; i < views.size(); i++) {
+            WorkspaceView view = views.get(i);
+            if (!view.id().equals(own) && view.selected() != null)
+                others.add(new OtherTab(view.id(), i + 1, WindowTabs.capped(tabTitle(view.selected()))));
+        }
+        return others;
+    }
+
+    /**
+     * Whether Move Pane to Tab would move {@code item} into the tab at {@code index} of this window's strip: one of
+     * {@link #paneTargets}, so another tab than its own.
+     *
+     * @param item an item, or null
+     * @param index a place in the strip, 0 for the first
+     * @return whether it would move
+     */
+    boolean mayMoveToTab(Tab item, int index) {
+        return paneTargets(item).stream().anyMatch(other -> other.number() == index + 1);
+    }
+
+    /**
+     * Move Pane to Tab (pane flexibility spec 4): {@code item}'s pane moves to the right of the active pane of the tab at
+     * {@code index} of the strip, as a pane drag drops it there ({@link #movePane}; workspace plan 9a Rulings 6): that tab
+     * shows, the item takes the focus, a maximized pane there stops being maximized and the item's old tab goes with its
+     * last pane. Nothing when {@link #mayMoveToTab} says no.
+     *
+     * @param item an item of this window
+     * @param index a place in the strip, 0 for the first
+     */
+    void moveToTab(Tab item, int index) {
+        if (!mayMoveToTab(item, index)) return;
+        movePane(item, parentTabs.views().get(index).model().activeGroup(), Side.RIGHT);
     }
 
     /**

@@ -472,13 +472,22 @@ final class WindowChrome {
     private JMenu tabMenu() { return tabMenu(splitMenu()); }
 
     /**
-     * Tab (workspace plan 8b Rulings 10): the Split submenu {@code split}, Move Pane to New Tab, focusing panes and moving
-     * between prompts, a rule, Rename Tab, a rule, the tab commands.
+     * Tab (workspace plan 8b Rulings 10): the Split submenu {@code split}, Move Pane to New Tab, Move Pane to Tab (pane
+     * flexibility spec 4), focusing panes and moving between prompts, a rule, Rename Tab, a rule, the tab commands.
      */
     private JMenu tabMenu(JMenu split) {
         JMenu menu = menu("Tab");
         menu.add(split);
-        for (ActionId id : GROUP_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
+        for (ActionId id : GROUP_ITEMS) {
+            menu.add(new MenuBarItems.Item(owner.action(id)));
+            // Move Pane to Tab follows Move Pane to New Tab (pane flexibility spec 4); the menu fills it as it opens, since
+            // the window's tabs are not there yet while its chrome is built.
+            if (id == ActionId.MOVE_PANE_TO_NEW_TAB) {
+                JMenu moves = menu("Move Pane to Tab");
+                moves.setName(PANE_MOVES);
+                menu.add(moves);
+            }
+        }
         menu.addSeparator();
         menu.add(new MenuBarItems.Item(owner.action(ActionId.RENAME_TAB)));
         menu.addSeparator();
@@ -524,6 +533,46 @@ final class WindowChrome {
         }
     }
 
+    /** The name of a Move Pane to Tab submenu, which the menu holding it fills as it opens ({@link #observe}). */
+    static final String PANE_MOVES = "movePaneToTab";
+
+    /**
+     * Fills {@code moves}, a Move Pane to Tab submenu (pane flexibility spec 4; workspace plan 9a Rulings 5 and 6), for
+     * the focused pane: an entry for each other tab of the window, its number and title as plain text, that moves the
+     * pane there; the first nine run Move Pane to Tab 1 to 9 and show their keys. Disabled while there is none: one tab,
+     * or a pane that may not move.
+     *
+     * @param moves the submenu
+     * @param item makes a menu-bar item or an ordinary popup item for an action
+     * @return the submenu
+     */
+    private JMenu paneMoves(JMenu moves, java.util.function.Function<Action, JMenuItem> item) {
+        moves.removeAll();
+        var targets = owner.paneTargets(owner.selectedTab());
+        for (var target : targets) {
+            int index = target.number() - 1;
+            Action run = index < 9 ? owner.action(ActionId.values()[ActionId.MOVE_PANE_TO_TAB_1.ordinal() + index])
+                : new AbstractAction() {
+                    @Override public void actionPerformed(ActionEvent event) { owner.moveToTab(owner.selectedTab(), index); }
+                };
+            JMenuItem built = item.apply(run);
+            built.setHideActionText(true);
+            // A tab's title is plain text: html.disable first, as the UI reads it only when the text changes.
+            built.putClientProperty("html.disable", true);
+            built.setText(target.label());
+            built.setIcon(null);
+            moves.add(built);
+        }
+        moves.setEnabled(!targets.isEmpty());
+        return moves;
+    }
+
+    /** Fills each Move Pane to Tab submenu {@code menu} holds, as {@code menu} opens. */
+    private void refreshPaneMoves(JMenu menu) {
+        for (Component child : menu.getMenuComponents())
+            if (child instanceof JMenu moves && PANE_MOVES.equals(moves.getName())) paneMoves(moves, MenuBarItems.Item::new);
+    }
+
     /** One item per tool window whose toggle action this window has, in registration order. */
     private List<JMenuItem> toolWindowItems() {
         var items = new ArrayList<JMenuItem>();
@@ -544,7 +593,7 @@ final class WindowChrome {
     private JMenu observe(JMenu menu) {
         NativeStyles.installed().menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         menu.addMenuListener(new MenuListener() {
-            @Override public void menuSelected(MenuEvent event) { owner.updateActions(); }
+            @Override public void menuSelected(MenuEvent event) { owner.updateActions(); refreshPaneMoves(menu); }
             @Override public void menuDeselected(MenuEvent event) {}
             @Override public void menuCanceled(MenuEvent event) {}
         });
@@ -651,8 +700,10 @@ final class WindowChrome {
         JMenu split = new JMenu("Split");
         fillSplit(split, JMenuItem::new);
         menu.add(split);
-        for (ActionId id : new ActionId[]{ActionId.MOVE_PANE_TO_NEW_TAB, ActionId.MAXIMIZE_PANE, ActionId.CLOSE_PANE})
-            menu.add(owner.action(id));
+        menu.add(owner.action(ActionId.MOVE_PANE_TO_NEW_TAB));
+        // Move Pane to Tab follows Move Pane to New Tab (pane flexibility spec 4).
+        menu.add(paneMoves(new JMenu("Move Pane to Tab"), JMenuItem::new));
+        for (ActionId id : new ActionId[]{ActionId.MAXIMIZE_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
         // The window menu's entries, for a window whose strip hides (tabs and panes spec 6).
         menu.addSeparator();
         for (ActionId id : owner.windowMenuItems()) menu.add(owner.action(id));

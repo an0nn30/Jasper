@@ -61,6 +61,9 @@ final class WorkspaceActions {
             case MOVE_TAB_TO_NEW_WINDOW -> owner.moveTabToNewWindow(owner.selectedTab());
             case MOVE_TO_MAIN_WINDOW -> owner.moveToMainWindow();
             case MOVE_PANE_TO_NEW_TAB -> owner.moveToNewTab(owner.selectedTab());
+            case MOVE_PANE_TO_TAB_1, MOVE_PANE_TO_TAB_2, MOVE_PANE_TO_TAB_3, MOVE_PANE_TO_TAB_4, MOVE_PANE_TO_TAB_5,
+                 MOVE_PANE_TO_TAB_6, MOVE_PANE_TO_TAB_7, MOVE_PANE_TO_TAB_8, MOVE_PANE_TO_TAB_9 ->
+                owner.moveToTab(owner.selectedTab(), id.ordinal() - ActionId.MOVE_PANE_TO_TAB_1.ordinal());
             case OPEN_FILE -> owner.openFile();
             case QUIT -> owner.requestQuit();
             case CLOSE_PANE -> owner.closeTab(owner.selectedTab());
@@ -130,6 +133,11 @@ final class WorkspaceActions {
                     case MOVE_TO_MAIN_WINDOW -> owner.mayMoveToMainWindow();
                     // A tab's only pane, a pinned item and one being closed stay (workspace plan 8b Rulings 9).
                     case MOVE_PANE_TO_NEW_TAB -> owner.mayMoveToNewTab(owner.selectedTab());
+                    // Its own tab's number, a number no tab has and a pane that may not move do nothing (pane
+                    // flexibility spec 4).
+                    case MOVE_PANE_TO_TAB_1, MOVE_PANE_TO_TAB_2, MOVE_PANE_TO_TAB_3, MOVE_PANE_TO_TAB_4, MOVE_PANE_TO_TAB_5,
+                         MOVE_PANE_TO_TAB_6, MOVE_PANE_TO_TAB_7, MOVE_PANE_TO_TAB_8, MOVE_PANE_TO_TAB_9 ->
+                        owner.mayMoveToTab(owner.selectedTab(), id.ordinal() - ActionId.MOVE_PANE_TO_TAB_1.ordinal());
                     case TOGGLE_ZEN_MODE -> owner.isMain();
                     // A child window has no status bar or rail of its own (workspace tabs spec 6.3).
                     case TOGGLE_RAIL, TOGGLE_STATUS_BAR -> owner.isMain() && !owner.zenMode();
