@@ -212,6 +212,24 @@ class WindowTabsTest {
         });
     }
 
+    /** Workspace plan 8c Rulings 3: an equal entry's outer quarters are new-tab places, before and after it. */
+    @Test void anEntrysOuterQuartersAreNewTabPlaces() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
+            owner.newTab(HOME); owner.newTab(HOME); owner.update();
+            var strip = owner.windowTabs();
+            layout(strip, 900, 30);
+            assertThat(strip.tabBounds()).containsExactly(new Rectangle(0, 0, 300, 30), new Rectangle(300, 0, 300, 30),
+                new Rectangle(600, 0, 300, 30));
+            assertThat(strip.newTabPlace(new Point(10, 15))).hasValue(0);
+            assertThat(strip.newTabPlace(new Point(150, 15))).as("the middle half shows its tab").isEmpty();
+            assertThat(strip.newTabPlace(new Point(290, 15))).hasValue(1);
+            assertThat(strip.newTabPlace(new Point(310, 15))).hasValue(1);
+            assertThat(strip.newTabPlace(new Point(899, 15))).as("the strip's end").hasValue(3);
+        });
+    }
+
     static JComponent named(Container parent, String name) {
         for (Component child : parent.getComponents()) {
             if (child instanceof JComponent component && name.equals(component.getName())) return component;

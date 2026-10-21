@@ -888,4 +888,63 @@ class TabDragWindowsTest {
             assertThat(from.workspace().tabs()).contains(moving);
         });
     }
+
+    /**
+     * Tabs and panes spec 7 and workspace plan 8c Rulings 3 and 12: a pane dropped on the leading quarter of another
+     * window's first entry becomes that window's first tab, shown, through the tab registry, one TAB_MOVED, under an id no
+     * other window holds.
+     */
+    @Test void aPaneDroppedOnAnotherWindowsEntryQuarterBecomesANewTabThere() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            main.content().split(Side.RIGHT);
+            relayout(frameOf(main));
+            ids[0] = child.content().activeParentTab();
+            ids[1] = secondTab(child);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            Tab moving = from.workspace().tabs().get(1);
+            Point before = onEntry(to, entryOf(to, ids[0]), 0.1);
+            facts.clear();
+            Component source = startPane(from, moving, before);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.NewTab(to, 0));
+            assertThat(manager.tabDrag().overlay().placeholder()).as("a bar before the first tab").isEqualTo(marker(to, null, 0));
+            mouse(source, MouseEvent.MOUSE_RELEASED, before, PANE);
+            List<ParentTabId> after = tabIds(to);
+            assertThat(after).hasSize(3);
+            assertThat(after.get(0)).as("first, shown").isEqualTo(to.activeParentTab());
+            assertThat(after.subList(1, 3)).containsExactly(ids[0], ids[1]);
+            assertThat(to.workspace().tabs()).containsExactly(moving);
+            assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(moving.id().value(), main.id(), child.id()));
+            assertThat(after).as("no id in two windows").doesNotContainAnyElementsOf(tabIds(from));
+        });
+    }
+
+    /** Review Focus 5 and workspace plan 8c Rulings 10: the main window's empty workspace takes a pane anywhere over it, in its place. */
+    @Test void theMainWindowsEmptyWorkspaceTakesAPaneAnywhereOverIt() throws Exception {
+        edt(() -> {
+            child.content().split(Side.DOWN);
+            relayout(frameOf(child));
+        });
+        launch();
+        edt(() -> {
+            WindowContent empty = main.content(), from = child.content();
+            empty.closeTab(empty.selectedTab());
+            assertThat(empty.parentTabs().isEmpty()).isTrue();
+            ParentTabId only = empty.activeParentTab();
+            Tab moving = from.workspace().tabs().get(1);
+            var parents = empty.parentTabs();
+            Point anywhere = inside(onScreen(parents, new Rectangle(parents.getSize())), 0.3, 0.7);
+            Component source = startPane(from, moving, anywhere);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.NewTab(empty, 0));
+            assertThat(manager.tabDrag().overlay().highlight()).as("all of the empty workspace").isEqualTo(SwingUtilities
+                .convertRectangle(parents, new Rectangle(parents.getSize()), SwingUtilities.getRootPane(empty).getLayeredPane()));
+            mouse(source, MouseEvent.MOUSE_RELEASED, anywhere, PANE);
+            assertThat(empty.workspace().tabs()).containsExactly(moving);
+            assertThat(tabIds(empty)).as("in its one tab's place, under its id").containsExactly(only);
+            assertThat(from.workspace().tabs()).hasSize(1);
+        });
+    }
 }

@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.dock.WorkspaceDropResolver;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.ThemeZone;
@@ -17,6 +18,7 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.function.LongSupplier;
 import javax.swing.*;
 
@@ -138,6 +140,8 @@ final class WindowTabs extends JPanel implements TabStrip {
         for (Tab tab : order) bounds.add(SwingUtilities.convertRectangle(viewport, entries.get(tab).getBounds(), this));
         return bounds;
     }
+
+    @Override public OptionalInt newTabPlace(Point point) { return WorkspaceDropResolver.newTabPlace(point, tabBounds()); }
 
     @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(source.owner().tabHeight())); }
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }

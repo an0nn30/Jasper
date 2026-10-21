@@ -11,9 +11,10 @@ import java.util.OptionalInt;
 
 /**
  * Where a drag would drop, from the cursor alone (workspace tabs spec 12; tabs and panes spec 6 and 7): a dragged pane
- * beside the pane under the cursor, on the side whose edge is nearest; a dragged tab's place among a strip's entries; the
- * rectangles that show the landing; and which of several windows takes the drop. The tab and pane drag's twin of
- * {@link DockDropResolver}. Pure; every rectangle and the cursor are in the caller's one coordinate space.
+ * beside the pane under the cursor, on the side whose edge is nearest, or into a new tab at a strip entry's outer
+ * quarter; a dragged tab's place among a strip's entries; the rectangles that show the landing; and which of several
+ * windows takes the drop. The tab and pane drag's twin of {@link DockDropResolver}. Pure; every rectangle and the cursor
+ * are in the caller's one coordinate space.
  */
 public final class WorkspaceDropResolver {
     private WorkspaceDropResolver() { }
@@ -81,6 +82,29 @@ public final class WorkspaceDropResolver {
         int index = 0;
         for (Rectangle entry : entries) if (entry.x + entry.width / 2.0 < cursor.x) index++;
         return OptionalInt.of(index);
+    }
+
+    /**
+     * Where a dragged pane over a strip's entries becomes a new tab (tabs and panes spec 7; workspace plan 8c Rulings 3):
+     * over an entry's leading quarter, the place before it, and over its trailing quarter, the place after it; over its
+     * middle half, which shows its tab, and anywhere off the entries, none. An entry's left and top edges lie inside it,
+     * its right and bottom edges do not.
+     *
+     * @param cursor the cursor
+     * @param entries the strip's entries in strip order
+     * @return the place, 0 to the number of entries; empty over an entry's middle half or off the entries
+     */
+    public static OptionalInt newTabPlace(Point cursor, List<Rectangle> entries) {
+        Objects.requireNonNull(cursor, "cursor");
+        for (int i = 0; i < entries.size(); i++) {
+            Rectangle entry = entries.get(i);
+            if (!entry.contains(cursor)) continue;
+            int quarter = entry.width / 4, across = cursor.x - entry.x;
+            if (across < quarter) return OptionalInt.of(i);
+            if (across >= entry.width - quarter) return OptionalInt.of(i + 1);
+            return OptionalInt.empty();
+        }
+        return OptionalInt.empty();
     }
 
     /** The side of {@code bounds} whose edge is nearest {@code cursor}, each distance a share of its width or height. */

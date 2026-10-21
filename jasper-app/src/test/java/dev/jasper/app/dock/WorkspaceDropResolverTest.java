@@ -133,4 +133,20 @@ class WorkspaceDropResolverTest {
         assertThatNullPointerException().isThrownBy(() -> new Drop(LEFT, null));
         assertThatNullPointerException().isThrownBy(() -> new Area(null, bounds));
     }
+
+    /** Workspace plan 8c Rulings 3: an entry's outer quarters are new-tab places, before and after it; its middle half is none. */
+    @Test void anEntrysOuterQuartersAreNewTabPlaces() {
+        List<Rectangle> entries = List.of(new Rectangle(0, 0, 300, 30), new Rectangle(300, 0, 300, 30),
+            new Rectangle(600, 0, 300, 30));
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(0, 15), entries)).as("the left edge is inside").hasValue(0);
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(74, 15), entries)).as("the leading quarter's last pixel").hasValue(0);
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(75, 15), entries)).as("the middle half").isEmpty();
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(224, 15), entries)).isEmpty();
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(225, 15), entries)).as("the trailing quarter").hasValue(1);
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(300, 15), entries)).as("the next one's leading quarter").hasValue(1);
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(899, 15), entries)).as("after the last").hasValue(3);
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(900, 15), entries)).as("the right edge is not inside").isEmpty();
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(450, 30), entries)).as("nor the bottom edge").isEmpty();
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(10, 10), List.of())).as("no entry").isEmpty();
+    }
 }

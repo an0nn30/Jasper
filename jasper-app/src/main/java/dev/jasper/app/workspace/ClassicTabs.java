@@ -4,6 +4,7 @@ import com.formdev.flatlaf.ui.FlatUIUtils;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.dock.WorkspaceDropResolver;
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
@@ -16,11 +17,13 @@ import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 import javax.accessibility.AccessibleAction;
 import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
@@ -96,6 +99,14 @@ final class ClassicTabs extends JPanel implements TabStrip {
     @Override public void close() { disposed = true; entries.clear(); removeAll(); selected = null; }
 
     @Override public List<Rectangle> tabBounds() { return entries.stream().map(Entry::getBounds).toList(); }
+
+    @Override public OptionalInt newTabPlace(Point point) {
+        if (!new Rectangle(getSize()).contains(point)) return OptionalInt.empty();
+        int end = entries.isEmpty() ? 0 : entries.getLast().getX() + entries.getLast().getWidth();
+        // The "+" and the room after the last tab; a crowded strip's "+" stands over the tabs it clips.
+        if (point.x >= (add.covering ? add.getX() : end)) return OptionalInt.of(entries.size());
+        return WorkspaceDropResolver.newTabPlace(point, tabBounds());
+    }
 
     List<Entry> entries() { return List.copyOf(entries); }
     JComponent add() { return add; }

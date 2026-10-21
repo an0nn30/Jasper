@@ -164,15 +164,23 @@ final class ParentTabsView extends JPanel {
      */
     void moveToNewTab(Tab tab) {
         WorkspaceView from = holding(tab).orElse(null);
+        if (from != null) moveToNewTab(tab, model.indexOf(from.id()) + 1);
+    }
+
+    /**
+     * As {@link #moveToNewTab(Tab)}, the new tab at {@code index} of the strip (its end past it): a pane dropped on a
+     * new-tab place of the strip (tabs and panes spec 7), held as that one is (workspace plan 8c Rulings 17).
+     */
+    void moveToNewTab(Tab tab, int index) {
+        WorkspaceView from = holding(tab).orElse(null);
         if (closed || from == null || from.tabCount() < 2) return;
-        int at = model.indexOf(from.id()) + 1;
         Layout before = from.model();
         ParentTabs strip = model;
         ParentTabId id = ParentTabId.random();
         owner.held(() -> {
             try {
                 from.remove(tab);
-                openParentTab(tab, id, at);
+                openParentTab(tab, id, index);
             } catch (RuntimeException | Error failure) {
                 // A new tab that stood when the failure came goes again before its item goes back.
                 WorkspaceView opened = views.remove(id);

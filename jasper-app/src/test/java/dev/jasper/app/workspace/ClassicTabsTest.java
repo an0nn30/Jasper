@@ -301,6 +301,36 @@ class ClassicTabsTest {
         });
     }
 
+    /**
+     * Workspace plan 8c Rulings 3: the "+" and the room after the last tab are the strip's end, a tab's outer quarters the
+     * places before and after it; a crowded strip's end is from its "+" on.
+     */
+    @Test void thePlusTheRoomAfterTheTabsAndATabsOuterQuartersAreNewTabPlaces() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                var strip = tabs(owner, 800);
+                var first = strip.entries().getFirst().getBounds();
+                var plus = strip.add().getBounds();
+                assertThat(strip.newTabPlace(new java.awt.Point(plus.x + plus.width / 2, plus.height / 2))).as("the +").hasValue(2);
+                assertThat(strip.newTabPlace(new java.awt.Point(790, 5))).as("the room after it").hasValue(2);
+                assertThat(strip.newTabPlace(new java.awt.Point(first.x + 1, first.height / 2))).as("a tab's leading quarter").hasValue(0);
+                assertThat(strip.newTabPlace(new java.awt.Point(first.x + first.width / 2, first.height / 2))).as("its middle").isEmpty();
+                assertThat(strip.newTabPlace(new java.awt.Point(900, 5))).as("off the strip").isEmpty();
+                for (int i = owner.tabCount(); i < 15; i++) owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                tabs(owner, 600);
+                var crowded = strip.add().getBounds();
+                assertThat(strip.entries().getLast().getX()).as("crowded: the last tabs clip").isGreaterThan(600);
+                assertThat(strip.newTabPlace(new java.awt.Point(crowded.x + crowded.width / 2, crowded.height / 2)))
+                    .as("the +, over the clipped tabs").hasValue(15);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
     @Test void theDefaultLookKeepsTheEqualTabs() throws Exception {
         edt(() -> {
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), dev.jasper.app.appearance.ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);

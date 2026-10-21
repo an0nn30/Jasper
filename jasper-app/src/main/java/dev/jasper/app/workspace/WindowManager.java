@@ -375,6 +375,25 @@ public final class WindowManager {
         return to.parentTabs().contains(tab);
     }
 
+    /**
+     * A pane drag's drop on a new-tab place of {@code to}'s strip, or on the main window's empty workspace (tabs and panes
+     * spec 7; workspace plan 8c Rulings 10 and 12): as {@link #movePane}, into a new tab at {@code index} of {@code to}'s
+     * strip; the main window's empty workspace takes it in its place, under its own id.
+     *
+     * @param from the window holding the item
+     * @param tab the item
+     * @param to another main or full window
+     * @param index where the new tab goes among {@code to}'s strip entries
+     * @return whether it arrived
+     */
+    public boolean movePaneToNewTab(WindowContent from, Tab tab, WindowContent to, int index) {
+        requireEdt();
+        if (!mayMovePane(from, tab, to)) return false;
+        if (to.parentTabs().isEmpty()) model.tabs().move(tab, to.id());
+        else to.receiveAsTab(tab, index);
+        return to.parentTabs().contains(tab);
+    }
+
     /** Whether {@code tab}, an item of {@code from}, may move to {@code to}, another open window: one the registry moves. */
     private boolean mayMovePane(WindowContent from, Tab tab, WindowContent to) {
         return from != null && to != null && from != to && !from.closed() && !to.closed() && from.parentTabs().contains(tab)

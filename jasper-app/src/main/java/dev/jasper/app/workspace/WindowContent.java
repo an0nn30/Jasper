@@ -1409,6 +1409,20 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
+     * A pane drag's drop on a new-tab place of this window's strip (tabs and panes spec 7): Move Pane to New Tab's move,
+     * the new tab at {@code index} of the strip, which takes it at once (workspace plan 8c Rulings 9); the item then takes
+     * the focus. Nothing when {@link #mayMoveToNewTab} says no, as for its tab's only pane (Rulings 8).
+     *
+     * @param tab an item of this window
+     * @param index where the new tab goes among the strip's entries
+     */
+    void movePaneToNewTab(Tab tab, int index) {
+        if (!mayMoveToNewTab(tab)) return;
+        parentTabs.bar().atOnce(() -> parentTabs.moveToNewTab(tab, index));
+        selectTab(tab);
+    }
+
+    /**
      * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
      * one move each, so each keeps its content and session and reports {@code TAB_MOVED} once (parent tabs spec 5;
      * workspace plan 7b Rulings 6). A parent tab this window lacks opens under that id at {@code index} of the bar, in
@@ -1458,6 +1472,25 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         }
         WindowManager.rethrow(failure);
         return arrived;
+    }
+    /**
+     * Takes {@code tab}, another window's item, into a new tab at {@code index} of this window's strip (its end past it),
+     * through the tab registry, one move, its content and session untouched (tabs and panes spec 7; workspace plan 8c
+     * Rulings 12): a pane dropped on a new-tab place of this window's strip. A tab moving in takes its place at once.
+     * Nothing once the window has closed; a receive that runs within another leaves the outer one's landing as it was.
+     *
+     * @param tab another window's item
+     * @param index where the new tab goes among the strip's entries
+     */
+    void receiveAsTab(Tab tab, int index) {
+        if (closed) return;
+        Landing outer = landing;
+        landing = new Landing(ParentTabId.random(), index);
+        try {
+            registry.move(tab, id);
+        } finally {
+            landing = outer;
+        }
     }
     TabRegistry tabRegistry() { return registry; }
     boolean windowActive() { return active; }

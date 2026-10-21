@@ -67,10 +67,13 @@ import javax.swing.text.JTextComponent;
  * already is its own; workspace plan 8a Rulings 6). A tab holding an item that is pinned (a modal owner holds it in its
  * window), or one being closed, takes targets along its own strip only.
  * <p>A pane's targets (tabs and panes spec 7): a pane of the window's shown tab other than its own, beside which it goes
- * on the side whose edge the cursor is nearest; and a tab's entry in the window's strip, which shows that tab at once,
- * with no drop of its own, so that one of its panes can take the pane; the tab that showed there before shows again when
- * the drag ends, unless its drop lands in that window (spec 13). A pane takes targets in windows alone, as a pane never
- * becomes a window; the drag of an item that is pinned or being closed never starts.
+ * on the side whose edge the cursor is nearest; the middle half of a tab's entry in the window's strip, which shows that
+ * tab at once, with no drop of its own, so that one of its panes can take the pane; the tab that showed there before
+ * shows again when the drag ends, unless its drop lands in that window (spec 13); a new-tab place in the strip
+ * ({@link TabStrip#newTabPlace}: an entry's outer quarter, the classic tabs' "+" and the room after them), where it
+ * becomes a new tab, except in its own window for its tab's only pane, which Move Pane to New Tab leaves where it is
+ * too; and the main window's empty workspace, anywhere over it, a new tab in its place. A pane takes targets in windows
+ * alone, as a pane never becomes a window; the drag of an item that is pinned or being closed never starts.
  * <p>Releasing the left button carries the target out: a tab along its own strip as a reorder and a pane within its
  * window as a layout change, neither through the tab registry; into another window, or a tab out of every window,
  * through the window manager of the drag's window, which moves the items through the tab registry, a moved pane's item
@@ -109,6 +112,15 @@ final class TabDrag {
          * @param side where the dragged pane goes
          */
         record Beside(WindowContent window, GroupId group, Side side) implements Target { }
+
+        /**
+         * A new tab at {@code index} of {@code window}'s strip, or the main window's empty workspace in its place (index
+         * 0): a pane drag's (tabs and panes spec 7).
+         *
+         * @param window the window
+         * @param index the new tab's place among the strip's entries
+         */
+        record NewTab(WindowContent window, int index) implements Target { }
     }
 
     /** How far right of and below the cursor the label's corner sits, so no window is ever under the pointer's tip. */
@@ -480,10 +492,12 @@ final class TabDrag {
     }
 
     /**
-     * A pane's target in {@code window} at {@code at} (tabs and panes spec 7): over the shown strip, an entry, whose tab
-     * shows at once and takes no drop itself; over a pane of the shown tab other than the dragged one's own, beside it on
-     * the side whose edge is nearest (workspace plan 8c Rulings 6 and 7). Empty anywhere else (the window's dock, chrome
-     * and title bar, a divider, the dragged pane itself) and for an item that may no longer move.
+     * A pane's target in {@code window} at {@code at} (tabs and panes spec 7): the main window's empty workspace anywhere
+     * over it, a new tab in its place (workspace plan 8c Rulings 10); over the shown strip, a new-tab place
+     * ({@link TabStrip#newTabPlace}), a new tab there, but not in the drag's own window for its tab's only pane (Rulings
+     * 8), or an entry's middle half, whose tab shows at once and takes no drop itself; over a pane of the shown tab other
+     * than the dragged one's own, beside it on the side whose edge is nearest (Rulings 6 and 7). Empty anywhere else (the
+     * window's dock, chrome and title bar, a divider, the dragged pane itself) and for an item that may no longer move.
      */
     private Optional<Target> onPanes(WindowContent window, Point at) {
         if (!from.tabRegistry().movable(tab)) return Optional.empty();
@@ -491,9 +505,13 @@ final class TabDrag {
         Point local = new Point(at);
         SwingUtilities.convertPointFromScreen(local, parents);
         if (!new Rectangle(parents.getSize()).contains(local)) return Optional.empty();
+        if (parents.isEmpty()) return Optional.of(new Target.NewTab(window, 0));
         Component strip = window.tabBar().component();
         if (strip.isVisible() && strip.getBounds().contains(local)) {
             Point inStrip = SwingUtilities.convertPoint(parents, local, strip);
+            OptionalInt place = window.tabBar().newTabPlace(inStrip);
+            if (place.isPresent())
+                return window != from || from.mayMoveToNewTab(tab) ? Optional.of(new Target.NewTab(window, place.getAsInt())) : Optional.empty();
             List<Rectangle> entries = window.tabBar().tabBounds();
             List<Tab> listed = parents.bar().tabs();
             for (int i = 0; i < Math.min(entries.size(), listed.size()); i++)
@@ -552,14 +570,14 @@ final class TabDrag {
     /** Whether a release outside every window takes the tab out of its window: never a window's only tab (Rulings 6). */
     private boolean tearsOut() { return from.mayMoveTabToNewWindow(parentTab); }
 
-    /** The strip's entries in {@code window}'s parent-tabs view's coordinates, in strip order, without the dragged one's own. */
+    /** The strip's entries in {@code window}'s parent-tabs view's coordinates, in strip order, without a dragged tab's own. */
     private List<Rectangle> barEntries(WindowContent window) {
         TabStrip bar = window.tabBar();
         List<Tab> listed = window.parentTabs().bar().tabs();
         List<Rectangle> bounds = bar.tabBounds();
         var entries = new ArrayList<Rectangle>();
         for (int i = 0; i < Math.min(listed.size(), bounds.size()); i++) {
-            if (listed.get(i) == tab) continue;
+            if (!pane && listed.get(i) == tab) continue;
             entries.add(SwingUtilities.convertRectangle(bar.component(), bounds.get(i), window.parentTabs()));
         }
         return entries;
@@ -568,8 +586,8 @@ final class TabDrag {
     /**
      * Shows the target's landing on its window's layered pane: for a tab, a bar where it would go in the strip as the
      * placeholder, or the band of a strip that hides as the highlight; for a pane, the half of the pane beside which it
-     * would go as the highlight; the main window's whole empty workspace for what drops there. Without a target in a
-     * window the overlay leaves its window.
+     * would go as the highlight, or a bar at the new-tab place where it would become a tab as the placeholder; the main
+     * window's whole empty workspace for what drops there. Without a target in a window the overlay leaves its window.
      */
     private void showLanding() {
         WindowContent window = target.map(TabDrag::window).orElse(null);
@@ -590,6 +608,9 @@ final class TabDrag {
         else switch (target.get()) {
             // The half of the pane beside which the dragged pane goes (tabs and panes spec 7).
             case Target.Beside beside -> highlight = SwingUtilities.convertRectangle(parents, besideLanding(parents, beside), layers);
+            // A pane becoming a new tab: a bar at its place, as the tab drag marks a tab's.
+            case Target.NewTab newTab -> placeholder = SwingUtilities.convertRectangle(parents,
+                WorkspaceDropResolver.marker(barArea(window), barEntries(window), newTab.index(), marker), layers);
             // A strip that hides takes the tab at its end: its band shows (workspace plan 7c Rulings 5).
             case Target.Bar bar when !window.tabBar().component().isVisible() ->
                 highlight = SwingUtilities.convertRectangle(parents, barArea(window), layers);
@@ -657,9 +678,10 @@ final class TabDrag {
     /**
      * Carries a release out; nothing touches an item's content or session. Along its own strip the tab takes its new
      * place there; on another window's strip, or out of every window into a full window, the window manager moves it
-     * whole ({@code home}, the drag's window, holds {@code parent}). A pane beside another pane of its window moves there
-     * as a layout change; beside another window's, the window manager moves its item there (workspace plan 8c Rulings
-     * 12). A window no manager opened moves nothing out of itself.
+     * whole ({@code home}, the drag's window, holds {@code parent}). A pane beside another pane of its window, or onto a
+     * new-tab place of its strip, moves there as a layout change; beside another window's pane, onto a new-tab place of
+     * its strip or onto the main window's empty workspace, the window manager moves its item there (workspace plan 8c
+     * Rulings 12). A window no manager opened moves nothing out of itself.
      */
     private void drop(Tab moving, WindowContent home, ParentTabId parent, Target where) {
         if (moving.closed()) return;
@@ -675,6 +697,11 @@ final class TabDrag {
                 // Another window's pane: the window manager moves the item there, through the tab registry.
                 else home.manager().ifPresent(manager -> manager.movePane(home, moving, beside.window(), beside.group(), beside.side()));
             }
+            case Target.NewTab newTab -> {
+                if (newTab.window() == home) home.movePaneToNewTab(moving, newTab.index());
+                // Another window's strip, or the main window's empty workspace: through the window manager and the registry.
+                else home.manager().ifPresent(manager -> manager.movePaneToNewTab(home, moving, newTab.window(), newTab.index()));
+            }
         }
     }
 
@@ -683,6 +710,7 @@ final class TabDrag {
         return switch (target) {
             case Target.Bar bar -> bar.window();
             case Target.Beside beside -> beside.window();
+            case Target.NewTab newTab -> newTab.window();
             case Target.TearOut out -> null;
         };
     }

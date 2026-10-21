@@ -5,6 +5,7 @@ import static dev.jasper.app.workspace.TabDragTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.AnimationSettings;
@@ -19,6 +20,7 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
+import dev.jasper.app.testsupport.EnterpriseLook;
 import java.awt.Component;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
@@ -658,6 +660,114 @@ class PaneDragTest {
             mouse(source, MouseEvent.MOUSE_RELEASED, right, PANE);
             assertThat(owner.workspace().model().maximized()).as("the maximize ends").isEmpty();
             assertThat(shape(owner)).isEqualTo("H[d, b, e]");
+        });
+    }
+
+    /**
+     * Tabs and panes spec 7 and workspace plan 8c Rulings 3 and 9: a pane dropped on an entry's outer quarter becomes a new
+     * tab at that place, which shows and lands at once; a bar at the place shows where.
+     */
+    @Test void aPaneDroppedOnAnEntrysOuterQuarterBecomesANewTabThere() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Component source = startPane(owner, b, onEntry(owner, d, 0.9));
+            assertThat(drag.target()).as("after the last tab").contains(new TabDrag.Target.NewTab(owner, 2));
+            Point before = onEntry(owner, d, 0.1);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, before, PANE);
+            assertThat(drag.target()).as("before the second tab").contains(new TabDrag.Target.NewTab(owner, 1));
+            assertThat(owner.activeParentTab()).as("a new-tab place shows no tab").isEqualTo(first);
+            assertThat(drag.overlay().placeholder()).as("a bar at the place").isEqualTo(marker(owner, null, 1));
+            facts.clear();
+            mouse(source, MouseEvent.MOUSE_RELEASED, before, PANE);
+            assertThat(owner.parentTabCount()).isEqualTo(3);
+            assertThat(owner.parentTabs().model().indexOf(owner.activeParentTab())).as("at that place, shown").isEqualTo(1);
+            assertThat(shape(owner)).isEqualTo("b");
+            assertThat(owner.selectedTab()).isSameAs(b);
+            assertThat(moves()).as("within its window: no TAB_MOVED").isEmpty();
+            owner.selectParentTab(first);
+            assertThat(shape(owner)).isEqualTo("H[a, c]");
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: the selected item's pane dropped on a new-tab place of its window is announced once,
+     * where it lands: the registry hears no selection, move, close or active pane, and no item of its old tab turns active.
+     */
+    @Test void aPaneDroppedOnANewTabPlaceIsAnnouncedOnceWhereItLands() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<Boolean>();
+            Tab shell = shellBesideC(heard);
+            relayout(frame);
+            Point after = onEntry(owner, d, 0.9);
+            Component source = startPane(owner, shell, after);
+            assertThat(owner.tabDrag().target()).contains(new TabDrag.Target.NewTab(owner, 2));
+            facts.clear();
+            heard.clear();
+            mouse(source, MouseEvent.MOUSE_RELEASED, after, PANE);
+            assertThat(owner.parentTabCount()).isEqualTo(3);
+            assertThat(owner.workspace().tabs()).as("its own tab, shown").containsExactly(shell);
+            assertThat(announced()).as("nothing changed for the registry").isEmpty();
+            assertThat(heard).as("no item it left turns active").isEmpty();
+        });
+    }
+
+    /** Workspace plan 8c Rulings 8: in its own window a tab's only pane takes no new tab, at any new-tab place. */
+    @Test void theOnlyPaneOfATabTakesNoNewTabInItsWindow() throws Exception {
+        edt(() -> {
+            owner.selectParentTab(second);
+            Tab shownThere = owner.parentTabs().view(first).orElseThrow().selected();
+            Point end = onEntry(owner, d, 0.9), start = onEntry(owner, shownThere, 0.1);
+            Component source = startPane(owner, d, end);
+            assertThat(owner.tabDrag().active()).isTrue();
+            assertThat(owner.tabDrag().target()).as("after the last tab").isEmpty();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, start, PANE);
+            assertThat(owner.tabDrag().target()).as("before the first").isEmpty();
+            assertThat(owner.tabDrag().overlay().getParent()).as("no landing").isNull();
+            assertThat(owner.activeParentTab()).as("an outer quarter shows no tab").isEqualTo(second);
+            mouse(source, MouseEvent.MOUSE_RELEASED, start, PANE);
+            assertThat(owner.parentTabCount()).isEqualTo(2);
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+        });
+    }
+
+    /**
+     * Tabs and panes spec 7 and workspace plan 8c Rulings 3: under Enterprise the "+", the room after the last tab and a
+     * tab's outer quarter make a new tab; the tab's middle shows its tab and takes no drop.
+     */
+    @Test void underEnterpriseThePlusTheRoomAfterTheTabsAndATabsOuterQuarterMakeANewTab() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                WindowContent classic = content(idleLauncher(pending), themes, ClassicTabsTest.classic());
+                classic.connectContributions(model);
+                Tab shell = classic.selectedTab();
+                Tab notes = model.tabs().open("dev.example.notes", "notes", "notes", classic.id(), new JPanel(),
+                    TabRegistry.Placement.SPLIT_RIGHT);
+                frame(classic, 100, 50, 1208, 760);
+                var strip = (ClassicTabs) classic.tabBar();
+                TabDrag drag = classic.tabDrag();
+                Point plus = middle(strip.add());
+                Component source = startPane(classic, notes, plus);
+                assertThat(drag.target()).as("the +").contains(new TabDrag.Target.NewTab(classic, 1));
+                Rectangle entry = onScreen(strip, strip.entries().getFirst().getBounds());
+                mouse(source, MouseEvent.MOUSE_DRAGGED, inside(entry, 0.5, 0.5), PANE);
+                assertThat(drag.target()).as("its tab's middle").isEmpty();
+                mouse(source, MouseEvent.MOUSE_DRAGGED, inside(entry, 0.1, 0.5), PANE);
+                assertThat(drag.target()).as("its tab's leading quarter").contains(new TabDrag.Target.NewTab(classic, 0));
+                Point after = new Point(plus.x + strip.add().getWidth(), plus.y);
+                mouse(source, MouseEvent.MOUSE_DRAGGED, after, PANE);
+                assertThat(drag.target()).as("the room after the +").contains(new TabDrag.Target.NewTab(classic, 1));
+                mouse(source, MouseEvent.MOUSE_RELEASED, after, PANE);
+                assertThat(classic.parentTabCount()).isEqualTo(2);
+                assertThat(classic.parentTabs().model().indexOf(classic.activeParentTab())).as("at the end, shown").isEqualTo(1);
+                assertThat(classic.selectedTab()).isSameAs(notes);
+                classic.selectTab(shell);
+                assertThat(classic.workspace().tabs()).containsExactly(shell);
+            } finally {
+                closeOwnersNow();
+                themes.close();
+                EnterpriseLook.restoreDefault();
+            }
         });
     }
 }

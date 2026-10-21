@@ -22,6 +22,8 @@ final class ParentTabBar {
     private final WindowContent owner;
     private final ParentTabsView parentTabs;
     private final TabStrip strip;
+    /** While {@link #atOnce} runs: the strip takes every change at once. */
+    private boolean still;
 
     ParentTabBar(WindowContent owner, ParentTabsView parentTabs) {
         this.owner = Objects.requireNonNull(owner, "owner");
@@ -93,6 +95,20 @@ final class ParentTabBar {
     String closeName() { return ActionId.CLOSE_TAB.label(); }
     /** The tab whose entry shows {@code tab}; null for an item no tab of the window holds, such as a closed one. */
     ParentTabId id(Tab tab) { return owner.parentTabOf(tab).orElse(null); }
-    /** Whether the strip's entries move as tabs open and close: while the look has motion (Rulings 20). */
-    boolean animates() { return owner.lookAnimates(); }
+    /**
+     * Runs {@code change} with the strip taking its places at once, as it takes a tab moving in from another window: a
+     * pane dropped on a new-tab place makes a tab that opens with no motion (tabs and panes spec 5 and 7; workspace plan
+     * 8c Rulings 9).
+     */
+    void atOnce(Runnable change) {
+        boolean was = still;
+        still = true;
+        try {
+            change.run();
+        } finally {
+            still = was;
+        }
+    }
+    /** Whether the strip's entries move as tabs open and close: while the look has motion (Rulings 20), outside {@link #atOnce}. */
+    boolean animates() { return !still && owner.lookAnimates(); }
 }

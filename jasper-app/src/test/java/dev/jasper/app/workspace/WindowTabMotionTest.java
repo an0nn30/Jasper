@@ -201,6 +201,36 @@ class WindowTabMotionTest {
         });
     }
 
+    /** Workspace plan 8c Rulings 9: a pane dropped on a new-tab place makes a tab that takes its place at once; an opened one still moves. */
+    @Test void aPaneDroppedAsANewTabTakesItsPlaceAtOnce() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.newTab(HOME);
+            owner.split(dev.jasper.app.layout.Side.RIGHT);
+            owner.setSize(800, 500); WindowTabsTest.layoutTree(owner);
+            var strip = owner.windowTabs();
+            assertThat(strip.motionRunning()).as("settled").isFalse();
+            owner.movePaneToNewTab(owner.selectedTab(), owner.parentTabCount());
+            assertThat(owner.parentTabCount()).isEqualTo(3);
+            assertThat(strip.motionRunning()).as("the new tab lands at once").isFalse();
+            owner.newTab(HOME);
+            assertThat(strip.motionRunning()).as("an opened tab still moves").isTrue();
+        });
+    }
+
+    /** Workspace plan 8c Rulings 9: Move Pane to New Tab, a command, still opens its tab with the motion. */
+    @Test void movePaneToNewTabStillMoves() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.newTab(HOME);
+            owner.split(dev.jasper.app.layout.Side.RIGHT);
+            owner.setSize(800, 500); WindowTabsTest.layoutTree(owner);
+            owner.moveToNewTab(owner.selectedTab());
+            assertThat(owner.parentTabCount()).isEqualTo(3);
+            assertThat(owner.windowTabs().motionRunning()).isTrue();
+        });
+    }
+
     private Fixture fixture() {
         var owner = content(launcher(new ArrayDeque<>())); owner.currentTerminal().rename("first"); owner.update();
         var clock = new AtomicLong(); var strip = new WindowTabs(owner.parentTabs().bar(), clock::get);
