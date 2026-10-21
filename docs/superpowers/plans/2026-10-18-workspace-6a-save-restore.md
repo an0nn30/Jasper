@@ -1,16 +1,18 @@
 # Workspace tabs 6a: saving and restoring the workspace Implementation Plan
 
-**Status: Tasks 1-5 executed (`30cc4ca35..3f273675e`), Tasks 6-10 executed on 2026-10-21** (`77d7b3033..987b30f63`, then
-the documentation commit), after the re-plan of 2026-10-21 on the tabs-and-panes model (plans 8a-8c); see
-`docs/STATUS.md`. Tasks 1-5 ran on the parent-tabs model, which had pane windows; their text below is history and is not
-run again. The pre-flight rulings F1-F21 of the earlier versions stand except where "Superseded" says otherwise.
-Deviations from the text of Tasks 6-10: (1) Task 8's review: a full window whose restore fails once its items are
-mounted is discarded unshown, not closed as one that opened (its emptying waits for its frame); one pane whose start
+**Status: Tasks 1-5 executed (`e51f2d14c..3f273675e`), Tasks 6-10 executed on 2026-10-21** (`77d7b3033..987b30f63`, then
+the documentation commit and its final-review fix wave), after the re-plan of 2026-10-21 on the tabs-and-panes model
+(plans 8a-8c); see `docs/STATUS.md`. Tasks 1-5 ran on the parent-tabs model, which had pane windows; their text below is
+history and is not run again. The pre-flight rulings F1-F21 of the earlier versions stand except where "Superseded" says
+otherwise. Deviations from the text of Tasks 6-10: (1) Task 8's review: a full window whose restore fails once its items
+are mounted is discarded unshown, not closed as one that opened (its emptying waits for its frame); one pane whose start
 fails leaves its tab's other panes starting; a restored window is sized as a new window is (the empty window's stand-in
 size goes); `keepAside` guards both set-asides; Rulings 43. (2) Task 9's review: the set-aside notice posts one EDT turn
 later (Rulings 44); the store takes a writer (`JasperApplication.workspaceWriter`) so tests pin that Quit waits for its
 save and that the store writes the Jasper home's `workspace.toml`. (3) 6b's text cites a few line numbers and a test
-count that moved; its anchors are unaffected.
+count that moved; its anchors are unaffected. (4) The final-review fix wave (one log recorder in `testsupport` and the
+warnings the tests now assert, three pins, a dead line, Javadoc, the restored-ids sentence and the hand-edit sentence
+corrected; see `docs/STATUS.md`).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -12,21 +12,19 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.terminals.TerminalEvent;
+import dev.jasper.app.testsupport.LogRecorder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
-import java.util.logging.Handler;
 import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,10 +38,20 @@ class WorkspaceSavingTest {
     private WorkspaceStore store;
     /** The saves changes scheduled; {@link #second()} runs them, as their second passing does. */
     private final Queue<Runnable> due = new ArrayDeque<>();
+    /** What the store logged during the test: its warnings are asserted here, never printed. */
+    private LogRecorder storeLog;
+
+    @BeforeEach void record() {
+        storeLog = LogRecorder.of(WorkspaceStore.class.getName());
+    }
 
     @AfterEach void cleanup() throws Exception {
-        if (windows != null) edt(() -> windows.manager.closeAll());
-        closeOwners();
+        try {
+            if (windows != null) edt(() -> windows.manager.closeAll());
+            closeOwners();
+        } finally {
+            storeLog.close();
+        }
     }
 
     private Path file() { return folder.resolve("workspace.toml"); }
@@ -163,6 +171,8 @@ class WorkspaceSavingTest {
             assertThat(store.held()).isTrue();
         });
         assertThat(file()).doesNotExist();
+        assertThat(storeLog.warnings()).as("each save that could not take the snapshot says so").isNotEmpty()
+            .containsOnly("Could not take the workspace's snapshot to save");
         windows.launch();
     }
 
@@ -257,47 +267,33 @@ class WorkspaceSavingTest {
      */
     @Test void aSnapshotThatThrowsMidMoveCostsOnlyThatSave() throws Exception {
         windows();
-        Logger logger = Logger.getLogger(WorkspaceStore.class.getName());
-        var records = new ArrayList<LogRecord>();
-        Handler handler = new Handler() {
-            @Override public void publish(LogRecord record) { records.add(record); }
-            @Override public void flush() { }
-            @Override public void close() { }
-        };
-        boolean parents = logger.getUseParentHandlers();
-        logger.setUseParentHandlers(false);
-        logger.addHandler(handler);
-        try {
-            edt(() -> {
-                MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
-                ChildWindow full = windows.manager.openTerminalWindow(folder).orElseThrow();
-                main.content().newTab(folder);
-                main.content().split(Side.RIGHT);
-                ParentTabId moving = main.content().activeParentTab();
-                Tab last = main.content().selectedTab();
-                second();
-                String before = text();
-                String[] during = new String[1];
-                // A move listener that saves at once, as the parent tab's second tab leaves: its first is in the full
-                // window already, under the parent tab's id, which the main window still holds.
-                last.onChanged(() -> {
-                    if (during[0] != null || !full.id().equals(last.window())) return;
-                    store.save();
-                    during[0] = text();
-                });
-                assertThat(windows.manager.moveParentTab(main.content(), moving, full.content(), 0)).isTrue();
-                assertThat(during[0]).as("the save mid-move wrote nothing").isEqualTo(before);
-                assertThat(store.held()).isFalse();
-                second();
-                assertThat(saved()).as("the next save writes the windows").isEqualTo(windows.manager.snapshot().orElseThrow());
-                assertThat(saved().children().getFirst().layout().parentTabs()).extracting(p -> p.id()).contains(moving);
+        edt(() -> {
+            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
+            ChildWindow full = windows.manager.openTerminalWindow(folder).orElseThrow();
+            main.content().newTab(folder);
+            main.content().split(Side.RIGHT);
+            ParentTabId moving = main.content().activeParentTab();
+            Tab last = main.content().selectedTab();
+            second();
+            String before = text();
+            String[] during = new String[1];
+            // A move listener that saves at once, as the parent tab's second tab leaves: its first is in the full
+            // window already, under the parent tab's id, which the main window still holds.
+            last.onChanged(() -> {
+                if (during[0] != null || !full.id().equals(last.window())) return;
+                store.save();
+                during[0] = text();
             });
-        } finally {
-            logger.removeHandler(handler);
-            logger.setUseParentHandlers(parents);
-        }
-        assertThat(records).as("logged, not swallowed").singleElement().satisfies(record -> {
+            assertThat(windows.manager.moveParentTab(main.content(), moving, full.content(), 0)).isTrue();
+            assertThat(during[0]).as("the save mid-move wrote nothing").isEqualTo(before);
+            assertThat(store.held()).isFalse();
+            second();
+            assertThat(saved()).as("the next save writes the windows").isEqualTo(windows.manager.snapshot().orElseThrow());
+            assertThat(saved().children().getFirst().layout().parentTabs()).extracting(p -> p.id()).contains(moving);
+        });
+        assertThat(storeLog.records()).as("logged, not swallowed").singleElement().satisfies(record -> {
             assertThat(record.getLevel()).isEqualTo(Level.WARNING);
+            assertThat(record.getMessage()).isEqualTo("Could not take the workspace's snapshot to save");
             assertThat(record.getThrown()).isInstanceOf(IllegalArgumentException.class);
         });
         windows.launch();

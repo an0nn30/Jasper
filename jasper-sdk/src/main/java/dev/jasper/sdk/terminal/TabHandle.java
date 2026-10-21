@@ -65,7 +65,9 @@ public interface TabHandle {
     void select();
 
     /**
-     * Whether the tab still exists.
+     * Whether the tab still exists. A tab Jasper closed with its windows comes back under the same id when they are
+     * restored, and a handle for that id is open again; a plugin that keeps handles drops one on
+     * {@link TerminalEvents#TAB_CLOSED}.
      *
      * @return true while it is open
      */

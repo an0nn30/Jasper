@@ -20,6 +20,7 @@ import dev.jasper.app.layout.TabId;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.terminals.PaneSnapshot;
+import dev.jasper.app.testsupport.LogRecorder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -42,10 +44,20 @@ class WorkspaceRestoreTest {
     private WorkspaceStore store;
     private final Queue<Path> setAside = new ArrayDeque<>();
     private final Queue<Runnable> due = new ArrayDeque<>();
+    /** What the codec logged while it read the bad files some tests feed the restore, recorded and never printed. */
+    private LogRecorder codecLog;
+
+    @BeforeEach void record() {
+        codecLog = LogRecorder.of(WorkspaceFile.class.getName());
+    }
 
     @AfterEach void cleanup() throws Exception {
-        if (windows != null) edt(() -> windows.manager.closeAll());
-        closeOwners();
+        try {
+            if (windows != null) edt(() -> windows.manager.closeAll());
+            closeOwners();
+        } finally {
+            codecLog.close();
+        }
     }
 
     private Path file() { return folder.resolve("workspace.toml"); }
@@ -183,6 +195,8 @@ class WorkspaceRestoreTest {
             assertThat(main.content().tabCount()).isEqualTo(1);
         });
         assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
+        assertThat(codecLog.warnings()).as("the codec logs what it set aside")
+            .containsExactly("Set aside the unreadable workspace state " + file() + " as " + folder.resolve("workspace.toml.bad"));
     }
 
     /** Tabs and panes spec 4 and 12: the main window saved as its empty workspace comes back empty, under its saved ids. */
@@ -253,6 +267,8 @@ class WorkspaceRestoreTest {
             assertThat(main.content().tabs()).extracting(Tab::id).containsExactly(first);
         });
         assertThat(setAside).as("told once, for the notice").containsExactly(folder.resolve("workspace.toml.bad"));
+        assertThat(codecLog.warnings()).as("the codec logs the copy it kept")
+            .contains("Kept a copy of the workspace state " + file() + " that dropped entries as " + folder.resolve("workspace.toml.bad"));
         windows.launch();
     }
 

@@ -55,8 +55,8 @@ public final class WorkspaceStore {
      * @param schedule runs a task on the EDT after a delay and returns how to cancel it
      * @param writer where writes run, off the EDT
      * @param setAside told where saved windows that could not be restored were kept ({@code workspace.toml.bad}): an
-     *     unreadable file {@link #load()} read, a file whose reader dropped a window or a tab entry, or a workspace
-     *     {@link #setAside(WorkspaceFile.Snapshot)} keeps
+     *     unreadable file {@link #load()} read, a file whose reader dropped a window, a tab or an item entry, or a
+     *     workspace {@link #setAside(WorkspaceFile.Snapshot)} keeps
      */
     public WorkspaceStore(Path file, Supplier<Optional<WorkspaceFile.Snapshot>> snapshot, BiFunction<Duration, Runnable, Runnable> schedule,
                           Executor writer, Consumer<Path> setAside) {
@@ -70,7 +70,7 @@ public final class WorkspaceStore {
     /**
      * What the main window restores, and saving starts again: what this process saved last, else the file. A file that
      * cannot be read was set aside ({@code workspace.toml.bad}) and {@code setAside} hears where; so does a file whose
-     * reader dropped a window or a tab entry, which the reader copied there (workspace plan 2).
+     * reader dropped a window, a tab or an item entry, which the reader copied there (workspace plan 2).
      *
      * @return the windows to restore, or that the main window opens fresh
      */

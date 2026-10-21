@@ -106,7 +106,8 @@ with no window and the menu bar item
 restore the main window first; closing the main window, Quit and going to the background close the child windows, then
 the main window. `MainWindow`'s constructor has one call site, `WindowManager.ensureMain`, which
 `verifyApplicationArchitecture` checks. `WorkspaceStore` (workspace) keeps the windows in `workspace.toml`
-(`persistence.WorkspaceFile`, which writes each window's tabs, their panes and each pane's item in the spec's words):
+(`persistence.WorkspaceFile`, which writes each window's tabs, their panes and each pane's item in the tabs and panes
+spec's words (window, tab, pane, item)):
 `WindowManager.snapshot()` builds what is saved, within a second of each change (a non-sliding timer on the EDT, the
 write on a virtual thread) and at once when a window closes; closing every window saves first and holds saving until
 the windows come back. `ensureMain` restores the main window, then its full windows, each with its place, tabs and

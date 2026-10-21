@@ -232,7 +232,6 @@ public final class WindowFrame {
 
     /** Disposes the frame, reporting nothing more: its window failed to open, or it is the rehearsal's. */
     public void discard() {
-        placement = null;
         dispose();
     }
 

@@ -678,8 +678,8 @@ usable display. A terminal comes back with its name and profile and a new shell 
 new shell starts when that directory was on another host or is gone; only the terminals of the tab each window shows
 start at once, the others when their tab first shows. Scrollback and running programs do not come back. A file Jasper
 cannot read is kept as `workspace.toml.bad`, and Jasper starts with one terminal tab and says so. This file is written
-by Jasper and is not meant to be edited; a hand edit of it while Jasper is running, or resident in the background, is
-ignored and later overwritten, so quit Jasper first.
+by Jasper and is not meant to be edited. Quit Jasper before changing it: once Jasper has opened a window it restores
+from what it last saved, not from the file, and a later save may replace the change.
 
 ## View modes
 

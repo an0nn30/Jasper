@@ -230,6 +230,7 @@ class WorkspaceFileReadTest {
                 {g3Item, "item = 3"},
                 {g3Item, "item = \"three\""},
                 {g3Item, "item = \"\""},
+                {g3Item, "note = \"no item key\""},
                 {"id = \"" + g3 + "\"", "id = \"pane-three\""}})
             assertThat(read(replaceOnce(text, change[0], change[1]))).as(change[1]).isEqualTo(mainOnly);
         // After the items, these nodes still join the full window's last tab.
@@ -396,10 +397,10 @@ class WorkspaceFileReadTest {
         assertThat(text.split(Pattern.quote(t2), -1)).as("its pane's item and the item's entry").hasSize(3);
         var cases = new LinkedHashMap<String, String>();
         cases.put("the first one's id", replaceOnce(text, "id = \"" + p2 + "\"\n", "id = \"" + parentTabId(1).value() + "\"\n"));
-        cases.put("the first one's group", text.replace(g2, groupId(1).value().toString()));
-        cases.put("the first one's tab", text.replace(t2, id(tab(1))));
+        cases.put("the first one's pane", text.replace(g2, groupId(1).value().toString()));
+        cases.put("the first one's item", text.replace(t2, id(tab(1))));
         for (var change : cases.entrySet())
-            assertThat(read(change.getValue())).as("the main window keeps its first parent tab when its second repeats %s", change.getKey())
+            assertThat(read(change.getValue())).as("the main window keeps its first tab when its second repeats %s", change.getKey())
                 .isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(1), single(1))))));
     }
 
@@ -410,10 +411,10 @@ class WorkspaceFileReadTest {
     @Test void aPaneNamingAListOfItemsDropsItsTabAlone() throws Exception {
         String text = WorkspaceFile.encode(parentTabs());
         String t2 = id(tab(2));
-        String twoTabs = replaceOnce(text, "item = \"" + t2 + "\"", "item = [\"" + t2 + "\", \"" + id(tab(9)) + "\"]");
-        assertThat(read(twoTabs)).as("the main window keeps its first tab, which shows")
+        String twoItems = replaceOnce(text, "item = \"" + t2 + "\"", "item = [\"" + t2 + "\", \"" + id(tab(9)) + "\"]");
+        assertThat(read(twoItems)).as("the main window keeps its first tab, which shows")
             .isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(1), single(1))))));
-        assertThat(Files.readString(bad())).isEqualTo(twoTabs);
+        assertThat(Files.readString(bad())).isEqualTo(twoItems);
     }
 
     @Test void aWindowHoldingAParentTabAnEarlierWindowHoldsIsDropped() throws Exception {
@@ -436,6 +437,7 @@ class WorkspaceFileReadTest {
             .replace("shown_tab = ", "active_parent_tab = ")
             .replace("active_pane = ", "active_group = ");
         assertThat(read(old)).isEqualTo(new Loaded.Fresh(Optional.of(bad())));
+        assertThat(Files.readString(bad())).as("kept as it was").isEqualTo(old);
     }
 
     @Test void anAbsentFileStartsFreshAndCreatesNothing() throws Exception {

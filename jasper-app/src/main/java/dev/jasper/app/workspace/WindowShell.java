@@ -37,7 +37,7 @@ public record WindowShell(Runnable show, Runnable toFront, Runnable dispose, Run
      * @param show shows the frame for the first time
      * @param toFront brings the frame to the front, restoring it when it is minimized
      * @param dispose disposes the frame, after its content has closed
-     * @param discard disposes the frame and remembers nothing
+     * @param discard disposes the frame and remembers nothing: a window that failed to open
      * @param window the frame, for parenting dialogs; null in a headless test
      * @param owns whether a component is the frame or sits inside it
      */

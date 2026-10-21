@@ -364,8 +364,9 @@ private static void installTerminalDemo(PluginContext context) {
 - `PaneInfo.shell` is the launcher's label (`zsh`, `fish`) or a provided session's title.
 - **A restored terminal may not have started (SDK 0.21.0).** Jasper restores its windows at start and whenever the main
   window opens again; a terminal whose tab Jasper has not shown yet reports `SessionState.NOT_STARTED` until its tab is
-  first shown: nothing runs there yet, and text sent to it is dropped. In the testkit `FakePluginHost.holdPane` holds a
-  pane the same way until its tab is shown.
+  first shown: nothing runs there yet, and text sent to it is dropped. A tab Jasper closed with its windows comes back
+  under the same id when they are restored; drop a handle on `TAB_CLOSED`. In the testkit `FakePluginHost.holdPane` holds
+  a local pane the same way until its tab is shown; a pane with a provided session is refused.
 - To run a command in a new tab, open one with `OpenRequest.local()` or `localIn(directory)` and
   `sendText` to the pane you get back; the tab runs the user's configured shell.
 - **Shell profiles (SDK 0.9.1).** `context.terminals().profiles()` lists the shells Jasper detected,

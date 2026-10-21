@@ -10,12 +10,11 @@ import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.persistence.WorkspaceFile;
+import dev.jasper.app.testsupport.LogRecorder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -27,6 +26,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Workspace tabs spec 13: saved within a second of a change, at once when a window closes, off the EDT, in order. */
 class WorkspaceStoreTest {
+    /** What the store logs when a snapshot cannot be taken. */
+    private static final String SNAPSHOT_FAILED = "Could not take the workspace's snapshot to save";
     @TempDir Path dir;
     /** The saves changes scheduled: each runs when the test says its second has passed. */
     private final Queue<Runnable> due = new ArrayDeque<>();
@@ -44,33 +45,22 @@ class WorkspaceStoreTest {
     private boolean refuseNext;
     private WorkspaceStore store;
     /** What the store logged during the test: its warnings are asserted here, never printed. */
-    private final List<java.util.logging.LogRecord> logged = new ArrayList<>();
-    private final java.util.logging.Logger log = java.util.logging.Logger.getLogger(WorkspaceStore.class.getName());
-    private final java.util.logging.Handler recorder = new java.util.logging.Handler() {
-        @Override public void publish(java.util.logging.LogRecord record) { synchronized (logged) { logged.add(record); } }
-        @Override public void flush() { }
-        @Override public void close() { }
-    };
-    private boolean parents;
+    private LogRecorder storeLog;
+    /** What the codec logged while it read the bad files some tests feed the store, recorded and never printed. */
+    private LogRecorder codecLog;
 
     @BeforeEach void record() {
-        parents = log.getUseParentHandlers();
-        log.setUseParentHandlers(false);
-        log.addHandler(recorder);
+        storeLog = LogRecorder.of(WorkspaceStore.class.getName());
+        codecLog = LogRecorder.of(WorkspaceFile.class.getName());
     }
 
     @AfterEach void stopRecording() {
-        log.removeHandler(recorder);
-        log.setUseParentHandlers(parents);
+        storeLog.close();
+        codecLog.close();
     }
 
-    /** The messages of the warnings the store logged, in order. */
-    private List<String> warnings() {
-        synchronized (logged) {
-            return logged.stream().filter(record -> record.getLevel() == java.util.logging.Level.WARNING)
-                .map(java.util.logging.LogRecord::getMessage).toList();
-        }
-    }
+    /** What the store logs when a write to the workspace file does not happen. */
+    private String saveFailed() { return "Could not save the workspace to " + file(); }
 
     private Path file() { return dir.resolve("workspace.toml"); }
 
@@ -153,6 +143,7 @@ class WorkspaceStoreTest {
         failing = new IllegalStateException("a window cannot say what it holds");
         edt(() -> store.save());
         assertThat(due).as("nor does a snapshot that fails take it").hasSize(1);
+        assertThat(storeLog.warnings()).as("the failed snapshot is logged").containsExactly(SNAPSHOT_FAILED);
         failing = null;
         current = Optional.of(workspace("/work"));
         edt(() -> due.remove().run());
@@ -199,6 +190,35 @@ class WorkspaceStoreTest {
         assertThat(due).hasSize(1);
     }
 
+    /**
+     * Workspace plan 6a Task 6's review: a hold while a save is scheduled and there is nothing to save yet leaves that save
+     * to fire as a no-op, and the next change after {@link WorkspaceStore#load()} schedules one that writes once.
+     */
+    @Test void aSaveScheduledBeforeAHoldFiresAsANoOpAndTheNextChangeAfterLoadSavesOnce() throws Exception {
+        store();
+        edt(() -> {
+            store.changed();
+            store.hold();
+        });
+        assertThat(store.held()).as("held although there was nothing to save").isTrue();
+        assertThat(due).as("nothing to save: the hold's save leaves the scheduled one").hasSize(1);
+        edt(() -> due.remove().run());
+        assertThat(writes).as("it fires as a no-op while held").isEmpty();
+        assertThat(file()).doesNotExist();
+        current = Optional.of(workspace("/work"));
+        edt(() -> {
+            store.load();
+            store.changed();
+        });
+        assertThat(due).as("the fired save left nothing pending: the next change schedules a save").hasSize(1);
+        edt(() -> due.remove().run());
+        assertThat(writes).as("which writes once").hasSize(1);
+        write();
+        assertThat(onDisk()).isEqualTo(current.get());
+        edt(() -> store.save());
+        assertThat(writes).as("the same windows are not written again").isEmpty();
+    }
+
     @Test void theFirstLoadReadsTheFileAndTellsWhatWasSetAside() throws Exception {
         store();
         edt(() -> assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Fresh(Optional.empty())));
@@ -213,6 +233,7 @@ class WorkspaceStoreTest {
         edt(() -> assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Fresh(Optional.of(bad))));
         assertThat(setAside).containsExactly(bad);
         assertThat(bad).exists();
+        assertThat(codecLog.warnings()).as("the codec logs what it set aside").containsExactly("Set aside the unreadable workspace state " + file() + " as " + bad);
     }
 
     @Test void aSnapshotThatFailsCostsOnlyThatSaveAndHoldingStillHolds() throws Exception {
@@ -224,6 +245,7 @@ class WorkspaceStoreTest {
             assertThat(store.held()).as("held although its save failed").isTrue();
         });
         assertThat(writes).isEmpty();
+        assertThat(storeLog.warnings()).as("the save's failed snapshot, and the one the hold's save takes").containsExactly(SNAPSHOT_FAILED, SNAPSHOT_FAILED);
         failing = null;
         current = Optional.of(workspace("/work"));
         edt(() -> { store.load(); store.save(); });
@@ -237,7 +259,7 @@ class WorkspaceStoreTest {
         breaking = new AssertionError("a layout that breaks its own rule");
         edt(() -> store.save());
         assertThat(writes).isEmpty();
-        assertThat(warnings()).containsExactly("Could not take the workspace's snapshot to save");
+        assertThat(storeLog.warnings()).containsExactly(SNAPSHOT_FAILED);
         breaking = null;
         current = Optional.of(workspace("/work"));
         edt(() -> store.save());
@@ -252,10 +274,8 @@ class WorkspaceStoreTest {
         current = Optional.of(workspace("/work"));
         edt(() -> store.save());
         assertThat(writes).as("refused").isEmpty();
-        assertThat(warnings()).as("logged with the file it was for").containsExactly("Could not save the workspace to " + file());
-        synchronized (logged) {
-            assertThat(logged.getLast().getThrown()).as("with why").hasRootCauseInstanceOf(java.util.concurrent.RejectedExecutionException.class);
-        }
+        assertThat(storeLog.warnings()).as("logged with the file it was for").containsExactly(saveFailed());
+        assertThat(storeLog.records().getLast().getThrown()).as("with why").hasRootCauseInstanceOf(java.util.concurrent.RejectedExecutionException.class);
     }
 
     @Test void aWriteThatFailsOrIsRefusedNeverStopsTheNextOne() throws Exception {
@@ -264,17 +284,21 @@ class WorkspaceStoreTest {
         current = Optional.of(workspace("/first"));
         edt(() -> store.save());
         assertThat(writes).as("refused").isEmpty();
+        assertThat(storeLog.warnings()).as("the refusal is logged").containsExactly(saveFailed());
         current = Optional.of(workspace("/second"));
         edt(() -> store.save());
         write();
         assertThat(store.written()).as("never completed exceptionally").isCompletedWithValue(null);
         assertThat(onDisk()).isEqualTo(current.get());
+        assertThat(storeLog.warnings()).as("a write that worked logs nothing").hasSize(1);
         Files.delete(file());
         Files.createDirectory(file());
         current = Optional.of(workspace("/third"));
         edt(() -> store.save());
         write();
-        assertThat(file()).as("a write that failed is logged").isDirectory();
+        assertThat(file()).as("a write that failed").isDirectory();
+        assertThat(storeLog.warnings()).as("is logged with the file it was for").containsExactly(saveFailed(), saveFailed());
+        assertThat(storeLog.records().getLast().getThrown()).as("with why").isInstanceOf(java.io.IOException.class);
         Files.delete(file());
         current = Optional.of(workspace("/fourth"));
         edt(() -> store.save());
@@ -293,6 +317,7 @@ class WorkspaceStoreTest {
         edt(() -> store.save());
         write();
         assertThat(file()).as("that write failed").isDirectory();
+        assertThat(storeLog.warnings()).as("the refusal, and the failed write").containsExactly(saveFailed(), saveFailed());
         Files.delete(file());
         edt(() -> store.save());
         assertThat(writes).as("the same windows, still unsaved, are written again").hasSize(1);
@@ -337,6 +362,7 @@ class WorkspaceStoreTest {
         write();
         assertThat(setAside).as("told once, for the notice").containsExactly(bad);
         assertThat(Files.readString(bad)).as("the original text, with the window the reader dropped").isEqualTo(original);
+        assertThat(codecLog.warnings()).as("the codec logs the copy it kept").contains("Kept a copy of the workspace state " + file() + " that dropped entries as " + bad);
     }
 
     @Test void theStoreBelongsToTheEdt() throws Exception {

@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 6a: saving and restoring the workspace — 2026-10-21** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `30cc4ca35..3f273675e` on the parent-tabs model, then `77d7b3033..987b30f63` and
-this documentation commit; [plan](superpowers/plans/2026-10-18-workspace-6a-save-restore.md),
+`.claude/worktrees/workspace-tabs`, `e51f2d14c..3f273675e` on the parent-tabs model, then `77d7b3033..987b30f63`,
+this documentation commit and its final-review fix wave; [plan](superpowers/plans/2026-10-18-workspace-6a-save-restore.md),
 [spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). Jasper saves its windows to
 `<home>/workspace.toml` (`workspace.WorkspaceStore` over plan 2's `WorkspaceFile`): one second after the first change (a
 timer that does not slide), at once when a window closes, and before closing every window (closing the main window,
@@ -74,34 +74,44 @@ its tab's other panes starting; a restored window is sized as a new window is (t
 `keepAside` guards both set-asides; Rulings 43. (2) Task 9's review: the set-aside notice posts one EDT turn later
 (Rulings 44); the store takes a writer (`JasperApplication.workspaceWriter`) so tests pin that Quit waits for its save
 and that the store writes the Jasper home's `workspace.toml`. (3) 6b's text cites a few line numbers and a test count
-that moved; its anchors are unaffected. Left for plan 6b: plugins' items (restore state, restorers, placeholders) within
-SDK 0.21.0, restored with their saved ids straight into their windows and tabs, never through `TabRegistry.open`, and
-never saving Jasper's own items (`TabRegistry.APP_OWNER`); `ContentTab.window()` names a never-open window for an item
-that waits for the main window, which now waits through every full window's restore; Remote's restored `NOT_STARTED`
-panes; `AppContractTest`'s `emptyWindow` and panel routing and `FakeWorkspace.closeWindow` nulling `Panel.instance`; THD
-Sourcing Crypto rebuilt after 6b, against 0.21.0. Left for 6a's final fix wave: Task 1's re-review items 1 and 2, Task
-2's review Minors 2 and 3, Task 4's review Minors 5 to 7, Task 6's review Minors 1, 2 and 5 (one log recorder in
-`testsupport` that ends the store's and the codec's stderr warnings and lets the tests assert them; a hold with a
-scheduled save and nothing to save), Task 7's review Minors 1 to 4 (a pane with no item key; the `.bad` bytes of the
-old-words test; wording; the writer refusing a file over the reader's size limit, unless 6b's window fitting already
-keeps every write under it) and Task 8's review Minors 5 to 7 (redundant announcements inside `atomically`, harmless;
-the duplication of `restoreChild` and `openChild`, plan-mandated; test gaps and noise). Follow-up: AOT training trains
-only the fresh path (its home is deleted each time), so the restore classes are untrained; seeding the training home
-with a one-tab `workspace.toml`, and deleting it between `StartupRuns` benchmark runs, is left for the start-up work.
-The rehearsal never reaching the store is pinned by the code's structure (it never calls `WindowManager`); headless,
-`warmUp` rehearses nothing. `./gradlew check --continue`: **12,157 tests, 0 failures, 0 errors, 25 skipped, BUILD
-SUCCESSFUL** (app 4,168, Editor 4,920, UI 930, terminal 460, testkit 213, Buddy 151, SDK 95, the other plugins 1,220).
-GUI checks for the user: with two tabs in the main window (one split), a full window of two tabs, quit and start again:
-every window comes back where it was, the tab each showed shown, with its panes, their sizes and the active one, the tab
-strip as before in each look (Enterprise always shows it), and only the shown tab's shells start; a hidden tab's shells
-start when it shows; a renamed tab keeps its name; maximize a window, quit, start: it comes back maximized; unplug a
-display between runs: every window lands on the remaining one; close a full window, quit, start: it stays closed; close
-every tab of the main window, quit, start: the empty workspace comes back; corrupt `workspace.toml`, start: one tab and
-the notice, the file kept as `workspace.toml.bad`; with residency, close the main window and reopen from the Dock: the
-same windows; with Jasper resident in the background (the login item) and a corrupt `workspace.toml`, reopen from the
-Dock: the notice shows as a card; under Enterprise, a restored terminal tab not yet shown has the idle dot on its strip
-entry (a shell that ended has the same; its entry tells assistive technology of no running session) until it is first
-shown, when the dot turns to running, and the status bar names only the shown tab's active pane. Not merged, not pushed.
+that moved; its anchors are unaffected. (4) The final-review fix wave: one log recorder in `testsupport` (`LogRecorder`)
+ends the store's and the codec's stderr warnings in the store and restore tests, and the tests assert the warnings (a
+write that fails or that the writer refuses says "Could not save the workspace to <file>"); a hold with a scheduled save
+and nothing to save, a pane with no `item` key and the `.bad` bytes of a file in the old words are pinned;
+`WindowFrame.discard` loses its dead `placement = null`; the Javadoc of `WindowShell` and `WorkspaceStore` and a few
+test names and messages say what the code does; the authoring guide and `TabHandle.isOpen` say that a tab Jasper closed
+with its windows comes back under the same id when they are restored, so a plugin drops a handle on `TAB_CLOSED`; and
+`configuration.md`'s hand-edit sentence is corrected (once Jasper has opened a window it restores from what it last
+saved, not from the file). Closed with no change, as the review ruled: Task 1's re-review item 2, Task 4's Minors 5 to
+7, the size half of Task 7's Minor 4 (6b's `WindowManager.fitted` keeps every write under the reader's limit), Task 8's
+Minors 5 to 7 (the focus half of 7 is a GUI check below) and Task 9's Minor 3; Task 1's re-review item 1 moves to 6b.
+Left for plan 6b: plugins' items (restore state, restorers, placeholders) within SDK 0.21.0, restored with their saved
+ids straight into their windows and tabs, never through `TabRegistry.open`, and never saving Jasper's own items
+(`TabRegistry.APP_OWNER`); `ContentTab.window()` names a never-open window for an item that waits for the main window,
+which now waits through every full window's restore; Remote's restored `NOT_STARTED` panes; `AppContractTest`'s
+`emptyWindow` and panel routing and `FakeWorkspace.closeWindow` nulling `Panel.instance`; the guides' "what each pane
+holds" sentences are completed by 6b's Task 6, since until then only terminals come back; `RestoreState` refuses a key
+holding a lone surrogate; a plugin's item in a file this build did not write is dropped without a `.bad` copy until 6b's
+placeholders; THD Sourcing Crypto rebuilt after 6b, against 0.21.0. So 6a merges only together with 6b. Follow-up: AOT
+training trains only the fresh path (its home is deleted each time), so the restore classes are untrained; seeding the
+training home with a one-tab `workspace.toml`, and deleting it between `StartupRuns` benchmark runs, is left for the
+start-up work. The rehearsal never reaching the store is pinned by the code's structure (it never calls
+`WindowManager`); headless, `warmUp` rehearses nothing. `./gradlew check --continue`: **12,162 tests, 0 failures, 0
+errors, 25 skipped, BUILD SUCCESSFUL** (app 4,173, Editor 4,920, UI 930, terminal 460, testkit 213, Buddy 151, SDK 95,
+the other plugins 1,220) (excludes the external example, which `check` does not run). GUI checks for the user: with two
+tabs in the main window (one split), a full window of two tabs, quit and start again: every window comes back where it
+was, the tab each showed shown, with its panes, their sizes and the active one, the tab strip as before in each look
+(Enterprise always shows it), and only the shown tab's shells start; a hidden tab's shells start when it shows; a
+renamed tab keeps its name; maximize a window, quit, start: it comes back maximized; unplug a display between runs:
+every window lands on the remaining one; close a full window, quit, start: it stays closed; close every tab of the main
+window, quit, start: the empty workspace comes back; corrupt `workspace.toml`, start: one tab and the notice, the file
+kept as `workspace.toml.bad`; with residency, close the main window and reopen from the Dock: the same windows; corrupt
+`workspace.toml` before the login-item process starts (a Jasper quit to the background restores from its own last save
+and shows no notice), then reopen from the Dock: the notice shows as a card; after a restore, the keyboard focus is in
+the active pane of the main window's shown tab, and typing reaches the shell once it starts; under Enterprise, a
+restored terminal tab not yet shown has the idle dot on its strip entry (a shell that ended has the same; its entry
+tells assistive technology of no running session) until it is first shown, when the dot turns to running, and the status
+bar names only the shown tab's active pane. Not merged, not pushed.
 
 **Workspace tabs, plan 8c: moving panes — 2026-10-20** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `107b7eb55..5ec032b5b`, then the documentation commit and its final-review fix wave;
