@@ -184,17 +184,17 @@ final class FakeTerminals implements Terminals {
         context.requireOpen();
         if (!knownProfile(request)) return Optional.empty();
         return workspace.pane(target.id()).map(model -> {
-            // A split is a terminal tab of its own in a new group after the target's, as in the application (spec 9.4).
+            // A split is a terminal tab of its own in a new pane right after the target, in its tab (tabs and panes spec 4).
             FakeWorkspace.Window window = model.tab.window;
             FakeWorkspace.Pane pane = switch (request) {
                 case OpenRequest.Local local -> {
                     workspace.openRequests.add("split|" + model.id + "|" + direction + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-")
                         + profile(local) + program(local));
-                    yield workspace.openTerminal(window, "opened", openedInfo(local), model.tab.group);
+                    yield workspace.openTerminal(window, "opened", openedInfo(local), model.tab);
                 }
                 case OpenRequest.Session session -> {
                     workspace.openRequests.add("session-split|" + model.id + "|" + direction + "|" + session.spec().title());
-                    FakeWorkspace.Pane created = workspace.openTerminal(window, session.spec().title(), sessionInfo(session), model.tab.group);
+                    FakeWorkspace.Pane created = workspace.openTerminal(window, session.spec().title(), sessionInfo(session), model.tab);
                     workspace.sessions.connect(context, created, session.spec());
                     yield created;
                 }

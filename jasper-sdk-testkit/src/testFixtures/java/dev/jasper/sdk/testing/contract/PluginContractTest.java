@@ -1648,8 +1648,11 @@ public abstract class PluginContractTest {
         });
     }
 
-    /** Workspace tabs spec 14's TabPlacement: the end of the active group, a new group after it, or a new child window. */
-    @Test void aPlacementPutsANewContentTabInTheActiveGroupBesideItOrInANewWindow() {
+    /**
+     * Tabs and panes spec 11's TabPlacement: NEW_TAB opens a new tab at the end of the window's strip, SPLIT_RIGHT and
+     * SPLIT_DOWN a new pane right after the focused pane, in its tab, and NEW_WINDOW a new child window.
+     */
+    @Test void aPlacementOpensANewTabANewPaneBesideTheFocusedOneOrANewWindow() {
         UUID main = h.addTerminalWindow(), left = h.addTerminalTab(main, "left");
         UUID pane = h.addTerminalPane(left, "zsh", Path.of("/"));
         UUID right = h.addTerminalTab(main, "right");
@@ -1662,50 +1665,82 @@ public abstract class PluginContractTest {
                 context.events().subscribe(topic, event -> heard.add(java.util.Map.entry(topic, event)));
         });
         var below = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
-        var active = new AtomicReference<Optional<UUID>>();
+        var placed = new AtomicReference<List<UUID>>();
         h.ui(() -> {
             var terminals = alpha.get().terminals();
             var windows = alpha.get().windows();
             var owner = terminals.window(main).orElseThrow();
             UUID split = terminals.split(terminals.pane(pane).orElseThrow(), Direction.RIGHT, OpenRequest.local()).orElseThrow().tab().id();
-            terminals.tab(left).orElseThrow().select();
             windows.openTab(new dev.jasper.sdk.ui.ContentSpec("here", "Here"), owner, kitView(alpha.get()));
-            var placedBelow = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("below", "Below"), owner, kitView(alpha.get()),
-                dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN);
-            List<UUID> ids = owner.tabs().stream().map(TabHandle::id).toList();
-            assertThat(ids).hasSize(5);
-            assertThat(ids.subList(0, 2)).as("the active group's tabs come first").containsExactly(left, right);
-            assertThat(ids.getLast()).as("the split's group stays last").isEqualTo(split);
-            UUID here = ids.get(2), placed = ids.get(3);
-            assertThat(owner.activeTab().map(TabHandle::id)).as("a placed tab opens selected").contains(placed);
-            windows.openTab(new dev.jasper.sdk.ui.ContentSpec("next", "Next"), owner, kitView(alpha.get()));
-            assertThat(owner.tabs().stream().map(TabHandle::id).toList()).as("the new group is the active group")
-                .hasSize(6).startsWith(left, right, here, placed).endsWith(split);
-            active.set(owner.activeTab().map(TabHandle::id));
-            below.set(placedBelow);
+            UUID here = owner.activeTab().orElseThrow().id();
+            below.set(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("below", "Below"), owner, kitView(alpha.get()),
+                dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN));
+            UUID under = owner.activeTab().orElseThrow().id();
+            terminals.tab(left).orElseThrow().select();
+            windows.openTab(new dev.jasper.sdk.ui.ContentSpec("beside", "Beside"), owner, kitView(alpha.get()),
+                dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+            UUID beside = owner.activeTab().orElseThrow().id();
+            windows.openTab(new dev.jasper.sdk.ui.ContentSpec("next", "Next"), null, kitView(alpha.get()),
+                dev.jasper.sdk.ui.TabPlacement.NEW_TAB);
+            UUID next = owner.activeTab().orElseThrow().id();
+            placed.set(List.of(left, beside, split, right, here, under, next));
+            assertThat(owner.tabs()).extracting(TabHandle::id).as("tab by tab, then pane by pane").containsExactlyElementsOf(placed.get());
         });
+        List<UUID> ids = placed.get();
+        assertThat(h.windowTabs(main)).as("a new tab at the end of the strip, a new pane right after the focused one").containsExactly(
+            List.of(ids.get(0), ids.get(1), ids.get(2)), List.of(ids.get(3)), List.of(ids.get(4), ids.get(5)), List.of(ids.get(6)));
         h.flush();
         heard.clear();
         var away = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
         h.ui(() -> away.set(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("away", "Away"),
             alpha.get().terminals().window(main).orElseThrow(), kitView(alpha.get()), dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW)));
         h.flush();
-        var placed = new AtomicReference<List<UUID>>();
-        h.ui(() -> placed.set(List.of(away.get().window().id(), away.get().window().tabs().getFirst().id())));
+        var child = new AtomicReference<List<UUID>>();
+        h.ui(() -> child.set(List.of(away.get().window().id(), away.get().window().tabs().getFirst().id())));
         assertThat(heard).as("the new child window opens, then the tab, selected in it").containsExactly(
-            java.util.Map.entry(TerminalEvents.WINDOW_OPENED, new TerminalEvents.WindowEvent(placed.get().get(0))),
-            java.util.Map.entry(TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(placed.get().get(0), placed.get().get(1))),
-            java.util.Map.entry(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(placed.get().get(0), placed.get().get(1))));
+            java.util.Map.entry(TerminalEvents.WINDOW_OPENED, new TerminalEvents.WindowEvent(child.get().get(0))),
+            java.util.Map.entry(TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(child.get().get(0), child.get().get(1))),
+            java.util.Map.entry(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(child.get().get(0), child.get().get(1))));
+        assertThat(h.windowTabs(child.get().get(0))).containsExactly(List.of(child.get().get(1)));
         h.ui(() -> {
             var owner = alpha.get().terminals().window(main).orElseThrow();
             assertThat(away.get().window().isMain()).as("a new child window").isFalse();
-            assertThat(away.get().window().tabs()).hasSize(1);
-            assertThat(owner.tabs()).as("the owner's window is not touched").hasSize(6);
-            assertThat(owner.activeTab().map(TabHandle::id)).as("nor its active tab").isEqualTo(active.get());
+            assertThat(owner.tabs()).as("the owner's window is not touched").hasSize(7);
+            assertThat(owner.activeTab().map(TabHandle::id)).as("nor its active tab").contains(ids.get(6));
             assertThat(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("below", "Again"), null, kitView(alpha.get()),
                 dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW)).as("an open key is selected where it is").isSameAs(below.get());
             assertThat(below.get().window().id()).isEqualTo(main);
         });
+    }
+
+    /**
+     * Tabs and panes spec 4 and 13: Terminals.openTab opens a new tab, a split a new pane right after its target, in its
+     * tab, and a tab moved in arrives as a tab of its own at the end of the strip.
+     */
+    @Test void openTabMakesANewTabASplitAPaneOfItsTargetsTabAndAMovedTabATabOfItsOwn() {
+        UUID main = h.addTerminalWindow(), first = h.addTerminalTab(main, "first");
+        UUID pane = h.addTerminalPane(first, "zsh", Path.of("/"));
+        UUID other = h.addTerminalWindow(), stays = h.addTerminalTab(other, "stays");
+        h.addTerminalPane(stays, "zsh", Path.of("/"));
+        UUID moving = h.addTerminalTab(other, "moving");
+        h.addTerminalPane(moving, "make", Path.of("/src"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), alpha::set);
+        var opened = new AtomicReference<List<UUID>>();
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            UUID down = terminals.split(terminals.pane(pane).orElseThrow(), Direction.DOWN, OpenRequest.local()).orElseThrow().tab().id();
+            UUID right = terminals.split(terminals.pane(pane).orElseThrow(), Direction.RIGHT, OpenRequest.local()).orElseThrow().tab().id();
+            UUID tab = terminals.openTab(terminals.window(main).orElseThrow(), OpenRequest.local()).orElseThrow().tab().id();
+            opened.set(List.of(down, right, tab));
+        });
+        UUID down = opened.get().get(0), right = opened.get().get(1), tab = opened.get().get(2);
+        assertThat(h.windowTabs(main)).as("splits in their target's tab, right after it; openTab a tab of its own")
+            .containsExactly(List.of(first, right, down), List.of(tab));
+        h.moveTab(moving, main);
+        assertThat(h.windowTabs(main)).as("a moved tab arrives as a tab of its own")
+            .containsExactly(List.of(first, right, down), List.of(tab), List.of(moving));
+        assertThat(h.windowTabs(other)).containsExactly(List.of(stays));
     }
 
     @Test void openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane() {

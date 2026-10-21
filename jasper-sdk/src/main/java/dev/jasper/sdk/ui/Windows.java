@@ -16,7 +16,7 @@ public interface Windows {
      * @param anchor attachment authority from this host @return initially hidden popup */
     PluginPopover popover(UiAnchor anchor);
     /**
-     * Opens an owned view as a content tab in a new tab of the owner's window ({@link TabPlacement#ACTIVE_GROUP}); moving
+     * Opens an owned view as a content tab in a new tab of the owner's window ({@link TabPlacement#NEW_TAB}); moving
      * retains it, final closure disposes it.
      *
      * @param spec the tab's key and title
@@ -26,7 +26,7 @@ public interface Windows {
      * @return the new tab, or the open tab with the same key, selected
      */
     default ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content) {
-        return openTab(spec, owner, content, TabPlacement.ACTIVE_GROUP);
+        return openTab(spec, owner, content, TabPlacement.NEW_TAB);
     }
 
     /**

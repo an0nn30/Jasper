@@ -532,7 +532,8 @@ final class FakeUi {
                 var shown = placement == dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW ? host.workspace.addWindow()
                     : host.workspace.window(((WindowHandle) owner).id()).orElseThrow();
                 if (placement == dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW) owner = context.terminals.windowHandle(shown.id);
-                var beside = placement == dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT || placement == dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN ? shown.active() : null;
+                // A split placement opens a new pane right after the window's selected item; NEW_TAB opens a new tab.
+                var beside = placement == dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT || placement == dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN ? shown.selected : null;
                 var entry=new FakeContent(FakeUi.this,spec,owner,component,host.workspace.addTab(shown,dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT,spec.title(),beside));
                 contents.add(entry);entry.select();
                 return entry;

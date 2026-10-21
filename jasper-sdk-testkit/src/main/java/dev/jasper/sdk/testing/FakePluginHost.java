@@ -1182,7 +1182,8 @@ public final class FakePluginHost implements AutoCloseable {
     public UUID addTerminalWindow() { return workspace.addWindow().id; }
 
     /**
-     * Adds and selects a terminal tab; {@link #addTerminalPane} gives it its one pane.
+     * Adds and selects a terminal tab, in a new tab of its own at the end of the window's strip (tabs and panes spec 4);
+     * {@link #addTerminalPane} gives it its one pane.
      *
      * @param windowId an open window
      * @param title the tab's title
@@ -1225,7 +1226,8 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Adds and selects a content tab, as the application or another plugin shows a document or a tool view: a tab with no
-     * pane, which {@code TabHandle.kind()} reports as {@code CONTENT}.
+     * terminal pane, which {@code TabHandle.kind()} reports as {@code CONTENT}, in a new tab of its own at the end of the
+     * window's strip.
      *
      * @param windowId an open window
      * @param title the tab's title
@@ -1238,7 +1240,20 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Moves a tab the test added to another open window, where it is selected, as dragging it there does: a terminal
+     * A window's tabs as its strip shows them (tabs and panes spec 4), each tab's items pane by pane: the ids
+     * {@code TabHandle.id()} reports.
+     *
+     * @param windowId an open window
+     * @return the tabs in strip order, each a list of item ids
+     * @since 0.21.0
+     */
+    public List<List<UUID>> windowTabs(UUID windowId) {
+        return workspace.tabsOf(workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No such window: " + windowId)));
+    }
+
+    /**
+     * Moves a tab the test added to a new tab at the end of another open window's strip, where it is selected, as
+     * dragging it there does: a terminal
      * tab's pane keeps its id and session with no {@code PANE_OPENED} or {@code PANE_CLOSED}, the move is announced on
      * {@code TAB_MOVED}, and a child window left with no tab closes after it. A plugin moves its own content tab with
      * {@code ContentTab.moveToNewWindow} or {@code moveToMainWindow}.

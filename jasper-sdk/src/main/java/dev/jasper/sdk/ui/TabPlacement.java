@@ -2,17 +2,17 @@ package dev.jasper.sdk.ui;
 
 /**
  * Where {@link Windows#openTab(ContentSpec, dev.jasper.sdk.WindowOwner, UiView, TabPlacement)} puts a new content tab
- * (workspace tabs spec 14). A tab already open for the same key is selected where it is, whatever the placement.
+ * (tabs and panes spec 11). A content tab is an item, the one a pane shows: a window holds tabs, and each tab holds
+ * panes. A tab already open for the same key is selected where it is, whatever the placement.
  *
  * @since 0.20.0
  */
 public enum TabPlacement {
     /**
      * In a new tab of the owner's window, or of the main window when there is no owner: at the end of its tab strip and
-     * shown, the main window's empty workspace taking it in its place. A content tab is an item, and each pane of a tab
-     * holds one.
+     * shown, the main window's empty workspace taking it in its place.
      */
-    ACTIVE_GROUP,
+    NEW_TAB,
     /** In a new pane to the right of the focused pane of that window's shown tab. */
     SPLIT_RIGHT,
     /** In a new pane below the focused pane of that window's shown tab. */

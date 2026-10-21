@@ -409,6 +409,7 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public void moveTab(UUID tabId, UUID windowId) { onEdt(() -> terminalFixture.moveTab(tabId, windowId)); }
             @Override public void closeTab(UUID tabId) { onEdt(() -> terminalFixture.closeTab(tabId)); }
+            @Override public List<List<UUID>> windowTabs(UUID windowId) { return onEdtValue(() -> terminalFixture.windowTabs(windowId)); }
             @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }
             @Override public UUID addTerminalPane(UUID tabId, String title, java.nio.file.Path directory) {
                 return onEdtValue(() -> terminalFixture.addPane(tabId, title, directory));

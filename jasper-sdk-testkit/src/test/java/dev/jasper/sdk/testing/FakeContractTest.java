@@ -79,6 +79,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public java.util.UUID addContentTab(java.util.UUID windowId, String title) { return host.addContentTab(windowId, title); }
             @Override public void moveTab(java.util.UUID tabId, java.util.UUID windowId) { host.moveTab(tabId, windowId); }
             @Override public void closeTab(java.util.UUID tabId) { host.closeTab(tabId); }
+            @Override public List<List<java.util.UUID>> windowTabs(java.util.UUID windowId) { return host.windowTabs(windowId); }
             @Override public List<String> scopes() { return host.scopes(); }
             @Override public String scopePresentation(String scopeId) { return host.scopePresentation(scopeId); }
             @Override public List<String> fileSources() { return host.fileSources(); }

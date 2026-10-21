@@ -307,7 +307,7 @@ public final class EditorWindow {
     public void openLocalFiles(List<Path> files) { openLocalFiles(files, owner()); }
     public void openLocalFiles(List<Path> files, WindowOwner owner) { for (Path file : files) openLocal(file, owner); }
     public void newUntitled() { newUntitled(owner()); }
-    public void newUntitled(WindowOwner owner) { newUntitled(owner, dev.jasper.sdk.ui.TabPlacement.ACTIVE_GROUP); }
+    public void newUntitled(WindowOwner owner) { newUntitled(owner, dev.jasper.sdk.ui.TabPlacement.NEW_TAB); }
     /** A new untitled document whose tab opens where {@code placement} puts it: New Editor Window's is a new child window. */
     public void newUntitled(WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
         origin = owner;
@@ -742,7 +742,7 @@ public final class EditorWindow {
     }
 
     private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef) {
-        add(session, ownerRef, dev.jasper.sdk.ui.TabPlacement.ACTIVE_GROUP);
+        add(session, ownerRef, dev.jasper.sdk.ui.TabPlacement.NEW_TAB);
     }
 
     private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef,

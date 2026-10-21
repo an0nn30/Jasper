@@ -660,7 +660,7 @@ final class HostedUi {
                     else if (!terminals.ownsWindow(handle)) throw new IllegalArgumentException("Foreign workspace owner");
                 }
                 var entry = model.tabs().open(pluginId, spec.key(), spec.title(), window, component, switch (placement) {
-                    case ACTIVE_GROUP -> dev.jasper.app.contributions.TabRegistry.Placement.NEW_TAB;
+                    case NEW_TAB -> dev.jasper.app.contributions.TabRegistry.Placement.NEW_TAB;
                     case SPLIT_RIGHT -> dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT;
                     case SPLIT_DOWN -> dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_DOWN;
                     case NEW_WINDOW -> dev.jasper.app.contributions.TabRegistry.Placement.NEW_WINDOW;

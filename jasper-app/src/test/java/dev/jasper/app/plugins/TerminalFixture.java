@@ -26,22 +26,23 @@ import dev.jasper.terminal.session.AttachedConnection;
 
 /**
  * A scripted workspace behind a real {@link TerminalRegistry}: what windows do, without windows. A terminal tab holds one
- * pane, a split opens a terminal tab of its own in a new group after the pane's, focusing a pane selects its tab, and a
- * pane closes with its tab (workspace tabs spec 9.4). A window's tabs sit in groups, listed group by group, as the
- * testkit's fake keeps them: a new tab opens at the end of the active group, closing a group's selected tab selects the
- * tab the group showed before it, and closing a group's last tab makes the group used before it active. A main window
+ * pane, a split opens a terminal tab of its own in a new pane right after the pane's, in its tab, focusing a pane
+ * selects its tab, and a pane closes with its tab. A window holds tabs, each holding panes, as the testkit's fake keeps
+ * them (tabs and panes spec 4; the registry calls each pane's item a tab): its items are listed tab by tab, then pane
+ * by pane, whatever opens without a pane opens in a new tab at the end of the strip, closing the selected item selects
+ * the item its tab showed before it, and closing a tab's last pane shows the tab shown before it. A main window
  * ({@link #addMainWindow}) stays open when its last tab leaves; any other window closes with its last tab (spec 6.4). A
  * plugin's tab is a content tab of its window, and a tab moved to another window is reported as a move. EDT only.
  */
 final class TerminalFixture {
     private static final class Pane { UUID id = UUID.randomUUID(); Tab tab; String title; Path directory; String selection; List<String> sent = new ArrayList<>(); dev.jasper.app.terminals.RemoteLocation remote;
         SessionRequest request; SessionAttempt attempt; AttachedConnection connection; boolean everAttached; String status = ""; String state = ""; String shell = "zsh"; }
-    /** One group of a window's tabs; {@code recent} holds them most recently selected first. */
+    /** One tab of a window's strip: its items, one per pane; {@code recent} holds them most recently selected first. */
     private static final class Group { final List<Tab> recent = new ArrayList<>(); }
     private static final class Tab { UUID id = UUID.randomUUID(); Window window; Group group; TabEntry.Kind kind = TabEntry.Kind.TERMINAL; Supplier<String> title; Pane pane; }
     private static final class Window {
         UUID id = UUID.randomUUID(); boolean main; List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; Runnable closed = () -> { };
-        /** The groups that hold tabs, most recently active first: the first is the active group. */
+        /** The window's tabs, most recently shown first: the first is the shown tab. */
         final List<Group> recent = new ArrayList<>();
         Group active() { return recent.isEmpty() ? null : recent.getFirst(); }
     }
@@ -68,18 +69,18 @@ final class TerminalFixture {
             text -> { if (!held(pane)) pane.sent.add("paste:" + text); },
             () -> Optional.ofNullable(pane.selection), () -> focusPane(pane.id),
             (side, spec) -> {
-                // A split is a terminal tab of its own, in a new group beside the pane's group (spec 9.4).
+                // A split is a terminal tab of its own, in a new pane right after the pane's, in its tab (tabs and panes spec 4).
                 UUID window = pane.tab.window.id;
                 UUID created = switch (spec) {
                     case OpenSpec.Local local -> {
                         opened.add("split|" + pane.id + "|" + side + "|" + local.directory().map(Path::toString).orElse("-")
                             + local.profile().map(profile -> "|" + profile).orElse("")
                             + local.program().map(program -> "|run:" + String.join(" ", program)).orElse(""));
-                        yield openTerminal(window, "split", local.directory().orElse(pane.directory), pane.tab.group);
+                        yield openTerminal(window, "split", local.directory().orElse(pane.directory), pane.tab);
                     }
                     case OpenSpec.Session session -> {
                         opened.add("session-split|" + pane.id + "|" + side + "|" + session.request().title());
-                        yield openSession(window, session.request(), pane.tab.group);
+                        yield openSession(window, session.request(), pane.tab);
                     }
                 };
                 focusPane(created);
@@ -118,22 +119,22 @@ final class TerminalFixture {
         return window.id;
     }
 
-    /** A terminal tab at the end of the active group, selected; {@link #addPane} gives it its one pane. */
+    /** A terminal tab in a new tab at the end of the strip, selected; {@link #addPane} gives it its one pane. */
     UUID addTab(UUID windowId, String title) { return addTab(windowId, title, null); }
 
-    /** A terminal tab, selected, in a new group after {@code beside}; at the end of the active group when it is null. */
-    private UUID addTab(UUID windowId, String title, Group beside) {
+    /** A terminal tab, selected, in a new pane right after {@code beside}; in a new tab when it is null. */
+    private UUID addTab(UUID windowId, String title, Tab beside) {
         Tab tab = newTab(windows.get(windowId), title, beside);
         registry.atomically(() -> { registry.publish(new TerminalEvent.TabOpened(tab.window.id, tab.id)); select(tab); });
         return tab.id;
     }
 
     /**
-     * A terminal tab with its one pane, as a window opens one for {@code openTab} or a split (a split's in a new group
-     * after {@code beside}): announced, given its pane, then selected, so the active pane goes straight to the new pane.
-     * Returns the pane's id.
+     * A terminal tab with its one pane, as a window opens one for {@code openTab} or a split (a split's in a new pane right
+     * after {@code beside}, in its tab): announced, given its pane, then selected, so the active pane goes straight to the
+     * new pane. Returns the pane's id.
      */
-    private UUID openTerminal(UUID windowId, String title, Path directory, Group beside) {
+    private UUID openTerminal(UUID windowId, String title, Path directory, Tab beside) {
         Tab tab = newTab(windows.get(windowId), title, beside);
         registry.publish(new TerminalEvent.TabOpened(tab.window.id, tab.id));
         UUID pane = addPane(tab.id, title, directory);
@@ -141,20 +142,28 @@ final class TerminalFixture {
         return pane;
     }
 
-    private Tab newTab(Window window, String title, Group beside) {
+    private Tab newTab(Window window, String title, Tab beside) {
         var tab = new Tab(); tab.title = () -> title;
         tabs.put(tab.id, tab);
         place(tab, window, beside);
         return tab;
     }
 
-    /** Puts {@code tab} at the end of {@code window}'s active group, or in a new group after {@code beside}. */
-    private void place(Tab tab, Window window, Group beside) {
-        Group group = beside == null ? window.active() : null;
-        Group after = beside != null ? beside : group;
-        int index = window.tabs.size();
-        if (after != null) for (int i = 0; i < window.tabs.size(); i++) if (window.tabs.get(i).group == after) index = i + 1;
-        if (group == null) { group = new Group(); window.recent.add(group); }
+    /**
+     * Puts {@code tab} in a new pane right after {@code beside}, in its tab, or in a new tab at the end of {@code window}'s
+     * strip when {@code beside} is null or not one of its items.
+     */
+    private void place(Tab tab, Window window, Tab beside) {
+        Group group;
+        int index;
+        if (beside != null && beside.window == window && window.tabs.contains(beside)) {
+            group = beside.group;
+            index = window.tabs.indexOf(beside) + 1;
+        } else {
+            group = new Group();
+            window.recent.add(group);
+            index = window.tabs.size();
+        }
         tab.window = window;
         tab.group = group;
         window.tabs.add(index, tab);
@@ -181,7 +190,7 @@ final class TerminalFixture {
 
     private static boolean held(Pane pane) { return pane.state.equals("NOT_STARTED"); }
 
-    /** Takes {@code tab} out of its window's groups; true when it was the window's selected tab. */
+    /** Takes {@code tab} out of its window's tabs, its tab going with its last pane; true when it was the selected tab. */
     private boolean takeOut(Tab tab) {
         Window window = tab.window;
         window.tabs.remove(tab);
@@ -192,7 +201,7 @@ final class TerminalFixture {
         return true;
     }
 
-    /** Its selected tab left: the tab the active group showed before it, else the group used before, takes over. */
+    /** Its selected tab left: the item its tab showed before it, else the tab shown before, takes over. */
     private void reselect(Window window) {
         if (!window.recent.isEmpty()) select(window.active().recent.getFirst());
     }
@@ -209,15 +218,15 @@ final class TerminalFixture {
         return pane.id;
     }
 
-    /** A content tab, such as a plugin's view, with the id and title its window gives it, at the end of the active group; it opens selected. */
+    /** A content tab, such as a plugin's view, with the id and title its window gives it, in a new tab at the end of the strip; it opens selected. */
     void addContentTab(UUID windowId, UUID tabId, Supplier<String> title) { addContentTab(windowId, tabId, title, false); }
 
-    /** As above; with {@code beside}, in a new group after the active group, as a split placement opens it. */
+    /** As above; with {@code beside}, in a new pane right after the window's selected item, as a split placement opens it. */
     void addContentTab(UUID windowId, UUID tabId, Supplier<String> title, boolean beside) {
         Window window = windows.get(windowId);
         var tab = new Tab(); tab.id = tabId; tab.title = title; tab.kind = TabEntry.Kind.CONTENT;
         tabs.put(tab.id, tab);
-        place(tab, window, beside ? window.active() : null);
+        place(tab, window, beside ? window.selected : null);
         registry.atomically(() -> { registry.publish(new TerminalEvent.TabOpened(window.id, tab.id)); select(tab); });
     }
 
@@ -228,7 +237,7 @@ final class TerminalFixture {
     }
 
     /**
-     * Moves a tab to the end of another window's active group, where it is selected: the move is reported once, its pane
+     * Moves a tab to a new tab at the end of another window's strip, where it is selected: the move is reported once, its pane
      * keeps its id with no PaneOpened or PaneClosed, and a child window left with no tab closes after the move is
      * reported (workspace plan 3b Rulings 5, 6; plan 4a Rulings 23).
      */
@@ -303,6 +312,19 @@ final class TerminalFixture {
     }
     List<String> opened() { return List.copyOf(opened); }
 
+    /** A window's tabs in strip order, each its items' ids pane by pane (tabs and panes spec 4); empty for a closed window. */
+    List<List<UUID>> windowTabs(UUID windowId) {
+        Window window = windows.get(windowId);
+        var result = new ArrayList<List<UUID>>();
+        if (window == null) return result;
+        Group current = null;
+        for (Tab tab : window.tabs) {
+            if (tab.group != current) { result.add(new ArrayList<>()); current = tab.group; }
+            result.getLast().add(tab.id);
+        }
+        return result.stream().map(List::copyOf).toList();
+    }
+
     void finishCommand(UUID paneId, String command, int exitStatus) {
         registry.publish(new TerminalEvent.CommandFinished(paneId, command, OptionalInt.of(exitStatus), Duration.ofMillis(1500),
             Optional.ofNullable(panes.get(paneId)).filter(pane -> pane.remote == null).map(pane -> pane.directory),
@@ -310,7 +332,7 @@ final class TerminalFixture {
     }
 
     /** A provided session's terminal tab, opened as {@link #openTerminal} opens one, then connected. */
-    private UUID openSession(UUID windowId, SessionRequest request, Group beside) {
+    private UUID openSession(UUID windowId, SessionRequest request, Tab beside) {
         UUID id = openTerminal(windowId, request.title(), null, beside);
         panes.get(id).request = request;
         connect(panes.get(id));
