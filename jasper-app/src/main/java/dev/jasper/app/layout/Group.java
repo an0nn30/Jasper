@@ -6,7 +6,8 @@ import java.util.Optional;
 
 /**
  * A pane, a leaf of the tree (tabs and panes spec 4): the one tab it holds and shows, or none in the empty workspace.
- * The record keeps a list and a selection, the shape {@code workspace.toml} saves (workspace plan 8a Rulings 2).
+ * The record keeps a list and a selection (workspace plan 8a Rulings 2); {@code workspace.toml} saves its one tab
+ * (workspace plan 6a Rulings 32).
  *
  * @param id the pane's id
  * @param tabs its one tab, or none in the empty workspace's pane

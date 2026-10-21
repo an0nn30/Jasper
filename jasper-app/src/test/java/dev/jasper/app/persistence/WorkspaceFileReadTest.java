@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Workspace tabs spec 8 and 17, parent tabs spec 4 and 9: reading the workspace file back, dropping bad entries alone,
+ * Workspace tabs spec 8 and 17, tabs and panes spec 4 and 12: reading the workspace file back, dropping bad entries alone,
  * setting a bad file aside.
  */
 class WorkspaceFileReadTest {
@@ -139,8 +139,8 @@ class WorkspaceFileReadTest {
 
     @Test void weightsAreNormalizedOnRead() throws Exception {
         String text = WorkspaceFile.encode(new Snapshot(List.of(window(Role.MAIN, 1, 2))));
-        text = replaceOnce(text, "weight = 0.5\ntabs = [\"" + id(tab(1)), "weight = 3\ntabs = [\"" + id(tab(1)));
-        text = replaceOnce(text, "weight = 0.5\ntabs = [\"" + id(tab(2)), "weight = 1.0\ntabs = [\"" + id(tab(2)));
+        text = replaceOnce(text, "weight = 0.5\nitem = \"" + id(tab(1)), "weight = 3\nitem = \"" + id(tab(1)));
+        text = replaceOnce(text, "weight = 0.5\nitem = \"" + id(tab(2)), "weight = 1.0\nitem = \"" + id(tab(2)));
         var restored = (Loaded.Restore) read(text);
         assertThat(((Split) shown(restored.snapshot().main()).root()).children()).extracting(Child::weight).containsExactly(0.75, 0.25);
     }
@@ -154,12 +154,10 @@ class WorkspaceFileReadTest {
             .isEqualTo(clean(withMain(Optional.empty(), 6, layout, main.tabs())));
         assertThat(read(replaceOnce(text, "extended_state = 6", "extended_state = 1"))).as("extended state")
             .isEqualTo(clean(withMain(main.bounds(), 0, layout, main.tabs())));
-        assertThat(read(replaceOnce(text, "active_group = \"" + g2 + "\"", "active_group = \"nope\""))).as("the first group; the maximize no longer names it")
+        assertThat(read(replaceOnce(text, "active_pane = \"" + g2 + "\"", "active_pane = \"nope\""))).as("the first pane; the maximize no longer names it")
             .isEqualTo(clean(withMain(main.bounds(), 6, new Layout(layout.root(), groupId(1), Optional.empty()), main.tabs())));
         assertThat(read(replaceOnce(text, "maximized = \"" + g2 + "\"", "maximized = \"" + g1 + "\""))).as("a maximize of a group that is not active")
             .isEqualTo(clean(withMain(main.bounds(), 6, new Layout(layout.root(), groupId(2), Optional.empty()), main.tabs())));
-        assertThat(read(replaceOnce(text, "selected = \"" + id(tab(2)) + "\"", "selected = \"" + id(tab(9)) + "\""))).as("the pane's one tab")
-            .isEqualTo(clean(snapshot()));
     }
 
     @Test void aBadTabEntryIsDroppedAlone() throws Exception {
@@ -184,7 +182,7 @@ class WorkspaceFileReadTest {
                 {kind, "\"content::document\""},
                 {kind, "\"content:dev.jasper.editor:\""}})
             assertThat(read(replaceOnce(text, change[0], change[1]))).as(change[1]).isEqualTo(droppedContent);
-        String second = "\n[[windows.tabs]]\nid = \"" + id(tab(2)) + "\"\nkind = \"terminal\"\ntitle = \"\"\ndirectory = \"\"\nprofile = \"\"\n";
+        String second = "\n[[windows.items]]\nid = \"" + id(tab(2)) + "\"\nkind = \"terminal\"\ntitle = \"\"\ndirectory = \"\"\nprofile = \"\"\n";
         assertThat(read(replaceOnce(text, "\n[[windows]]\nrole = \"full\"", second + "\n[[windows]]\nrole = \"full\"")))
             .as("the first entry for an id wins; the second is a dropped entry").isEqualTo(keptAside(snapshot()));
     }
@@ -214,29 +212,29 @@ class WorkspaceFileReadTest {
         String text = WorkspaceFile.encode(new Snapshot(List.of(window(Role.MAIN, 1, 2), window(Role.CHILD, 3, 4))));
         var mainOnly = keptAside(new Snapshot(List.of(window(Role.MAIN, 1, 2))));
         String g3 = groupId(3).value().toString(), g4 = groupId(4).value().toString(), t3 = id(tab(3)), t4 = id(tab(4));
-        String split = "kind = \"split\"\norientation = \"horizontal\"\nparent = \"\"\nweight = 1.0\n\n[[windows.parent_tabs.nodes]]\nid = \"" + g3 + "\"";
-        String g4Node = "id = \"" + g4 + "\"\nkind = \"group\"\nparent = \"" + WorkspaceFile.splitId("") + "\"";
-        String g4Weight = "weight = 0.5\ntabs = [\"" + t4 + "\"]";
-        String g3Tabs = "tabs = [\"" + t3 + "\"]";
+        String split = "kind = \"split\"\norientation = \"horizontal\"\nparent = \"\"\nweight = 1.0\n\n[[windows.tabs.nodes]]\nid = \"" + g3 + "\"";
+        String g4Node = "id = \"" + g4 + "\"\nkind = \"pane\"\nparent = \"" + WorkspaceFile.splitId("") + "\"";
+        String g4Weight = "weight = 0.5\nitem = \"" + t4 + "\"";
+        String g3Item = "item = \"" + t3 + "\"";
         for (String[] change : new String[][] {
                 {"role = \"full\"", "role = \"side\""},
                 {"role = \"full\"", "role = \"pane\""},
-                {split, split.replace("kind = \"split\"", "kind = \"pane\"")},
+                {split, split.replace("kind = \"split\"", "kind = \"group\"")},
                 {split, split.replace("horizontal", "diagonal")},
                 {g4Weight, g4Weight.replace("0.5", "-1.0")},
                 {g4Weight, g4Weight.replace("0.5", "\"half\"")},
-                {g4Node, "id = \"" + g4 + "\"\nkind = \"group\"\nparent = \"\""},
-                {g4Node, "id = \"" + g4 + "\"\nkind = \"group\"\nparent = \"" + g3 + "\""},
-                {g4Node, "id = \"" + g4 + "\"\nkind = \"group\"\nparent = \"00000000-0000-4000-9000-000000000099\""},
-                {g3Tabs, "tabs = [\"" + t3 + "\", \"" + t3 + "\"]"},
-                {g3Tabs, "tabs = \"" + t3 + "\""},
-                {g3Tabs, "tabs = [\"three\"]"},
-                {g3Tabs + "\nselected = \"" + t3 + "\"", "tabs = []\nselected = \"\""},
-                {"id = \"" + g3 + "\"", "id = \"group-three\""}})
+                {g4Node, "id = \"" + g4 + "\"\nkind = \"pane\"\nparent = \"\""},
+                {g4Node, "id = \"" + g4 + "\"\nkind = \"pane\"\nparent = \"" + g3 + "\""},
+                {g4Node, "id = \"" + g4 + "\"\nkind = \"pane\"\nparent = \"00000000-0000-4000-9000-000000000099\""},
+                {g3Item, "item = [\"" + t3 + "\"]"},
+                {g3Item, "item = 3"},
+                {g3Item, "item = \"three\""},
+                {g3Item, "item = \"\""},
+                {"id = \"" + g3 + "\"", "id = \"pane-three\""}})
             assertThat(read(replaceOnce(text, change[0], change[1]))).as(change[1]).isEqualTo(mainOnly);
-        // After the tabs, these nodes still join the full window's last parent tab.
-        String cycle = "\n[[windows.parent_tabs.nodes]]\nid = \"x\"\nkind = \"split\"\norientation = \"vertical\"\nparent = \"y\"\nweight = 0.5\n"
-            + "\n[[windows.parent_tabs.nodes]]\nid = \"y\"\nkind = \"split\"\norientation = \"horizontal\"\nparent = \"x\"\nweight = 0.5\n";
+        // After the items, these nodes still join the full window's last tab.
+        String cycle = "\n[[windows.tabs.nodes]]\nid = \"x\"\nkind = \"split\"\norientation = \"vertical\"\nparent = \"y\"\nweight = 0.5\n"
+            + "\n[[windows.tabs.nodes]]\nid = \"y\"\nkind = \"split\"\norientation = \"horizontal\"\nparent = \"x\"\nweight = 0.5\n";
         assertThat(read(text + cycle)).as("a cycle under no root").isEqualTo(mainOnly);
     }
 
@@ -267,7 +265,7 @@ class WorkspaceFileReadTest {
         assertThat(read(replaceOnce(text, "role = \"full\"", "role = \"main\""))).as("a second main window").isEqualTo(mainOnly);
         String t5 = "id = \"" + id(tab(5)) + "\"\n";
         assertThat(read(replaceOnce(text, t5 + "kind = \"terminal\"", t5 + "kind = \"x\""))).as("a full window left empty").isEqualTo(mainOnly);
-        assertThat(text.split(Pattern.quote(id(tab(5))), -1)).hasSize(4);
+        assertThat(text.split(Pattern.quote(id(tab(5))), -1)).as("its pane's item and its entry").hasSize(3);
         assertThat(read(text.replace(id(tab(5)), id(tab(1))))).as("a tab the main window holds").isEqualTo(mainOnly);
     }
 
@@ -376,8 +374,8 @@ class WorkspaceFileReadTest {
         String t2 = "id = \"" + id(tab(2)) + "\"\nkind = \"terminal\"";
         assertThat(read(replaceOnce(text, t2, "id = \"" + id(tab(2)) + "\"\nkind = \"telnet\""))).as("the shown one's only tab dropped: the other shows")
             .isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(1), single(1))))));
-        String active = "active_parent_tab = \"" + parentTabId(2).value() + "\"";
-        assertThat(read(replaceOnce(text, active, "active_parent_tab = \"nope\""))).as("a choice that falls back to the first, not a drop")
+        String active = "shown_tab = \"" + parentTabId(2).value() + "\"";
+        assertThat(read(replaceOnce(text, active, "shown_tab = \"nope\""))).as("a choice that falls back to the first, not a drop")
             .isEqualTo(clean(withParentTabs(new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(2), single(2))),
                 parentTabId(1)))));
     }
@@ -386,7 +384,7 @@ class WorkspaceFileReadTest {
     @Test void anEmptyParentTabBesideOthersIsDroppedAlone() throws Exception {
         String text = WorkspaceFile.encode(parentTabs());
         String t1 = id(tab(1));
-        assertThat(read(replaceOnce(text, "tabs = [\"" + t1 + "\"]\nselected = \"" + t1 + "\"", "tabs = []\nselected = \"\"")))
+        assertThat(read(replaceOnce(text, "item = \"" + t1 + "\"", "item = \"\"")))
             .as("its window keeps its other parent tab").isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(2), single(2))))));
     }
 
@@ -394,8 +392,8 @@ class WorkspaceFileReadTest {
     @Test void aParentTabRepeatingAnEarlierOnesIdsIsDroppedAlone() throws Exception {
         String text = WorkspaceFile.encode(parentTabs());
         String p2 = parentTabId(2).value().toString(), g2 = groupId(2).value().toString(), t2 = id(tab(2));
-        assertThat(text.split(Pattern.quote(g2), -1)).as("the second parent tab's active group and its group").hasSize(3);
-        assertThat(text.split(Pattern.quote(t2), -1)).as("its group's tabs and selection, and the tab's entry").hasSize(4);
+        assertThat(text.split(Pattern.quote(g2), -1)).as("the second tab's active pane and its pane").hasSize(3);
+        assertThat(text.split(Pattern.quote(t2), -1)).as("its pane's item and the item's entry").hasSize(3);
         var cases = new LinkedHashMap<String, String>();
         cases.put("the first one's id", replaceOnce(text, "id = \"" + p2 + "\"\n", "id = \"" + parentTabId(1).value() + "\"\n"));
         cases.put("the first one's group", text.replace(g2, groupId(1).value().toString()));
@@ -406,14 +404,14 @@ class WorkspaceFileReadTest {
     }
 
     /**
-     * Review Focus 4 (workspace plan 8a Rulings 2): a pane holds one tab, so a parent tab whose pane lists two is a bad
-     * entry, dropped alone, and the original is kept aside.
+     * Workspace plan 6a Rulings 32 (plan 8a Rulings 2): a pane names its one item, so a tab whose pane names a list of
+     * items is a bad entry, dropped alone, and the original is kept aside.
      */
-    @Test void aPaneListingTwoTabsDropsItsParentTabAlone() throws Exception {
+    @Test void aPaneNamingAListOfItemsDropsItsTabAlone() throws Exception {
         String text = WorkspaceFile.encode(parentTabs());
         String t2 = id(tab(2));
-        String twoTabs = replaceOnce(text, "tabs = [\"" + t2 + "\"]", "tabs = [\"" + t2 + "\", \"" + id(tab(9)) + "\"]");
-        assertThat(read(twoTabs)).as("the main window keeps its first parent tab, which shows")
+        String twoTabs = replaceOnce(text, "item = \"" + t2 + "\"", "item = [\"" + t2 + "\", \"" + id(tab(9)) + "\"]");
+        assertThat(read(twoTabs)).as("the main window keeps its first tab, which shows")
             .isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(1), single(1))))));
         assertThat(Files.readString(bad())).isEqualTo(twoTabs);
     }
@@ -424,6 +422,20 @@ class WorkspaceFileReadTest {
         assertThat(read(replaceOnce(text, p3, "id = \"" + parentTabId(1).value() + "\"\n")))
             .as("parent tab ids are unique across windows (workspace plan 7b Rulings 10)")
             .isEqualTo(keptAside(new Snapshot(List.of(parentTabs().main()))));
+    }
+
+    /**
+     * Workspace plan 6a Rulings 32: a file in the parent-tabs words Task 3 wrote (a window's {@code parent_tabs}, its
+     * items under {@code tabs}) holds no tab this build reads, so it is set aside and starts fresh, never misread.
+     */
+    @Test void aFileInTheParentTabsWordsIsSetAside() throws Exception {
+        String old = WorkspaceFile.encode(parentTabs())
+            .replace("[[windows.tabs]]", "[[windows.parent_tabs]]")
+            .replace("[[windows.tabs.nodes]]", "[[windows.parent_tabs.nodes]]")
+            .replace("[[windows.items]]", "[[windows.tabs]]")
+            .replace("shown_tab = ", "active_parent_tab = ")
+            .replace("active_pane = ", "active_group = ");
+        assertThat(read(old)).isEqualTo(new Loaded.Fresh(Optional.of(bad())));
     }
 
     @Test void anAbsentFileStartsFreshAndCreatesNothing() throws Exception {

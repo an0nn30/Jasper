@@ -31,7 +31,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Workspace tabs spec 8 and parent tabs spec 4 and 9: the workspace file's values and its exact text. */
+/** Workspace tabs spec 8, tabs and panes spec 4 and 12: the workspace file's values and its exact text, in the spec's words. */
 class WorkspaceFileTest {
     @TempDir Path dir;
 
@@ -111,87 +111,83 @@ class WorkspaceFileTest {
             width = 1400
             height = 900
             extended_state = 6
-            active_parent_tab = "00000000-0000-4000-a000-000000000001"
+            shown_tab = "00000000-0000-4000-a000-000000000001"
 
-            [[windows.parent_tabs]]
+            [[windows.tabs]]
             id = "00000000-0000-4000-a000-000000000001"
-            active_group = "00000000-0000-4000-9000-000000000002"
+            active_pane = "00000000-0000-4000-9000-000000000002"
             maximized = "00000000-0000-4000-9000-000000000002"
 
-            [[windows.parent_tabs.nodes]]
+            [[windows.tabs.nodes]]
             id = "e8b5eccb-037b-3d65-a6c6-5e4889602b31"
             kind = "split"
             orientation = "horizontal"
             parent = ""
             weight = 1.0
 
-            [[windows.parent_tabs.nodes]]
+            [[windows.tabs.nodes]]
             id = "92cc2645-e802-3d4b-aa67-3432c68ad0b2"
             kind = "split"
             orientation = "vertical"
             parent = "e8b5eccb-037b-3d65-a6c6-5e4889602b31"
             weight = 0.5
 
-            [[windows.parent_tabs.nodes]]
+            [[windows.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000001"
-            kind = "group"
+            kind = "pane"
             parent = "92cc2645-e802-3d4b-aa67-3432c68ad0b2"
             weight = 0.5
-            tabs = ["00000000-0000-4000-8000-000000000001"]
-            selected = "00000000-0000-4000-8000-000000000001"
+            item = "00000000-0000-4000-8000-000000000001"
 
-            [[windows.parent_tabs.nodes]]
+            [[windows.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000005"
-            kind = "group"
+            kind = "pane"
             parent = "92cc2645-e802-3d4b-aa67-3432c68ad0b2"
             weight = 0.5
-            tabs = ["00000000-0000-4000-8000-000000000002"]
-            selected = "00000000-0000-4000-8000-000000000002"
+            item = "00000000-0000-4000-8000-000000000002"
 
-            [[windows.parent_tabs.nodes]]
+            [[windows.tabs.nodes]]
             id = "59943c66-5e92-39d1-a8ea-1f88b440a667"
             kind = "split"
             orientation = "vertical"
             parent = "e8b5eccb-037b-3d65-a6c6-5e4889602b31"
             weight = 0.5
 
-            [[windows.parent_tabs.nodes]]
+            [[windows.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000002"
-            kind = "group"
+            kind = "pane"
             parent = "59943c66-5e92-39d1-a8ea-1f88b440a667"
             weight = 0.75
-            tabs = ["00000000-0000-4000-8000-000000000003"]
-            selected = "00000000-0000-4000-8000-000000000003"
+            item = "00000000-0000-4000-8000-000000000003"
 
-            [[windows.parent_tabs.nodes]]
+            [[windows.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000003"
-            kind = "group"
+            kind = "pane"
             parent = "59943c66-5e92-39d1-a8ea-1f88b440a667"
             weight = 0.25
-            tabs = ["00000000-0000-4000-8000-000000000004"]
-            selected = "00000000-0000-4000-8000-000000000004"
+            item = "00000000-0000-4000-8000-000000000004"
 
-            [[windows.tabs]]
+            [[windows.items]]
             id = "00000000-0000-4000-8000-000000000001"
             kind = "terminal"
             title = "build"
             directory = "/Users/me/src/jasper"
             profile = "zsh"
 
-            [[windows.tabs]]
+            [[windows.items]]
             id = "00000000-0000-4000-8000-000000000002"
             kind = "content:dev.jasper.editor:document"
             title = "README.md"
             state = { path = "/Users/me/src/jasper/README.md" }
 
-            [[windows.tabs]]
+            [[windows.items]]
             id = "00000000-0000-4000-8000-000000000003"
             kind = "terminal"
             title = ""
             directory = "C:\\\\work"
             profile = ""
 
-            [[windows.tabs]]
+            [[windows.items]]
             id = "00000000-0000-4000-8000-000000000004"
             kind = "content:dev.jasper.remote:sftp"
             title = "Files \\"prod\\""
@@ -200,22 +196,21 @@ class WorkspaceFileTest {
             [[windows]]
             role = "full"
             extended_state = 0
-            active_parent_tab = "00000000-0000-4000-a000-000000000005"
-
-            [[windows.parent_tabs]]
-            id = "00000000-0000-4000-a000-000000000005"
-            active_group = "00000000-0000-4000-9000-000000000004"
-            maximized = ""
-
-            [[windows.parent_tabs.nodes]]
-            id = "00000000-0000-4000-9000-000000000004"
-            kind = "group"
-            parent = ""
-            weight = 1.0
-            tabs = ["00000000-0000-4000-8000-000000000005"]
-            selected = "00000000-0000-4000-8000-000000000005"
+            shown_tab = "00000000-0000-4000-a000-000000000005"
 
             [[windows.tabs]]
+            id = "00000000-0000-4000-a000-000000000005"
+            active_pane = "00000000-0000-4000-9000-000000000004"
+            maximized = ""
+
+            [[windows.tabs.nodes]]
+            id = "00000000-0000-4000-9000-000000000004"
+            kind = "pane"
+            parent = ""
+            weight = 1.0
+            item = "00000000-0000-4000-8000-000000000005"
+
+            [[windows.items]]
             id = "00000000-0000-4000-8000-000000000005"
             kind = "terminal"
             title = ""
@@ -238,42 +233,40 @@ class WorkspaceFileTest {
             width = 1400
             height = 900
             extended_state = 0
-            active_parent_tab = "00000000-0000-4000-a000-000000000002"
-
-            [[windows.parent_tabs]]
-            id = "00000000-0000-4000-a000-000000000001"
-            active_group = "00000000-0000-4000-9000-000000000001"
-            maximized = ""
-
-            [[windows.parent_tabs.nodes]]
-            id = "00000000-0000-4000-9000-000000000001"
-            kind = "group"
-            parent = ""
-            weight = 1.0
-            tabs = ["00000000-0000-4000-8000-000000000001"]
-            selected = "00000000-0000-4000-8000-000000000001"
-
-            [[windows.parent_tabs]]
-            id = "00000000-0000-4000-a000-000000000002"
-            active_group = "00000000-0000-4000-9000-000000000002"
-            maximized = ""
-
-            [[windows.parent_tabs.nodes]]
-            id = "00000000-0000-4000-9000-000000000002"
-            kind = "group"
-            parent = ""
-            weight = 1.0
-            tabs = ["00000000-0000-4000-8000-000000000002"]
-            selected = "00000000-0000-4000-8000-000000000002"
+            shown_tab = "00000000-0000-4000-a000-000000000002"
 
             [[windows.tabs]]
+            id = "00000000-0000-4000-a000-000000000001"
+            active_pane = "00000000-0000-4000-9000-000000000001"
+            maximized = ""
+
+            [[windows.tabs.nodes]]
+            id = "00000000-0000-4000-9000-000000000001"
+            kind = "pane"
+            parent = ""
+            weight = 1.0
+            item = "00000000-0000-4000-8000-000000000001"
+
+            [[windows.tabs]]
+            id = "00000000-0000-4000-a000-000000000002"
+            active_pane = "00000000-0000-4000-9000-000000000002"
+            maximized = ""
+
+            [[windows.tabs.nodes]]
+            id = "00000000-0000-4000-9000-000000000002"
+            kind = "pane"
+            parent = ""
+            weight = 1.0
+            item = "00000000-0000-4000-8000-000000000002"
+
+            [[windows.items]]
             id = "00000000-0000-4000-8000-000000000001"
             kind = "terminal"
             title = ""
             directory = "/tmp"
             profile = ""
 
-            [[windows.tabs]]
+            [[windows.items]]
             id = "00000000-0000-4000-8000-000000000002"
             kind = "terminal"
             title = ""
@@ -283,42 +276,40 @@ class WorkspaceFileTest {
             [[windows]]
             role = "full"
             extended_state = 0
-            active_parent_tab = "00000000-0000-4000-a000-000000000003"
-
-            [[windows.parent_tabs]]
-            id = "00000000-0000-4000-a000-000000000003"
-            active_group = "00000000-0000-4000-9000-000000000003"
-            maximized = ""
-
-            [[windows.parent_tabs.nodes]]
-            id = "00000000-0000-4000-9000-000000000003"
-            kind = "group"
-            parent = ""
-            weight = 1.0
-            tabs = ["00000000-0000-4000-8000-000000000003"]
-            selected = "00000000-0000-4000-8000-000000000003"
-
-            [[windows.parent_tabs]]
-            id = "00000000-0000-4000-a000-000000000004"
-            active_group = "00000000-0000-4000-9000-000000000004"
-            maximized = ""
-
-            [[windows.parent_tabs.nodes]]
-            id = "00000000-0000-4000-9000-000000000004"
-            kind = "group"
-            parent = ""
-            weight = 1.0
-            tabs = ["00000000-0000-4000-8000-000000000004"]
-            selected = "00000000-0000-4000-8000-000000000004"
+            shown_tab = "00000000-0000-4000-a000-000000000003"
 
             [[windows.tabs]]
+            id = "00000000-0000-4000-a000-000000000003"
+            active_pane = "00000000-0000-4000-9000-000000000003"
+            maximized = ""
+
+            [[windows.tabs.nodes]]
+            id = "00000000-0000-4000-9000-000000000003"
+            kind = "pane"
+            parent = ""
+            weight = 1.0
+            item = "00000000-0000-4000-8000-000000000003"
+
+            [[windows.tabs]]
+            id = "00000000-0000-4000-a000-000000000004"
+            active_pane = "00000000-0000-4000-9000-000000000004"
+            maximized = ""
+
+            [[windows.tabs.nodes]]
+            id = "00000000-0000-4000-9000-000000000004"
+            kind = "pane"
+            parent = ""
+            weight = 1.0
+            item = "00000000-0000-4000-8000-000000000004"
+
+            [[windows.items]]
             id = "00000000-0000-4000-8000-000000000003"
             kind = "terminal"
             title = ""
             directory = "/tmp"
             profile = ""
 
-            [[windows.tabs]]
+            [[windows.items]]
             id = "00000000-0000-4000-8000-000000000004"
             kind = "terminal"
             title = ""
@@ -327,7 +318,7 @@ class WorkspaceFileTest {
             """);
     }
 
-    @Test void theEmptyMainWorkspaceWritesItsParentTabWithAGroupWithNoTabs() {
+    @Test void theEmptyMainWorkspaceWritesItsTabWithAPaneThatNamesNoItem() {
         Layout empty = new Layout(new Group(groupId(1), List.of(), Optional.empty()), groupId(1), Optional.empty());
         assertThat(WorkspaceFile.encode(new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(new UiState.Bounds(0, 0, 800, 600)), 0,
             one(1, empty), Map.of())))))
@@ -341,20 +332,19 @@ class WorkspaceFileTest {
                 width = 800
                 height = 600
                 extended_state = 0
-                active_parent_tab = "00000000-0000-4000-a000-000000000001"
+                shown_tab = "00000000-0000-4000-a000-000000000001"
 
-                [[windows.parent_tabs]]
+                [[windows.tabs]]
                 id = "00000000-0000-4000-a000-000000000001"
-                active_group = "00000000-0000-4000-9000-000000000001"
+                active_pane = "00000000-0000-4000-9000-000000000001"
                 maximized = ""
 
-                [[windows.parent_tabs.nodes]]
+                [[windows.tabs.nodes]]
                 id = "00000000-0000-4000-9000-000000000001"
-                kind = "group"
+                kind = "pane"
                 parent = ""
                 weight = 1.0
-                tabs = []
-                selected = ""
+                item = ""
                 """);
     }
 
