@@ -165,9 +165,10 @@ From `c1540b4e9` with plans 8a and 8b applied (see Workspace).
    centre), `landing` (`:181-195`), and the tab drag's `place` (`:138-141`), `marker` (`:208-218`) and `windowAt`
    (`:229-232`). After plan 8a only `TabDrag` (`place`, `marker`, `windowAt`) and the tests call it.
 3. **A press on a pane.** `WindowContent.paneClicks` (`:76-82`), an AWT listener for mouse events each window adds
-   (`:374`) and removes (`:2146`), makes the pane of the shown tab that a left press reaches active (`tabHolding`
-   `:1703-1706`, `selectTab` `:1737-1743`). Every window's listener hears every event; only the window holding the
-   press's component acts.
+   (after `addHost`) and removes (in `close`), makes the pane of the shown tab that a left press lands on active
+   (`tabHolding(under(source, point))`: plan 8a's final fix wave finds the item by the press's location, since AWT hands
+   a press on a view's bare area to an ancestor; `selectTab`). Every window's listener hears every event; only the
+   window holding the component under the press acts.
 4. **AWT delivery** (JBR 25 sources, `java.desktop`). `Component.dispatchEventImpl` hands an event to the AWT listeners
    (step 2, `java/awt/Component.java:4911-4914`) before input methods (step 4, `:4932-4957`) and the component's own
    listeners (step 6, `:5000`); step 4 returns for an input event already consumed when the component has input methods
@@ -1106,7 +1107,7 @@ edit(C, [
     private final AWTEventListener paneClicks = event -> {
         if (event.getID() != MouseEvent.MOUSE_PRESSED || closed() || !(event instanceof MouseEvent press)
             || !SwingUtilities.isLeftMouseButton(press) || !(press.getSource() instanceof Component source)) return;
-        Tab tab = tabHolding(source);
+        Tab tab = tabHolding(under(source, press.getPoint()));
         if (tab != null && tab != selectedTab()
             && parentTabs().holding(tab).filter(view -> view == parentTabs().active()).isPresent()) selectTab(tab);
     };
@@ -1121,7 +1122,7 @@ edit(C, [
             || !(press.getSource() instanceof Component source)) return;
         int id = press.getID();
         if (id != MouseEvent.MOUSE_PRESSED && id != MouseEvent.MOUSE_CLICKED) return;
-        Tab tab = tabHolding(source);
+        Tab tab = tabHolding(under(source, press.getPoint()));
         if (tab == null || parentTabs().holding(tab).filter(view -> view == parentTabs().active()).isEmpty()) return;
         if (TabDrag.movesPane(press, macOs())) {
             press.consume();
