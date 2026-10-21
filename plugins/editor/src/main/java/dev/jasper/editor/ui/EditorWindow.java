@@ -235,13 +235,70 @@ public final class EditorWindow {
     public void open(EditorDocument document, WindowOwner owner) {
         origin = owner;
         Optional<DocumentSession> existing = model.find(document.key());
-        DocumentSession session = existing.orElseGet(() -> {
-            var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
-            var created = new DocumentSession(document, sessionEnvironment(ref));
-            add(created, ref); reportWhenLoaded(created); created.load(); return created;
-        });
-        if (existing.isPresent() && session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
+        if (existing.isPresent()) {
+            selectOpen(existing.get());
+            return;
+        }
+        openSession(document, dev.jasper.sdk.ui.TabPlacement.NEW_TAB);
+    }
+
+    /**
+     * Open File Right and Open File Down, and the File menu's Open in Editor Pane… (pane flexibility spec 3; workspace plan
+     * 9a Rulings 2): the Editor's chooser for one file, local or in a file source, starting in the folder of the Editor
+     * file active in {@code owner}'s window, else where the host locates its focused pane; then
+     * {@link #openDocumentBeside} with the file chosen. Cancelling the chooser opens nothing.
+     *
+     * @param owner the window the command ran in
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     */
+    public void openBeside(WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
+        java.util.UUID shown = owner instanceof WindowHandle window ? window.id() : null;
+        Optional<FileLocation> near = hosted.entrySet().stream()
+            .filter(entry -> entry.getValue().isActive() && entry.getValue().window().id().equals(shown))
+            .findFirst().flatMap(entry -> folderOf(entry.getKey().session()));
+        var choice = new FileChoice(owner, "Open in Editor Pane", FileChoice.Mode.OPEN, false, near, Optional.empty(), locations.sources());
+        context.windows().choose(choice).stream().findFirst()
+            .ifPresent(chosen -> withDocument(chosen, owner, document -> openDocumentBeside(document, owner, placement)));
+    }
+
+    /**
+     * Opens {@code document} in a new pane at {@code placement} beside the focused pane of {@code owner}'s window, which
+     * the new pane then has, as Split Right with Editor opens an untitled one (pane flexibility spec 3). A document that is
+     * open already shows its open pane, as {@link #open} shows it (workspace plan 9a Rulings 4).
+     *
+     * @param document the document
+     * @param owner the window
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     * @throws IllegalArgumentException for another placement
+     */
+    public void openDocumentBeside(EditorDocument document, WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
+        if (placement != dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT && placement != dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN)
+            throw new IllegalArgumentException("A file opens in a pane to the right or below, not " + placement);
+        origin = owner;
+        Optional<DocumentSession> existing = model.find(document.key());
+        if (existing.isPresent()) {
+            // Until plan 9b's second view: the file's open pane shows, as Open in Editor… shows it.
+            selectOpen(existing.get());
+            return;
+        }
+        openSession(document, placement);
+    }
+
+    /**
+     * Shows {@code session}, a document that is open already, as Open in Editor… does: its pane is selected, and a document
+     * that has loaded is reported opened again, so Recent Files records it.
+     */
+    private void selectOpen(DocumentSession session) {
+        if (session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
         select(session);
+    }
+
+    /** A new session of {@code document}, its pane where {@code placement} puts it, reported once its first read succeeds, loaded and selected. */
+    private void openSession(EditorDocument document, dev.jasper.sdk.ui.TabPlacement placement) {
+        var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
+        var created = new DocumentSession(document, sessionEnvironment(ref));
+        add(created, ref, placement); reportWhenLoaded(created); created.load();
+        select(created);
     }
 
     EditorTab openLinked(EditorTab originTab, EditorDocument document) {
@@ -543,18 +600,25 @@ public final class EditorWindow {
 
     /** Opens what the chooser returned: local files directly, a source's files through its resolver. */
     public void openLocations(List<FileLocation> chosen, WindowOwner owner) {
-        for (FileLocation location : chosen) {
-            switch (location) {
-                case FileLocation.Local local -> openLocal(local.path(), owner);
-                case FileLocation.Sourced sourced -> locations.resolver(sourced.sourceId()).ifPresent(resolver -> {
-                    try {
-                        open(resolver.document(sourced, forOthers(owner)), owner);
-                    } catch (RuntimeException failure) {
-                        context.notifications().group().error("Could not open a file", sourced.path() + ": "
-                            + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
-                    }
-                });
-            }
+        for (FileLocation location : chosen) withDocument(location, owner, document -> open(document, owner));
+    }
+
+    /**
+     * Runs {@code use} with the document at {@code location}: a local file's, or a file source's through its resolver,
+     * which is handed the window, never the Editor's tab; a resolver's failure, or {@code use}'s on a source's file, is
+     * reported, and a source with no resolver gives nothing.
+     */
+    private void withDocument(FileLocation location, WindowOwner owner, java.util.function.Consumer<EditorDocument> use) {
+        switch (location) {
+            case FileLocation.Local local -> use.accept(new LocalDocument(local.path(), context.background()));
+            case FileLocation.Sourced sourced -> locations.resolver(sourced.sourceId()).ifPresent(resolver -> {
+                try {
+                    use.accept(resolver.document(sourced, forOthers(owner)));
+                } catch (RuntimeException failure) {
+                    context.notifications().group().error("Could not open a file", sourced.path() + ": "
+                        + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
+                }
+            });
         }
     }
 

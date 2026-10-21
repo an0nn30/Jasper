@@ -1227,6 +1227,129 @@ class EditorWindowTest {
         assertThat(host.windowTabs(main)).as("nothing opens").isEqualTo(before);
     }
 
+    /**
+     * Pane flexibility spec 3: Open File Right shows the Editor's chooser for one file and opens it in a new pane beside the
+     * focused pane, in its tab, the new file selected and recorded once it has loaded; Down opens one below the focused
+     * file, the new one.
+     */
+    @Test void openBesideOpensTheChosenFileInANewPaneBesideTheFocusedOne() throws Exception {
+        UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
+        WindowHandle handle = context.terminals().window(main).orElseThrow();
+        Path a = file("a.txt", "a"), b = file("b.txt", "b");
+        host.queueFileChoice(List.of(new FileLocation.Local(a)));
+        window.openBeside(handle, dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+        drain();
+        var asked = host.fileChoices().getLast();
+        assertThat(asked.title()).isEqualTo("Open in Editor Pane");
+        assertThat(asked.mode()).isEqualTo(FileChoice.Mode.OPEN);
+        assertThat(asked.multiple()).as("one file").isFalse();
+        assertThat(((WindowHandle) asked.owner()).id()).isEqualTo(main);
+        assertThat(asked.initial()).as("from a terminal pane, where the host locates it").isEmpty();
+        assertThat(host.windowTabs(main)).as("a pane beside the shell, in its tab").hasSize(1);
+        assertThat(host.windowTabs(main).getFirst()).hasSize(2).startsWith(shell);
+        assertThat(window.selected().orElseThrow().session().name()).isEqualTo("a.txt");
+        assertThat(recorded).containsExactly(LocalDocument.key(a));
+        host.queueFileChoice(List.of(new FileLocation.Local(b)));
+        window.openBeside(handle, dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN);
+        drain();
+        assertThat(host.windowTabs(main)).hasSize(1);
+        assertThat(host.windowTabs(main).getFirst()).as("beside the focused file, in the same tab").hasSize(3).startsWith(shell);
+        assertThat(window.selected().orElseThrow().session().name()).isEqualTo("b.txt");
+        assertThat(host.fileChoices().getLast().initial()).as("from an Editor file, in its folder")
+            .contains(new FileLocation.Local(home));
+    }
+
+    /**
+     * Pane flexibility spec 3 and workspace plan 9a Rulings 4: Open File Right of a file that is open already shows its
+     * open pane, as Open in Editor… does, records it again and opens nothing.
+     */
+    @Test void openBesideOfAFileThatIsOpenShowsItsOpenPane() throws Exception {
+        UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
+        UUID pane = host.addTerminalPane(shell, dev.jasper.sdk.terminal.PaneInfo.unknown());
+        WindowHandle handle = context.terminals().window(main).orElseThrow();
+        Path a = file("a.txt", "a");
+        window.openLocal(a, handle);
+        drain();
+        UUID editor = host.windowTabs(main).get(1).getFirst();
+        host.focusTerminalPane(pane);
+        host.queueFileChoice(List.of(new FileLocation.Local(a)));
+        window.openBeside(handle, dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+        drain();
+        assertThat(host.contentTabs()).as("no second pane").hasSize(1);
+        assertThat(host.windowTabs(main)).containsExactly(List.of(shell), List.of(editor));
+        assertThat(handle.activeTab().map(dev.jasper.sdk.terminal.TabHandle::id)).as("its open pane shows").contains(editor);
+        assertThat(recorded).containsExactly(LocalDocument.key(a), LocalDocument.key(a));
+    }
+
+    /** Pane flexibility spec 3: cancelling the chooser opens nothing. */
+    @Test void cancellingOpenBesideOpensNothing() {
+        UUID main = host.addTerminalWindow();
+        UUID shell = host.addTerminalTab(main, "zsh");
+        host.queueFileChoice(List.of());
+        window.openBeside(context.terminals().window(main).orElseThrow(), dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN);
+        assertThat(host.fileChoices()).hasSize(1);
+        assertThat(host.contentTabs()).isEmpty();
+        assertThat(host.windowTabs(main)).containsExactly(List.of(shell));
+    }
+
+    /** Review Focus 4: in a window that shows no tab, as the main window's empty workspace, the file is its one tab. */
+    @Test void openBesideInAWindowWithNoTabOpensTheFileAsItsOneTab() throws Exception {
+        UUID empty = host.addTerminalWindow();
+        host.queueFileChoice(List.of(new FileLocation.Local(file("a.txt", "a"))));
+        window.openBeside(context.terminals().window(empty).orElseThrow(), dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+        drain();
+        assertThat(host.windowTabs(empty)).hasSize(1).allSatisfy(tab -> assertThat(tab).hasSize(1));
+        assertThat(window.selected().orElseThrow().session().name()).isEqualTo("a.txt");
+    }
+
+    /** A file source's file opens beside through its resolver, which is handed the window, never the Editor's tab. */
+    @Test void openBesideOpensASourcesFileThroughItsResolver() throws Exception {
+        var handed = new ArrayList<WindowOwner>();
+        locations.register("test.hosts", new LocationResolver() {
+            @Override public EditorDocument document(FileLocation.Sourced location, WindowOwner owner) {
+                handed.add(owner);
+                return new StubDocument("stub:" + location.path(), "app.conf", "me@box:" + location.path(), "box");
+            }
+            @Override public Optional<FileLocation.Sourced> location(String key) { return Optional.empty(); }
+        });
+        UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
+        WindowHandle handle = context.terminals().window(main).orElseThrow();
+        host.queueFileChoice(List.of(new FileLocation.Sourced("test.hosts", "box", "/srv/app.conf")));
+        window.openBeside(handle, dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+        drain();
+        assertThat(handed).hasSize(1).allSatisfy(owner -> assertThat(owner).isInstanceOf(WindowHandle.class));
+        assertThat(host.windowTabs(main).getFirst()).hasSize(2).startsWith(shell);
+    }
+
+    /** {@code openDocumentBeside} opens beside a pane, right or down, and nowhere else. */
+    @Test void openDocumentBesideTakesOnlyTheSplitPlacements() throws Exception {
+        UUID main = host.addTerminalWindow();
+        host.addTerminalTab(main, "zsh");
+        WindowHandle handle = context.terminals().window(main).orElseThrow();
+        var document = new LocalDocument(file("a.txt", "a"), context.background());
+        for (var placement : List.of(dev.jasper.sdk.ui.TabPlacement.NEW_TAB, dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW))
+            org.assertj.core.api.Assertions.assertThatIllegalArgumentException().as(placement.name())
+                .isThrownBy(() -> window.openDocumentBeside(document, handle, placement));
+        assertThat(host.contentTabs()).isEmpty();
+    }
+
+    /** Workspace plan 9a Rulings 1: an editor's right-click Split submenu ends an asking item's entries with an ellipsis. */
+    @Test void anEditorsRightClickMenuEndsAnAskingItemsEntriesWithAnEllipsis() throws Exception {
+        context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("dev.jasper.editor.open-file", "Open File").asking(),
+            (shown, placement) -> window.openBeside(shown, placement));
+        UUID main = host.addTerminalWindow();
+        host.addTerminalTab(main, "zsh");
+        window.openLocal(file("a.txt", "a"), context.terminals().window(main).orElseThrow());
+        drain();
+        var popup = window.selected().orElseThrow().area().getPopupMenu();
+        opened(popup);
+        assertThat(texts(submenu(popup, "Split"))).containsExactly("Terminal Right", "Terminal Down", "Open File Right…",
+            "Open File Down…");
+        host.queueFileChoice(List.of());
+        item(submenu(popup, "Split").getMenuComponents(), "Open File Down…").doClick();
+        assertThat(host.fileChoices()).as("the entry runs its action, which asks").hasSize(1);
+    }
+
     /** The menu opening, as a right-click shows it: the Editor's pane entries are built again. */
     private static void opened(javax.swing.JPopupMenu popup) {
         for (var listener : popup.getPopupMenuListeners())

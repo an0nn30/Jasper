@@ -47,12 +47,17 @@ import javax.swing.SwingUtilities;
 public final class EditorPlugin implements Plugin {
     static final String OPEN = "dev.jasper.editor.open", NEW_TAB = "dev.jasper.editor.new_editor_tab", SHOW = "dev.jasper.editor.show",
         NEW_WINDOW = "dev.jasper.editor.new_window", REVERT = "dev.jasper.editor.revert",
-        RELOAD_VIMRC = "dev.jasper.editor.reload_vimrc";
+        RELOAD_VIMRC = "dev.jasper.editor.reload_vimrc", OPEN_IN_PANE = "dev.jasper.editor.open_in_pane";
     /**
      * The Editor's split item (tabs and panes spec 8 and 10): Split Right with Editor, which is New Editor Pane, and Split
      * Down with Editor (workspace plan 8b Rulings 13).
      */
     static final SplitItemSpec SPLIT = SplitItemSpec.of("dev.jasper.editor.editor", "Editor").withIcon("file");
+    /**
+     * The Editor's second split item (pane flexibility spec 3): Open File Right… and Open File Down… ask for a file and open
+     * it in a new pane beside the focused one, so its entries end with an ellipsis (workspace plan 9a Rulings 1 and 2).
+     */
+    static final SplitItemSpec OPEN_FILE = SplitItemSpec.of("dev.jasper.editor.open-file", "Open File").withIcon("file").asking();
 
     private final Executor ui;
     private final BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments;
@@ -124,6 +129,12 @@ public final class EditorPlugin implements Plugin {
         context.actions().register(ActionSpec.of(NEW_TAB, "New Editor Tab").withKeywords(List.of("editor", "new", "tab", "file", "untitled")),
             invoked -> window().newUntitled(invoked.window(), dev.jasper.sdk.ui.TabPlacement.NEW_TAB));
         context.windows().splitItem(SPLIT, (shown, placement) -> window().newUntitled(shown, placement));
+        context.windows().splitItem(OPEN_FILE, (shown, placement) -> window().openBeside(shown, placement));
+        // Pane flexibility spec 3: the File menu's Open in Editor Pane… does what Open File Right does; the menu shows an
+        // action's title, so it is an action of its own (workspace plan 9a Rulings 3). No default key.
+        context.actions().register(ActionSpec.of(OPEN_IN_PANE, "Open in Editor Pane…").withIcon("file")
+                .withKeywords(List.of("editor", "open", "file", "pane", "split", "right")),
+            invoked -> window().openBeside(invoked.window(), dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT));
         // Workspace plan 8b Rulings 20: the tab strip's menu, which hides with one tab, was these two's only place; as
         // actions with no default key they reach the palette and the keymap. Each acts on the window it runs in.
         context.actions().register(ActionSpec.of(REVERT, "Revert to Saved").withKeywords(List.of("editor", "revert", "saved", "discard")),
@@ -169,6 +180,7 @@ public final class EditorPlugin implements Plugin {
         file.add(OPEN);
         file.add(NEW_TAB);
         file.add(SPLIT.rightAction()); // New Editor Pane (workspace plan 8b Rulings 21)
+        file.add(OPEN_IN_PANE); // beside it (pane flexibility spec 3)
         file.add(NEW_WINDOW);
         context.toolbar().add(ToolbarItem.action(NEW_WINDOW));
     }

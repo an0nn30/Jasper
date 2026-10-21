@@ -236,7 +236,9 @@ class EditorPluginTest {
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of(), Set.of(), consumer::set);
             assertThat(consumer.get().windows().splitChoices()).containsExactly(dev.jasper.sdk.ui.SplitChoice.TERMINAL,
                 new dev.jasper.sdk.ui.SplitChoice("Editor", "dev.jasper.editor.split_right_editor", "dev.jasper.editor.split_down_editor",
-                    false));
+                    false),
+                new dev.jasper.sdk.ui.SplitChoice("Open File", "dev.jasper.editor.split_right_open-file",
+                    "dev.jasper.editor.split_down_open-file", true));
             assertThat(host.invoke("dev.jasper.editor.new_editor_tab", main, null)).isTrue();
             assertThat(host.windowTabs(main)).as("a new tab").hasSize(2);
             host.focusTerminalPane(pane);
@@ -247,6 +249,41 @@ class EditorPluginTest {
             assertThat(host.contentTabs()).hasSize(3).allSatisfy(tab -> assertThat(host.contentPresentation(tab).title()).startsWith("Untitled"));
             assertThat(host.menu("FILE")).as("New Editor Tab, then New Editor Pane").containsSubsequence("item:dev.jasper.editor.open",
                 "item:dev.jasper.editor.new_editor_tab", "item:dev.jasper.editor.split_right_editor", "item:dev.jasper.editor.new_window");
+        }
+    }
+
+    /**
+     * Pane flexibility spec 3 and workspace plan 9a Rulings 1 to 3: the Editor's second split item, Open File, lists Open
+     * File Right… and Open File Down…, whose actions ask for a file and open it beside the focused pane; Open in Editor
+     * Pane… does what Open File Right does and sits in the File menu after New Editor Pane. None has a default key.
+     */
+    @Test void openFileIsASplitItemAndOpenInEditorPaneSitsInTheFileMenu() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
+            UUID pane = host.addTerminalPane(shell, dev.jasper.sdk.terminal.PaneInfo.unknown());
+            assertThat(host.actions()).contains("dev.jasper.editor.split_right_open-file|Split Right with Open File…|true",
+                "dev.jasper.editor.split_down_open-file|Split Down with Open File…|true",
+                "dev.jasper.editor.open_in_pane|Open in Editor Pane…|true");
+            for (String id : List.of("dev.jasper.editor.split_right_open-file", "dev.jasper.editor.split_down_open-file",
+                    "dev.jasper.editor.open_in_pane"))
+                assertThat(host.actionSpec(id)).as(id).hasValueSatisfying(spec -> assertThat(spec.defaultBinding()).as("no default key").isEmpty());
+            assertThat(host.menu("FILE")).as("beside New Editor Pane").containsSubsequence("item:dev.jasper.editor.split_right_editor",
+                "item:dev.jasper.editor.open_in_pane", "item:dev.jasper.editor.new_window");
+            Path a = Files.writeString(home.resolve("a.txt"), "a"), b = Files.writeString(home.resolve("b.txt"), "b");
+            host.focusTerminalPane(pane);
+            host.queueFileChoice(List.of(new FileLocation.Local(a)));
+            assertThat(host.invoke("dev.jasper.editor.split_down_open-file", main, pane)).isTrue();
+            drain(host);
+            assertThat(host.windowTabs(main)).as("a pane beside the shell").hasSize(1);
+            assertThat(host.windowTabs(main).getFirst()).hasSize(2).startsWith(shell);
+            host.queueFileChoice(List.of(new FileLocation.Local(b)));
+            assertThat(host.invoke("dev.jasper.editor.open_in_pane", main, null)).isTrue();
+            drain(host);
+            assertThat(host.windowTabs(main).getFirst()).as("Open in Editor Pane… opens one too").hasSize(3);
+            assertThat(host.fileChoices()).extracting(dev.jasper.sdk.files.FileChoice::title)
+                .containsExactly("Open in Editor Pane", "Open in Editor Pane");
+            assertThat(host.failures()).isEmpty();
         }
     }
 

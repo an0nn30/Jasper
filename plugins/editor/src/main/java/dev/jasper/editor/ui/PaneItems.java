@@ -53,8 +53,9 @@ final class PaneItems implements PopupMenuListener {
         if (pane.isClosed()) return;
         var split = DocumentArea.submenu("Split");
         for (SplitChoice choice : choices.get()) {
-            split.add(DocumentArea.plainItem(choice.label() + " Right", () -> splitIfListed(choice, Direction.RIGHT)));
-            split.add(DocumentArea.plainItem(choice.label() + " Down", () -> splitIfListed(choice, Direction.DOWN)));
+            // Worded as Jasper's lists word them: an asking item's end with an ellipsis (pane flexibility spec 3).
+            split.add(DocumentArea.plainItem(choice.rightLabel(), () -> splitIfListed(choice, Direction.RIGHT)));
+            split.add(DocumentArea.plainItem(choice.downLabel(), () -> splitIfListed(choice, Direction.DOWN)));
         }
         var move = DocumentArea.plainItem("Move Pane to New Tab", pane::moveToNewTab);
         move.setEnabled(pane.mayMoveToNewTab());
