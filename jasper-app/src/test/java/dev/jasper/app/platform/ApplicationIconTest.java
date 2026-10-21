@@ -19,7 +19,7 @@ class ApplicationIconTest {
         var normal = ApplicationIcon.images();
         try {
             var branding = dev.jasper.app.testsupport.EnterpriseResources.facts().parsed().orElseThrow().branding();
-            assertThat(branding.present()).isTrue();
+            assertThat(branding).isSameAs(dev.jasper.app.presentation.Branding.NONE);
             assertThat(branding.iconFiles()).isEmpty();
             ApplicationIcon.useLook(branding.iconFiles());
             assertThat(ApplicationIcon.images()).isSameAs(normal);

@@ -39,8 +39,7 @@ class PresentationConformanceTest {
         "type/data/family", "type/data/regular", "type/data/medium",
         "colors/dialog_surface", "colors/navigation_surface",
         "defaults/ui.theme.light", "defaults/ui.theme.dark", "defaults/palette.visible_rows", "defaults/window.toolbar_height",
-        "defaults/window.toolbar", "defaults/dev.jasper.editor/font_family",
-        "branding/product", "branding/icons", "branding/splash_art");
+        "defaults/window.toolbar", "defaults/dev.jasper.editor/font_family");
     /** The official IBM Plex 1.1.0 files (verified fact 11), by their name in the plugin. */
     static final Map<String, String> SUMS = Map.of(
         "presentation/fonts/ibm-plex-sans-regular.ttf", "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
@@ -130,10 +129,10 @@ class PresentationConformanceTest {
         });
     }
 
-    /** Enterprise shares Jasper's icon; its preserved reference assets and active splash art remain intact. */
+    /** Enterprise shares Jasper's icon; its historical reference assets remain intact. */
     @Test void enterpriseSharesJaspersIconAndPreservesItsReferenceArtwork() throws Exception {
         var branding = EnterpriseResources.facts().parsed().orElseThrow().branding();
-        assertThat(branding.product()).isEqualTo("JasperOps");
+        assertThat(branding).isSameAs(dev.jasper.app.presentation.Branding.NONE);
         assertThat(branding.iconFiles()).as("use the shared Shell Prompt platform icon").isEmpty();
         Path reference = EnterpriseResources.ROOT.resolve("docs/design/enterprise/reference");
         var sources = new java.util.LinkedHashMap<Integer, String>();
@@ -157,7 +156,6 @@ class PresentationConformanceTest {
         }
         byte[] art = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/splash/art.svg"));
         assertThat(art).as("the splash art is the reference file").isEqualTo(Files.readAllBytes(reference.resolve("10 Boot Splash/extracted/art.svg")));
-        assertThat(branding.splashArt()).isEqualTo(art);
         assertThat(art.length).isLessThanOrEqualTo(256 * 1024);
     }
 

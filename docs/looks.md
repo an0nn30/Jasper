@@ -491,11 +491,6 @@ medium = "fonts/ibm-plex-mono-medium.ttf"
 dialog_surface = "surface.app"
 navigation_surface = "surface.card"
 
-[branding]
-product = "JasperOps"
-icons = "@jasper"
-splash_art = "splash/art.svg"
-
 [defaults]
 "ui.theme.light" = "enterprise"
 "ui.theme.dark" = "enterprise"
@@ -510,8 +505,7 @@ font_family = "IBM Plex Mono"
 - `base = "classic"`, and `[chrome]`, `[controls]`, `[metrics]`, `[colors]` and `[type] base` restate the classic
   base's values, except `title_bar` (`classic` for the base's `native`), `window_title` and `toolbar_search` (`icon`
   for the base's `field`).
-- The fonts sit in `presentation/fonts/`, the art in
-  `presentation/splash/art.svg`, all inside the kit file's folder.
+- The fonts sit in `presentation/fonts/`, inside the kit file’s folder. Enterprise shares Jasper’s Shell Prompt icon and animated Meadow splash.
 - `[defaults]` makes the plugin's own `enterprise` theme the default for both appearances, shows 8 Run window rows,
   makes the toolbar 28 pixels high, IntelliJ's, and shows its buttons as icons only; its Editor table draws the
   Editor's documents in IBM Plex Mono, the look's data face.

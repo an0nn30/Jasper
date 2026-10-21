@@ -61,11 +61,6 @@ medium = "fonts/ibm-plex-mono-medium.ttf"
 dialog_surface = "surface.app"
 navigation_surface = "surface.card"
 
-[branding]
-product = "JasperOps"
-icons = "@jasper"
-splash_art = "splash/art.svg"
-
 [defaults]
 "ui.theme.light" = "enterprise"
 "ui.theme.dark" = "enterprise"

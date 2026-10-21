@@ -57,14 +57,14 @@ class BootSplashMockTest {
         COPYRIGHT_INK = new Box(568, 398, 678, 407);
 
     static SplashPainter.Content content(KitParser.Parsed parsed) throws java.io.IOException {
-        var branding = parsed.branding();
         var ui = parsed.faces().ui().orElseThrow();
         var data = parsed.faces().data().orElseThrow();
-        // These historical mocks contain the original emblem. Shared Shell Prompt selection is covered by
+        // These historical mocks contain the original branding. Shared Meadow selection is covered by
         // ApplicationBootstrapTest; keep this renderer comparison on the exact reference assets.
         byte[] icon64 = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/icons/icon-64.png"));
         byte[] icon128 = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/icons/icon-128.png"));
-        return new SplashPainter.Content(branding.product(), VERSION, COPYRIGHT, icon64, icon128, branding.splashArt(),
+        return new SplashPainter.Content("JasperOps", VERSION, COPYRIGHT, icon64, icon128,
+            Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/splash/art.svg")),
             Optional.of(ui.semibold().bytes()), Optional.of(ui.regular().bytes()), Optional.of(data.regular().bytes()));
     }
 
