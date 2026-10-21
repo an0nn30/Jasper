@@ -11,126 +11,91 @@ import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-/** Workspace tabs spec 12 and 17: where a dragged tab drops, from the cursor alone, for every zone and overlapping windows. */
+/**
+ * Tabs and panes spec 6 and 7, workspace tabs spec 12 and 17: where a dragged pane or tab drops, from the cursor alone,
+ * and which of overlapping windows takes it.
+ */
 class WorkspaceDropResolverTest {
     private static final GroupId LEFT = GroupId.random(), RIGHT = GroupId.random();
-    /**
-     * Two groups side by side, 6 px apart, under 28 px strips: the left strip shows two tabs besides the dragged one, the
-     * right strip one tab 120 px wide.
-     */
-    private static final List<Area> TWO = List.of(
-        new Area(LEFT, new Rectangle(0, 0, 400, 28), List.of(new Rectangle(0, 0, 200, 28), new Rectangle(200, 0, 200, 28)),
-            new Rectangle(0, 28, 400, 572), true),
-        new Area(RIGHT, new Rectangle(406, 0, 394, 28), List.of(new Rectangle(406, 0, 120, 28)),
-            new Rectangle(406, 28, 394, 572), true));
-    /** One group whose card area is 100 x 80 under a 10 px strip that shows no other tab, for pixel-exact boundaries. */
-    private static final List<Area> SMALL = List.of(new Area(LEFT, new Rectangle(0, 0, 100, 10), List.of(), new Rectangle(0, 10, 100, 80), true));
+    /** Two panes side by side, 6 px apart. */
+    private static final List<Area> TWO = List.of(new Area(LEFT, new Rectangle(0, 0, 400, 600)),
+        new Area(RIGHT, new Rectangle(406, 0, 394, 600)));
+    /** One pane 100 x 80 from 0, 10, for pixel-exact boundaries: the shares are dx / 100 and dy / 80. */
+    private static final List<Area> SMALL = List.of(new Area(LEFT, new Rectangle(0, 10, 100, 80)));
 
     private static Drop at(List<Area> areas, int x, int y) {
         return WorkspaceDropResolver.resolve(new Point(x, y), areas).orElseThrow();
     }
 
-    @Test void overAStripTheTabGoesBeforeTheFirstTabWhoseMiddleIsNotLeftOfTheCursor() {
-        assertThat(at(TWO, 10, 10)).isEqualTo(new Drop.Strip(LEFT, 0));
-        assertThat(at(TWO, 100, 10)).as("on a middle: still before that tab").isEqualTo(new Drop.Strip(LEFT, 0));
-        assertThat(at(TWO, 101, 10)).isEqualTo(new Drop.Strip(LEFT, 1));
-        assertThat(at(TWO, 399, 27)).as("the strip's last pixel").isEqualTo(new Drop.Strip(LEFT, 2));
-        assertThat(at(TWO, 700, 0)).as("the empty end of a strip").isEqualTo(new Drop.Strip(RIGHT, 1));
-        assertThat(at(SMALL, 50, 5)).as("a strip whose only tab is the dragged one").isEqualTo(new Drop.Strip(LEFT, 0));
+    /** Workspace plan 8c Rulings 6: beside the pane under the cursor, on the nearer side; a pane has no centre. */
+    @Test void aPaneGoesBesideThePaneUnderTheCursorOnTheNearestSide() {
+        assertThat(at(TWO, 40, 300)).isEqualTo(new Drop(LEFT, Side.LEFT));
+        assertThat(at(TWO, 360, 300)).isEqualTo(new Drop(LEFT, Side.RIGHT));
+        assertThat(at(TWO, 200, 60)).isEqualTo(new Drop(LEFT, Side.UP));
+        assertThat(at(TWO, 200, 560)).isEqualTo(new Drop(LEFT, Side.DOWN));
+        assertThat(at(TWO, 420, 300)).as("the right pane's own left").isEqualTo(new Drop(RIGHT, Side.LEFT));
+        assertThat(at(TWO, 190, 300)).as("near the middle: still the nearer side").isEqualTo(new Drop(LEFT, Side.LEFT));
+        assertThat(at(TWO, 210, 300)).isEqualTo(new Drop(LEFT, Side.RIGHT));
     }
 
-    @Test void theMiddleOfACardAreaAddsToItsGroup() {
-        assertThat(at(TWO, 200, 300)).isEqualTo(new Drop.Centre(LEFT));
-        assertThat(at(TWO, 603, 314)).isEqualTo(new Drop.Centre(RIGHT));
+    @Test void theSidesAreTheTrianglesBetweenThePanesDiagonalsPixelExact() {
+        assertThat(at(SMALL, 0, 50)).as("the left edge is inside").isEqualTo(new Drop(LEFT, Side.LEFT));
+        assertThat(at(SMALL, 50, 10)).as("the top edge is inside").isEqualTo(new Drop(LEFT, Side.UP));
+        assertThat(at(SMALL, 99, 50)).as("the last column").isEqualTo(new Drop(LEFT, Side.RIGHT));
+        assertThat(at(SMALL, 50, 89)).as("the last row").isEqualTo(new Drop(LEFT, Side.DOWN));
+        assertThat(at(SMALL, 20, 30)).as("a fifth of the width against a quarter of the height").isEqualTo(new Drop(LEFT, Side.LEFT));
+        assertThat(at(SMALL, 30, 30)).as("three tenths against a quarter").isEqualTo(new Drop(LEFT, Side.UP));
+        assertThat(at(SMALL, 50, 20)).isEqualTo(new Drop(LEFT, Side.UP));
+        assertThat(at(SMALL, 80, 60)).isEqualTo(new Drop(LEFT, Side.RIGHT));
     }
 
-    @Test void eachOuterQuarterOfACardAreaSplitsItsSide() {
-        assertThat(at(TWO, 40, 300)).isEqualTo(new Drop.Edge(LEFT, Side.LEFT));
-        assertThat(at(TWO, 360, 300)).isEqualTo(new Drop.Edge(LEFT, Side.RIGHT));
-        assertThat(at(TWO, 200, 60)).as("just under the strip").isEqualTo(new Drop.Edge(LEFT, Side.UP));
-        assertThat(at(TWO, 200, 560)).isEqualTo(new Drop.Edge(LEFT, Side.DOWN));
-        assertThat(at(TWO, 420, 300)).as("the right group's own left quarter").isEqualTo(new Drop.Edge(RIGHT, Side.LEFT));
+    @Test void aTieGoesLeftThenRightThenUpThenDown() {
+        assertThat(at(SMALL, 25, 30)).as("as near the left as the top").isEqualTo(new Drop(LEFT, Side.LEFT));
+        assertThat(at(SMALL, 75, 30)).as("as near the right as the top").isEqualTo(new Drop(LEFT, Side.RIGHT));
+        assertThat(at(SMALL, 75, 70)).as("as near the right as the bottom").isEqualTo(new Drop(LEFT, Side.RIGHT));
+        assertThat(at(SMALL, 50, 50)).as("the middle, as near every side").isEqualTo(new Drop(LEFT, Side.LEFT));
     }
 
-    @Test void theQuartersArePixelExact() {
-        assertThat(at(SMALL, 0, 50)).as("the left edge is inside").isEqualTo(new Drop.Edge(LEFT, Side.LEFT));
-        assertThat(at(SMALL, 24, 50)).isEqualTo(new Drop.Edge(LEFT, Side.LEFT));
-        assertThat(at(SMALL, 25, 50)).isEqualTo(new Drop.Centre(LEFT));
-        assertThat(at(SMALL, 74, 50)).isEqualTo(new Drop.Centre(LEFT));
-        assertThat(at(SMALL, 75, 50)).isEqualTo(new Drop.Edge(LEFT, Side.RIGHT));
-        assertThat(at(SMALL, 50, 29)).isEqualTo(new Drop.Edge(LEFT, Side.UP));
-        assertThat(at(SMALL, 50, 30)).isEqualTo(new Drop.Centre(LEFT));
-        assertThat(at(SMALL, 50, 69)).isEqualTo(new Drop.Centre(LEFT));
-        assertThat(at(SMALL, 50, 70)).isEqualTo(new Drop.Edge(LEFT, Side.DOWN));
-        assertThat(at(SMALL, 99, 89)).as("the last pixel").isEqualTo(new Drop.Edge(LEFT, Side.RIGHT));
-        assertThat(WorkspaceDropResolver.resolve(new Point(100, 50), SMALL)).as("the right edge is not inside").isEmpty();
-        assertThat(WorkspaceDropResolver.resolve(new Point(50, 90), SMALL)).as("nor the bottom edge").isEmpty();
-    }
-
-    @Test void aCornerGoesToTheNearerEdgeAndATieToLeftThenRightThenUpThenDown() {
-        assertThat(at(SMALL, 10, 15)).as("nearer the top").isEqualTo(new Drop.Edge(LEFT, Side.UP));
-        assertThat(at(SMALL, 5, 20)).as("nearer the left").isEqualTo(new Drop.Edge(LEFT, Side.LEFT));
-        assertThat(at(SMALL, 5, 14)).as("as near the left as the top").isEqualTo(new Drop.Edge(LEFT, Side.LEFT));
-        assertThat(at(SMALL, 95, 86)).as("as near the right as the bottom").isEqualTo(new Drop.Edge(LEFT, Side.RIGHT));
-    }
-
-    @Test void theEmptyWorkspacesGroupIsItsCentreEverywhere() {
-        var empty = List.of(new Area(LEFT, new Rectangle(), List.of(), new Rectangle(0, 0, 800, 600), false));
-        assertThat(at(empty, 0, 0)).isEqualTo(new Drop.Centre(LEFT));
-        assertThat(at(empty, 400, 300)).isEqualTo(new Drop.Centre(LEFT));
-        assertThat(at(empty, 799, 599)).isEqualTo(new Drop.Centre(LEFT));
-        assertThat(empty.getFirst().bounds()).as("with no strip, its whole is its card area").isEqualTo(new Rectangle(0, 0, 800, 600));
-    }
-
-    @Test void nothingBetweenOrOutsideTheGroups() {
+    @Test void nothingBetweenOrOutsideThePanes() {
         assertThat(WorkspaceDropResolver.resolve(new Point(403, 300), TWO)).as("the divider").isEmpty();
         assertThat(WorkspaceDropResolver.resolve(new Point(900, 10), TWO)).isEmpty();
         assertThat(WorkspaceDropResolver.resolve(new Point(-1, 10), TWO)).isEmpty();
+        assertThat(WorkspaceDropResolver.resolve(new Point(100, 50), SMALL)).as("the right edge is not inside").isEmpty();
+        assertThat(WorkspaceDropResolver.resolve(new Point(50, 90), SMALL)).as("nor the bottom edge").isEmpty();
+        assertThat(WorkspaceDropResolver.resolve(new Point(50, 50), List.of())).as("no pane").isEmpty();
     }
 
-    @Test void theLandingIsTheWholeGroupItsHalfOnASideOrABarInTheStrip() {
-        Rectangle whole = new Rectangle(0, 0, 400, 600);
-        assertThat(TWO.getFirst().bounds()).as("the strip and the card area").isEqualTo(whole);
-        assertThat(WorkspaceDropResolver.landing(new Drop.Centre(LEFT), TWO, 2)).isEqualTo(whole);
-        assertThat(WorkspaceDropResolver.landing(new Drop.Edge(LEFT, Side.LEFT), TWO, 2)).isEqualTo(new Rectangle(0, 0, 200, 600));
-        assertThat(WorkspaceDropResolver.landing(new Drop.Edge(LEFT, Side.RIGHT), TWO, 2)).isEqualTo(new Rectangle(200, 0, 200, 600));
-        assertThat(WorkspaceDropResolver.landing(new Drop.Edge(LEFT, Side.UP), TWO, 2)).isEqualTo(new Rectangle(0, 0, 400, 300));
-        assertThat(WorkspaceDropResolver.landing(new Drop.Edge(LEFT, Side.DOWN), TWO, 2)).isEqualTo(new Rectangle(0, 300, 400, 300));
-        assertThat(WorkspaceDropResolver.landing(new Drop.Edge(RIGHT, Side.RIGHT), TWO, 2)).as("an odd width: the new group's half")
+    @Test void theLandingIsThePanesHalfOnItsSide() {
+        assertThat(WorkspaceDropResolver.landing(new Drop(LEFT, Side.LEFT), TWO)).isEqualTo(new Rectangle(0, 0, 200, 600));
+        assertThat(WorkspaceDropResolver.landing(new Drop(LEFT, Side.RIGHT), TWO)).isEqualTo(new Rectangle(200, 0, 200, 600));
+        assertThat(WorkspaceDropResolver.landing(new Drop(LEFT, Side.UP), TWO)).isEqualTo(new Rectangle(0, 0, 400, 300));
+        assertThat(WorkspaceDropResolver.landing(new Drop(LEFT, Side.DOWN), TWO)).isEqualTo(new Rectangle(0, 300, 400, 300));
+        assertThat(WorkspaceDropResolver.landing(new Drop(RIGHT, Side.RIGHT), TWO)).as("an odd width: the new pane's half")
             .isEqualTo(new Rectangle(603, 0, 197, 600));
-        assertThat(WorkspaceDropResolver.landing(new Drop.Strip(LEFT, 1), TWO, 2)).as("between the two tabs")
-            .isEqualTo(new Rectangle(199, 0, 2, 28));
-        assertThat(WorkspaceDropResolver.landing(new Drop.Strip(LEFT, 0), TWO, 2)).as("before the first, kept inside the strip")
-            .isEqualTo(new Rectangle(0, 0, 2, 28));
-        assertThat(WorkspaceDropResolver.landing(new Drop.Strip(LEFT, 2), TWO, 2)).as("after the last, kept inside the strip")
-            .isEqualTo(new Rectangle(398, 0, 2, 28));
-        assertThat(WorkspaceDropResolver.landing(new Drop.Strip(RIGHT, 1), TWO, 2)).as("after the last, mid-strip")
-            .isEqualTo(new Rectangle(525, 0, 2, 28));
-        assertThat(WorkspaceDropResolver.landing(new Drop.Strip(LEFT, 0), SMALL, 2)).as("a strip with no other tab: its start")
-            .isEqualTo(new Rectangle(0, 0, 2, 10));
-        assertThatIllegalArgumentException().isThrownBy(() -> WorkspaceDropResolver.landing(new Drop.Centre(GroupId.random()), TWO, 2));
+        assertThatIllegalArgumentException().isThrownBy(() -> WorkspaceDropResolver.landing(new Drop(GroupId.random(), Side.LEFT), TWO));
     }
 
-    /** Parent tabs spec 5 and workspace plan 7c Rulings 2: a parent tab's place in a bar follows the strip rule. */
-    @Test void aParentTabGoesBeforeTheFirstOtherEntryOfABarWhoseMiddleIsNotLeftOfTheCursor() {
+    /** Tabs and panes spec 6 and workspace plan 7c Rulings 2: a tab's place in a strip follows the strip rule. */
+    @Test void aTabGoesBeforeTheFirstOtherEntryOfAStripWhoseMiddleIsNotLeftOfTheCursor() {
         Rectangle bar = new Rectangle(0, 0, 600, 28);
         List<Rectangle> entries = List.of(new Rectangle(0, 0, 200, 28), new Rectangle(400, 0, 200, 28));
         assertThat(WorkspaceDropResolver.place(new Point(10, 10), bar, entries)).hasValue(0);
-        assertThat(WorkspaceDropResolver.place(new Point(0, 0), bar, entries)).as("the bar's left and top edges are inside")
+        assertThat(WorkspaceDropResolver.place(new Point(0, 0), bar, entries)).as("the strip's left and top edges are inside")
             .hasValue(0);
         assertThat(WorkspaceDropResolver.place(new Point(100, 10), bar, entries)).as("on a middle: still before that entry")
             .hasValue(0);
         assertThat(WorkspaceDropResolver.place(new Point(101, 10), bar, entries)).hasValue(1);
-        assertThat(WorkspaceDropResolver.place(new Point(599, 27), bar, entries)).as("the bar's last pixel").hasValue(2);
-        assertThat(WorkspaceDropResolver.place(new Point(300, 5), bar, List.of())).as("a bar with no other entry").hasValue(0);
-        assertThat(WorkspaceDropResolver.place(new Point(300, 28), bar, entries)).as("just under the bar").isEmpty();
+        assertThat(WorkspaceDropResolver.place(new Point(599, 27), bar, entries)).as("the strip's last pixel").hasValue(2);
+        assertThat(WorkspaceDropResolver.place(new Point(300, 5), bar, List.of())).as("a strip with no other entry").hasValue(0);
+        assertThat(WorkspaceDropResolver.place(new Point(300, 28), bar, entries)).as("just under the strip").isEmpty();
         assertThat(WorkspaceDropResolver.place(new Point(-1, 10), bar, entries)).isEmpty();
         assertThat(WorkspaceDropResolver.marker(bar, entries, 1, 2)).as("between the two entries")
             .isEqualTo(new Rectangle(299, 0, 2, 28));
-        assertThat(WorkspaceDropResolver.marker(bar, entries, 2, 2)).as("after the last, kept inside the bar")
+        assertThat(WorkspaceDropResolver.marker(bar, entries, 2, 2)).as("after the last, kept inside the strip")
             .isEqualTo(new Rectangle(598, 0, 2, 28));
-        assertThat(WorkspaceDropResolver.marker(bar, List.of(), 0, 2)).as("no other entry: the bar's start")
+        assertThat(WorkspaceDropResolver.marker(bar, List.of(), 0, 2)).as("no other entry: the strip's start")
             .isEqualTo(new Rectangle(0, 0, 2, 28));
     }
 
@@ -159,13 +124,13 @@ class WorkspaceDropResolverTest {
             .isEqualTo(OptionalInt.of(1));
     }
 
-    @Test void anAreaKeepsItsOwnRectangles() {
-        Rectangle strip = new Rectangle(0, 0, 100, 10);
-        var area = new Area(LEFT, strip, List.of(new Rectangle(0, 0, 50, 10)), new Rectangle(0, 10, 100, 80), true);
-        strip.width = 1;
-        area.strip().width = 2;
-        area.tabs().getFirst().width = 3;
-        assertThat(area.strip()).isEqualTo(new Rectangle(0, 0, 100, 10));
-        assertThat(area.tabs()).containsExactly(new Rectangle(0, 0, 50, 10));
+    @Test void anAreaKeepsItsOwnRectangleAndADropNeedsBoth() {
+        Rectangle bounds = new Rectangle(0, 0, 100, 80);
+        var area = new Area(LEFT, bounds);
+        bounds.width = 1;
+        area.bounds().width = 2;
+        assertThat(area.bounds()).isEqualTo(new Rectangle(0, 0, 100, 80));
+        assertThatNullPointerException().isThrownBy(() -> new Drop(LEFT, null));
+        assertThatNullPointerException().isThrownBy(() -> new Area(null, bounds));
     }
 }

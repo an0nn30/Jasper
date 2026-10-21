@@ -3,8 +3,10 @@ package dev.jasper.app.workspace;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static dev.jasper.app.workspace.TabDragTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
+import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
@@ -13,12 +15,14 @@ import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.Node;
 import dev.jasper.app.layout.Orientation;
 import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import java.awt.Component;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -29,6 +33,7 @@ import java.util.List;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
+import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -378,6 +383,281 @@ class PaneDragTest {
             assertThat(shell[0].tabDrag().movingPane()).isTrue();
             assertThat(mouse(source, MouseEvent.MOUSE_RELEASED, to, PANE).isConsumed()).isTrue();
             assertThat(view.hasSelection()).as("no selection").isFalse();
+        });
+    }
+
+    /**
+     * Tabs and panes spec 7 and workspace plan 8c Rulings 6 and 12: a pane dropped on another pane of its tab goes beside
+     * it on the side whose edge the cursor is nearest; the landing shows that half; nothing reaches the tab registry.
+     */
+    @Test void aPaneDropsBesideAnotherPaneOfItsTabOnTheNearestSide() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            GroupView under = owner.workspace().groupView(c.group().orElseThrow());
+            Point low = inside(pane(owner, under.id()), 0.5, 0.9);
+            facts.clear();
+            Component source = startPane(owner, a, low);
+            assertThat(drag.target()).contains(new TabDrag.Target.Beside(owner, under.id(), Side.DOWN));
+            var layers = SwingUtilities.getRootPane(owner).getLayeredPane();
+            assertThat(drag.overlay().getParent()).as("the landing shows in its window").isSameAs(layers);
+            assertThat(drag.overlay().highlight()).as("c's lower half").isEqualTo(SwingUtilities.convertRectangle(under,
+                new Rectangle(0, under.getHeight() - under.getHeight() / 2, under.getWidth(), under.getHeight() / 2), layers));
+            mouse(source, MouseEvent.MOUSE_RELEASED, low, PANE);
+            assertThat(shape(owner)).isEqualTo("V[b, c, a]");
+            assertThat(owner.selectedTab()).as("the moved pane is the active one").isSameAs(a);
+            assertThat(owner.parentTabCount()).isEqualTo(2);
+            assertThat(moves()).as("within its window: no TAB_MOVED").isEmpty();
+            assertThat(drag.overlay().getParent()).isNull();
+        });
+    }
+
+    /** Tabs and panes spec 7 and workspace plan 8c Rulings 7: over its own pane, a divider or the title bar a pane takes no drop. */
+    @Test void aPaneOverItsOwnPaneADividerOrTheTitleBarTakesNoDrop() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Component source = startPane(owner, b, inside(pane(owner, b.group().orElseThrow()), 0.9, 0.9));
+            assertThat(drag.active()).isTrue();
+            assertThat(drag.target()).as("its own pane, near an edge").isEmpty();
+            assertThat(drag.overlay().getParent()).isNull();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, middle(owner.workspace().split(List.of()).divider(0)), PANE);
+            assertThat(drag.target()).as("the divider between a and the column").isEmpty();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onTitleBar(frame), PANE);
+            assertThat(drag.target()).as("the title bar").isEmpty();
+            mouse(source, MouseEvent.MOUSE_RELEASED, onTitleBar(frame), PANE);
+            assertThat(shape(owner)).isEqualTo("H[a, V[b, c]]");
+        });
+    }
+
+    /**
+     * Tabs and panes spec 7 and 13: hovering another tab's entry shows that tab at once, with no drop of its own, and a
+     * pane of it then takes the pane, which leaves its tab and shows in its new one.
+     */
+    @Test void hoveringATabsEntryShowsItAndAPaneOfItTakesTheDrop() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Component source = startPane(owner, c, onEntry(owner, d, 0.5));
+            assertThat(owner.activeParentTab()).as("the hovered tab shows at once").isEqualTo(second);
+            assertThat(drag.target()).as("an entry takes no drop").isEmpty();
+            Point right = inside(pane(owner, d.group().orElseThrow()), 0.9, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, right, PANE);
+            assertThat(drag.target()).contains(new TabDrag.Target.Beside(owner, d.group().orElseThrow(), Side.RIGHT));
+            facts.clear();
+            mouse(source, MouseEvent.MOUSE_RELEASED, right, PANE);
+            assertThat(owner.activeParentTab()).as("the tab it landed in shows").isEqualTo(second);
+            assertThat(shape(owner)).isEqualTo("H[d, c]");
+            assertThat(owner.selectedTab()).isSameAs(c);
+            assertThat(moves()).isEmpty();
+            assertThat(announced()).as("announced once, where it lands")
+                .containsExactly(new TerminalEvent.TabSelected(owner.id(), c.id().value()));
+            owner.selectParentTab(first);
+            assertThat(shape(owner)).as("its old tab keeps its other panes").isEqualTo("H[a, b]");
+        });
+    }
+
+    /**
+     * Tabs and panes spec 13 and Review Focus 3: a drag that showed another tab and ends elsewhere shows the tab that
+     * showed before again, its item focused: after Esc, and after a release over nothing.
+     */
+    @Test void aDragEndingElsewhereShowsTheTabThatShowedBefore() throws Exception {
+        edt(() -> {
+            int[] focused = {0};
+            b.focusTarget(() -> focused[0]++);
+            Point entry = onEntry(owner, d, 0.5);
+            Component source = startPane(owner, b, entry);
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+            focused[0] = 0;
+            assertThat(esc()).isTrue();
+            assertThat(owner.activeParentTab()).as("after Esc").isEqualTo(first);
+            assertThat(owner.selectedTab()).isSameAs(b);
+            assertThat(focused[0]).as("its item takes the focus again").isPositive();
+            mouse(source, MouseEvent.MOUSE_RELEASED, entry, PANE);
+            source = startPane(owner, b, entry, onTitleBar(frame));
+            assertThat(owner.activeParentTab()).as("still the hovered tab while the drag runs").isEqualTo(second);
+            mouse(source, MouseEvent.MOUSE_RELEASED, onTitleBar(frame), PANE);
+            assertThat(owner.activeParentTab()).as("after a release over the title bar").isEqualTo(first);
+            assertThat(shape(owner)).isEqualTo("H[a, V[b, c]]");
+        });
+    }
+
+    /** Tabs and panes spec 7: a tab's last pane moved into another tab of its window takes its tab with it. */
+    @Test void aTabsLastPaneMovedIntoAnotherTabClosesItsTab() throws Exception {
+        edt(() -> {
+            owner.selectParentTab(second);
+            Tab shownThere = owner.parentTabs().view(first).orElseThrow().selected();
+            Component source = startPane(owner, d, onEntry(owner, shownThere, 0.5));
+            assertThat(owner.activeParentTab()).isEqualTo(first);
+            Point left = inside(pane(owner, a.group().orElseThrow()), 0.1, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, left, PANE);
+            mouse(source, MouseEvent.MOUSE_RELEASED, left, PANE);
+            assertThat(owner.parentTabCount()).as("its tab went with it").isEqualTo(1);
+            assertThat(shape(owner)).isEqualTo("H[d, a, V[b, c]]");
+            assertThat(owner.tabBar().component().isVisible()).as("one tab: the strip hides").isFalse();
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17's cases: a terminal opens beside "c" and is selected, so the registry, which takes this
+     * window as its active one, has an active pane to report; "a", "b" and "c", the plugin views a move of the terminal
+     * leaves behind, record into {@code heard} every activation change they hear from then on.
+     *
+     * @return the terminal's item
+     */
+    private Tab shellBesideC(List<Boolean> heard) {
+        owner.selectTab(c);
+        TerminalContent terminal = owner.split(Side.RIGHT);
+        Tab shell = owner.selectedTab();
+        assertThat(shell.content()).isSameAs(terminal);
+        terminals.windowActivated(owner.id());
+        for (Tab left : List.of(a, b, c)) left.onActive(heard::add);
+        facts.clear();
+        return shell;
+    }
+
+    /** What the registry heard of selections, moves, closes and the active pane since {@link #facts} was last cleared. */
+    private List<TerminalEvent> announced() {
+        return facts.stream().filter(fact -> fact instanceof TerminalEvent.TabSelected || fact instanceof TerminalEvent.TabMoved
+            || fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.ActivePaneChanged).toList();
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: the selected item's pane moved beside a pane of another tab of its window is announced
+     * once, where it lands. It stays the selected item, so the registry hears no selection, move, close or active pane,
+     * and no item of the tab it left turns active on the way. This pins {@code movePane} itself, called while the item's
+     * own tab shows: a drag shows the other tab first (Rulings 4), so its drop announces the moved item once, which
+     * {@code hoveringATabsEntryShowsItAndAPaneOfItTakesTheDrop} pins.
+     */
+    @Test void aPaneMovedIntoAnotherTabIsAnnouncedOnceWhereItLands() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<Boolean>();
+            Tab shell = shellBesideC(heard);
+            owner.movePane(shell, d.group().orElseThrow(), Side.RIGHT);
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+            assertThat(owner.workspace().tabs()).containsExactly(d, shell);
+            assertThat(owner.selectedTab()).isSameAs(shell);
+            assertThat(announced()).as("nothing changed for the registry").isEmpty();
+            assertThat(heard).as("no item it left turns active").isEmpty();
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: Move Pane to New Tab, plan 8b's command, is announced once too, where the pane lands,
+     * though the command announced its old tab's next pane before this plan.
+     */
+    @Test void movePaneToNewTabIsAnnouncedOnceWhereThePaneLands() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<Boolean>();
+            Tab shell = shellBesideC(heard);
+            owner.updateActions();
+            owner.invoke(ActionId.MOVE_PANE_TO_NEW_TAB);
+            assertThat(owner.parentTabCount()).isEqualTo(3);
+            assertThat(owner.workspace().tabs()).as("its own tab, shown").containsExactly(shell);
+            assertThat(announced()).as("nothing changed for the registry").isEmpty();
+            assertThat(heard).as("no item it left turns active").isEmpty();
+        });
+    }
+
+    /** A plugin's view whose next showing throws once armed, as a view that fails to take its new pane does. */
+    private static final class Refusing extends JPanel {
+        boolean armed;
+
+        @Override public void setVisible(boolean visible) {
+            if (visible && armed) {
+                armed = false;
+                throw new IllegalStateException("refused");
+            }
+            super.setVisible(visible);
+        }
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: a pane that fails to land goes back where it was, beside another tab's pane and into a
+     * new tab alike: the window's tabs and layouts as they were, the item in its pane, nothing closed, and the failure
+     * propagates.
+     */
+    @Test void aPaneThatFailsToLandGoesBackWhereItWas() throws Exception {
+        edt(() -> {
+            var refusing = new Refusing();
+            Tab notes = view("notes", refusing, TabRegistry.Placement.SPLIT_RIGHT);
+            var before = owner.windowLayout();
+            var pane = notes.group().orElseThrow();
+            refusing.armed = true;
+            assertThatThrownBy(() -> owner.movePane(notes, d.group().orElseThrow(), Side.RIGHT)).hasMessage("refused");
+            assertThat(owner.windowLayout()).as("beside another tab's pane").isEqualTo(before);
+            assertThat(refusing.getParent()).as("back in its pane").isSameAs(owner.workspace().groupView(pane));
+            refusing.armed = true;
+            assertThatThrownBy(() -> owner.moveToNewTab(notes)).hasMessage("refused");
+            assertThat(owner.windowLayout()).as("into a new tab").isEqualTo(before);
+            assertThat(refusing.getParent()).isSameAs(owner.workspace().groupView(pane));
+            assertThat(notes.closed()).as("nothing closes").isFalse();
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: a tab's last pane that fails to land beside another tab's pane goes back, its tab
+     * standing as it stood; once it lands, its tab goes with it (spec 4).
+     */
+    @Test void aTabsLastPaneThatFailsToLandKeepsItsTab() throws Exception {
+        edt(() -> {
+            var refusing = new Refusing();
+            Tab notes = view("notes", refusing, TabRegistry.Placement.NEW_TAB);
+            owner.selectParentTab(first);
+            var before = owner.windowLayout();
+            var pane = notes.group().orElseThrow();
+            ParentTabId own = owner.parentTabOf(notes).orElseThrow();
+            refusing.armed = true;
+            assertThatThrownBy(() -> owner.movePane(notes, a.group().orElseThrow(), Side.LEFT)).hasMessage("refused");
+            assertThat(owner.windowLayout()).isEqualTo(before);
+            assertThat(refusing.getParent()).as("back in its pane")
+                .isSameAs(owner.parentTabs().view(own).orElseThrow().groupView(pane));
+            assertThat(notes.closed()).as("nothing closes").isFalse();
+            owner.movePane(notes, a.group().orElseThrow(), Side.LEFT);
+            assertThat(owner.parentTabCount()).as("its tab went with it").isEqualTo(2);
+            assertThat(shape(owner)).isEqualTo("H[notes, a, V[b, c]]");
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 17: a new tab that fails once it stands in the strip, where a displayable window first
+     * gives its item's view a peer, goes again, and the pane goes back where it was.
+     */
+    @Test void aNewTabThatFailsOnceItStandsGoesAgain() throws Exception {
+        edt(() -> {
+            boolean[] armed = {false};
+            owner.parentTabs().addContainerListener(new java.awt.event.ContainerAdapter() {
+                @Override public void componentAdded(java.awt.event.ContainerEvent event) {
+                    if (!armed[0]) return;
+                    armed[0] = false;
+                    throw new IllegalStateException("refused");
+                }
+            });
+            var before = owner.windowLayout();
+            var pane = c.group().orElseThrow();
+            armed[0] = true;
+            assertThatThrownBy(() -> owner.moveToNewTab(c)).hasMessage("refused");
+            assertThat(owner.windowLayout()).isEqualTo(before);
+            assertThat(owner.parentTabs().views()).as("no tab stays behind").hasSize(2);
+            assertThat(c.component().getParent()).as("back in its pane").isSameAs(owner.workspace().groupView(pane));
+        });
+    }
+
+    /** Tabs and panes spec 13 and Review Focus 4: a pane dropped into a tab whose pane is maximized ends the maximize. */
+    @Test void aDropIntoAMaximizedTabEndsItsMaximize() throws Exception {
+        edt(() -> {
+            owner.selectParentTab(second);
+            view("e", TabRegistry.Placement.SPLIT_RIGHT);
+            owner.selectTab(d);
+            owner.workspace().toggleMaximize();
+            owner.selectParentTab(first);
+            relayout(frame);
+            Component source = startPane(owner, b, onEntry(owner, d, 0.5));
+            assertThat(owner.workspace().model().maximized()).as("the hovered tab shows maximized").isPresent();
+            Point right = inside(pane(owner, d.group().orElseThrow()), 0.9, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, right, PANE);
+            assertThat(owner.tabDrag().target()).as("only the maximized pane shows")
+                .contains(new TabDrag.Target.Beside(owner, d.group().orElseThrow(), Side.RIGHT));
+            mouse(source, MouseEvent.MOUSE_RELEASED, right, PANE);
+            assertThat(owner.workspace().model().maximized()).as("the maximize ends").isEmpty();
+            assertThat(shape(owner)).isEqualTo("H[d, b, e]");
         });
     }
 }

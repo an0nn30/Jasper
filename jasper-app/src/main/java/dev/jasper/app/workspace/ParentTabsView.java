@@ -4,6 +4,7 @@ import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
@@ -157,14 +158,95 @@ final class ParentTabsView extends JPanel {
     /**
      * Move Pane to New Tab (tabs and panes spec 9): {@code tab} leaves its tab, whose other panes stay, for a new tab right
      * after it in the strip, which shows. Its component moves between the two workspaces: nothing closes, nothing leaves
-     * the window, and the registry hears no move. Nothing for a tab's only pane or an item the window does not hold.
+     * the window, and the registry hears no move. The window announces it once, where it lands, and a new tab that fails
+     * to take it leaves it where it was (workspace plan 8c Rulings 17). Nothing for a tab's only pane or an item the
+     * window does not hold.
      */
     void moveToNewTab(Tab tab) {
         WorkspaceView from = holding(tab).orElse(null);
         if (closed || from == null || from.tabCount() < 2) return;
         int at = model.indexOf(from.id()) + 1;
-        from.remove(tab);
-        openParentTab(tab, ParentTabId.random(), at);
+        Layout before = from.model();
+        ParentTabs strip = model;
+        ParentTabId id = ParentTabId.random();
+        owner.held(() -> {
+            try {
+                from.remove(tab);
+                openParentTab(tab, id, at);
+            } catch (RuntimeException | Error failure) {
+                // A new tab that stood when the failure came goes again before its item goes back.
+                WorkspaceView opened = views.remove(id);
+                if (opened != null) {
+                    model = strip;
+                    try {
+                        super.remove(opened);
+                        opened.close();
+                        reveal(active());
+                    } catch (RuntimeException | Error undone) {
+                        failure.addSuppressed(undone);
+                    }
+                }
+                undo(failure, tab, from, before, null, null);
+                throw failure;
+            }
+        });
+    }
+
+    /**
+     * Moves {@code tab}'s pane beside the pane {@code group} of this window, on {@code side} (tabs and panes spec 7): within
+     * its own tab a layout change ({@link WorkspaceView#moveToNewGroup}); into another tab it leaves its tab, which goes
+     * with its last pane (spec 4), and joins that one, which shows, its maximize ending (spec 13). Its component moves
+     * between the workspaces: nothing closes, nothing leaves the window and the registry hears no move. Into another tab
+     * the window announces it once, where it lands, and a pane that fails to land goes back where it was (workspace plan
+     * 8c Rulings 17). Nothing for an item or a pane the window does not hold, or for the item's own pane; the focus stays
+     * where it is, for the caller to move.
+     */
+    void moveBeside(Tab tab, GroupId group, Side side) {
+        WorkspaceView from = holding(tab).orElse(null), to = holding(group).orElse(null);
+        if (closed || from == null || to == null || from.model().groupOf(tab.id()).filter(group::equals).isPresent()) return;
+        if (from == to) {
+            from.moveToNewGroup(tab, group, side);
+            return;
+        }
+        Layout left = from.model(), joined = to.model();
+        ParentTabs strip = model;
+        // A tab's last pane takes its tab out of the strip first, as no tab beside others may be empty (spec 4); its
+        // workspace stands until the pane has landed, so a pane that fails to land goes back into it.
+        boolean last = from.tabCount() == 1, focused = last && from == active() && WorkspaceView.holdsFocus(owner, this);
+        owner.held(() -> {
+            try {
+                if (last) {
+                    model = model.remove(from.id());
+                    views.remove(from.id());
+                }
+                from.remove(tab);
+                to.openBeside(tab, group, side);
+            } catch (RuntimeException | Error failure) {
+                undo(failure, tab, from, left, to, joined);
+                if (last) {
+                    views.put(from.id(), from);
+                    model = strip;
+                }
+                throw failure;
+            }
+            if (last) discard(from, focused);
+            select(to.id());
+        });
+    }
+
+    /**
+     * Takes back a pane move whose landing failed (workspace plan 8c Rulings 17): {@code to}, when it was to take the pane,
+     * and {@code from} return to the layouts they had, {@code from} holding {@code tab} again, so nothing closes. A
+     * failure of that is suppressed under {@code failure}, which the caller rethrows.
+     */
+    private static void undo(Throwable failure, Tab tab, WorkspaceView from, Layout fromBefore, WorkspaceView to,
+                             Layout toBefore) {
+        try {
+            if (to != null) to.restore(tab, toBefore);
+            from.restore(tab, fromBefore);
+        } catch (RuntimeException | Error undone) {
+            failure.addSuppressed(undone);
+        }
     }
 
     /**
@@ -200,9 +282,25 @@ final class ParentTabsView extends JPanel {
             view.remove(tab);
             return;
         }
+        drop(view);
+    }
+
+    /**
+     * Takes the tab {@code view}, whose last pane closed or left, out of the strip with its workspace: the one used before
+     * it shows, and takes the focus when the tab held it (spec 4; workspace plan 7a Rulings 2, 6 and 10).
+     */
+    private void drop(WorkspaceView view) {
         boolean held = view == active() && WorkspaceView.holdsFocus(owner, this);
         model = model.remove(view.id());
         views.remove(view.id());
+        discard(view, held);
+    }
+
+    /**
+     * Takes the workspace of {@code view}, a tab the strip's model no longer has, out of the tree and closes it: the tab
+     * that shows then shows, taking the focus when {@code held}.
+     */
+    private void discard(WorkspaceView view, boolean held) {
         super.remove(view);
         view.close();
         reveal(active());

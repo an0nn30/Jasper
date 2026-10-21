@@ -444,12 +444,12 @@ public final class TabRegistry {
     public void move(Tab tab, UUID window) { move(tab, window, next -> next.attach().accept(tab)); }
 
     /**
-     * As {@link #move(Tab, UUID)}, beside {@code group} in that window: into a new group on its {@code side}, as
-     * workspace plan 8c's pane drag moves a tab.
+     * As {@link #move(Tab, UUID)}, into a new pane on {@code side} of the pane {@code group} in that window: a pane dragged
+     * beside another window's pane (tabs and panes spec 7).
      *
      * @param tab the tab
      * @param window the window to move it to
-     * @param group a group of that window
+     * @param group a pane of that window
      * @param side where the new group goes
      * @throws IllegalArgumentException when no workspace {@code window} is registered
      */

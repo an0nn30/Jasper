@@ -25,6 +25,7 @@ import java.awt.Component;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -42,11 +43,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Workspace tabs spec 12, 15 and 17, tabs and panes spec 6: one tab drag across Jasper's windows, on synthetic events,
- * headless. The window manager's windows stand in stand-in frames on a pretend screen, each under a 28 px title bar: the
- * main window at 0,0 (1208 x 800) and a child window beside it at 1400,100 (800 x 600), one tab each holding one
- * terminal, and a new window far away until a test places it. The standard look shows a window's strip from two tabs,
- * so a test gives the window it drags from a second tab first.
+ * Workspace tabs spec 12, 15 and 17, tabs and panes spec 6 and 7: one tab drag, which drags panes too, across Jasper's
+ * windows, on synthetic events, headless. The window manager's windows stand in stand-in frames on a pretend screen,
+ * each under a 28 px title bar: the main window at 0,0 (1208 x 800) and a child window beside it at 1400,100 (800 x
+ * 600), one tab each holding one terminal, and a new window far away until a test places it. The standard look shows a
+ * window's strip from two tabs, so a test gives the window it drags from a second tab first.
  */
 class TabDragWindowsTest {
     private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
@@ -748,5 +749,143 @@ class TabDragWindowsTest {
         assertThat(TabDrag.dropFrame(display, display, false, true, false)).as("elsewhere a window covering its display is in sight")
             .isEqualTo(display);
         assertThat(TabDrag.dropFrame(display, null, false, false, true)).as("no display known").isEqualTo(display);
+    }
+
+    /**
+     * Tabs and panes spec 7 and workspace plan 8c Rulings 12: a pane dropped beside another window's pane moves there
+     * through the tab registry, one TAB_MOVED, its session kept, and shows there; its old tab keeps its other pane.
+     */
+    @Test void aPaneDroppedBesideAnotherWindowsPaneMovesThroughTheRegistry() throws Exception {
+        edt(() -> {
+            main.content().split(Side.RIGHT);
+            relayout(frameOf(main));
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            List<Tab> panes = from.workspace().tabs();
+            Tab stays = panes.get(0), moving = panes.get(1), there = to.selectedTab();
+            GroupId target = there.group().orElseThrow();
+            Object kept = session(moving);
+            Point left = inside(pane(to, target), 0.1, 0.5);
+            facts.clear();
+            Component source = startPane(from, moving, left);
+            assertThat(manager.tabDrag().movingPane()).isTrue();
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.Beside(to, target, Side.LEFT));
+            assertThat(manager.tabDrag().overlay().getParent()).as("the landing shows in the target window")
+                .isSameAs(SwingUtilities.getRootPane(to).getLayeredPane());
+            mouse(source, MouseEvent.MOUSE_RELEASED, left, PANE);
+            assertThat(to.workspace().tabs()).as("beside it, on its left").containsExactly(moving, there);
+            assertThat(to.selectedTab()).as("shown where it landed").isSameAs(moving);
+            assertThat(from.workspace().tabs()).containsExactly(stays);
+            assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(moving.id().value(), main.id(), child.id()));
+            assertThat(session(moving)).as("the same session").isSameAs(kept);
+        });
+    }
+
+    /** Review Focus 5: a full window's last pane dropped into another window moves there, and its window closes after the move. */
+    @Test void aFullWindowsLastPaneLeavingClosesItAfterItsMove() throws Exception {
+        edt(() -> {
+            WindowContent from = child.content(), to = main.content();
+            Tab moving = from.selectedTab(), there = to.selectedTab();
+            Point right = inside(pane(to, there.group().orElseThrow()), 0.9, 0.5);
+            facts.clear();
+            dropPane(from, moving, right);
+            assertThat(to.workspace().tabs()).containsExactly(there, moving);
+            assertThat(child.closed()).as("its last pane moved out").isTrue();
+            assertThat(manager.children()).isEmpty();
+            int moved = facts.indexOf(new TerminalEvent.TabMoved(moving.id().value(), child.id(), main.id()));
+            int closed = facts.indexOf(new TerminalEvent.WindowClosed(child.id()));
+            assertThat(moved).as("TAB_MOVED").isNotNegative();
+            assertThat(closed).as("then WINDOW_CLOSED").isGreaterThan(moved);
+        });
+    }
+
+    /**
+     * Review Focus 5 and spec 4: the main window's only pane dropped beside another window's leaves the main window's
+     * empty workspace, under the id it had, which no other window holds.
+     */
+    @Test void theMainWindowsOnlyPaneLeavingLeavesItsEmptyWorkspace() throws Exception {
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            Tab moving = from.selectedTab(), there = to.selectedTab();
+            ParentTabId emptied = from.activeParentTab();
+            dropPane(from, moving, inside(pane(to, there.group().orElseThrow()), 0.5, 0.9));
+            assertThat(to.workspace().tabs()).as("below it").containsExactly(there, moving);
+            assertThat(main.closed()).isFalse();
+            assertThat(from.parentTabs().isEmpty()).as("the main window's empty workspace").isTrue();
+            assertThat(tabIds(from)).as("its one tab, empty").containsExactly(emptied);
+            assertThat(tabIds(to)).as("no id in two windows").doesNotContain(emptied);
+        });
+    }
+
+    /** Tabs and panes spec 7: a tab's only pane dropped into another window takes its tab with it; its window keeps the other. */
+    @Test void aTabsOnlyPaneLeavingForAnotherWindowTakesItsTab() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            ids[0] = main.content().activeParentTab();
+            ids[1] = secondTab(main);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            Tab moving = entryOf(from, ids[1]), there = to.selectedTab();
+            dropPane(from, moving, inside(pane(to, there.group().orElseThrow()), 0.9, 0.5));
+            assertThat(to.workspace().tabs()).containsExactly(there, moving);
+            assertThat(tabIds(from)).as("its tab went with it").containsExactly(ids[0]);
+            assertThat(from.tabBar().component().isVisible()).as("one tab: the strip hides").isFalse();
+        });
+    }
+
+    /**
+     * Tabs and panes spec 13 and workspace plan 8c Rulings 4 and 5: hovering another window's tab shows it there until the
+     * drag ends elsewhere, when the tab that showed before shows again; a pane of the hovered tab takes the drop.
+     */
+    @Test void hoveringAnotherWindowsTabShowsItUntilTheDragEndsElsewhere() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            ids[0] = child.content().activeParentTab();
+            ids[1] = secondTab(child);
+            main.content().split(Side.RIGHT);
+            relayout(frameOf(main));
+        });
+        launch();
+        edt(() -> recordingKeys(keys -> {
+            WindowContent from = main.content(), to = child.content();
+            Tab moving = from.workspace().tabs().get(1), there = entryOf(to, ids[0]);
+            Point entry = onEntry(to, there, 0.5);
+            Component source = startPane(from, moving, entry);
+            assertThat(to.activeParentTab()).as("the hovered tab shows").isEqualTo(ids[0]);
+            assertThat(keys.send(new KeyEvent(from, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).isTrue();
+            assertThat(to.activeParentTab()).as("Esc: the tab that showed before").isEqualTo(ids[1]);
+            mouse(source, MouseEvent.MOUSE_RELEASED, entry, PANE);
+            source = startPane(from, moving, entry);
+            Point below = inside(pane(to, there.group().orElseThrow()), 0.5, 0.9);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, below, PANE);
+            mouse(source, MouseEvent.MOUSE_RELEASED, below, PANE);
+            assertThat(to.activeParentTab()).as("the tab it landed in shows").isEqualTo(ids[0]);
+            assertThat(to.workspace().tabs()).containsExactly(there, moving);
+        }));
+    }
+
+    /** Tabs and panes spec 7: outside every window a pane drops nothing, and no window opens for it. */
+    @Test void outsideEveryWindowAPaneDropsNothing() throws Exception {
+        edt(() -> {
+            main.content().split(Side.RIGHT);
+            relayout(frameOf(main));
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content();
+            Tab moving = from.workspace().tabs().get(1);
+            Point outside = new Point(3000, 3000);
+            Component source = startPane(from, moving, outside);
+            assertThat(manager.tabDrag().active()).isTrue();
+            assertThat(manager.tabDrag().target()).isEmpty();
+            mouse(source, MouseEvent.MOUSE_RELEASED, outside, PANE);
+            assertThat(manager.windows()).containsExactly(main, child);
+            assertThat(placed).as("no window was placed").isEmpty();
+            assertThat(from.workspace().tabs()).contains(moving);
+        });
     }
 }

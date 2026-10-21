@@ -109,6 +109,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Where tabs moving in land while {@link #receive} runs: a parent tab, and its place in the bar when it is new. */
     private record Landing(ParentTabId parentTab, int index) { }
     private Landing landing;
+    /** Pane moves between this window's tabs under way ({@link #held}): only where the last one ends is announced. */
+    private int holding;
+    /** Whether a change during a held move asked for the focus. */
+    private boolean heldRefocus;
     /** The configured tab motion, which the window's strip takes. */
     private dev.jasper.app.config.AnimationSettings animations = dev.jasper.app.config.AnimationSettings.defaults();
     private final WorkspaceActions workspaceActions;
@@ -1264,11 +1268,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /**
      * A parent tab's layout changed, or the window's parent tabs did (one opened, closed or shows now): the model takes
      * {@code view}'s layout, which is saved, the registry hears the selection, the palette a new active tab; the active
-     * tab takes focus when {@code refocus} and {@code view} is the shown parent tab's.
+     * tab takes focus when {@code refocus} and {@code view} is the shown parent tab's. While a pane moves between tabs
+     * ({@link #held}) only the model takes it, and the rest follows once, where the pane lands.
      */
     void workspaceChanged(WorkspaceView view, boolean refocus) {
         if (closed) return;
         parentTabs.changed(view);
+        // A pane moving between tabs is announced once, where it lands (workspace plan 8c Rulings 17).
+        if (holding > 0) {
+            heldRefocus |= refocus;
+            return;
+        }
         // Every parent tab's layout change and every parent-tab change ends here (workspace plan 6a Rulings 8 and 28): the
         // save is asked for once the model has it, so a listener below that throws costs no save.
         layoutChanged();
@@ -1281,6 +1291,39 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /** Something {@code workspace.toml} saves of this window changed (workspace tabs spec 13). */
     void layoutChanged() { if (!closed) onLayoutChanged.run(); }
+
+    /**
+     * Runs {@code move}, a pane moving between tabs of this window, as one change (workspace plan 8c Rulings 17): while it
+     * runs the parent tabs' model takes each layout as it changes, and the save, the terminal registry, the palette, the
+     * items' activation and the focus hear only where it ends, once, in one registry change. No item is announced
+     * selected or turns active on the way. The move's failure propagates after that, a failure of the announcement
+     * suppressed under it.
+     *
+     * @param move the move
+     */
+    void held(Runnable move) {
+        holding++;
+        Throwable failure = null;
+        try {
+            move.run();
+        } catch (RuntimeException | Error thrown) {
+            failure = thrown;
+            throw thrown;
+        } finally {
+            if (--holding == 0) {
+                boolean refocus = heldRefocus;
+                heldRefocus = false;
+                Runnable landed = () -> workspaceChanged(parentTabs.active(), refocus);
+                try {
+                    if (terminals != null) terminals.atomically(landed); else landed.run();
+                } catch (RuntimeException | Error late) {
+                    // The move's own failure stays the one that propagates.
+                    if (failure == null) throw late;
+                    failure.addSuppressed(late);
+                }
+            }
+        }
+    }
 
     /** The selected plugin tab; null while a terminal tab is selected or the window is empty. */
     public Tab selectedContent() { Tab tab = selectedTab(); return tab != null && tab.kind() == Tab.Kind.HOSTED ? tab : null; }
@@ -1348,6 +1391,22 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * @param tab an item of this window
      */
     void moveToNewTab(Tab tab) { if (mayMoveToNewTab(tab)) parentTabs.moveToNewTab(tab); }
+
+    /**
+     * A pane drag's drop beside {@code group}, a pane of this window (tabs and panes spec 7; workspace plan 8c Rulings
+     * 12): {@code tab}'s pane moves there on {@code side}, within its tab a layout change, into another tab leaving its
+     * tab, which goes with its last pane; the item then takes the focus. Nothing closes, nothing leaves the window and the
+     * registry hears no move. Nothing for an item that is pinned or being closed, or one this window does not hold.
+     *
+     * @param tab an item of this window
+     * @param group another pane of this window
+     * @param side where the item's pane goes
+     */
+    void movePane(Tab tab, GroupId group, Side side) {
+        if (closed || tab == null || !registry.movable(tab) || !parentTabs.contains(tab)) return;
+        parentTabs.moveBeside(tab, group, side);
+        selectTab(tab);
+    }
 
     /**
      * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
@@ -1889,7 +1948,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void updateActions() { workspaceActions.update(); }
 
     void update() {
-        if (closed) return;
+        // A held move's items hear where it ends, once (workspace plan 8c Rulings 17).
+        if (closed || holding > 0) return;
         Tab selected = selectedTab();
         for (Tab tab : tabs()) {
             // Every tab is active while it is the window's active tab; a terminal's dimming also follows the window.

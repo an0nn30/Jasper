@@ -3,9 +3,11 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
+import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.persistence.WorkspaceFile;
 import java.awt.Point;
@@ -350,6 +352,33 @@ public final class WindowManager {
         }
         rethrow(failure);
         return moved;
+    }
+
+    /**
+     * A pane drag's drop beside {@code group}, a pane of {@code to}'s shown tab (tabs and panes spec 7; workspace plan 8c
+     * Rulings 12): {@code tab}'s pane leaves {@code from} for a new pane on {@code side} of it, through the tab registry,
+     * so it reports {@code TAB_MOVED} once and keeps its content and session, and {@code to} shows it, raised, its
+     * maximize ended (spec 13). Its tab in {@code from} goes with its last pane, the main window keeping its empty
+     * workspace, and a full window it empties closes after the move. An item that is pinned or being closed stays.
+     *
+     * @param from the window holding the item
+     * @param tab the item
+     * @param to another main or full window
+     * @param group a pane of {@code to}
+     * @param side where the item's pane goes
+     * @return whether it arrived
+     */
+    public boolean movePane(WindowContent from, Tab tab, WindowContent to, GroupId group, Side side) {
+        requireEdt();
+        if (!mayMovePane(from, tab, to) || to.parentTabs().holding(group).isEmpty()) return false;
+        model.tabs().move(tab, to.id(), group, side);
+        return to.parentTabs().contains(tab);
+    }
+
+    /** Whether {@code tab}, an item of {@code from}, may move to {@code to}, another open window: one the registry moves. */
+    private boolean mayMovePane(WindowContent from, Tab tab, WindowContent to) {
+        return from != null && to != null && from != to && !from.closed() && !to.closed() && from.parentTabs().contains(tab)
+            && model.tabs().movable(tab);
     }
 
     /**

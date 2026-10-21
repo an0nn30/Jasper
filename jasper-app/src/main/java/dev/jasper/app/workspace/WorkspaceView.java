@@ -99,6 +99,16 @@ final class WorkspaceView extends JPanel {
         apply(next);
     }
 
+    /**
+     * Takes back a pane move that failed (workspace plan 8c Rulings 17): this workspace returns to {@code before}, its
+     * layout when the move began, holding {@code tab} again if {@code before} places it and letting it go if not.
+     */
+    void restore(Tab tab, Layout before) {
+        if (before.contains(tab.id())) tabs.put(tab.id(), tab);
+        else tabs.remove(tab.id());
+        apply(before);
+    }
+
     void select(Tab tab) { if (contains(tab)) apply(layout.select(tab.id())); }
 
     /**
