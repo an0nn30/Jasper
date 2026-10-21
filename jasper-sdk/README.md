@@ -11,14 +11,14 @@ plugins built outside this repository; `./gradlew sdkRelease` builds them into `
 
 | Package | Contents |
 | --- | --- |
-| `dev.jasper.sdk` | `JasperSdk.VERSION`, `PluginInfo`, `Variant`, `Subscription`, `WindowOwner`, `Capabilities`, `MissingCapabilityException` |
+| `dev.jasper.sdk` | `JasperSdk.VERSION`, `PluginInfo`, `Variant`, `Subscription`, `WindowOwner`, `RestoreState`, `Capabilities`, `MissingCapabilityException` |
 | `dev.jasper.sdk.plugin` | `Plugin` (the entry point), `PluginContext` |
 | `dev.jasper.sdk.cli` | `CommandLine`, `CommandHandler`, `CommandCall`: answering `jasper` subcommands |
 | `dev.jasper.sdk.settings` | `PluginSettings`, `Setting`, `SettingSpec`, `SettingKind`, `Choice`, `EditorHint`, `Applies`, `SettingsPanel`, `SettingsPanelHost` |
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `ToolbarViewFactory`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `DialogSpec`, `OverlaySpec`, `PluginDialog`, `ContentTab`, `TabPlacement`, `SplitItemSpec`, `SplitChoice`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform`, `FileEditor` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `ToolbarViewFactory`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `DialogSpec`, `OverlaySpec`, `PluginDialog`, `ContentTab`, `TabPlacement`, `SplitItemSpec`, `SplitChoice`, `ContentSpec`, `TabRestorer`, `RestoreRequest`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform`, `FileEditor` |
 | `dev.jasper.sdk.notifications` | `Notifications`, `NotificationGroup`, `GroupSpec`, `NotificationSpec`, `NotificationAction`, `NotificationHandle`, `Severity`, `DisplayMode` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
@@ -78,7 +78,22 @@ opens one beside that item's pane (the terminal's needs `terminal.open`), and `C
 Jasper saves its windows and restores them at start and whenever the main window opens again: the main window and its
 full windows, their tabs, the panes of each tab and what each pane holds. A restored terminal whose tab Jasper has not
 shown yet has not started: its pane's `info().state()` is `SessionState.NOT_STARTED` until its tab first shows, and text
-sent to it is dropped; then its shell starts as a new terminal's does.
+sent to it is dropped; then its shell starts, or its session connects, as a new terminal's does.
+
+A plugin's tab comes back when the plugin says how: a `RestoreState` (`dev.jasper.sdk`: a restorer kind and at most 32
+strings, which Jasper writes into `workspace.toml`, so never a secret) in its `ContentSpec` or `SessionSpec`
+(`withRestore`), or later through `ContentTab.setRestore`, and a restorer for that kind registered in `start()` with
+`Windows.restorer(kind, restorer)`. The restorer gets a `RestoreRequest` (the window being restored, the saved title, the
+state) and opens the tab the way the plugin opens it, before it returns `Optional.empty()`; the first content tab it
+opens is the saved tab, whatever window or placement it names, and so is the first session it opens in
+`request.window()`; Jasper puts it where it was saved, in its tab and pane of that window. When the
+tab cannot come back for a reason the plugin expects (its file or host is gone), the restorer returns that reason
+instead, which is no failure. A tab whose plugin is not installed, turned off, waiting for review or failed to start, has
+no restorer for its kind, or whose restorer declines, throws before it opens its tab or opens nothing comes back as a
+placeholder that says why, with Close and, while the plugin runs, Retry. In the testkit `FakePluginHost.restoreState`
+reads the restore state a tab gives and `restoreTab` runs a plugin's restorer as Jasper does: the tab is placed in the
+window being restored, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown; `declinedRestores()` lists
+the reasons restorers gave when no tab came back.
 
 ## Tabs of every kind (SDK 0.19.0)
 

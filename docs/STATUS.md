@@ -1,5 +1,135 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 6b: plugins' tabs come back — 2026-10-21** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `eefe0324e..b22836d14`, then this documentation commit;
+[plan](superpowers/plans/2026-10-18-workspace-6b-plugin-restorers.md),
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). SDK 0.21.0 (plan 6a's bump; no bump of this
+plan's own) gains `dev.jasper.sdk.RestoreState` (a restorer kind and at most 32 strings, 4096 characters in all),
+restore state on `ContentSpec` and `SessionSpec` (`withRestore`), `ContentTab.setRestore`, `Windows.restorer(kind,
+TabRestorer)` (a restorer returns empty, or why the tab cannot come back, which raises no incident) and
+`RestoreRequest`; the testkit gains `FakePluginHost.restoreState`, `restoreTab` (the restored tab takes the window being
+restored, placed, not shown; a session waits `NOT_STARTED` until shown) and `declinedRestores` (the reasons given when
+no tab came back; a restored item goes in a new tab of the window, unshown), and `PluginContractTest` checks restorers
+on the fake and on the application. In the application a tab carries its restore state (`Tab.restore()`,
+`layout.TabRestore`); `TabRegistry` keeps each plugin's restorers and, while one runs (one at a time), a slot whose
+saved id (while free) and window the next content tab that plugin opens takes, or the next session it opens in that
+window, unshown, before any placement or wait for the main window, so its `ContentTab.window()` names that window at
+once; the window being restored takes no other tab meanwhile (another content tab goes where an owner-less one goes,
+another session is refused). `WindowManager` saves a plugin's tab as `TabRecord.Content` of its window's `WindowRecord`
+while its plugin restores that kind (never Jasper's own tabs, going or coming), leaving out tabs, plugins' first and as
+closing them would, if the file would pass `WorkspaceFile.MAX_BYTES`; restoring, plan 6a's `WindowContent.restore` asks
+it for each record (`savedTabs`), so a plugin's item comes back in its saved tab and pane of the main window or a full
+window, or as a `Tab.Kind.PLACEHOLDER` item (`workspace.PlaceholderContent`) in its pane that says why from how its
+plugin stands (`PluginRuntime.standing`, given as `WindowManager.PluginState`: not installed, turned off, waiting for
+review, could not start, or "… could not restore this tab: …" with Retry), asks again when it shows and on Retry
+(`Layout.replaceTab`: the rebuilt item takes the placeholder's pane), and acts in whatever window holds it; a
+placeholder is saved again as it was, and a full window holding only plugins' items comes back with them. The Editor
+(0.13.0) saves a document's key and reopens it through its reopeners (`openRestored`): a remote document waits until its
+tab is first active or Load, then reads with the Editor API's new `EditorDocument.readQuietly`, asking nothing. Remote
+(0.16.0) reopens remote documents before its hosts have loaded (`SavedRemoteDocument`) and saves an SSH tab's host and
+folder (a folder too long to save is left out); when the tab is first shown it reconnects, one tab after another per
+window, if the SSH agent signs it in, else (a Vault login, locked or not: the Vault may ask for a grant) shows Not
+connected with Reconnect, asking nothing; a quiet connect that fails says why, Cancel keeps a restored tab, and a
+missing host declines; a remote document's quiet read reads over an open connection or the agent. A restored tab's first
+connect and a restored document's quiet read answer a host-key question Cancel (`ConnectAttempt.quiet`,
+`EditChannels.submitQuietly`), so a host accepted Once comes back Not connected with Reconnect, which asks; picking a
+host whose restored tab still waits shows that tab (`restoredPanes`, plan 6a's `NOT_STARTED` hand-off). The sample's
+About (0.5.0) comes back; the Vault's manager, a dialog over the main window, does not, and the Vault keeps 0.7.0.
+`AppContractTest` now opens the main window and then a child for a tab placed in a new window while none is open (plan
+4b's hand-off), and the two other harness hand-offs (`FakeWorkspace.closeWindow` nulling `Panel.instance` with
+`AppContractTest`'s panel caches, and `AppContractTest`'s panel routing) closed without code: no harness can close a
+main window and no contract case toggles a panel; they belong to the plan that first adds such a case. Rulings (plan,
+"Rulings"): (1) a restore state is `RestoreState(kind, values)` in the SDK's root package: a kind of 1 to 64 letters,
+digits, dots, underscores or hyphens, at most 32 values and 4096 characters in all; (2) a session's tab carries restore
+state too, and is saved as `TabRecord.Content` under its plugin; (3) a plugin's tab is saved only while its plugin has a
+restorer for its kind, Jasper's own tabs never; (4) a restorer opens its tab as the plugin always does while the
+registry holds a slot, which gives the first tab it opens, or the first session in the window being restored, the saved
+id and that window, unshown, before any window is looked for; (5) a restorer returns empty or why the tab cannot come
+back, a returned reason is the placeholder's with no incident, and what it throws before it opens its tab is both; (6)
+(reworded by 32) a placeholder keeps the saved title and record, says why from how its plugin stands, asks again when it
+shows and on Retry, and offers Retry while its plugin runs; (7) how a plugin stands is `PluginRuntime.standing`, given
+to the window manager as `WindowManager.PluginState`; turning a plugin off takes effect at the next start, where its
+tabs are placeholders; (8) the Editor saves a document's key and reopens it through `Reopeners.resolve`: a local file at
+once, a remote one once its tab is active or on Load, quietly; an untitled buffer is not saved; (9) (restated by 43)
+Remote saves an SSH tab's host id, name and folder, and the restored tab connects when first shown only if the SSH agent
+signs in, else shows Not connected with Reconnect; (10) (superseded by 28) the Vault's manager is not a restored tab;
+(11) the sample's About comes back through the one method its action uses, its echo session does not; (12) (superseded
+by 18, itself by 37) the plugin version numbers; (13) a restored session that is not connected offers Reconnect, not
+Retry; (14) THD Sourcing Crypto rebuilds once, against 0.21.0, and needs nothing more; (15) (reworded by 34) the
+testkit's fake restores as Jasper does: the first tab or session takes the window being restored, a session waits
+`NOT_STARTED`, a declined reason is kept in `declinedRestores()`; (16) (restated by 46) a snapshot over
+`WorkspaceFile.MAX_BYTES` leaves out tabs until it fits, plugins' first and largest first, then terminals; (17) Remote's
+reopener answers before its hosts have loaded (`SavedRemoteDocument`); (18) (superseded by 37) Editor 0.12.0, Remote
+0.16.0 and sample 0.5.0; (19) (narrowed to the main window and full windows) a plugin's tab comes back in its saved tab
+and pane through `WindowContent.restore` and `ParentTabsView.restore`, its restorer seeing only the window; (20)
+(narrowed likewise) a content record whose restorer rebuilds nothing becomes a placeholder, so a full window holding
+only plugins' tabs comes back; (21) the size limit takes a tab out as closing it would (`WorkspaceFile.keeping`); (22) a
+saved record naming `jasper` is left out at restore, never a placeholder; (23) a restored tab names the window being
+restored at once, never the never-open window; (24) while a restorer runs its window takes only the saved tab: another
+content tab goes where an owner-less one goes, another session is refused; (25) `AppContractTest`'s `emptyWindow` opens
+the main window first when none is open, with a contract case on both runtimes; (26) `FakeWorkspace.closeWindow` nulling
+`Panel.instance` and `AppContractTest`'s panel routing close without code; (27) 6b's SDK additions stay in 0.21.0, with
+no bump of their own; (28) dialogs are not restored: the Vault's manager and a plugin's dialog close with their window;
+(29) (restated by 43 and 45) a restored SSH tab's first connect and a restored document's quiet read are quiet and run
+only when signing in asks nothing, a host-key question answered Cancel; (30) only a tab still open in the window being
+restored is the saved tab, and a state the SDK refuses runs no restorer; (31) (restated by 50) the Editor's decline says
+which: no running plugin opens that prefix, or its file can no longer be opened; (32) Retry puts the rebuilt item in the
+placeholder's pane, in its place, selected (`Layout.replaceTab`); (33) everything restores into the main window or a
+full window, and a placeholder moves to a full window like any item, with its Retry and Close; (34) the fake places a
+restored item in a new tab at the end of the window's strip, unshown; (35) a restored session's pane in the fake is held
+as `holdPane` holds a local one and connects when its tab is shown; (36) Remote's quiet host-key test asks the question
+directly while the connect waits on the fake's background executor; (37) Editor 0.13.0, Remote 0.16.0 and sample 0.5.0;
+the Vault and the other plugins keep their versions; (38) the Editor's restorer opens its document as New Editor Tab
+does, and the saved layout says where; (39) no `docs/sdk-reference.html` change here: the merge with main regenerates
+it; (40) a restored SSH tab joins Remote's attached panes when its session attaches, waiting in `restoredPanes` until
+then; (41) `activateHost` shows a restored tab of the host that still waits instead of opening a second; (42)
+`BundledSamplePluginTest`'s pinned sample version moves with the manifest; (43) only the SSH agent, or an open
+connection, signs in alone at restore, so a Vault login comes back Not connected and asks the Vault for nothing; (44)
+Cancel on a restored session's first connect keeps its pane, with Reconnect; (45) a quiet connect that fails keeps its
+reason, "Not connected: <why>", with Reconnect; (46) the size limit logs each item it leaves out once per process; (47)
+a local file deleted since its tab was saved comes back as the Editor's failed read, with Retry; (48) restorers ask
+nothing, which the Javadoc and the authoring guide say; (49) a placeholder's Retry and Close are focusable, and its
+tab's focus target is Retry while it shows, else Close; (50) a key with no prefix declines "no running plugin opens this
+document", a remote document reopened before the hosts load names "a remote host", and the guide's testkit paragraph
+names `restoreTab`, `restoreState` and `declinedRestores`; 10, 12 and 18 are superseded, 6, 15, 19 and 20 reworded, and
+9, 16, 29 and 31 restated by the review. Deviations: (1) Task 1's review: `RestoreState` refuses a key holding a lone
+surrogate, which a save would turn into a duplicate key; a restorer's item stays in the window being restored, so a move
+asked of it then is refused, and a placeholder is never registered under an id already open; an `Error` from a restorer
+closes the item it opened; the fake's `Terminals.split` and its declines follow the app; `TabRestorer` says it must not
+block. (2) Task 2's review: the size limit counts each item's UTF-8 share once (`WorkspaceFile.sizes`) and encodes once;
+Retry reads a failed rebuild's reason directly; a saved `jasper` record is logged when left out; a placeholder's reason
+wraps. (3) Task 3's review: a document's restore state never stops it opening or saving (a key over about 4,090
+characters is simply not restored); a restored document is not recorded in Recent Files; a deferred document reads
+"loads when you select it". (4) Task 4's review: both harnesses keep a restored session's pane on its first Cancel, as
+Jasper does; an SSH tab whose restore state does not fit drops its folder, then its state, and still opens; a
+`hosts.toml` that cannot be read says so; a quiet attach failure says why; a host's running tab is shown before a
+restored one that waits; a document's quiet open checks again that signing in asks nothing. THD Sourcing Crypto
+(`~/projects/thd-sourcing-crypto-jasper-plugin`, branch `jasper-sdk-0.17.1` at `3740e4e`): SDK 0.21.0 is the series'
+last bump and the one to rebuild it against, once, with the jars `sdkRelease` publishes; plan 4b's entry lists what
+0.18, 0.19 and 0.20 need, and its `plugin.toml` and `PluginPackagingTest.java:49` take `sdk = ">=0.21.0, <0.22"` and
+`build.gradle.kts:8` and `README.md:28` name 0.21.0; 0.21 needs nothing more (it names `SessionState.RUNNING` in one
+fixture and switches over no `SessionState`, and it opens only a dialog, which is not saved). `docs/sdk-reference.html`
+is main's: the merge with main regenerates it with this plan's SDK Javadoc. `./gradlew check --continue`:
+**12,243 tests, 0 failures, 0 errors, 25 skipped** (excludes the external example, which `check` does not run). GUI checks for the user: two tabs in the main window, an Editor file in a pane of the hidden one beside
+a terminal (Split Right with Editor), a Remote SSH tab (one host through the agent, one with a password in the Vault,
+locked), and, with the sample on, its About moved to a full window (Move Tab to New Window); an Editor tab in a full
+window; quit and start: each comes back in its window, tab and pane, the agent's SSH tab connects when shown, the other
+says Not connected with Reconnect, and the hidden tab's remote file loads only when that tab shows; the Vault's manager,
+if it was open, stays closed; under the Enterprise look the tab strip shows as before; turn the sample off in Manage
+Plugins, restart: its About is a placeholder without Retry in its full window, and Close closes that window; turn Remote
+off with a remote file open in the Editor, restart: that tab is a placeholder with Retry ("Editor could not restore this
+tab: no running plugin opens remote: documents."), and turning Remote on again and restarting brings it back; a remote
+file open in the Editor comes back without asking for anything, loads when its tab is clicked if an open connection or
+the agent signs in, and otherwise says so with Retry; with residency and the Vault unlocked, close the main window and
+reopen it from the Dock: the Vault-signed SSH tab comes back Not connected with Reconnect and no grant prompt; press
+Cancel while a restored SSH tab connects: the tab stays with Reconnect; tab to a placeholder's Retry and Close with the
+keyboard; two SSH tabs restored side by side in one window both connect; with a restored SSH tab still hidden, pick its
+host in Remote's Sessions: that tab shows instead of a new one; an Editor tab whose file was deleted comes back as the
+Editor's failed read, with Retry; drag a placeholder's pane into another tab and press Retry there: the file comes back
+in that pane; connect an SSH host whose key you accept Once, quit and start: its tab comes back Not connected with
+Reconnect, asking nothing, and Reconnect asks about the key; start in safe mode with a user plugin's tab saved: its
+placeholder says the plugin is turned off. Not merged, not pushed.
+
 **Workspace tabs, plan 6a: saving and restoring the workspace — 2026-10-21** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `e51f2d14c..3f273675e` on the parent-tabs model, then `77d7b3033..987b30f63`,
 this documentation commit and its final-review fix wave; [plan](superpowers/plans/2026-10-18-workspace-6a-save-restore.md),

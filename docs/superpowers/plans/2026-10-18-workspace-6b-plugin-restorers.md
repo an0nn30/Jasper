@@ -1,8 +1,20 @@
 # Workspace tabs 6b: plugins' tabs come back Implementation Plan
 
-**Status: not executed.** Re-planned in place on 2026-10-21 on the tabs-and-panes model (plans 8a-8c) and the
-re-planned plan 6a (see Workspace); the earlier versions' Rulings stand except where "Superseded" says otherwise.
-Record every deviation from this text here and in `docs/STATUS.md`.
+**Status: executed on 2026-10-21** (`eefe0324e..b22836d14`); see `docs/STATUS.md`. Re-planned in place on 2026-10-21 on
+the tabs-and-panes model (plans 8a-8c) and the re-planned plan 6a (see Workspace); the earlier versions' Rulings stand
+except where "Superseded" says otherwise. Deviations from the text: (1) Task 1's review: `RestoreState` refuses a key
+holding a lone surrogate, which a save would turn into a duplicate key; a restorer's item stays in the window being
+restored, so a move asked of it then is refused, and a placeholder is never registered under an id already open; an
+`Error` from a restorer closes the item it opened; the fake's `Terminals.split` and its declines follow the app;
+`TabRestorer` says it must not block. (2) Task 2's review: the size limit counts each item's UTF-8 share once
+(`WorkspaceFile.sizes`) and encodes once; Retry reads a failed rebuild's reason directly; a saved `jasper` record is
+logged when left out; a placeholder's reason wraps. (3) Task 3's review: a document's restore state never stops it
+opening or saving (a key over about 4,090 characters is simply not restored); a restored document is not recorded in
+Recent Files; a deferred document reads "loads when you select it". (4) Task 4's review: both harnesses keep a restored
+session's pane on its first Cancel, as Jasper does; an SSH tab whose restore state does not fit drops its folder, then
+its state, and still opens; a `hosts.toml` that cannot be read says so; a quiet attach failure says why; a host's
+running tab is shown before a restored one that waits; a document's quiet open checks again that signing in asks
+nothing.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

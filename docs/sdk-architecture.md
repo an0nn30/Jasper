@@ -412,6 +412,19 @@ result; final `close` is reserved for shutdown and disposes exactly once without
 Closed handles cannot reattach or take focus.
 
 The application translates SDK values to `contributions.TabRegistry`/`Tab`.
+Since SDK 0.21.0 a tab carries its plugin's restore state (`Tab.restore()`, the app's `layout.TabRestore`), and the
+registry keeps each plugin's restorers (`Windows.restorer`). `WindowManager.snapshot()` saves a plugin's tab as a
+`TabRecord.Content` of its window while its plugin has a restorer for its kind, never Jasper's own tabs, and leaves out
+tabs, plugins' first, when the file would pass `WorkspaceFile.MAX_BYTES`. Restoring a window, `WindowContent.restore`
+asks the window manager for each such record; `TabRegistry.restore` runs the restorer with a slot set (one at a time),
+and the first content tab the plugin opens meanwhile (`TabRegistry.open`), or the first session it opens in the window
+being restored (`WindowContent.openTerminal`), takes the saved id, while it is free, and that window, before any
+placement applies; the window then places it in its saved tab and pane with its other items, and takes no other item
+while the restorer runs, nor lets the saved tab move. A reason the restorer returns is the placeholder's and no
+incident; what it throws before it opens its tab is both. Otherwise the tab is a `Tab.Kind.PLACEHOLDER`
+(`workspace.PlaceholderContent`) that says why, from `WindowManager.PluginState` (the application's reading of
+`PluginRuntime.standing`), saved again as it was; its Retry and Close act in the window that holds it then, and it asks
+how its plugin stands whenever it shows and on Retry.
 `WindowContent` hosts both terminal and plugin components; its `WorkspaceView` and
 `ToolWindowArea` remain the single renderer. Separate document windows reuse those same
 owners without starting a shell. `WindowHandle.tabs()` lists these tabs as content

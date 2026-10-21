@@ -112,7 +112,8 @@ spec's words (window, tab, pane, item)):
 write on a virtual thread) and at once when a window closes; closing every window saves first and holds saving until
 the windows come back. `ensureMain` restores the main window, then its full windows, each with its place, tabs and
 items, before it shows; a restored terminal's shell starts when its tab first shows, and until then its pane reports
-`NOT_STARTED`.
+`NOT_STARTED`; a plugin's item comes back through its plugin's restorer or as a placeholder (see
+[SDK architecture](sdk-architecture.md)).
 
 Residency retains indexes/config/history after the last window,
 and does not intentionally retain pane sessions; asynchronous child cleanup may

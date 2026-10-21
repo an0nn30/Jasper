@@ -48,6 +48,12 @@ lists every command with its shortcut. The status line shows the caret's line an
 another), the encoding, the line endings (`Mixed → LF` until the first save converts them), the
 indentation and Wrap (click to toggle soft wrap for the tab).
 
+When Jasper restores its windows, each file comes back in its tab and pane: a local file is read at once, and one deleted
+since comes back as a failed read with Retry; a remote one, through Remote, waits until its tab is first active or you
+press Load, and then reads only if signing in asks nothing (an open connection, or the SSH agent); otherwise it says so,
+and Retry signs in. An untitled file that was never saved does not come back, nor does a document whose key is too long
+to save. A restored file is not added to Recent Files.
+
 | Shortcut (macOS / others) | Command |
 |---|---|
 | ⌘S / Ctrl+S | Save |

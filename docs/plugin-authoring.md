@@ -443,6 +443,9 @@ private static void connectEcho(PendingSession pending, long stepMillis) {
 - A remote shell with Jasper's shell integration produces the same command events as a local one.
   The directory it reports appears as the pane's `remoteDirectory`, never as a local one.
 - `PipedInputStream` fails once the thread that wrote last has ended. The sample uses a queue.
+- **Coming back (SDK 0.21.0).** `SessionSpec.withRestore(state)` saves the session's tab with Jasper's windows; your
+  restorer for the kind (`Windows.restorer`) opens the session again with `Terminals.openTab(request.window(), …)`, and
+  Jasper connects it when its tab is first shown, calling your `connector` as for a first connect.
 
 ## Palette scopes
 
@@ -717,6 +720,10 @@ try (var host = new FakePluginHost()) {
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
 `titleChanged`, `cwdChanged`, `sessionExited` and `bell` publish terminal events, delivered by
 `flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory.
+`host.restoreState(tab)` reads the restore state a tab gives, `host.restoreTab(pluginId, windowId, title, state)` runs
+your restorer as Jasper does when it restores its windows (the tab placed in that window, not shown; a session's tab
+waits, `NOT_STARTED`, until it is shown), and `host.declinedRestores()` lists the reasons your restorers gave when no
+tab came back.
 `host.setShellProfiles(list)` scripts the detected shell profiles and runs `onProfilesChanged` listeners; `openRequests()` then ends a line with `|<profile id>` when the request named one, and a program tab's or split's
 line with `|run:<command>`, its words joined by spaces. `host.shellEnvironment(jasperEnvironment)` returns what the
 plugins' `Terminals.environment` contributors add for a new shell; `host.edit(file, line, windowId)` calls the
@@ -938,6 +945,21 @@ SDK 0.20 `openTab(spec, owner, view, placement)` opens
 it in a new tab of the window (`TabPlacement.NEW_TAB`), in a new pane beside the focused one (`SPLIT_RIGHT`,
 `SPLIT_DOWN`) or in a new child window (`NEW_WINDOW`). Preserve the component/session during moves. The tab is a
 content tab of its window: `WindowHandle.tabs()` lists it and the `TAB_*` topics report it.
+
+A tab comes back when Jasper restores its windows (SDK 0.21.0) if you say how: give its `ContentSpec` a `RestoreState`
+(`spec.withRestore(RestoreState.of("document", "path", file.toString()))`), change it with `ContentTab.setRestore` when the tab
+comes to stand for something else, and register the restorer for the kind in `start()`:
+`context.windows().restorer("document", request -> openDocument(request.state().values().get("path"), request.window()))`,
+where `openDocument` returns empty once the tab is open, or why it could not open it.
+The restorer opens the tab the way your action does, with the same restore state, and returns `Optional.empty()`; Jasper
+places it where it was saved, in whichever window, tab and pane held it. When it cannot come back now (its file is gone),
+return why instead, `Optional.of("its file is gone")`: its placeholder says so with Retry, and nothing reports a failure.
+A restore state is saved in `workspace.toml`: keep it small, and never put a secret in it. A tab without one is not
+saved, and one whose restorer throws before it opens its tab, or opens nothing, comes back as a placeholder with Retry
+too. Open only that tab: the window being restored takes no other while your restorer runs, so another tab opens where
+an owner-less one would.
+Ask the user nothing here (no dialog, sign-in or prompt); a tab that needs one opens waiting, as a session that offers
+Reconnect does.
 
 Since SDK 0.21, `Windows.splitItem(SplitItemSpec.of(id, label), (window, placement) -> ...)` puts a plugin's view in every
 Split list (the Tab menu's and the right-click menus' Split submenus) after the terminal, with two actions, "Split Right
