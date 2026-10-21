@@ -150,7 +150,7 @@ class WindowMenuTest {
             Tab left = main.selectedTab();
             main.newTab(HOME);
             var menu = main.tabMenu(left);
-            assertThat(texts(menu)).containsExactly("Rename Tab", "Move Tab to New Window", "---", "Close Tab");
+            assertThat(texts(menu)).containsExactly("Rename Tab", "Move Tab to New Window", "Move Tab Into", "---", "Close Tab");
             item(menu, "Move Tab to New Window").doClick();
             ChildWindow full = windows.manager.children().getLast();
             assertThat(full.content().activeParentTab()).as("the tab the entry stands for").isEqualTo(first);

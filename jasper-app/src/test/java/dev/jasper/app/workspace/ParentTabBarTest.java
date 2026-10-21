@@ -184,9 +184,10 @@ class ParentTabBarTest {
             assertThat(second.closed()).isTrue();
             assertThat(owner.parentTabCount()).isEqualTo(2);
             var menu = owner.parentTabs().bar().menu(third);
-            // Workspace plan 8a Rulings 8: Rename Tab and Move Tab to New Window, then a rule, before Close Tab.
+            // Workspace plan 8a Rulings 8 and pane flexibility spec 5: Rename Tab, Move Tab to New Window and Move Tab Into,
+            // then a rule, before Close Tab.
             assertThat(Arrays.stream(menu.getComponents()).filter(JMenuItem.class::isInstance).map(item -> ((JMenuItem) item).getText()))
-                .containsExactly("Rename Tab", "Move Tab to New Window", "Close Tab");
+                .containsExactly("Rename Tab", "Move Tab to New Window", "Move Tab Into", "Close Tab");
             ((JMenuItem) menu.getComponent(menu.getComponentCount() - 1)).doClick();
             assertThat(third.closed()).isTrue();
             assertThat(owner.parentTabCount()).isEqualTo(1);

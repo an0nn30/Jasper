@@ -1649,6 +1649,72 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
+     * The tabs Move Tab Into offers the tab {@code id} (pane flexibility spec 5): this window's other tabs, in strip order;
+     * none while it holds an item that may not move (a dialog open in a pane, one being closed; workspace plan 9a Rulings
+     * 7), and none in a window of one tab.
+     *
+     * @param id a tab of this window
+     * @return the tabs, each numbered as Select Tab numbers it
+     */
+    java.util.List<OtherTab> tabTargets(ParentTabId id) {
+        if (closed || id == null) return java.util.List.of();
+        Optional<WorkspaceView> view = parentTabs.view(id);
+        return view.isPresent() && movable(view.get().tabs()) ? otherTabs(id) : java.util.List.of();
+    }
+
+    /**
+     * Move Tab Into (pane flexibility spec 5): every pane of the tab {@code id} goes to the right of the active pane of the
+     * tab {@code into}, as {@link #mergeTab} moves them. Nothing unless {@link #tabTargets} offers {@code into}.
+     *
+     * @param id a tab of this window
+     * @param into another tab of this window
+     */
+    void moveTabInto(ParentTabId id, ParentTabId into) {
+        if (tabTargets(id).stream().noneMatch(other -> other.id().equals(into))) return;
+        parentTabs.view(into).ifPresent(target -> mergeTab(id, target.model().activeGroup(), Side.RIGHT));
+    }
+
+    /**
+     * Move Tab Into, and a tab's entry dropped beside a pane (pane flexibility spec 5): every pane of the tab {@code id}
+     * goes on {@code side} of {@code group}, a pane of another tab of this window, as one nested split that keeps their
+     * arrangement and sizes; that tab shows, its maximize ended, and the moved tab's active item takes the focus, so the
+     * tab is named after it (workspace plan 9a Rulings 10 to 12 and 16). Nothing closes, nothing leaves the window and
+     * the registry hears no move. Nothing for a tab holding an item that may not move, a pane of the tab itself or one
+     * the window does not hold.
+     *
+     * @param id a tab of this window
+     * @param group a pane of another tab of this window
+     * @param side where the tab's panes go
+     */
+    void mergeTab(ParentTabId id, GroupId group, Side side) {
+        WorkspaceView view = closed ? null : parentTabs.view(id).orElse(null);
+        if (view == null || !movable(view.tabs())) return;
+        Tab shown = view.selected();
+        parentTabs.moveInto(id, group, side);
+        if (parentTabs.view(id).isEmpty()) selectTab(shown);
+    }
+
+    /**
+     * Move Tab Into's submenu for the tab {@code parent} (pane flexibility spec 5; workspace plan 9a Rulings 9): an entry
+     * for each other tab of the window, its number and title as plain text, that moves every pane of {@code parent} into
+     * that tab; disabled while there is none.
+     */
+    private JMenu tabMoves(ParentTabId parent) {
+        var moves = new JMenu("Move Tab Into");
+        var targets = tabTargets(parent);
+        for (OtherTab target : targets) {
+            var entry = new JMenuItem();
+            // A tab's title is plain text: html.disable before the text, as the UI reads it only when the text changes.
+            entry.putClientProperty("html.disable", true);
+            entry.setText(target.label());
+            entry.addActionListener(event -> moveTabInto(parent, target.id()));
+            moves.add(entry);
+        }
+        moves.setEnabled(!targets.isEmpty());
+        return moves;
+    }
+
+    /**
      * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
      * one move each, so each keeps its content and session and reports {@code TAB_MOVED} once (parent tabs spec 5;
      * workspace plan 7b Rulings 6). A parent tab this window lacks opens under that id at {@code index} of the bar, in
@@ -1733,7 +1799,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
     /**
      * A tab's menu, from its strip entry (tabs and panes spec 6 and 10; workspace plan 8a Rulings 8), for the tab holding
-     * {@code item}: Rename Tab while {@code item} is a terminal, Move Tab to New Window, a rule, Close Tab, then
+     * {@code item}: Rename Tab while {@code item} is a terminal, Move Tab to New Window, Move Tab Into (pane flexibility
+     * spec 5), a rule, Close Tab, then
      * {@code item}'s own commands. Move to Main Window moves the whole window, so the window menu and the context menu
      * offer it alone. Empty for an item this window does not hold.
      *
@@ -1746,6 +1813,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (item.kind() == Tab.Kind.TERMINAL)
                 menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(item); invoke(ActionId.RENAME_TAB); }));
             menu.add(windowItem(ActionId.MOVE_TAB_TO_NEW_WINDOW, item));
+            menu.add(tabMoves(parent));
             menu.addSeparator();
             menu.add(tabMenuItem(ActionId.CLOSE_TAB.label(), ActionId.CLOSE_TAB, () -> closeParentTab(parent)));
             if (!item.commands().isEmpty()) menu.addSeparator();

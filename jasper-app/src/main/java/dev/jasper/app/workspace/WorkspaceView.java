@@ -129,9 +129,17 @@ final class WorkspaceView extends JPanel {
      * Takes back a pane move that failed (workspace plan 8c Rulings 17): this workspace returns to {@code before}, its
      * layout when the move began, holding {@code tab} again if {@code before} places it and letting it go if not.
      */
-    void restore(Tab tab, Layout before) {
-        if (before.contains(tab.id())) tabs.put(tab.id(), tab);
-        else tabs.remove(tab.id());
+    void restore(Tab tab, Layout before) { restore(List.of(tab), before); }
+
+    /**
+     * As {@link #restore(Tab, Layout)}, for every item of {@code items}: a whole tab whose move into another tab failed
+     * (workspace plan 9a Rulings 12).
+     */
+    void restore(List<Tab> items, Layout before) {
+        for (Tab tab : items) {
+            if (before.contains(tab.id())) tabs.put(tab.id(), tab);
+            else tabs.remove(tab.id());
+        }
         apply(before);
     }
 
@@ -148,6 +156,17 @@ final class WorkspaceView extends JPanel {
     void moveToNewGroup(Tab tab, GroupId group, Side side) {
         if (!contains(tab)) return;
         apply(layout.moveToNewGroup(tab.id(), group, side));
+    }
+
+    /**
+     * Takes {@code arrived}, every item of another tab, beside {@code group} as {@code arranged}, that tab's layout, gives
+     * them (pane flexibility spec 5): one nested split on {@code side} of the pane ({@link Layout#insertBeside}), the moved
+     * tab's active pane active and a maximize ended. Their components leave the workspace that showed them.
+     */
+    void join(List<Tab> arrived, Layout arranged, GroupId group, Side side) {
+        Layout next = layout.insertBeside(arranged, group, side);
+        for (Tab tab : arrived) tabs.put(tab.id(), tab);
+        apply(next);
     }
 
     /**

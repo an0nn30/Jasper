@@ -307,6 +307,33 @@ public final class Layout {
     }
 
     /**
+     * Puts every pane of {@code other}, another tab's layout, on {@code side} of {@code group}, as one nested split that
+     * keeps their arrangement and sizes (pane flexibility spec 5; workspace plan 9a Rulings 10): the two take half of
+     * {@code group}'s space each, as {@link #split(TabId, GroupId, Side)} shares it, and a split of {@code side}'s
+     * orientation joins its parent's, as {@link Split} flattens one, its panes keeping their shares of the moved half.
+     * {@code other}'s active pane is active and first in the order of use, its other panes next; the maximize clears.
+     *
+     * @param other a layout holding tabs, none of whose panes or tabs this layout holds
+     * @param group a pane of this layout holding a tab
+     * @param side where {@code other}'s panes go
+     * @return the new layout
+     * @throws IllegalArgumentException when {@code other} is empty or shares a pane or a tab with this layout, or when the
+     *     group is not in this layout or holds no tab
+     */
+    public Layout insertBeside(Layout other, GroupId group, Side side) {
+        Objects.requireNonNull(other, "other");
+        Objects.requireNonNull(side, "side");
+        if (other.isEmpty()) throw new IllegalArgumentException("An empty layout has no panes to put beside " + group);
+        if (requireGroup(group).tabs().isEmpty()) throw new IllegalArgumentException("The empty workspace's group cannot be split");
+        Node next = replace(root, group, found -> new Split(side.orientation(), side.leading()
+            ? List.of(new Child(other.root, 0.5), new Child(found, 0.5))
+            : List.of(new Child(found, 0.5), new Child(other.root, 0.5))));
+        var order = new ArrayList<GroupId>(other.recent);
+        order.addAll(recent);
+        return new Layout(next, other.activeGroup, Optional.empty(), order);
+    }
+
+    /**
      * Sets the weights of the split at {@code path} (workspace plan 2, Rulings 3), from a divider drag. Keeps the maximize.
      *
      * @param path the child indexes from the root to the split; empty for the root

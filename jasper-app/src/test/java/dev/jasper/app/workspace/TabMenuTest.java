@@ -77,7 +77,7 @@ class TabMenuTest {
         edt(() -> {
             var keys = window.bindings();
             var menu = window.tabMenu(window.selectedTab());
-            assertThat(titles(menu)).containsExactly("Rename Tab", "Move Tab to New Window", "Close Tab");
+            assertThat(titles(menu)).containsExactly("Rename Tab", "Move Tab to New Window", "Move Tab Into", "Close Tab");
             assertThat(item(menu, "Rename Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.RENAME_TAB).orElseThrow());
             assertThat(item(menu, "Close Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_TAB).orElseThrow());
             Tab view = beside(window, "notes");
@@ -85,13 +85,13 @@ class TabMenuTest {
             view.commands(List.of(new ContentCommand("save", "Save", null, true, () -> saved[0]++)));
             var hosted = window.tabMenu(view);
             assertThat(titles(hosted)).as("a plugin's item has no Rename Tab").containsExactly("Move Tab to New Window",
-                "Close Tab", "Save");
+                "Move Tab Into", "Close Tab", "Save");
             item(hosted, "Save").doClick();
             assertThat(saved[0]).isEqualTo(1);
             var full = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { });
             assertThat(full.windowMenuItems()).as("a full window's window menu").contains(ActionId.MOVE_TO_MAIN_WINDOW);
             assertThat(titles(full.tabMenu(full.selectedTab()))).as("Move to Main Window moves the whole window: not here")
-                .containsExactly("Rename Tab", "Move Tab to New Window", "Close Tab");
+                .containsExactly("Rename Tab", "Move Tab to New Window", "Move Tab Into", "Close Tab");
         });
     }
 

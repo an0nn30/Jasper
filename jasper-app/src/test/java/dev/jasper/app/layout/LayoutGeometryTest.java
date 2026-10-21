@@ -93,6 +93,37 @@ class LayoutGeometryTest {
         assertThatIllegalArgumentException().isThrownBy(() -> pair.moveToNewGroup(tab(1), groupId(9), Side.RIGHT));
     }
 
+    /**
+     * Pane flexibility spec 5 and workspace plan 9a Rulings 10: another tab's whole layout goes beside a pane as one nested
+     * split, which takes half the pane's space as a split does, keeping its arrangement and sizes; a split of the side's
+     * orientation joins its parent's, its shares kept. Its active pane is active and first in the order of use, and a
+     * maximize ends.
+     */
+    @Test void insertBesidePutsAnotherTabsPanesBesideAPaneAsOneNestedSplit() {
+        Layout target = layout(h(child(group(1), 0.5), child(group(2), 0.5)), 1).toggleMaximize(groupId(1));
+        Layout moved = layout(v(child(group(3), 0.75), child(group(4), 0.25)), 4);
+        Layout joined = target.insertBeside(moved, groupId(2), Side.RIGHT);
+        assertThat(joined.root()).isEqualTo(h(child(group(1), 0.5), child(group(2), 0.25),
+            child(v(child(group(3), 0.75), child(group(4), 0.25)), 0.25)));
+        assertThat(joined.activeGroup()).as("the moved tab's active pane").isEqualTo(groupId(4));
+        assertThat(joined.maximized()).as("a maximize ends").isEmpty();
+        assertThat(joined.recent()).startsWith(groupId(4), groupId(3));
+        Layout flat = target.insertBeside(layout(h(child(group(3), 0.75), child(group(4), 0.25)), 3), groupId(2), Side.RIGHT);
+        assertThat(flat.root()).as("a split of the side's orientation joins its parent's")
+            .isEqualTo(h(child(group(1), 0.5), child(group(2), 0.25), child(group(3), 0.1875), child(group(4), 0.0625)));
+        Layout left = layout(group(1), 1).insertBeside(moved, groupId(1), Side.LEFT);
+        assertThat(left.root()).isEqualTo(h(child(v(child(group(3), 0.75), child(group(4), 0.25)), 0.5), child(group(1), 0.5)));
+        Layout single = layout(group(1), 1).insertBeside(layout(group(5), 5), groupId(1), Side.DOWN);
+        assertThat(single.root()).as("a tab of one pane, as a split puts it").isEqualTo(v(child(group(1), 0.5), child(group(5), 0.5)));
+        assertThatIllegalArgumentException().as("an empty layout").isThrownBy(() -> target.insertBeside(Layout.empty(), groupId(2), Side.RIGHT));
+        assertThatIllegalArgumentException().as("a pane in both").isThrownBy(() -> target.insertBeside(layout(group(2, 9), 2), groupId(1), Side.RIGHT));
+        assertThatIllegalArgumentException().as("a tab in both").isThrownBy(() -> target.insertBeside(layout(group(9, 1), 9), groupId(2), Side.RIGHT));
+        assertThatIllegalArgumentException().as("an unknown pane").isThrownBy(() -> target.insertBeside(moved, groupId(9), Side.RIGHT));
+        Layout empty = Layout.empty();
+        assertThatIllegalArgumentException().as("the empty workspace").isThrownBy(() -> empty.insertBeside(moved, empty.activeGroup(), Side.RIGHT));
+        assertThatNullPointerException().isThrownBy(() -> target.insertBeside(moved, groupId(2), null));
+    }
+
     @Test void resizeAddressesASplitByItsPathAndNormalizes() {
         // SplitTreeTest.ratiosAreClampedAndNonFiniteRatiosAreRejected: no clamp here (plan Rulings 4), the rest rejected
         Layout nested = layout(h(child(group(1), 0.5), child(v(child(group(2), 0.5), child(group(3), 0.5)), 0.5)), 2);

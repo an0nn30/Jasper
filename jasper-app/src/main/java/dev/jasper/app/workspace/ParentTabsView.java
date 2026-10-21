@@ -243,6 +243,49 @@ final class ParentTabsView extends JPanel {
     }
 
     /**
+     * Move Tab Into, and a tab's entry dropped beside a pane (pane flexibility spec 5): every pane of the tab {@code id} goes
+     * on {@code side} of the pane {@code group} of another tab of this window, as one nested split that keeps their
+     * arrangement and sizes ({@link Layout#insertBeside}); that tab shows, the moved tab's active pane active, and the moved
+     * tab's entry goes. Its components move between the workspaces: nothing closes, nothing leaves the window and the
+     * registry hears no move. The window announces it once, where it lands, and a tab that fails to land stays as it was
+     * (workspace plan 9a Rulings 12). Nothing for a tab or a pane the window does not hold, a pane of the tab itself or the
+     * empty workspace; the focus stays where it is, for the caller to move.
+     */
+    void moveInto(ParentTabId id, GroupId group, Side side) {
+        WorkspaceView from = views.get(id), to = holding(group).orElse(null);
+        if (closed || from == null || to == null || from == to || from.isEmpty()) return;
+        java.util.List<Tab> moving = from.tabs();
+        Layout arranged = from.model(), joined = to.model();
+        ParentTabs strip = model;
+        boolean focused = from == active() && WorkspaceView.holdsFocus(owner, this);
+        owner.held(() -> {
+            try {
+                // Its entry goes first, as no pane may be in two tabs (spec 4); its workspace stands until the panes have
+                // landed, so a tab that fails to land keeps it.
+                model = model.remove(from.id());
+                views.remove(from.id());
+                to.join(moving, arranged, group, side);
+            } catch (RuntimeException | Error failure) {
+                try {
+                    to.restore(moving, joined);
+                } catch (RuntimeException | Error undone) {
+                    failure.addSuppressed(undone);
+                }
+                try {
+                    from.restore(moving, arranged);
+                } catch (RuntimeException | Error undone) {
+                    failure.addSuppressed(undone);
+                }
+                views.put(from.id(), from);
+                model = strip;
+                throw failure;
+            }
+            discard(from, focused);
+            select(to.id());
+        });
+    }
+
+    /**
      * Takes back a pane move whose landing failed (workspace plan 8c Rulings 17): {@code to}, when it was to take the pane,
      * and {@code from} return to the layouts they had, {@code from} holding {@code tab} again, so nothing closes. Each
      * goes back whatever the other's throws; a failure of either is suppressed under {@code failure}, which the caller
