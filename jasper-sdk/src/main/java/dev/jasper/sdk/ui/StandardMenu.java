@@ -9,7 +9,9 @@ public enum StandardMenu {
     EDIT,
     /** The View menu. */
     VIEW,
-    /** The Tab menu: splitting and focusing tab groups, moving between prompts, and the tab commands. */
+    /**
+     * The Tab menu: the Split submenu, Move Pane to New Tab, focusing panes, moving between prompts, and the tab commands.
+     */
     TAB,
     /**
      * The Tools menu, for utility commands. Jasper has none of its own, so it shows only while a plugin has entries in

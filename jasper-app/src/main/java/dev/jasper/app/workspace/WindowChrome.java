@@ -43,6 +43,8 @@ final class WindowChrome {
     private final JCheckBoxMenuItem statusVisible = new MenuBarItems.CheckBox("Status Bar", true);
     private final JCheckBoxMenuItem railVisible = new MenuBarItems.CheckBox("Rail", true);
     private final java.util.EnumMap<MenuTarget.Slot, JMenu> standardMenus = new java.util.EnumMap<>(MenuTarget.Slot.class);
+    /** The built-once Tab menu's Split submenu, filled again on every contribution pass (workspace plan 8b Rulings 6). */
+    private final JMenu tabSplit;
     private final List<Component> contributedToolbar = new ArrayList<>();
     private final Map<JMenu, List<Component>> contributedSections = new LinkedHashMap<>();
     private final List<JMenu> contributedMenus = new ArrayList<>();
@@ -94,7 +96,8 @@ final class WindowChrome {
         JMenu visibility = menu("Show/Hide");
         view.add(visibility);
         view.add(menu("Font Size", ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET));
-        JMenu tab = tabMenu();
+        tabSplit = splitMenu();
+        JMenu tab = tabMenu(tabSplit);
         // The look's layout decides which built-in menus the bar shows from the start (spec 10.2).
         for (JMenu fixed : owner.look().menus().fixed(new MenuBarLayout.BuiltIn(file, edit, view, tab))) menuBar.add(fixed);
         owner.look().menus().style(menuBar);
@@ -410,6 +413,7 @@ final class WindowChrome {
         contributedMenus.clear();
         MenuBarLayout layout = owner.look().menus();
         if (contributions != null) {
+            fillSplit(tabSplit, MenuBarItems.Item::new);
             var sections = contributions.model().menus();
             // Session, Transfer and Tools hold only plugin entries and, like a plugin's own menu, are built fresh on
             // every pass and added to the bar only while they have any: a stale one would keep an old look and feel,
@@ -453,23 +457,66 @@ final class WindowChrome {
         menuBar.revalidate(); menuBar.repaint();
     }
 
-    /** The Tab menu's pane and prompt items, before Rename Tab and its tab items (workspace plan 8a Rulings 17). */
-    private static final ActionId[] GROUP_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MOVE_PANE_TO_NEW_TAB,
-        ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
-        ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
+    /** The Tab menu's pane and prompt items after its Split submenu, before Rename Tab and its tab items (plan 8b Rulings 10). */
+    private static final ActionId[] GROUP_ITEMS = {ActionId.MOVE_PANE_TO_NEW_TAB, ActionId.FOCUS_PANE_LEFT,
+        ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
     /** The tab items (tabs and panes spec 10): Next Tab, Previous Tab and Select Tab 1 to 9 switch the window's tabs. */
     private static final ActionId[] TAB_ITEMS = {ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.SELECT_TAB_1,
         ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4, ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6,
         ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9};
 
-    /** Tab: splitting and focusing panes and moving between prompts, a rule, Rename Tab, a rule, the tab commands. */
-    private JMenu tabMenu() {
-        JMenu menu = menu("Tab", GROUP_ITEMS);
+    /** Tab, built afresh for a layout that gathers it into another menu on every pass, with a Split submenu of its own. */
+    private JMenu tabMenu() { return tabMenu(splitMenu()); }
+
+    /**
+     * Tab (workspace plan 8b Rulings 10): the Split submenu {@code split}, Move Pane to New Tab, focusing panes and moving
+     * between prompts, a rule, Rename Tab, a rule, the tab commands.
+     */
+    private JMenu tabMenu(JMenu split) {
+        JMenu menu = menu("Tab");
+        menu.add(split);
+        for (ActionId id : GROUP_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
         menu.addSeparator();
         menu.add(new MenuBarItems.Item(owner.action(ActionId.RENAME_TAB)));
         menu.addSeparator();
         for (ActionId id : TAB_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
         return menu;
+    }
+
+    /** A Split submenu for the menu bar, filled with the window's Split list. */
+    private JMenu splitMenu() {
+        JMenu split = menu("Split");
+        fillSplit(split, MenuBarItems.Item::new);
+        return split;
+    }
+
+    /**
+     * Fills {@code split} with the window's Split list (tabs and panes spec 2.10 and 8; workspace plan 8b Rulings 5 and 6):
+     * Terminal Right and Terminal Down, then each split item's Right and Down, the bundled plugins' first. Each entry is
+     * its action, showing its shortcut and no icon (Rulings 22), under the list's own label; an entry whose action this
+     * window no longer has is left out.
+     *
+     * @param split the submenu
+     * @param item makes a menu-bar item or an ordinary popup item for an action
+     */
+    private void fillSplit(JMenu split, java.util.function.Function<Action, JMenuItem> item) {
+        split.removeAll();
+        var entries = new ArrayList<Map.Entry<String, Action>>();
+        entries.add(Map.entry("Terminal Right", owner.action(ActionId.SPLIT_RIGHT)));
+        entries.add(Map.entry("Terminal Down", owner.action(ActionId.SPLIT_DOWN)));
+        if (contributions != null) for (var listed : contributions.model().splitItems()) {
+            Action right = contributions.action(listed.rightAction()), down = contributions.action(listed.downAction());
+            if (right != null) entries.add(Map.entry(listed.label() + " Right", right));
+            if (down != null) entries.add(Map.entry(listed.label() + " Down", down));
+        }
+        for (var entry : entries) {
+            JMenuItem built = item.apply(entry.getValue());
+            built.setHideActionText(true);
+            built.setText(entry.getKey());
+            built.putClientProperty("html.disable", true);
+            built.setIcon(null);
+            split.add(built);
+        }
     }
 
     /** One item per tool window whose toggle action this window has, in registration order. */
@@ -593,9 +640,14 @@ final class WindowChrome {
     JPopupMenu contextMenu() {
         owner.updateActions();
         JPopupMenu menu = new JPopupMenu();
-        for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL,
-            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MOVE_PANE_TO_NEW_TAB, ActionId.MAXIMIZE_PANE,
-            ActionId.CLOSE_PANE}) menu.add(owner.action(id));
+        for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL})
+            menu.add(owner.action(id));
+        // The Split list, as the Tab menu has it (tabs and panes spec 2.10; workspace plan 8b Rulings 6).
+        JMenu split = new JMenu("Split");
+        fillSplit(split, JMenuItem::new);
+        menu.add(split);
+        for (ActionId id : new ActionId[]{ActionId.MOVE_PANE_TO_NEW_TAB, ActionId.MAXIMIZE_PANE, ActionId.CLOSE_PANE})
+            menu.add(owner.action(id));
         // The window menu's entries, for a window whose strip hides (tabs and panes spec 6).
         menu.addSeparator();
         for (ActionId id : owner.windowMenuItems()) menu.add(owner.action(id));

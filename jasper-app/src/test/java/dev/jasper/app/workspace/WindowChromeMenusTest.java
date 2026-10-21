@@ -97,13 +97,24 @@ class WindowChromeMenusTest {
             var model = model(false);
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel());
             model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TAB)).set(List.of(new MenuEntry.Item("dev.x.split")));
+            // A split item whose actions carry an icon (workspace plan 8b Rulings 22).
+            for (String side : List.of("Right", "Down"))
+                model.addAction("dev.x.split_" + side.toLowerCase(java.util.Locale.ROOT) + "_sketch", "Split " + side + " with Sketch",
+                    new ImageIcon(), List.of(), Optional.empty(), invocation -> { });
+            model.addSplitItem(new dev.jasper.app.contributions.SplitItem("dev.x.sketch", "Sketch", new ImageIcon(),
+                "dev.x.split_right_sketch", "dev.x.split_down_sketch", false));
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), classic());
             owner.connectContributions(model);
             var window = items(menu(owner, "Window"));
-            assertThat(window.getFirst()).isEqualTo("Split Right");
-            assertThat(window).as("the Tab menu's group, prompt and tab items with the plugin's Tab section, then the toggles")
-                .containsSubsequence("Split Right", "Next Prompt", "---", "Next Tab", "Previous Tab", "---", "split", "---", "Toggle Hosts");
+            assertThat(window.getFirst()).isEqualTo("submenu:Split");
+            assertThat(window).as("the Tab menu's Split list, pane, prompt and tab items with the plugin's Tab section, then the toggles")
+                .containsSubsequence("submenu:Split", "Move Pane to New Tab", "Next Prompt", "---", "Next Tab", "Previous Tab", "---",
+                    "split", "---", "Toggle Hosts");
             assertThat(window.getLast()).as("the tool-window toggles close the menu").isEqualTo("Toggle Hosts");
+            var split = (JMenu) menu(owner, "Window").getMenuComponent(0);
+            assertThat(items(split)).containsExactly("Terminal Right", "Terminal Down", "Sketch Right", "Sketch Down");
+            for (Component child : split.getMenuComponents())
+                assertThat(((JMenuItem) child).getIcon()).as("%s: the Split submenu shows no icons", ((JMenuItem) child).getText()).isNull();
             assertThat(items(menu(owner, "View"))).as("the toggles moved to Window").doesNotContain("submenu:Tool Windows");
             var standard = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             standard.connectContributions(model);
