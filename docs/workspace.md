@@ -81,7 +81,8 @@ Plugins can open their own tabs beside terminal tabs; the Editor opens each docu
 [Editor](editor.md)). A plugin tab shows ● before its title while it has unsaved changes. While one is selected:
 
 - its own commands take their shortcuts (the Editor's Cmd+S, Ctrl+S on Linux and Windows, and so on), and **Find**,
-  **Find Next**, **Find Previous**, **Copy**, **Paste**, **Close Tab** and **Close Pane** act on it;
+  **Find Next**, **Find Previous**, **Copy**, **Paste**, **Increase**, **Decrease** and **Reset Font Size**,
+  **Close Tab** and **Close Pane** act on it;
 - the header's search field shows its title and host, and the status bar shows its location and its own items.
 
 Its right-click menu has **Open in Separate Window**, the tab's own commands and **Close Tab**. Open in Separate Window

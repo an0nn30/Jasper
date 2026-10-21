@@ -582,7 +582,8 @@ strip, the window, its menus and the status bar; the plugin provides the view.
 - `setCommands(List<ContentCommand>)`: commands appear in the tab's right-click menu, after Open in Separate Window
   (Move to Main Window) and before Close Tab, and their shortcuts work while the tab is selected. Commands with the
   ids `find`, `find-next`, `find-previous`, `copy` and `paste` answer Jasper's Find, Find Next, Find Previous, Copy and
-  Paste; Close Tab and Close Pane ask the tab to close.
+  Paste, and `font-bigger`, `font-smaller` and `font-reset` its Increase, Decrease and Reset Font Size; Close Tab and
+  Close Pane ask the tab to close.
 - `setStatus(List<ContentStatus>)`: items in the status bar while the tab is selected, each plain text or a button.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `move(true)` opens the tab in a separate window and
   `move(false)` brings it back to the last main window, keeping the view and its state; `isSeparate()`.

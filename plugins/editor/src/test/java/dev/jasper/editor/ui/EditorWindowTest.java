@@ -152,6 +152,75 @@ class EditorWindowTest {
             .satisfies(command -> assertThat(command.shortcut()).isEqualTo(KeyNames.findAgain(true)));
     }
 
+    private void run(dev.jasper.sdk.ui.ContentTab tab, String id) {
+        host.contentCommands(tab).stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow().run().run();
+    }
+    private static float size(EditorTab tab) { return tab.area().getFont().getSize2D(); }
+
+    @Test void fontSizeCommandsLeaveTheirKeysToTheWindow() throws Exception {
+        var published = window.contentCommands(opened(file("zoom-keys.txt", "text")));
+        assertThat(published).filteredOn(command -> command.id().startsWith("font-"))
+            .extracting(dev.jasper.sdk.ui.ContentCommand::id, dev.jasper.sdk.ui.ContentCommand::title,
+                dev.jasper.sdk.ui.ContentCommand::shortcut, dev.jasper.sdk.ui.ContentCommand::enabled)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple("font-bigger", "Increase Font Size", null, true),
+                org.assertj.core.groups.Tuple.tuple("font-smaller", "Decrease Font Size", null, true),
+                org.assertj.core.groups.Tuple.tuple("font-reset", "Reset Font Size", null, true));
+    }
+
+    @Test void theTextLeavesTheDefaultFontSizeKeysToTheWindow() throws Exception {
+        var map = opened(file("zoom-map.txt", "text")).area().getInputMap(javax.swing.JComponent.WHEN_FOCUSED);
+        for (String stroke : List.of("meta EQUALS", "meta MINUS", "meta 0", "ctrl shift EQUALS", "ctrl shift MINUS", "ctrl shift 0"))
+            assertThat(map.get(javax.swing.KeyStroke.getKeyStroke(stroke))).as(stroke).isNull();
+    }
+
+    @Test void fontSizeChangesOnlyTheSelectedTabUntilReset() throws Exception {
+        var first = opened(file("zoom-a.txt", "alpha")); var a = host.contentTabs().getFirst();
+        var second = opened(file("zoom-b.txt", "beta")); var b = host.contentTabs().getLast();
+        a.select();
+        run(a, "font-bigger"); run(a, "font-bigger");
+        assertThat(size(first)).isEqualTo(15f);
+        assertThat(size(second)).as("another tab keeps the saved size").isEqualTo(13f);
+        run(a, "font-smaller");
+        assertThat(size(first)).isEqualTo(14f);
+        run(a, "font-reset");
+        assertThat(size(first)).isEqualTo(13f);
+        assertThat(settings.get().fontSize()).as("nothing is saved").isEqualTo(13.0);
+    }
+
+    @Test void fontSizeStaysBetweenSixAndSeventyTwoPoints() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 71.5, List.of(), false, 1.0, false, 4, false, 1, false));
+        var tab = opened(file("zoom-max.txt", "text")); var handle = host.contentTabs().getFirst();
+        run(handle, "font-bigger"); run(handle, "font-bigger");
+        assertThat(size(tab)).isEqualTo(72f);
+        settings.set(new EditorSettings("Monospaced", 6.5, List.of(), false, 1.0, false, 4, false, 1, false));
+        window.apply();
+        run(handle, "font-smaller"); run(handle, "font-smaller");
+        assertThat(size(tab)).isEqualTo(6f);
+    }
+
+    @Test void aZoomedTabKeepsItsSizeUntilANewSizeIsSaved() throws Exception {
+        var tab = opened(file("zoom-settings.txt", "text")); var handle = host.contentTabs().getFirst();
+        run(handle, "font-bigger");
+        settings.set(new EditorSettings("Monospaced", 13, List.of(), false, 1.5, false, 4, false, 1, false));
+        window.apply();
+        assertThat(size(tab)).as("other font settings keep the tab's own size").isEqualTo(14f);
+        settings.set(new EditorSettings("Monospaced", 16, List.of(), false, 1.5, false, 4, false, 1, false));
+        window.apply();
+        assertThat(size(tab)).as("a new saved size applies to every tab").isEqualTo(16f);
+        run(handle, "font-reset");
+        assertThat(size(tab)).isEqualTo(16f);
+    }
+
+    @Test void theMarkdownPreviewFollowsItsTabsFontSize() throws Exception {
+        var tab = opened(file("zoom.md", "# Title\n")); var handle = host.contentTabs().getFirst();
+        assertThat(tab.surface().previewStyle().typography().size()).isEqualTo(13.0);
+        run(handle, "font-bigger");
+        assertThat(tab.surface().previewStyle().typography().size()).isEqualTo(14.0);
+        run(handle, "font-reset");
+        assertThat(tab.surface().previewStyle().typography().size()).isEqualTo(13.0);
+    }
+
     @Test void filesUseHostedTabsAndMovingPreservesDirtyTextAndUndo() throws Exception {
         var tab = opened(file("hosted.txt", "before"));
         assertThat(host.windows()).isEmpty();

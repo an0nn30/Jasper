@@ -59,6 +59,11 @@ instead of a new window. The Edit menu's **Copy**, **Paste**, **Find**, **Find N
 File menu's **Close Tab** and **Close Pane**, act on the Editor tab. **Next Tab**, **Previous Tab** and
 **Select Tab 1**–**9** count Editor tabs with terminal tabs.
 
+**Increase Font Size** and **Decrease Font Size** (View › Font Size; Cmd+= and Cmd+-, Ctrl+Shift+= and Ctrl+Shift+- on
+Linux and Windows) change the selected Editor tab and its Markdown preview by one point, from 6 to 72 points, without
+saving anything. **Reset Font Size** (Cmd+0; Ctrl+Shift+0) returns the tab to the saved [font size](#settings). Saving
+a new font size applies it to every tab; other font changes keep each tab's own size.
+
 Jasper does not reopen Editor tabs when it starts again; **Recent Files…** reopens them.
 
 ## Status bar
@@ -105,6 +110,9 @@ Vim mode, `:action id` and `<Action>(id)` run them by the id in the last column.
 | Reload vimrc | | | `reload-vimrc` |
 | Copy | Cmd+C | Ctrl+C | |
 | Paste | Cmd+V | Ctrl+V | |
+| Increase Font Size | Cmd+= | Ctrl+Shift+= | |
+| Decrease Font Size | Cmd+- | Ctrl+Shift+- | |
+| Reset Font Size | Cmd+0 | Ctrl+Shift+0 | |
 
 The plugin's actions are in the command palette and can be given other shortcuts in Settings › Keymap or
 `[keybindings]` ([Shortcuts](configuration.md#shortcuts)):

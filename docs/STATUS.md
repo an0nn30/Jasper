@@ -86,6 +86,17 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Editor font size shortcuts — 2026-10-21** (`claude/editor-font-zoom`, worktree `.claude/worktrees/editor-font-zoom`,
+from `main` at `427321de4`): Increase, Decrease and Reset Font Size (Cmd+=, Cmd+- and Cmd+0; Ctrl+Shift+=, - and 0)
+act on a selected Editor tab as they do on a terminal pane: one point at a time from 6 to 72 points, the tab's Markdown
+preview included, nothing saved; Reset returns it to the saved Editor size (the terminal's while the Editor follows
+it). A new saved size replaces the tab's own size; other font changes keep it. The workspace runs a plugin tab's
+content commands `font-bigger`, `font-smaller` and `font-reset` for the three actions (named in the SDK's
+`ContentTab`/`ContentCommand` Javadoc, the plugin guide and the regenerated SDK reference); the Editor publishes them
+without shortcuts, so the keymap's keys apply. The SDK stays 0.18.3 and the Editor 0.11.0. A small change agreed in
+chat, without a written spec or plan. Full headless `check` passed on macOS with Python 3.13: 11,893 tests, zero
+failures/errors, 29 skips. GUI check pending.
+
 **Rail and Status Bar shortcuts — 2026-10-20** (`claude/rail-status-keys`): View › Show/Hide › Rail and Status Bar
 are Keymap actions `toggle_rail` and `toggle_status_bar` (keymap spec rows 57 and 59): Global, unbound by default and
 disabled in Zen like their menu items. They replace the palette-only `view.rail` and `view.status_bar` commands; the

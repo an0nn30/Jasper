@@ -139,7 +139,8 @@ already has open selects that tab and returns its handle. Through the {@link Con
 title, detail, icon, unsaved marker and location ({@link ContentTab#setPresentation(ContentPresentation)}), its commands
 ({@link ContentTab#setCommands(List)}), which its context menu lists and whose shortcuts apply while it is selected, and
 its status bar items ({@link ContentTab#setStatus(List)}). Commands with the ids {@code find}, {@code find-next},
-{@code find-previous}, {@code copy} and {@code paste} answer Jasper's own Find, Find Next, Find Previous, Copy and Paste.
+{@code find-previous}, {@code copy} and {@code paste} answer Jasper's own Find, Find Next, Find Previous, Copy and Paste,
+and {@code font-bigger}, {@code font-smaller} and {@code font-reset} its Increase, Decrease and Reset Font Size.
 The user can move the tab to a separate window and back. {@link Windows#onTabsClosing(BiFunction)} decides whether
 tabs with unsaved work may close.</p>
 
