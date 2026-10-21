@@ -1,6 +1,7 @@
 # Jasper pane flexibility: open beside, move into tabs, two views of a file
 
-Status: **Draft, 2026-10-21, for the user's review.** This design amends the
+Status: **Approved by the user on 2026-10-21** ("The pane-flexibility spec looks right. Write plans 9a and 9b and
+execute them on the branch."). This design amends the
 [tabs and panes spec](2026-10-20-jasper-tabs-and-panes-design.md); where they disagree, this document wins. It is
 planned as two plans:
 - **9a:** open beside, and moving panes and tabs into tabs (sections 3 to 5);
