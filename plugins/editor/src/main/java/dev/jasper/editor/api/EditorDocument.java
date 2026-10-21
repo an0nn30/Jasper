@@ -30,9 +30,10 @@ public interface EditorDocument {
     CompletableFuture<Content> read(long limitBytes);
 
     /**
-     * Reads the whole file as {@link #read} does, without asking the user anything: a document that would have to (a sign-in
-     * prompt) fails instead and says so. The Editor reads a document this way when Jasper has restored its tab and it is
-     * first shown; Retry then reads it with {@link #read}. Reads as {@link #read} does unless the document asks.
+     * Reads the whole file as {@link #read} does, for a restore, which asks the user nothing. The Editor reads a document
+     * this way when Jasper has restored its tab and the tab is first active or Load is pressed; Retry then reads it with
+     * {@link #read}. A document whose read can ask the user anything (a sign-in, a prompt) must override this so that it
+     * fails, saying why, instead of asking. The default reads as {@link #read} does.
      *
      * @param limitBytes the largest size the editor accepts
      * @return the content and the revision it was read at

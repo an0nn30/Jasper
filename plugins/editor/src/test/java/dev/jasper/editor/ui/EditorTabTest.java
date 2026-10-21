@@ -261,15 +261,20 @@ class EditorTabTest {
         };
         var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), new DocumentSession(remote, environment), closed::add, false);
         tab.session().defer();
-        assertThat(stateText(tab)).isEqualTo("notes.md on box loads when you open it");
+        assertThat(stateText(tab)).isEqualTo("notes.md on box loads when you select it");
         assertThat(button(tab, EditorTab.RETRY).label()).isEqualTo("Load");
         assertThat(button(tab, EditorTab.RETRY).state().visible()).isTrue();
+        assertThat(button(tab, EditorTab.DISMISS).label()).as("nothing is loading to cancel").isEqualTo("Close");
         assertThat(quiet.get() + loud.get()).isZero();
         click(tab, EditorTab.RETRY);
         drain();
         assertThat(quiet).hasValue(1);
         assertThat(tab.session().state()).isEqualTo(DocumentSession.State.FAILED);
+        assertThat(stateText(tab)).isEqualTo(EditorTab.FAILED_TITLE);
+        assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(), EditorTab.STATE, dev.jasper.sdk.ui.Nodes.Empty.class).description())
+            .as("the quiet read's reason").contains("Not signed in to box; Retry signs in");
         assertThat(button(tab, EditorTab.RETRY).label()).isEqualTo("Retry");
+        assertThat(button(tab, EditorTab.RETRY).state().visible()).isTrue();
         click(tab, EditorTab.RETRY);
         drain();
         assertThat(loud).as("Retry reads as usual, which may sign in").hasValue(1);

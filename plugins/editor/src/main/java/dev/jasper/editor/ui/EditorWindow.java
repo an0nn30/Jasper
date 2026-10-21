@@ -87,6 +87,8 @@ public final class EditorWindow {
     private final java.util.Map<DocumentSession, Path> newFiles = new java.util.HashMap<>();
     /** Tabs {@code :q!} closes: their changes go without asking. */
     private final Set<EditorTab> discarding = new java.util.HashSet<>();
+    /** The sessions whose document key is too long to restore, each warned of once (workspace plan 6b's review). */
+    private final Set<DocumentSession> unrestorable = new java.util.HashSet<>();
     /** Vim mode as toggled in this session, until the settings file says the same; null to follow the settings. */
     private Boolean vimToggled;
     /** Whether the vimrc has been read into {@link #vim}: the first time Vim turns on, and again on Reload vimrc. */
@@ -184,7 +186,8 @@ public final class EditorWindow {
     /**
      * Opens a document Jasper restores with its windows (workspace tabs spec 13): its tab is placed where it was saved, not
      * selected. A document on another host waits until its tab is first active, or Load is pressed, and then reads without
-     * asking anything ({@code EditorDocument.readQuietly}); Retry then reads it as usual, which may sign in.
+     * asking anything ({@code EditorDocument.readQuietly}); Retry then reads it as usual, which may sign in. Recent Files
+     * does not record it: coming back is not an open (workspace plan 6b's review).
      *
      * @param document the saved document
      * @param owner the window being restored
@@ -195,7 +198,7 @@ public final class EditorWindow {
         origin = owner;
         var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
         var created = new DocumentSession(document, sessionEnvironment(ref));
-        add(created, ref); reportWhenLoaded(created);
+        add(created, ref);
         if (document.host().isPresent()) created.defer(); else created.load();
         return true;
     }
@@ -847,6 +850,7 @@ public final class EditorWindow {
         tab.dispose(); tab.session().cancelLoad(); model.remove(tab.session());
         numbers.remove(tab.session());
         newFiles.remove(tab.session());
+        unrestorable.remove(tab.session());
         discarding.remove(tab);
         if (previous == tab) previous = null;
         if (selectedTab == tab) selectedTab = hosted.keySet().stream().findFirst().orElse(null);
@@ -900,10 +904,22 @@ public final class EditorWindow {
 
     /**
      * How a document's tab comes back when Jasper restores its windows (workspace tabs spec 13): by its document's key, as
-     * Recent Files reopens it. An untitled document has none: an unsaved untitled buffer is not kept.
+     * Recent Files reopens it. An untitled document has none: an unsaved untitled buffer is not kept. A key too long for a
+     * restore state (a path of thousands of characters) gives none either, with one warning that names its length: opening
+     * or saving a file never fails because of its restore state (workspace plan 6b's review).
      */
-    private static Optional<dev.jasper.sdk.RestoreState> restoreState(DocumentSession session) {
-        return session.document().map(document -> dev.jasper.sdk.RestoreState.of(RESTORE_KIND, RESTORE_KEY, document.key()));
+    private Optional<dev.jasper.sdk.RestoreState> restoreState(DocumentSession session) {
+        Optional<EditorDocument> document = session.document();
+        if (document.isEmpty()) return Optional.empty();
+        String key = document.get().key();
+        try {
+            return Optional.of(dev.jasper.sdk.RestoreState.of(RESTORE_KIND, RESTORE_KEY, key));
+        } catch (IllegalArgumentException | NullPointerException refused) {
+            if (unrestorable.add(session)) context.log().log(System.Logger.Level.WARNING, "A document whose key holds "
+                + (key == null ? 0 : key.length()) + " characters does not come back at the next start: a restore state holds at most "
+                + dev.jasper.sdk.RestoreState.MAX_CHARACTERS);
+            return Optional.empty();
+        }
     }
 
     private static Optional<Path> localFile(DocumentSession session) {

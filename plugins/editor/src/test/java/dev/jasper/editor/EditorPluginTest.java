@@ -324,6 +324,26 @@ class EditorPluginTest {
         }
     }
 
+    /** Workspace plan 6b's review: a document that comes back is not an open, so Recent Files does not record it. */
+    @Test void aRestoredDocumentIsNotRecordedInRecentFiles() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow();
+            Path notes = Files.writeString(home.resolve("notes.md"), "# notes\n");
+            var state = dev.jasper.sdk.RestoreState.of("document", "key", "local:" + notes.toAbsolutePath().normalize());
+            assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", state)).isPresent();
+            drain(host);
+            assertThat(host.contentTab("dev.jasper.editor", "notes.md")).isPresent();
+            assertThat(host.searchScope(RECENT, "", main, null)).as("restored, not opened").isEmpty();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            consumer.get().services().require(Editor.class).open(notes);
+            drain(host);
+            assertThat(titles(host.searchScope(RECENT, "", main, null))).as("opened as usual").containsExactly("notes.md");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
     /**
      * Workspace plan 6b's review: a local file deleted since its tab was saved comes back as a failed read with Retry, and
      * keeps its restore state, so it comes back again while it stays open.
@@ -390,6 +410,12 @@ class EditorPluginTest {
             drain(host);
             assertThat(quiet).as("read once it is active, asking nothing").hasValue(1);
             assertThat(loud).hasValue(0);
+            // Showing the tab again does not read it again: it waits for Retry now.
+            consumer.get().services().require(Editor.class).open(Files.writeString(home.resolve("other.md"), "x\n"));
+            drain(host);
+            tab.select();
+            drain(host);
+            assertThat(quiet.get() + loud.get()).as("selected again, not read again").isEqualTo(1);
             assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", state)).as("already open").isEmpty();
             assertThat(host.declinedRestores()).singleElement().asString().contains("the file is open in another tab");
         }

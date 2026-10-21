@@ -144,6 +144,101 @@ class EditorWindowTest {
         assertThat(recorded).containsExactly(LocalDocument.key(file), LocalDocument.key(file));
     }
 
+    private static dev.jasper.sdk.RestoreState stateOf(String key) {
+        return dev.jasper.sdk.RestoreState.of(EditorWindow.RESTORE_KIND, EditorWindow.RESTORE_KEY, key);
+    }
+
+    /**
+     * Workspace plan 6b's review: a document's restore state never stops it opening. A key past what a restore state
+     * holds opens as any other file, once, with one warning that names its length and not the key, and does not come back.
+     */
+    @Test void aDocumentWhoseKeyIsTooLongToRestoreStillOpensOnceAndGivesNoRestoreState() throws Exception {
+        var warnings = new ArrayList<String>();
+        var logger = java.util.logging.Logger.getLogger("dev.jasper.plugins.dev.jasper.editor");
+        var handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) {
+                if (record.getLevel().intValue() >= java.util.logging.Level.WARNING.intValue()) warnings.add(record.getMessage());
+            }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        logger.addHandler(handler);
+        try {
+            var document = new StubDocument("stub:" + "x".repeat(5_000), "long.txt", "/srv/long.txt", null);
+            window.open(document);
+            drain();
+            assertThat(host.contentTabs()).hasSize(1);
+            var handle = host.contentTabs().getFirst();
+            assertThat(host.restoreState(handle)).as("too long to restore: not saved").isEmpty();
+            assertThat(window.sessions()).singleElement().extracting(DocumentSession::state).isEqualTo(DocumentSession.State.READY);
+            assertThat(document.reads).isEqualTo(1);
+            var tab = window.selected().orElseThrow();
+            window.open(document);
+            drain();
+            assertThat(host.contentTabs()).as("the second open selects the same tab").containsExactly(handle);
+            assertThat(window.selected()).containsSame(tab);
+            assertThat(document.reads).isEqualTo(1);
+            assertThat(warnings).as("one warning for the document, naming its key's length").singleElement().satisfies(warning -> {
+                assertThat(warning).contains("5005 characters");
+                assertThat(warning).doesNotContain("xxxxx");
+            });
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
+    /** Workspace plan 6b's review: a Save As to a key too long to restore completes, and the tab gives no restore state. */
+    @Test void aSaveAsToAKeyTooLongToRestoreCompletesAndGivesNoRestoreState() throws Exception {
+        var written = new ArrayList<String>();
+        locations.register("test.hosts", new LocationResolver() {
+            @Override public EditorDocument document(FileLocation.Sourced location, WindowOwner owner) { return new RemoteStub(location.path(), written); }
+            @Override public Optional<FileLocation.Sourced> location(String key) {
+                return key.startsWith("stub:") ? Optional.of(new FileLocation.Sourced("test.hosts", "box", key.substring(5))) : Optional.empty();
+            }
+        });
+        window.newUntitled();
+        window.selected().orElseThrow().area().setText("hello\n");
+        host.queueFileChoice(List.of(new FileLocation.Sourced("test.hosts", "box", "/srv/" + "a".repeat(5_000) + ".txt")));
+        var saved = window.saveAll();
+        drain();
+        assertThat(saved).isCompletedWithValue(true);
+        assertThat(written).singleElement().asString().endsWith(".txt=hello\n");
+        var handle = host.contentTabs().getFirst();
+        assertThat(host.contentPresentation(handle).title()).as("the tab's header followed the save").endsWith(".txt");
+        assertThat(host.restoreState(handle)).isEmpty();
+        assertThat(window.sessions().getFirst().dirty()).isFalse();
+    }
+
+    /** Workspace plan 6b's review: a tab's restore state follows its document, through a first save and a Save As. */
+    @Test void aTabsRestoreStateFollowsItsDocumentThroughAFirstSaveAndASaveAs() throws Exception {
+        window.newUntitled();
+        var handle = host.contentTabs().getFirst();
+        assertThat(host.restoreState(handle)).as("an unsaved untitled buffer is not kept").isEmpty();
+        window.selected().orElseThrow().area().setText("print(1)\n");
+        Path first = home.resolve("first.py");
+        host.queueFileChoice(List.of(new FileLocation.Local(first)));
+        window.save();
+        drain();
+        assertThat(host.restoreState(handle)).as("its new file").contains(stateOf(LocalDocument.key(first)));
+        Path second = home.resolve("second.py");
+        host.queueFileChoice(List.of(new FileLocation.Local(second)));
+        window.saveAs();
+        drain();
+        assertThat(host.restoreState(handle)).as("the Save As target").contains(stateOf(LocalDocument.key(second)));
+    }
+
+    /** Workspace plan 6b's review: a document that comes back is not an open, so Recent Files does not record it. */
+    @Test void aRestoredDocumentIsNotRecordedAsOpened() throws Exception {
+        Path file = file("restored.txt", "text\n");
+        assertThat(window.openRestored(new LocalDocument(file, context.background()), null)).isTrue();
+        drain();
+        assertThat(window.sessions()).singleElement().extracting(DocumentSession::state).isEqualTo(DocumentSession.State.READY);
+        assertThat(recorded).isEmpty();
+        assertThat(window.openRestored(new LocalDocument(file, context.background()), null)).as("open already").isFalse();
+        window.openLocal(file);
+        assertThat(recorded).as("opening it as usual is recorded").containsExactly(LocalDocument.key(file));
+    }
+
     @Test void filesUseHostedTabsAndMovingPreservesDirtyTextAndUndo() throws Exception {
         var tab = opened(file("hosted.txt", "before"));
         assertThat(host.windows()).isEmpty();

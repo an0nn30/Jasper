@@ -169,7 +169,7 @@ public final class EditorTab {
         // The canonical full-body empty state: a short title over one sentence, the secondary action, then the one primary.
         children.add(new Nodes.Empty(STATE, visible(!ready), new Nodes.Icon("document.state.icon", ControlState.READY,
             failed ? "error" : "file", Nodes.Hue.NONE, Nodes.IconSize.EMPTY, failed ? "Load failed" : "Loading"),
-            failed ? FAILED_TITLE : waiting ? session.name() + session.host().map(host -> " on " + host).orElse("") + " loads when you open it"
+            failed ? FAILED_TITLE : waiting ? session.name() + session.host().map(host -> " on " + host).orElse("") + " loads when you select it"
                 : "Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…", failed ? session.failure() : "",
             List.of(button(DISMISS, failed || waiting ? "Close" : "Cancel", true),
                 new Nodes.Button(RETRY, visible(waiting || failed && session.retryable()), waiting ? "Load" : "Retry", "", Nodes.ButtonKind.PRIMARY, RETRY, ""))));
