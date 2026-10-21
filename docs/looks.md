@@ -362,7 +362,7 @@ All three keys are required when the table is present.
 | Key | Value | What it does |
 |---|---|---|
 | `product` | 1 to 32 characters | The name the splash screen shows. |
-| `icons` | a folder path | The folder holding `icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-64.png`, `icon-128.png`, `icon-256.png` and `icon-1024.png`, each a PNG of exactly that many pixels square. They replace Jasper's application icon in every window and in the Dock or taskbar, on every launch. |
+| `icons` | a folder path or `@jasper` | The folder holding `icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-64.png`, `icon-128.png`, `icon-256.png` and `icon-1024.png`, each a PNG of exactly that many pixels square. They replace Jasper's application icon in every window and in the Dock or taskbar, on every launch. Use `@jasper` to share Jasper's platform icon, including in the splash. |
 | `splash_art` | an `.svg` path | The art at the top of the splash screen. |
 
 With `[branding]`, a start that opens a window (not `--background`, `--no-window` or `--safe-mode`) shows a 720 × 440 splash until the
@@ -493,7 +493,7 @@ navigation_surface = "surface.card"
 
 [branding]
 product = "JasperOps"
-icons = "icons"
+icons = "@jasper"
 splash_art = "splash/art.svg"
 
 [defaults]
@@ -510,7 +510,7 @@ font_family = "IBM Plex Mono"
 - `base = "classic"`, and `[chrome]`, `[controls]`, `[metrics]`, `[colors]` and `[type] base` restate the classic
   base's values, except `title_bar` (`classic` for the base's `native`), `window_title` and `toolbar_search` (`icon`
   for the base's `field`).
-- The fonts sit in `presentation/fonts/`, the icons in `presentation/icons/` and the art in
+- The fonts sit in `presentation/fonts/`, the art in
   `presentation/splash/art.svg`, all inside the kit file's folder.
 - `[defaults]` makes the plugin's own `enterprise` theme the default for both appearances, shows 8 Run window rows,
   makes the toolbar 28 pixels high, IntelliJ's, and shows its buttons as icons only; its Editor table draws the

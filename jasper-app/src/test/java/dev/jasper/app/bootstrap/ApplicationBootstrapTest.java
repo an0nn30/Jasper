@@ -458,6 +458,20 @@ class ApplicationBootstrapTest {
         assertThat(calls).containsExactly("show false", "show true", "icon", "show false", "show true", "icon");
     }
 
+    @Test void enterpriseSplashUsesShellPromptAndRetainsItsProductAndArtwork() throws Exception {
+        var parsed = dev.jasper.app.testsupport.EnterpriseResources.facts().parsed().orElseThrow();
+        var presentation = dev.jasper.app.presentation.Presentation.of(
+            new dev.jasper.app.presentation.Presentation.Provider("dev.jasper.enterprise", "Enterprise", "1", "test"),
+            parsed, new dev.jasper.app.presentation.Projections.Host(dev.jasper.app.presentation.Projections.Platform.MAC, true));
+        var content = ApplicationBootstrap.splashContent(presentation, dev.jasper.app.platform.BuildInfo.current());
+        assertThat(content.product()).isEqualTo("JasperOps");
+        assertThat(content.art()).isEqualTo(parsed.branding().splashArt());
+        assertThat(content.icon64()).isEqualTo(dev.jasper.app.platform.ApplicationIcon.defaultPng(64));
+        assertThat(content.icon128()).isEqualTo(dev.jasper.app.platform.ApplicationIcon.defaultPng(128));
+        assertThat(javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(content.icon64())).getWidth()).isEqualTo(64);
+        assertThat(javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(content.icon128())).getWidth()).isEqualTo(128);
+    }
+
     /** Spec 10.11: the splash shows the look's files, the version line and About's copyright. */
     @Test void theSplashContentIsTheLooksBrandingWithAboutsVersionAndCopyright() throws Exception {
         var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));

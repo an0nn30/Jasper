@@ -14,6 +14,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ApplicationIconTest {
     private static final Path ICONS = Path.of(System.getProperty("jasper.projectDir"), "packaging", "icons");
 
+    @Test void enterpriseKeepsTheSameShellPromptIconAsNormalMode() {
+        ApplicationIcon.useLook(java.util.List.of());
+        var normal = ApplicationIcon.images();
+        try {
+            var branding = dev.jasper.app.testsupport.EnterpriseResources.facts().parsed().orElseThrow().branding();
+            assertThat(branding.present()).isTrue();
+            assertThat(branding.iconFiles()).isEmpty();
+            ApplicationIcon.useLook(branding.iconFiles());
+            assertThat(ApplicationIcon.images()).isSameAs(normal);
+            assertThat(ApplicationIcon.branded()).isFalse();
+            assertThat(ApplicationIcon.setsTaskbarIcon(true, "/Applications/Jasper.app", ApplicationIcon.branded())).isFalse();
+        } finally {
+            ApplicationIcon.useLook(java.util.List.of());
+        }
+    }
+
     @Test void packagedMacKeepsItsNativeIconWhileDevelopmentCanSetOne() {
         assertThat(ApplicationIcon.usesBundleIcon(true, "/Applications/Jasper.app/Contents/MacOS/Jasper")).isTrue();
         assertThat(ApplicationIcon.usesBundleIcon(true, null)).isFalse();

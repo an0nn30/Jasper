@@ -46,6 +46,15 @@ class KitBrandingTest {
         assertThat(branding.splashArt()).isEqualTo(files.get("presentation/splash/art.svg"));
     }
 
+    @Test void sharedJasperIconsNeedNoPluginIconFilesButRetainSplashBranding() throws Exception {
+        var files = files();
+        files.keySet().removeIf(path -> path.contains("/icons/"));
+        var branding = parse(HEAD + BrandingFixtures.TABLE.replace("icons = \"icons\"", "icons = \"@jasper\""), files).branding();
+        assertThat(branding.product()).isEqualTo("JasperOps");
+        assertThat(branding.iconFiles()).isEmpty();
+        assertThat(branding.files()).containsExactly(files.get("presentation/splash/art.svg"));
+    }
+
     /** One invalid branding: the kit text, the jar's files and the one message it gives. */
     record Case(String kit, Map<String, byte[]> files, String message) { }
 

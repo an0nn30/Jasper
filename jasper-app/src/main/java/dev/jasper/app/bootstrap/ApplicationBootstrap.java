@@ -167,7 +167,9 @@ public final class ApplicationBootstrap {
     static SplashPainter.Content splashContent(Presentation presentation, BuildInfo build) {
         Branding branding = presentation.branding();
         var faces = presentation.faces();
-        return new SplashPainter.Content(branding.product(), build.buildLine(), BuildInfo.COPYRIGHT, branding.icon(64), branding.icon(128),
+        boolean sharedIcon = branding.iconFiles().isEmpty();
+        return new SplashPainter.Content(branding.product(), build.buildLine(), BuildInfo.COPYRIGHT, sharedIcon ? ApplicationIcon.defaultPng(64) : branding.icon(64),
+            sharedIcon ? ApplicationIcon.defaultPng(128) : branding.icon(128),
             branding.splashArt(), faces.ui().map(ui -> ui.semibold().bytes()), faces.ui().map(ui -> ui.regular().bytes()),
             faces.data().map(data -> data.regular().bytes()));
     }

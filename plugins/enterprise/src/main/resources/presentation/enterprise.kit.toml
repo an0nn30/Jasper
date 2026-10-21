@@ -63,7 +63,7 @@ navigation_surface = "surface.card"
 
 [branding]
 product = "JasperOps"
-icons = "icons"
+icons = "@jasper"
 splash_art = "splash/art.svg"
 
 [defaults]

@@ -461,10 +461,10 @@ public final class KitParser {
         if (product.isBlank() || product.codePointCount(0, product.length()) > 32)
             throw new Invalid("[branding].product: expected a name of 1 to 32 characters");
         String folder = string(table, "branding", "icons");
-        if (!path(folder))
+        if (!folder.equals("@jasper") && !path(folder))
             throw new Invalid("[branding].icons: " + folder + " must be a lowercase path inside the kit's folder, without . or .. segments");
         var icons = new LinkedHashMap<Integer, byte[]>();
-        for (int size : Branding.SIZES) {
+        for (int size : folder.equals("@jasper") ? List.<Integer>of() : Branding.SIZES) {
             String file = folder + "/icon-" + size + ".png";
             byte[] bytes = context.files().read(context.directory() + file, MAX_ICON_BYTES)
                 .orElseThrow(() -> new Invalid("[branding].icons: " + file + " is not in the plugin's jars"));

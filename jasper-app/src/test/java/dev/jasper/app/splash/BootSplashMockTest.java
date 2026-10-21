@@ -16,7 +16,7 @@ import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
 /**
- * Spec 10.11 and 16.1.4: the splash under the shipped Enterprise branding, at 1x, against the ten Boot Splash frames
+ * Spec 10.11 and 16.1.4: the splash under the original reference branding, at 1x, against the ten Boot Splash frames
  * (1x, 720 by 440). The frames are palette-quantised screenshots of the animated mock (the plan's Measured targets), so
  * the render's flat colours are exact and the mock's within 3, regions compare by mean difference, text by its ink box,
  * and the fill by frame 10's rows. The version, the copyright, the steps and their fill are the mock's fixtures. The
@@ -56,11 +56,15 @@ class BootSplashMockTest {
     static final Box NAME_INK = new Box(122, 291, 265, 317), VERSION_INK = new Box(122, 323, 271, 332),
         COPYRIGHT_INK = new Box(568, 398, 678, 407);
 
-    static SplashPainter.Content content(KitParser.Parsed parsed) {
+    static SplashPainter.Content content(KitParser.Parsed parsed) throws java.io.IOException {
         var branding = parsed.branding();
         var ui = parsed.faces().ui().orElseThrow();
         var data = parsed.faces().data().orElseThrow();
-        return new SplashPainter.Content(branding.product(), VERSION, COPYRIGHT, branding.icon(64), branding.icon(128), branding.splashArt(),
+        // These historical mocks contain the original emblem. Shared Shell Prompt selection is covered by
+        // ApplicationBootstrapTest; keep this renderer comparison on the exact reference assets.
+        byte[] icon64 = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/icons/icon-64.png"));
+        byte[] icon128 = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/icons/icon-128.png"));
+        return new SplashPainter.Content(branding.product(), VERSION, COPYRIGHT, icon64, icon128, branding.splashArt(),
             Optional.of(ui.semibold().bytes()), Optional.of(ui.regular().bytes()), Optional.of(data.regular().bytes()));
     }
 

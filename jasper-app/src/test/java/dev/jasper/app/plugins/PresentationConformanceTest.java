@@ -130,10 +130,11 @@ class PresentationConformanceTest {
         });
     }
 
-    /** Spec 5.1, 5.9 and 14.1: the branding is the reference artwork the user supplied, each icon a PNG of its size. */
-    @Test void theBrandingIsTheReferenceArtwork() throws Exception {
+    /** Enterprise shares Jasper's icon; its preserved reference assets and active splash art remain intact. */
+    @Test void enterpriseSharesJaspersIconAndPreservesItsReferenceArtwork() throws Exception {
         var branding = EnterpriseResources.facts().parsed().orElseThrow().branding();
         assertThat(branding.product()).isEqualTo("JasperOps");
+        assertThat(branding.iconFiles()).as("use the shared Shell Prompt platform icon").isEmpty();
         Path reference = EnterpriseResources.ROOT.resolve("docs/design/enterprise/reference");
         var sources = new java.util.LinkedHashMap<Integer, String>();
         sources.put(16, "09 App Icon/macOS/AppIcon.iconset/icon_16x16.png");
@@ -148,7 +149,6 @@ class PresentationConformanceTest {
             int size = source.getKey();
             byte[] shipped = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/icons/icon-" + size + ".png"));
             assertThat(shipped).as("icon-%s.png is the reference file", size).isEqualTo(Files.readAllBytes(reference.resolve(source.getValue())));
-            assertThat(branding.icon(size)).isEqualTo(shipped);
             assertThat(shipped.length).isLessThanOrEqualTo(512 * 1024);
             var image = javax.imageio.ImageIO.read(new ByteArrayInputStream(shipped));
             assertThat(image.getWidth()).as("icon-%s.png width", size).isEqualTo(size);

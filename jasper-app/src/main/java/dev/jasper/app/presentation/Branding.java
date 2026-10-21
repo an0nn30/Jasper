@@ -35,7 +35,7 @@ public final class Branding {
      * A look's branding.
      *
      * @param product the name the splash shows, 1 to 32 characters
-     * @param icons one PNG file for each of {@link #SIZES}
+     * @param icons one PNG file for each of {@link #SIZES}, or empty to use Jasper's platform icons
      * @param splashArt the splash art's SVG file
      * @return the branding, holding copies
      * @throws IllegalArgumentException when a part is missing
@@ -46,7 +46,7 @@ public final class Branding {
         Objects.requireNonNull(splashArt, "splashArt");
         if (product.isBlank() || product.codePointCount(0, product.length()) > 32)
             throw new IllegalArgumentException("A product name has 1 to 32 characters: " + product);
-        if (!new TreeSet<>(icons.keySet()).equals(new TreeSet<>(SIZES)))
+        if (!icons.isEmpty() && !new TreeSet<>(icons.keySet()).equals(new TreeSet<>(SIZES)))
             throw new IllegalArgumentException("Branding needs one icon of each size " + SIZES + ", not " + new TreeSet<>(icons.keySet()));
         if (splashArt.length == 0) throw new IllegalArgumentException("Branding needs its splash art");
         var copies = new TreeMap<Integer, byte[]>();
@@ -73,7 +73,7 @@ public final class Branding {
         return file.clone();
     }
 
-    /** Every icon's PNG file, smallest first; empty for {@link #NONE}. */
+    /** Every custom icon's PNG file, smallest first; empty when using Jasper's platform icons. */
     public List<byte[]> iconFiles() { return icons.values().stream().map(byte[]::clone).toList(); }
 
     /** The splash art's SVG file; empty for {@link #NONE}. */
