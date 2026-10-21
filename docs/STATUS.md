@@ -2,7 +2,7 @@
 
 **Workspace tabs, plan 6b: plugins' tabs come back — 2026-10-21** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `eefe0324e..b22836d14`, then this documentation commit and its final-review fix
-wave; [plan](superpowers/plans/2026-10-18-workspace-6b-plugin-restorers.md),
+wave and a residual round; [plan](superpowers/plans/2026-10-18-workspace-6b-plugin-restorers.md),
 [spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). SDK 0.21.0 (plan 6a's bump; no bump of this
 plan's own) gains `dev.jasper.sdk.RestoreState` (a restorer kind and at most 32 entries and 4,096 characters in all
 (keys and values); a larger state, or a key holding a lone surrogate, throws `IllegalArgumentException`),
@@ -100,59 +100,66 @@ registered under an id already open; an `Error` from a restorer closes the item 
 and its declines follow the app; `TabRestorer` says it must not block. (2) Task 2's review: the size limit counts each
 item's UTF-8 share once (`WorkspaceFile.sizes`) and encodes once; Retry reads a failed rebuild's reason directly; a
 saved `jasper` record is logged when left out; a placeholder's reason wraps. (3) Task 3's review: a document's restore
-state never stops it opening or saving (a key over about 4,090
-characters is simply not restored); a restored document is not recorded in Recent Files; a deferred document reads
-"loads when you select it". (4) Task 4's review: both harnesses keep a restored session's pane on its first Cancel, as
-Jasper does; an SSH tab whose restore state does not fit drops its folder, then its state, and still opens; a
-`hosts.toml` that cannot be read says so; a quiet attach failure says why; a host's running tab is shown before a
-restored one that waits; a document's quiet open checks again that signing in asks nothing. The fix rounds' accepted
-deviations: public `WorkspaceFile.sizes` and `Sizes`; `PlaceholderContent`'s wrapping `JTextArea`; the fake also
-closing on an `Error`; a contract case for the move refusal on both runtimes; `TerminalFixture.restoringSessions` wired
-to the slot; package-private test seams. (5) The final-review fix wave: a plugin's subcommand while no main window is
-open restores the windows first, then runs (`JasperApplication.commands`), so `jasper editor` for a file that was a
-saved tab selects that tab instead of leaving a placeholder beside a second tab; `TabRegistry.open` for the main window
-while none is open restores it before it looks for the (plugin, key), so an item that restore brought back is selected,
-not opened twice; an `Error` from a restorer other than a `VirtualMachineError` is that plugin's restore failure, as an
-exception is (`HostedUi` reports it, `TabRegistry.restore` closes the item it opened and gives its message as the
-reason), so its saved tab comes back as a placeholder and the rest of the windows as saved, and the fake follows, with a
-contract case on both runtimes; `TabRestorer` names every time a restorer runs (at a window's restore, on Retry, and
-inside a plugin's own call that opens a tab while no window is open) and what an `Error` does; a placeholder for a
-plugin that is turned off, off in safe mode (`PluginRuntime.Standing.Kind.SAFE_MODE`) or waiting for review says what
-brings it back, after a restart, since a change in Manage Plugins takes effect at the next start; the Editor's
-`openRestored` keeps the window the Editor was used from (`origin`); Remote's test-only `EditChannels` and
-`RemoteEditing` constructors are gone, their tests on the full ones; and the guides say a restore state's limits, a
-restorer's thread contract and an SSH tab's folder as they are. THD Sourcing Crypto
-(`~/projects/thd-sourcing-crypto-jasper-plugin`) starts from branch `jasper-sdk-0.18.3` at `941874e`, where 0.18 is
-done (`sdk = ">=0.18.0, <0.19"`, version 1.3.0): SDK 0.21.0 is the series' last bump and the one to rebuild it against,
-once, with the jars `sdkRelease` publishes; plan 4b's entry lists what 0.19 and 0.20 need (0.19:
-`CryptoFormTest.java:39-41` adds two panes to one tab, so `other` needs its own), and its `plugin.toml` and
-`PluginPackagingTest.java:49` take `sdk = ">=0.21.0, <0.22"` and `build.gradle.kts:8` and `README.md:28` name 0.21.0;
-0.21 needs nothing more (it names `SessionState.RUNNING` in one fixture and switches over no `SessionState`, and it
-opens only a dialog, which is not saved). These files are main's, and the merge with main brings them up to date:
-`docs/sdk-reference.html`, which it regenerates with this plan's SDK Javadoc; `docs/plugin-apis.md`, which describes
-`EditorDocument` method by method and needs `readQuietly`; and the `AGENTS.md` sentence on the Editor types Remote
-names, which needs `SavedRemoteDocument`. `./gradlew check`: **12,250 tests, 0 failures, 0 errors, 25 skipped**
-(excludes the external example, which `check` does not run). GUI checks for the user: with Jasper resident and no window
-open, `jasper editor <a file that was a saved tab>` gives one tab and no placeholder; two tabs in the main window, an
-Editor file in a pane of the hidden one beside a terminal (Split Right with Editor), a Remote SSH tab (one host through
-the agent, one with a password in the Vault, locked), and, with the sample on, its About moved to a full window (Move
-Tab to New Window); an Editor tab in a full window; quit and start: each comes back in its window, tab and pane, the
-agent's SSH tab connects when shown, the other says Not connected with Reconnect, and the hidden tab's remote file loads
-only when that tab shows; the Vault's manager, if it was open, stays closed; under the Enterprise look the tab strip
-shows as before; turn the sample off in Manage Plugins, restart: its About is a placeholder without Retry in its full
-window, and Close closes that window; turn Remote off with a remote file open in the Editor, restart: that tab is a
-placeholder with Retry ("Editor could not restore this tab: no running plugin opens remote: documents."), and turning
-Remote on again and restarting brings it back; a remote file open in the Editor comes back without asking for anything,
-loads when its tab is clicked if an open connection or the agent signs in, and otherwise says so with Retry; with
-residency and the Vault unlocked, close the main window and reopen it from the Dock: the Vault-signed SSH tab comes back
-Not connected with Reconnect and no grant prompt; press Cancel while a restored SSH tab connects: the tab stays with
-Reconnect; tab to a placeholder's Retry and Close with the keyboard; two SSH tabs restored side by side in one window
-both connect; with a restored SSH tab still hidden, pick its host in Remote's Sessions: that tab shows instead of a new
-one; an Editor tab whose file was deleted comes back as the Editor's failed read, with Retry; drag a placeholder's pane
-into another tab and press Retry there: the file comes back in that pane; connect an SSH host whose key you accept Once,
-quit and start: its tab comes back Not connected with Reconnect, asking nothing, and Reconnect asks about the key; start
-in safe mode with a user plugin's tab saved: its placeholder says the plugin is off in safe mode. Not merged, not
-pushed.
+state never stops it opening or saving (a key over about 4,090 characters is simply not restored); a restored document
+is not recorded in Recent Files; a deferred document reads "loads when you select it". (4) Task 4's review: both
+harnesses keep a restored session's pane on its first Cancel, as Jasper does; an SSH tab whose restore state does not
+fit drops its folder, then its state, and still opens; a `hosts.toml` that cannot be read says so; a quiet attach
+failure says why; a host's running tab is shown before a restored one that waits; a document's quiet open checks again
+that signing in asks nothing. The fix rounds' accepted deviations: public `WorkspaceFile.sizes` and `Sizes`;
+`PlaceholderContent`'s wrapping `JTextArea`; the fake also closing on an `Error`; a contract case for the move refusal
+on both runtimes; `TerminalFixture.restoringSessions` wired to the slot; package-private test seams. (5) The
+final-review fix wave: a plugin's subcommand while no main window is open restores the windows first, then runs
+(`JasperApplication.commands`), so `jasper editor` for a file that was a saved tab selects that tab instead of leaving a
+placeholder beside a second tab; `TabRegistry.open` for the main window while none is open restores it before it looks
+for the (plugin, key), so an item that restore brought back is selected, not opened twice; an `Error` from a restorer
+other than a `LinkageError` (contained like an exception, so the tab it opened is kept) or a `VirtualMachineError` is
+that plugin's restore failure, as an exception is (`HostedUi` reports it, `TabRegistry.restore` closes the item it
+opened and gives its message as the reason), so its saved tab comes back as a placeholder and the rest of the windows as
+saved, and the fake follows, with a contract case on both runtimes; `TabRestorer` names every time a restorer runs (at a
+window's restore, on Retry, and inside a plugin's own call that opens a tab while no window is open) and what an `Error`
+does; a placeholder for a plugin that is turned off, off in safe mode (`PluginRuntime.Standing.Kind.SAFE_MODE`) or
+waiting for review says what brings it back, after a restart, since a change in Manage Plugins takes effect at the next
+start; the Editor's `openRestored` keeps the window the Editor was used from (`origin`); Remote's test-only
+`EditChannels` and `RemoteEditing` constructors are gone, their tests on the full ones; and the guides say a restore
+state's limits, a restorer's thread contract and an SSH tab's folder as they are. The residual round: a plugin's
+subcommand restores the windows first only when it will run (`PluginRuntime.runsSubcommand`: its plugin has registered
+the handler), so a call whose plugin is off answers "unavailable" and opens no window; a placeholder for a plugin marked
+for removal says `<name> is marked for removal in Manage Plugins.` (`PluginRuntime.Standing.Kind.MARKED_FOR_REMOVAL`),
+with no advice to turn it on, while one the user turned off stays "turned off"; `TabRegistry.restore` warns that a
+restorer's item did not close only when closing it failed; and the guides say that a `LinkageError` stays contained like
+an exception and keeps its tab, that a restorer may check that a local file exists, but reading it or using the network
+waits until the tab is shown, and that a restorer also runs on Retry. THD Sourcing Crypto
+(`~/projects/thd-sourcing-crypto-jasper-plugin`) starts from branch `jasper-sdk-0.18.3` at `941874e`, where 0.18 is done
+(`sdk = ">=0.18.0, <0.19"`, version 1.3.0): SDK 0.21.0 is the series' last bump and the one to rebuild it against, once,
+with the jars `sdkRelease` publishes; plan 4b's entry lists what 0.19 and 0.20 need (0.19: `CryptoFormTest.java:39-41`
+adds two panes to one tab, so `other` needs its own), and its `plugin.toml` and `PluginPackagingTest.java:49` take
+`sdk = ">=0.21.0, <0.22"` and `build.gradle.kts:8` and `README.md:28` name 0.21.0; 0.21 needs nothing more (it names
+`SessionState.RUNNING` in one fixture and switches over no `SessionState`, and it opens only a dialog, which is not
+saved). These files are main's, and the merge with main brings them up to date: `docs/sdk-reference.html`, which it
+regenerates with this plan's SDK Javadoc; `docs/plugin-apis.md`, which describes `EditorDocument` method by method and
+needs `readQuietly`; and the `AGENTS.md` sentence on the Editor types Remote names, which needs `SavedRemoteDocument`.
+`./gradlew check`: **12,255 tests, 0 failures, 0 errors, 25 skipped** (excludes the external example, which `check` does
+not run). GUI checks for the user: with Jasper resident and no window open,
+`jasper editor <a file that was a saved tab>` gives one tab and no placeholder, and with the Editor turned off it
+answers that the Editor plugin is off and opens no window; two tabs in the main window, an Editor file in a pane of the
+hidden one beside a terminal (Split Right with Editor), a Remote SSH tab (one host through the agent, one with a
+password in the Vault, locked), and, with the sample on, its About moved to a full window (Move Tab to New Window); an
+Editor tab in a full window; quit and start: each comes back in its window, tab and pane, the agent's SSH tab connects
+when shown, the other says Not connected with Reconnect, and the hidden tab's remote file loads only when that tab
+shows; the Vault's manager, if it was open, stays closed; under the Enterprise look the tab strip shows as before; turn
+the sample off in Manage Plugins, restart: its About is a placeholder without Retry in its full window, and Close closes
+that window; turn Remote off with a remote file open in the Editor, restart: that tab is a placeholder with Retry
+("Editor could not restore this tab: no running plugin opens remote: documents."), and turning Remote on again and
+restarting brings it back; a remote file open in the Editor comes back without asking for anything, loads when its tab
+is clicked if an open connection or the agent signs in, and otherwise says so with Retry; with residency and the Vault
+unlocked, close the main window and reopen it from the Dock: the Vault-signed SSH tab comes back Not connected with
+Reconnect and no grant prompt; press Cancel while a restored SSH tab connects: the tab stays with Reconnect; tab to a
+placeholder's Retry and Close with the keyboard; two SSH tabs restored side by side in one window both connect; with a
+restored SSH tab still hidden, pick its host in Remote's Sessions: that tab shows instead of a new one; an Editor tab
+whose file was deleted comes back as the Editor's failed read, with Retry; drag a placeholder's pane into another tab
+and press Retry there: the file comes back in that pane; connect an SSH host whose key you accept Once, quit and start:
+its tab comes back Not connected with Reconnect, asking nothing, and Reconnect asks about the key; start in safe mode
+with a user plugin's tab saved: its placeholder says the plugin is off in safe mode. Not merged, not pushed.
 
 **Workspace tabs, plan 6a: saving and restoring the workspace — 2026-10-21** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `e51f2d14c..3f273675e` on the parent-tabs model, then `77d7b3033..987b30f63`,

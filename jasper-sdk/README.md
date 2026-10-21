@@ -90,8 +90,10 @@ opens is the saved tab, whatever window or placement it names, and so is the fir
 `request.window()`; Jasper puts it where it was saved, in its tab and pane of that window. When the
 tab cannot come back for a reason the plugin expects (its file or host is gone), the restorer returns that reason
 instead, which is no failure. A tab whose plugin is not installed, turned off, waiting for review or failed to start, has
-no restorer for its kind, or whose restorer declines, throws before it opens its tab or opens nothing comes back as a
-placeholder that says why, with Close and, while the plugin runs, Retry. In the testkit `FakePluginHost.restoreState`
+no restorer for its kind, or whose restorer declines, throws before it opens its tab, throws an `Error` that closes it
+(any but a `LinkageError`, which stays contained like an exception and keeps the tab, and a `VirtualMachineError`, which
+is not contained) or opens nothing comes back as a placeholder that says why, with Close and, while the plugin runs,
+Retry. In the testkit `FakePluginHost.restoreState`
 reads the restore state a tab gives and `restoreTab` runs a plugin's restorer as Jasper does: the tab is placed in the
 window being restored, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown; `declinedRestores()` lists
 the reasons restorers gave when no tab came back.

@@ -951,15 +951,17 @@ A tab comes back when Jasper restores its windows (SDK 0.21.0) if you say how: g
 comes to stand for something else, and register the restorer for the kind in `start()`:
 `context.windows().restorer("document", request -> openDocument(request.state().values().get("path"), request.window()))`,
 where `openDocument` opens the tab at once and reads the file afterwards, off the UI thread, as the Editor does, and
-returns empty once the tab is open, or why it could not open it. A restorer runs on the UI thread before its window
-shows and must not block: it does no file or network I/O.
+returns empty once the tab is open, or why it could not open it. A restorer runs on the UI thread, before its window
+shows or when the user presses Retry, and must not block: it may check quickly that a local file exists, but reading
+its content, or anything remote, waits until the tab is shown.
 The restorer opens the tab the way your action does, with the same restore state, and returns `Optional.empty()`; Jasper
 places it where it was saved, in whichever window, tab and pane held it. When it cannot come back now (its file is gone),
 return why instead, `Optional.of("its file is gone")`: its placeholder says so with Retry, and nothing reports a failure.
 A restore state is saved in `workspace.toml`: keep it small, and never put a secret in it. A tab without one is not
-saved, and one whose restorer throws before it opens its tab, or opens nothing, comes back as a placeholder with Retry
-too. Open only that tab: the window being restored takes no other while your restorer runs, so another tab opens where
-an owner-less one would.
+saved, and one whose restorer throws before it opens its tab, throws an `Error` that closes it (any but a `LinkageError`,
+which stays contained like an exception and keeps the tab, and a `VirtualMachineError`, which is not contained), or opens
+nothing, comes back as a placeholder with Retry too. Open only that tab: the window being restored takes no other while
+your restorer runs, so another tab opens where an owner-less one would.
 Ask the user nothing here (no dialog, sign-in or prompt); a tab that needs one opens waiting, as a session that offers
 Reconnect does.
 

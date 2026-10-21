@@ -1,15 +1,15 @@
 # Workspace tabs 6b: plugins' tabs come back Implementation Plan
 
 **Status: executed on 2026-10-21** (`eefe0324e..b22836d14`, then the documentation commit and its final-review fix
-wave); see `docs/STATUS.md`. Re-planned in place on 2026-10-21 on the tabs-and-panes model (plans 8a-8c) and the
-re-planned plan 6a (see Workspace); the earlier versions' Rulings stand except where "Superseded" says otherwise.
-Deviations from the text: (1) Task 1, by a controller ruling from plan 6a's final review: `RestoreState` refuses a key
-holding a lone surrogate, which a save would turn into a duplicate key. Task 1's review: a restorer's item stays in the
-window being restored, so a move asked of it then is refused, and a placeholder is never registered under an id already
-open; an `Error` from a restorer closes the item it opened; the fake's `Terminals.split` and its declines follow the
-app; `TabRestorer` says it must not block. (2) Task 2's review: the size limit counts each item's UTF-8 share once
-(`WorkspaceFile.sizes`) and encodes once; Retry reads a failed rebuild's reason directly; a saved `jasper` record is
-logged when left out; a placeholder's reason wraps. (3) Task 3's review: a document's restore state never stops it
+wave and a residual round); see `docs/STATUS.md`. Re-planned in place on 2026-10-21 on the tabs-and-panes model (plans
+8a-8c) and the re-planned plan 6a (see Workspace); the earlier versions' Rulings stand except where "Superseded" says
+otherwise. Deviations from the text: (1) Task 1, by a controller ruling from plan 6a's final review: `RestoreState`
+refuses a key holding a lone surrogate, which a save would turn into a duplicate key. Task 1's review: a restorer's item
+stays in the window being restored, so a move asked of it then is refused, and a placeholder is never registered under
+an id already open; an `Error` from a restorer closes the item it opened; the fake's `Terminals.split` and its declines
+follow the app; `TabRestorer` says it must not block. (2) Task 2's review: the size limit counts each item's UTF-8 share
+once (`WorkspaceFile.sizes`) and encodes once; Retry reads a failed rebuild's reason directly; a saved `jasper` record
+is logged when left out; a placeholder's reason wraps. (3) Task 3's review: a document's restore state never stops it
 opening or saving (a key over about 4,090 characters is simply not restored); a restored document is not recorded in
 Recent Files; a deferred document reads "loads when you select it". (4) Task 4's review: both harnesses keep a restored
 session's pane on its first Cancel, as Jasper does; an SSH tab whose restore state does not fit drops its folder, then
@@ -21,17 +21,24 @@ nothing. The fix rounds' accepted deviations: public `WorkspaceFile.sizes` and `
 plugin's subcommand while no main window is open restores the windows first, then runs (`JasperApplication.commands`),
 so `jasper editor` for a file that was a saved tab selects that tab instead of leaving a placeholder beside a second
 tab; `TabRegistry.open` for the main window while none is open restores it before it looks for the (plugin, key), so an
-item that restore brought back is selected, not opened twice; an `Error` from a restorer other than a
-`VirtualMachineError` is that plugin's restore failure, as an exception is (`HostedUi` reports it, `TabRegistry.restore`
-closes the item it opened and gives its message as the reason), so its saved tab comes back as a placeholder and the
-rest of the windows as saved, and the fake follows, with a contract case on both runtimes; `TabRestorer` names every
-time a restorer runs (at a window's restore, on Retry, and inside a plugin's own call that opens a tab while no window
-is open) and what an `Error` does; a placeholder for a plugin that is turned off, off in safe mode
-(`PluginRuntime.Standing.Kind.SAFE_MODE`) or waiting for review says what brings it back, after a restart, since a
-change in Manage Plugins takes effect at the next start; the Editor's `openRestored` keeps the window the Editor was
-used from (`origin`); Remote's test-only `EditChannels` and `RemoteEditing` constructors are gone, their tests on the
-full ones; and the guides say a restore state's limits, a restorer's thread contract and an SSH tab's folder as they
-are.
+item that restore brought back is selected, not opened twice; an `Error` from a restorer other than a `LinkageError`
+(contained like an exception, so the tab it opened is kept) or a `VirtualMachineError` is that plugin's restore failure,
+as an exception is (`HostedUi` reports it, `TabRegistry.restore` closes the item it opened and gives its message as the
+reason), so its saved tab comes back as a placeholder and the rest of the windows as saved, and the fake follows, with a
+contract case on both runtimes; `TabRestorer` names every time a restorer runs (at a window's restore, on Retry, and
+inside a plugin's own call that opens a tab while no window is open) and what an `Error` does; a placeholder for a
+plugin that is turned off, off in safe mode (`PluginRuntime.Standing.Kind.SAFE_MODE`) or waiting for review says what
+brings it back, after a restart, since a change in Manage Plugins takes effect at the next start; the Editor's
+`openRestored` keeps the window the Editor was used from (`origin`); Remote's test-only `EditChannels` and
+`RemoteEditing` constructors are gone, their tests on the full ones; and the guides say a restore state's limits, a
+restorer's thread contract and an SSH tab's folder as they are. The residual round: a plugin's subcommand restores the
+windows first only when it will run (`PluginRuntime.runsSubcommand`: its plugin has registered the handler), so a call
+whose plugin is off answers "unavailable" and opens no window; a placeholder for a plugin marked for removal says
+`<name> is marked for removal in Manage Plugins.` (`PluginRuntime.Standing.Kind.MARKED_FOR_REMOVAL`), with no advice to
+turn it on, while one the user turned off stays "turned off"; `TabRegistry.restore` warns that a restorer's item did not
+close only when closing it failed; and the guides say that a `LinkageError` stays contained like an exception and keeps
+its tab, that a restorer may check that a local file exists, but reading it or using the network waits until the tab is
+shown, and that a restorer also runs on Retry.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
