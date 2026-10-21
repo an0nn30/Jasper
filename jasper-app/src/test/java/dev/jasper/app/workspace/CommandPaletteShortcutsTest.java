@@ -53,7 +53,7 @@ class CommandPaletteShortcutsTest {
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_1, primary))).isTrue();
                 assertThat(owner.currentTerminal()).isSameAs(second);
                 owner.action(ActionId.NEW_TAB).actionPerformed(new ActionEvent(root, 0, "menu"));
-                owner.windowCommands().view("view.status_bar").actionPerformed(new ActionEvent(root, 0, "menu"));
+                owner.action(ActionId.TOGGLE_STATUS_BAR).actionPerformed(new ActionEvent(root, 0, "menu"));
                 assertThat(owner.tabCount()).isEqualTo(2);
                 assertThat(owner.status().isVisible()).isTrue();
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, primary | InputEvent.SHIFT_DOWN_MASK))).isTrue();

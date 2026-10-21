@@ -40,8 +40,8 @@ import static org.assertj.core.api.Assertions.*;
 
 class CwdWatcherTest {
     @TempDir Path data;
-    final Path home = Path.of("/Users/me");
-    final Path app = Path.of("/Users/me/src/app");
+    final Path home = Path.of("/Users/me").toAbsolutePath();
+    final Path app = Path.of("/Users/me/src/app").toAbsolutePath();
     final ProjectKey appKey = ProjectKey.local(app);
     final ManualExecutor io = new ManualExecutor();
     final ManualExecutor ui = new ManualExecutor();
@@ -162,7 +162,7 @@ class CwdWatcherTest {
         cd(app);
         assertThat(cards()).singleElement().satisfies(card -> {
             assertThat(card.title()).isEqualTo("Index project?");
-            assertThat(card.content()).isEqualTo("app · ~/src/app\nGit repository");
+            assertThat(card.content()).isEqualTo("app · " + "~/src/app".replace('/', java.io.File.separatorChar) + "\nGit repository");
             assertThat(card.actions()).extracting(action -> action.label()).containsExactly("Yes", "No", "Ignore this path");
         });
         assertThat(notifications.runAction("Index project?", "Yes")).isTrue();
@@ -227,13 +227,13 @@ class CwdWatcherTest {
         scheduled.get(0).run();
         assertThat(listed).hasSize(1);
         watcher.finished(new TerminalEvents.CommandFinished(UUID.randomUUID(), "ls", OptionalInt.of(0), Duration.ZERO,
-            Optional.of(Path.of("/tmp")), Optional.empty()));
+            Optional.of(Path.of("/tmp").toAbsolutePath()), Optional.empty()));
         assertThat(scheduled).hasSize(1);
     }
 
     @Test void helpersShortenHomeAndMatchIgnoredFolders() {
         assertThat(CwdWatcher.display(app, home)).isEqualTo("~/src/app".replace('/', java.io.File.separatorChar));
-        assertThat(CwdWatcher.display(Path.of("/opt/x"), home)).isEqualTo(Path.of("/opt/x").toString());
+        assertThat(CwdWatcher.display(Path.of("/opt/x").toAbsolutePath(), home)).isEqualTo(Path.of("/opt/x").toAbsolutePath().toString());
         assertThat(CwdWatcher.ignored(List.of(app.toString()), app.resolve("lib"))).isTrue();
         assertThat(CwdWatcher.ignored(List.of("0b6f2b5e-8c1a-4c55-9d43-2f3a4b5c6d7e:/Users/me/src/app"), app)).as("a remote entry").isFalse();
         assertThat(CwdWatcher.ignored(List.of("relative"), app)).isFalse();

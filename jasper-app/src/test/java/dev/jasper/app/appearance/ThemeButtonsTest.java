@@ -31,7 +31,7 @@ class ThemeButtonsTest {
                 SwingUtilities.updateComponentTreeUI(parent);
                 SwingUtilities.updateComponentTreeUI(dialog);
                 assertThat(button.getUI()).isInstanceOf(FlatButtonUI.class);
-                assertThat(button.getFont().getSize2D()).as("form font").isEqualTo(13f);
+                assertThat(button.getFont().getSize2D()).as("form font").isEqualTo(UIManager.getFont("defaultFont").getSize2D());
                 // FlatLaf sizes the text button to its line inside margin and border (20 to 28 with the macOS faces).
                 var insets = button.getInsets();
                 assertThat(button.getPreferredSize().height).isEqualTo(button.getFontMetrics(button.getFont()).getHeight() + insets.top + insets.bottom);
@@ -40,7 +40,9 @@ class ThemeButtonsTest {
                 // IntelliJ Light's default button is a slight gradient; sample within a small tolerance.
                 assertThat(distance(fill(confirm), UIManager.getColor("Button.default.background"))).as((themeDark ? "dark" : "light")).isLessThanOrEqualTo(8);
                 for (var input : List.of(field, password, formatted)) {
-                    assertThat(input.getPreferredSize().height).isBetween(26, 34);
+                    var inputInsets = input.getInsets();
+                    assertThat(input.getPreferredSize().height).as("native input fits its font and border")
+                        .isEqualTo(input.getFontMetrics(input.getFont()).getHeight() + inputInsets.top + inputInsets.bottom);
                     assertThat(input.isEditable()).isTrue();
                 }
                 assertThat(field.getBackground()).isEqualTo(UIManager.getColor("TextField.background"));

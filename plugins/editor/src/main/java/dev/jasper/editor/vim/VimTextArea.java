@@ -11,11 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import javax.swing.JViewport;
 import javax.swing.KeyStroke;
-import javax.swing.text.Element;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
-import org.fife.ui.rsyntaxtextarea.RSyntaxTextAreaUI;
-import org.fife.ui.rsyntaxtextarea.Token;
-import org.fife.ui.rsyntaxtextarea.WrappedSyntaxView;
 import org.fife.ui.rtextarea.RTextAreaUI;
 import org.fife.ui.rtextarea.RUndoManager;
 
@@ -76,44 +72,52 @@ public class VimTextArea extends RSyntaxTextArea {
         return size;
     }
 
-    /** Wrapped lines honour {@link #setWrapStyleWord}, which RSyntaxTextArea ignores (it always wraps at words). */
-    @Override protected RTextAreaUI createRTextAreaUI() {
-        return new RSyntaxTextAreaUI(this) {
-            @Override public javax.swing.text.View create(Element element) {
-                return getLineWrap() ? new CharacterWrappedView(element) : super.create(element);
-            }
-        };
+    private dev.jasper.sdk.ui.TerminalTypography typography;
+    private dev.jasper.editor.textview.EditorFonts editorFonts;
+
+    /** Updates the source font set, shaping and uniform line box without replacing the document. */
+    public void typography(dev.jasper.sdk.ui.TerminalTypography value) {
+        var previous = typography;
+        typography = java.util.Objects.requireNonNull(value);
+        editorFonts = new dev.jasper.editor.textview.EditorFonts(value, dev.jasper.editor.textview.EditorTextView.CONTEXT);
+        setFont(editorFonts.primary());
+        setFractionalFontMetricsEnabled(true);
+        // Font family and point size can stay unchanged when only line height or fallbacks change.
+        if (getUI() != null) getUI().getRootView(this).preferenceChanged(null, true, true);
+        firePropertyChange("editorTypography", previous, value);
+        revalidate(); repaint();
     }
 
-    /**
-     * Without word wrapping (Vim's 'nolinebreak', set while Vim is on), a line breaks at the last character that fits,
-     * inside a word or not, so the screen lines are Vim's.
-     */
-    private static final class CharacterWrappedView extends WrappedSyntaxView {
-        CharacterWrappedView(Element element) { super(element); }
-
-        @Override protected int calculateBreakPosition(int p0, Token tokenList, float x0) {
-            RSyntaxTextArea area = (RSyntaxTextArea) getContainer();
-            if (area.getWrapStyleWord()) return super.calculateBreakPosition(p0, tokenList, x0);
-            float room = getWidth();
-            if (room == Integer.MAX_VALUE) room = getPreferredSpan(X_AXIS);
-            room = Math.max(room, 1);
-            int p = p0;
-            float x = x0;
-            for (Token t = tokenList; t != null && t.isPaintable(); t = t.getNextToken()) {
-                float width = t.getWidth(area, this, x);
-                if (width > room) {
-                    // The first character that does not fit starts the next screen line; a screen line holds at
-                    // least one character.
-                    if (p != p0 && t.getWidthUpTo(1, area, this, x) > room) return p;
-                    return t.getOffsetBeforeX(area, this, x, x + room);
-                }
-                room -= width;
-                x += width;
-                p += t.length();
-            }
-            return p + 1;
+    private dev.jasper.editor.textview.EditorFonts metrics() {
+        if (editorFonts == null && getFont() != null) {
+            var font=getFont();
+            var value=new dev.jasper.sdk.ui.TerminalTypography(font.getFamily(),Math.max(6,Math.min(72,font.getSize2D())),java.util.List.of(),false,1);
+            editorFonts=new dev.jasper.editor.textview.EditorFonts(value,dev.jasper.editor.textview.EditorTextView.CONTEXT);
         }
+        return editorFonts;
+    }
+    @Override public void setFont(java.awt.Font font) {
+        editorFonts=null;
+        super.setFont(font);
+        if (typography != null) editorFonts=new dev.jasper.editor.textview.EditorFonts(typography,dev.jasper.editor.textview.EditorTextView.CONTEXT);
+    }
+    @Override public int getLineHeight() { var fonts=metrics(); return fonts == null ? super.getLineHeight() : fonts.height(); }
+    @Override public int getMaxAscent() { var fonts=metrics(); return fonts == null ? super.getMaxAscent() : Math.round(fonts.baseline()); }
+
+    /** The geometry currently installed by the editor UI. */
+    public dev.jasper.editor.textview.EditorTextView textView() {
+        return (dev.jasper.editor.textview.EditorTextView)getUI().getRootView(this).getView(0);
+    }
+
+    @Override public void foldToggled(org.fife.ui.rsyntaxtextarea.folding.Fold fold) {
+        if(getUI()!=null && getUI().getRootView(this).getViewCount()>0
+            && getUI().getRootView(this).getView(0) instanceof dev.jasper.editor.textview.EditorTextView view)
+            view.foldsChanged();
+        super.foldToggled(fold);
+    }
+
+    @Override protected RTextAreaUI createRTextAreaUI() {
+        return new dev.jasper.editor.textview.EditorTextAreaUI(this, () -> typography);
     }
 
     @Override protected void processKeyEvent(KeyEvent event) {

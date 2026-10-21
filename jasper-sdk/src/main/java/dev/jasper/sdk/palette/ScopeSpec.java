@@ -10,23 +10,28 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * What a scope is: identity, wording, verbs and how it is reached. The palette shows an All tab first,
- * then one tab per scope.
+ * What a scope is: identity, wording, verbs and how it is reached. The palette shows either no scope chosen (All),
+ * which searches every scope that takes part, or one scope's chip; the user chooses a scope by typing its label and
+ * {@code >}, with the scope's shortcut action, from a "More in …" row, or from the Run window's scope menu.
  *
  * @param id               namespaced like an action id and starting with the plugin's id, such as
- *                         {@code dev.jasper.history.scope}; the host rejects any other prefix
- * @param label            the tab text, such as "History"
- * @param description      one line, shown as the tab's tooltip
- * @param placeholder      the query field's hint while this scope's tab is open
- * @param verbs            one to three verbs with distinct ids, bound to Enter, Cmd/Ctrl+Enter, Shift+Enter; at most
- *                         one is a {@link PaletteVerb.Role#SPLIT} verb, and never the first
- * @param monospaceRows    whether rows are data values (commands, paths), drawn in the data face
- * @param icon             the tab icon
- * @param shortcutActionId one of the plugin's own actions: while the palette is open, that action's
- *                         shortcut switches to or dismisses this scope's tab instead of running the handler
- * @param inAll            whether the All tab searches this scope too (since 0.8.0)
+ *                         {@code dev.jasper.history.scope}; at most 128 characters; the host rejects any other prefix
+ * @param label            the scope's name, such as "History": the chip text, the heading of its rows in the
+ *                         command palette's All results, and the prefix the user types
+ * @param description      one line the Run window shows as its help while this scope is chosen; may be empty
+ * @param placeholder      the command palette's query hint while this scope is chosen
+ * @param verbs            one to three verbs with distinct ids, bound to Enter, Cmd+Enter (Ctrl+Enter on Linux and
+ *                         Windows) and Shift+Enter; at most one is a {@link PaletteVerb.Role#SPLIT} verb, and never the
+ *                         first
+ * @param monospaceRows    whether rows are data values (commands, paths), which the command palette draws in the data
+ *                         face
+ * @param icon             a semantic icon name for the scope, checked at registration; neither palette view draws it
+ * @param shortcutActionId one of the plugin's own actions: while the palette is open, that action's shortcut chooses
+ *                         this scope instead of running the handler (the command palette dismisses when this scope is
+ *                         already chosen); the Run window shows its shortcut beside the scope in its menu
+ * @param inAll            whether a query with no scope chosen searches this scope too (since 0.8.0)
  * @param inRecents        whether the palette may offer this scope's rows before anything is typed, among the
- *                         recently and most used items (since 0.9.2)
+ *                         recently and most used items; only a scope in All is offered there (since 0.9.2)
  * @param hue              the hue of this scope's row squares where a presentation draws them; NONE takes the plugin's
  *                         manifest {@code icon_hue}, and NEUTRAL without one (since 0.18.0)
  * @param itemNoun         what one row is, as a lowercase singular noun such as "session", which a presentation shows
@@ -63,17 +68,17 @@ public record ScopeSpec(String id, String label, String description, String plac
     }
 
     /**
-     * The 0.9.2 shape: no hue of its own and the label as the item noun.
+     * A scope with no hue of its own and the label as the item noun.
      *
      * @param id               the scope id
-     * @param label            the tab text
-     * @param description      the tooltip line
+     * @param label            the scope's name
+     * @param description      the Run window's help line
      * @param placeholder      the query hint
      * @param verbs            the verbs
      * @param monospaceRows    whether rows are data values
-     * @param icon             the tab icon
+     * @param icon             the scope's icon name
      * @param shortcutActionId the plugin's action whose shortcut reaches this scope
-     * @param inAll            whether the All tab searches this scope
+     * @param inAll            whether a query with no scope chosen searches this scope
      * @param inRecents        whether the palette may offer this scope's rows before anything is typed
      */
     public ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
@@ -82,17 +87,17 @@ public record ScopeSpec(String id, String label, String description, String plac
     }
 
     /**
-     * The 0.9.1 shape, offered among recent items.
+     * A scope offered among recent items, with no hue of its own and the label as the item noun.
      *
      * @param id               the scope id
-     * @param label            the tab text
-     * @param description      the tooltip line
+     * @param label            the scope's name
+     * @param description      the Run window's help line
      * @param placeholder      the query hint
      * @param verbs            the verbs
      * @param monospaceRows    whether rows are data values
-     * @param icon             the tab icon
+     * @param icon             the scope's icon name
      * @param shortcutActionId the plugin's action whose shortcut reaches this scope
-     * @param inAll            whether the All tab searches this scope
+     * @param inAll            whether a query with no scope chosen searches this scope
      */
     public ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
                      boolean monospaceRows, Optional<String> icon, Optional<String> shortcutActionId, boolean inAll) {
@@ -100,11 +105,11 @@ public record ScopeSpec(String id, String label, String description, String plac
     }
 
     /**
-     * The minimum: no description, icon or shortcut, proportional rows, searched by the All tab, no hue of its own and
-     * the label as the item noun.
+     * The minimum: no description, icon or shortcut, proportional rows, in All and among recent items, no hue of its
+     * own and the label as the item noun.
      *
      * @param id          the scope id
-     * @param label       the tab text
+     * @param label       the scope's name
      * @param placeholder the query hint
      * @param verbs       the verbs
      * @return the spec
@@ -116,7 +121,7 @@ public record ScopeSpec(String id, String label, String description, String plac
     /**
      * Derives a value.
      *
-     * @param value the tooltip line
+     * @param value the Run window's help line while this scope is chosen
      * @return a copy with that description
      */
     public ScopeSpec withDescription(String value) { return new ScopeSpec(id, label, value, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, inRecents, hue, itemNoun); }
@@ -132,7 +137,7 @@ public record ScopeSpec(String id, String label, String description, String plac
     /**
      * Derives a value.
      *
-     * @param value the tab icon, or null for none
+     * @param value the scope's semantic icon name, or null for none
      * @return a copy with that icon
      */
     public ScopeSpec withIcon(String value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, Optional.ofNullable(value), shortcutActionId, inAll, inRecents, hue, itemNoun); }
@@ -146,16 +151,19 @@ public record ScopeSpec(String id, String label, String description, String plac
     public ScopeSpec withShortcutActionId(String value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, Optional.ofNullable(value), inAll, inRecents, hue, itemNoun); }
 
     /**
-     * Derives a value. A scope whose rows should not appear beside others, such as secrets, opts out.
+     * Derives a value. A scope whose rows should not appear beside others, such as secrets, opts out; a scope out of
+     * All is also never offered among recent items.
      *
-     * @param value whether the All tab searches this scope
+     * @param value whether a query with no scope chosen searches this scope
      * @return a copy with that setting
      * @since 0.8.0
      */
     public ScopeSpec withInAll(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, value, inRecents, hue, itemNoun); }
 
     /**
-     * Derives a value. A scope whose rows should appear only when searched for, such as shell history, opts out.
+     * Derives a value. A scope whose rows should appear only when searched for, such as shell history, opts out. Jasper
+     * keeps each row run from a scope offered among recent items, by its id and title, in its command history, and
+     * offers it again only while searching the scope for that title still returns a row with that id.
      *
      * @param value whether the palette may offer this scope's rows before anything is typed
      * @return a copy with that setting

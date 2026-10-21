@@ -50,6 +50,46 @@ class HostedContentTest {
             assertThat(root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(stroke)).isNull();
         });
     }
+    @Test void staleContentMenuResolvesCurrentHostSelectionAfterSwitchMoveAndClose() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = content(launcher(new ArrayDeque<>())); owner.connectContributions(model);
+            var other = content(launcher(new ArrayDeque<>())); other.connectContributions(model);
+            int[] calls = {0, 0};
+            var a = model.tabs().open("dev.editor", "a", "A", owner.id(), new JPanel());
+            a.commands(List.of(new ContentCommand("preview", "Preview", null, true, () -> calls[0]++)));
+            var menu = owner.tabMenu(a);
+            var item = java.util.Arrays.stream(menu.getComponents()).filter(JMenuItem.class::isInstance).map(JMenuItem.class::cast)
+                .filter(entry -> entry.getText().equals("Preview")).findFirst().orElseThrow();
+            var b = model.tabs().open("dev.editor", "b", "B", owner.id(), new JPanel());
+            b.commands(List.of(new ContentCommand("preview", "Preview", null, true, () -> calls[1]++)));
+            item.doClick(); assertThat(calls).containsExactly(0, 1);
+            model.tabs().move(a, other.id());
+            item.doClick(); assertThat(calls).containsExactly(0, 2);
+            b.commands(List.of(new ContentCommand("preview", "Preview", null, false, () -> calls[1]++)));
+            item.doClick(); assertThat(calls).containsExactly(0, 2);
+            b.requestClose(); item.doClick(); assertThat(calls).containsExactly(0, 2);
+            assertThat(other.selectedContent()).isSameAs(a);
+        });
+    }
+
+    @Test void previewClipboardKeysStayWithNativeReadOnlyTextComponent() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var model = new Contributions(); owner.connectContributions(model);
+            var preview = new JEditorPane(); preview.setEditable(false);
+            var entry = model.tabs().open("dev.editor", "preview", "Preview", owner.id(), preview);
+            int[] mutations = {0};
+            var paste = KeyStroke.getKeyStroke("meta V");
+            var copy = KeyStroke.getKeyStroke("meta C");
+            entry.commands(List.of(new ContentCommand("paste", "Paste", paste, true, () -> mutations[0]++),
+                new ContentCommand("copy", "Copy", copy, true, () -> mutations[0]++)));
+            assertThat(owner.dispatchShortcut(paste, preview)).isFalse();
+            assertThat(owner.dispatchShortcut(copy, preview)).isFalse();
+            assertThat(mutations).containsExactly(0);
+        });
+    }
+
     @Test void aWindowConnectedWithoutHostingContentNeverReceivesPluginContent() throws Exception {
         edt(() -> {
             var model = new Contributions();

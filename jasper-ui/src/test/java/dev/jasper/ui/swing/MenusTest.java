@@ -280,8 +280,10 @@ class MenusTest {
             assertThat(open.shortcutText).isEqualTo("\u21e7\u2318O");
             assertThat(other.shortcutText).isEmpty();
             var fm = open.getFontMetrics(open.getFont());
+            var shortcutMetrics = open.getFontMetrics(open.shortcutFont());
+            assertThat(open.shortcutFont().canDisplayUpTo(open.shortcutText)).isEqualTo(-1);
             assertThat(open.getPreferredSize().width).isEqualTo(open.labelX() + fm.stringWidth("Open")
-                + s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_SHORTCUT_GAP)) + fm.stringWidth("\u21e7\u2318O") + open.getInsets().right);
+                + s(m(dev.jasper.ui.metrics.DesignMetrics.Role.MENU_SHORTCUT_GAP)) + shortcutMetrics.stringWidth("\u21e7\u2318O") + open.getInsets().right);
             bindings.put("dev.jasper.sample.open", "\u2325\u2318O");
             open.addNotify();
             assertThat(open.shortcutText).as("a rebinding shows at the next open").isEqualTo("\u2325\u2318O");

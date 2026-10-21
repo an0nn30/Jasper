@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Export the approved Steep SVG to native packages, runtime PNGs and a shareable set.
+"""Export the approved Shell Prompt raster master to native packages, runtime PNGs and a shareable set.
 
-Requires Inkscape, macOS iconutil and Xcode (actool/Swift). Normal builds use committed assets.
-Windows/Linux render directly from SVG; macOS uses the native icon renderer.
+Requires Pillow, macOS iconutil and Xcode (actool/Swift). Normal builds use committed assets.
+Windows/Linux resize the raster master; macOS uses the native icon renderer.
 """
 from pathlib import Path
+import base64
 import hashlib
 import json
 import plistlib
@@ -13,7 +14,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
-import xml.etree.ElementTree as ET
+from PIL import Image
 import zipfile
 
 HERE = Path(__file__).resolve().parent
@@ -21,10 +22,6 @@ ROOT = HERE.parent.parent
 RESOURCES = ROOT / 'jasper-app/src/main/resources/dev/jasper/app/icons/app'
 EXPORTS = ROOT / 'build/jasper-icon-set'
 ARCHIVE = ROOT / 'build/Jasper-icon-set.zip'
-SVG = 'http://www.w3.org/2000/svg'
-ET.register_namespace('', SVG)
-ET.register_namespace('inkscape', 'http://www.inkscape.org/namespaces/inkscape')
-
 # Keep runtime sizes aligned with ApplicationIcon.java. The standalone pack adds
 # intermediate desktop/DPI sizes without making every window load them all.
 RUNTIME = {
@@ -70,22 +67,16 @@ def write_ico(destination, images):
                             + b''.join(entries) + b''.join(payloads))
 
 
-def framed_svg(master, bounds, coverage, destination):
-    root = ET.parse(master).getroot()
-    artwork = ET.Element(f'{{{SVG}}}g', {'id': 'jasper-artwork'})
-    for child in list(root):
-        if child.tag not in {f'{{{SVG}}}defs', f'{{{SVG}}}title', f'{{{SVG}}}desc'}:
-            root.remove(child)
-            artwork.append(child)
-    x, y, width, height = bounds
-    scale = 1024 * coverage / max(width, height)
-    artwork.set('transform', f'translate(512 512) scale({scale:.12f}) '
-                             f'translate({-x-width/2:.12f} {-y-height/2:.12f})')
-    root.append(artwork)
-    root.set('width', '1024')
-    root.set('height', '1024')
-    root.set('viewBox', '0 0 1024 1024')
-    ET.ElementTree(root).write(destination, encoding='utf-8', xml_declaration=True)
+def raster_svg(image, destination):
+    """Embed the selected pixels for SVG-consuming desktop integrations."""
+    import io
+    buffer = io.BytesIO()
+    image.save(buffer, format='PNG')
+    encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
+    destination.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">'
+        '<title>Jasper Shell Prompt</title>'
+        f'<image width="1024" height="1024" href="data:image/png;base64,{encoded}"/></svg>\n')
 
 
 def normalize_small_icns_alpha(path):
@@ -130,7 +121,7 @@ def normalize_small_icns_alpha(path):
 
 
 def render_macos(pack, temporary):
-    """Compile the approved full-canvas tab artwork and render all native Mac sizes."""
+    """Compile the approved Shell Prompt artwork and render all native Mac sizes."""
     source = pack / 'macos/Jasper.icon'
     (source / 'Assets').mkdir(parents=True)
     shutil.copyfile(HERE / 'macos/icon.json', source / 'icon.json')
@@ -164,32 +155,33 @@ def render_macos(pack, temporary):
 
 
 def main():
-    inkscape, iconutil = shutil.which('inkscape'), shutil.which('iconutil')
-    if not inkscape or not iconutil:
-        raise SystemExit('Regeneration requires Inkscape and macOS iconutil')
-    master = HERE / 'Jasper.svg'
-    with tempfile.TemporaryDirectory(prefix='jasper-steep-') as temporary:
+    iconutil = shutil.which('iconutil')
+    if not iconutil:
+        raise SystemExit('Regeneration requires Pillow and macOS iconutil')
+    master = HERE / 'shell-prompt-source.png'
+    artwork = Image.open(master).convert('RGBA')
+    # Remove generated transparent padding/shadow before applying platform padding once.
+    bounds = artwork.getchannel('A').point(lambda alpha: 255 if alpha >= 240 else 0).getbbox()
+    if not bounds:
+        raise ValueError('Master contains no opaque artwork')
+    artwork = artwork.crop(bounds)
+    with tempfile.TemporaryDirectory(prefix='jasper-shell-prompt-') as temporary:
         pack = Path(temporary) / 'Jasper-icon-set'
         (pack / 'source').mkdir(parents=True)
-        shutil.copyfile(master, pack / 'source/Jasper.svg')
-        bounds = tuple(float(run(inkscape, str(master), f'--query-{field}'))
-                       for field in ('x', 'y', 'width', 'height'))
-        if len(bounds) != 4 or min(bounds[2:]) <= 0:
-            raise ValueError(f'Invalid SVG bounds: {bounds}')
+        shutil.copyfile(master, pack / 'source/shell-prompt-source.png')
         for platform, sizes in SIZES.items():
             directory = pack / platform
             pngs = directory / 'png'
             pngs.mkdir(parents=True)
-            vector = directory / 'Jasper.svg'
-            if platform == 'macos':
-                shutil.copyfile(HERE / 'macos/Jasper.svg', vector)
-            else:
-                framed_svg(master, bounds, COVERAGE[platform], vector)
+            extent = round(1024 * COVERAGE[platform])
+            tile = artwork.resize((extent, extent), Image.Resampling.LANCZOS)
+            # Icon Composer applies the Mac mask. Fill source corners with forest, not silver.
+            canvas = Image.new('RGBA', (1024, 1024), '#303D29' if platform == 'macos' else (0, 0, 0, 0))
+            canvas.alpha_composite(tile, ((1024 - extent) // 2, (1024 - extent) // 2))
+            raster_svg(canvas, directory / 'Jasper.svg')
             for size in sizes:
                 output = pngs / f'icon-{size}.png'
-                run(inkscape, str(vector), '--export-type=png',
-                    f'--export-filename={output}', f'--export-width={size}',
-                    f'--export-height={size}')
+                canvas.resize((size, size), Image.Resampling.LANCZOS).save(output)
                 if png_size(output) != (size, size):
                     raise ValueError(f'Wrong export dimensions: {output}')
             print(f'Rendered {platform}: {sizes}', flush=True)
@@ -213,25 +205,14 @@ def main():
         scalable.mkdir(parents=True)
         shutil.copyfile(pack / 'linux/Jasper.svg', scalable / 'jasper.svg')
         (pack / 'README.md').write_text(
-            '# Jasper — Original Steep icon set\n\n'
-            'The selected original Steep artwork, with the full-height 68-degree tab.\n'
-            'Windows/Linux PNGs render directly from SVG. macOS adds the approved full-canvas tab artwork '
-            'through Icon Composer and native rendering; transparent outer corners are preserved.\n\n'
-            '- macOS: Jasper.icns, the ten standard/Retina iconset representations, '
-            'PNGs at 16, 32, 64, 128, 256, 512 and 1024px, plus Jasper.icon and Assets.car. '
-            'Bundle Assets.car in Contents/Resources with CFBundleIconName=Jasper; keep '
-            'Jasper.icns as the fallback. Jasper.svg is the foreground layer.\n'
-            f'- Windows: a 32-bit-alpha ICO containing {len(ICO_SIZES)} PNG frames '
-            f'at {", ".join(map(str, ICO_SIZES))}px; extra PNGs at 384, 512, 768 and 1024px.\n'
-            f'- Linux: hicolor PNGs at {", ".join(map(str, SIZES["linux"]))}px, '
-            'a scalable SVG, and a 512px package PNG.\n\n'
-            'source/Jasper.svg is the exact approved master. Platform SVGs include optical '
-            'padding: macOS uses system framing, Windows 960/1024, Linux 90% artwork coverage. '
-            'Do not add another padding pass.\n\n'
-            'The iconset is ready for iconutil; Linux hicolor contents install beneath '
-            'share/icons/hicolor with the desktop icon name jasper.\n'
-        )
-        manifest = {'artwork': 'Original Steep', 'renderer': run(inkscape, '--version'),
+            '# Jasper — Shell Prompt icon set\n\n'
+            'The approved moss shell and cream terminal prompt. source/shell-prompt-source.png '
+            'is the generated raster master. SVG files embed this artwork; they are not vector redraws.\n\n'
+            'macOS: native Icon Composer catalog, ICNS fallback, ten standard/Retina iconset '
+            'representations and PNGs through 1024px. Windows: 20 RGBA ICO frames through 256px '
+            'plus standalone PNGs through 1024px. Linux: hicolor PNGs through 1024px and an embedded-raster SVG.\n\n'
+            'Platform padding is applied once: macOS system framing, Windows 960/1024, Linux 90%.\n')
+        manifest = {'artwork': 'Shell Prompt', 'renderer': 'Pillow ' + Image.__version__,
                     'source_sha256': hashlib.sha256(master.read_bytes()).hexdigest(),
                     'sizes': SIZES, 'ico_sizes': ICO_SIZES, 'coverage': COVERAGE, 'files': {}}
         for file in sorted(pack.rglob('*')):
@@ -250,8 +231,13 @@ def main():
         for platform, extension in [('macos', 'icns'), ('windows', 'ico'), ('linux', 'png')]:
             shutil.copyfile(pack / f'{platform}/Jasper.{extension}', HERE / f'Jasper.{extension}')
         shutil.copyfile(pack / 'macos/Assets.car', HERE / 'macos/Assets.car')
+        shutil.copyfile(pack / 'macos/Jasper.svg', HERE / 'macos/Jasper.svg')
+        shutil.copyfile(pack / 'windows/Jasper.svg', HERE / 'Jasper.svg')
+        shutil.copyfile(pack / 'linux/png/icon-256.png', ROOT / 'website/assets/jasper.png')
         shutil.copytree(pack / 'linux/hicolor', HERE / 'linux/hicolor', dirs_exist_ok=True)
-        shutil.copytree(pack, EXPORTS, dirs_exist_ok=True)
+        if EXPORTS.exists():
+            shutil.rmtree(EXPORTS)
+        shutil.copytree(pack, EXPORTS)
         # Fixed ZIP metadata makes an identical set reproducible byte-for-byte.
         with zipfile.ZipFile(ARCHIVE, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
             for file in sorted(pack.rglob('*')):

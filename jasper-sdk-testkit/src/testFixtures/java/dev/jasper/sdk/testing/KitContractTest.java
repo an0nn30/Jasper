@@ -204,6 +204,17 @@ public abstract class KitContractTest {
             var view=kit.create(empty,e -> {});view.update(empty);view.close();
         } finally {stop(kit);stop(foreign);}
     }); }
+    @Test void editorToolbarNamesAreAvailableToHostAndFake() throws Exception { edt(() -> {
+        var kit = kit("owner");
+        try {
+            for (String name : List.of("editor.source", "editor.split", "editor.preview", "editor.scroll-sync",
+                "editor.source.classic", "editor.split.classic", "editor.preview.classic", "editor.scroll-sync.classic")) {
+                var spec = iconSpec(descriptorButton(name));
+                try (var view = kit.create(spec, e -> {})) { assertThat(view.spec()).isEqualTo(spec); }
+            }
+        } finally { stop(kit); }
+    }); }
+
     private static ViewSpec iconSpec(Nodes.Node node) {
         return new ViewSpec(new Nodes.Stack("outer",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
             new Nodes.Section("section",ControlState.READY,"Section",new Nodes.Card("card",ControlState.READY,Nodes.CardKind.MIXED,List.of(node))))));

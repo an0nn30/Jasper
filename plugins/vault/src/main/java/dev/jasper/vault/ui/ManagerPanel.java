@@ -43,7 +43,8 @@ final class ManagerPanel implements AutoCloseable {
         GRANTS = "grants", BACK = "back", REVOKE = "revoke", STATUS = "status", CANCEL = "cancel", OKAY = "okay", CLOSE = "close",
         ADD_GENERATE = "add.generate", UNLOCK_PREFIX = "unlock.", TOOLBAR = "toolbar";
     /** The Lock Vault action's default binding as the platform writes it (plan 10b Rulings 8). */
-    static final String LOCK_SHORTCUT = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac") ? "\u21E7\u2318L" : "Ctrl+Shift+L";
+    static final String LOCK_SHORTCUT = LockShortcut.caption(LockShortcut.BINDING,
+        System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac"));
     static final String ALL_TYPES = "all";
     /** The classic table's columns and footer (spec 14.8). */
     static final String COLUMN_NAME = "name", COLUMN_USERNAME = "username", COLUMN_TYPE = "type", COLUMN_MODIFIED = "modified",

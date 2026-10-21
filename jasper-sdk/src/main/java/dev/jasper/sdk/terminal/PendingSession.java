@@ -3,7 +3,7 @@ package dev.jasper.sdk.terminal;
 import dev.jasper.sdk.Subscription;
 
 /**
- * One attempt to connect a pane: the first connect, or one Reconnect. Exactly one of {@link #attach},
+ * One attempt to connect a pane: the first connect, or one Retry or Reconnect. Exactly one of {@link #attach},
  * {@link #fail} and cancellation takes effect; the first wins and later calls are ignored. Every method is safe
  * from any thread, also after the plugin stopped.
  */

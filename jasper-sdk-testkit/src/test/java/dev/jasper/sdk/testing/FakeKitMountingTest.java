@@ -144,6 +144,38 @@ class FakeKitMountingTest {
             }
         });
     }
+    @Test void standardDraftEventsNotifyThePageAfterPublishingPendingValues() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var host = new FakePluginHost()) {
+                var view = new AtomicReference<FakeKitView>();
+                var rows = new AtomicReference<SettingsPanelHost>();
+                var wrap = new AtomicReference<Setting<Boolean>>();
+                var observed = new ArrayList<Boolean>();
+                host.start(new PluginInfo("test.pending", "Pending", "1.0.0", Set.of()), Set.of(), Set.of(), plugin -> {
+                    wrap.set(plugin.settings().declare(SettingSpec.of("wrap", SettingKind.bool(), false).label("Wrap lines")));
+                    plugin.settings().page(new SettingsPanel() {
+                        @Override public UiView create(SettingsPanelHost h) {
+                            rows.set(h);
+                            var made = (FakeKitView) plugin.kit().create(new ViewSpec(h.row(wrap.get())), e -> { });
+                            view.set(made);
+                            return made;
+                        }
+                        @Override public void pendingChanged() { observed.add(rows.get().pending(wrap.get())); }
+                    });
+                });
+                host.settingsPanel("test.pending");
+                rows.get().stage(wrap.get(), true);
+                assertThat(observed).as("plugin staging does not recurse").isEmpty();
+                view.get().emit(new UiEvent.Toggled("settings:wrap", false));
+                view.get().emit(new UiEvent.Toggled("settings:wrap", true));
+                view.get().emit(new UiEvent.Action("settings:wrap:reset"));
+                assertThat(observed).containsExactly(false, true, false);
+                host.closeSettingsPanel("test.pending");
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
     @Test void resetRemovesSavedOverrideWithoutChangingOrdinaryStageDefault() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try(var host=new FakePluginHost()) {
@@ -162,6 +194,38 @@ class FakeKitMountingTest {
                 assertThat(host.pendingSettings("test.reset")).isEmpty();
             }
         });
+    }
+    /** Plan 15a, as the host: under a look default, staging the declared default saves it, and Reset returns to the look's. */
+    @Test void stagingTheDeclaredDefaultUnderALookDefaultSavesItAndResetReturnsToTheLooks() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try(var host=new FakePluginHost()) {
+                host.setKitDefault("test.look","size",8L);
+                var view=new AtomicReference<FakeKitView>();var rows=new AtomicReference<SettingsPanelHost>();var size=new AtomicReference<Setting<Integer>>();
+                host.start(new PluginInfo("test.look","Look","1.0.0",Set.of()),Set.of(),Set.of(),context -> {
+                    size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
+                    context.settings().page((SettingsPanel) h -> {rows.set(h);var made=(FakeKitView)context.kit().create(new ViewSpec(h.row(size.get())),e -> {});view.set(made);return made;});
+                });
+                assertThat(size.get().get()).isEqualTo(8);
+                assertThatIllegalStateException().isThrownBy(() -> host.setKitDefault("test.look","size",9L)).withMessage("Plugins have already started");
+                host.settingsPanel("test.look");
+                assertThat(resetShown(rows.get(),size.get())).as("the look's default is not resettable").isFalse();
+                rows.get().stage(size.get(),4);
+                assertThat(host.pendingSettings("test.look")).containsEntry("size",4);
+                assertThat(resetShown(rows.get(),size.get())).isTrue();
+                host.applySettingsPanel("test.look");
+                assertThat(host.savedSettings("test.look")).containsEntry("size",4L);
+                assertThat(size.get().get()).isEqualTo(4);
+                view.get().emit(new UiEvent.Action("settings:size:reset"));host.applySettingsPanel("test.look");
+                assertThat(host.savedSettings("test.look")).doesNotContainKey("size");
+                assertThat(size.get().get()).isEqualTo(8);
+                assertThat(resetShown(rows.get(),size.get())).isFalse();
+                assertThat(host.lookDefaultProblems("test.look")).isEmpty();
+            }
+        });
+    }
+    private static boolean resetShown(SettingsPanelHost rows,Setting<?> setting){
+        var row=(Nodes.SettingRow)rows.row(setting);
+        return ((Nodes.Stack)row.control()).children().get(1).state().visible();
     }
     @Test void reloadRebasesCleanAndPendingMountedRowsUntilPageCloses() throws Exception {
         SwingUtilities.invokeAndWait(() -> {

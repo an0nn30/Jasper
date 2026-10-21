@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.ui.kit.Kit;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,7 @@ class ProjectionsTest {
     static final Projections.Host MAC = new Projections.Host(Projections.Platform.MAC, true),
         WINDOWS = new Projections.Host(Projections.Platform.WINDOWS, false), LINUX = new Projections.Host(Projections.Platform.LINUX, false);
     /** The classic look's chrome with IntelliJ Classic's title (plan 14). */
-    static final ChromeSpec CLASSIC_TITLE = dev.jasper.app.testsupport.EnterpriseLook.titled(ChromeSpec.CLASSIC, ChromeSpec.TitleBar.CLASSIC);
+    static final ChromeSpec CLASSIC_TITLE = EnterpriseLook.titled(ChromeSpec.CLASSIC, ChromeSpec.TitleBar.CLASSIC);
 
     @Test void theClassicLookMapsByTheSpecTable() {
         var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
@@ -115,7 +116,8 @@ class ProjectionsTest {
         for (var dialogs : ChromeSpec.DialogKind.values()) for (var motion : ChromeSpec.MotionKind.values())
         for (String template : new String[] {"{context}", "Workstation — {session} — {directory}"}) {
             if (menu == ChromeSpec.MenuBar.WINDOW && title == ChromeSpec.TitleBar.UNIFIED) continue;
-            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion, ChromeSpec.Icons.NEW_UI);
+            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion, ChromeSpec.Icons.NEW_UI,
+                ChromeSpec.ToolbarSearch.FIELD);
             for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX})
                 assertThatCode(() -> Projections.of(chrome, true, true, "p", host)).doesNotThrowAnyException();
             if (title != ChromeSpec.TitleBar.CLASSIC)
@@ -165,7 +167,7 @@ class ProjectionsTest {
     @Test void labelledStripesHideThePanelRailWidth() {
         var d = ChromeSpec.DEFAULT;
         var stripes = new ChromeSpec(d.titleBar(), d.menuBar(), d.windowTitle(), ChromeSpec.ToolWindows.STRIPES, d.editorTabs(),
-            d.statusBar(), d.palette(), d.dialogs(), d.motion(), d.icons());
+            d.statusBar(), d.palette(), d.dialogs(), d.motion(), d.icons(), d.toolbarSearch());
         for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX}) {
             assertThat(Projections.of(stripes, false, false, "p", host).settings().hiddenKeys()).contains("window.rail_width");
             assertThat(Projections.of(d, false, false, "", host).settings().hiddenKeys()).doesNotContain("window.rail_width");
@@ -211,5 +213,44 @@ class ProjectionsTest {
         assertThat(Projections.standard(MAC).workspace().icons()).isEqualTo(WorkspaceLook.Icons.NEW_UI);
         for (var committed : new DesktopFlags[] {DesktopFlags.STANDARD, new DesktopFlags(false, true)})
             assertThat(Projections.fallback(committed, MAC).workspace().icons()).as("%s", committed).isEqualTo(WorkspaceLook.Icons.NEW_UI);
+    }
+
+    /** Plan 15a (spec 9.1): what plugins learn of the look, on each platform. */
+    @Test void thePluginLookIsTheLookOnEachPlatform() {
+        var standard = Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC).plugins();
+        assertThat(standard).isEqualTo(new PluginLook(false, false, false, PluginLook.TitleBar.UNIFIED, PluginLook.Menus.SCREEN_MENU_BAR, PluginLook.Search.FIELD));
+        assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", WINDOWS).plugins().menus()).isEqualTo(PluginLook.Menus.TITLE_BAR);
+        assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", LINUX).plugins().menus()).isEqualTo(PluginLook.Menus.TITLE_BAR);
+        var classic = EnterpriseLook.CHROME;
+        assertThat(Projections.of(classic, true, true, "dev.jasper.enterprise", MAC).plugins())
+            .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.CLASSIC, PluginLook.Menus.SCREEN_MENU_BAR, PluginLook.Search.ICON));
+        assertThat(Projections.of(classic, true, true, "dev.jasper.enterprise", WINDOWS).plugins())
+            .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.CLASSIC, PluginLook.Menus.TITLE_BAR, PluginLook.Search.ICON));
+        assertThat(Projections.of(classic, true, true, "dev.jasper.enterprise", LINUX).plugins())
+            .isEqualTo(new PluginLook(true, true, true, PluginLook.TitleBar.NATIVE, PluginLook.Menus.WINDOW, PluginLook.Search.ICON));
+        var nativeWindowMenus = EnterpriseLook.titled(classic, ChromeSpec.TitleBar.NATIVE);
+        assertThat(Projections.of(nativeWindowMenus, true, true, "dev.jasper.enterprise", MAC).plugins().menus()).isEqualTo(PluginLook.Menus.WINDOW);
+    }
+
+    /** Plan 15b: the kit's [chrome] toolbar_search reaches the workspace's classic header and the plugins' look. */
+    @Test void theToolbarSearchReachesTheWorkspaceAndPlugins() {
+        var c = ChromeSpec.CLASSIC;
+        var icon = new ChromeSpec(c.titleBar(), c.menuBar(), c.windowTitle(), c.toolWindows(), c.editorTabs(), c.statusBar(), c.palette(),
+            c.dialogs(), c.motion(), c.icons(), ChromeSpec.ToolbarSearch.ICON);
+        for (var host : new Projections.Host[] {MAC, WINDOWS, LINUX}) {
+            var projections = Projections.of(icon, true, true, "p", host);
+            assertThat(projections.workspace().search()).as("%s", host).isEqualTo(WorkspaceLook.Search.ICON);
+            assertThat(projections.plugins().search()).as("%s", host).isEqualTo(PluginLook.Search.ICON);
+            var standard = Projections.of(ChromeSpec.DEFAULT, false, false, "", host);
+            assertThat(standard.workspace().search()).as("%s", host).isEqualTo(WorkspaceLook.Search.FIELD);
+            assertThat(standard.plugins().search()).as("%s", host).isEqualTo(PluginLook.Search.FIELD);
+        }
+    }
+
+    /** Plan 15a Rulings 7: the fallback's plugin look is the default look's under the flags committed before AWT. */
+    @Test void theFallbacksPluginLookIsTheDefaultLooksUnderTheCommittedFlags() {
+        assertThat(Projections.fallback(DesktopFlags.STANDARD, MAC).plugins()).isEqualTo(Projections.standard(MAC).plugins());
+        assertThat(Projections.fallback(new DesktopFlags(false, true), LINUX).plugins())
+            .isEqualTo(new PluginLook(false, false, false, PluginLook.TitleBar.NATIVE, PluginLook.Menus.WINDOW, PluginLook.Search.FIELD));
     }
 }

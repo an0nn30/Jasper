@@ -136,6 +136,7 @@ public final class JasperApplication {
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
     private final ShellProfileCatalog shellProfiles;
+    private final CygwinFeature cygwin;
     /**
      * How long a launch of a WSL or PowerShell 7 profile, resolved before the first detection completed, waits for it
      * off the EDT: both of detection's process calls may take their full timeout.
@@ -229,19 +230,17 @@ public final class JasperApplication {
     /** The presentation this process runs. EDT. */
     public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
 
-    /** The steps a branded look's splash shows (spec 10.11); none until the bootstrap hands them over. EDT. */
+    /** The startup splash's steps; none until the bootstrap hands them over. EDT. */
     private dev.jasper.app.startup.StartupSteps startupSteps = dev.jasper.app.startup.StartupSteps.NONE;
 
     /**
-     * The steps this application reports to a branded look's splash (spec 10.11): each plugin as it starts, then the
-     * first window as it is composed and shown. A presentation without branding, as a look that fell back at start has
-     * (spec 4.7), ends them at once. Before {@link #startPlugins(AppDirs)}. EDT.
+     * The startup splash's progress through plugins and window composition. It closes after the first visible
+     * workspace paint, or when startup is abandoned. Before {@link #startPlugins(AppDirs)}. EDT.
      *
      * @param steps the bootstrap's steps
      */
     public void startupSteps(dev.jasper.app.startup.StartupSteps steps) {
         startupSteps = java.util.Objects.requireNonNull(steps, "steps");
-        if (!presentation.branding().present()) steps.done();
     }
 
     /** What Jasper windows and the rehearsal's are made of under this process's presentation. */
@@ -382,6 +381,11 @@ public final class JasperApplication {
         if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
+        cygwin = new CygwinFeature(work -> Thread.ofVirtual().name("jasper-cygwin-manager").start(work), SwingUtilities::invokeLater,
+            dev.jasper.app.cygwin.CygwinManager::manageSystem, shellProfiles::refresh, (failed, message) -> {
+                if (failed) notificationViews.error("Cygwin package management", message);
+                else notificationViews.info("Cygwin package management", message);
+            });
         // A supplied launcher (the benchmark, tests) never starts a detected profile, so reg.exe and wsl.exe stay
         // unrun; nothing waits on that catalog, because awaitDetection returns at once when nobody refreshed it.
         if (suppliedLauncher == null) {
@@ -398,7 +402,10 @@ public final class JasperApplication {
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             loginItems.accept(snapshot.backgroundEnabled());
-            if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
+            if (plugins != null) {
+                plugins.terminalTypography(snapshot.font());
+                plugins.configurationChanged(snapshot.plugins()); reportBindingProblems();
+            }
             updateMigrateAction();
         });
         if (configuration != null) {
@@ -556,6 +563,7 @@ public final class JasperApplication {
             boolean main = opening.role() == WindowRole.MAIN;
             // A child window has no dock or Zen of its own: its layout state is never saved (workspace tabs spec 6.3).
             content.connectContributions(contributions, main ? uiState : UiState.inMemory());
+            if (WINDOWS) content.onManageCygwinPackages = cygwin::manage;
             UUID windowId = content.id();
             content.onError = (title, details) -> notificationViews.error(title, details, windowId);
             content.onInfo = (title, details) -> notificationViews.info(title, details, windowId);
@@ -617,6 +625,8 @@ public final class JasperApplication {
         try {
             frame.place(window.placement(), window::placed);
             startupSteps.workstation();
+            // The splash covering the screen goes once this window has painted its whole workspace, not when it is shown.
+            frame.afterFirstVisiblePaint(startupSteps::done);
             return frame.shell();
         } catch (RuntimeException | Error failure) {
             try {
@@ -628,13 +638,12 @@ public final class JasperApplication {
         }
     }
 
-    /** A window shows: its timing ends, and the start-up steps with the first. EDT. */
+    /** A window shows: its timing ends; the start-up steps end at its frame's first visible paint. EDT. */
     private void windowOpened(JasperWindow window) {
         memoryIndicator.windows(windows.windows().size());
         WindowTrace windowTrace = windowTraces.remove(window.id());
         if (windowTrace != null) windowTrace.mark(WindowTrace.Milestone.SHOWN);
         trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
-        startupSteps.done();
         // A main window that shows no terminal once its opening's turn ends (a request's new tab or file comes after this
         // in the same turn) paints none at once: its own first paint is the start-up's, which proves the look and settles
         // residency (workspace plan 6a Rulings 17 and 42).
@@ -1275,8 +1284,9 @@ public final class JasperApplication {
         }) : dev.jasper.app.plugins.GlassSource.NONE);
         plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
         plugins.animations(themes::animationsEnabled);
-        // The kit the controller installed: the presentation's, or the default one when the kit was blamed (spec 4.7).
-        plugins.presentation(themes.kit());
+        // The kit the controller installed and the look plugins read: the presentation's, or the fallback when the kit was blamed (spec 4.7).
+        plugins.presentation(themes.kit(), presentation.projections().plugins(), presentation.defaults());
+        plugins.terminalTypography((configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).font());
         plugins.shortcuts(this::shortcutLabel);
         plugins.clipboard(clipboard);
         plugins.commandClient(CommandInstall.client(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),
@@ -1375,7 +1385,7 @@ public final class JasperApplication {
                 configuration::migrationAvailable, Optional.of(vmOptions.hooks()), Optional.of(commandLine));
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
-                shellProfiles::refresh, shellProfiles::onChanged);
+                shellProfiles::refresh, shellProfiles::onChanged, WINDOWS ? Optional.of(cygwin::manage) : Optional.empty());
             // ThemeFolder.prepare runs on the import worker (ThemeMenu.chooseAndImport), so the folder reads the session's
             // fixed plugin tier, never ThemeController.library(), which requires the EDT.
             var pluginThemes = dev.jasper.app.appearance.ThemeLibrary.of(selection.themes());
@@ -1735,7 +1745,7 @@ public final class JasperApplication {
         };
         BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm = (requested, captured) -> {
             ShellProfile profile = captured.profile();
-            boolean checkable = profile.kind() == ShellProfile.Kind.WSL || profile.id().equals(ShellProfiles.PWSH);
+            boolean checkable = profile.kind() == ShellProfile.Kind.WSL || profile.id().equals(ShellProfiles.PWSH) || profile.id().equals(ShellProfiles.CYGWIN);
             if (!checkable || SwingUtilities.isEventDispatchThread() || !awaitDetection.getAsBoolean()) return captured;
             var confirmed = new java.util.concurrent.atomic.AtomicReference<LaunchSettings>();
             try {
@@ -1774,6 +1784,21 @@ public final class JasperApplication {
 
     private static TerminalSession startSession(Path directory, LaunchSettings settings) {
         try {
+            if (settings.profile().id().equals(dev.jasper.app.launch.ShellProfiles.CYGWIN)
+                    && !"1".equals(settings.environment().get("JASPER_CYGWIN_SKIP_RELAY"))) {
+                var layout = dev.jasper.app.cygwin.CygwinLayout.system();
+                var reservation = dev.jasper.app.cygwin.CygwinOperations.registerLaunch(layout);
+                try {
+                    String scripts = settings.environment().get("JASPER_CYGWIN_BOOTSTRAP");
+                    var requested = Optional.ofNullable(settings.environment().get("JASPER_CYGWIN_START_DIRECTORY")).map(Path::of);
+                    var prepared = dev.jasper.app.launch.CygwinLaunch.prepare(settings, requested, scripts == null ? null : Path.of(scripts), layout);
+                    var session = TerminalSession.start(sessionOptions(prepared.directory(), prepared.settings()));
+                    session.exitFuture().whenComplete((exit, failure) -> {
+                        try { reservation.close(); } catch (IOException error) { LOG.log(System.Logger.Level.WARNING, "Cygwin reservation cleanup failed", error); }
+                    });
+                    return session;
+                } catch (Exception failure) { reservation.close(); throw failure; }
+            }
             return TerminalSession.start(sessionOptions(directory, settings));
         } catch (IOException failure) {
             LOG.log(System.Logger.Level.ERROR, "Shell launch failed", failure);
@@ -1847,6 +1872,7 @@ public final class JasperApplication {
 
     void windowClosed(JasperWindow window) {
         forget(window);
+        if (windows.isEmpty()) startupSteps.done();
         // Residency keeps the warm process: the command history, the plugins and the configuration
         // watcher are precisely what makes the next window fast, and shutdown would close all of them.
         // Quit still terminates.
@@ -2199,6 +2225,7 @@ public final class JasperApplication {
     }
 
     private void requestShutdown() {
+        startupSteps.done();
         quitting = true;
         if (shutdownQueued || stopped) return;
         shutdownQueued = true;
@@ -2216,6 +2243,7 @@ public final class JasperApplication {
         // await() below is never reached in that case.
         shutdown.arm(() -> plugins == null ? null : plugins.executing());
         launches.close();
+        cygwin.close();
         shellProfiles.close();
         // Application-owned state first, so none of it depends on plugins behaving.
         history.close();

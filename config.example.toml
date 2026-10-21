@@ -1,6 +1,8 @@
 # Jasper example configuration
 # Copy this file to your platform's config.toml, then edit only the values you want to change.
-# All active values below are Jasper's built-in defaults.
+# All active values below are Jasper's built-in defaults. A look can set its own defaults for toolbar,
+# toolbar_height, visible_rows and the [ui.theme] ids; a copied line overrides the look's, so delete the lines you do
+# not change.
 version = 2
 
 [window]
@@ -13,7 +15,7 @@ rail_width = 28
 toolbar = "icons_and_labels"
 # Live across open windows, including the unified macOS title bar.
 # Range: 28-64 logical pixels; out-of-range values use the nearest limit.
-# The default depends on the active look.
+# The default depends on the active look (28 under Enterprise); this line overrides it.
 toolbar_height = 30
 # Live across open windows.
 status_bar = true
@@ -21,7 +23,7 @@ status_bar = true
 status_bar_height = 24
 # Live across open windows.
 memory_indicator = false
-# Initial grid for new windows only. Columns: 5-500; lines: 2-200.
+# Initial grid for a new window when no window size is saved yet (see ui-state.toml). Columns: 5-500; lines: 2-200.
 columns = 100
 lines = 35
 # Restart required. Windows and Linux only: true uses the operating system's title bar, with the menus and
@@ -33,7 +35,7 @@ native_decorations = false
 view_mode = "normal"
 
 [buddy]
-# Live. Show the pixel-art Jasper floating above your windows while a terminal is open.
+# Live. Show the pixel-art Jasper floating above your windows while a Jasper window is open.
 # Show/Hide Jasper in the command palette and right-click > Hide Jasper toggle him for the session.
 enabled = false
 
@@ -48,8 +50,8 @@ system = true
 
 [notifications.groups]
 # Live. How each group's notifications appear: "card" (a card that hides itself), "sticky" (a card
-# that stays until you close it), "history" (only the Notifications panel) or "off". Settings > Notifications
-# lists every group; a group not listed here keeps its default.
+# that stays until you close it), "history" (only the Notifications panel) or "off". Settings > Appearance &
+# Behavior > Notifications lists every group; a group not listed here keeps its default.
 # "jasper.commands" = "history"
 
 [system]
@@ -62,15 +64,16 @@ system = true
 
 [palette]
 # Live. Result rows the palette list shows before it scrolls. Range: 1-20.
-# The default depends on the active look.
+# The default depends on the active look (8 under Enterprise); this line overrides it.
 visible_rows = 5
 
 [terminal.font]
-# Live across existing and new panes. Cousine Nerd Font Mono is bundled; other missing fonts use JBR/system fallback.
+# Live across existing and new panes. Cousine Nerd Font Mono is bundled; a family that is not installed is replaced
+# by the Java runtime's default font.
 family = "Cousine Nerd Font Mono"
 # Range: 6-72 points. A saved size change is live; new panes and Font reset use this value.
 size = 12.0
-# Ordered live fallbacks; names must be nonblank. An empty list is allowed.
+# Live. Families tried in order for characters the font cannot display; names must not be blank. An empty list is allowed.
 fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
 # Live across existing and new panes.
 ligatures = true
@@ -80,7 +83,8 @@ line_height = 1.0
 [terminal]
 # New panes only. Range: 0-1000000 retained lines; zero disables scrollback history.
 scrollback = 10000
-# Live. Options: "left", "right", "both", or "none".
+# Live, macOS only: which Option key sends Meta: "left", "right", "both", or "none". On Linux and Windows,
+# Alt always sends Meta except together with Ctrl.
 option_as_meta = "left"
 # Live. Range: 0.0-1.0; zero disables inactive dimming and one fully dims.
 dim_inactive_panes = 0.3
@@ -93,20 +97,22 @@ bell = "visual"
 # Only the exited pane closes; its tab/window closes when empty. Live for future exits;
 # reloading never closes previously retained output. A program returning to the shell is not a shell exit.
 on_exit = "keep_open"
-# New panes only. "auto" loads Jasper's shell integration script (zsh, bash, fish) after your startup files;
-# "manual" only exports JASPER_SHELL_INTEGRATION for you to source; "off" does neither.
+# New panes only. "auto" loads Jasper's shell integration script into zsh and bash after your startup files, into
+# fish before config.fish, and into a zsh or fish $SHELL inside tmux; "manual" only exports JASPER_SHELL_INTEGRATION
+# for you to source; "off" does neither.
 shell_integration = "auto"
-# Colors for terminal panes, live: "match" uses the shown theme's own scheme; or a scheme id, <theme id>/<scheme key>,
+# Colours for terminal panes, live: "match" uses the shown theme's own scheme; or a scheme id, <theme id>/<scheme key>,
 # such as "slate-cobalt/dark", "slate-cobalt/light" or "slate-cobalt/high-contrast".
 scheme = "match"
 
 [terminal.shell]
-# New panes only. The shell new tabs start: "powershell", "pwsh" (PowerShell 7) or "cmd" on Windows,
-# "wsl:<name>" for a WSL distribution, "login" on macOS and Linux, or "custom" (program and args below).
+# New panes only. The shell new tabs start: "powershell", "pwsh" (PowerShell 7), "cmd" or "cygwin" (Jasper's
+# Cygwin Bash) on Windows, "wsl:<name>" for a WSL distribution, "login" on macOS and Linux, or "custom" (program and
+# args below).
 # Empty means "custom" when program or args are set, otherwise the platform default. A split starts the
 # shell of the pane it splits; a profile that is not installed starts the default with a warning.
 profile = ""
-# For the "custom" profile. An empty program selects the platform default login shell.
+# For the "custom" profile. An empty program selects the platform's default shell (the login shell on macOS and Linux).
 # Configured args append to that default command. An explicit program receives only these args,
 # with no implicit login flag. Each array item is passed as one exact argument: Jasper performs
 # no shell parsing, splitting, expansion, or interpolation. Program and args must contain no NUL.
@@ -123,22 +129,26 @@ blink = true
 # Names must match [A-Za-z_][A-Za-z0-9_]* and values must contain no NUL. TERM and COLORTERM are
 # reserved: Jasper always sets TERM=xterm-256color and COLORTERM=truecolor. This table does not
 # choose the default login shell; setting SHELL here only changes the child's environment.
-# Desktop launches remove inherited TERM_PROGRAM, TERM_PROGRAM_VERSION, TERM_SESSION_ID, TMUX,
-# TMUX_PANE, and ITERM_* variables before applying this overlay; configured values override them.
+# Jasper removes inherited TERM_PROGRAM, TERM_PROGRAM_VERSION, TERM_SESSION_ID, TMUX, TMUX_PANE,
+# ITERM_* and JASPER_* variables; this overlay then overrides the inherited environment and the
+# variables Jasper and plugins add. Jasper still sets JASPER_PANE and JASPER_COMMAND_SOCKET last.
 # On macOS, LANG defaults to en_US.UTF-8 only when absent or blank; LC_* values are preserved.
 # MY_VARIABLE = "a value with spaces"
 
 [ui]
-# The UI appearance, live across windows: "system" follows the operating system's light or dark setting;
-# "dark" or "light" chooses one. [ui.theme] names the theme each shows.
+# The UI appearance, live across windows: "system" follows the macOS light or dark setting (Linux and Windows
+# report none, so it shows Dark there); "dark" or "light" chooses one. [ui.theme] names the theme each shows.
 appearance = "system"
 
 [ui.theme]
-# The themes the Dark and Light appearances show, live: "slate-cobalt", a built-in Catppuccin flavour such as
-# "catppuccin-mocha", or an imported theme's id (its file name in the themes folder without .json). A theme without that variant is reported and Slate Cobalt is used.
-# The default depends on the active look.
-dark = "slate-cobalt"
-light = "slate-cobalt"
+# The themes the Dark and Light appearances show, live: a built-in theme ("jasper-meadow", "slate-cobalt" or
+# "ubuntu-yaru" for either, "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or
+# "catppuccin-mocha" for Dark), a plugin's theme such as "enterprise", or an imported theme's id (its file name in the
+# themes folder without .json). A theme without that variant is reported and the appearance's default is used:
+# Jasper Meadow for Dark and Light. The standard and Enterprise looks both default to Jasper Meadow; these lines
+# save an explicit choice.
+dark = "jasper-meadow"
+light = "jasper-meadow"
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of [terminal.font].
@@ -153,7 +163,7 @@ family = "system"
 # macOS only (ignored on other platforms), live: translucent terminal and editor backgrounds. Omit opacity to keep the terminal area opaque.
 # Opacity: 10-100 percent.
 # opacity = 95
-# Blur behind a translucent workspace: "theme" (Slate Cobalt does not blur), "on" or "off".
+# Blur behind a translucent workspace: "theme" (no theme blurs), "on" or "off".
 blur = "theme"
 
 [ui.animations]
@@ -163,8 +173,8 @@ enabled = true
 [keybindings]
 # Zen mode is unassigned by default. Assign it here or in Settings > Keymap.
 # toggle_zen_mode = "none"
-# Optional live overrides. Shortcuts must be unique; use "none" to disable an action.
-# On macOS, cmd is Command and alt/option is Option. Example:
+# Optional live overrides. Shortcuts must be unique; use "none" to leave an action without a shortcut.
+# On macOS, cmd is Command and alt is Option. Example:
 # new_tab = "cmd+t"
 # split_down = "cmd+shift+d"
 # On Linux and Windows, cmd means Ctrl+Shift; literal Ctrl combinations are often clearer. Example:
@@ -173,7 +183,7 @@ enabled = true
 # macOS: the palette opens with Cmd+Shift+P and Cmd+K clears the scrollback (these are the defaults).
 # command_palette = "cmd+shift+p"
 # clear_scrollback = "cmd+k"
-# Windows/Linux: the palette opens with Ctrl+Shift+P and Ctrl+Shift+K clears the scrollback, so Ctrl+K stays with the
+# Linux and Windows: the palette opens with Ctrl+Shift+P and Ctrl+Shift+K clears the scrollback, so Ctrl+K stays with the
 # terminal (these are the defaults).
 # command_palette = "ctrl+shift+p"
 # clear_scrollback = "ctrl+shift+k"

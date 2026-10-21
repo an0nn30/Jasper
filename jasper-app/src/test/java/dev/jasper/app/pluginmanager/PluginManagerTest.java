@@ -65,8 +65,10 @@ class PluginManagerTest {
 
     @AfterEach void stop() throws Exception {
         var pending = new CompletableFuture<List<CompletableFuture<?>>>();
+        var pluginWorkers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime);
         edt(() -> pending.complete(runtime.stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        pluginWorkers.await();
         edt(() -> { if (page != null) page.dispose(); windows.close(); });
     }
 

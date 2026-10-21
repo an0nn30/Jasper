@@ -50,17 +50,18 @@ public record PaletteStep(String title, List<Field> fields, BiConsumer<Map<Strin
         }
 
         /**
-     * The work is done; dismiss.
-     *
-     * @return the work is done; dismiss
-     */
+         * The work is done: dismiss the palette.
+         *
+         * @return the result
+         */
         public static Result done() { return new Result(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()); }
 
         /**
-     * Derives a value.
-     *
-     * @param message what went wrong
-         *  @return keep the form open with that message */
+         * Keeps the form open with this message.
+         *
+         * @param message what went wrong
+         * @return the result
+         */
         public static Result error(String message) {
             return new Result(Optional.of(Objects.requireNonNull(message, "message")), Optional.empty(), Optional.empty(), Optional.empty());
         }

@@ -21,6 +21,8 @@ public enum ActionId {
     MAXIMIZE_PANE("maximize_pane", "Maximize Pane", "cmd+shift+enter", "ctrl+alt+shift+enter"),
     MOVE_PANE_TO_NEW_TAB("move_pane_to_new_tab", "Move Pane to New Tab", "alt+cmd+t", "ctrl+alt+shift+t"),
     TOGGLE_ZEN_MODE("toggle_zen_mode", "Zen", "none", "none"),
+    TOGGLE_RAIL("toggle_rail", "Rail", "none", "none"),
+    TOGGLE_STATUS_BAR("toggle_status_bar", "Status Bar", "none", "none"),
     FOCUS_PANE_LEFT("focus_pane_left", "Focus Pane Left", "cmd+alt+left", "ctrl+alt+shift+left"),
     FOCUS_PANE_RIGHT("focus_pane_right", "Focus Pane Right", "cmd+alt+right", "ctrl+alt+shift+right"),
     FOCUS_PANE_UP("focus_pane_up", "Focus Pane Up", "cmd+alt+up", "ctrl+alt+shift+up"),
@@ -52,6 +54,7 @@ public enum ActionId {
     FONT_RESET("font_reset", "Reset Font Size", "cmd+0", "ctrl+shift+0"),
     OPEN_SETTINGS("open_settings", "Settings", "cmd+,", "ctrl+shift+,"),
     RELOAD_CONFIG("reload_config", "Reload Config", "none", "none"),
+    MANAGE_CYGWIN_PACKAGES("manage_cygwin_packages", "Manage Cygwin packages…", "none", "none"),
     QUIT("quit", "Quit", "cmd+q", "ctrl+alt+shift+q");
 
     private final String id;
@@ -70,6 +73,10 @@ public enum ActionId {
         this.macDefault = macDefault;
         this.otherDefault = otherDefault;
         this.context = context;
+    }
+
+    public boolean availableOn(String osName) {
+        return this != MANAGE_CYGWIN_PACKAGES || osName.startsWith("Windows");
     }
 
     public String id() {

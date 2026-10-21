@@ -87,7 +87,7 @@ final class DockFixture implements AutoCloseable {
         stripes = new StripeSet.LabelledStripes(kit, ChromeArtwork.CLASSIC);
         var terminal = new JPanel();
         terminal.setBackground(theme.semantic().color(SemanticColor.SURFACE_TERMINAL));
-        area = new ToolWindowArea(terminal, state, kit, true);
+        area = new ToolWindowArea(terminal, state, kit, true, ChromeArtwork.CLASSIC);
         body.add(stripes.left(), BorderLayout.WEST);
         body.add(area, BorderLayout.CENTER);
         body.add(stripes.right(), BorderLayout.EAST);
@@ -173,6 +173,23 @@ final class DockFixture implements AutoCloseable {
         Panel panel = panels.stream().filter(each -> each.id().equals(id)).findFirst().orElseThrow();
         JComponent header = kitHeaders ? views.get(id).panelHeader(id) : area.headerOf(panel.slot());
         return SwingUtilities.convertRectangle(header.getParent(), header.getBounds(), body);
+    }
+
+    /** The independently specified native count; also hold the label's literal content and role. */
+    String nativeCount(String id) {
+        if (kitHeaders) return null;
+        Panel panel = panels.stream().filter(each -> each.id().equals(id)).findFirst().orElseThrow();
+        if (panel.count() == 0) return null;
+        String expected = "(" + panel.count() + ")";
+        var title = area.headerOf(panel.slot()).titleLabel();
+        var labels = java.util.Arrays.stream(title.getParent().getComponents())
+            .filter(component -> component instanceof javax.swing.JLabel && component != title)
+            .map(component -> (javax.swing.JLabel) component).toList();
+        org.assertj.core.api.Assertions.assertThat(labels).hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(labels.getFirst().getText()).isEqualTo(expected);
+        org.assertj.core.api.Assertions.assertThat(labels.getFirst().getFont())
+            .isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.COUNT));
+        return expected;
     }
 
     @Override public void close() {

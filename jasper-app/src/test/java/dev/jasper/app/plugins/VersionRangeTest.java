@@ -68,6 +68,7 @@ class VersionRangeTest {
         assertThat(VersionRange.parse(">=0.17.1, <0.18").contains(host)).as("the former Editor range").isFalse();
         assertThat(VersionRange.parse(">=0.18.0, <0.19").contains(host)).as("the former bundled range").isFalse();
         assertThat(VersionRange.parse(">=0.18.1, <0.19").contains(host)).as("the former Remote range").isFalse();
+        assertThat(VersionRange.parse(">=0.18.2, <0.19").contains(host)).as("main's former range").isFalse();
         assertThat(VersionRange.parse(">=0.19.0, <0.20").contains(host)).as("the former bundled range").isFalse();
         assertThat(VersionRange.parse(">=0.20.0, <0.21").contains(host)).as("the former bundled range").isFalse();
         assertThat(VersionRange.parse(">=0.21.0, <0.22").contains(host)).as("every bundled range").isTrue();

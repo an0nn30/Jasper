@@ -125,16 +125,19 @@ class EnterpriseWorkstationMockTest {
             // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
             assertThat(actual.get(i).top() + Y).as(what + "ink " + i + " top").isCloseTo(expected.get(i).top() - rise - SHORTER / 2, within(3));
         }
-        // The search field: x 2116-2715, y 122-165 in the mock.
-        var field = mounted.field();
-        // The field ends 6 before Settings…, whose label follows the face.
-        // The user's 2026-10-18 direction: classic icon then label (Settings… gains its 16 px icon and 6 px gap).
-        // Workspace plan 7b Rulings 20: the window's ⋮ after Settings… moves it and the field left of the mocks'.
-        MockProfile.fonts(what + "search field left", 2 * field.x + X, 2116 - 2 * (16 + 6) - WINDOW_MENU, 4);
-        assertThat(2 * field.width).as(what + "search field width").isCloseTo(600, within(2));
-        // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
-        assertThat(2 * field.y + Y).as(what + "search field top").isCloseTo(122 - SHORTER / 2, within(2));
-        assertThat(2 * field.height).as(what + "search field height").isCloseTo(44, within(2));
+        // The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field (x 2116-2715).
+        assertThat(mounted.field().width).as(what + "no search field").isZero();
+        var search = mounted.search();
+        var settingsButton = mounted.settings();
+        // The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field (x 2116-2715).
+        // The icon square ends 8 px (16 mock px) before Settings…, the trailing group's button gap (CHROME_BUTTON_GAP, as
+        // between the toolbar's buttons).
+        assertThat(2 * (settingsButton.x - (search.x + search.width))).as(what + "the search icon's gap before Settings…").isEqualTo(2 * 8);
+        // The user's 2026-10-19 direction: IntelliJ Classic's Search Everywhere icon in place of the mocks' field (x 2116-2715).
+        // It is a 22 px icon square, centred in the 28 px row where the field's 22 px stood (mock y 122-165).
+        assertThat(2 * search.width).as(what + "search icon width").isEqualTo(44);
+        assertThat(2 * search.height).as(what + "search icon height").isEqualTo(44);
+        assertThat(2 * search.y + Y).as(what + "search icon top").isCloseTo(122 - SHORTER / 2, within(2));
         // "Settings…" at the trailing edge: ink 2742-2846 in the mock.
         var settings = MockProfile.inks(mock, new Rectangle(2722, 112, 160, 64), 12, 25);
         // The user's 2026-10-18 direction: classic icon then label. The crop widens left by the icon and its gap. Settings…

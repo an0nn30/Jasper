@@ -23,6 +23,7 @@ import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.testing.FakeKit;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.testing.FakePresentations;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
@@ -287,9 +288,9 @@ class CompositionParityTest {
 
     @Test void transfersIsReachableInBothLooks() throws Exception {
         for (var layout : List.of(Layout.ROWS, Layout.CLASSIC)) try (var host = new FakePluginHost()) {
-            if (layout == Layout.CLASSIC) dev.jasper.remote.workstation.FakeEnterprise.start(host);
+            if (layout == Layout.CLASSIC) host.setPresentation(FakePresentations.CLASSIC);
             var plugin = new TestRemotePlugin(UI, context -> Optional.empty(), (delay, task) -> () -> { }, dir.resolve("ssh-" + layout));
-            host.start(RemotePluginTest.INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise"), plugin);
+            host.start(RemotePluginTest.INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin);
             settle(host);
             var window = host.addTerminalWindow();
             assertThat(value(() -> host.invoke(dev.jasper.remote.ui.transfers.TransferUi.SHOW, window, null))).as(layout + ": Transfers runs").isTrue();

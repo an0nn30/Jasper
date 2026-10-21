@@ -15,7 +15,9 @@ import java.util.function.Supplier;
 /** Application-built windows and dialogs with consistent chrome. */
 public interface Windows {
     /** Create a nonblocking popup attached to a host-issued live capability.
-     * @param anchor attachment authority from this host @return initially hidden popup */
+     * @param anchor attachment authority from this host
+     * @return initially hidden popup
+     */
     PluginPopover popover(UiAnchor anchor);
     /**
      * Opens an owned view as a content tab in a new tab of the owner's window ({@link TabPlacement#NEW_TAB}); moving
@@ -150,11 +152,12 @@ public interface Windows {
     PluginDialog overlay(OverlaySpec spec);
 
     /**
-     * Selects existing local files in an owner-attached picker. The synchronous call pumps UI
+     * Selects existing local files in Jasper's file chooser, attached to the owner. The synchronous call pumps UI
      * events; closing the owner or stopping the plugin cancels and discards the result.
      * @param owner an open Jasper window, or a content tab of this plugin
      * @param title picker title
-     * @param initial initial location, or empty for the platform default
+     * @param initial initial location, or empty to start in the local folder of the focused terminal pane of the owner's
+     *     window, else in the home folder
      * @return absolute normalized selected files, or an empty immutable list on cancel
      * @throws IllegalArgumentException for a foreign, unshown or dead owner
      * @throws IllegalStateException for a closed context or off-UI call
@@ -169,7 +172,8 @@ public interface Windows {
      * Selects one local directory with the same lifetime rules as {@link #chooseFiles}.
      * @param owner an open Jasper window, or a content tab of this plugin
      * @param title picker title
-     * @param initial initial location, or empty for the platform default
+     * @param initial initial location, or empty to start in the local folder of the focused terminal pane of the owner's
+     *     window, else in the home folder
      * @return absolute normalized directory, or empty on cancel
      * @throws IllegalArgumentException for a foreign, unshown or dead owner
      * @throws IllegalStateException for a closed context or off-UI call
@@ -181,11 +185,12 @@ public interface Windows {
     }
 
     /**
-     * Asks for a local file to save to, in the platform's save dialog, which confirms replacing an existing
-     * file. The same owner, lifetime and UI-thread rules as {@link #chooseFiles} apply.
+     * Asks for a local file to save to in Jasper's file chooser, which asks before replacing an existing file. The
+     * same owner, lifetime and UI-thread rules as {@link #chooseFiles} apply.
      * @param owner an open Jasper window, or a content tab of this plugin
      * @param title dialog title
-     * @param initial a directory to start in, or a suggested file whose folder and name are filled in; empty for the platform default
+     * @param initial a directory to start in, or a suggested file whose folder and name are filled in; empty starts
+     *     where {@link #chooseFiles} does
      * @return an absolute normalized path, or empty on cancellation or owner closure
      * @throws IllegalArgumentException for a foreign, unshown or dead owner
      * @throws IllegalStateException for a closed context or off-UI call

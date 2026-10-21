@@ -34,6 +34,12 @@ class ZenModeTest {
     private static ActionId zenAction() {
         return ActionId.forId("toggle_zen_mode").orElseThrow(() -> new AssertionError("Missing Zen action"));
     }
+    private static ActionId railAction() {
+        return ActionId.forId("toggle_rail").orElseThrow(() -> new AssertionError("Missing Rail action"));
+    }
+    private static ActionId statusAction() {
+        return ActionId.forId("toggle_status_bar").orElseThrow(() -> new AssertionError("Missing Status Bar action"));
+    }
     private static void toggle(WindowContent owner) { owner.invoke(zenAction()); }
     private static void show(Contributions model, WindowContent owner, String id) {
         model.requestPanel(new Contributions.PanelRequest(owner.id(), id, Contributions.PanelRequest.Op.SHOW));
@@ -208,6 +214,61 @@ class ZenModeTest {
                 assertThat(owner.toolbar().isVisible()).isTrue();
                 owner.close(); assertThat(owner.action(action).isEnabled()).isFalse();
             }
+        });
+    }
+
+    @Test void railAndStatusBarAreUnassignedButMenuPaletteAndLiveShortcutShareTheirStateOnBothPlatforms() throws Exception {
+        edt(() -> {
+            for (boolean mac : new boolean[]{true, false}) {
+                var owner = content(launcher(new ArrayDeque<>()), mac);
+                var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
+                var visibility = child(view(owner), "Show/Hide");
+                var rail = item(visibility, "Rail"); var status = item(visibility, "Status Bar");
+                var railKey = KeyStroke.getKeyStroke(KeyEvent.VK_F9, 0); var statusKey = KeyStroke.getKeyStroke(KeyEvent.VK_F8, 0);
+                assertThat(owner.bindings().strokeFor(railAction())).isEmpty();
+                assertThat(owner.bindings().strokeFor(statusAction())).isEmpty();
+                assertThat(rail.getAction()).isSameAs(owner.action(railAction()));
+                assertThat(status.getAction()).isSameAs(owner.action(statusAction()));
+                assertThat(rail.getAccelerator()).isNull(); assertThat(status.getAccelerator()).isNull();
+                owner.setBindings(KeyBindings.withOverrides(mac, Map.of("toggle_rail", "f9", "toggle_status_bar", "f8")));
+                assertThat(rail.getAccelerator()).isEqualTo(railKey); assertThat(status.getAccelerator()).isEqualTo(statusKey);
+                assertThat(root.activate(railKey)).isTrue();
+                assertThat(owner.railVisible()).isFalse(); assertThat(rail.isSelected()).isFalse();
+                assertThat(owner.status().isVisible()).isTrue(); assertThat(status.isSelected()).isTrue();
+                assertThat(root.activate(statusKey)).isTrue();
+                assertThat(owner.status().isVisible()).isFalse(); assertThat(status.isSelected()).isFalse();
+                assertThat(owner.railVisible()).isFalse();
+                owner.dispatchCommand(owner.commands().find("toggle_rail").orElseThrow());
+                owner.dispatchCommand(owner.commands().find("toggle_status_bar").orElseThrow());
+                assertThat(owner.railVisible()).isTrue(); assertThat(owner.status().isVisible()).isTrue();
+                rail.doClick(); status.doClick();
+                assertThat(owner.railVisible()).isFalse(); assertThat(rail.isSelected()).isFalse();
+                assertThat(owner.status().isVisible()).isFalse(); assertThat(status.isSelected()).isFalse();
+                rail.doClick(); status.doClick();
+                assertThat(owner.railVisible()).isTrue(); assertThat(rail.isSelected()).isTrue();
+                assertThat(owner.status().isVisible()).isTrue(); assertThat(status.isSelected()).isTrue();
+                assertThat(owner.commands().find("view.rail")).isEmpty();
+                assertThat(owner.commands().find("view.status_bar")).isEmpty();
+                owner.close();
+            }
+        });
+    }
+
+    @Test void railAndStatusBarActionsAreInactiveInZenAndKeepTheirOwnState() throws Exception {
+        edt(() -> {
+            var owner = window();
+            owner.invoke(railAction()); owner.invoke(statusAction());
+            assertThat(owner.railVisible()).isFalse(); assertThat(owner.status().isVisible()).isFalse();
+            toggle(owner);
+            assertThat(owner.action(railAction()).isEnabled()).isFalse();
+            assertThat(owner.action(statusAction()).isEnabled()).isFalse();
+            owner.invoke(railAction()); owner.invoke(statusAction());
+            toggle(owner);
+            assertThat(owner.action(railAction()).isEnabled()).isTrue();
+            assertThat(owner.action(statusAction()).isEnabled()).isTrue();
+            assertThat(owner.railVisible()).isFalse(); assertThat(owner.status().isVisible()).isFalse();
+            owner.invoke(railAction()); owner.invoke(statusAction());
+            assertThat(owner.railVisible()).isTrue(); assertThat(owner.status().isVisible()).isTrue();
         });
     }
 

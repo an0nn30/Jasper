@@ -66,7 +66,7 @@ public final class PluginManagerStatesPreview {
                 });
             }
         } finally {
-            if(runtime[0]!=null){var done=new CompletableFuture<List<CompletableFuture<?>>>();SwingUtilities.invokeAndWait(()->done.complete(runtime[0].stop()));CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10,TimeUnit.SECONDS);}
+            if(runtime[0]!=null){var pluginWorkers=dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime[0]);var done=new CompletableFuture<List<CompletableFuture<?>>>();SwingUtilities.invokeAndWait(()->done.complete(runtime[0].stop()));CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10,TimeUnit.SECONDS);pluginWorkers.await();}
             SwingUtilities.invokeAndWait(()->{if(page[0]!=null)page[0].dispose();if(windows[0]!=null)windows[0].close();if(controller[0]!=null)controller[0].close();});
             try(var paths=Files.walk(home)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}
         }

@@ -10,4 +10,4 @@ icon_selected_ink = "foreground"
 icon = "icons/fileserver.svg"
 homepage = "https://github.com/an0nn30/Jasper"
 capabilities = ["network.listen", "terminal.observe", "palette.contribute", "clipboard.read"]
-requires = [{ id = "dev.jasper.vault", version = ">=0.2", optional = true }, { id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]
+requires = [{ id = "dev.jasper.vault", version = ">=0.2", optional = true }]

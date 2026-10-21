@@ -1,0 +1,192 @@
+Package source: x86_64/release/pcre/pcre-8.45-1-src.tar.zst
+License identifier: LicenseRef-Upstream-libpcre1
+
+--- pcre-8.45-1.src/pcre-8.45-1.cygport ---
+# -*- mode: sh; sh-shell: bash -*-
+BUILD_REQUIRES="gcc-g++ libbz2-devel libreadline-devel zlib-devel"
+NAME="pcre"
+VERSION="8.45"
+RELEASE="1"
+CATEGORY="Libs"
+SUMMARY="Perl Compatible Regular Expressions"
+DESCRIPTION="The PCRE library is a set of functions that implement regular
+expression pattern matching using the same syntax and semantics as Perl,
+with just a few differences."
+HOMEPAGE="https://www.pcre.org/"
+SRC_URI="https://ftp.pcre.org/pub/pcre/pcre-${PV}.tar.bz2 \
+	 https://ftp.pcre.org/pub/pcre/pcre-${PV}.tar.bz2.sig"
+FEDORA="https://src.fedoraproject.org/rpms/${PN}/raw/25c98b9ed0137a5752bcb61cc9a59f7eac3f287b/f"
+PATCH_URI="
+	${FEDORA}/pcre-8.21-multilib.patch
+	${FEDORA}/pcre-8.41-fix_stack_estimator.patch
+	${FEDORA}/pcre-8.42-Declare-POSIX-regex-function-names-as-macros-to-PCRE.patch
+	${FEDORA}/pcre-8.44-Inicialize-name-table-memory-region.patch
+	${P}-cygwin-jit.patch
+"
+
+PKG_NAMES="${NAME} libpcre1 libpcre16_0 libpcre32_0 libpcrecpp0 libpcreposix0 libpcre-devel libpcre-doc"
+pcre_CATEGORY="Text"
+pcre_SUMMARY="${SUMMARY} utilities"
+pcre_CONTENTS="--exclude=html --exclude=pcre-config*
+               usr/bin/*.exe usr/share/doc/ usr/share/man/man1/"
+libpcre1_SUMMARY="${SUMMARY} UTF-8 runtime"
+libpcre1_CONTENTS="usr/bin/cygpcre-1.dll"
+libpcre16_0_SUMMARY="${SUMMARY} UTF-16 runtime"
+libpcre16_0_CONTENTS="usr/bin/cygpcre16-0.dll"
+libpcre32_0_SUMMARY="${SUMMARY} UTF-32 runtime"
+libpcre32_0_CONTENTS="usr/bin/cygpcre32-0.dll"
+libpcrecpp0_SUMMARY="${SUMMARY} C++ bindings"
+libpcrecpp0_CONTENTS="usr/bin/cygpcrecpp-0.dll"
+libpcreposix0_SUMMARY="POSIX regex API using PCRE"
+libpcreposix0_CONTENTS="usr/bin/cygpcreposix-0.dll"
+libpcre_devel_SUMMARY="${SUMMARY} library development"
+libpcre_devel_CONTENTS="usr/bin/pcre-config usr/include/
+                        usr/lib/ usr/share/doc/${NAME}/pcre-config.txt
+                        usr/share/man/man1/pcre-config.*"
+libpcre_doc_CATEGORY="Doc"
+libpcre_doc_SUMMARY="${SUMMARY} API documentation"
+libpcre_doc_CONTENTS="usr/share/doc/${NAME}/html/ usr/share/man/man3/"
+
+NO_AUTOHEADER=1
+CYGCONF_ARGS="
+		--enable-jit \
+		--enable-pcre16 \
+		--enable-pcre32 \
+		--enable-newline-is-anycrlf \
+		--enable-unicode-properties --enable-utf8 \
+		--enable-pcregrep-libbz2 \
+		--enable-pcregrep-libz \
+		--enable-pcretest-libreadline \
+		--disable-stack-for-recursion
+		ac_cv_header_windows_h=no
+"
+
+Source archive: x86_64/release/pcre/pcre-8.45-1-src.tar.zst
+
+--- pcre-8.45-1.src/pcre-8.45.tar.bz2!/pcre-8.45/LICENCE ---
+PCRE LICENCE
+------------
+
+PCRE is a library of functions to support regular expressions whose syntax
+and semantics are as close as possible to those of the Perl 5 language.
+
+Release 8 of PCRE is distributed under the terms of the "BSD" licence, as
+specified below. The documentation for PCRE, supplied in the "doc"
+directory, is distributed under the same terms as the software itself. The data
+in the testdata directory is not copyrighted and is in the public domain.
+
+The basic library functions are written in C and are freestanding. Also
+included in the distribution is a set of C++ wrapper functions, and a
+just-in-time compiler that can be used to optimize pattern matching. These
+are both optional features that can be omitted when the library is built.
+
+
+THE BASIC LIBRARY FUNCTIONS
+---------------------------
+
+Written by:       Philip Hazel
+Email local part: Philip.Hazel
+Email domain:     gmail.com
+
+University of Cambridge Computing Service,
+Cambridge, England.
+
+Copyright (c) 1997-2021 University of Cambridge
+All rights reserved.
+
+
+PCRE JUST-IN-TIME COMPILATION SUPPORT
+-------------------------------------
+
+Written by:       Zoltan Herczeg
+Email local part: hzmester
+Email domain:     freemail.hu
+
+Copyright(c) 2010-2021 Zoltan Herczeg
+All rights reserved.
+
+
+STACK-LESS JUST-IN-TIME COMPILER
+--------------------------------
+
+Written by:       Zoltan Herczeg
+Email local part: hzmester
+Email domain:     freemail.hu
+
+Copyright(c) 2009-2021 Zoltan Herczeg
+All rights reserved.
+
+
+THE C++ WRAPPER FUNCTIONS
+-------------------------
+
+Contributed by:   Google Inc.
+
+Copyright (c) 2007-2012, Google Inc.
+All rights reserved.
+
+
+THE "BSD" LICENCE
+-----------------
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    * Neither the name of the University of Cambridge nor the name of Google
+      Inc. nor the names of their contributors may be used to endorse or
+      promote products derived from this software without specific prior
+      written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+End
+
+
+--- pcre-8.45-1.src/pcre-8.45.tar.bz2!/pcre-8.45/cmake/COPYING-CMAKE-SCRIPTS ---
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. The name of the author may not be used to endorse or promote products 
+   derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--- pcre-8.45-1.src/pcre-8.45.tar.bz2!/pcre-8.45/COPYING ---
+PCRE LICENCE
+
+Please see the file LICENCE in the PCRE distribution for licensing details.
+
+End

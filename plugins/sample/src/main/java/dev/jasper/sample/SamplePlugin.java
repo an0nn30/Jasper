@@ -16,6 +16,7 @@ import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
+import dev.jasper.sdk.ui.Presentation;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
@@ -65,7 +66,7 @@ public final class SamplePlugin implements Plugin {
         context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("dev.jasper.sample:flask", "M 6 2 H 10 M 6.67 6 H 9.33 M 6.67 2 V 6 L 4 13.33 Q 3.8 14 4.33 14 H 11.67 Q 12.2 14 12 13.33 L 9.33 6 V 2"));
         context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
         context.events().subscribe(AppEvents.THEME_CHANGED,
-            event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
+            event -> context.log().log(System.Logger.Level.INFO, "The theme is now " + event.variant()));
         var settings = new SampleSettings(context.settings());
         context.settings().page(new SampleSettingsPanel(context.kit(), settings));
         long stepMillis = settings.stepMillis.get();
@@ -111,7 +112,7 @@ public final class SamplePlugin implements Plugin {
     private static void installPanelAndAboutTab(PluginContext context, long stepMillis) {
         // Built the first time the panel shows in the main window, the only window with tool windows. Its body is the kit's empty state:
         // a tile, a title, one sentence and one secondary action, centered in the panel.
-        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
+        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host ->
             context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
                 new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
                 Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
@@ -159,6 +160,14 @@ public final class SamplePlugin implements Plugin {
         context.rail().add("dev.jasper.sample.about");
     }
     // example:pluginpanels:end
+
+    // example:pluginlook:start
+    /** IntelliJ's classic layout keeps a tool window like this one in the bottom strip: under labelled stripes it starts there. */
+    private static Anchor panelAnchor(PluginContext context) {
+        var look = context.appearance().presentation();
+        return look.toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;
+    }
+    // example:pluginlook:end
 
     // example:pluginterminal:start
     private static void installTerminalDemo(PluginContext context) {
@@ -219,7 +228,7 @@ public final class SamplePlugin implements Plugin {
         }
         // Register the action first: the scope names it, and its shortcut then reaches the scope both ways.
         // Closed, this handler opens the palette on the scope; open, the palette switches to it or dismisses.
-        context.actions().register(ActionSpec.of(GREETINGS_OPEN, "Sample Greetings…").withDefaultBinding("cmd+alt+g"), invoked ->
+        context.actions().register(ActionSpec.of(GREETINGS_OPEN, "Sample Greetings…").withDefaultBinding("cmd+alt+y"), invoked ->
             context.palette().open(invoked.window(), GREETINGS, Optional.empty(), Optional.empty()));
         List<String> greetings = List.of("good morning", "hello", "hi there");
         context.palette().register(new PaletteScope() {

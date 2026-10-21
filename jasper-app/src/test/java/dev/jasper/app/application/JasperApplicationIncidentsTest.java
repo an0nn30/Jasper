@@ -110,6 +110,7 @@ class JasperApplicationIncidentsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     @DisabledOnOs(OS.WINDOWS)
@@ -131,5 +132,6 @@ class JasperApplicationIncidentsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 }

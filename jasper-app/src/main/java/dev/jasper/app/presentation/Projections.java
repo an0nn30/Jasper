@@ -20,10 +20,11 @@ import java.util.Set;
  * @param title the frame title template
  * @param dockLayout the ui-state key of the dock
  * @param panels the app's own panels
+ * @param plugins what plugins learn of the look (plan 15a)
  */
 public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLook shell, PaletteLook palette, SettingsChrome settings,
                           Composition composition, DialogMapping dialogs, Motion motion, TitleFormat title, DockLayoutKey dockLayout,
-                          AppPanels panels) {
+                          AppPanels panels, PluginLook plugins) {
     /** The desktop platform the 9.1 table distinguishes; every other system counts as Linux. */
     public enum Platform {
         /** macOS. */
@@ -69,6 +70,7 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
         Objects.requireNonNull(desktop); Objects.requireNonNull(workspace); Objects.requireNonNull(shell); Objects.requireNonNull(palette);
         Objects.requireNonNull(settings); Objects.requireNonNull(composition); Objects.requireNonNull(dialogs); Objects.requireNonNull(motion);
         Objects.requireNonNull(title); Objects.requireNonNull(dockLayout); Objects.requireNonNull(panels);
+        Objects.requireNonNull(plugins);
     }
 
     /**
@@ -93,6 +95,8 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
         // IntelliJ Classic shows its macOS menus only in the screen menu bar; on Windows they stay in the window's title bar.
         boolean shellWindowMenus = windowMenus && !(classicTitle && host.mac());
         boolean stripes = chrome.toolWindows() == ChromeSpec.ToolWindows.STRIPES, runWindow = chrome.palette() == ChromeSpec.PaletteKind.RUN_WINDOW;
+        // ChromeSpec's constraint gives the icon a classic header and the Run window (spec 5.3).
+        boolean iconSearch = chrome.toolbarSearch() == ChromeSpec.ToolbarSearch.ICON;
         var desktop = new DesktopFlags(screenMenuBar, nativeTitle);
         var workspace = new WorkspaceLook(windowMenus ? WorkspaceLook.Menus.CLASSIC : WorkspaceLook.Menus.STANDARD,
             unified ? WorkspaceLook.Header.UNIFIED : WorkspaceLook.Header.CLASSIC,
@@ -101,7 +105,8 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
             chrome.statusBar() == ChromeSpec.StatusBar.CELLS ? WorkspaceLook.Status.RULED : WorkspaceLook.Status.SLASH,
             chrome.palette() == ChromeSpec.PaletteKind.RUN_WINDOW,
             stripes ? WorkspaceLook.FrameStyle.FLUSH : WorkspaceLook.FrameStyle.STANDARD,
-            chrome.icons() == ChromeSpec.Icons.CLASSIC ? WorkspaceLook.Icons.CLASSIC : WorkspaceLook.Icons.NEW_UI);
+            chrome.icons() == ChromeSpec.Icons.CLASSIC ? WorkspaceLook.Icons.CLASSIC : WorkspaceLook.Icons.NEW_UI,
+            iconSearch ? WorkspaceLook.Search.ICON : WorkspaceLook.Search.FIELD);
         var shell = new ShellLook(unified && host.unifiedTitleSupported(), shellWindowMenus, !unified, classicTitle);
         var palette = new PaletteLook(runWindow ? PaletteLook.View.RUN_WINDOW : PaletteLook.View.CARD,
             runWindow ? PaletteLook.Home.UPPER : PaletteLook.Home.TITLE_FIELD);
@@ -110,11 +115,15 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
         if (chrome.motion() == ChromeSpec.MotionKind.NONE) hidden.add("ui.animations.enabled");
         if (stripes) hidden.add("window.rail_width");
         var settings = new SettingsChrome(unified, classicBase, !classicBase, hidden, namesUiFace);
+        var plugins = new PluginLook(classicBase, chrome.icons() == ChromeSpec.Icons.CLASSIC, stripes,
+            unified ? PluginLook.TitleBar.UNIFIED : classicTitle ? PluginLook.TitleBar.CLASSIC : PluginLook.TitleBar.NATIVE,
+            host.mac() ? (screenMenuBar ? PluginLook.Menus.SCREEN_MENU_BAR : PluginLook.Menus.WINDOW)
+                : (nativeTitle ? PluginLook.Menus.WINDOW : PluginLook.Menus.TITLE_BAR), iconSearch ? PluginLook.Search.ICON : PluginLook.Search.FIELD);
         return new Projections(desktop, workspace, shell, palette, settings, classicBase ? Composition.CLASSIC : Composition.ROWS,
             new DialogMapping(chrome.dialogs() == ChromeSpec.DialogKind.CLASSIC ? DialogMapping.Kind.CLASSIC : DialogMapping.Kind.AS_REQUESTED, !unified),
             chrome.motion() == ChromeSpec.MotionKind.NONE ? Motion.NONE : Motion.STANDARD, new TitleFormat(chrome.windowTitle()),
             new DockLayoutKey(providerId),
-            stripes ? new AppPanels("Event Log", Slot.BOTTOM_LEFT) : new AppPanels("Notifications", Slot.RIGHT_TOP));
+            stripes ? new AppPanels("Event Log", Slot.BOTTOM_LEFT) : new AppPanels("Notifications", Slot.RIGHT_TOP), plugins);
     }
 
     /**
@@ -147,6 +156,9 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
             new PaletteLook(PaletteLook.View.CARD, PaletteLook.Home.TITLE_FIELD),
             new SettingsChrome(!nativeTitle, false, true, hidden, false), Composition.ROWS,
             new DialogMapping(DialogMapping.Kind.AS_REQUESTED, nativeTitle), Motion.STANDARD, new TitleFormat("{context}"), new DockLayoutKey(""),
-            new AppPanels("Notifications", Slot.RIGHT_TOP));
+            new AppPanels("Notifications", Slot.RIGHT_TOP),
+            new PluginLook(false, false, false, nativeTitle ? PluginLook.TitleBar.NATIVE : PluginLook.TitleBar.UNIFIED,
+                host.mac() ? (committed.screenMenuBar() ? PluginLook.Menus.SCREEN_MENU_BAR : PluginLook.Menus.WINDOW)
+                    : (nativeTitle ? PluginLook.Menus.WINDOW : PluginLook.Menus.TITLE_BAR), PluginLook.Search.FIELD));
     }
 }

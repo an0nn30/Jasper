@@ -35,8 +35,8 @@ class EnterpriseHomeTest {
             assertThat(snapshot.visibleRows()).isEqualTo(8);
             // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.
             assertThat(snapshot.toolbarHeight()).isEqualTo(28);
-            assertThat(snapshot.lightTheme()).isEqualTo("enterprise");
-            assertThat(snapshot.darkTheme()).isEqualTo("enterprise");
+            assertThat(snapshot.lightTheme()).isEqualTo("jasper-meadow");
+            assertThat(snapshot.darkTheme()).isEqualTo("jasper-meadow");
         }
         var library = ThemeLibrary.of(on.themes());
         assertThat(library.theme("enterprise")).hasValueSatisfying(theme -> assertThat(theme.name()).isEqualTo("Enterprise"));

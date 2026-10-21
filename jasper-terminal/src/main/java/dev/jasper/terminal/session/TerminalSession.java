@@ -98,7 +98,12 @@ public final class TerminalSession implements AutoCloseable {
     public String title() { return access.title(); }
     /** Current foreground job's executable name, when the OS exposes it. Query off the EDT. */
     public Optional<String> foregroundJob() { return access.foregroundJob(); }
-    /** Completes with the exit code after output ends, the child wait completes, and the exit message reaches the buffer. */
+    /**
+     * For a local process, completes with the exit code after output ends, the child wait completes, and the exit
+     * message reaches the buffer. For an attached session, completes with the connection's exit status after output
+     * ends, writing no exit message, or exceptionally with an {@link IOException} when the connection failed or ended
+     * without an exit status.
+     */
     public CompletableFuture<Integer> exitFuture() { return access.exitFuture(); }
     /** Closes this session once, initiating bounded asynchronous child cleanup. Safe to repeat; does not remove any Swing view. */
     public void close() { access.close(); }

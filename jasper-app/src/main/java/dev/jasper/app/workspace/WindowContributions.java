@@ -195,7 +195,7 @@ final class WindowContributions implements AutoCloseable {
             case SHOW -> showPanel(request.panelId());
             case HIDE -> hidePanel(request.panelId());
             case TOGGLE -> togglePanel(request.panelId());
-            case ACTIVATING_TOGGLE -> toggleAndActivate(request.panelId());
+            case ACTIVATING_TOGGLE -> activatingToggle(request.panelId());
             case ACTIVATING_SHOW -> showAndActivate(request.panelId());
         }
     }
@@ -205,7 +205,10 @@ final class WindowContributions implements AutoCloseable {
     /** A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). */
     private void toggleAndActivate(String id) { changeAndActivate(id, () -> dock.toggle(id)); }
 
-    /** A show for a user gesture in another window, a child window's View toggle: the panel becomes the active tool window under flush frames. */
+    /**
+     * A show by the panel's own toggle action (plan 15b Rulings 1), or for a user gesture in another window, a child
+     * window's View toggle: the panel becomes the active tool window under flush frames.
+     */
     private void showAndActivate(String id) { changeAndActivate(id, () -> dock.show(id)); }
 
     private void changeAndActivate(String id, Runnable change) {
@@ -217,8 +220,20 @@ final class WindowContributions implements AutoCloseable {
     }
 
     /**
-     * The panel a user gesture is toggling and activating, or null: when it shows in place of another window, focus is
-     * not handed back to the terminal, whose focus events would otherwise land after the activation and undo it.
+     * A toggle by the user's View action or the panel's own toggle action, as IntelliJ's ActivateToolWindowAction: under
+     * flush frames a visible tool window that is not the active one is activated, and only the active one hides; else a
+     * toggle that activates what it shows. A stripe click stays {@link #toggleAndActivate}.
+     */
+    private void activatingToggle(String id) {
+        if (!panels.containsKey(id)) return;
+        var area = owner.area();
+        if (area.flush() && dock.visible(id) && !area.focusedSlot().equals(dock.slot(id))) { area.activate(id); return; }
+        toggleAndActivate(id);
+    }
+
+    /**
+     * The panel a user gesture is toggling or showing and activating, or null: when it shows in place of another window,
+     * focus is not handed back to the terminal, whose focus events would otherwise land after the activation and undo it.
      */
     private String activating;
 

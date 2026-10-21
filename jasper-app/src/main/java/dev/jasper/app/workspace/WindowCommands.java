@@ -37,7 +37,7 @@ final class WindowCommands implements AutoCloseable {
         owner.action(ActionId.SPLIT_RIGHT).putValue(Command.TITLE, "Split Right \u00b7 Vertical");
         owner.action(ActionId.SPLIT_DOWN).putValue(Command.TITLE, "Split Down \u00b7 Horizontal");
         for (ActionId id : ActionId.values()) {
-            if (id == ActionId.COMMAND_PALETTE) continue;
+            if (id == ActionId.COMMAND_PALETTE || !id.availableOn(System.getProperty("os.name", ""))) continue;
             String icon = switch (id) {
                 case NEW_TAB -> "square-plus"; case NEW_TERMINAL_WINDOW -> "app-window";
                 case SPLIT_RIGHT, SPLIT_DOWN -> "columns-2"; case MAXIMIZE_PANE -> "maximize";
@@ -58,6 +58,8 @@ final class WindowCommands implements AutoCloseable {
                 case RELOAD_CONFIG -> List.of("configuration", "refresh");
                 case MAXIMIZE_PANE -> List.of("zoom", "restore");
                 case TOGGLE_ZEN_MODE -> List.of("view mode", "focus", "distraction free", "hide tools", "restore layout");
+                case TOGGLE_RAIL -> List.of("view", "panels", "sidebar", "tool window bars");
+                case TOGGLE_STATUS_BAR -> List.of("view");
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> List.of("search");
                 case CLEAR_SCROLLBACK -> List.of("history", "clear");
                 case CLEAR_TERMINAL -> List.of("clear", "screen");
@@ -75,8 +77,6 @@ final class WindowCommands implements AutoCloseable {
             add(registry, "view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT), label,
                 "Toolbar: " + label, () -> owner.chooseToolbarMode(mode));
         }
-        add(registry, "view.status_bar", "Status Bar", "Hide Status Bar", () -> owner.chooseStatusVisible(!owner.status().isVisible()));
-        add(registry, "view.rail", "Rail", "Hide Rail", () -> owner.setRailVisible(!owner.railVisible()), List.of("panels", "sidebar"));
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
         themeListening = owner.themes().subscribe((theme, chrome) -> syncSchemes());
@@ -141,14 +141,14 @@ final class WindowCommands implements AutoCloseable {
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Command.TITLE, zen ? "Exit Zen Mode" : "Enter Zen Mode");
         owner.action(ActionId.MAXIMIZE_PANE).putValue(Command.TITLE,
             owner.workspace().model().maximized().isPresent() ? "Restore Pane" : "Maximize Pane");
-        view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
-        view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
-        // A child window has no toolbar, status bar, rail or Zen of its own (workspace tabs spec 6.3).
+        var status = owner.action(ActionId.TOGGLE_STATUS_BAR);
+        status.putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
+        status.putValue(Action.SELECTED_KEY, owner.status().isVisible());
+        var rail = owner.action(ActionId.TOGGLE_RAIL);
+        rail.putValue(Command.TITLE, !zen && owner.railVisible() ? "Hide Rail" : "Show Rail");
+        rail.putValue(Action.SELECTED_KEY, !zen && owner.railVisible());
+        // A child window has no toolbar of its own (workspace tabs spec 6.3); its status bar and rail actions are disabled too.
         boolean main = owner.isMain();
-        view("view.status_bar").setEnabled(main && !zen);
-        view("view.rail").putValue(Command.TITLE, !zen && owner.railVisible() ? "Hide Rail" : "Show Rail");
-        view("view.rail").putValue(Action.SELECTED_KEY, !zen && owner.railVisible());
-        view("view.rail").setEnabled(main && !zen);
         boolean buddy = owner.buddyEnabled.getAsBoolean();
         view("view.buddy").putValue(Command.TITLE, buddy ? "Hide Jasper" : "Show Jasper");
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);

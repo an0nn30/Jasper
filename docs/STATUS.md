@@ -1,5 +1,136 @@
 # Jasper — Status and Handoff
 
+## Current state — 2026-10-21
+
+Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (windows, tabs, panes
+and tool windows), the terminal (with the bundled Cygwin environment's Cygwin Bash on Windows), the command palette,
+notifications, Settings, themes and looks; most features, the Editor and its Markdown preview among them, are bundled
+plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
+
+- **Branches.** This is `claude/workspace-tabs` (the workspace tabs and the single instance: plans 1 to 5, 7a to 8c, 6a
+  and 6b), which merged `origin/main` at `8c8776e7e` on 2026-10-21 (the merge entry below); it is not merged into
+  `main` and not pushed. `origin/main` at `8c8776e7e` is `427321de4` and the two documentation commits that bring the
+  guides up to it. `origin/main` at `427321de4` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status
+  Bar Keymap actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise mode),
+  the Editor's own typography and Markdown preview (SDK 0.18.3, Editor 0.11.0, Remote 0.15.1), the bundled Cygwin on
+  Windows, Jasper Meadow as the default theme of both appearances in both looks, with a new Dark variant (`73c2b8f61`),
+  and the website without its demo fixtures and preview pages (`375615bbf`); the Cygwin entry below, which says "merged
+  into local `main`", was written before the push. `c6bb59fdd` has the V1 code fixes (`claude/v1-code-fixes`, the code
+  problems the V1 documentation audit found: the package description and Linux menu categories, setting descriptions,
+  Option key as Meta shown only on macOS, the Sample's Greetings… shortcut (Cmd+Option+Y; Ctrl+Alt+Shift+Y), the
+  Editor's F3 and Shift+F3 off macOS and one Close Tab in its tab menu, Vault's classic Lock Vault caption, the
+  `shellHistorySearchMeasurement` task's removal and the vimrc byte order mark written as a Java escape), Enterprise
+  plans 13 (stripe icons), 14 (IntelliJ Classic's title bar), 15a (the look query) and 15b (look polish), Jasper
+  Meadow's Light variant, the Windows user installation, Desk Buddy's shaded pixel sprites, the boot splash fix and
+  PR #1's CI, Windows and Linux fixes; entries below that end "merged to local `main`, not pushed" were written before
+  the push, and the Ubuntu Yaru, plan 10b, series and side-stripes entries, which end "Not merged", before their merge
+  (the side stripes as the rebased `e8ecfdcf2` to `faeec76f3`, which plan 15a's E15 leaves to confirm). The V1
+  documentation overhaul (`claude/v1-docs`, with `origin/main` at `c6bb59fdd` merged in) is merged into `main`; its entry below, which
+  ends "Not merged into `main`", was written before the merge. Since then `claude/v1-docs` has brought the guides up to
+  `427321de4`. Unmerged into `main`: this branch and `claude/test-isolation-leaks` (the Swing test-isolation guard, 3
+  commits).
+- **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
+  one `:jasper-plugin-<dir>` for each directory under `plugins/`.
+- **SDK** `0.21.0` (`JasperSdk.VERSION`, not shipped), with main's 0.18.2 and 0.18.3 additions; every bundled plugin
+  declares `sdk = ">=0.21.0, <0.22"`.
+- **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
+  either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
+  Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.
+  **Looks:** the default look, and the Enterprise look while its plugin is on (Settings › Plugins, then restart;
+  safe mode starts with the default look).
+- **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
+  prerelease Jasper 1.0.0; no entry below records that run.
+- **Last recorded checks.** This branch after the second sync (2026-10-21): 12,600 tests, 0 failures, 0 errors, 29
+  skipped. `./gradlew check` on local `main` with the Editor's typography and Markdown preview and the
+  bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in
+  Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
+  `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
+  macOS, Ubuntu and every Linux packaging and install check passed, and so did the single-worker Windows check. No
+  check is recorded for the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode
+  (`eb424eeec`, `4743469e5`), the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the
+  Javadoc rename (`427321de4`).
+
+Bundled plugins, all enabled by default except Enterprise:
+
+| Plugin | Id | Version | Exports | Provides |
+| --- | --- | --- | --- | --- |
+| Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
+| Editor | `dev.jasper.editor` | 0.13.0 | `dev.jasper.editor.api` | Local and remote text files in tabs, with Markdown preview; `jasper editor` |
+| Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
+| File Server | `dev.jasper.fileserver` | 0.6.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
+| Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
+| Remote | `dev.jasper.remote` | 0.16.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
+| Sample | `dev.jasper.sample` | 0.5.0 | — | Exercises the plugin runtime; inert unless a `demo_*` setting is set |
+| Shell History | `dev.jasper.history` | 0.3.0 | — | Searching every shell's history from the palette |
+| Snippets | `dev.jasper.snippets` | 0.3.0 | `dev.jasper.snippets.api` | Saved commands in the palette |
+
+Open items, as the entries below record them:
+
+- **GUI checks.** No entry from 2026-10-13 on records its "GUI checks for the user" as done. The longest list is the
+  Enterprise look's, in the series entry (2026-10-18, spec 16.2); the side stripes entry and plans 13, 14, 15a and 15b
+  add their own, plan 14's starting with the classic title band in the packaged macOS app. The Editor's fonts and
+  Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
+  Meadow splash and the Rail and Status Bar shortcuts (2026-10-20) await theirs.
+- **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
+  one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
+  fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
+  classic title bar, the boot splash on Windows and Linux (2026-10-19), the Windows network-share checks (2026-10-14),
+  the Enterprise look's Windows and Linux checks (series entry) and Ubuntu Yaru's native appearance and window checks
+  (2026-10-17) need those machines. The bundled Cygwin's native x64 Windows acceptance and its interactive checks in
+  the app on both architectures (2026-10-20) are still to run and block release publication
+  ([verification](superpowers/plans/2026-10-20-jasper-cygwin-verification.md)).
+- **Theme converter.** `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14 (2026-10-17,
+  and again on 2026-10-20); that test last changed on 2026-10-13.
+- **Website.** The Shell Prompt and Meadow website changes are not deployed: the Pages workflow runs only by hand and
+  has not been run (2026-10-20).
+- **Rulings awaited.** Plan 12's Rulings 17 (the focused header's guard) and its question on the Run window's row
+  count, and plan 13's comparison of the iconed stripes with their icon slices cut out.
+- **Enterprise residuals.** The differences from the mocks that the series entry and plans 13 to 15b list; the
+  splash's fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's port to
+  SDK 0.18; the default look's macOS menu bar, which still folds against the window's width (plan 14).
+
+## Handoff log
+
+Newest first. Each entry describes its change as it stood when the entry was written.
+
+**Workspace tabs: origin/main merged in (the second sync) — 2026-10-21** (`claude/workspace-tabs`, the merge of
+`origin/main` at `8c8776e7e` into `154aaf27b`, plan 6b's close; the merge base was the first sync's `f78bb0385`). Main
+brought Enterprise plans 15a and 15b (SDK 0.18.2's `Appearance.presentation()`, the look's defaults for plugin
+settings, a panel's own toggle action activating its tool window, the toolbar's Search Everywhere icon), the Editor's
+own typography and Markdown preview (SDK 0.18.3's saved terminal typography), the bundled Cygwin on Windows, Jasper
+Meadow as the default theme pair, the Meadow splash and the Shell Prompt icon, the Rail and Status Bar keymap actions,
+the V1 code fixes and the V1 documentation overhaul. 80 files conflicted; the merge commit names each one's resolution.
+The branch's windows, tabs, panes, tab registry, save and restore and SDK 0.21.0 API stay, and main's changes are
+ported into them: (1) the splash closes at the first visible paint of a window's frame (main's
+`TerminalWindow.afterFirstVisiblePaint`, now `WindowFrame.afterFirstVisiblePaint`, registered in
+`JasperApplication.frameOnScreen`), not when the window shows; (2) `toggle_rail` and `toggle_status_bar` are the
+View › Show/Hide items in the branch's `WindowCommands` and `WorkspaceActions`, enabled only in the main window and not
+in Zen; (3) a tab menu's command item runs the command of the content active when it is clicked (main's focus-safe
+commands) in the branch's `WindowContent.tabMenu`; (4) main's `activatingToggle` and the panel's own toggle action's
+`ACTIVATING_SHOW` join the branch's child-window routing; (5) main's Cygwin hook (`onManageCygwinPackages`) is wired on
+every `WindowContent`; (6) the Editor keeps the branch's restore, deferred Load, Split submenu and Move Pane to New Tab
+with main's Markdown surface, preview, typography and focus-safe content commands, and publishes Close Pane without a
+shortcut (main's fix of the shortcut the Editor showed but did not bind); (7) main's Javadoc pass on the SDK and its
+SDK reference guide pages are worded for the branch's API (no plugin windows, items in panes, split items, restorers).
+Main's new guides (`workspace.md`, `command-line.md`, `getting-started.md`, `plugins.md`, `terminal.md`, `editor.md`,
+`configuration.md`, `plugin-authoring.md` and the rest) keep main's structure and describe the branch's model: the main
+window and child windows, tabs of panes, the Split submenu and pane drags, `workspace.toml`, one Jasper per home (no
+`--standalone`), the Errors tab and the Vault manager as a dialog. Plan 6b's three hand-offs are done here:
+`docs/sdk-reference.html` regenerated, `EditorDocument.readQuietly` in `plugin-apis.md`, `SavedRemoteDocument` in
+`AGENTS.md`. Nothing of main's was left out. Versions: SDK 0.21.0 (main's 0.18.2 and 0.18.3 additions included;
+every bundled range `sdk = ">=0.21.0, <0.22"`), Editor 0.13.0, Remote 0.16.0, sample 0.5.0, Enterprise 0.3.0 (main's,
+with the branch's range), Credential Vault 0.7.0 and File Server 0.6.0 (the same number on both sides, now holding
+both sides' changes; neither shipped). The first `./gradlew check --continue` after resolving: 12,600 tests, 7
+failures (main's new tests written for the pre-branch API, and `verifySdkReference` stale); after the fixes
+**12,600 tests, 0 failures, 0 errors, 29 skipped** (25 platform skips and four opt-in Editor performance tests), and
+the external example builds against the SDK jars. GUI checks for the user: the Meadow splash closes once the restored
+main window has painted; View › Show/Hide › Rail and Status Bar, and their bound keys, act in the main window and are
+disabled in a child window and in Zen; under Enterprise the toolbar's Search Everywhere icon sits before Settings… and
+the window's ⋮; a tool window's own toggle shortcut activates it under Enterprise, also from a child window; a
+Markdown file in a pane beside a terminal shows its preview, and Split Right with Editor beside it opens a new file; a
+restored Markdown file comes back in its saved view; the Editor's tab menu shows Close Pane with no shortcut and Cmd+W
+closes the pane; on Windows, Manage Cygwin packages… from a child window. Not merged into `main`, not pushed.
+
 **Workspace tabs, plan 6b: plugins' tabs come back — 2026-10-21** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `eefe0324e..b22836d14`, then this documentation commit and its final-review fix
 wave and a residual round; [plan](superpowers/plans/2026-10-18-workspace-6b-plugin-restorers.md),
@@ -135,9 +266,9 @@ with the jars `sdkRelease` publishes; plan 4b's entry lists what 0.19 and 0.20 n
 adds two panes to one tab, so `other` needs its own), and its `plugin.toml` and `PluginPackagingTest.java:49` take
 `sdk = ">=0.21.0, <0.22"` and `build.gradle.kts:8` and `README.md:28` name 0.21.0; 0.21 needs nothing more (it names
 `SessionState.RUNNING` in one fixture and switches over no `SessionState`, and it opens only a dialog, which is not
-saved). These files are main's, and the merge with main brings them up to date: `docs/sdk-reference.html`, which it
-regenerates with this plan's SDK Javadoc; `docs/plugin-apis.md`, which describes `EditorDocument` method by method and
-needs `readQuietly`; and the `AGENTS.md` sentence on the Editor types Remote names, which needs `SavedRemoteDocument`.
+saved). These files are main's, and the merge with main on 2026-10-21 brought them up to date: it regenerated
+`docs/sdk-reference.html` with this plan's SDK Javadoc, added `readQuietly` to `docs/plugin-apis.md`'s
+`EditorDocument`, and named `SavedRemoteDocument` in the `AGENTS.md` sentence on the Editor types Remote names.
 `./gradlew check`: **12,255 tests, 0 failures, 0 errors, 25 skipped** (excludes the external example, which `check` does
 not run). GUI checks for the user: with Jasper resident and no window open,
 `jasper editor <a file that was a saved tab>` gives one tab and no placeholder, and with the Editor turned off it
@@ -788,26 +919,6 @@ Windows and Linux; a `jasper` request and a plugin's tab open in the shown paren
 Window open windows that take parent tabs; a tab dragged within the shown parent tab and into another window lands as
 before. Not merged, not pushed.
 
-**Workspace tabs: local main merged in (Enterprise plans 12 to 14) — 2026-10-19** (`claude/workspace-tabs`, the merge
-`23436efc3` of local main `f78bb0385`, then the fixes `5e709850c` and `94c91e6d2` and "Merge fixes: a child window's
-activating toggle activates, its Windows title dims"). The merge had 22 conflicts; the merge commit lists the resolutions.
-Ports of main into the branch's replacements, for the user to confirm: (1) a child window takes the classic title: on
-macOS `WindowContent.mountChild` gives it `MacTitleBand`, the vibrant appearance and `TitleInset`, and unfolds the screen
-menus; on Windows it gets a 28 px FlatLaf title pane in the toolbar's colour that publishes `TitleInset` and dims while
-the window is inactive (FlatLaf paints the title in one colour, so `mountChild` repicks `WindowPairs.TITLE` or
-`INACTIVE_TITLE` from `setActive`); (2) a child window's `ACTIVATING_TOGGLE` routes to the main window as
-`Op.ACTIVATING_SHOW`, which shows the panel and makes it the active tool window under flush frames, as IntelliJ's
-detached editor does (a routed toggle never hides, and a plugin's `TOGGLE` stays non-activating). SDK 0.20.0 includes
-main's 0.18.1 additions, and Enterprise is 0.2.0. Remote is 0.15.0: the v1.0.0 tag already shipped a Remote 0.14.0 (main's icon-only GHOST
-buttons, on SDK 0.18.1), and this one also carries the branch's SDK 0.20. The fixes also close the SDK
-README's parenthesis and correct `ShellLook`'s Javadoc (the main window's menu row; every window frame's classic title).
-`./gradlew check` passes: 3921 app tests, 4913 Editor, 930 UI, 544 Remote, 459 terminal, 285 File Server, 221 Vault,
-205 testkit, 151 Buddy, 99 Indexer, 94 SDK, 41 History, 14 sample, 13 Snippets and 3 Enterprise tests, 0 failures
-(19 app, 5 terminal and 1 Vault test skipped). GUI checks for the user: a child window under Enterprise on macOS shows the
-band, the traffic lights, the screen menus and Compact; a child window under Enterprise on Windows shows the 28 px title
-pane with overlays below it, and its title and caption buttons dim when the window is inactive; View > a tool window from a child window
-activates it in the main window. Not merged, not pushed.
-
 **Credential Vault: the manager is a dialog over the main window again — 2026-10-20** (`claude/workspace-tabs`,
 `144ff89f1` on `bba5c472e`, then its review fix). The user decided on 2026-10-19: "Make the Vault manager a separate dialog window that floats above
 the main window. That needs no SDK change." This replaces plan 4b's tab form of the manager (`VaultManagerTab`,
@@ -838,6 +949,150 @@ Enterprise it matches the 07 mock again (dialog ground, Done); the main window i
 Vault from a child window while the main window is minimized restores the main window with the manager over it; and the
 manager closes with the main window.
 Not merged, not pushed.
+
+**Meadow theme pair — 2026-10-20**: Normal and Enterprise first-run defaults use Jasper Meadow in both appearances. Dark pairs moonlit blue-green surfaces with sage accents and ivory text across the UI, terminal and Editor; Light colours are unchanged. Saved picks take precedence. Implemented as a bounded theme update with an in-chat approved design and independent review.
+
+**Bundled Cygwin implementation complete — 2026-10-20** (merged into local `main`): The approved [design](superpowers/specs/2026-10-20-jasper-bundled-cygwin-design.md) and [plan](superpowers/plans/2026-10-20-jasper-bundled-cygwin.md) now include the locked 114-package seed, corresponding sources/notices, production PTY relay, Cygwin Bash discovery, Manage Cygwin packages, and persistent provisioning through both Windows install routes. Default Gradle acquisition/install uses Java and bundled artifacts without PowerShell or separately installed tooling. Disconnected Windows ARM64 acceptance passes real MSI install/add-package/repair/upgrade/uninstall and actual Gradle install/update/uninstall/reinstall; all 8,275 Cygwin root entries survive the Gradle lifecycle unchanged. Native validation fixed WiX/source path limits, MSI empty-root process inspection and read-only launcher cleanup. Independent review and the full merged headless check pass: 11,878 tests, zero failures/errors and 29 skips. Native x64 Windows and interactive-app acceptance remain outstanding and block release publication. [Verification evidence](superpowers/plans/2026-10-20-jasper-cygwin-verification.md).
+
+**Shell Prompt icon and Meadow website — 2026-10-20**: The approved moss shell/terminal artwork replaces package and runtime icons on all three platforms, including the native macOS catalog. The website header, footer and favicon match. Enterprise shares the Shell Prompt platform icon and animated Meadow splash with normal mode. The icon generator uses the tracked raster master, retains platform framing and exports native containers plus a manifest. The local merge also includes the animated Meadow splash and visible-workspace handoff, Meadow website scenery, welcome section and shared tab transitions. Full headless check and macOS package verification pass (11,633 tests, zero failures/errors, 25 existing skips). Pages remains manual-only; deployment has not been run.
+
+**Local Meadow splash — 2026-10-20** (`codex/meadow-splash-preview`): Standard windowed launches show
+Jasper in a pixel meadow with the Meadow palette, build version and actual startup steps. A daemon animates
+blink/wave frames while startup occupies the EDT; painting is serialized and the first visible workspace paint (or startup failure) cancels
+animation before closing the window. The saved app-wide animation preference is honored. Custom branded looks
+retain their own splash, and background/headless/safe-mode launches stay silent. Sprite resources are packaged
+from the companion's approved source artwork. The browser study remains local and outside the public site bundle.
+Independent review passed after correcting the animation preference; native desktop testing remains with the user.
+
+**Rail and Status Bar shortcuts — 2026-10-20** (`claude/rail-status-keys`): View › Show/Hide › Rail and Status Bar
+are Keymap actions `toggle_rail` and `toggle_status_bar` (keymap spec rows 57 and 59): Global, unbound by default and
+disabled in Zen like their menu items. They replace the palette-only `view.rail` and `view.status_bar` commands; the
+menu items and palette entries use the actions. Full headless `check` passed on macOS after the rebase onto
+`origin/main` at `bee2c9f28`: 11,630 Java tests, zero failures/errors, 25 expected skips. GUI check pending.
+
+**Jasper pixel sprites — 2026-10-20**: The app uses the approved shaded pixel artwork: 20 frames at 84 × 96, nearest-neighbor sampling, and a 105 × 120 default display. Animation timing and reduced-motion behavior are unchanged. The editable master, atlas, exporter and maintenance documentation match the runtime strip. Full headless `check` passed: 11,621 Java tests, zero failures/errors and 25 existing platform skips; the exporter verified all 20 frames against the runtime strip.
+
+**Windows user install from IntelliJ — 2026-10-20** (`codex/windows-user-install`):
+`installWindowsUser` builds a separate standard-JBR app image and installs it in
+`%APPDATA%\JasperApp` with a Start Menu shortcut; `uninstallWindowsUser` removes the
+owned installation, shortcut and matching login entry, preserving user data.
+The user approved omitting custom VM options, native startup recovery and the native CLI.
+The install graph excludes native compilation, installer generation and AOT training.
+Full parallel headless `check` passed on merged main on macOS: 11,618 Java tests, zero failures/errors,
+25 expected skips, plus native, architecture and 71 theme tests. Used `-Pjasper.python`
+with installed Python 3.13: the unchanged deeply nested JSON theme test fails on 3.14.
+Install dry-run and independent review passed; graph verification uses resolved task
+data to avoid cross-project state locks during parallel checks.
+Windows lifecycle tests cover updates, rollback, ownership, junctions and data preservation;
+native Windows execution and desktop/daemon acceptance remain pending. No GUI launched.
+Follow-up: Windows script policy blocked the PowerShell install step. The same tasks
+now use a Java helper with direct JNA Windows APIs for shortcuts, process checks and
+the matching login entry. Both compile only this small helper; uninstall builds no
+application artifacts. Portable filesystem/rollback tests run on every host, with
+native shortcut, registry and junction checks added on Windows.
+Full parallel headless `check`, 26 portable installer checks, install dry-run and
+independent review passed for the Java replacement. Native Windows execution remains pending.
+
+**Jasper Meadow Light — 2026-10-20**: The default light theme uses warm cream surfaces and moss #52643F accents for buttons, selections and focus. Existing saved theme choices, Enterprise defaults and the Slate Cobalt dark default are retained. Select Light appearance and Jasper Meadow Light in Settings to try it with an existing profile. After merging the current remote main, full headless `check` passed: 11,618 Java tests, zero failures/errors, 25 existing platform skips, plus theme-tool, native and architecture checks.
+
+**Enterprise presentation, plan 15b: look polish at the user's direction — 2026-10-20** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, after plan 15a; [plan](superpowers/plans/2026-10-19-enterprise-15b-look-polish.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+Commits `41847317f..807169d15` (the anchor refresh, then Tasks 1 to 5), then this documentation commit and the final review fixes; plan 15's spec
+amendment line gains 5.2, 5.3, 10.3, 10.7, 11.6 and 16.2, and 5.1, 5.9, 9.1 and 16.1 are edited again. The user asked on
+2026-10-19: "in entperise I want to replace that text box command pallete in the toolbar with just search icon like in
+IntelliJ classic", and approved plan 15 ("... activation, classic icons everywhere, the search icon, versions, docs and
+the Sample plugin", quoted in full in plan 15a's entry below). What they became. **Activation:** a `Panels.toggle` or
+`PanelHost.show()` made synchronously inside the handler of the panel's own declared toggle action
+(`PanelSpec.withToggleActionId`) is sent as `PanelRequest.Op.ACTIVATING_TOGGLE` or the new `ACTIVATING_SHOW`, which
+`WindowContributions` maps to toggle or show, then activate; under flush frames (Enterprise) the tool window takes the
+focused tint and the keyboard, and under standard frames nothing activates. A hide, a deferred call, another action's
+call and a panel without a declared toggle stay plain. An activating toggle of a shown tool window that is not the
+active one activates it, and only the active one hides, as IntelliJ's ActivateToolWindowAction (final review). This answers plan 12's question (the user: yes): View › Tool
+Windows and ⌘⌥1 to ⌘⌥3 activate Sessions, SFTP, Tunnels, Transfers and File Servers, and Transfers' action, which only
+shows, activates on every press without a Remote change. No SDK or testkit value changes; the javadoc of
+`Panels.toggle`, `PanelHost.show` and `PanelSpec` says it (since 0.18.2). **Classic icons:** under `[chrome] icons =
+"classic"` the six classic names (`add`, `split`, `zoom`, `settings`, `window.add`, `search`) draw IntelliJ's classic
+art in the app-drawn `ToolWindowHeader` actions, a borrowed kit header's host actions, the panel's own header controls
+and the buttons of toolbar views, through `KitView.classicChromeIcons(boolean)`, `IconRegistry.classicChromeIcon`,
+`AppIcons.classicChromeIcon` and `ToolWindowArea` taking the window's `ChromeArtwork`; `BuiltInArtwork.CLASSIC_NAMES`
+lets the host ask without decoding the classic SVGs. Every other name, a document bar's buttons and every panel or
+window body keep their catalog art. **`toolbar_search`:** the eleventh chrome point, `[chrome] toolbar_search = "field"
+| "icon"`, is `field` in both bases and `icon` in Enterprise's kit; `icon` needs `palette = "run_window"` and a native
+or classic title bar, else the kit is refused with one message naming the key. `WorkspaceLook.Search` (read only by
+`WorkspaceChrome`) and `PluginLook.Search` carry it, and SDK 0.18.2's `Presentation.toolbarSearch` now reports `ICON`
+under Enterprise; `FakePresentations.CLASSIC` takes `ICON`. **The button:** `ClassicHeader(true)` puts an icon-only
+"Search Everywhere" button with the classic magnifier (a 22 px square, priority 100) first in the trailing group, 8 px
+before Settings…, in place of the field; it runs COMMAND_PALETTE as the field does, its tooltip is "Search Everywhere"
+plus the palette's shortcut in parentheses, it stays icon-only under `icons_and_labels`, goes with the row under
+`hidden` (⇧⌘P still opens the Run window) and stays beside Settings… in a narrow window. **`LookIdentityTest`:** no
+class in the app or jasper-ui jar, and no `dev/jasper/` class of a staged plugin other than Enterprise, holds
+"enterprise" in its constant pool, so a look stays data. No version moves: SDK 0.18.2, Enterprise 0.3.0, no plugin code
+or manifest changes. Rulings (plan, "Rulings"): (1) a toggle or show inside the panel's own declared toggle action
+activates, anything else stays plain; (2) activation needs no SDK or testkit change; (3) the classic set reaches
+tool-window headers and toolbar views, not bodies; (4) classic art for the six names only, through a `KitView` flag and
+`AppIcons.classicChromeIcon`; (5) the key is `toolbar_search`, values `field` and `icon`; (6) `icon` needs the Run
+window and a native or classic title bar; (7) the button is icon-only, named "Search Everywhere" with the shortcut,
+first in the trailing group, and runs COMMAND_PALETTE; (8) the covering array holds `toolbar_search` at `field`; (9) no
+version moves; (10) the identity guard scans constant pools, Enterprise's own classes and bundled libraries excepted;
+(11) `FakePresentations.CLASSIC` moves to `ICON`; (12) plan 15a's baseline is reused; (13) one spec header line for plan
+15. Execution rulings (plan, "Execution notes") X1 to X23, among them: X1 the window-level activation tests sit in
+`WindowPanelsTest`; X2 an activating toggle also needs `PanelEntry.namedToggle()`; X3 "in the panel header" is `panel &&
+!documentBar`; X4 `CLASSIC_NAMES` lives outside `ClassicHolder`; X7 `ClassicHeader` declares both constructors; X8
+`ProjectionsTest`'s Enterprise plugin looks take `Search.ICON`; X9 `EnterpriseMenuRowMockTest.Mounted` captures the
+button's bounds; X12 and X13 spec 5.3, 9.1 and 10.7 are corrected, not just extended. Deviations from the Enterprise
+mocks, as the user's 2026-10-19 direction: the toolbar's field is the icon, so `EnterpriseWorkstationMockTest` drops the
+field's assertions (mock x 2116-2715, y 122-165) for the button's (a 44 mock px square at the field's top, 16 mock px
+before Settings…; the Settings… crop is unchanged), and the pairs `chrome-toolbar-light` (0.581, now 0.427) and
+`chrome-toolbar-dark` (0.577, now 0.423) pass at their unchanged 0.30 floors with a note, the light one no longer
+listing `#FFFFFF`, the field's `surface.input`. Under classic artwork a header's `+` is IntelliJ's classic `add`,
+authored (#6E6E6E in Light), in the strip's 10 px glyph box beside ⋯ and − in the strip's ink (#404040 in Light), where
+the mocks set a glyph in the strip's ink: since the final review `DockFixture` builds its area with
+`ChromeArtwork.CLASSIC`, as Enterprise windows do, and `DockMockTest.compareHeader` expects that art's own ink for the
+`add` of File Servers, Sessions and Tunnels (the glyph centre and extent checks pass unchanged); the 16 dock header pairs
+pass their unchanged floors, each within 0.002 of before (`dock-light-kit-servers-header` 0.986 to 0.985,
+`dock-light-kit-sessions-header` 0.982 to 0.981, `dock-light-disconnected-kit-sessions-header` 0.982 to 0.981,
+`dock-light-disconnected-kit-tunnels-header` 0.996 to 0.995, `dock-dark-kit-servers-header` 0.986 to 0.985,
+`dock-dark-kit-sessions-header` 0.984 to 0.982, `dock-dark-kit-tunnels-header` 0.988 to 0.986,
+`dock-vault-kit-servers-header` 0.993 to 0.992, `dock-vault-kit-sessions-header` 0.983 to 0.982,
+`dock-vault-kit-tunnels-header` 0.997 to 0.995; the other six the same). `./gradlew check
+--continue`: **11,597 tests, 0 failures, 0 errors, 25 skipped** (plan 15a: 11,569 and 25); `check_pairs.py` passes 101
+of 101 gated pairs with the same verdicts as the baseline (`plan15-baseline`, from `f78bb0385`), and every agreement is
+the same except the two toolbar lines and `enterprise-settings-13` (0.723, 0.722 since plan 15a), and since the final
+review the dock header lines above; the headless gallery
+is byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look
+jasper-app renders. No test needed a re-run. The final review fixes add three tests
+(`KitClassicChromeIconsTest`, `WindowPanelsTest`, `HostedUiTest`), counted above. Later: the splash's fixed colours and "Workstation…" step text for other
+branded looks; the external THD plugin's port to SDK 0.18. GUI checks for the user, in this order: (1) under Enterprise
+Light and Dark, the toolbar's magnifier before the wrench, against IntelliJ Classic's: its hover, the tooltip "Search
+Everywhere (⇧⌘P)", a click opens the Run window, ⇧⌘P still does, Icons & Labels keeps it icon-only, and a narrow window
+keeps it beside the wrench; (2) View › Tool Windows › Sessions, SFTP, Tunnels, Transfers and File Servers, and ⌘⌥1 to
+⌘⌥3: each opens its tool window with the focused header tint, and typing goes there; for Sessions, SFTP, Tunnels and
+File Servers a second press hides it and hands the keyboard back to the terminal, a press while the terminal has the
+keyboard activates an open tool window instead of hiding it, while Transfers' action only shows, so
+a second View › Transfers or ⌘⌥3 keeps it open and activates it again; (3) Sessions', Tunnels' and File Servers'
+header `+` in IntelliJ's classic art: authored, in the strip's 10 px glyph box beside ⋯ and − in the strip's ink; judge
+its size and ink against IntelliJ Classic; (4) Remote's session view's Run button unchanged; (5) the
+default look: the title field, the rails, the headers and the shortcuts as before (a toggle shortcut opens without the
+tint). Merged to local main, not pushed.
+
+**Workspace tabs: local main merged in (Enterprise plans 12 to 14) — 2026-10-19** (`claude/workspace-tabs`, the merge
+`23436efc3` of local main `f78bb0385`, then the fixes `5e709850c` and `94c91e6d2` and "Merge fixes: a child window's
+activating toggle activates, its Windows title dims"). The merge had 22 conflicts; the merge commit lists the resolutions.
+Ports of main into the branch's replacements, for the user to confirm: (1) a child window takes the classic title: on
+macOS `WindowContent.mountChild` gives it `MacTitleBand`, the vibrant appearance and `TitleInset`, and unfolds the screen
+menus; on Windows it gets a 28 px FlatLaf title pane in the toolbar's colour that publishes `TitleInset` and dims while
+the window is inactive (FlatLaf paints the title in one colour, so `mountChild` repicks `WindowPairs.TITLE` or
+`INACTIVE_TITLE` from `setActive`); (2) a child window's `ACTIVATING_TOGGLE` routes to the main window as
+`Op.ACTIVATING_SHOW`, which shows the panel and makes it the active tool window under flush frames, as IntelliJ's
+detached editor does (a routed toggle never hides, and a plugin's `TOGGLE` stays non-activating). SDK 0.20.0 includes
+main's 0.18.1 additions, and Enterprise is 0.2.0. Remote is 0.15.0: the v1.0.0 tag already shipped a Remote 0.14.0 (main's icon-only GHOST
+buttons, on SDK 0.18.1), and this one also carries the branch's SDK 0.20. The fixes also close the SDK
+README's parenthesis and correct `ShellLook`'s Javadoc (the main window's menu row; every window frame's classic title).
+`./gradlew check` passes: 3921 app tests, 4913 Editor, 930 UI, 544 Remote, 459 terminal, 285 File Server, 221 Vault,
+205 testkit, 151 Buddy, 99 Indexer, 94 SDK, 41 History, 14 sample, 13 Snippets and 3 Enterprise tests, 0 failures
+(19 app, 5 terminal and 1 Vault test skipped). GUI checks for the user: a child window under Enterprise on macOS shows the
+band, the traffic lights, the screen menus and Compact; a child window under Enterprise on Windows shows the 28 px title
+pane with overlays below it, and its title and caption buttons dim when the window is inactive; View > a tool window from a child window
+activates it in the main window. Not merged, not pushed.
 
 **Editor: a New Editor Window toolbar button — 2026-10-19** (`claude/workspace-tabs`, one commit on `914bfc272`). The user
 asked on 2026-10-19: "I also want a toolbar button in this mode and Enterprise mode where I can open a new Editor File
@@ -1508,6 +1763,123 @@ Editor tab (one prompt); a translucent workspace with groups; Open in Separate W
 palette, the Run window or a tool window while a background group closes (a shell exiting with `on_exit = close`),
 and Focus Group and Maximize Group run from the palette still moving focus to the group. Not merged, not pushed.
 
+**V1 documentation overhaul — 2026-10-19** (`claude/v1-docs`, worktree `.claude/worktrees/v1-docs`, from `main` at
+`faeec76f3`). The current guides describe Jasper as a pluggable DevOps workstation, its core and its bundled plugins,
+as the code stands, with each claim checked against the code: plan numbers, phase framing, review chatter and the SDK's
+version-by-version sections are gone from them, their still-true content folded into the topic it belongs to, and the
+current SDK version is the only one they name (older versions appear only where Jasper refuses plugins built for
+them). The root [README](../README.md) is rewritten, and the
+[documentation index](README.md) groups the guides by reader: Using Jasper, Plugins, Theming, Building plugins, and
+Building Jasper and contributing, then the project records. New guides under `docs/`: `getting-started.md`,
+`workspace.md`, `terminal.md`, `command-line.md`, `plugins.md`, `plugin-apis.md`, `history-and-snippets.md`,
+`enterprise.md`, `creating-themes.md` and `looks.md`; also `jasper-sdk-testkit/README.md` and
+`docs/examples/external-plugin/README.md`. `keyboard-shortcuts.md` is rewritten as the reference of every default
+shortcut. `docs/sdk-reference.html` is the generated SDK reference: `tools/sdk-reference/SdkReference.java` renders the
+guide pages in `tools/sdk-reference/guide/` and the Javadoc of the SDK, the testkit and the bundled plugins' exported APIs;
+`./gradlew sdkReference` (`gradle/sdk-reference.gradle.kts`) rewrites it and `verifySdkReference`, in
+`:jasper-sdk:check`, fails when it is stale. The SDK and testkit changes are Javadoc only. `AppDocumentationTest`
+now also link-checks every Markdown file under `docs/` and the terminal, UI, testkit, `jasper` command, launcher and
+mock-tool READMEs. `config.example.toml` changes only comments. `AGENTS.md` gains the documentation map, the generated
+pages and the build checks it did not name, and drops its phase framing. Dated records keep their text: only link
+targets that renamed headings broke were changed, links to checklists and evidence the guides no longer carry point at
+`ef03625b4`, STATUS's former top-level Open acceptance work section now stands in the historical notes as "Open
+acceptance work — 2026-09-21", whose headings drop a level, the 2026-10-10 "Current state" heading reads "Theme engine
+status — 2026-10-10", and the STATUS entries then on the branch write shortcuts in words (Cmd+Shift+P / Ctrl+Shift+P)
+instead of glyphs; entries merged in from `main` later keep their authors' text.
+Outside the SDK and the exported plugin APIs, five Javadoc comments in jasper-terminal's supported API change
+(`TerminalOptions.Builder.lineHeight`, `SessionLaunchOptions.Builder.localPathMapper`, `TerminalSession.exitFuture`,
+`TerminalView.setFindResultListener` and `TerminalView.resetFontSize`), and `packaging/README.txt`, the text shipped in
+the packages, is rewritten. Apart from those, `AppDocumentationTest` and the build scripts' wiring for the reference and
+the link check, code comments and strings are unchanged. `./gradlew check` passed before `origin/main` was merged in (11,437
+tests, 0 failures, 0 errors, 25 skipped); the branch is pushed for review, and each time `origin/main` was merged in
+the guides were brought up to it, last to `34aa868fe` (Enterprise plans 13 to 15b, SDK 0.18.2) on 2026-10-20. Not
+merged into `main`.
+
+**Enterprise presentation, plan 15a: the look query at the user's direction — 2026-10-19** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, from `main` at `f78bb0385`; [plan](superpowers/plans/2026-10-19-enterprise-15a-look-query.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+Commits `2ad889b0b..23796aaa9`, then this documentation commit and the final review fixes; spec 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1,
+4.6, 4.7, 5.1, 5.8, 5.9, 8.4, 8.7, 9.1, 14.1 to 14.3, 15, 16.1, 17, 18 and 19.1 amended, and the plugin SDK design gains
+a banner line. The user asked: "Lets make sure that the changes we made were in the enterprise kit, and are exposed via
+plugin code and all plugins are up to date with these changes so that future plugins can also leverage look-specific
+settings when Enterprise is enabled." After the audit they approved: "Go ahead with plan 15 as proposed: SDK look query
+(and remove the Enterprise API), kit defaults for plugin settings, activation, classic icons everywhere, the search
+icon, versions, docs and the Sample plugin." This plan is the first of two; plan 15b
+(`2026-10-19-enterprise-15b-look-polish.md`) runs next on this branch. SDK 0.18.2 adds `Appearance.presentation()`,
+which returns `dev.jasper.sdk.ui.Presentation`, a JDK-only record of the look Jasper runs with: `classic` (the classic
+base), `icons` (`NEW_UI`, `CLASSIC`), `toolWindows` (`RAILS`, `STRIPES`), `titleBar` (`UNIFIED`, `NATIVE`, `CLASSIC`,
+resolved for the platform), `menus` (`SCREEN_MENU_BAR`, `TITLE_BAR`, `WINDOW`), `toolbarSearch` (`FIELD` for every look
+until 15b), `uiFace` and `dataFace`, `bodySize` and the look's default `toolbarHeight`; it is IntelliJ's
+`ExperimentalUI.isNewUI()` plus `JBUI.CurrentTheme`, fixed for the run, the same for every plugin and safe from any
+thread. The host builds it once in `dev.jasper.app.plugins.HostedPresentation` from the new `PluginLook` projection
+(`classic`, `classicIcons`, `stripes`, `titleBar`, `menus`, `search`; read only by `HostedPresentation`), the installed
+`Kit` and the look's `DefaultSource`, handed over by `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)`; the
+fallback (spec 4.7) reports the default look's chrome with the defaults read at start. The Enterprise API is removed
+outright: `dev.jasper.enterprise.api.Workstation`, its export, the optional requirements, the compile-only dependencies,
+the `workstationPackages` gate rule and the three `FakeEnterprise` copies are gone; Enterprise 0.3.0 has no exports and
+its `start` does nothing. Remote 0.15.0, Vault 0.7.0 and File Server 0.6.0 choose `Layout.CLASSIC` from
+`Layout.of(context.appearance().presentation())` in `start`, so any classic look drives their classic compositions;
+they, Sample 0.4.0 and Enterprise declare `sdk = ">=0.18.2, <0.19"` (Editor, History, Indexer and Snippets are
+unchanged). A kit's `[defaults."<plugin id>"]` table holds raw TOML values keyed as that plugin's settings file writes
+its keys; `DefaultSource` carries them, and `DeclaredSettings` reads each with the declared setting's own kind and uses
+it as the default, so the precedence is user-saved, then the kit's, then the plugin's own, and Reset to Default returns
+to the kit's (staging the plugin's own default under a kit default saves an explicit value). A value the kind rejects
+and a key the plugin never declares are logged at WARNING once (`PluginHost.lookDefaultProblem`) and ignored, and the
+plugin starts. Enterprise's kit sets `[defaults."dev.jasper.editor"] font_family = "IBM Plex Mono"`, its bundled data
+face. The Sample's panel starts in the bottom strip under labelled stripes and on the left otherwise
+(`example:pluginlook` in the authoring guide), and its `demo_step_millis` demonstrates a kit default under test. The
+testkit mirrors it all: `FakePluginHost.setPresentation`, `FakePresentations.STANDARD` and `CLASSIC`, `setKitDefault`
+and `lookDefaultProblems`, with shared contract cases on both hosts. Rulings (plan, "Rulings"): (1) two plans, 15a and
+15b; (2) the type is `dev.jasper.sdk.ui.Presentation`, reached as `Appearance.presentation()`; (3) the method is
+abstract; (4) the design's ten facts; (5) values a user can change are reported as the look's, fixed for the run, with
+no change notification; (6) `menus` is the look's placement in the Normal view with the platform's default decorations;
+(7) the fallback reports the default look's chrome with the defaults read at start; (8) a new projection `PluginLook`,
+read only by `HostedPresentation`; (9) `toolbarSearch` ships now and reads `FIELD` until 15b; (10) `Layout.CLASSIC`
+exactly when `classic()`; (11) the `workstation` packages keep their names; (12) Enterprise keeps an `EnterprisePlugin`
+whose `start` does nothing; (13) Enterprise is 0.3.0 once for plan 15; (14) the consumers and Enterprise declare
+`>=0.18.2`, and the Editor is not bumped; (15) the `[defaults."<plugin id>"]` format, with raw values checked by the
+declared kind; (16) a rejected value or an undeclared key is logged once and the plugin starts; (17) Reset returns to
+the kit's default; (18) Enterprise's kit sets only the Editor's `font_family`; (19) the Sample shows the query and a kit
+default with no new setting; (20) the external Hello example gets only its `jasperSdkVersion` default, `0.18.2`; (21)
+the `FakeKit.BUILT_INS` parity test reads the private field reflectively; (22) `FakePresentations` replaces the
+`FakeEnterprise` copies; (23) migration rows follow added and deleted files; (24) the two stale STATUS lines are
+corrected; (25) the docs are split by the plans' points; (26) `PluginRuntime.presentation` takes the kit, the look and
+the defaults, with no one-argument overload; (27) one spec header line for plan 15. Execution rulings (plan, "Execution
+notes"): E1 the app's default presentation is per platform (`SCREEN_MENU_BAR` on macOS) while
+`FakePresentations.STANDARD` is the Windows and Linux one; E2 one "started" flag in `FakePluginHost`; E3 the SDK
+README's version sentence names 0.18.2; E4 the staged fixtures set the host's presentation before the consumer starts
+and keep today's Vault compositions; E5 `KitParser.name` quotes non-bare segments; E6 Task 4 keeps
+`plugin-architecture.gradle.kts:51`, drops `EnterprisePluginTest`'s unused constants and corrects its migration row; E7
+Task 9 finds its guide anchors by text; E8 migration rows copy their neighbours' owners; E9 `sdkRelease --rerun` for
+stale jars; E10 a changed Enterprise render is recorded, never a lowered floor; E11 the `LayoutTest` javadoc; E12 Task
+6's logger, import and harness details; E13 the guide's `pluginlook` text after the `pluginpanels` notes; E14 every
+interface plan 15b relies on kept as written; E15 only the two STATUS lines of Rulings 24 are corrected; and
+`HostedPresentation.standard()` reads the default presentation (`Presentation.standard`), since only the listed classes
+may read `Kit.DEFAULT` (`StaticDefaultTest`). No Enterprise
+Settings render moved in Task 2. One Enterprise render changed, at the user's 2026-10-19 direction: Settings › Editor
+(`enterprise-settings/light/13.png`) shows the Font row's kit default, "IBM Plex Mono", where it showed "JetBrains Mono"
+(pair `enterprise-settings-13` 0.723, now 0.722). `./gradlew check --continue`: **11,569 tests, 0 failures, 0 errors, 25
+skipped**; `check_pairs.py` passes 101 of 101 gated pairs with the same verdicts as the Task 1 baseline (`f78bb0385`),
+and every agreement is the same except that line and `composition-light-vault-manager` (0.730, now 0.729), whose status
+bar prints the vault file's path under a fresh JUnit temporary directory on every run; the headless gallery is
+byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look jasper-app
+renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and settings images,
+`DefaultDockPixelsTest`'s `default-dark` and `default-light`). No test needed a re-run. Left for plan 15b: activation by
+a panel's own toggle action, classic icons in tool-window headers and toolbar views, the toolbar search icon
+(`[chrome] toolbar_search`, which `toolbarSearch` will report) and the identity guard, with their docs. Later: the
+splash's fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's port to SDK 0.18.
+The side-stripes entry below also ends "Not merged, not pushed.", but its commits are not ancestors of `f78bb0385` (the
+series was rebased), so it is left for the user to confirm (E15). GUI checks for the user, in this order: (1) under
+Enterprise, the Editor opens files in IBM Plex Mono, and Settings › Editor shows "IBM Plex Mono" with Reset to Default
+hidden; choosing another font shows Reset, and Reset returns to IBM Plex Mono; (2) with Enterprise off, the Editor keeps
+its own default font; (3) under Enterprise, Remote's Sessions on the right, Transfers in the bottom strip, File Servers'
+table and the Vault manager's classic layout, as before; (4) with Enterprise off, all three show their rows; (5) with
+`demo_ui = true`, the Sample panel starts in the bottom strip under Enterprise and on the left without it; (6) Settings
+› Plugins shows Enterprise 0.3.0, Remote 0.15.0, Vault 0.7.0, File Server 0.6.0 and Sample 0.4.0. The final review's
+fixes add `PresentationReachTest.theApplicationHandsTheLooksPluginDefaultsToThePlugins` (the application hands the look's
+plugin defaults to a started plugin) and `PluginSettingsPageTest.stagingThePluginsOwnDefaultUnderAKitDefaultSavesItAndResetReturnsToTheKits`,
+so the suite holds 11,569 tests (only the touched classes were re-run); a `[defaults]` table named without a dot now
+also says to quote a dotted setting key, and a rejected look default's report no longer ends "configuration was not
+applied". Merged to local main, not pushed.
+
 **Enterprise presentation, plan 14: IntelliJ Classic's title bar at the user's direction — 2026-10-19** (`claude/enterprise-title-bar`, worktree `.claude/worktrees/enterprise-14`, from `main` at `3a36993ba`; [plan](superpowers/plans/2026-10-19-enterprise-14-title-bar.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
 Commits `200367316..98dedc443`, then this documentation commit; spec 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1
 to 5.3, 5.9, 9.1, 10.1 to 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1 amended, and the app architecture guide
@@ -1604,7 +1976,7 @@ its process streams. They add 5 tests; the windows, workspace, platform, present
 (1,158 tests) and `javadoc` pass, the 11 default-look jasper-app renders still equal the baseline, and `check` was
 not rerun after them. Follow-up: the
 default look's macOS menu bar (in the unified bar) still folds against the window's width, a risk older than this plan.
-Not merged, not pushed.
+Merged to local `main` (`f78bb0385`), not pushed.
 
 **Enterprise presentation, plan 13: stripe icons at the user's direction — 2026-10-19** (`claude/enterprise-stripe-icons`, worktree `.claude/worktrees/enterprise-13`, from `main` at `2c065f8cd`; [plan](superpowers/plans/2026-10-19-enterprise-13-stripe-icons.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
 Commits `eca2feca8..2606d5633`, then this documentation commit; spec 5.2, 10.7, 16.1 and 19.1 amended. After trying
@@ -1682,6 +2054,29 @@ step; a step that only moves the fill writes only the bar, and an expose writes 
 Wayland session, scale 1 and 2), with Enterprise on, a cold start's splash keeps its art, icon, name, version and
 copyright steady at every step while only the step text and the bar change, with no blank or dark frame, and a window
 dragged over it and away leaves it whole; on macOS it looks as before.
+
+**CI runtime optimization — 2026-10-19** (PR #1): CI runs independent Gradle projects with
+`--parallel`, two workers on Unix and one on Windows; each project's tests remain sequential. Root verifiers consume
+root-owned runtime dependencies, and plugin staging consumes producer task outputs. Full local
+`check`, forcing all 15 Java test tasks to execute with warm build artifacts, fell from 8m48s
+serial to 4m45s parallel (46%). All 11,437 tests were retained, with zero failures/errors and the
+same 25 platform skips; one new regression prevents Windows Git Bash probing root UNC paths.
+Architecture/license checks and independent review passed. Hosted checks on the final head gate merge.
+Ubuntu improved from 13m47s to 9m26s. Windows with two workers hit subprocess/startup/cleanup
+deadlines that passed serially; the single-worker hosted Windows check subsequently passed in 18m01s.
+Synchronized main at `2c065f8cd`, retaining its Enterprise theme assertions alongside portable
+font checks; full local `check` passed (11,486 tests, zero failures/errors, 25 existing skips).
+
+**macOS/Windows CI follow-up — 2026-10-19** (`codex/ubuntu-rendering-tests`, PR #1): Startup
+fixtures await application shutdown before temporary-home cleanup. Windows fixes cover native
+linker artifacts and const-correct C fixtures, portable filesystem fixtures, FTP completion waits,
+font-aware rendering assertions and stable gallery scale. Remote shell tests now run through Git
+Bash on Windows; worktree/home comparison canonicalizes both paths. Plugin fixtures await actual
+worker termination before deleting data. Runtime shutdown retains plugin classloaders until worker
+cleanup completes, preserving the bounded stop grace. Shell fixtures use finite-file stdin and captures.
+Full local `check` passed (11,432 tests, zero failures/errors); GitHub macOS, Ubuntu and all Linux
+packaging/install checks passed. Focused checks cover the subsequent Windows fixture corrections;
+PR #1 is gated on all hosted checks. No new test skips.
 
 **Workspace tabs, plan 2: the layout model and its encoding — 2026-10-18** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `255264a42..a2dbb4472` (Tasks 1 to 5 and their fix rounds), the documentation commit
@@ -1841,6 +2236,26 @@ an immediate relaunch end with one process; Restart Now and the VM options resta
 that holds a request (a second launch handed it one while it started hidden, with residency off) shows its Dock icon
 with its window. Not merged, not pushed.
 
+**Ubuntu CI fixes — 2026-10-18** (`codex/ubuntu-rendering-tests`): Reproduced the 12 rendering
+failures on Ubuntu 24.04 ARM64/JBR 25. Font fallback now reaches logical families when physical
+fonts lack symbols/CJK; CI installs DejaVu and Noto CJK. Settings mock fixtures explicitly select
+their depicted capabilities; exact paint checks sample opaque glyph interiors and menu sizing uses
+the actual shortcut font. Full Linux validation also exposed an SSH shutdown race: host-key
+rejection reasons now survive MINA session cleanup, with deterministic regressions. Full `check`
+passed on Ubuntu and macOS: 11,430 tests each, zero failures/errors (53/25 existing platform skips).
+The Ubuntu external SDK plugin check/ZIP build also passed (one additional test). No skips or
+layout tolerances added; actionlint, source hygiene and independent review passed.
+
+**Windows installer build — 2026-10-18** (`codex/fix-windows-launcher-build`). MSVC's export
+library and `.exp` file now go to the object directory instead of jpackage's launcher resources;
+`buildLauncher` previously rejected `jpackageapplauncher.exp` as missing Jasper's hook.
+`packaging/windows/Build-Installer.ps1` passed on Windows ARM64, including image and MSI
+verification, producing `Jasper-1.0.0-windows-aarch64-setup.exe`. Launcher core: 152 checks,
+zero failures; watcher tests passed. Broader `check --continue` failed in command-client core
+compilation (MSVC const qualifiers), Editor, File Server, Indexer, Remote and UI tests; app test
+compilation failed during overlapping builds and passed on the standalone installer rerun.
+Merged into `main`; no installer run.
+
 **Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18**
 (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`;
 [plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md),
@@ -1944,7 +2359,7 @@ Log and Transfers from their stripe labels after clicking into one (the tint sta
 against the user's screenshot (#DFE2E9); Enterprise Light and Dark as a whole against IntelliJ Light and New UI Dark;
 the Run window opening centred in the upper part in a tall window (about 1200 px or more), ending at the middle in a
 window about 1000 to 1200 px tall and just under the toolbar, crossing the middle, in a shorter one, then dragged away
-and back; the About page's IntelliJ entries. Not merged, not pushed.
+and back; the About page's IntelliJ entries. Merged to local `main` (`f78bb0385`), not pushed.
 
 **Enterprise presentation: side stripes at the user's direction — 2026-10-18** (`claude/enterprise-stripes`, worktree
 `.claude/worktrees/enterprise-stripes`, from `main` at `4ed94fb78`: `095e220b9`, `4b55dbfb7`, then this documentation
@@ -2049,8 +2464,8 @@ Plex installed, the look's Warning names the hidden files; in the default look, 
 (no SSH menu; Transfer reads Share Folder…, New File Server…, —, Open SFTP here, Transfers), the Vault status item
 locking and unlocking, the palette's three recent rows. Dock: stripe drag and drop including the bottom strip; the
 stripes' numbers after a Keymap change; the focused header strip (Catppuccin included); the header action glyphs;
-Enterprise Dark's dock against the Dark Mode mock; the default slots on a fresh Enterprise start; Transfers and ⌘⌥3. Run
-window: open it with ⇧⌘P, "▶ Run…" (shown active while open) and Search everywhere; drag it, drop it near its home and
+Enterprise Dark's dock against the Dark Mode mock; the default slots on a fresh Enterprise start; Transfers and Cmd+Option+3. Run
+window: open it with Cmd+Shift+P, "▶ Run…" (shown active while open) and Search everywhere; drag it, drop it near its home and
 below it (it re-attaches) and elsewhere (it stays, and a new window opens it there); double-click its title; a clicked
 pane takes the keys while it stays; its title row or help text gives the keys back; tab switches and other applications
 leave it open; Escape, ×, Cancel and running a row close it; Browse… opens a file and it stays. Settings: the native
@@ -2062,7 +2477,7 @@ Connect, the Sessions tree's star and Properties, the Tunnels and File Servers t
 SFTP row); Add Host; New File Server (in the default look too: TFTP's read-only login, FTP's Warning notice, Choose…
 setting the folder); the Vault manager against the Item selected and New menu mocks (sorting, the tree's collapse, Show
 and Copy, the toolbar's verbs while locked), Add Login, Add SSH Key and Unlock Vault; the Licenses and Errors windows'
-list width; a plugin window without a menu row closing with ⌘W, and the default look's File row unchanged. Dialogs:
+list width; a plugin window without a menu row closing with Cmd+W, and the default look's File row unchanged. Dialogs:
 Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second dialog over the first, the
 window closing under them, full screen, either requested over a minimised window opening natively; an in-window classic
 dialog blocks only its window, a known residual); the file chooser (Browse…, File › Open File…, which opens the file in
@@ -2156,7 +2571,7 @@ anonymous class moved into `DefaultRevealFace`; no default render changed; the f
 are unused by the default faces, and the gallery was not re-run for them). `./gradlew check --continue` after the final
 review fixes: **11,422 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the Enterprise Vault manager against the Item
 selected and New menu mocks (sorting, the tree's collapse, Show and Copy, the toolbar's verbs while locked), Add Login,
-Add SSH Key and Unlock Vault; under Enterprise, a plugin window without a menu row closing with ⌘W (and Ctrl+W on
+Add SSH Key and Unlock Vault; under Enterprise, a plugin window without a menu row closing with Cmd+W (and Ctrl+W on
 Windows and Linux), and the default look's File row unchanged; the Licenses and Errors windows' list width under
 Enterprise; under Enterprise, the file chooser (Browse…, File › Open File…), Create Vault, About Jasper and Remote's
 "Items already exist". Not merged, not pushed.
@@ -2181,7 +2596,7 @@ published, ROWS otherwise, including when Enterprise is not installed); `verifyP
 `dev.jasper.enterprise.api` to those packages. Under the Enterprise look Remote contributes the "Session: [combo]
 [Connect]" toolbar view, the Sessions panel is a Name/Host/Port tree over Properties, Tunnels a Type/Local/Remote/Via
 table, SFTP's tools read Hidden files and Upload over a Modified column (disconnected: Choose Session… over "Not
-Connected"), Transfers a bottom panel shown by ⌘⌥3, and the panels start Sessions and Tunnels right, SFTP and File
+Connected"), Transfers a bottom panel shown by Cmd+Option+3, and the panels start Sessions and Tunnels right, SFTP and File
 Servers left; File Server's panel is a Folder/Address/Status table over Properties and New File Server lists keys as a
 table; Add Host's keys read "No keys". Classic Properties (jasper-ui) follow the table point: the Workstation grid when
 titled, label-colon lines when untitled. `ClassicCompositionRenderTest` renders every surface from the staged plugins
@@ -2230,7 +2645,7 @@ re-measures `FORM_TOP` and `MIXED_ROW_GAP` against the 07 in-window sheets. The 
 `./gradlew check --continue` (after the final review's fixes): **11,308 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the
 Enterprise Workstation window against the Workstation and Dark Mode mocks (the toolbar view's combo and Connect, the
 Sessions tree's star and Properties, the Tunnels and File Servers tables' activation and context menus, the SFTP row,
-the Transfers panel and ⌘⌥3, the default slots on a fresh Enterprise start), Add Host and New File Server. Not merged,
+the Transfers panel and Cmd+Option+3, the default slots on a fresh Enterprise start), Add Host and New File Server. Not merged,
 not pushed. Merged with main (plans 8b and 9b) as `567ac7b2e` (textual conflicts only in STATUS.md and
 migration.csv; no classic value changed on both sides, so the role enum and both role tables keep 8b's
 `RUN_WINDOW_HOME_SIDE`, `RUN_WINDOW_HOME_BOTTOM` and `RUN_WINDOW_BUTTON_PADDING` and 9b's Keymap, keycap and list roles
@@ -2404,7 +2819,7 @@ before, and the headless gallery's files for Slate Cobalt Dark and Light (322) a
 selected result's title and tag take the text-aware face (Plex has no ⌘): the Enterprise print's selected row reads ⌘T.
 Under ruled cells the open Run window's "▶ Run…" paints `surface.header.active` (the 06 mocks' #D9DFEA; Dark #3D4658), not
 spec 10.6's `surface.control.selected`, which slash segments keep (orchestrator ruling, mock wins; `WindowPairs.ACTIVE_RUN`). GUI checks for the user (spec 16.2): with Enterprise on, open the Run
-window with ⇧⌘P, "▶ Run…" and Search everywhere; drag it by its title, drop it near its home and below it (it
+window with Cmd+Shift+P, "▶ Run…" and Search everywhere; drag it by its title, drop it near its home and below it (it
 re-attaches) and elsewhere (it stays, and a new window opens it there); double-click its title; click a terminal pane
 and type (the pane takes the keys, the window stays); click the Run window's title row or help text and type (the keys go to
 the Open field); switch tabs and focus another application (it stays); Escape in
@@ -2640,6 +3055,15 @@ are the Enterprise icon from the splash on; in a packaged Enterprise build, the 
 a `--background` resident opens its first window and after Quit then reopen; no splash with `--background` (the resident's later windows still carry the icon), `--no-window` or
 `--safe-mode`; a start that fails after the splash opened leaves no splash behind; the default look shows no splash and
 Jasper's icon. Not merged, not pushed.
+
+2026-10-19 splash flicker fix: each step is completed in an offscreen image at the window graphics' actual X/Y
+scale and copied once, retaining fractional HiDPI resolution, origin and clipping. Merging with local `main` on
+2026-10-20 kept the boot splash's `SplashBuffer` (the boot-splash entry above), which also draws off screen at the device
+scale and copies only the step's line and the bar; `SplashPainter.frame` went, and `SplashFrameTest` now checks
+`SplashBuffer` on an offset, clipped target at the same seven scales. All 23 splash tests pass;
+independent review found no actionable issues. Serial `./gradlew check --continue`: Java XML **11,454 tests, 0 failures, 0 errors, 26 skipped**;
+only the previously documented `checkThemeTool.test_deeply_nested_input_is_a_message` assertion fails.
+Native Windows/Linux startup acceptance remains user-run.
 
 **Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-17** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `4b373d85b..45616955d`, then this documentation commit and the final review's fixes;
@@ -2901,7 +3325,7 @@ every `finally { themes.close(); EnterpriseLook.restoreDefault(); }`. At the mer
 with plan 5b, `EnterpriseLook` takes the shipped kit, faces and theme, `enterprise-fixture.json` goes, and
 `EnterpriseMenuRowMockTest` runs again under Plex. `./gradlew check --continue` after the final review fixes: **10,809 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user (spec 16.2), which wait for plan 5b's Enterprise
 or run now under a development plugin whose kit says `title_bar = "native"`, `menu_bar = "window"`, `motion = "none"`
-(`--plugin-dir`): the macOS in-window menu bar and native title (⌘W in a plugin window, its classic File row, About in
+(`--plugin-dir`): the macOS in-window menu bar and native title (Cmd+W in a plugin window, its classic File row, About in
 Help), Windows and Linux NATIVE and what the Windows caption shows under a dark theme (Rulings 32), Compact keeping the
 menu row, nothing moving with animations on. Not pushed.
 Merged with main (plans 4b and 8a) as `bff0edae2`: the `Role` enum, `compact-roles.tsv` and `classic-roles.tsv` take
@@ -3571,7 +3995,7 @@ first failed in the app: the folder loads off the EDT, so the list was hidden wh
 focused Refresh (ring shown, cause ACTIVATION). The dialog's traversal policy now has no initial component, and the
 chooser focuses the list when it appears (the search field for an empty or unreadable folder) unless the user
 focused something meanwhile; GUI check pending. Hidden items (user's ask, both browsers): the chooser's tools row
-has a **Show hidden items** toggle (the saved choice Cmd/Ctrl+Shift+. already toggled); the SFTP browser (and the Copy
+has a **Show hidden items** toggle (the saved choice Cmd+Shift+. / Ctrl+Shift+. already toggled); the SFTP browser (and the Copy
 to host picker) gains the choice, off by default, remembered as `sftp_show_hidden` in Remote's `panel-state.toml`,
 filtered in `DirectoryCache` so pages and counts stay right. New kit glyph `hidden`; SDK 0.17.1 (the testkit mirrors
 it). Then the active-tab line (user's ask): new format roles `tab.indicator` (focused window) and
@@ -3678,7 +4102,7 @@ when the command is installed; a dangling `jasper` link counts as Jasper's own o
 `Resources/bin/jasper` or `lib/bin/jasper`, any other asking first; `jasper editor` also completes when a tab closes
 while its file is still loading; from the final review, the cold start on Linux runs from the home folder without the caller's `GIT_*` variables and on Windows with the user's default environment, the client refuses a request over 1 MiB (exit 2), a plugin that stops ends its calls in flight (exit 1), and connections that end before the first call never make a `--no-window` Jasper quit. Known limits: a relative `JASPER_HOME` resolves against the home folder in a cold start; a shell that outlives its Jasper's `commands-<pid>` socket (tmux) waits on that dead socket. `./gradlew check --continue`: **9,928 tests, 0 failures, 0 errors, 12 skipped**; after merging `main`:
 **10,108 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI checks for the user: in a dev run's
-shell, `jasper-app/build/cli/bin/jasper editor --wait notes.txt` and Ctrl-C; on the packaged macOS app, Install (the
+shell, `jasper-app/build/cli/bin/jasper editor --wait notes.txt` and Ctrl+C; on the packaged macOS app, Install (the
 administrator prompt), then from iTerm `jasper editor --wait notes.txt`, `git config --global core.editor "jasper editor
 --wait"` and `git commit`, with Jasper resident, not resident and not running, `jasper` alone, and `jasper --help`; on
 Windows, Install, a new terminal, and `jasper editor --wait` bringing Jasper to the front; on Windows and Linux,
@@ -3841,7 +4265,7 @@ Rebased onto `main` (f8bd2c41) and merged to local `main` (not pushed). `./gradl
 **9,795 tests**, whose only failure was the `SftpChooseSessionTest` flake that `main`'s c6523372 then fixed; after
 rebasing onto that fix, `:jasper-plugin-remote:check` passes (0 failures, 8 skipped overall). An independent review found one Important issue (the
 last panel restored in Zen was saved as hidden until the next dock change), fixed with a regression test, and doc nits,
-fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Alt+1 and View › Tool Windows show a panel with no rail
+fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Option+1 / Alt+1 and View › Tool Windows show a panel with no rail
 (frame corners and insets as with View › Rail hidden); a divider drag in Zen; leaving Zen restores the earlier layout;
 quitting and relaunching in Zen; the new commands from the palette; Add and Connect in the Add Host form; one rail
 hidden (the borderless, square side), the placeholder over the terminal's edge while dragging to an empty side, and a
@@ -3849,8 +4273,9 @@ drop there showing the rail. Not pushed.
 
 **Enter's verb in the palette hint bar — 2026-10-13** (`claude/palette-enter-hint`, worktree
 `.claude/worktrees/palette-enter-hint`; bounded change, design approved in chat, no spec or plan). In a scope with two or
-three verbs the hint bar now lists every verb with its key, Enter's first ("Copy password ⏎ · Copy username ⌘⏎ · Open
-in Vault ⇧⏎"), so the Vault's password copy shows a key; a click on Enter's link runs the first verb. Single-verb scopes
+three verbs the hint bar now lists every verb with its key, Enter's first ("Copy password Enter · Copy username
+Cmd+Enter · Open in Vault Shift+Enter" on macOS, Ctrl+Enter elsewhere, the keys drawn as symbols on macOS), so the
+Vault's password copy shows a key; a click on Enter's link runs the first verb. Single-verb scopes
 (Commands) still show only the row's detail. This replaces the search-everywhere spec's secondary-verbs-only hint bar
 (user decision). A test pins that the longest bundled set (Files: Open, Copy path, Open terminal here) stays on one line
 at the 560 px anchored minimum on macOS and elsewhere. `./gradlew check --continue`: **9,776 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched.
@@ -4013,7 +4438,7 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
 
 **Task9b and fix1 independently approved through `f4b9d4ee`.** Scoped re-review found I1/I2/I3/M1 addressed and no new findings. Physical recorder/popup/focus/appearance and all source/pixel acceptance remain open. The older9b handoff below is historical implementation evidence, superseded for review status by this approval.
 
-**Historical Task9b fix round1 handoff (now independently approved through f4b9d4ee; native/pixel acceptance pending).** Ordinary Keymap recording passes bare Tab/Shift-Tab and owned auxiliary-button Space to Swing while search/literal modes preserve all-key capture. Popup presses retain independent physical ownership through dismissal/selection tails and clear on owner teardown. Tree-detail updates preflight registered artwork throughout the full descriptor, including lazy rows/menus, before touching retained controls. The focused same-ID rejection regression preserves the original action, component, document, selection and focus, then accepts a valid update. M1 adds only the missing artwork parameter documentation. Exact causal tests, failed headless harness attempts, frozen gate/capture evidence and final outcome are recorded in scratch `.superpowers/sdd/2026-10-04-theme-engine-3-surface-refactor/task-9b-fix1-report.md`. The traversal fixture uses AWT container-order enumeration with Swing eligibility and supplies OS focus transfer; it is not native LayoutFocusTraversalPolicy/keyboard proof. Independent scoped re-review is approved; all native/pixel acceptance remains open. EarlyTask10 ordering and all carried visual debt remain unchanged; no SDK/API expansion, GUI, AOT, push or merge.
+**Historical Task9b fix round1 handoff (now independently approved through f4b9d4ee; native/pixel acceptance pending).** Ordinary Keymap recording passes bare Tab/Shift+Tab and owned auxiliary-button Space to Swing while search/literal modes preserve all-key capture. Popup presses retain independent physical ownership through dismissal/selection tails and clear on owner teardown. Tree-detail updates preflight registered artwork throughout the full descriptor, including lazy rows/menus, before touching retained controls. The focused same-ID rejection regression preserves the original action, component, document, selection and focus, then accepts a valid update. M1 adds only the missing artwork parameter documentation. Exact causal tests, failed headless harness attempts, frozen gate/capture evidence and final outcome are recorded in scratch `.superpowers/sdd/2026-10-04-theme-engine-3-surface-refactor/task-9b-fix1-report.md`. The traversal fixture uses AWT container-order enumeration with Swing eligibility and supplies OS focus transfer; it is not native LayoutFocusTraversalPolicy/keyboard proof. Independent scoped re-review is approved; all native/pixel acceptance remains open. EarlyTask10 ordering and all carried visual debt remain unchanged; no SDK/API expansion, GUI, AOT, push or merge.
 
 **Historical Task9b implementation handoff (review superseded by approved fix1; native/pixel acceptance pending).** Task9a and fix1 are independently approved through `6409ace0`. Actual Keymap now owns one inline tree detail, shared keycaps/input-like recorder, embedded search Record and native read-only input, while retaining staged Apply, conflict consent and physical-event ownership. Actual Plugins rows/identity header, Settings Tools navigation and notification owner headings receive declared immutable SVG/PNG through one safe engine decoder. Runtime prepares shared values on its management worker; failed decorative art falls back generically. Shared identity geometry, receiving sampling, constrained keycaps/actions and split separator preserve owner state and raw/custom artwork contracts. The exact contracts, evidence and retained source differences are recorded in the Settings amendment, calibration ledger and scratch `task-9b-report.md`; final gate outcomes live in that report. No native or pixel acceptance is claimed. After independent9b approval, the bounded original-art foundation portion of existing Task10 runs **before9c/6–8**, including the carried declared identity-hue contract; remaining Task10 integration and Task11 typography/native work stay open. No Task10 catalog, routing or manifest-key change is included here. Zero pages accepted; locked-desktop physical recorder/popup/focus/appearance checks remain controller-owned.
 
@@ -4042,7 +4467,7 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
 - **Plan3 Task2b implementation independently approved through `02eb78e4`; visual completion remains open (2026-10-10).** Grouped Add Host uses the real Vault-owned DEFAULT28 picker, preserves single-clear versus managed-key append intent and ordered UUID selection, and reflects actual validation/persistence busy/error. Shared Form submission policy preserves older defaults while allowing primary appearance with Enter opt-out; TECHNICAL fields and MONO_CAPTION carry technical typography. Retained Form traversal after close is fixed, with actual staged Login/path-key Cancel and completed Import Close containment regressions. Independent review found no new actionable code defects and confirmed824 affected tests, zero failures/errors/skips. V1 keeps the measured heading/card/list/settings geometry and picker artwork corrections open; native ink and fresh teardown/keyboard verification remain required. A signed isolated Host-a bundle at this commit passed headless package verification with AOT disabled; native launch is pending because the Mac is locked. Task3 may proceed using the reviewed contracts and must recheck affected form families when shared geometry changes. No page is accepted.
 - **Task2a status supersedes historical bullets below:** cf8e163c fix1 independently approved; I1–I4 addressed. Controller observed all four Login/path-key Save/Cancel transitions return to the same query and captured all six compact states. Native Cancel warnings and completed Import Close blank shell exposed the additional shared closed-focus-policy defect addressed in Task2b; fresh native verification remains required. Native/headless query/footer ink divergence and transient enlarged footer truncation remain explicit investigation items, without a font-policy workaround.
 
-## Current state — 2026-10-10
+### Theme engine status — 2026-10-10
 
 - **Theme engine Plan2 independently approved through `0b367eee`; Plan3 Task1 implementation approved through `83d2435c`.** Original migration review findings are closed. Task1's I1 annotation projection, I2 strength spacing, I3 enlarged warning and inherited C1 font scaling fixes passed scoped independent re-review with no new breakage. UI446/app31/SDK64/testkit135/Vault160 pass, zero failures/errors, one existing Keychain skip. These are scoped counts; last full migration gate was9,658 tests, zero failures/errors, six skips.
 - **Fixed-head native E checks passed.** Actual Create default800×896 and system20 1200×1350 show the full warning; same-size Serif refresh and physical keyboard focus/drafts survive font changes/reset. Actual standalone Unlock760×568 and wrong-password760×648 preserve visible error, clear/focus/readiness and successful recovery. Synthetic Vault header confirms unbound; config restored and isolated QA quit. Full original frames/AX/hashes/equal-scale ICC overlays remain in Plan3 SDD native E evidence. **No page is pixel-accepted:** font ink/baseline, palette/disabled-opacity and native chrome residuals remain, alongside all other pages. Fixture cleanup warning M1 remains Task11 hygiene.
@@ -4801,7 +5226,7 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
   verifyUiDistribution confirm the application engine jar and isolate all seven plugin runtimes.
   Task 14 initial headless repository verification and audit completed before review: fresh `./gradlew check --rerun-tasks` passed in **5m 6s**, **99/99 tasks executed**.
   Across **681 XML files**: **9,043 tests, 9,037 passed, 0 failures, 0 errors, 6 skipped**; per-module
-  counts in [UI maintenance](ui-maintenance.md). All five architecture gates and UI/SDK doclint passed.
+  counts in [UI maintenance at `ef03625b4`](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/ui-maintenance.md#combined-final-review-fix-verification). All five architecture gates and UI/SDK doclint passed.
   All 26 module/SDK nodes have real renderer/exhaustive host branches; eight events and 14 node enum
   vocabularies match. The two unreachable unsupported-renderer defaults are removed, making creation
   and validation compile-time exhaustive. The [exact temporary-path ledger](design/theme-engine/temporary-paths.md)
@@ -4887,7 +5312,7 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
   `git ls-files` (with `core.fsmonitor=false`, never in a home-folder work tree) or a folder walk skipping excluded
   names, capped at 200,000 files, saved under the plugin's data directory and refreshed when a pane re-enters the
   project or a command finishes there (5-minute throttle, 3 s debounce). The palette's **Files** scope (Go to File,
-  ⌘P / Ctrl+Alt+Shift+P) ranks exact, prefix, initials, substring and path matches with the current project first and
+  Cmd+P / Ctrl+Alt+Shift+P) ranks exact, prefix, initials, substring and path matches with the current project first and
   opens files in the Editor, copies paths or opens a terminal there. File › Index Folder… and the Settings page add
   folders by hand. Deviations from the spec: `data/projects.toml` instead of JSON (no JSON library is bundled); user
   guide [`docs/project-index.md`](project-index.md) instead of a plugin README; Linux/Windows Go to File is
@@ -5044,6 +5469,13 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
   `./gradlew check --continue` on main passed **8,771 tests, 0 failures, 0 errors, 6 existing skips**.
   Previews are preserved in the main checkout under `jasper-app/build/flat-tabs-preview/`.
   The managed worktree is archived after verification. No push performed.
+
+- **Editor fonts and Markdown preview** (2026-10-20; `codex/editor-markdown-preview`): written spec approved.
+  Local main `34aa868fe` merged as `c74465f5d`; the [implementation plan](superpowers/plans/2026-10-20-editor-fonts-markdown-preview.md)
+  is approved for subagent-driven implementation and per-task review; all 13 tasks implemented and independently reviewed; whole-branch review and scoped re-review passed through `59e790a6c`. Thirteen tasks cover SDK typography, independent/followed
+  fonts and source geometry, current semantic-icon toolbar, native Markdown rendering, provider-relative resources,
+  mode persistence, focus/search/navigation and linked scrolling. Refresh replaces the removed icon enums with
+  semantic names and targets SDK 0.18.3, Editor 0.11.0 and Remote 0.15.1. Headless baseline passed using Python 3.13 for the theme-tool test. Task 3 uses a uniform configured-font line box, preserves the stock gutter, and adapts physical Vim geometry; its review fixed syntax invalidation, bidi caret mapping and repeated layout costs. Task 13 measures full-limit, dense and multiple-preview fixtures and fixes native break/attribute scans, repeated preferred-size invalidation and unsliced anchor rebuilding. Warm maps now rebuild in about 1 ms for giant/dense paragraphs; exact cold source layout still takes about 1.28/2.12 s and can recur after invalidation. The vendor Java tokenizer can delay worker cancellation about 27 s. See [verification evidence and pending native acceptance](editor-verification.md#fonts-and-markdown-preview); maximum-size responsiveness is not claimed. Before review fixes, full `check` passed with Python 3.13: **11,843 tests, zero failures/errors, 29 skips** (25 existing plus four opt-in performance tests, separately passed), and `sdkRelease` passed. After final fixes, **5,115 Editor tests, zero failures/errors, four opt-in skips**, all three architecture gates, and rebuilt `packageApp`/`verifyPackage` passed. Review fixes cover scroll intent across geometry retries, Find ownership across tab/pane changes, keyboard traversal out of Preview and stale-content labeling. Merged into local main as `048b58680`; independent conflict-resolution review passed. Full merged-tree `check` passed with Python 3.13: **11,866 tests, zero failures/errors, 29 skips**, all 150 tasks executed. Native acceptance remains pending. No GUI, AOT training or push.
 
 - **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
   second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.
@@ -6063,7 +6495,7 @@ launched, no AOT training. GUI checks for the user: move and resize a window, Cm
   **7,930/0/0/6**, all architecture gates and 1,637-source hygiene pass; authored diff whitespace clean.
   Deferred minor: CoreSettings theme help still mentions runtime theme plugins; update with Plan 5 Import UI.
   No second review or desktop visual acceptance. User-only acceptance checklist:
-  [themes](themes.md#native-acceptance-for-this-upgrade-user-run). **Next: Plan 5**, the Themes page, staged preview,
+  [themes](design/theme-engine/acceptance.md). **Next: Plan 5**, the Themes page, staged preview,
   Import/Duplicate/Open/Remove UI and live file reload on the completed APIs.
 
 - **Hidden-rail terminal framing** (2026-10-01, user visually accepted): the terminal/tab column
@@ -6084,7 +6516,7 @@ s
   the final whole-branch review's five findings are fixed in `863ca6b9` and independently approved.
   All seven plugins audited: Remote/File Server/Vault/Editor
   custom renderers and rules use mounted-owner palettes; Vim error/bell styles remain plugin-owned; syntax and
-  configured yank colors stay unchanged. [Authoring audit](plugin-authoring.md#supported-custom-content) records
+  configured yank colors stay unchanged. [Authoring audit](plugin-ui.md) records
   precedence, exemptions, cleanup and progress text limitations (all three audited bundled bars draw no text).
   Recorded deviations: narrow public `setUI` stack detection plus silent UIResource default semantics; source-owned
   hierarchy observation of excluded associated headers/editors; failed mount/registry rollback and live unmounted
@@ -6203,7 +6635,7 @@ s
   tunnel on the same session holds is refused locally (MINA cancels by port on any failed request); palette verbs
   re-resolve the tunnel by id; `BundledSamplePluginTest` and `RemoteShortcutConfigTest` expectations count the new
   panel, toggle and status item; Remote is 0.10.0 because main already shipped 0.9.0. Follow-ups: Toggle Tunnels is
-  unbound (⌥⌘4 / Alt+4 would continue the approved panel series; needs the user's approval); the Tunnels panel's row
+  unbound (Cmd+Option+4 / Alt+4 would continue the approved panel series; needs the user's approval); the Tunnels panel's row
   operations are list keys, not yet Keymap panel actions like the Sessions panel's; half-close through a remote tunnel
   is untested against OpenSSH, and MINA's client cannot carry a target-first half-close (later client-to-target bytes
   are lost); stopping a remote tunnel while its port request is still in flight and restarting it at once on the same
@@ -6213,7 +6645,7 @@ s
   `./gradlew check` green after merging main (File Server FS-2): app 1471/0/1 (also after `:jasper-app:test --rerun`),
   terminal 391/0/4, Editor 4782/0/0, Remote 382/0/0, Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0,
   Sample 12/0/0, File Server 158/0/0, SDK 39/0/0, testkit 79/0/0 (7,669 tests in all, 0 failures, 6 skipped). GUI
-  checks pending with the user (`docs/remote.md`, Native acceptance for tunnels). Merged to local main 2026-10-01 (not
+  checks pending with the user ([`docs/remote.md` at `ef03625b4`](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/remote.md#tunnels), Native acceptance for tunnels). Merged to local main 2026-10-01 (not
   pushed).
 - **File Server FS-2: FTP/FTPS and TLS** (branch `claude/file-server-fs2`, plan
   `docs/superpowers/plans/2026-09-30-file-server-fs2.md`): File Server 0.2.0 serves FTP with explicit FTPS (Apache
@@ -6249,19 +6681,19 @@ s
   actions carry a context (Global, Terminal, a plugin's tabs, a panel, a window). The most specific applicable action
   takes a key; a key with no applicable action reaches the focused component (the shell, in a terminal pane), and so
   does a disabled action's key outside terminal panes. Built-ins have explicit macOS and Linux/Windows defaults; plugin
-  cmd+shift defaults get Alt outside macOS. Settings › Keymap has a Where column. Menu items show their shortcuts, but
+  `cmd+shift` defaults get Alt outside macOS. Settings › Keymap has a Where column. Menu items show their shortcuts, but
   only the root input map takes keys, so a key it declines never fires a menu item (Linux Ctrl+Shift+V in a text field
   no longer pastes into the shell). Linux Ctrl+Tab / Ctrl+Shift+Tab switch tabs before focus traversal can take them,
   from a text area, a table or a field too.
   SDK 0.11.0 (with File Server's `network.listen` and `Windows.onQuitting`): `ShortcutContext`, `ActionSpec.withContext` / `withDefaultBindings`, `FakePluginHost.actionSpec`;
   bundled plugins declare `sdk = ">=0.11.0, <0.12"`; Remote 0.9.0, Vault 0.4.0. **Moved defaults** (macOS / Linux and
-  Windows): Command Palette ⇧⌘P / Ctrl+Shift+P (was ⌘K / Ctrl+K); Clear Scrollback ⌘K, terminal only (was ⇧⌘K);
-  Close Pane ⌘W / Ctrl+Shift+W, closing the tab with its last pane (was ⇧⌘W / Ctrl+Alt+Shift+W); Close Tab ⌥⌘W /
-  Ctrl+Alt+Shift+W (was ⌘W / Ctrl+Shift+W); Rename Tab ⌘I / Ctrl+Shift+I (was F2); Reload Config unbound (was ⇧⌘R /
+  Windows): Command Palette Cmd+Shift+P / Ctrl+Shift+P (was Cmd+K / Ctrl+K); Clear Scrollback Cmd+K, terminal only (was Cmd+Shift+K);
+  Close Pane Cmd+W / Ctrl+Shift+W, closing the tab with its last pane (was Cmd+Shift+W / Ctrl+Alt+Shift+W); Close Tab Cmd+Option+W /
+  Ctrl+Alt+Shift+W (was Cmd+W / Ctrl+Shift+W); Rename Tab Cmd+I / Ctrl+Shift+I (was F2); Reload Config unbound (was Cmd+Shift+R /
   Ctrl+Alt+Shift+R); Linux Next/Previous Tab Ctrl+Tab / Ctrl+Shift+Tab (was Ctrl+Shift+] / [); Linux Quit
-  Ctrl+Alt+Shift+Q (was Ctrl+Shift+Q); SSH Sessions ⌥⌘1 / Alt+1 (was ⇧⌘S / Ctrl+Shift+S); new: SFTP ⌥⌘2 / Alt+2,
-  Transfers ⌥⌘3 / Alt+3, Open SFTP Here ⇧⌘O / Ctrl+Alt+Shift+O, Lock Vault ⇧⌘L / Ctrl+Alt+Shift+L; Open Vault
-  ⌘\ / Ctrl+Shift+\ (was F8). Deviations
+  Ctrl+Alt+Shift+Q (was Ctrl+Shift+Q); SSH Sessions Cmd+Option+1 / Alt+1 (was Cmd+Shift+S / Ctrl+Shift+S); new: SFTP Cmd+Option+2 / Alt+2,
+  Transfers Cmd+Option+3 / Alt+3, Open SFTP Here Cmd+Shift+O / Ctrl+Alt+Shift+O, Lock Vault Cmd+Shift+L / Ctrl+Alt+Shift+L; Open Vault
+  Cmd+\ / Ctrl+Shift+\ (was F8). Deviations
   (plan banner): the SDK type is `ShortcutContext` (`ActionContext` was taken); Find/Copy/Paste stay Global until K3;
   palette hiding of owned-context actions, the testkit's context invocation and DEFAULT_DROPPED, and the Keymap's
   "overrides … here" wait for K3/K4; the docs sweep is K4 (it also owns the stale F8 mentions left in
@@ -6269,16 +6701,16 @@ s
   Vault's own no-vault notice no longer names F8); menu items show accelerators but never fire them from the keyboard
   (Deviation 6); in a terminal pane a disabled action's key does nothing instead of reaching the shell, because X11 and
   Windows would deliver it as a control character, such as ^C from Ctrl+Shift+C with no selection (Deviation 9).
-  **Upgrade note:** a user `[keybindings]` entry on a stroke that is now another action's default (⌘K, ⌘I, ⇧⌘P, ⌘W,
-  ⌥⌘W, Ctrl+Tab, Ctrl+Alt+Shift+Q, …) collides, and the loader falls back to the default keybindings, as for any
+  **Upgrade note:** a user `[keybindings]` entry on a stroke that is now another action's default (Cmd+K, Cmd+I, Cmd+Shift+P, Cmd+W,
+  Cmd+Option+W, Ctrl+Tab, Ctrl+Alt+Shift+Q, …) collides, and the loader falls back to the default keybindings, as for any
   collision.
   `./gradlew check` green after merging main: app 1471/0/1, terminal 391/0/4, Editor 4782/0/0, Remote 297/0/0,
   Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, File Server 114/0/0, SDK 39/0/0,
   testkit 79/0/0. Merged into local main 2026-09-30 (not pushed). GUI checks pending with
-  the user: ⇧⌘P / Ctrl+Shift+P opens the palette; ⌘K clears in a terminal and does nothing in the SSH Sessions panel's
-  search; ⌘W closes a split pane, then the tab; on Linux Ctrl+K and F2 reach the shell, Ctrl+Tab switches tabs from a
+  the user: Cmd+Shift+P / Ctrl+Shift+P opens the palette; Cmd+K clears in a terminal and does nothing in the SSH Sessions panel's
+  search; Cmd+W closes a split pane, then the tab; on Linux Ctrl+K and F2 reach the shell, Ctrl+Tab switches tabs from a
   terminal, an Editor tab or a panel field, Ctrl+Shift+C with no selection in a terminal does nothing, and
-  Ctrl+Shift+V in a panel field pastes into the field only; ⌥⌘1 / Alt+1 toggles SSH Sessions; the Keymap shows the
+  Ctrl+Shift+V in a panel field pastes into the field only; Cmd+Option+1 / Alt+1 toggles SSH Sessions; the Keymap shows the
   Where column; menus still show each shortcut, a click still runs the item, and every menu shortcut still works from
   a terminal.
 - **File Server FS-1: foundation and HTTP** (branch `claude/file-server-fs1`, spec
@@ -6397,13 +6829,13 @@ s
   (`dev.jasper.remote.chooser.RemoteHosts`, `files.source`): each host is a root with a connected dot, clicking it
   resolves the logins (Vault prompts as usual) and browses over SFTP with links followed, and an SSH pane is located on
   its host at the shell's folder (or the login's home). Editor 0.6.0 adds `LocationResolver` /
-  `Editor.locationDocuments`; Open in Editor… (Cmd/Ctrl+O) now always shows Jasper's chooser, offering sources with a
+  `Editor.locationDocuments`; Open in Editor… (Cmd+O / Ctrl+Shift+O) now always shows Jasper's chooser, offering sources with a
   resolver and opening their files through it, starting in the active document's folder (local or remote) or where the
   focused pane is. Remote's resolver builds `RemoteDocument`s. Removed: `RemoteFilePicker`, `RemoteOpening`, File ›
   Open Remote File… and `SftpPanel.pickMode`. SDK 0.10.1: `FileLocation.Sourced.HOME`. `./gradlew check` green:
   app 1348/0/1, terminal 391/0/4, Editor 4781/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
-  Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Not merged. GUI checks pending with the user: Cmd/Ctrl+O in an SSH pane opens on that host at the shell's
-  folder; clicking a disconnected host connects (Vault prompt, Cancel, Retry); opening a remote file; Cmd/Ctrl+O from a
+  Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Not merged. GUI checks pending with the user: Cmd+O / Ctrl+Shift+O in an SSH pane opens on that host at the shell's
+  folder; clicking a disconnected host connects (Vault prompt, Cancel, Retry); opening a remote file; Cmd+O / Ctrl+Shift+O from a
   remote Editor tab starts in its folder; pinning a remote folder.
 - **File chooser plan B1: SDK file sources** (branch `claude/file-chooser-b1`, plan
   `docs/superpowers/plans/2026-09-30-file-chooser-b1.md`): SDK 0.10.0 adds `dev.jasper.sdk.files` (`FileSources`,
@@ -6419,28 +6851,28 @@ s
   `docs/superpowers/specs/2026-09-30-file-chooser-design.md`, plan `docs/superpowers/plans/2026-09-30-file-chooser-a.md`,
   executed inline 2026-09-30): every native file picker (`FileDialog`, `JFileChooser`) is replaced by Jasper's
   Explorer-style chooser (`dev.jasper.app.files`): navigation pane (Terminal folder, home, Desktop, Downloads, Pinned,
-  Recent), back/forward/up, breadcrumb path bar with typed paths (Cmd/Ctrl+L), search filter, sortable list, preview
-  pane toggle, dotfile toggle (Cmd/Ctrl+Shift+.), typed paths in the name field, Save with replace confirmation and
+  Recent), back/forward/up, breadcrumb path bar with typed paths (Cmd+L / Ctrl+L), search filter, sortable list, preview
+  pane toggle, dotfile toggle (Cmd+Shift+. / Ctrl+Shift+.), typed paths in the name field, Save with replace confirmation and
   New folder. Choosers start at the owner's focused-pane folder when the caller gives none; Open in Editor… no longer
   overrides that in a terminal pane. No SDK change (moved to plan B; deviations listed in the plan). `./gradlew check`
   green: app 1338/0/1, terminal 391/0/4, Editor 4778/0/0, Remote 306/0/0, Vault 139/0/1, Buddy 163/0/0, History
   41/0/0, Snippets 11/0/0, Sample 12/0/0, SDK 31/0/0, testkit 69/0/0. Not merged. GUI checks pending with the user:
-  Cmd/Ctrl+O from a local pane opens at its folder quickly (target about 100 ms); Save As in the Editor; Settings file
+  Cmd+O / Ctrl+Shift+O from a local pane opens at its folder quickly (target about 100 ms); Save As in the Editor; Settings file
   pickers; Install Plugin (.zip only); SFTP upload/download folder pickers; dark and light themes; long paths in the
-  path bar. Cmd/Ctrl+O in an SSH pane still shows the old remote picker until plan B.
-- **Opening remote files from Cmd/Ctrl+O and File › Open Remote File…** (branch `claude/remote-open-file`, spec
+  path bar. Cmd+O / Ctrl+Shift+O in an SSH pane still shows the old remote picker until plan B.
+- **Opening remote files from Cmd+O / Ctrl+Shift+O and File › Open Remote File…** (branch `claude/remote-open-file`, spec
   `docs/superpowers/specs/2026-09-29-remote-open-file-design.md`, plan
   `docs/superpowers/plans/2026-09-29-remote-open-file.md`, executed inline 2026-09-29): Open in Editor… asks openers
-  before the local chooser (Editor 0.5.0: `OpenRequest`, `Editor.opener`); the Editor tab's hardcoded Cmd/Ctrl+O is
+  before the local chooser (Editor 0.5.0: `OpenRequest`, `Editor.opener`); the Editor tab's hardcoded Cmd+O / Ctrl+O is
   gone, so the Keymap's binding for Open in Editor… applies in terminal panes and Editor tabs. Remote 0.7.0 answers
   for connected SSH panes and remote Editor tabs with a modal Open Remote File picker (host dropdown, navigation,
   multi-select, up to 20 files, links followed), also on File and SSH › Open Remote File… (no default shortcut); the
   SFTP panel's open-in-Editor logic moved to `EditorOpening`, shared with the picker. `./gradlew check` green: app
   1294/0/1, terminal 391/0/4, Editor 4776/0/0, Remote 299/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
   Snippets 11/0/0, Sample 12/0/0, SDK 31/0/0, testkit 69/0/0 (tests/failures/skipped). Not merged. GUI checks pending
-  with the user: Cmd/Ctrl+O in an SSH pane, a remote Editor tab and a local pane; rebinding Open in Editor… in the
+  with the user: Cmd+O / Ctrl+Shift+O in an SSH pane, a remote Editor tab and a local pane; rebinding Open in Editor… in the
   Keymap moves all three; File › Open Remote File… with and without an SSH pane focused; on Linux/Windows, the
-  Keymap's cmd+o is Ctrl+Shift+O, which now applies in Editor tabs too (their old in-tab key was Ctrl+O). Superseded by the file chooser (plan B2): the picker and Open Remote File… are gone.
+  Keymap's `cmd+o` is Ctrl+Shift+O, which now applies in Editor tabs too (their old in-tab key was Ctrl+O). Superseded by the file chooser (plan B2): the picker and Open Remote File… are gone.
 - **IntelliJ parent themes and schemes** (branch `claude/intellij-parent-themes`, bounded change approved in chat
   2026-09-29, no spec): every theme and editor scheme IntelliJ bundles at the pinned intellij-community commit is
   vendored under `themes/intellij/` (New UI `expUI/`, `islands/`, `Light.xml`), so plugin themes built on
@@ -6612,7 +7044,7 @@ s
   none) and as `WSL` rows in `>ssh`. `./gradlew check --continue` on Windows: 3479 tests, 234
   skipped, 8 failed, all on the known list in `docs/windows-startup-verification.md` (app 1187/141 skipped/2 failed,
   terminal 391/19/0, Editor 1172/13/0, Remote 278/54/6, Vault 139/7/0, Buddy 163/0/0, History 40/0/0, SDK 27/0/0,
-  SDK testkit 60/0/0, Sample 11/0/0, Snippets 11/0/0); hygiene scan clean. Native WSL acceptance (docs/remote.md items 11 to 15, also in
+  SDK testkit 60/0/0, Sample 11/0/0, Snippets 11/0/0); hygiene scan clean. Native WSL acceptance (items 11 to 15 of [docs/remote.md at `ef03625b4`](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/remote.md#native-acceptance), also in
   `docs/windows-startup-verification.md`) and the macOS/Linux check pending with the user. Deviations from the
   plan: none in code. Plan A's names matched the plan's assumptions (`ShellProfile.Kind`, `ShellProfileCatalog`,
   `OpenSpec.Local(Optional<Path>, Optional<String>)`, `JasperApplication.shellProfiles`); `knownProfile` compares
@@ -6843,7 +7275,7 @@ s
   `docs/superpowers/specs/2026-09-27-jasper-editor-vim-design.md`, 2026-09-27): a headless Vim engine in
   `dev.jasper.editor.vim` on every tab's `VimTextArea`: Normal, Insert and Replace modes, counts, motions, text
   objects, operators, registers (with `"+` and `"*`), undo in Vim's steps, and `.`. The handler rule gives Vim only
-  the keys it defines; ⌘ keys stay with the Editor. The Vim bar shows the mode, pending keys and messages. The
+  the keys it defines; Cmd keys stay with the Editor. The Vim bar shows the mode, pending keys and messages. The
   `vim` setting, the Vim status item and Toggle Vim Mode switch it (the toggle writes the settings file).
   - Fidelity: 469 corpus cases in `plugins/editor/src/test/resources/vim/corpus`, recorded from Vim 9.1 by
     `./gradlew :jasper-plugin-editor:recordVimCorpus` (not part of `check`) and replayed by `VimCorpusTest`; every
@@ -7485,7 +7917,7 @@ s
   - **Not done:** visual acceptance of Light and Dark (user-run), merge and push.
 - **Search Everywhere palette** (branch `claude/theme-engine`, plan
   `docs/superpowers/plans/2026-09-25-jasper-search-everywhere.md`):
-  - **Tabs:** All first (Cmd/Ctrl+K), then one tab per scope.
+  - **Tabs:** All first (Cmd+K / Ctrl+K), then one tab per scope.
   - **All tab:** groups each participating scope's matches, capped per scope, with a "More in…"
     row. SDK 0.8.0 adds `ScopeSpec.withInAll`; Vault opts out.
   - **Rows:** one line, with a hint bar showing the other verbs. Tab and Shift+Tab switch tabs.
@@ -7541,7 +7973,7 @@ s
   longer adds its own View items (SFTP panel, SSH Hosts), which duplicated those toggles. SDK 0.8.1
   adds `PanelSpec.toggleActionId`: a panel may name one of its plugin's already registered actions as
   its toggle, and the app then lists that action in Tools and registers no `<panel id>.toggle`.
-  Remote names its renamed actions (Toggle SSH hosts, with ⇧⌘S, and Toggle SFTP), so each panel has
+  Remote names its renamed actions (Toggle SSH hosts, with Cmd+Shift+S, and Toggle SFTP), so each panel has
   one palette entry and Tools shows the shortcuts; Remote requires `>=0.8.1`.
 - **Rail width:** `window.rail_width` is 28–64 logical pixels, default 28, clamped the same way.
   Rail buttons stay square at width − 6, separators at width − 14. View → Rail width… and the
@@ -7662,7 +8094,7 @@ The approved keyboard shortcut reference is integrated into local `main` through
 `/Users/dustin/.codex/worktrees/keyboard-shortcuts/moray`.
 **Help → Keyboard Shortcuts…** opens one reusable window with grouped app/plugin rows,
 text and exact-key capture search, effective overridden bindings, conflict explanations,
-contextual keys and live updates. [Guide and native acceptance](keyboard-shortcuts.md).
+contextual keys and live updates. [Guide and native acceptance](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/keyboard-shortcuts.md#maintenance-and-verification) (at `ef03625b4`).
 No SDK changes. Third-party private UI listeners are not discoverable, and OS-reserved
 shortcuts remain OS-controlled.
 
@@ -7927,7 +8359,7 @@ Implemented in the native worktree `/Users/dustin/.codex/worktrees/remote-7a/mor
 `codex/remote-7a`, now merged into local `main` (not pushed). The [7a plan](superpowers/plans/2026-09-22-jasper-remote-plan-7a-ssh.md)
 implements the approved [Remote design](superpowers/specs/2026-09-22-jasper-remote-design.md): saved hosts,
 config import, host-key trust, Vault/agent authentication, shared sessions, ProxyJump, hosts panel,
-editor, palette, actions and status. [Guide and native acceptance](remote.md). Tunnels (7b) and SFTP (7c) follow.
+editor, palette, actions and status. [Guide and native acceptance](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/remote.md#native-acceptance) (at `ef03625b4`). Tunnels (7b) and SFTP (7c) follow.
 
 Native inline execution, one commit per task, followed by one independent review and a tested fix commit.
 `./gradlew check :jasper-app:installDist` passed: **1,604 tests, 1,601 passed, three expected skips,
@@ -8195,7 +8627,7 @@ fills and blue default buttons. Editors align actions right and attach/release t
 button with the form lifetime. The terminal toolbar keeps its independent geometry. The dark
 secondary button text is slightly lighter (#A7AEBB instead of #A0A7B4), preserving Jasper's existing
 4.5:1 contrast guard; disabled text keeps its tested defaults. No JetBrains platform dependency,
-SDK change, credential-type addition or vault format change. [Authoring guidance](plugin-authoring.md#consistent-buttons-flexible-layouts).
+SDK change, credential-type addition or vault format change. [Authoring guidance](plugin-ui.md).
 
 `./gradlew check :jasper-app:installDist -q` passed: **1,546 tests, 1,543 passed, three expected
 skips, no failures/errors**. Independent review found two P2 issues (visible security status and
@@ -8225,7 +8657,7 @@ The resumed handoff held an uncommitted draft with only palette/status tasks. Th
 [6b plan](superpowers/plans/2026-09-22-jasper-vault-plan-6b-ui.md) now covers the palette,
 self-clearing clipboard, padlock/rail, persisted manager operations, account/key/note editors,
 master-password change, singleton manager, grant revocation and key generation with an optional
-login account. [User guide and native acceptance](credential-vault.md).
+login account. [User guide and native acceptance](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/credential-vault.md#native-acceptance) (at `ef03625b4`).
 
 **Resolved user decision:** the user chose passphrase encryption on 2026-09-22. The generator
 now accepts and confirms an optional passphrase. Nonempty values encrypt every supported algorithm
@@ -8343,7 +8775,7 @@ the service is present (`requires … optional = true`, the Vault/SSH shape). Th
 and every wiring arm (3,473 lines); `CommandsScope` moved into `palette`, `CommandHistory` into
 `commands`, `PaletteContext` lost `trivialCommands` and `PaletteTarget` lost `shellName`.
 `ConfigLoader` reports `[palette.scopes.history]` as moved. See
-[command palette](command-palette.md), [configuration](configuration.md#shell-history) and
+[command palette](command-palette.md), [configuration](history-and-snippets.md) and
 [plugin authoring](plugin-authoring.md#palette-scopes).
 
 Scope decisions, as recorded at the top of the plan:
@@ -8723,19 +9155,6 @@ tests. The two terminal documentation follow-ups (option reconstruction sites an
 plan completion markers) are addressed by the [documentation audit](documentation-audit.md). App review
 left no deferred minors.
 
-## Open acceptance work
-
-- User-run desktop behavior: window placement, physical keyboard/clipboard,
-  fonts/IME, Buddy native windows, shell exits and residency.
-- Windows native packaging and desktop acceptance.
-- Fresh native throughput/RSS measurements on the refactored code; the dated
-  [readiness measurements](terminal-readiness.md) apply only to their recorded revisions.
-- The two-week daily-use trial has not started.
-
-Use the [packaging checklist](packaging.md#native-acceptance-checklist) and
-[benchmark protocol](benchmarks.md). Agents must not launch native windows or
-benchmarks without the user's applicable authorization.
-
 ## Historical implementation notes
 
 The remainder is an archive of earlier handoffs, not a current task queue.
@@ -9003,7 +9422,7 @@ completion ordering, per-pane identity, pre-threshold titles, dismissal and long
 Unicode titles. `./gradlew check`: app 674 (673 passed, one fish skip), terminal
 320 (319 passed, one existing font skip): **994 total, 992 passed, two skipped,
 zero failures/errors**. Source hygiene and diff checks pass. Native GUI remains
-user-run. [Title behavior and tmux settings](configuration.md#automatic-tab-and-notification-titles).
+user-run. [Title behavior and tmux settings](terminal.md#titles).
 
 **Buddy notification reference correction (2026-09-17):** On
 `claude/command-notifications` in `.claude/worktrees/practical-shamir-1252c5`, the
@@ -9227,8 +9646,8 @@ fish skip; jasper-terminal 316 tests, 315 passed and one existing font skip.
 Total 839 tests, 837 passed, two skipped, zero failures/errors; after merging
 `main`, which had brought in the palette input-row anchor and its three tests,
 842 tests, 840 passed, two skipped, zero failures. [Configuration
-guide](configuration.md#shell-history), [palette
-guide](command-palette.md#shell-history), [design
+guide](history-and-snippets.md), [palette
+guide](history-and-snippets.md#searching-history), [design
 spec](superpowers/specs/2026-09-16-jasper-history-ranking-design.md),
 [plan](superpowers/plans/2026-09-16-jasper-history-ranking.md). Still user-run:
 the History palette inside tmux on the real desktop, confirming a just-run
@@ -9414,7 +9833,7 @@ placeholder for the process — and Shift+Enter is "Edit file" (creates
 From History, Shift+Enter is "Save as snippet…": a one-field name step prefilled
 with the command's first word and argument, appending to the store and, on
 success, reopening Snippets with the new row selected; a duplicate name or a
-write failure keeps the step open with an error message. Cmd+J/Ctrl+Shift+J
+write failure keeps the step open with an error message. Cmd+J / Ctrl+Shift+J
 always opens Snippets (a prior override collides with the new `snippets_palette`
 default exactly as `history_palette` does). Deviations from the plan text,
 recorded in the plan and spec status banners: scopes expose steps through
@@ -9436,7 +9855,7 @@ Task 6 extended the [headless render matrix](design/command-palette/README.md)
 with three new states — the Snippets list, the `Deploy` fill-in step and the
 History save-name step — rendered from a six-snippet fixture file (two of them
 with placeholders) written into a temporary directory, all inspected in dark and
-light. [Guide](command-palette.md#snippets),
+light. [Guide](history-and-snippets.md#using-snippets),
 [design spec](superpowers/specs/2026-09-15-jasper-snippets-design.md),
 [plan](superpowers/plans/2026-09-15-jasper-snippets.md). Fresh
 `./gradlew check --rerun-tasks`: jasper-app 464 tests passed; jasper-terminal 303
@@ -9458,7 +9877,7 @@ many").
 hard cap every scope returns: `PaletteContext` carries it to `CommandsScope` (through a
 `CommandSearch.find` limit) and `ShellHistoryScope` (which no longer holds fifty rows and
 scrolls twelve), the card sizes to exactly that many rows, and `PaletteScope.preferredRows()`
-is gone. Cmd/Ctrl+1–5 still number the first five. Tests cover parsing, the range, both
+is gone. Cmd+1–5 / Ctrl+1–5 still number the first five. Tests cover parsing, the range, both
 scopes and the live change on an open palette. History renders regenerated.
 
 **Palette scopes and shell history (2026-09-15):** On `claude/palette-scopes` in
@@ -9468,8 +9887,8 @@ scope-based: one `PaletteScope` contract with two implementations, `CommandsScop
 `ShellHistoryScope` (substring search over an application-wide `ShellHistoryIndex`
 fed by zsh/bash/fish/nushell/PowerShell history files and OSC 133 B/C live
 capture; nushell is looked up under `$XDG_CONFIG_HOME` or `~/.config` and, on macOS,
-also under `~/Library/Application Support/nushell`). Cmd+K/Ctrl+K
-always opens Commands, Cmd+R/Ctrl+Shift+R always opens History (a prior user override
+also under `~/Library/Application Support/nushell`). Cmd+K / Ctrl+K
+always opens Commands, Cmd+R / Ctrl+Shift+R always opens History (a prior user override
 already bound to that shortcut now collides with the `history_palette` default and reverts
 all keybinding overrides to defaults until the user sets `history_palette = "none"` or
 rebinds it); a scope's own shortcut dismisses it while already active, even from the
@@ -9528,7 +9947,7 @@ bracketed paste enabled. No GUI, merge or push.
 
 **Palette placement follow-up (2026-09-13):** Moved the card upward at the user's request: its center targets one-third of the way down the terminal area, retaining horizontal centering and small-window clearance clamps. The updated position assertion failed before the change; all 15 palette integration tests pass afterward. Regenerated the 24-image theme/state matrix and separate 2× UI-scale artifact; representative normal/narrow renders were inspected. This is a focused follow-up to the full verification below; native GUI checks remain user-run.
 
-**Command palette implementation (2026-09-12):** Complete and independently reviewed on `codex/command-palette-design` in `.worktrees/command-palette`, branched from main `1db31b1`; the main checkout remains unchanged. Cmd/Ctrl+K opens the centered themed palette, Cmd/Ctrl+1–5 runs numbered results, and three shared recents persist across restarts. Commands register through window-owned Swing actions without a plugin framework. All six task gates and final whole-branch/scoped review are complete through runtime fix `28a7ff0`. Final review corrected selected-result visibility after query/reorder changes in short scrolled cards; two actual-viewport regressions reproduced the defect before the fix. Fresh `./gradlew check --rerun-tasks` executed all eight tasks: 661 tests, 660 passed, one existing font skip, zero failures/errors. Actual purple/classic/light renders and separate 2× UI scaling were inspected; matching-only medians were 18.3–93.9 µs over 1,000 indexed commands. Branch-wide diff checks and source hygiene passed after temporary-report cleanup. [Guide and extension example](command-palette.md), [visuals, measurements and review record](design/command-palette/README.md), [plan](superpowers/plans/2026-09-12-jasper-command-palette.md), [native acceptance checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md). Native focus, IME, accessibility, Windows desktop and real restart acceptance remain user-run. No GUI, packaging, merge or push.
+**Command palette implementation (2026-09-12):** Complete and independently reviewed on `codex/command-palette-design` in `.worktrees/command-palette`, branched from main `1db31b1`; the main checkout remains unchanged. Cmd+K / Ctrl+K opens the centered themed palette, Cmd+1–5 / Ctrl+1–5 runs numbered results, and three shared recents persist across restarts. Commands register through window-owned Swing actions without a plugin framework. All six task gates and final whole-branch/scoped review are complete through runtime fix `28a7ff0`. Final review corrected selected-result visibility after query/reorder changes in short scrolled cards; two actual-viewport regressions reproduced the defect before the fix. Fresh `./gradlew check --rerun-tasks` executed all eight tasks: 661 tests, 660 passed, one existing font skip, zero failures/errors. Actual purple/classic/light renders and separate 2× UI scaling were inspected; matching-only medians were 18.3–93.9 µs over 1,000 indexed commands. Branch-wide diff checks and source hygiene passed after temporary-report cleanup. [Guide and extension example](command-palette.md), [visuals, measurements and review record](design/command-palette/README.md), [plan](superpowers/plans/2026-09-12-jasper-command-palette.md), [native acceptance checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md). Native focus, IME, accessibility, Windows desktop and real restart acceptance remain user-run. No GUI, packaging, merge or push.
 
 **Default purple theme (2026-09-12):** `jasper-dark-purple` now supplies the default app chrome and terminal colors, including the dark half of Follow System. Explicit `jasper-dark` remains classic; `jasper-light` is unchanged. Custom files keep their existing fixed classic palette inheritance. Source defaults, generated config template, root example and documentation are updated. `./gradlew check` executed both modules: 585 tests, 584 passed and one existing font skip. Actual purple/classic/light Swing + ANSI previews were rendered headlessly and inspected; independent review found no actionable issues. The Mac app/DMG was rebuilt and package verification passed with the official Eclipse icon. The user has approved merging the completed icon/theme work into `main` and publishing it to `origin`. No live settings, GUI or installation changes were performed. Historical palette/render folder `design/jasper-dark-purple/` is not present in this checkout.
 
@@ -9556,7 +9975,20 @@ The following dated milestone notes describe earlier verification; the readiness
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-jasper-phase-1-terminal-design.md) for binding product requirements. Normal GUI acceptance is user-run. The user explicitly authorized controlled readiness benchmarks; game/VM prerequisites were checked before every run.
 
-## Plan 4c implementation — custom themes and system appearance
+### Open acceptance work — 2026-09-21
+
+- User-run desktop behavior: window placement, physical keyboard/clipboard,
+  fonts/IME, Buddy native windows, shell exits and residency.
+- Windows native packaging and desktop acceptance.
+- Fresh native throughput/RSS measurements on the refactored code; the dated
+  [readiness measurements](terminal-readiness.md) apply only to their recorded revisions.
+- The two-week daily-use trial has not started.
+
+Use the [packaging checklist](packaging.md#native-acceptance-checklist) and
+[benchmark protocol](benchmarks.md). Agents must not launch native windows or
+benchmarks without the user's applicable authorization.
+
+### Plan 4c implementation — custom themes and system appearance
 
 Implemented on `codex/plan-4c-themes` and integrated locally on main after user approval. The completed feature worktree and branch are being cleaned up after successful merged verification. All four task reviews passed; whole-branch review findings were resolved in `3c3af48`, and scoped re-review approved with no new findings. See [design](superpowers/specs/2026-09-12-jasper-plan-4c-themes-design.md), [implementation plan](superpowers/plans/2026-09-12-jasper-plan-4c-themes.md), [configuration](configuration.md), [headless comparison](design/plan-4c-themes/comparison.md) and [native checklist](superpowers/plans/2026-09-12-jasper-plan-4c-manual-check.md). The main checkout was clean at integration; the updated example is now available at the repository root.
 
@@ -9566,7 +9998,7 @@ Task 4 deviations: remember latest OS reading outside the committed reducer so f
 
 Fresh `./gradlew check --rerun-tasks` passed with all eight tasks executed: 502 tests, 501 passed, one known `FontSetTest.fallsBackWhenPrimaryCannotDisplay()` skip, zero failures/errors. Both modules passed source hygiene (152 Java files) and `git diff --check` passed. Native detector/GUI/physical screens/benchmark remain unrun; all native checklist items are unchecked. Logging/launcher cleanup and packaging remain pending. Final review correction `3c3af48` makes explicit Reload retry unchanged desired theme state through the existing delivery guards, makes service-test timestamps deterministic, and adds the combined malformed-main-config/theme-poll regression. Both actual OS and saved-config failure paths recover through the real Reload action. Root final verification ran all eight tasks in 13 seconds: 506 tests, 505 passed, one known font skip, zero failures/errors; scoped re-review approved all three findings. No review findings remain open.
 
-## 1. Goal and delivery phases
+### 1. Goal and delivery phases
 
 Jasper is a Java Swing terminal workstation with a MobaXterm-style layout, built to replace `~/projects/conch` as the daily terminal. Product phases: terminal → SSH session management → credential vault → SFTP → tunnels → plugins and editor. Reuse tested non-UI Java from `~/projects/termlab-bundle` in later phases. Do not redesign the terminal foundation before the Phase 1 switch-over test.
 
@@ -9590,7 +10022,7 @@ Plan 3.5 was developed on `codex/plan-3-5-chrome-themes` and merged locally. Tha
 
 Previous milestone: [Plan 3.5 — macOS chrome, themes and toolbar](superpowers/plans/2026-09-11-jasper-plan-3-5-chrome-and-themes.md). The user has tried Plan 3 during development and reports that it looks good overall; this is qualitative feedback, not a claim that every native checklist item or benchmark was completed.
 
-## 2. Implemented behavior
+### 2. Implemented behavior
 
 The existing terminal retains ligatures, fallback fonts, wide characters, colors, cursor modes, Option input, mouse reporting, scrollback, selection, clipboard, bracketed paste, prompt jumps, OSC integration and clickable links.
 
@@ -9624,7 +10056,7 @@ The screenshot revision now supplies:
 - A 30px status bar that shares the terminal background, live shell/path/grid metadata and running dot; the current 4px terminal padding supersedes the old 24px mock geometry, and the app default/reset font size remains 16.
 - Measured dark surface and visible ANSI accent colors, with equivalent light geometry. Actual headless previews: [dark](design/mock-ui-dark.png), [light](design/mock-ui-light.png). Reproduce with `./gradlew :jasper-app:mockUiPreview`.
 
-## 3. Fixes included during Plan 3
+### 3. Fixes included during Plan 3
 
 - `openingLink` capture clears on new press and focus loss; a missed release cannot swallow a later gesture.
 - Alternate-screen transitions invalidate selections, matches, pending find and viewport row references.
@@ -9640,7 +10072,7 @@ The screenshot revision now supplies:
 - Global shortcuts are installed on the root pane, with native text-field editing retained.
 - F13–F24 override parsing uses Java's separate high-function-key range; actual F13/F24 strokes are regression-tested.
 
-## 4. Verification still required
+### 4. Verification still required
 
 1. User-run [compact tab/motion checklist](superpowers/plans/2026-09-11-jasper-tab-motion-manual-check.md), then [screenshot UI checklist](superpowers/plans/2026-09-11-jasper-mock-ui-manual-check.md): native controls, title-tab hit testing, dragging/double-click, fullscreen, scaling and exact visual comparison in real windows. The earlier Plan 3.5 appearance checklist is superseded by this reference. Also retain the [Plan 3 acceptance checklist](superpowers/plans/2026-09-11-jasper-plan-3-manual-check.md): native windows/menu/Quit, split/zoom/focus/dividers, tab gestures, find, clipboard, links, mouse reporting, directory inheritance and chrome readability. Headless tests do not establish these native visual results.
 2. Packaged readiness benchmarking is recorded in the [measurement report](benchmarks/2026-09-12-terminal-readiness.md). Final runtime `8d84e7d` passed three full throughput runs at 36.91–37.28 MB/s. The 35 MB/s floor passes; 45 MB/s target remains unmet. These controlled fixtures do not replace normal native acceptance.
@@ -9649,7 +10081,7 @@ The screenshot revision now supplies:
 
 Known skip: `FontSetTest.fallsBackWhenPrimaryCannotDisplay` skips on this Mac because its probe finds no differentiating glyph. Nerd Font-specific fallback tests run with a suitable installed font and skip on systems lacking it.
 
-## 5. Remaining terminal hardening
+### 5. Remaining terminal hardening
 
 The integrated readiness work resolves the carried-over gesture ownership, bounded logical-line traversal, idle frame/blink work, pure mouse-report snapshots, visible search scanning, EDT browser dispatch, multi-notch wheel and selection integrity findings. See the [handoff](terminal-readiness.md) for evidence. Remaining limitations:
 
@@ -9660,7 +10092,7 @@ The integrated readiness work resolves the carried-over gesture ownership, bound
 
 Readiness added astral/edge/overlapping search, bounded wrapped continuation, button ownership and multi-notch regressions. Retained coverage opportunities include large-history indicator geometry, empty-scrollback viewport, copy-on-select, alternate-screen wheel/arrows, paste-to-live, Shift+PageDown and match colors. Add behavioral regressions when working in these areas, not tests that mirror source constants.
 
-## 6. Native acceptance and remaining Plan 4 work
+### 6. Native acceptance and remaining Plan 4 work
 
 The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance remains open; the user approved integration and starting Plan 4. The integrated UI baseline runs from `/Users/dustin/projects/moray` with `./gradlew :jasper-app:run`. That checkout now includes Plan 4a live reload and Plan 4b full terminal configuration. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
 
@@ -9668,20 +10100,20 @@ Plans 4a–4d supply saved settings, full terminal configuration, custom themes/
 
 Remaining opportunities: logical-pixel font-cell rounding, cosmetic ShellIntegrationFilter hold-limit prefix counting, and deeper retention/dependency/font-cache profiling if real usage warrants it. No speculative heap or backend change is part of this slice. Three-platform CI passed; normal native acceptance remains necessary before the two-week trial.
 
-## 7. Decisions and implementation deviations
+### 7. Decisions and implementation deviations
 
 - Keep JediTerm, own renderer, two one-way modules, no emulator abstraction/plugin API.
 - Option+Left/Right remains ESC[1;3D / ESC[1;3C, not ESC b / ESC f.
 - OSC8 schemes remain http/https/ftp/mailto; detected text may include file URLs. Refused OSC8 targets do not fall through to text detection.
-- macOS Command-click links takes precedence over program mouse reports; Shift provides local mouse behavior; horizontal Shift-wheel on macOS is ignored.
+- macOS Cmd-click links takes precedence over program mouse reports; Shift provides local mouse behavior; horizontal Shift-wheel on macOS is ignored.
 - The user's approved Phase 1 direction and Plan 3 go-ahead were used for execution; a supplemental written design records concrete app contracts.
-- On Linux/Windows, cmd already means Ctrl+Shift. Defaults explicitly written cmd+shift add Alt to avoid collisions; user overrides parse literally and collisions are errors. macOS defaults are unchanged.
+- On Linux/Windows, `cmd` already means Ctrl+Shift. Defaults explicitly written `cmd+shift` add Alt to avoid collisions; user overrides parse literally and collisions are errors. macOS defaults are unchanged.
 - Settings/reload and saved configuration were deferred from Plan 3 to Plan 4a and are now implemented. Plan 3.5 supplied coordinated built-in themes and macOS title-bar work; automatic system appearance remains a later Plan 4 deliverable.
 - Four direct multi-pane carryovers were included; the remaining hardening list above is follow-up scope.
 - Native acceptance is user-run per newly merged AGENTS.md. No agent GUI launch or benchmark followed discovery of that rule.
 - The user selected the local `~/projects/tabler-icons` repository. Seven outline assets and full MIT license are bundled; SOURCE.txt records the source commit and theme-color adaptation.
 
-## 8. Workflow and historical Plan 3 verification
+### 8. Workflow and historical Plan 3 verification
 
 Superpowers spec/plan → task implementer with TDD → separate task review → scoped fix/re-review → final branch review. Reviewed commits: models `a75d5fa`; terminal hooks `56b251d`; lifecycle fixes `73f105c`; desktop `acfc79f`; desktop review fixes `6fac903`/`dcc0b00`; final minor fixes `dda35e2`. Task reviews and final whole-branch review approved. Final fixes synchronize appearance menu state and make the forced-close test wait for installed signal traps. A mutation check confirmed that removing force fallback makes the latter test fail; production cleanup was restored before verification.
 
@@ -9689,19 +10121,19 @@ Root final verification on `dda35e2`: all 8 Gradle tasks executed successfully i
 
 Plan 3 was merged locally and its feature worktree/branch removed after merged checks passed (277 tests, zero failures/errors, one expected skip). Plan 3.5 is now integrated on main; continue native acceptance from `/Users/dustin/projects/moray`, retaining the daily-use gate.
 
-## 9. Execution rulings preserved from the completed Plan 3 ledger
+### 9. Execution rulings preserved from the completed Plan 3 ledger
 
 These are historical Plan 3 scope decisions. The user's subsequent Plan 3.5 amendment above changes the sequencing of built-in theme work.
 
 - The existing approved Phase 1 design plus the user's Plan 3 go-ahead authorizes execution; use a supplemental execution design instead of restarting approval — avoids repeating settled layout decisions — costs rework if the detailed choices differ from user intent.
-- Non-mac defaults containing explicit cmd+shift add Alt because cmd already means Ctrl+Shift — prevents duplicate destructive shortcuts — costs non-mac shortcut familiarity; macOS unchanged.
+- Non-mac defaults containing explicit `cmd+shift` add Alt because `cmd` already means Ctrl+Shift — prevents duplicate destructive shortcuts — costs non-mac shortcut familiarity; macOS unchanged.
 - Settings/reload remain visibly disabled and status says Built-in defaults until Plan 4 — no configuration subsystem in Plan 3 — costs waiting for settings until the next planned milestone.
 - Light/dark chrome is selectable in Plan 3; automatic system appearance remains Plan 4 with config — keeps scope aligned — costs manual appearance selection temporarily.
 - Fold four immediate STATUS carryovers into Task 2 (lost link gesture, alternate-buffer invalidation, prompt pruning, child termination), retain remaining performance/selection findings for follow-up — these directly affect reliable multiple panes — costs additional Task 2 work and later hardening before Phase 1 acceptance.
 - GUI smoke and final benchmark are user-run under newly added AGENTS.md — respects desktop-operation restriction — costs leaving visual/performance acceptance pending after headless completion.
 - Keep disabled Settings/Reload tooltips user-facing, without internal Plan 4 numbers — developer instructions exclude implementation details from product flows and implementation already explains unavailable config — costs losing an internal milestone reference in tooltips, which remains in docs. Corrected ambiguous plan phrase before re-review.
 
-## 10. Plan 3.5 execution rulings
+### 10. Plan 3.5 execution rulings
 
 - The user's go-ahead authorizes implementation of the requested title/theme direction with reviewable initial colors — avoids repeated approval of the already requested milestone — costs visual rework if the initial palette differs from intent.
 - Start with slim custom title surface and separate tabs unless the pending optional layout answer changes it — limits geometry changes before toolbar discussion — costs a later layout revision if tabs should be integrated.
@@ -9716,7 +10148,7 @@ Root final verification on `f487631`: `./gradlew check --rerun-tasks` ran all ei
 
 The user selected local integration. The completed feature worktree and branch are cleaned up after merged verification succeeds. No GUI or benchmark was launched and no remote is configured. Native title-bar/appearance checks and the terminal daily-use gate remain open.
 
-## 11. Screenshot revision execution rulings
+### 11. Screenshot revision execution rulings
 
 - Treat the supplied mock and explicit exact-match instruction as the approved visual design, superseding earlier colored-toolbar and separate-title decisions — avoids asking approval for the mock the user just selected — costs rework for any mistaken measurements.
 - Interpret the144dpi screenshot as2x and convert its monitor ICC colors to sRGB for Swing values — aligns logical sizes and displayed colors — costs refinement if the mock's intended logical scale differs.
@@ -9725,7 +10157,7 @@ The user selected local integration. The completed feature worktree and branch a
 
 Both task reviews and the final whole-branch review (`182b9fb..be39bbf`) approved without actionable findings. The screenshot-only production/test commit was `63a3325`; the follow-up below changes it. Fresh root verification and independent reviewer XML checks confirm 308 total tests, 307 passed, one known skip. This plan’s scratch workspace is removed after review; the committed plan, comparison report, previews and this handoff retain the evidence and rulings. The feature worktree remains available for user inspection and integration approval.
 
-## 12. Compact tab follow-up
+### 12. Compact tab follow-up
 
 Task 1 (`0c4ab43`) approved without findings: shared live native/Swing height, current-window numeric control, real platform shortcut/override dispatch, 80 app tests. Task 2 (`e46eaae`) implements 180ms entry/underline motion; nine deterministic real-strip tests cover intermediate/final rendered positions, retargeting, metadata continuity, overflow/resize/removal and idle/lifecycle cleanup. Fresh root full verification is recorded at the top. The updated previews show settled 38px geometry; the original 54px mock remains a historical reference. Persistence remains Plan 4.
 
@@ -9735,19 +10167,19 @@ Task 1 (`0c4ab43`) approved without findings: shared live native/Swing height, c
 
 Final whole-branch review (`182b9fb..7449ac4`) found one integration issue: the active title’s preferred width changed tab-strip allocation and prematurely settled animation. The single fix wave `20764b3` preserves motion when allocation changes leave tab coordinates valid, and adds three real MacTitleBar/JRootPane regressions. Scoped review (`7449ac4..20764b3`) marked it addressed with no new findings. Twelve motion tests now pass; root fresh final verification is 328 total, 327 passed, one known skip. Native smoothness, controls and physical keyboard-layout acceptance remain user-run. The plan scratch workspace is removed after review; committed reports, plan, source and this handoff preserve the result. At that milestone the feature remained in `.worktrees/mock-ui`; section 14 records its subsequent integration and removal.
 
-## 13. Reverse close animation
+### 13. Reverse close animation
 
 User-requested bounded follow-up `0f4cd74` reverses the existing motion for visible tab closure. The tab and shell leave the live model immediately; a disabled departing entry contracts while following tabs fill its space and the underline targets the new selection. Closing during entry uses its current width; consecutive closes have independent deadlines. Completed, hidden, reordered, cramped/overflow and disposed departing visuals are removed. Final-tab closure is not delayed.
 
 Four new real MacTitleBar/JRootPane regressions cover active/inactive closes, closing during entry, consecutive deadlines and cleanup. Initial three regressions failed against the prior behavior; the empty-owner timer regression also failed before its fix. Final covering tests:27 passed. Fresh full `./gradlew check --rerun-tasks`:332 total,331 passed, one known font skip; all eight tasks executed, no warnings. Source hygiene and diff checks pass. Independent review of `600c378..0f4cd74` approved without actionable findings; native reverse-motion acceptance remains user-run. This bounded extension updates the existing spec without a new subsystem or plan.
 
-## 14. Approved integration and Plan 4 start
+### 14. Approved integration and Plan 4 start
 
 The user explicitly approved merging all current UI work into main and beginning Plan 4 with saved settings and live reload. Main received the complete UI branch at `1bd8b49`. Fresh merged verification passed 332 tests (331 passed, one known font skip), and the completed mock-ui worktree/branch were removed. Plan 4a then started in the isolated `.worktrees/plan-4` worktree. Native UI/benchmark/daily-use acceptance remains open and is not implied by merge approval.
 
 Plan 4a covers existing live controls only: tab height, toolbar/status, font size, built-in theme and shortcut overrides. Runtime View choices remain temporary; saved defaults are in the user-edited file. Additional terminal options, custom themes, system appearance and packaging follow in separate runnable slices. TomlJ 1.1.1 is selected for precise TOML source positions.
 
-## 15. Plan 4a implementation and execution rulings
+### 15. Plan 4a implementation and execution rulings
 
 Parser/paths/CLI: `8c6fa0e`. File service/template: `e25b4c8`. Live application integration: `a18de61`. Review fixes: `9c0ae64` (all modifiers in rendered toolbar hints and removal of obsolete configuration tooltip). Task reviews are complete with no open findings. Full check after fixes executed all eight Gradle tasks: app 158 passed; terminal 235 passed and one known skip. Source hygiene and diff checks passed. No terminal-module changes were needed.
 
@@ -9764,7 +10196,7 @@ Final whole-branch review (`1bd8b49..b23ee71`) found one P2 test portability iss
 
 Merged-result verification on `05a94d4`: `./gradlew check --rerun-tasks` passed in 11 seconds, all eight tasks executed; XML confirms 394 tests, 393 passed and one known skip, zero failures/errors. The completed feature worktree is no longer the development entry point; use the main checkout.
 
-## Plan 4b recorded decisions
+### Plan 4b recorded decisions
 
 - Ruling: Treat the user's go-ahead as approval of the full Plan4b scope just presented, continuing the established spec-driven workflow without repeating approval — explicit scope and live/new-pane semantics were accepted — costs rework if detailed choices differ from intent.
 - Ruling: Extend the existing terminal options API with backward-compatible constructors and applyOptions rather than replacing views — preserves sessions and existing callers — costs maintaining compatibility overloads.
@@ -9773,7 +10205,7 @@ Merged-result verification on `05a94d4`: `./gradlew check --rerun-tasks` passed 
 - Ruling: Coalesce attached-view bells; visual defaults to a150ms15%-foreground flash, sound is explicit, and stale attachment callbacks are rejected — implements the spec bell choice without late sound/flashes or unbounded queued events — costs tuning visual strength/duration after native use and ignoring bells while detached.
 - Ruling: Anchor array validation diagnostics to the containing key’s exact position instead of TomlJ’s misleading element start — TomlJ includes preceding whitespace/comments in array-element locations, and existing diagnostics identify fields — costs locating the invalid element within the named list rather than pointing directly to its token.
 
-## Plan 4c execution rulings
+### Plan 4c execution rulings
 
 Ruling: Exclude the detector dependency’s transitive net.java.dev.jna group while retaining existing pty4j-provided JNA and JNA-platform 5.14.0 — detector metadata requested an unpublished jpms variant during Gradle test resolution; this avoids replacing the established runtime — costs revisiting the exclusion if native dependency requirements change. Implementer must include runtime dependency evidence.
 
@@ -9782,11 +10214,11 @@ Ruling: Keep the latest OS appearance reading separately from the committed effe
 Ruling: Explicit Reload publishes one accepted state through the existing revision/close guard even when its value is unchanged, while polling and Settings still suppress unchanged values — equal-state suppression prevented the promised failed-theme retry — costs one deliberate UI reapplication per user reload and avoids a second unguarded completion path.
 
 
-## Packaging verification notes
+### Packaging verification notes
 
 Task 1 was independently approved with no required fixes. Task 2 added RED/GREEN environment regressions; full `./gradlew check` passed with 508 tests, 507 passed and one known font skip. Final forced `./gradlew check :jasper-app:packageDist --rerun-tasks` passed all 13 tasks in 44 seconds: 508 tests, 507 passed, one known font skip, zero failures/errors; package and DMG checks passed. Whole-branch review fixes in `de4ec8c` were approved by scoped re-review with no open findings. [Verification, artifact checksum and execution decisions](superpowers/plans/2026-09-12-jasper-plan-4d-verification.md). One intermediate forced run observed a concurrent RIS snapshot NPE in `TerminalLiveOptionsTest` in unchanged terminal source/tests; targeted and subsequent full runs passed. The readiness branch reproduced and fixed this reset-lock race with a deterministic concurrent-reset regression, distinct from the known font skip. No claim of Windows or desktop runtime acceptance is made.
 
-## Authorized publication and Windows CI test portability
+### Authorized publication and Windows CI test portability
 
 The readiness branch was pushed after explicit user approval. Initial CI passed macOS/Linux but failed three Windows app tests. Test-only `a5f4dc1` uses the platform line separator for the exact logging fallback assertion and adds method-level Windows exclusions for two existing `/bin/sh` fixtures. Production code, package and measured runtime remain unchanged. Focused 15/15 and local full 575 passed/one known skip; `c793925` additionally fixes an off-EDT test resize race without weakening its grid/connector assertions; focused8/full575pass1skip and the confirming three-platform run passed. Details and the controller-review substitution caused by the agent service's thread limit are recorded in the [readiness handoff](terminal-readiness.md#publication-and-ci-follow-up).
 
@@ -9907,7 +10339,7 @@ Independent review and rollback re-review are complete. No GUI launch or push.
 Theme-engine Plan 1 final fix evidence (2026-10-04): stabilized headless `./gradlew check` passed
 9,063 tests (9,057 passed; zero failures/errors; six existing environment skips). Six regenerated
 gallery runs contain 49 fixtures each / 636 files total; details and exact per-module totals are in
-[UI maintenance](ui-maintenance.md) and [calibration](design/theme-engine/calibration.md).
+[UI maintenance at `ef03625b4`](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/ui-maintenance.md#combined-final-review-fix-verification) and [calibration](design/theme-engine/calibration.md).
 Task 14 verification and independent review are complete; one known Minor expression-parity gap
 is assigned to Plan 2 Task 2 before imported-theme visual acceptance. User/native acceptance remains
 pending; Plan 2 execution started 2026-10-05 and Plan 3 remains unexecuted. See the [review handoff](design/theme-engine/verification.md).

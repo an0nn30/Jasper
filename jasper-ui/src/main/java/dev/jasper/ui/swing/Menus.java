@@ -213,19 +213,21 @@ final class Menus {
                                         + (barLane >= 0 ? barLane : ThemePainting.metric(
                                                 context(), DesignMetrics.Role.MENU_ARROW_WIDTH))));
             }
+            int extent = com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), Nodes.IconSize.CONTROL));
+            var classic = menu.icon().isEmpty() ? null
+                    : Buttons.classicChrome(view, view.toolbarStrip() || main.panel && !main.documentBar, menu.icon(), extent);
             main.setIcon(
                     menu.icon().isEmpty()
                             ? null
+                            : classic != null
+                            ? classic
                             : context()
                                     .icons()
                                     .icon(
                                             menu.icon(),
                                             context().theme().semantic(),
                                             main.documentBar ? context().faces().buttons.iconRole(main, false) : main.textRole(false),
-                                            com.formdev.flatlaf.util.UIScale.scale(
-                                                    context()
-                                                            .icons()
-                                                            .size(context().metrics(), Nodes.IconSize.CONTROL))));
+                                            extent));
             main.setDisabledIcon(main.getIcon());
             main.setToolTipText(menu.tooltip().isBlank() ? null : menu.tooltip());
             main.getAccessibleContext()

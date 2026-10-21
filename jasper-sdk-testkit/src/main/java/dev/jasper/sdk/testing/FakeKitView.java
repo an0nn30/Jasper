@@ -97,10 +97,11 @@ public final class FakeKitView implements UiView {
  * @param text the text typed */
  public void type(String fieldId,String text){guard();Objects.requireNonNull(text);if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(field.readOnly()||!live(fieldId))return;emit(new UiEvent.Edited(fieldId,text));}
  private boolean live(String id){var nodes=mounted(spec.root());for(String step:path(spec.root(),id)){var state=nodes.get(step).state();if(!state.visible()||!state.enabled()||state.busy())return false;}return true;}
+ void contentFont(java.awt.Font font){for(var content:List.copyOf(contents.values()))content.component().setFont(font);}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);
   if(mounted(spec.root()).values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id())&&c.kind()==content.kind()))throw new IllegalArgumentException("No matching Custom content");
   if(contents.containsKey(content.id()))throw new IllegalArgumentException("Content already registered");
-  FakeKitContent.validate(content);if(CONTENT_OWNERS.containsKey(content.component())||content.component().getParent()!=null)throw new IllegalArgumentException("Content is already owned or mounted");CONTENT_OWNERS.put(content.component(),this);contents.put(content.id(),content);
+  FakeKitContent.validate(content);if(CONTENT_OWNERS.containsKey(content.component())||content.component().getParent()!=null)throw new IllegalArgumentException("Content is already owned or mounted");CONTENT_OWNERS.put(content.component(),this);contents.put(content.id(),content);content.component().setFont(owner.contentFont());
  }
  private void dispose(CustomContent content){
   // Claim removal before invoking plugin code; reentrant close may consume the remaining snapshot.

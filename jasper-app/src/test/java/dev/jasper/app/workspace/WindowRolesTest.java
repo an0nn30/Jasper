@@ -123,8 +123,8 @@ class WindowRolesTest {
                 window.updateActions();
                 boolean expected = window.isMain();
                 assertThat(window.action(ActionId.TOGGLE_ZEN_MODE).isEnabled()).as("Zen").isEqualTo(expected);
-                assertThat(window.windowCommands().view("view.status_bar").isEnabled()).as("Status Bar").isEqualTo(expected);
-                assertThat(window.windowCommands().view("view.rail").isEnabled()).as("Rail").isEqualTo(expected);
+                assertThat(window.action(ActionId.TOGGLE_STATUS_BAR).isEnabled()).as("Status Bar").isEqualTo(expected);
+                assertThat(window.action(ActionId.TOGGLE_RAIL).isEnabled()).as("Rail").isEqualTo(expected);
                 assertThat(window.windowCommands().view("view.toolbar.icons").isEnabled()).as("Toolbar").isEqualTo(expected);
                 assertThat(window.action(ActionId.NEW_TAB).isEnabled()).as("its own tabs").isTrue();
             }

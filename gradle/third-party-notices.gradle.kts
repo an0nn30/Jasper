@@ -1,5 +1,8 @@
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 
+@Suppress("UNCHECKED_CAST")
+val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.gradle.api.artifacts.Configuration>
+
 // Every external jar Jasper or a bundled plugin ships has a component in the third-party notices index, and every file
 // the index names exists. The index is Jasper's own format (notices.toml); ThirdPartyNotices reads it with tomlj at
 // runtime, and this check reads the few fields it needs with regular expressions, as plugin-packaging reads plugin.toml.
@@ -10,10 +13,11 @@ val verifyThirdPartyNotices = tasks.register("verifyThirdPartyNotices") {
     val index = noticesApp.file("src/main/resources/dev/jasper/app/about/licenses/notices.toml")
     inputs.file(index)
     inputs.files(rootProject.fileTree("plugins") { include("*/src/main/resources/plugin.toml", "*/src/main/resources/**/*.ttf", "*/src/main/resources/**/*.otf") })
+    val modules = listOf(noticesApp) + rootProject.subprojects.filter { it.path.startsWith(":jasper-plugin-") }
+    inputs.files(modules.map { verificationClasspaths.getValue(it.path) })
     doLast {
-        val modules = listOf(noticesApp) + rootProject.subprojects.filter { it.path.startsWith(":jasper-plugin-") }
         val shipped = modules.flatMap { module ->
-            module.configurations.getByName("runtimeClasspath").incoming.artifacts.artifacts.mapNotNull { artifact ->
+            verificationClasspaths.getValue(module.path).incoming.artifacts.artifacts.mapNotNull { artifact ->
                 (artifact.id.componentIdentifier as? ModuleComponentIdentifier)?.let { "${it.group}:${it.module}:${it.version}" }
             }
         }.toSortedSet()

@@ -13,6 +13,16 @@ import javax.swing.border.EmptyBorder;
 /** Five button treatments sharing semantics, content fitting and owned action/focus listeners. */
 final class Buttons {
     private Buttons() {}
+    /**
+     * The classic chrome art for {@code name} at {@code extent}, when {@code view} draws the classic chrome icons and
+     * {@code chrome} says the control is in a toolbar strip or a panel header; null otherwise, and for every name outside
+     * the classic set. The flag is read first, so a view without it never asks.
+     */
+    static javax.swing.Icon classicChrome(KitView view, boolean chrome, String name, int extent) {
+        if (!view.classicChromeIcons() || !chrome || !dev.jasper.ui.icons.IconRegistry.classicChromeNames().contains(name)) return null;
+        var context = view.context();
+        return context.icons().classicChromeIcon(name, extent).map(icon -> icon.icon(context.theme(), SemanticColor.TEXT_PRIMARY)).orElse(null);
+    }
     /** One fully validated host-artwork snapshot; its registry is retired only after a successful header commit. */
     static final class HostArtwork implements AutoCloseable {
         final javax.swing.Icon raw;
@@ -59,6 +69,13 @@ final class Buttons {
             button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
             button.setRolloverEnabled(true); button.setHorizontalAlignment(SwingConstants.CENTER);
             button.focus = new ThemePainting.Focus(button, button, view); own(button.focus);
+            var revealAction = new java.awt.event.FocusAdapter() {
+                @Override public void focusGained(java.awt.event.FocusEvent event) {
+                    if (SwingUtilities.getAncestorOfClass(SplitViews.ActionBarScroll.class, button) != null)
+                        button.scrollRectToVisible(new Rectangle(0, 0, button.getWidth(), button.getHeight()));
+                }
+            };
+            button.addFocusListener(revealAction); own(() -> button.removeFocusListener(revealAction));
             ActionListener listener = event -> {
                 if (interactive()) try { events.accept(new UiEvent.Action(((Nodes.Button)this.node).action())); }
                 catch (Throwable failure) { view.report(failure); }
@@ -81,14 +98,23 @@ final class Buttons {
             button.contextual = value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.embedded = embedded;
             button.toolbarStrip = view.toolbarStrip();
-            if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false), button.stripInk)); button.putClientProperty("Jasper.button.icon", null); }
+            if (hostArtwork != null) {
+                // A host action with canonical artwork sits in the panel header; a plugin path keeps its art.
+                var classic = hostArtwork.semantic == null || hostArtwork.semantic.pathData() != null ? null
+                    : classicChrome(view, true, hostArtwork.semantic.name(), ThemePainting.metric(context(), DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH));
+                button.setIcon(classic != null ? classic : hostArtwork.icon(context(), button.iconRole(false), button.stripInk));
+                button.putClientProperty("Jasper.button.icon", null);
+            }
             else {
                 int extent=UIScale.scale(button.stripInk != null ? context().metrics().value(DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH) : button.orderedAction || button.orderedCommand ? context().metrics().value(DesignMetrics.Role.ORDERED_GLYPH) : button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size(context().metrics(), value.label().isEmpty() && (embedded || button.panel || button.toolbarStrip) ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
-                button.setIcon(value.icon().isEmpty() ? null : button.stripInk != null ? context().icons().panel(value.icon(), context().theme().semantic(), button.stripInk, extent)
+                // A document bar in a panel's body also sets panel; only the header and toolbar strips take classic art.
+                var classic = value.icon().isEmpty() ? null : classicChrome(view, button.toolbarStrip || button.panel && !button.documentBar, value.icon(), extent);
+                button.setIcon(value.icon().isEmpty() ? null : classic != null ? classic : button.stripInk != null ? context().icons().panel(value.icon(), context().theme().semantic(), button.stripInk, extent)
                     : button.panel || button.panelDetail || button.panelRow
                     ? context().icons().panel(value.icon(),context().theme(),button.iconRole(false),extent)
                     : context().icons().icon(value.icon(), context().theme(), button.iconRole(false),extent));
-                button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() ? null : value.icon());
+                // Classic art is authored: it is not re-tinted on hover.
+                button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() || classic != null ? null : value.icon());
             }
             if(keycaps!=null){button.setText("");button.setIcon(new Keycaps(context(),keycaps));button.putClientProperty("Jasper.button.icon",null);}
             button.setHorizontalAlignment(button.recorder() ? SwingConstants.LEFT

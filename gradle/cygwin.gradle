@@ -1,0 +1,257 @@
+// Opt-in Windows probes; the portable evidence checks are part of headless check.
+def probeClasses = layout.buildDirectory.dir('cygwin-probes/classes')
+def probeCompiler = tasks.register('compileCygwinProbes', JavaCompile) {
+    dependsOn(tasks.named('classes'))
+    source(rootProject.fileTree('packaging/windows/cygwin/probe') { include('*.java') })
+    classpath = files(sourceSets.main.output, configurations.runtimeClasspath)
+    destinationDirectory = probeClasses
+    javaCompiler = javaToolchains.compilerFor(java.toolchain)
+}
+def verify = tasks.register('verifyCygwinProbes', JavaExec) {
+    group = 'verification'
+    dependsOn(probeCompiler)
+    classpath = files(probeClasses, configurations.runtimeClasspath)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'ProbeAssertionsTest'
+    jvmArgs('-ea', '-Djava.awt.headless=true')
+}
+tasks.named('check') { dependsOn(verify) }
+
+def probeJar = tasks.register('cygwinProbeJar', Jar) {
+    dependsOn(probeCompiler)
+    from(probeClasses)
+    archiveFileName = 'probe.jar'
+    destinationDirectory = layout.buildDirectory.dir('cygwin-probes')
+}
+['Installer', 'Terminal'].each { kind ->
+    tasks.register("probeCygwin${kind}", JavaExec) {
+        group = 'verification'
+        description = "Runs the opt-in Windows Cygwin ${kind.toLowerCase()} probe in a NEW scratch directory."
+        dependsOn(probeJar)
+        classpath = files(probeClasses, configurations.runtimeClasspath)
+        javaLauncher = javaToolchains.launcherFor(java.toolchain)
+        mainClass = kind == 'Installer' ? 'InstallerProbe' : 'ConPtyProbe'
+        jvmArgs('-ea', '-Djava.awt.headless=true', '--enable-native-access=ALL-UNNAMED')
+        doFirst {
+            if (!System.getProperty('os.name').startsWith('Windows'))
+                throw new GradleException("Cygwin ${kind.toLowerCase()} probe requires Windows")
+            String root = providers.gradleProperty('jasper.cygwinProbeRoot').orNull
+            if (!root) throw new GradleException('Set -Pjasper.cygwinProbeRoot to an absolute, nonexistent scratch directory')
+            String input = kind == 'Installer' ? probeJar.get().archiveFile.get().asFile.absolutePath :
+                providers.gradleProperty('jasper.cygwinProbePayload').orNull
+            if (!input) throw new GradleException('Set -Pjasper.cygwinProbePayload to a verified offline payload directory')
+            def probeArgs = [root, input, layout.buildDirectory.dir('cygwin-probes/reports').get().asFile.absolutePath]
+            String relay = providers.gradleProperty('jasper.cygwinProbeRelay').orNull
+            if (kind == 'Terminal' && relay) {
+                String frontend = providers.gradleProperty('jasper.cygwinProbeFrontend').orNull
+                if (!frontend) throw new GradleException('Set jasper.cygwinProbeFrontend with the relay backend')
+                probeArgs.addAll([relay, frontend])
+            }
+            setArgs(probeArgs)
+        }
+    }
+}
+
+tasks.register('verifyCygwinProbeRuntime', JavaExec) {
+    group = 'verification'
+    dependsOn(probeCompiler)
+    classpath = files(probeClasses, configurations.runtimeClasspath)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'ProbeAssertionsTest'
+    args('runtime')
+ }
+
+tasks.named('check') { dependsOn('verifyCygwinProbeRuntime') }
+
+// Experimental only: never a dependency of check, packaging or user installation.
+tasks.register('compileCygwinRelayProbe', Exec) {
+    group = 'verification'
+    description = 'Builds the experimental POSIX relay with an explicitly selected Cygwin GCC.'
+    doFirst {
+        if (!System.getProperty('os.name').startsWith('Windows')) throw new GradleException('Cygwin relay build requires Windows')
+        String compiler = providers.gradleProperty('jasper.cygwinProbeCompiler').orNull
+        if (!compiler || !new File(compiler).isAbsolute() || !file(compiler).isFile())
+            throw new GradleException('Set -Pjasper.cygwinProbeCompiler to an absolute Cygwin gcc.exe path')
+        def output = layout.buildDirectory.file('cygwin-probes/cygwin-pty-relay.exe').get().asFile
+        output.parentFile.mkdirs()
+        environment('PATH', file(compiler).parent + File.pathSeparator + System.getenv('PATH'))
+        commandLine(compiler, '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2', '-pthread',
+            rootProject.file('packaging/windows/cygwin/probe/CygwinPtyRelay.c').absolutePath, '-o', output.absolutePath)
+    }
+}
+
+tasks.register('verifyCygwinRelayProtocol', JavaExec) {
+    group = 'verification'
+    dependsOn(probeCompiler)
+    classpath = files(probeClasses, configurations.runtimeClasspath)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'RelayProtocolTest'
+    doFirst {
+        String relay = providers.gradleProperty('jasper.cygwinProbeRelay').orNull
+        String shell = providers.gradleProperty('jasper.cygwinProbeShell').orNull
+        if (relay && shell) setArgs([relay, shell])
+        else throw new GradleException('Native protocol checks require both jasper.cygwinProbeRelay and jasper.cygwinProbeShell')
+    }
+}
+
+// Run from the matching MSVC developer environment; release/user installs consume prebuilts.
+tasks.register('compileConPtyRelayProbe', Exec) {
+    group = 'verification'
+    description = 'Builds the experimental native Windows console frontend with MSVC.'
+    doFirst {
+        if (!System.getProperty('os.name').startsWith('Windows')) throw new GradleException('Console relay build requires Windows')
+        String compiler = providers.gradleProperty('jasper.cygwinProbeMsvc').orNull
+        if (!compiler || !new File(compiler).isAbsolute() || !file(compiler).isFile())
+            throw new GradleException('Set -Pjasper.cygwinProbeMsvc to an absolute cl.exe path in a configured developer environment')
+        def output = layout.buildDirectory.dir('cygwin-probes/native-frontend').get().asFile
+        output.mkdirs()
+        workingDir(output)
+        commandLine(compiler, '/nologo', '/std:c++20', '/W4', '/WX', '/EHsc', '/MT', '/O2',
+            rootProject.file('packaging/windows/cygwin/probe/ConPtyRelay.cpp').absolutePath, '/Fe:conpty-relay.exe')
+    }
+}
+
+// Shared JDK-only verification code is also compiled into the provisioning helper.
+def cygwinLibraries = configurations.create('cygwinLibraries')
+dependencies.add(cygwinLibraries.name, 'net.java.dev.jna:jna-platform:5.14.0')
+def bundleClasses = layout.buildDirectory.dir('cygwin/classes')
+def compileBundle = tasks.register('compileCygwinBundle', JavaCompile) {
+    source(rootProject.fileTree('jasper-app/src/main/java/dev/jasper/app/cygwin') { include('*.java') })
+    source(rootProject.fileTree('packaging/windows/cygwin') { include('*.java') })
+    classpath = cygwinLibraries
+    destinationDirectory = bundleClasses
+    javaCompiler = javaToolchains.compilerFor(java.toolchain)
+}
+tasks.register('verifyCygwinManifest', JavaExec) {
+    group = 'verification'
+    dependsOn(compileBundle)
+    classpath = files(bundleClasses)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'BundleManifestTest'
+}
+tasks.named('check') { dependsOn('verifyCygwinManifest') }
+
+def seedLock = rootProject.file('packaging/windows/cygwin/seed.lock.json')
+def retainedSeed = providers.gradleProperty('jasper.cygwinSnapshot').map { file(it) }
+    .orElse(layout.buildDirectory.dir('cygwin/downloads').map { it.asFile })
+def acquireSeed = tasks.register('acquireCygwinSeed', JavaExec) {
+    group = 'distribution'
+    description = 'Obtains only hash-locked seed artifacts using the JDK; no package resolution or external tools.'
+    dependsOn(compileBundle)
+    classpath = files(bundleClasses)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'BundleTool'
+    onlyIf { !providers.gradleProperty('jasper.cygwinSnapshot').isPresent() }
+    doFirst { setArgs(['acquire', seedLock.absolutePath, retainedSeed.get().absolutePath,
+        rootProject.file('packaging/windows/cygwin/seed-support').absolutePath]) }
+}
+['verify', 'stage'].each { action ->
+    tasks.register("${action}CygwinSeed", JavaExec) {
+        group = 'distribution'
+        dependsOn(compileBundle, acquireSeed)
+        classpath = files(bundleClasses)
+        javaLauncher = javaToolchains.launcherFor(java.toolchain)
+        mainClass = 'BundleTool'
+        doFirst {
+            def arguments = [action, seedLock.absolutePath, retainedSeed.get().absolutePath]
+            if (action == 'stage') arguments.add(layout.buildDirectory.dir('cygwin/seed').get().asFile.absolutePath)
+            setArgs(arguments)
+        }
+    }
+}
+tasks.register('refreshCygwinSeed', Exec) {
+    group = 'distribution'
+    description = 'Creates a new candidate snapshot from signed metadata and reviewed licenses; never modifies the committed lock.'
+    doFirst {
+        def arguments = [providers.gradleProperty('jasper.python').getOrElse('python3'), rootProject.file('packaging/windows/cygwin/seed_refresh.py').absolutePath]
+        ['mirror', 'snapshot', 'metadata', 'licenses', 'relays', 'setup-source', 'installed-bytes'].each { key ->
+            String value = providers.gradleProperty("jasper.cygwinRefresh.${key}").orNull
+            if (!value) throw new GradleException("Set -Pjasper.cygwinRefresh.${key} for explicit refresh")
+            arguments.addAll(["--${key}", value])
+        }
+        commandLine(arguments)
+    }
+}
+tasks.register('verifyCygwinLifecycle', JavaExec) {
+    group = 'verification'
+    dependsOn(compileBundle)
+    classpath = files(bundleClasses, configurations.runtimeClasspath)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'CygwinToolTest'
+}
+tasks.named('check') { dependsOn('verifyCygwinLifecycle') }
+tasks.register('verifyCygwinProvisioning', JavaExec) {
+    group = 'verification'
+    dependsOn(compileBundle)
+    classpath = files(bundleClasses, cygwinLibraries)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'CygwinProvisionerTest'
+}
+tasks.named('verifyCygwinLifecycle') { dependsOn('verifyCygwinProvisioning') }
+
+def cygwinTool = tasks.register('cygwinToolJar', Jar) {
+    dependsOn(compileBundle)
+    from(bundleClasses) { exclude('*Test*', 'BundleTool*', 'CygwinInstallerTemplate*') }
+    from({ cygwinLibraries.collect { zipTree(it) } }) { exclude('META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA', 'module-info.class') }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    archiveFileName = 'cygwin-tool.jar'
+    destinationDirectory = layout.buildDirectory.dir('cygwin')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+// Both image paths consume the same verified immutable seed and prebuilt relay bytes.
+if (System.getProperty('os.name').startsWith('Windows')) {
+    ['stagePackage', 'stageWindowsUser'].each { name ->
+        tasks.named(name) {
+            dependsOn('stageCygwinSeed', cygwinTool)
+            from(layout.buildDirectory.dir('cygwin/seed')) { into('cygwin-seed') }
+            from(cygwinTool.flatMap { it.archiveFile })
+        }
+    }
+}
+
+// Explicit native acceptance of the actual application launch adapter and bootstrap scripts.
+tasks.register('probeCygwinProduction', JavaExec) {
+    group = 'verification'
+    dependsOn(probeJar, tasks.named('classes'))
+    classpath = files(probeClasses, sourceSets.main.output, configurations.runtimeClasspath)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'ProductionLaunchProbe'
+    jvmArgs('-ea', '-Djava.awt.headless=true', '--enable-native-access=ALL-UNNAMED')
+    doFirst {
+        if (!System.getProperty('os.name').startsWith('Windows')) throw new GradleException('Production Cygwin probe requires Windows')
+        def scratch = providers.gradleProperty('jasper.cygwinProbeRoot').orNull
+        def runtime = providers.gradleProperty('jasper.cygwinProbeRuntime').orNull
+        if (!scratch || !runtime) throw new GradleException('Specify a new jasper.cygwinProbeRoot and an existing jasper.cygwinProbeRuntime')
+        def binaries = rootProject.file('packaging/windows/cygwin/relay/prebuilt')
+        systemProperty('jasper.cygwinProbeRelay', new File(binaries, 'backend.exe').absolutePath)
+        ['aarch64', 'amd64'].each { arch -> systemProperty("jasper.cygwinProbeFrontend.${arch}", new File(binaries, "frontend-${arch}.exe").absolutePath) }
+        args(scratch, runtime)
+    }
+}
+
+// Release verification is stricter than local user installation: native evidence is tied to this seed.
+tasks.register('verifyCygwinDistribution', JavaExec) {
+    group = 'verification'
+    dependsOn('stageCygwinSeed', cygwinTool)
+    classpath = files(bundleClasses)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'BundleTool'
+    doFirst {
+        String arch = System.getProperty('os.arch') in ['aarch64', 'arm64'] ? 'aarch64' : 'amd64'
+        setArgs(['distribution', seedLock.absolutePath, layout.buildDirectory.dir('cygwin/seed').get().asFile.absolutePath,
+            cygwinTool.get().archiveFile.get().asFile.absolutePath,
+            rootProject.file('packaging/windows/cygwin/validation.json').absolutePath, arch])
+    }
+}
+tasks.register('cygwinSourcesZip', Zip) {
+    group = 'distribution'
+    dependsOn('stageCygwinSeed')
+    archiveFileName = providers.provider { "Jasper-${jasperPackageVersion.get()}-cygwin-sources-${System.getProperty('os.arch')}.zip" }
+    destinationDirectory = layout.buildDirectory.dir('packaging/dist')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    from(layout.buildDirectory.dir('cygwin/seed')) {
+        include('seed.lock.json', '**/*-src.tar.*', 'notices/**', 'setup-source/**', 'relay/*.c', 'relay/*.cpp', 'relay/LICENSE.md')
+    }
+}

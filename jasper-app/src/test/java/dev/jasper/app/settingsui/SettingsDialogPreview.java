@@ -145,8 +145,10 @@ public final class SettingsDialogPreview {
         } finally {
             if (previewPlugins[0] != null) previewPlugins[0].close();
             var stopping = new CompletableFuture<List<CompletableFuture<?>>>();
+            var pluginWorkers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime[0]);
             SwingUtilities.invokeAndWait(() -> stopping.complete(runtime[0].stop()));
             CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+            pluginWorkers.await();
             SwingUtilities.invokeAndWait(windows::close);
         }
     }

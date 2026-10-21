@@ -10,5 +10,5 @@ icon_selected_ink = "foreground"
 icon = "icons/remote.svg"
 homepage = "https://github.com/an0nn30/Jasper"
 capabilities = ["terminal.open", "session.provide", "terminal.observe", "palette.contribute", "files.source"]
-requires = [{ id = "dev.jasper.vault", version = ">=0.2", optional = true }, { id = "dev.jasper.editor", version = ">=0.2", optional = true }, { id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]
+requires = [{ id = "dev.jasper.vault", version = ">=0.2", optional = true }, { id = "dev.jasper.editor", version = ">=0.2", optional = true }]
 exports = ["dev.jasper.remote.api"]

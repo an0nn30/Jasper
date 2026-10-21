@@ -56,9 +56,12 @@ class EnterpriseMenuRowMockTest {
      * @param owner the window's content, for the geometry of its parts
      * @param root the root pane it is mounted in
      * @param field the search field's bounds in the root, read before the window closed
+     * @param search the Search Everywhere button's bounds in the root (empty under the field), read before the window closed
+     * @param settings the "Settings…" button's bounds in the root, read before the window closed
      * @param firstTab the first classic tab's bounds in the root (empty under equal tabs), read before the window closed
      */
-    record Mounted(BufferedImage image, WindowContent owner, JRootPane root, Rectangle field, Rectangle firstTab) { }
+    record Mounted(BufferedImage image, WindowContent owner, JRootPane root, Rectangle field, Rectangle search, Rectangle settings,
+                   Rectangle firstTab) { }
 
     /** The Enterprise window as the mocks show its content, printed at 2× and written for inspection. EDT. */
     static BufferedImage render(boolean dark, java.util.function.Consumer<WindowContent> fixture) {
@@ -82,9 +85,14 @@ class EnterpriseMenuRowMockTest {
             // Closing the window clears its tab strip: the parts' geometry is read now (Execution notes R35).
             var field = owner.chrome().header().field();
             var fieldAt = javax.swing.SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), root);
+            var classic = (ClassicHeader) owner.chrome().composition();
+            var search = classic.searchButton();
+            var searchAt = search == null ? new Rectangle() : javax.swing.SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), root);
+            var settings = ClassicHeaderTest.labelled(classic.trailing(), "Settings…");
+            var settingsAt = javax.swing.SwingUtilities.convertRectangle(settings.getParent(), settings.getBounds(), root);
             var firstTab = owner.tabBar() instanceof ClassicTabs tabs && !tabs.entries().isEmpty()
                 ? javax.swing.SwingUtilities.convertRectangle(tabs, tabs.entries().getFirst().getBounds(), root) : new Rectangle();
-            return new Mounted(image, owner, root, fieldAt, firstTab);
+            return new Mounted(image, owner, root, fieldAt, searchAt, settingsAt, firstTab);
         } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
     }
 

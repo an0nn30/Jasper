@@ -21,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /** One file on one connection identity, edited in the Editor. Every operation queues on {@link EditChannels}. */
@@ -114,6 +115,25 @@ public final class RemoteDocument implements EditorDocument {
             catch (IllegalArgumentException malformed) { return Optional.empty(); }
         }
         return Optional.of(new ParsedKey(hops, path));
+    }
+
+    @Override public Optional<EditorDocument> resolveRelative(String relative) {
+        // Keep validation local: Remote also loads with Editors predating RelativePaths and this hook.
+        if (relative == null || relative.isEmpty() || relative.startsWith("/") || relative.indexOf('\\') >= 0
+                || relative.indexOf('?') >= 0 || relative.indexOf('#') >= 0
+                || Pattern.compile("[A-Za-z][A-Za-z0-9+.-]*:").matcher(relative).lookingAt())
+            throw new IllegalArgumentException("A decoded relative file path is required");
+        for (int offset = 0; offset < relative.length();) {
+            int codePoint = relative.codePointAt(offset);
+            if (Character.isISOControl(codePoint) || codePoint >= 0xD800 && codePoint <= 0xDFFF)
+                throw new IllegalArgumentException("A relative file path cannot contain controls or unpaired surrogates");
+            offset += Character.charCount(codePoint);
+        }
+        try {
+            return Optional.of(new RemoteDocument(identity, FilePaths.parent(path) + "/" + relative, channels, owner));
+        } catch (IOException invalid) {
+            throw new IllegalArgumentException("An absolute source path is required", invalid);
+        }
     }
 
     @Override public String key() { return key(identity, path); }

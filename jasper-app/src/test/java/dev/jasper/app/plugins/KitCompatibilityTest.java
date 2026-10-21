@@ -100,7 +100,7 @@ class KitCompatibilityTest {
         var candidate=candidate(">=0.20.0, <0.21",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$ChoiceKind","SEGMENTED")),false);
         var result=PluginResolver.resolve(List.of(candidate),Map.of(),Version.parse(JasperSdk.VERSION),false);
         assertThat(result.load()).isEmpty();
-        assertThat(result.rejected()).singleElement().satisfies(value -> assertThat(value.reason()).isEqualTo("needs SDK >=0.20.0, <0.21.0; this is SDK 0.21.0"));
+        assertThat(result.rejected()).singleElement().satisfies(value -> assertThat(value.reason()).isEqualTo("needs SDK >=0.20.0, <0.21.0; this is SDK " + JasperSdk.VERSION));
     }
     @Test void truthfulOldRangeIsRejectedByPureResolver() throws Exception {
         var candidate=candidate(">=0.14, <0.15",Map.of(),false);

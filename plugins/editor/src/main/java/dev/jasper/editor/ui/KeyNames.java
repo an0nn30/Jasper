@@ -22,6 +22,17 @@ public final class KeyNames {
     public static KeyStroke stroke(int keyCode, int extraModifiers) { return KeyStroke.getKeyStroke(keyCode, MENU | extraModifiers); }
 
     /**
+     * @param backwards Find Previous rather than Find Next
+     * @return Cmd+G and Shift+Cmd+G on macOS; F3 and Shift+F3 elsewhere, where Ctrl+Shift+G is the window's Find Next
+     */
+    public static KeyStroke findAgain(boolean backwards) { return findAgain(backwards, MAC); }
+
+    static KeyStroke findAgain(boolean backwards, boolean mac) {
+        int shift = backwards ? InputEvent.SHIFT_DOWN_MASK : 0;
+        return mac ? KeyStroke.getKeyStroke(KeyEvent.VK_G, InputEvent.META_DOWN_MASK | shift) : KeyStroke.getKeyStroke(KeyEvent.VK_F3, shift);
+    }
+
+    /**
      * @param stroke a shortcut
      * @return how it reads on this platform, such as "⇧⌘S" or "Ctrl+Shift+S"
      */

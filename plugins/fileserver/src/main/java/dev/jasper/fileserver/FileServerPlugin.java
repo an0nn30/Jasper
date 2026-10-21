@@ -143,7 +143,7 @@ public final class FileServerPlugin implements Plugin {
         Files.createDirectories(context.dataDirectory());
         settings = new FileServerSettings(context.settings());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
-        layout = dev.jasper.fileserver.workstation.Layout.of(context.services());
+        layout = dev.jasper.fileserver.workstation.Layout.of(context.appearance().presentation());
         var logins = new LoginResolver(vault, () -> System.getProperty("user.name", "jasper"), SessionPasswords::generate);
         transfers = new TransferActivities(context.activities()::begin, SHOW);
         tls = new TlsMaterial(context.dataDirectory().resolve("tls"), Clock.systemUTC(), FileServerPlugin::hostName);

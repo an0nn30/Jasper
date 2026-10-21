@@ -27,15 +27,33 @@ import javax.swing.JButton;
  * The classic toolbar row (spec 10.3; the Workstation mocks): left-packed "New Session", "Split ▾" and "Maximize" in
  * separated groups, the plugin group, then "Search everywhere" with the palette's keycap, "Settings…" and the window's ⋮
  * at the trailing edge, over a 1 px {@code border.window} rule. The row is window chrome under a native title, not a
- * title-bar zone.
+ * title-bar zone. Under {@code toolbar_search = "icon"} (the user, 2026-10-19), an icon-only "Search Everywhere" button
+ * with IntelliJ's classic magnifier leads the trailing group in place of the field.
  */
 final class ClassicHeader implements HeaderComposition {
     private final WindowToolbar trailing = new WindowToolbar(() -> { });
+    /** Whether the toolbar offers Search Everywhere as IntelliJ Classic's icon button rather than the field (plan 15b). */
+    private final boolean iconSearch;
+    /** The icon-only "Search Everywhere" button under {@link #iconSearch}, once built; else null. */
+    private ClassicToolbarButton search;
+
+    /** The classic row with the search field. */
+    ClassicHeader() { this(false); }
+
+    /**
+     * The classic row.
+     *
+     * @param iconSearch whether Search Everywhere is an icon button rather than the field
+     */
+    ClassicHeader(boolean iconSearch) { this.iconSearch = iconSearch; }
 
     private static int metric(DesignMetrics.Role role) { return UIScale.scale(FlatLafInstaller.installedKit().metrics().value(role)); }
 
-    /** The trailing group: "Settings…", then the window's ⋮ (parent tabs spec 6). */
+    /** The trailing group: "Search Everywhere" under the icon, then "Settings…", then the window's ⋮ (parent tabs spec 6). */
     WindowToolbar trailing() { return trailing; }
+
+    /** The icon-only "Search Everywhere" button, or null under the field; for tests. */
+    JButton searchButton() { return search; }
 
     @Override public void build(WindowChrome chrome) {
         var spacing = WindowToolbar.Leading.classic(FlatLafInstaller.installedKit().metrics());
@@ -51,6 +69,16 @@ final class ClassicHeader implements HeaderComposition {
         trailing.setBorder(BorderFactory.createEmptyBorder());
         trailing.setOpaque(false);
         trailing.packLeading(new WindowToolbar.Leading(0, spacing.gap(), spacing.separatorGap(), spacing.separatorInset(), spacing.side()));
+        if (iconSearch) {
+            // IntelliJ Classic's Search Everywhere: icon-only in every toolbar mode, named and tipped with its action name.
+            search = chrome.classicButton(trailing, ActionId.COMMAND_PALETTE, SEARCH_EVERYWHERE, "search", 100);
+            search.putClientProperty("keepLabel", false);
+            search.setText(null);
+            search.tooltip(() -> {
+                String shortcut = chrome.paletteShortcut();
+                return shortcut == null || shortcut.isBlank() ? SEARCH_EVERYWHERE : SEARCH_EVERYWHERE + " (" + shortcut + ")";
+            });
+        }
         chrome.classicButton(trailing, ActionId.OPEN_SETTINGS, "Settings…", "settings", 100);
         chrome.classicWindowMenu(trailing);
         trailing.finish();
@@ -75,6 +103,14 @@ final class ClassicHeader implements HeaderComposition {
         trailing.setBounds(right - trailingWidth, top, trailingWidth, height);
         var field = header.field();
         var toolbar = header.toolbar();
+        if (iconSearch) {
+            // The button in the trailing group stands for the field, so the toolbar runs up to the group.
+            field.setVisible(false);
+            field.setBounds(0, 0, 0, 0);
+            int toolbarRight = trailing.getX() - gap;
+            toolbar.setBounds(insets.left, top, toolbar.isVisible() ? Math.max(0, toolbarRight - insets.left) : 0, height);
+            return;
+        }
         Dimension preferred = searchPreferred(), minimum = searchMinimum();
         int fieldRight = trailing.getX() - gap;
         int toolbarMinimum = toolbar.isVisible() ? toolbar.minimumWidth() : 0;
@@ -99,6 +135,8 @@ final class ClassicHeader implements HeaderComposition {
     }
     @Override public String searchName(String context) { return SEARCH; }
     private static final String SEARCH = "Search everywhere";
+    /** IntelliJ's action name, which the icon button takes. */
+    private static final String SEARCH_EVERYWHERE = "Search Everywhere";
 
     /**
      * A field on {@code surface.input} in a {@code border.control} edge ({@code border.hover} while hovered), the

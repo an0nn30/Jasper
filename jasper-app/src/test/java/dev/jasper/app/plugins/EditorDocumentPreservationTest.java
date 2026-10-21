@@ -68,7 +68,8 @@ class EditorDocumentPreservationTest {
                 var tab=editor.contentTab(); var entry=editor.contributions.tabs().hosted().getFirst();
                 assertThat(entry.commands()).extracting(dev.jasper.app.contributions.ContentCommand::title)
                     .contains("Save", "Save As…", "Save All", "Open…", "New File", "Close Pane", "Find…", "Replace…", "Go to Line…",
-                        "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode");
+                        "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode")
+                    .as("the host's tab menu has its own Close Tab").doesNotContain("Close Tab");
                 var view=(KitView)entry.component();
                 assertThat(view.route()).isEqualTo(ThemeRoute.WORKSPACE);
                 assertThat(view.isOpaque()).isTrue();
@@ -174,7 +175,7 @@ class EditorDocumentPreservationTest {
                 assertThat(area.getFont().getSize()).isEqualTo(size);
                 assertThat(java.nio.file.Files.exists(editor.host.environment.settingsFiles().file("dev.jasper.editor"))).isFalse();
                 var reopened=(PluginPanelPage)editor.host.settingsPages(pageContext).getFirst();
-                assertThat(named(reopened.component(),"settings:font_size.input",JTextComponent.class).getText()).isEqualTo(Integer.toString(size));
+                assertThat(Double.parseDouble(named(reopened.component(),"settings:font_size.input",JTextComponent.class).getText())).isEqualTo((double)size);
                 assertThat(reopened.modified()).isFalse();reopened.dispose();
                 editor.contentTab().close();
             });

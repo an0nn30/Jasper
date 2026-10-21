@@ -110,8 +110,8 @@ final class WindowChrome {
             toolbarModes.add(item); modes.add(item);
         }
         visibility.add(modes); visibility.add(statusVisible); visibility.add(railVisible);
-        statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
-        railVisible.setAction(owner.windowCommands().view("view.rail"));
+        statusVisible.setAction(owner.action(ActionId.TOGGLE_STATUS_BAR));
+        railVisible.setAction(owner.action(ActionId.TOGGLE_RAIL));
         pluginSeparator.setName("pluginSeparator");
         composition.build(this);
         owner.action(ActionId.COMMAND_PALETTE).addPropertyChangeListener(event -> {
@@ -195,6 +195,8 @@ final class WindowChrome {
 
     WindowToolbar windowToolbar() { return toolbar; }
     HeaderComposition composition() { return composition; }
+    /** The palette's shortcut as the window shows it, or blank when it has none. */
+    String paletteShortcut() { return owner.paletteShortcut(); }
 
     /** Today's contributed button, as UnifiedHeader draws it; a dropdown's shows its chevron and keeps its label. */
     JButton referenceButton(Action action, String label, Icon icon, boolean dropdown) {
@@ -348,6 +350,7 @@ final class WindowChrome {
                         // in a title-bar zone, the window chrome's in a classic row or under a native title.
                         if (mounted.component() instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) {
                             kit.toolbarStrip(true);
+                            kit.classicChromeIcons(owner.look().chromeArtwork() == dev.jasper.ui.icons.ChromeArtwork.CLASSIC);
                             kit.route(headerIsTitleBar() ? dev.jasper.ui.theme.ThemeRoute.TITLE_BAR : dev.jasper.ui.theme.ThemeRoute.CHROME);
                         }
                         WindowToolbar.view(mounted.component(), VIEW_PRIORITY);

@@ -1,0 +1,106 @@
+<section class="guide" id="manifest">
+<h2>Manifest</h2>
+<p>Every plugin describes itself in {@code plugin.toml}, a TOML file at the root of exactly one of its jars (in a Gradle
+build, {@code src/main/resources/plugin.toml}). Jasper reads it at launch, before it loads any of the plugin's classes,
+and when a user installs the plugin's zip. The file may be at most 64 KiB.</p>
+
+<pre><code class="language-toml">id = "dev.example.tool"
+name = "Example Tool"
+version = "1.2.0"
+entry = "dev.example.tool.ToolPlugin"
+sdk = "&gt;=0.21.0, &lt;0.22"
+description = "Runs the team's deploy checks from the command palette."
+vendor = "Example"
+homepage = "https://example.dev/tool"
+icon = "dev/example/tool/tool.svg"
+icon_hue = "green"
+icon_selected_ink = "foreground"
+capabilities = ["palette.contribute", "terminal.inject"]
+exports = ["dev.example.tool.api"]
+requires = [{ id = "dev.jasper.vault", version = "&gt;=0.2", optional = true }]
+
+[[subcommands]]
+name = "deploy-check"
+summary = "Run the deploy checks for the current folder"</code></pre>
+
+<h3>Keys</h3>
+<p>Only the keys below are allowed; any other top-level key makes the manifest invalid ("Unknown key: <i>key</i>").</p>
+<table>
+<thead><tr><th>Key</th><th>Type</th><th>Required</th><th>Rules</th></tr></thead>
+<tbody>
+<tr><td>{@code id}</td><td>string</td><td>yes</td><td>Matches <code>[a-z][a-z0-9_.-]{0,127}</code>; {@code jasper} and ids starting {@code jasper.} are reserved. It namespaces what the plugin adds: action, menu, panel, window, status item, palette scope, notification group and file source ids start with {@code <id>.}, as do the topics it publishes, and icon names start with {@code <id>:}. Icon names allow no {@code _}, so a plugin that registers icons keeps its id to letters, digits, dots and dashes.</td></tr>
+<tr><td>{@code name}</td><td>string</td><td>yes</td><td>Shown everywhere Jasper names the plugin. It must show something: not only spaces, zero-width or bidi characters.</td></tr>
+<tr><td>{@code version}</td><td>string</td><td>yes</td><td>One to three numeric components, such as {@code 1}, {@code 1.2} or {@code 1.2.0}, without leading zeros, pre-release or build suffixes. Missing components are 0, and {@link PluginInfo#version()} reads the normalised form, {@code 1.2.0}.</td></tr>
+<tr><td>{@code entry}</td><td>string</td><td>yes</td><td>The fully qualified name of the entry class, in a package. It must be public, have a public no-argument constructor and implement {@link Plugin}.</td></tr>
+<tr><td>{@code sdk}</td><td>string</td><td>yes</td><td>The SDK versions the plugin runs on, as a range (see <a href="#versions">Versions</a>). A plugin whose range excludes this Jasper's SDK does not load.</td></tr>
+<tr><td>{@code description}</td><td>string</td><td>no</td><td>Shown on the plugin's Overview tab in Settings › Plugins and matched by its search.</td></tr>
+<tr><td>{@code vendor}</td><td>string</td><td>no</td><td>Shown in the plugin list, its details and the review and install sheets ("From <i>vendor</i>").</td></tr>
+<tr><td>{@code capabilities}</td><td>array of strings</td><td>no</td><td>Each one of the twelve names in <a href="#capabilities">Capabilities</a>; an unknown name makes the manifest invalid. A user-installed plugin loads only after the user allows all of them.</td></tr>
+<tr><td>{@code exports}</td><td>array of strings</td><td>no</td><td>Package names ({@code [a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)*}) other plugins may use. Each names exactly one package; a subpackage is exported only when it is listed too. {@code dev.jasper.sdk}, {@code dev.jasper.app}, {@code dev.jasper.terminal}, {@code dev.jasper.buddy}, {@code java}, {@code javax}, {@code jdk} and their subpackages are reserved. See <a href="#services">Services</a>.</td></tr>
+<tr><td>{@code requires}</td><td>array of tables</td><td>no</td><td>Other plugins this one uses; see <a href="#manifest-requires">below</a>.</td></tr>
+<tr><td>{@code icon}</td><td>string</td><td>no</td><td>The path of an {@code .svg} or {@code .png} file in the plugin's jars, at most 256 KiB. Another extension is logged and ignored; a missing, empty or larger file shows the generic plugin icon. See <a href="sdk-icons.md">plugin icons</a>.</td></tr>
+<tr><td>{@code homepage}</td><td>string</td><td>no</td><td>An absolute {@code http} or {@code https} address, shown as "Plugin homepage ↗" on the Details tab. Anything else is logged and ignored.</td></tr>
+<tr><td>{@code icon_hue}</td><td>string</td><td>no</td><td>The tile behind the icon: {@code neutral} (the default), {@code blue}, {@code green}, {@code amber} or {@code purple}. A palette scope that names no hue takes it too. Another value is logged and {@code neutral} is used.</td></tr>
+<tr><td>{@code icon_selected_ink}</td><td>string</td><td>no</td><td>{@code authored} (the default) keeps the icon's own colours on a selected row; {@code foreground} draws it in the selected row's text colour. Another value is logged and {@code authored} is used.</td></tr>
+<tr><td>{@code subcommands}</td><td>array of tables</td><td>no</td><td>The {@code jasper} subcommands the plugin answers; see <a href="#manifest-subcommands">below</a>.</td></tr>
+<tr><td>{@code presentation}</td><td>string</td><td>no</td><td>The jar path of the plugin's kit file, which makes the plugin a look. It needs the {@code presentation.provide} capability, and that capability needs this key. See <a href="looks.md">looks</a>.</td></tr>
+<tr><td>{@code themes}</td><td>array of strings</td><td>no</td><td>Jar paths of theme files, each named {@code <theme id>.json} with an id of lowercase letters, digits and dashes; no id twice. See <a href="creating-themes.md">creating themes</a>.</td></tr>
+<tr><td>{@code enabled_by_default}</td><td>boolean</td><td>no</td><td>{@code true} unless set. {@code false} keeps a plugin bundled in the application off until the user turns it on, as the Enterprise look is; an installed or {@code --plugin-dir} plugin ignores it.</td></tr>
+</tbody>
+</table>
+<p>Jar paths in {@code presentation} and {@code themes} are {@code /}-separated segments of lowercase letters, digits,
+{@code _}, {@code .} and {@code -}, without {@code .} or {@code ..} segments or a leading {@code /}.</p>
+
+<h3 id="manifest-requires">requires</h3>
+<p>Each entry names another plugin. Write them as an inline array or as {@code [[requires]]} tables:</p>
+<pre><code class="language-toml">[[requires]]
+id = "dev.example.core"
+version = "&gt;=2.1"
+
+[[requires]]
+id = "dev.jasper.snippets"
+version = "&gt;=0.1"
+optional = true</code></pre>
+<table>
+<thead><tr><th>Key</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>{@code id}</td><td>Required. A valid plugin id other than the plugin's own; no id twice.</td></tr>
+<tr><td>{@code version}</td><td>A range the other plugin's version must be in. Absent or empty admits any version.</td></tr>
+<tr><td>{@code optional}</td><td>A boolean, {@code false} unless set.</td></tr>
+</tbody>
+</table>
+<p>A hard requirement ({@code optional} absent or false) must be met for the plugin to load: when the other plugin is
+missing or outside the range, this one is skipped ("requires <i>id</i>, which is not available" or
+"requires <i>id</i> <i>range</i>; found <i>version</i>"), and when the other one fails to start or is skipped, so is this
+one ("requires <i>id</i>, which failed to start"). An optional requirement never keeps the plugin from loading, and its
+version range is not checked. Either kind makes the other plugin start first and, when it loads, gives this plugin the packages it
+exports and the services it publishes; either kind counts toward a dependency cycle, which skips every plugin in it.</p>
+
+<h3 id="manifest-subcommands">subcommands</h3>
+<p>Each {@code [[subcommands]]} table declares one {@code jasper <name>} command, which the plugin answers with
+{@link CommandLine#handle(String,CommandHandler)}:</p>
+<table>
+<thead><tr><th>Key</th><th>Rules</th></tr></thead>
+<tbody>
+<tr><td>{@code name}</td><td>Required. Matches {@code [a-z][a-z0-9-]*}; {@code help} and {@code version} are reserved; no name twice.</td></tr>
+<tr><td>{@code summary}</td><td>Required. One visible line without tabs, shown by {@code jasper --help}.</td></tr>
+</tbody>
+</table>
+<p>When two plugins declare the same name, a plugin that loads wins over one that does not, then a bundled plugin, then
+the lowest plugin id; a loading plugin that loses gets the notification "A plugin command was not added". See <a href="#contributions-subcommands">subcommands</a>.</p>
+
+<h3>Errors</h3>
+<p>A manifest that is not valid TOML, lacks a required key, has a key of the wrong type or breaks a rule above is
+invalid, and the plugin does not load: Jasper posts "A plugin could not be read" in the Plugin problems notification
+group with the reason after the plugin's folder, for example "Missing required key: entry" or "capabilities names an
+unknown capability: terminal.read". The same happens when no jar or more than one jar holds a {@code plugin.toml}, when
+it is larger than 64 KiB, and when a folder in Jasper home's {@code plugins} is not named after the plugin's id. A zip
+with such a manifest is refused when the user installs it. The values Jasper only logs and ignores ({@code icon},
+{@code homepage}, {@code icon_hue}, {@code icon_selected_ink}) never keep a plugin from loading.</p>
+
+<h3>Other files in the jar</h3>
+<p>A {@code settings.toml} at the root of one of the plugin's jars, at most 1 MiB, is the plugin's settings file as it
+starts out: the first launch that finds the plugin copies it to {@code plugins/<id>/<id>.toml} in Jasper home; a later
+launch never replaces that file. Write it as commented examples of your settings. Without one, the file starts with a one-line
+header. See <a href="#settings">Settings</a>.</p>
+</section>

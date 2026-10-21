@@ -7,7 +7,24 @@ import java.util.Objects;
 import java.util.Set;
 import static dev.jasper.sdk.ui.Nodes.*;
 
-/** A validated immutable view tree. Node ids are global; item ids are local to their owning control. */
+/**
+ * A validated immutable view tree. Node ids are global; item ids are local to their owning control. The constructor
+ * throws {@link IllegalArgumentException} unless:
+ * <ul>
+ * <li>node ids are unique in the view, and so are {@link Nodes.Custom} content ids;</li>
+ * <li>the view nests at most 128 levels below its root and holds at most 100,000 nodes;</li>
+ * <li>a {@link Nodes.Notice} stands only in a {@link Nodes.Form}'s sections or a VERTICAL {@link Nodes.Stack}, and a
+ * {@link Nodes.Separator} only in an INLINE or ACTIONS stack, between two other children;</li>
+ * <li>selected and expanded ids name existing items, rows or options, and expanded ids name branches;</li>
+ * <li>a table row's cells and cell nodes name the table's columns;</li>
+ * <li>tree item ids are unique in their tree, items nest at most 128 levels below a root item, and a tree with
+ * columns has at most one trailing value per column after the first;</li>
+ * <li>an EXCLUSIVE {@link Nodes.Choice} has two to four options and a TABS choice at least two;</li>
+ * <li>a {@link Nodes.Field}'s {@code listId}, when not blank, names an {@link Nodes.ItemList} in the same view.</li>
+ * </ul>
+ *
+ * @param root the view's top node; not a Notice or a Separator
+ */
 public record ViewSpec(Node root) {
     public ViewSpec {
         Objects.requireNonNull(root);

@@ -27,6 +27,7 @@ import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
+import dev.jasper.sdk.ui.Presentation;
 import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
@@ -92,6 +93,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CopyOnWriteArrayList;
+import dev.jasper.sdk.settings.Choice;
 import dev.jasper.sdk.settings.SettingSpec;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.Setting;
@@ -816,6 +818,75 @@ public abstract class PluginContractTest {
         h.stopAll();
         assertThat(h.actions()).isEmpty();
         assertThat(h.menu("TAB")).isEmpty();
+    }
+
+    @Test void terminalTypographyIsPublishedBeforeCallbacksAcrossPluginsAndThreads() throws Exception {
+        var initial = new dev.jasper.sdk.ui.TerminalTypography("DialogInput", 13.5, List.of("Monospaced"), true, 1.25);
+        var next = new dev.jasper.sdk.ui.TerminalTypography("Monospaced", 15.25, List.of(), false, 1.5);
+        h.ui(() -> h.setTerminalTypography(initial)); h.flush();
+        var first = new AtomicReference<PluginContext>();
+        var second = new AtomicReference<PluginContext>();
+        var seen = new ArrayList<dev.jasper.sdk.ui.TerminalTypography>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            first.set(context);
+            context.appearance().onTerminalTypographyChanged(value -> {
+                assertThat(javax.swing.SwingUtilities.isEventDispatchThread()).isTrue();
+                assertThat(context.appearance().terminalTypography()).isEqualTo(value);
+                seen.add(value);
+            });
+        });
+        h.start(info("test.beta"), Set.of(), Set.of(), second::set);
+        assertThat(first.get().appearance().terminalTypography()).isEqualTo(initial);
+        assertThat(second.get().appearance().terminalTypography()).isEqualTo(initial);
+        assertThat(CompletableFuture.supplyAsync(() -> first.get().appearance().terminalTypography()).get(5, TimeUnit.SECONDS)).isEqualTo(initial);
+        assertThat(seen).isEmpty();
+        h.ui(() -> h.setTerminalTypography(new dev.jasper.sdk.ui.TerminalTypography(
+            "DialogInput", 13.5, List.of("Monospaced"), true, 1.25))); h.flush();
+        assertThat(seen).isEmpty();
+        h.ui(() -> h.setTerminalTypography(next)); h.flush();
+        assertThat(seen).containsExactly(next);
+        assertThat(second.get().appearance().terminalTypography()).isEqualTo(next);
+        h.stopAll();
+        h.ui(() -> h.setTerminalTypography(initial)); h.flush();
+        assertThat(seen).containsExactly(next);
+        h.ui(() -> assertThatIllegalStateException().isThrownBy(() ->
+            first.get().appearance().onTerminalTypographyChanged(value -> { })));
+    }
+
+    @Test void terminalTypographyCallbacksCanUnsubscribeAndFailuresDoNotBlockOthers() {
+        var next = new dev.jasper.sdk.ui.TerminalTypography("DialogInput", 14, List.of(), false, 1);
+        var later = new dev.jasper.sdk.ui.TerminalTypography("DialogInput", 16, List.of(), false, 1);
+        var seen = new ArrayList<String>();
+        var self = new AtomicReference<Subscription>();
+        var skipped = new AtomicReference<Subscription>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            self.set(context.appearance().onTerminalTypographyChanged(value -> {
+                seen.add("first"); self.get().close(); skipped.get().close();
+            }));
+            skipped.set(context.appearance().onTerminalTypographyChanged(value -> seen.add("skipped")));
+            context.appearance().onTerminalTypographyChanged(value -> { throw new IllegalStateException("bad typography callback"); });
+            context.appearance().onTerminalTypographyChanged(value -> seen.add("last"));
+        });
+        h.ui(() -> h.setTerminalTypography(next)); h.flush();
+        assertThat(seen).containsExactly("first", "last");
+        h.ui(() -> h.setTerminalTypography(later)); h.flush();
+        assertThat(seen).containsExactly("first", "last", "last");
+    }
+
+    /** SDK 0.18.2: the presentation is the host's, the same for every plugin and on any thread, and a theme change keeps it. */
+    @Test void presentationIsTheHostsForEveryPluginOnAnyThreadAndThroughThemeChanges() throws Exception {
+        var classic = new Presentation(true, Presentation.Icons.CLASSIC, Presentation.ToolWindows.STRIPES, Presentation.TitleBar.NATIVE,
+            Presentation.Menus.WINDOW, Presentation.ToolbarSearch.FIELD, Optional.of("IBM Plex Sans"), Optional.of("IBM Plex Mono"), 12, 28);
+        h.setPresentation(classic);
+        var first = new AtomicReference<PluginContext>(); var second = new AtomicReference<PluginContext>();
+        h.start(new PluginInfo("test.lookone", "One", "1.0.0", Set.of()), Set.of(), Set.of(), first::set);
+        h.start(new PluginInfo("test.looktwo", "Two", "1.0.0", Set.of()), Set.of(), Set.of(), second::set);
+        assertThat(first.get().appearance().presentation()).isEqualTo(classic);
+        assertThat(second.get().appearance().presentation()).isEqualTo(classic);
+        var offThread = CompletableFuture.supplyAsync(() -> first.get().appearance().presentation()).get(5, TimeUnit.SECONDS);
+        assertThat(offThread).isEqualTo(classic);
+        h.setVariant(Variant.LIGHT); h.flush();
+        assertThat(first.get().appearance().presentation()).isEqualTo(classic);
     }
 
     @Test void aPanelMayNameOneOfThePluginsOwnActionsAsItsToggle() {
@@ -2930,6 +3001,43 @@ public abstract class PluginContractTest {
         assertThat(size.get().get()).isEqualTo(13);
         assertThat(tab.get().get()).isEqualTo(6);
         assertThat(h.settingsReports("test.settings")).singleElement().asString().startsWith("font_size: ");
+    }
+
+    /** Plan 15a (spec 5.8): saved, then the look's, then the plugin's own default. */
+    @Test void aKitDefaultReplacesTheDeclaredDefaultAndASavedValueWins() {
+        h.setKitDefault("test.kitdefault", "size", 15L);
+        var size = new AtomicReference<Setting<Integer>>();
+        h.start(new PluginInfo("test.kitdefault", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context ->
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size"))));
+        assertThat(size.get().get()).isEqualTo(15);
+        h.setSetting("test.kitdefault", "size", 13L);
+        assertThat(size.get().get()).as("a saved value equal to the plugin's own default still wins").isEqualTo(13);
+        assertThat(h.lookDefaultProblems("test.kitdefault")).isEmpty();
+    }
+
+    @Test void aKitDefaultTheKindRejectsLeavesThePluginsDefaultAndIsReported() {
+        h.setKitDefault("test.kitbad", "size", 99L);
+        h.setKitDefault("test.kitbad", "mode", "sideways");
+        var size = new AtomicReference<Setting<Integer>>(); var mode = new AtomicReference<Setting<String>>();
+        h.start(new PluginInfo("test.kitbad", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context -> {
+            size.set(context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+            mode.set(context.settings().declare(SettingSpec.of("mode", SettingKind.choice(List.of(Choice.of("up", "Up", "up"), Choice.of("down", "Down", "down"))), "up").label("Mode")));
+        });
+        assertThat(h.active("test.kitbad")).isTrue();
+        assertThat(size.get().get()).isEqualTo(13);
+        assertThat(mode.get().get()).isEqualTo("up");
+        assertThat(h.lookDefaultProblems("test.kitbad")).hasSize(2).allSatisfy(line -> assertThat(line).startsWith("test.kitbad: the look's default for "))
+            .anySatisfy(line -> assertThat(line).startsWith("test.kitbad: the look's default for size is not used: "));
+    }
+
+    @Test void aKitDefaultForAnUndeclaredKeyIsReportedAndAnotherPluginsTableIsIgnored() {
+        h.setKitDefault("test.kitextra", "missing", true);
+        h.setKitDefault("test.notrunning", "size", 9L);
+        h.start(new PluginInfo("test.kitextra", "Kit", "1.0.0", Set.of()), Set.of(), Set.of(), context ->
+            context.settings().declare(SettingSpec.of("size", SettingKind.integer(8, 48), 13).label("Size")));
+        assertThat(h.lookDefaultProblems("test.kitextra"))
+            .containsExactly("test.kitextra: the look gives a default for missing, which the plugin does not declare");
+        assertThat(h.lookDefaultProblems("test.notrunning")).isEmpty();
     }
 
     @Test void settingsAreDeclaredOnlyWhileStartingWithUniqueLabelledKeys() {

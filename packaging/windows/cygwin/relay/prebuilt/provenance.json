@@ -1,0 +1,53 @@
+{
+  "aarch64": {
+    "file": "frontend-aarch64.exe",
+    "sha512": "4f03abed3a66da36b70a024c5139dfb833f451d3a31dce4f6223538ff68c3800f131eb8ee763444113d137bb37ddfd611b5d33137c5665b1260eb32ef6ae5473",
+    "origin": "https://github.com/an0nn30/Jasper",
+    "machine": "ARM64",
+    "compiler": "MSVC 14.51.36231",
+    "command": "cl /std:c++20 /W4 /WX /EHsc /MT /O2 ConPtyRelay.cpp"
+  },
+  "amd64": {
+    "file": "frontend-amd64.exe",
+    "sha512": "59b1c43186ee0e01f1b90f82307237000da495daeec31ba6fff47e3ae568e194313fb9f84e97ab066a1f94c2e1303b09d1b83b77c2e6341c2eb0b65381e452b9",
+    "origin": "https://github.com/an0nn30/Jasper",
+    "machine": "AMD64",
+    "compiler": "MSVC 14.51.36231 (arm64_x64 cross toolchain)",
+    "command": "cl /std:c++20 /W4 /WX /EHsc /MT /O2 ConPtyRelay.cpp"
+  },
+  "backend": {
+    "file": "backend.exe",
+    "sha512": "4b78323dd1c73d8cc5a89cf60a9089455b66d16055d5fcc0a3391680163279203d5999e167d7f694200c8170745e0ae4e40406ecfdb7c87b6a243cd308e889a3",
+    "origin": "https://github.com/an0nn30/Jasper",
+    "machine": "AMD64",
+    "compiler": "Cygwin GCC 14.4.0",
+    "command": "gcc -std=c11 -Wall -Wextra -Werror -O2 -pthread CygwinPtyRelay.c"
+  },
+  "sourceCommit": "10615c84c69a4823491b246400288f4dcc948ffe",
+  "validation": {
+    "nativeArm64": "passed",
+    "x64Emulated": "passed",
+    "nativeX64Windows": "outstanding",
+    "interactiveApps": "outstanding"
+  },
+  "sources": [
+    {
+      "file": "ConPtyRelay.cpp",
+      "source": "../../probe/ConPtyRelay.cpp",
+      "sha512": "c404233b7565a9fd8138eaf5338d66d0354788c9108b213b8279a462fb1b7fc99885bac32e110c3af79a68d9b599f9172bb569d18e08da262ae4a419e8b6b236",
+      "origin": "https://github.com/an0nn30/Jasper"
+    },
+    {
+      "file": "CygwinPtyRelay.c",
+      "source": "../../probe/CygwinPtyRelay.c",
+      "sha512": "55c99255b229e7879cb8fa897bdbb658762986de78fdc22549f59075dd50513ee7982f1d2bbc458a8c6b790228a7bf74613255e3579f1a4cb8e4dc9921dfca59",
+      "origin": "https://github.com/an0nn30/Jasper"
+    },
+    {
+      "file": "LICENSE.md",
+      "source": "../../../../../LICENSE.md",
+      "sha512": "e01a97db49c81bc7f530425156de5c2168f70b89b3185e04c586feadd3ee21c40e9378285fba4eaa62b4ffe64d8e911c9b2e9cd2c4ab869296e4902626f667db",
+      "origin": "https://github.com/an0nn30/Jasper"
+    }
+  ]
+}

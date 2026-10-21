@@ -13,13 +13,36 @@ import java.util.function.Consumer;
  * @since 0.8.5
  */
 public interface ContentTab extends WindowOwner, AutoCloseable {
-    /** @param value literal title, location and state */
+    /**
+     * Sets what the tab shows: its title, preceded by a dot while dirty and followed by the detail, its icon and, as its
+     * tooltip, the location; while the tab is active, the window's title and header context follow it. Ignored once
+     * the tab is closed.
+     *
+     * @param value literal title, location and state
+     */
     void setPresentation(ContentPresentation value);
-    /** @param commands immutable snapshot of active-content commands */
+    /**
+     * Replaces the content's commands. They appear in the tab's context menu; while the tab is active, a command's
+     * shortcut runs it ahead of the Jasper actions bound to the same key, the command palette's shortcuts excepted (a
+     * disabled command's shortcut does nothing), and Jasper's Copy, Paste, Find, Find Next and Find Previous run the enabled command with the id {@code copy},
+     * {@code paste}, {@code find}, {@code find-next} or {@code find-previous}. In a text field, the shortcut of a
+     * {@code copy} or {@code paste} command keeps the field's own clipboard behaviour. Ignored once the tab is closed.
+     *
+     * @param commands immutable snapshot of active-content commands
+     */
     void setCommands(List<ContentCommand> commands);
-    /** @param items immutable snapshot of status items */
+    /**
+     * Replaces the items the window's status bar shows while this tab is active. Ignored once the tab is closed.
+     *
+     * @param items immutable snapshot of status items
+     */
     void setStatus(List<ContentStatus> items);
-    /** @param focus UI-thread callback focusing the editable content */
+    /**
+     * Sets what Jasper runs to focus the content, as when its tab is selected or its window is brought to the front; by
+     * default Jasper focuses the content's view.
+     *
+     * @param focus UI-thread callback focusing the editable content
+     */
     void setFocusTarget(Runnable focus);
     /**
      * How the tab comes back when Jasper restores its windows, in place of what its {@link ContentSpec#restore()} said:
@@ -86,17 +109,41 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      * @since 0.20.0
      */
     dev.jasper.sdk.terminal.WindowHandle window();
-    /** @return whether the content is selected in its host */
+    /**
+     * Whether the tab is active: the item of the focused pane in its window's shown tab.
+     *
+     * @return whether the content is selected in its host
+     */
     boolean isActive();
-    /** @return whether the handle has been disposed */
+    /**
+     * Whether the content has closed: by the user, through {@link #requestClose()} or {@link #close()}, with its window,
+     * or when the plugin stopped.
+     *
+     * @return whether the handle has been disposed
+     */
     boolean isClosed();
-    /** @return whether closing was accepted; false keeps content intact */
+    /**
+     * Asks to close the content as Close Tab does: it closes unless this plugin's
+     * {@link Windows#onTabsClosing(java.util.function.BiFunction) closing guard} refuses, another close decision is
+     * pending, or a file chooser or modal dialog it owns is open.
+     *
+     * @return whether closing was accepted; false keeps content intact
+     */
     CompletableFuture<Boolean> requestClose();
-    /** @param listener activation callback
-     * @return removable registration */
+    /**
+     * Calls {@code listener} with true when the tab becomes its window's active item and with false when it stops
+     * being active, including when it moves or closes.
+     *
+     * @param listener activation callback
+     * @return removable registration
+     */
     Subscription onActive(Consumer<Boolean> listener);
-    /** @param listener once-only disposal callback
-     * @return removable registration */
+    /**
+     * Calls {@code listener} once when the content closes; on a closed handle it is never called.
+     *
+     * @param listener once-only disposal callback
+     * @return removable registration
+     */
     Subscription onClosed(Runnable listener);
     /** Disposes without asking, for plugin shutdown; user close uses requestClose. */
     @Override void close();

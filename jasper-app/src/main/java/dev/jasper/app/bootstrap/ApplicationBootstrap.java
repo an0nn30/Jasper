@@ -107,7 +107,7 @@ public final class ApplicationBootstrap {
             Runtime.getRuntime().addShutdownHook(shutdown);
             acquired.own((AutoCloseable) () -> removeShutdownHook(shutdown));
             applyDesktop(startup.selection().presentation(), service.initialState().snapshot(), System.getProperty("os.name").startsWith("Mac"));
-            // Spec 10.11, as soon as AWT may start: the look's icons and, on a start that will open a window, its splash.
+            // Spec 10.11, as soon as AWT may start: the look's icons and, on a start that will open a window, the default or branded splash.
             opened.set(openSplash(startup, GraphicsEnvironment.isHeadless()));
             // Off the EDT and before the first window: an optional prewarm of the built-in icons.
             dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
@@ -135,18 +135,21 @@ public final class ApplicationBootstrap {
     static StartupSteps openSplash(Startup startup, boolean headless) {
         Presentation presentation = startup.selection().presentation();
         Branding branding = presentation.branding();
-        if (!branding.present()) return StartupSteps.NONE;
+        String product = branding.present() ? branding.product() : "Jasper";
         long began = System.nanoTime();
         ApplicationIcon.useLook(branding.iconFiles());
         if (!splashWanted(startup.options(), headless, true)) return StartupSteps.NONE;
         SplashPainter painter;
-        try { painter = SplashPainter.of(splashContent(presentation, BuildInfo.current()), screenScale()); }
+        try { painter = branding.present()
+            ? SplashPainter.of(splashContent(presentation, BuildInfo.current()), screenScale())
+            : SplashPainter.meadow(BuildInfo.current().buildLine(), screenScale()); }
         catch (RuntimeException undrawable) {
-            LOG.log(System.Logger.Level.WARNING, "The " + branding.product() + " splash cannot be drawn; starting without it", undrawable);
+            LOG.log(System.Logger.Level.WARNING, "The " + product + " splash cannot be drawn; starting without it", undrawable);
             return StartupSteps.NONE;
         }
-        var splash = new Splash(painter, ApplicationIcon.images());
-        var steps = StartupSteps.of(branding.product(), startup.selection().loading().size(), splash::show, splash::close);
+        var splash = new Splash(painter, ApplicationIcon.images(), startup.service() == null
+            || startup.service().initialState().snapshot().animations().enabled());
+        var steps = StartupSteps.of(product, startup.selection().loading().size(), splash::show, splash::close);
         SwingUtilities.invokeLater(() -> {
             ApplicationIcon.installTaskbarIcon();
             splash.open(steps.current());
@@ -156,18 +159,20 @@ public final class ApplicationBootstrap {
     }
 
     /**
-     * Whether this start shows a branded look's splash: one that will open a window, so not headless,
+     * Whether this start shows the default or branded splash: one that will open a window, so not headless,
      * {@code --background}, {@code --no-window} or {@code --safe-mode} (a handed-off launch never gets here).
      */
     static boolean splashWanted(AppArguments options, boolean headless, boolean branded) {
-        return branded && !headless && !options.background() && !options.noWindow() && !options.safeMode();
+        return !headless && !options.background() && !options.noWindow() && !options.safeMode();
     }
 
     /** What the splash draws: the look's branding and faces, the version line and About's copyright line (spec 10.11). */
     static SplashPainter.Content splashContent(Presentation presentation, BuildInfo build) {
         Branding branding = presentation.branding();
         var faces = presentation.faces();
-        return new SplashPainter.Content(branding.product(), build.buildLine(), BuildInfo.COPYRIGHT, branding.icon(64), branding.icon(128),
+        boolean sharedIcon = branding.iconFiles().isEmpty();
+        return new SplashPainter.Content(branding.product(), build.buildLine(), BuildInfo.COPYRIGHT, sharedIcon ? ApplicationIcon.defaultPng(64) : branding.icon(64),
+            sharedIcon ? ApplicationIcon.defaultPng(128) : branding.icon(128),
             branding.splashArt(), faces.ui().map(ui -> ui.semibold().bytes()), faces.ui().map(ui -> ui.regular().bytes()),
             faces.data().map(data -> data.regular().bytes()));
     }
@@ -182,10 +187,10 @@ public final class ApplicationBootstrap {
         if (steps.active()) edt.execute(steps::done);
     }
 
-    /** Runs {@code start}, then ends {@code steps} whatever happened: a splash never outlives the start that opened it. EDT. */
+    /** Transfers successful startup to the window paint callback; failed composition closes the splash. EDT. */
     static void presenting(StartupSteps steps, Runnable start) {
         try { start.run(); }
-        finally { steps.done(); }
+        catch (RuntimeException | Error failure) { steps.done(); throw failure; }
     }
 
     /** The main screen's device scale, for the splash art's first raster; 1 without a screen. */
@@ -345,7 +350,7 @@ public final class ApplicationBootstrap {
             steps.configuration();
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
                 () -> System.exit(0), integrationDir, dirs.themes(), selection);
-            // A look that fell back at start runs without its branding (spec 4.7 and 9.1): Jasper's icons, and no splash.
+            // A look that fell back at start runs without its branding (spec 4.7 and 9.1): Jasper's icons and default Meadow splash.
             ApplicationIcon.useLook(application.presentation().branding().iconFiles());
             ApplicationIcon.installTaskbarIcon();
             application.startupSteps(steps);

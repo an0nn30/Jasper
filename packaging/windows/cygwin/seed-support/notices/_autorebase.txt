@@ -1,0 +1,579 @@
+Package source: noarch/release/_autorebase/_autorebase-001091-1-src.tar.zst
+License identifier: LicenseRef-Upstream-_autorebase
+Upstream supplies no explicit license declaration in this release; the complete distributed scripts and README follow.
+
+--- _autorebase-001091-1.src/_autorebase-001091-1.cygport ---
+# -*- mode: sh; sh-shell: bash -*-
+NAME="_autorebase"
+VERSION="001091"
+RELEASE="1"
+HOMEPAGE="https://cygwin.com/packages/summary/_autorebase-src.html"
+ARCH=noarch
+SRC_URI="${PN}-${PV}.tar.xz"
+
+CATEGORY="Base"
+SUMMARY="Incremental autorebase script"
+DESCRIPTION="${SUMMARY}
+
+This package installs a permanent postinstall script to keep the
+Cygwin installation properly rebased and additionally provides an
+easier interface for triggering a manual full rebase.  The rebaselst
+script uses the rebase database and a cache directory in
+/var/cache/rebase to record state.
+
+"
+
+inherit autotools
+src_compile () {
+	rm -fr ${B} ${D}
+	mkdir ${B} ${D}
+}
+src_install () {
+	cp -rp ${S}/{etc,usr} ${D}
+}
+KEEPDIRS="$(echo /var/cache/rebase /var/lib/rebase/{dyn,local,user}{path,file}.d)"
+
+PKG_CONTENTS="etc usr var/cache var/lib"
+
+Source archive: noarch/release/_autorebase/_autorebase-001091-1-src.tar.zst
+
+
+--- _autorebase-001091/CYGWIN-PATCHES/_autorebase.README ---
+_autorebase
+===========
+
+This package provides scripts to keep the Cygwin system properly
+rebased.  By default this happens incrementally, which means only
+dynamic objects that have been installed after the last run of rebase
+will be considered and the current rebase map takes account of the
+already rebased parts of the installation.  The scripts must be run by
+the system administrator or from another account that has all the
+necessary access rights.
+
+Over time the rebase map can fragment.  By triggering a full rebase,
+all dynamic objects on the system are treated as newly installed and
+the existing rebase map is cleared before doing the rebase.  To
+perform a full rebase, execute "rebase-trigger fullrebase".  Then shut
+down Cygwin including any services you have installed and simply run
+setup.exe.  The rebase will be performed even when the installation
+did not get modified in any way.  Subsequent runs of setup.exe will
+again rebase in incremental mode.
+
+Some programs allow the user to create or install dynamic objects
+after installation.  Since these are not part of an installed package,
+they wouldn't be rebased automatically, as their location isn't known
+to the package system. Entire subtrees to be searched for dynamic
+objects can be advertised in /var/lib/rebase/dynpath.d/,
+/var/lib/rebase/localpath.d/ and /var/lib/rebase/userpath.d/ for
+packaged paths, locally provided paths and user paths, respectively.
+The format of files in these directories is one absolute path per
+line.  The list of suffixes that files need to have to be considered
+dynamic objects in these locations is hardcoded as
+"dll|so|eln|oct|mex".  Files that should be rebased, but do not have
+one of these suffixes can be advertised in /var/lib/dynfile.d,
+/var/lib/localfile.d and /var/lib/userfile.d for packaged files,
+locally provided files and user files, respectively.  The format of
+files in these directories is one absolute file name per line.
+Packagers should name their files after the (main) application package
+that creates the dynamic objects at the advertised location and must
+not package anything in either the local*.d or user*.d directories.
+The local system administrator should only place files in local*.d
+directories and otherwise keep the naming scheme as used for packages.
+The user*.d file names should start with the account name of the user
+the advertised locations belong to.
+
+The user running the installation must have full access rights to all
+such paths and all such locations must be available (e.g. remote or
+encrypted volumes must be mounted and unlocked, respectively).
+
+The incremental rebase is controlled by the script /usr/bin/rebaselst.
+Except for debugging purposes this script should not be run directly
+by users.  Like any other attempt at rebasing it doesn't work
+correctly on a live Cygwin system.
+
+
+--- _autorebase-001091/etc/postinstall/0p_000_autorebase.dash ---
+#!/bin/dash
+export PATH=/bin
+b=/var/cache/rebase
+if [ -e ${b}/peflags ] ; then
+    noaslr=--noaslr
+    peflags=peflags
+    rm -f ${b}/peflags
+else
+    noaslr=''
+    peflags=''
+fi
+if [ -e ${b}/rebuild_always ] ; then
+    rebuild=--rebuild
+elif [ -e ${b}/rebuild_incremental ] ; then
+    rebuild=''
+else
+    rebase-trigger rebuild_always
+    rebuild=--rebuild    
+fi
+if [ ! -e ${b}/fullrebase.done ] ; then
+    rebase-trigger fullrebase
+    rebaselst --rebuild update --cleardb $noaslr rebase $peflags
+    mv ${b}/fullrebase ${b}/fullrebase.done
+else
+    rebaselst $rebuild update $noaslr rebase $peflags
+fi
+
+--- _autorebase-001091/etc/preremove/_autorebase.sh ---
+#!/bin/dash
+export PATH=/bin
+b=/var/cache/rebase
+echo -n "_autorebase cache directory ${b} removal... "
+rm -rf "${b}" && echo "succeeded!" || echo "failed!"
+
+--- _autorebase-001091/usr/bin/rebase-trigger ---
+#!/bin/dash
+export PATH=/bin
+b=/var/cache/rebase
+if [ ! -d ${b} ] ; then
+    echo "Directory ${b} does not exist, trying to re-create."
+    mkdir -p ${b}
+fi
+
+usage () {
+  echo "
+rebase-trigger [-h | --help | [ full[rebase] | peflags ]]
+
+Commands:
+------------------------------------
+
+full
+fullrebase
+	Perform a full rebase the next time autorebase is run.
+
+peflags
+        Set some flags on executables necessary to run on a Terminal
+	Server.  This is only needed for 32bit executables that have
+	been created with old toolchains.
+
+rebuild
+rebuild_always
+	Always build the cache files from scratch.
+
+incremental
+rebuild_incremental
+	Build the cache files considering only changes from the last
+	run.  This assumes that no manual changes were done to the
+	system and all timestamps are correct.
+"
+}
+trigger_fullrebase () {
+  local f g
+  f="${b}/fullrebase"
+  g="${f}.done"
+  if [ -e "$g" ] ; then
+    mv "$g" "$f"
+  else
+    cat > "$f" <<EOF
+# _autorebase will do a rebuild of the rebase database if this file
+# exists and then rename it to fullrebase.done
+EOF
+  fi
+  echo "Note: _autorebase will do a full rebase the next time setup is run."
+}
+
+trigger_peflags () {
+  local f g
+  f="${b}/peflags"
+  g="${f}.disabled"
+  if [ -e "$g" ] ; then
+    mv "$g" "$f"
+  else
+    cat > "$f" <<EOF
+# _autorebase will run peflags after rebasing and then rename the file
+# to rebase_peflags.disabled
+EOF
+  fi
+  echo "Note: _autorebase will set peflags the next time setup is run."
+}
+
+trigger_rebuild () {
+  local f g
+  f="${b}/rebuild_always"
+  g="${b}/rebuild_incremental"
+  if [ yes = "$1" ] ; then
+    rm -f "$g"
+    cat > "$f" <<EOF
+# _autorebase will rebuild cache files from scratch on each run
+EOF
+  echo "Note: _autorebase will always rebuild cache files when next run."
+  else
+    rm -f "$f"
+    cat > "$g" <<EOF
+# _autorebase will run peflags after rebasing and then rename the file
+# to rebase_peflags.disabled
+EOF
+  echo "Note: _autorebase will incrementally rebuild cache files when next run."
+  fi
+}
+
+if [ "$#" = "0" ] ; then
+  set -- "--help"
+fi
+while [ $# -gt 0 ] ; do 
+  case "$1" in
+    full|fullrebase )
+      trigger_fullrebase
+      ;;
+    peflags )
+      trigger_peflags
+      ;;
+    incremental|rebuild_incremental )
+      trigger_rebuild no
+      ;;
+    rebuild|rebuild_always )
+      trigger_rebuild yes
+      ;;
+    -h|--help|* )
+      usage
+      exit 127
+      ;;
+  esac
+  shift
+done
+exit 0
+
+--- _autorebase-001091/usr/bin/rebaselst ---
+#!/bin/dash
+export PATH=/bin
+l=/var/lib/rebase
+b=/var/cache/rebase
+eb="${b}/rebase_epoch"
+db="${l}/dynpath.d"
+lb="${l}/localpath.d"
+ub="${l}/userpath.d"
+df="${l}/dynfile.d"
+lf="${l}/localfile.d"
+uf="${l}/userfile.d"
+for d in ${b} ${db} ${lb} ${ub} ${df} ${lf} ${uf} ; do
+  if [ ! -d ${d} ] ; then
+    echo "Directory ${d} does not exist, trying to re-create."
+    mkdir -p ${d}
+  fi
+done
+
+BaseAddress=''
+if [ "x86_64" = $( uname -m ) ] ; then
+  DefaultBaseAddress=0x400000000
+else
+  DefaultBaseAddress=0x070000000
+fi    
+
+cleardb="no"
+rebuild="no"
+noaslr="no"
+verbose=""
+debug="no"
+pkgdone="no"
+doSuffixes='dll|so|eln|oct|mex'
+exeSuffixes='exe'
+dyndirs=''
+dynLocs=''
+dynFLocs=''
+ret='
+'
+
+dyndirs () {
+  [ "done" = "${dyndirs}" ] && return
+  local _IFS IFS dynPaths dynFiles
+  _IFS="$IFS"
+  IFS="${ret}"
+  dynPaths="$( find ${db} ${lb} ${ub} -type f | sort -u )"
+  for d in ${dynPaths} ; do
+    for f in "$(cat ${d})" ; do
+      [ -z "$f" ] || dynLocs="${dynLocs}${ret}${f}"
+      [ "yes" = "${debug}" ] && echo "dynLoc:  <${f}> => ${dynLocs}"
+    done
+  done
+  dynFiles=$( find ${df} ${lf} ${uf} -type f | sort -u )
+  for d in ${dynFiles} ; do
+    for f in "$(cat ${d})" ; do
+      [ -z "$f" ] || dynFLocs="${dynFLocs}${ret}${f}"
+      [ "yes" = "${debug}" ] && echo "dynFile:  <${f}> => ${dynFLocs}"
+    done
+  done
+  dyndirs="done"
+}
+
+usage () {
+  echo "
+rebaselst [-h | --help | [ <cmd> | <cmd1> <cmd2> ... <cmdn> ]]
+
+Commands, will be executed in order:
+------------------------------------
+
+--verbose
+	Run some commands with verbose output.
+
+--rebuild
+	Later commands will discard information in cache files and
+	rebuild them from scratch.
+
+--no-rebuild
+	Keep and use information in cache files.  This is the default,
+	can be used to cancel effect of a \"--rebuild\" earlier on the
+	command line.
+
+update
+	Update all caches.
+
+lst
+	Update cache for package installation lists.
+
+dyn
+	Update cache for dynamic language modules and libraries.
+
+--cleardb
+	Remove an existing rebase database before doing a \"rebase\".
+
+--noaslr
+	Remove ASLR and TSAware flags from dynamic objects.
+
+rebase
+	Rebase with the information in cache files (i.e does not imply
+	an \"update\").
+
+peflags
+	Set PE flags on executables with the information in cache
+	files (i.e does not imply an \"update\").
+
+
+pkg
+	Update first stage cache for package installation lists only.
+	This step is implied by \"lst\" and available for debugging
+	only.
+
+"
+}
+
+check_file () {
+  if [ "$2" = "yes" -a  -e $1 ] ; then
+    echo "removing $1"
+    rm -f $1
+  fi
+  if [ ! -e "${eb}" ] ; then
+      touch -d "@0"                          "${eb}" || \
+	  touch -d "1980-01-01 00:00 UTC"    "${eb}" || \
+	  touch -d "1999-05-03 07:29:06 UTC" "${eb}" || \
+	  touch -d "2002-08-17 07:00 CEST"   "${eb}"
+  fi
+  if [ ! -e "$1" ] ; then
+    echo "creating empty $1"
+    touch -r "${eb}"  "$1"
+  fi
+  if [ "$2" != "nowrite" -a  -e $1 ] ; then
+    chmod 644 "$1"
+  fi
+}
+
+old_file () {
+  local f g
+  f="$1"
+  g="${f}.old"
+  mv -f "${f}" "${g}"
+  cat >"${f}" <<EOF
+## autogenerated, do not edit!
+EOF
+}
+
+update_file () {
+  local f g
+  f="$1"
+  chmod 444 "${f}"
+}
+
+rebase_do () {
+  local g
+  if [ "$1" = "yes" ] ; then
+    rm -f /etc/rebase.db.*
+  fi
+  shift
+  g="${b}/rebase_all"
+  echo "Rebasing with list ${g}, built from $@."
+  cat $@ | grep -vE '^#' | sort -u >"${g}"
+  if [ ! -e "/etc/rebase.db.i386" -a ! -e "/etc/rebase.db.x86_64" ] ; then
+    BaseAddress="-b ${DefaultBaseAddress}"
+  fi
+  rebase ${BaseAddress} ${verbose} -n -s -T "${g}"
+  if [ "noaslr" = "yes" ] ; then
+    peflags ${verbose} -d0 -t0 -T "${g}"
+  fi
+  BaseAddress=''
+}
+
+peflags_do () {
+  local g
+  g="${b}/rebase_all_exe"
+  echo "Setting PE flags with list ${g}, built from $@."
+  cat $@ | grep -vE '^#|ddd\/Ddd\.exe$' | sort -u >"${g}"
+  peflags ${verbose} -t1 -T "${g}"
+}
+
+rebase_pkg () {
+  local IFS f g r
+  if [ "${pkgdone}" = "no" ] ; then
+    g="${b}/rebase_pkg"
+    check_file "${g}" "${rebuild}"
+    old_file "${g}"
+    echo "Updating package information in ${g}."
+    r=$( find /etc/setup -xdev -type f \! -name '*-debuginfo.lst.gz' -name '*.lst.gz' -newer "${g}.old" )
+    if [ ! -z "${r}" ] ; then
+      echo "${r}" | sed -e 's/^/  from /'
+      echo "${r}" | sed -e '1i # rebase_pkg information' -e 's/^/#   from /' >>"$g"
+      IFS="${ret}"
+      gzip -d -c ${r} |
+	sed -E \
+	    -e '/\/$/d' \
+            -e "/\.(${doSuffixes}|${exeSuffixes})\$/!{d}" \
+	    -e '/(cygwin1|cyglsa.*)\.dll$/d' \
+            -e '/\/(d?ash|rebase|peflags)\.exe$/d' \
+	    -e '/\/octave\//!{/\.(mex|oct)$/d}' \
+	    -e '/gnuplot\/demo\/plugin\/.*\.so/d' \
+	    -e '/^usr\/lib\/ocaml\/.*\.so/d' \
+	    -e '/sys-root\/mingw/d' \
+	    -e 's/^/\//' \
+	    >>"$g"
+    fi
+    update_file "${g}"
+    pkgdone="yes"
+  fi
+}
+
+rebase_exe () {
+  local f g
+  f="${b}/rebase_pkg"
+  g="${b}/rebase_exe"
+  check_file "${f}" "nowrite"
+  check_file "${g}" "no"
+  rebase_pkg
+  old_file "${g}"
+  if [ "${f}" -nt "${g}.old" ] ; then
+    echo "Updating rebase information for installed executables in ${g}."
+    grep -E "\.(${exeSuffixes})\$" "${f}" >>"${g}"
+    update_file "${g}"
+  fi
+}
+
+rebase_lst () {
+  local f g
+  f="${b}/rebase_pkg"
+  rebase_pkg
+  g="${b}/rebase_lst"
+  check_file "${g}" "${rebuild}"
+  old_file "${g}"
+  if [ "${f}" -nt "${g}.old" ] ; then
+    echo "Updating rebase information for installed dynamic objects in ${g}."
+    grep -E "\.(${doSuffixes})\$" "${f}" >>"${g}"
+  fi
+  update_file "${g}"
+}
+
+rebase_dyn () {
+  local IFS f g
+  g="${b}/rebase_dyn"
+  check_file "${g}" "${rebuild}"
+  old_file "${g}"
+  dyndirs
+  if [ "x" = "${dynLocs:-x}" ] ; then
+    [ "yes" = "${debug}" ] && echo "dynLocs empty"
+    touch "${g}"
+  else
+    echo "Looking for dynamic language modules/libraries in:"
+    IFS="${ret}"
+    for d in ${dynLocs} ; do
+      echo "  ${d}" ;
+      [ -d "${d}" ] && find "${d}" -xdev -regextype posix-extended -regex ".*\.(${doSuffixes})$" -newer "${g}.old" >>"${g}"
+    done
+    for f in ${dynFLocs} ; do
+      echo "  ${f}" ;
+      grep -vE "\.(${exeSuffixes})\$" "${f}" >>"${g}"
+    done
+  fi
+  echo "Updating rebase information for dynamic language modules/libraries ${g}."
+  update_file "${g}"
+}
+
+rebase_dyn_exe () {
+  local IFS f g
+  g="${b}/rebase_dyn_exe"
+  check_file "${g}" "${rebuild}"
+  old_file "${g}"
+  dyndirs
+  if [ "x" = "${dynFLocs:-x}" ] ; then
+    [ "yes" = "${debug}" ] && echo "dynFLocs empty"
+    touch "${g}"
+  else
+    IFS="${ret}"
+    for d in ${dynLocs} ; do
+      echo "  ${d}" ;
+      [ -d "${d}" ] && find "${d}" -xdev -regextype posix-extended -regex ".*\.(${exeSuffixes})$" -newer "${g}.old" >>"${g}"
+    done
+    for f in ${dynFLocs} ; do
+      echo "  ${f}" ;
+      grep -E "\.(${exeSuffixes})\$" "${f}" >>"${g}"
+    done
+  fi
+  echo "Updating rebase information for user-defined executables ${g}."
+  update_file "${g}"
+}
+
+if [ "$#" = "0" ] ; then
+  set -- "--help"
+fi
+while [ "$#" -gt 0 ] ; do
+  [ "yes" = "${debug}" ] && echo "in $#: $@"
+  case "$1" in
+    --verbose )
+      verbose=--verbose
+      ;;
+    --debug )
+      debug=yes
+      ;;
+    --cleardb )
+      cleardb=yes
+      ;;
+    --rebuild )
+      rebuild=yes
+      ;;
+    --noaslr )
+      noaslr=yes
+      ;;
+    --no-rebuild )
+      rebuild=no
+      ;;
+    rebase )
+      rebase_do "${cleardb}" "${b}/rebase_dyn" "${b}/rebase_lst"
+      ;;
+    peflags )
+      peflags_do "${b}/rebase_dyn_exe"
+      ;;
+    update )
+      shift
+      set -- dummy dyn lst $@
+      ;;
+    pkg )
+      rebase_pkg
+      ;;
+    lst )
+      rebase_lst
+      rebase_exe
+      ;;
+    dyn )
+      rebase_dyn
+      rebase_dyn_exe
+      ;;
+    -h|--help|* )
+      usage
+      exit 127
+      ;;
+  esac
+  shift
+  [ "yes" = "${debug}" ] && echo "out $#: $@"
+done
+exit 0

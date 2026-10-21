@@ -24,7 +24,24 @@ import javax.swing.*;
  * {@link WindowManager}; this is never constructed in headless tests.
  */
 public final class WindowFrame {
-    private final JFrame frame = new JFrame("Jasper");
+    private Runnable firstVisiblePaint;
+    private boolean paintNotificationQueued;
+    private final JFrame frame = new JFrame("Jasper") {
+        @Override public void paint(java.awt.Graphics graphics) {
+            super.paint(graphics);
+            if (!isShowing() || firstVisiblePaint == null || paintNotificationQueued) return;
+            Toolkit.getDefaultToolkit().sync();
+            paintNotificationQueued = true;
+            // Let the native paint finish before removing the splash covering this window.
+            SwingUtilities.invokeLater(() -> {
+                paintNotificationQueued = false;
+                if (closed || !isShowing()) return;
+                Runnable ready = firstVisiblePaint;
+                firstVisiblePaint = null;
+                if (ready != null) ready.run();
+            });
+        }
+    };
     private final WindowContent content;
     private final JasperWindow.Events events;
     private final MacTitleBar titleBar;
@@ -146,6 +163,15 @@ public final class WindowFrame {
         frame.addWindowStateListener(listener);
     }
 
+    /**
+     * Runs once after this visible window has painted its complete workspace. Register before showing it. EDT.
+     *
+     * @param ready notified after native painting returns
+     */
+    public void afterFirstVisiblePaint(Runnable ready) {
+        firstVisiblePaint = java.util.Objects.requireNonNull(ready, "ready");
+    }
+
     /** @return what this frame does for its window */
     public WindowShell shell() {
         return new WindowShell(this::show, this::toFront, this::dispose, this::discard, () -> frame, this::owns, this::placeWorkspace);
@@ -239,6 +265,7 @@ public final class WindowFrame {
     private void dispose() {
         if (closed) return;
         closed = true;
+        firstVisiblePaint = null;
         frame.removeComponentListener(geometry);
         frame.removeWindowStateListener(listener);
         if (glass != null) glass.close();

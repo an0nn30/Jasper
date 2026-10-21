@@ -12,6 +12,7 @@ dependencies {
     testImplementation(project(":jasper-sdk-testkit"))
     testImplementation(testFixtures(project(":jasper-sdk-testkit")))
     implementation("org.tomlj:tomlj:1.1.1")
+    implementation("net.java.dev.jna:jna-platform:5.14.0")
     implementation("com.formdev:flatlaf:3.7")
     implementation("org.jetbrains.runtime:jbr-api:1.9.0")
     implementation("com.formdev:flatlaf-extras:3.7")
@@ -40,21 +41,15 @@ application {
 
 // Bundled plugins are separate jars in plugins/<id>/, never on the application classpath.
 val stagePlugins = tasks.register<Sync>("stagePlugins") {
-    from(project(":jasper-plugin-sample").tasks.named("jar")) { into("dev.jasper.sample") }
-        from(project(":jasper-plugin-snippets").tasks.named("jar")) { into("dev.jasper.snippets") }
-        from(project(":jasper-plugin-snippets").configurations.named("runtimeClasspath")) { into("dev.jasper.snippets") }
-    from(project(":jasper-plugin-history").tasks.named("jar")) { into("dev.jasper.history") }
-    from(project(":jasper-plugin-vault").tasks.named("jar")) { into("dev.jasper.vault") }
-    from(project(":jasper-plugin-vault").configurations.named("runtimeClasspath")) { into("dev.jasper.vault") }
-    from(project(":jasper-plugin-remote").tasks.named("jar")) { into("dev.jasper.remote") }
-    from(project(":jasper-plugin-remote").configurations.named("runtimeClasspath")) { into("dev.jasper.remote") }
-    from(project(":jasper-plugin-editor").tasks.named("jar")) { into("dev.jasper.editor") }
-    from(project(":jasper-plugin-editor").configurations.named("runtimeClasspath")) { into("dev.jasper.editor") }
-    from(project(":jasper-plugin-fileserver").tasks.named("jar")) { into("dev.jasper.fileserver") }
-    from(project(":jasper-plugin-fileserver").configurations.named("runtimeClasspath")) { into("dev.jasper.fileserver") }
-    from(project(":jasper-plugin-indexer").tasks.named("jar")) { into("dev.jasper.indexer") }
-    from(project(":jasper-plugin-indexer").configurations.named("runtimeClasspath")) { into("dev.jasper.indexer") }
-    from(project(":jasper-plugin-enterprise").tasks.named("jar")) { into("dev.jasper.enterprise") }
+    from(project(":jasper-plugin-sample").tasks.named("stagePlugin")) { into("dev.jasper.sample") }
+    from(project(":jasper-plugin-snippets").tasks.named("stagePlugin")) { into("dev.jasper.snippets") }
+    from(project(":jasper-plugin-history").tasks.named("stagePlugin")) { into("dev.jasper.history") }
+    from(project(":jasper-plugin-vault").tasks.named("stagePlugin")) { into("dev.jasper.vault") }
+    from(project(":jasper-plugin-remote").tasks.named("stagePlugin")) { into("dev.jasper.remote") }
+    from(project(":jasper-plugin-editor").tasks.named("stagePlugin")) { into("dev.jasper.editor") }
+    from(project(":jasper-plugin-fileserver").tasks.named("stagePlugin")) { into("dev.jasper.fileserver") }
+    from(project(":jasper-plugin-indexer").tasks.named("stagePlugin")) { into("dev.jasper.indexer") }
+    from(project(":jasper-plugin-enterprise").tasks.named("stagePlugin")) { into("dev.jasper.enterprise") }
     into(layout.buildDirectory.dir("plugins"))
 }
 // installDist and the distribution archives carry them beside the application jar, where the runtime looks.
@@ -66,6 +61,12 @@ distributions { main { contents {
 } } }
 // Jasper's own license has one copy, at the root; the Licenses window reads it from the jar.
 tasks.named<ProcessResources>("processResources") {
+    // Package the same approved artwork as the companion, without importing Buddy internals.
+    from(rootProject.file("jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png")) {
+        into("dev/jasper/app/splash")
+        rename { "jasper-pixel.png" }
+    }
+
     from(rootProject.file("LICENSE.md")) {
         into("dev/jasper/app/about/licenses")
         rename { "jasper.md" }
@@ -73,7 +74,7 @@ tasks.named<ProcessResources>("processResources") {
 }
 // A development launch keeps its own home (plugins, consent, data, history, snippets, logs, socket)
 // under build/, apart from the installed app's ~/.config/jasper. The IntelliJ run configuration in
-// .run/ sets the same two properties. Override with -Pjasper.home=<dir> or the JASPER_HOME variable.
+// .run/ sets the same two properties. Override with -Pjasper.home=<dir>; this property wins over JASPER_HOME.
 tasks.named<JavaExec>("run") {
     dependsOn(stagePlugins)
     systemProperty("jasper.plugins.bundled", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
@@ -154,23 +155,16 @@ tasks.register<JavaExec>("settingsPreview") {
 // Explicit opt-in verification tools. They use real app components from the test
 // runtime, but check never runs them and they never create a native window.
 for ((taskName, entryPoint) in listOf(
-    "hostedContentPreview" to "HostedContentPreview",
-    "commandPalettePreview" to "CommandPalettePreview",
-    "titleBarPreview" to "TitleBarPreview",
-    "commandSearchMeasurement" to "CommandSearchMeasurement",
-    "shellHistorySearchMeasurement" to "ShellHistorySearchMeasurement",
+    "hostedContentPreview" to "dev.jasper.app.workspace.HostedContentPreview",
+    "commandPalettePreview" to "dev.jasper.app.workspace.CommandPalettePreview",
+    "titleBarPreview" to "dev.jasper.app.workspace.TitleBarPreview",
+    "commandSearchMeasurement" to "dev.jasper.app.commands.CommandSearchMeasurement",
 )) {
     tasks.register<JavaExec>(taskName) {
         group = "verification"
         dependsOn(tasks.testClasses)
         classpath = sourceSets["test"].runtimeClasspath
-        mainClass = when (entryPoint) {
-            "HostedContentPreview" -> "dev.jasper.app.workspace.$entryPoint"
-            "CommandPalettePreview" -> "dev.jasper.app.workspace.$entryPoint"
-            "TitleBarPreview" -> "dev.jasper.app.workspace.$entryPoint"
-            "CommandSearchMeasurement" -> "dev.jasper.app.commands.$entryPoint"
-            else -> "dev.jasper.app.history.$entryPoint"
-        }
+        mainClass = entryPoint
         jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
         providers.gradleProperty("jasper.uiScale").orNull?.let {
             systemProperty("flatlaf.uiScale", it)
@@ -198,6 +192,7 @@ tasks.test {
         rootProject.file("README.md"), rootProject.file("AGENTS.md"),
         rootProject.file("jasper-app/README.md"), rootProject.file("jasper-terminal/README.md"),
         rootProject.file("jasper-buddy/README.md"), rootProject.file("jasper-sdk/README.md"),
+        rootProject.file("jasper-ui/README.md"), rootProject.file("jasper-sdk-testkit/README.md"), rootProject.file("tools/visual/README.md"),
         // Sources only: the plugin project's build directory holds other tasks' outputs and must not be an input here.
         rootProject.fileTree("plugins/sample/src") { include("**/*.java") }, rootProject.fileTree("packaging") { include("**/*.md") },
         // The example external plugin's descriptor and build script (not its own build output).
@@ -288,3 +283,5 @@ tasks.register<JavaExec>("pluginManagerStatesPreview") {
     args(layout.buildDirectory.dir("theme-surfaces9b/plugin-states").get().asFile.absolutePath)
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
 }
+
+apply(from = rootProject.file("gradle/cygwin.gradle"))

@@ -1,0 +1,179 @@
+Package source: x86_64/release/sqlite3/sqlite3-3.49.1-1-src.tar.xz
+License identifier: LicenseRef-Upstream-libsqlite3_0
+
+--- sqlite3-3.49.1-1.src/sqlite3-3.49.1-1.cygport ---
+CROSS_HOST="x86_64-w64-mingw32"
+
+HOMEPAGE="http://www.sqlite.org/"
+
+ORIG_PV=`echo $PV | tr . ' ' | awk -e '{printf "%1d%02d%02d%02d", $1, $2, $3, $4;}'`
+#ORIG_PV="3270200"
+SRC_DIR="sqlite-autoconf-${ORIG_PV}"
+SRC_URI="http://www.sqlite.org/2025/${SRC_DIR}.tar.gz"
+
+EXEPKG="${PN}"
+TCLPKG="tcl-${PN}"
+TCLPKG_=`echo $TCLPKG | tr -- - _`
+RBUPKG="${PN}-rbu"
+RBUPKG_=`echo $RBUPKG | tr -- - _`
+VFSLOGPKG="${PN}-vfslog"
+VFSLOGPKG_=`echo $VFSLOGPKG | tr -- - _`
+WINPKG="mingw64-x86_64-${PN}"
+WINPKG_=`echo $WINPKG | tr -- - _`
+LIBPKG="lib${PN}_0"
+DEVPKG="lib${PN}-devel"
+DEVPKG_=`echo $DEVPKG | tr -- - _`
+EXTPKG="${PN}-extensions"
+EXTPKG_=`echo $EXTPKG | tr -- - _`
+COMPRESSPKG="${PN}-compress"
+COMPRESSPKG_=`echo $COMPRESSPKG | tr -- - _`
+ICUPKG="${PN}-icu"
+ICUPKG_=`echo $ICUPKG | tr -- - _`
+PKG_NAMES="$EXEPKG $DEVPKG $TCLPKG $RBUPKG $VFSLOGPKG $WINPKG $LIBPKG $EXTPKG $COMPRESSPKG $ICUPKG"
+
+DESCRIPTION=$(cat <<LDESCDOC
+SQLite is a C library that implements an embeddable SQL database
+engine.  Programs that link with the SQLite library can have SQL
+database access without running a separate RDBMS process. The
+distribution comes with a standalone command-line access program
+(sqlite3) that can be used to administer an SQLite database and which
+serves as an example of how to use the SQLite library.
+LDESCDOC
+)
+
+eval "${EXEPKG}_CONTENTS='usr/bin/sqlite3_analyzer usr/bin/sqlite3.exe usr/bin/sqldiff.exe usr/share/man/man1/  usr/share/doc/'"
+eval "${EXEPKG}_CATEGORY='Database'"
+eval "${EXEPKG}_SUMMARY='Client program for accessing SQLite 3 databases, plus docs'"
+
+eval "${DEVPKG_}_CONTENTS='usr/include/ usr/lib/libsqlite3*.dll.a usr/lib/pkgconfig/'"
+eval "${DEVPKG_}_CATEGORY='Database Devel'"
+eval "${DEVPKG_}_SUMMARY='Header and library files for building programs against SQLite'"
+
+eval "${TCLPKG_}_CONTENTS='usr/lib/sqlite3/ usr/share/man/mann/'"
+eval "${TCLPKG_}_CATEGORY='Database Tcl'"
+eval "${TCLPKG_}_SUMMARY='Tcl bindings for SQLite'"
+
+eval "${VFSLOGPKG_}_CONTENTS='usr/bin/cygsqlite3vfslog-0.dll'"
+eval "${VFSLOGPKG_}_CATEGORY='Database'"
+eval "${VFSLOGPKG_}_SUMMARY='vfslog extension for SQLite'"
+
+eval "${WINPKG_}_CONTENTS=''"
+eval "${WINPKG_}_CATEGORY='Database Devel'"
+eval "${WINPKG_}_SUMMARY='SQLite for Win64 toolchain'"
+
+eval "${LIBPKG}_CONTENTS='usr/bin/cygsqlite3-0.dll'"
+eval "${LIBPKG}_CATEGORY='Database Libs'"
+eval "${LIBPKG}_SUMMARY='An embeddable SQL database engine (library)'"
+
+eval "${RBUPKG_}_CONTENTS='usr/bin/rbu.exe usr/bin/cygsqlite3rbu-0.dll'"
+eval "${RBUPKG_}_CATEGORY='Database Libs'"
+eval "${RBUPKG_}_SUMMARY='RBU extension for SQLite'"
+
+eval "${EXTPKG_}_CONTENTS='usr/bin/cygsqlite3amatch-0.dll usr/bin/cygsqlite3anycollseq-0.dll usr/bin/cygsqlite3carray-0.dll usr/bin/cygsqlite3closure-0.dll usr/bin/cygsqlite3completion-0.dll usr/bin/cygsqlite3csv-0.dll usr/bin/cygsqlite3eval-0.dll usr/bin/cygsqlite3fileio-0.dll usr/bin/cygsqlite3fuzzer-0.dll usr/bin/cygsqlite3ieee754-0.dll usr/bin/cygsqlite3memvfs-0.dll usr/bin/cygsqlite3nextchar-0.dll usr/bin/cygsqlite3percentile-0.dll usr/bin/cygsqlite3regexp-0.dll usr/bin/cygsqlite3remember-0.dll usr/bin/cygsqlite3rot13-0.dll usr/bin/cygsqlite3series-0.dll usr/bin/cygsqlite3stmt-0.dll usr/bin/cygsqlite3sha1-0.dll usr/bin/cygsqlite3shathree-0.dll usr/bin/cygsqlite3showauth-0.dll usr/bin/cygsqlite3spellfix-0.dll usr/bin/cygsqlite3totype-0.dll usr/bin/cygsqlite3unionvtab-0.dll usr/bin/cygsqlite3vtshim-0.dll usr/bin/cygsqlite3vfsstat-0.dll usr/bin/cygsqlite3wholenumber-0.dll'"
+eval "${EXTPKG_}_CATEGORY='Database'"
+eval "${EXTPKG_}_SUMMARY='various extensions for SQLite'"
+
+eval "${COMPRESSPKG_}_CONTENTS='usr/bin/cygsqlite3compress-0.dll'"
+eval "${COMPRESSPKG_}_CATEGORY='Database'"
+eval "${COMPRESSPKG_}_SUMMARY='Zlib extension for SQLite'"
+
+eval "${ICUPKG_}_CONTENTS='usr/bin/cygsqlite3icu-0.dll'"
+eval "${ICUPKG_}_CATEGORY='Database'"
+eval "${ICUPKG_}_SUMMARY='ICU extension for SQLite'"
+
+DISTCLEANFILES="sqlite3.pc"
+NO_AUTOHEADER=1
+
+CPPFLAGS="$CPPFLAGS \
+	-DHAVE_MALLOC_H \
+	-DHAVE_MALLOC_USABLE_SIZE \
+	-DSQLITE_ENABLE_DBPAGE_VTAB=1 \
+	-DSQLITE_ENABLE_DBSTAT_VTAB=1 \
+	-DSQLITE_ENABLE_FTS5=1 \
+	-DSQLITE_ENABLE_STAT4=1 \
+	-DSQLITE_ENABLE_UNLOCK_NOTIFY=1 \
+	-DSQLITE_ENABLE_UPDATE_DELETE_LIMIT=1 \
+	-DSQLITE_OMIT_LOOKASIDE \
+	-DSQLITE_OS_UNIX=1 \
+	-DSQLITE_OS_WIN=1 \
+	-DSQLITE_SECURE_DELETE=1 \
+	-DSQLITE_ENABLE_SESSION=1 \
+	-DSQLITE_ENABLE_PREUPDATE_HOOK=1 \
+	-DSQLITE_SOUNDEX=1 \
+	-DSQLITE_TEMP_STORE=1 \
+	-DSQLITE_USE_FCNTL_TRACE=1 \
+	-DUSE_SYSTEM_SQLITE=1"
+
+
+src_compile() {
+	cd ${S}
+	cygautoreconf
+	cd ${S}/tea
+	cygautoreconf
+
+	cd ${B}
+	cygconf --disable-static-shell --enable-readline --disable-editline --enable-fts5 --enable-json1
+	cygmake
+
+	mkdir -p ${B}/tea
+	cd ${B}/tea
+	CFLAGS+=" -I${S}"
+	LIBS+=" -L${B}/.libs"
+	cygconf --with-system-sqlite
+	cygmake
+}
+
+src_install() {
+	cd ${B}
+	cyginstall
+	cd ${B}/tea
+	cyginstall
+}
+
+Source archive: x86_64/release/sqlite3/sqlite3-3.49.1-1-src.tar.xz
+
+--- sqlite3-3.49.1-1.src/sqlite-autoconf-3490100.tar.gz!/sqlite-autoconf-3490100/autosetup/LICENSE ---
+Unless explicitly stated, all files which form part of autosetup
+are released under the following license:
+
+---------------------------------------------------------------------
+autosetup - A build environment "autoconfigurator"
+
+Copyright (c) 2010-2011, WorkWare Systems <http://workware.net.au/>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above
+   copyright notice, this list of conditions and the following
+   disclaimer in the documentation and/or other materials
+   provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE WORKWARE SYSTEMS ``AS IS'' AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL WORKWARE
+SYSTEMS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The views and conclusions contained in the software and documentation
+are those of the authors and should not be interpreted as representing
+official policies, either expressed or implied, of WorkWare Systems.
+
+
+--- sqlite3-3.49.1-1.src/sqlite-autoconf-3490100.tar.gz!/sqlite-autoconf-3490100/tea/license.terms ---
+The author disclaims copyright to this source code.  In place of
+a legal notice, here is a blessing:
+
+    May you do good and not evil.
+    May you find forgiveness for yourself and forgive others.
+    May you share freely, never taking more than you give.

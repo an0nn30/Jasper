@@ -21,7 +21,7 @@ class ShellIntegrationScriptsTest {
         Path target = dir.resolve("shell-integration");
         assertThat(ShellIntegrationScripts.install(target)).isEqualTo(target);
         assertThat(ShellIntegrationScripts.FILES).containsExactly("jasper.zsh", "jasper.bash", "jasper.fish",
-            "zsh/.zshenv", "zsh/.zprofile", "zsh/.zshrc", "zsh/.zlogin", "bash/rc.bash", "fish/fish/vendor_conf.d/jasper.fish");
+            "zsh/.zshenv", "zsh/.zprofile", "zsh/.zshrc", "zsh/.zlogin", "bash/rc.bash", "bash/cygwin.bash", "fish/fish/vendor_conf.d/jasper.fish");
         for (String name : ShellIntegrationScripts.FILES) {
             assertThat(target.resolve(name)).isRegularFile();
             assertThat(Files.readAllBytes(target.resolve(name))).isEqualTo(ShellIntegrationScripts.bundled(name));
@@ -43,8 +43,8 @@ class ShellIntegrationScriptsTest {
         // plumbing, both PROMPT_COMMAND forms, the readonly guards and the HISTCONTROL check.
         // Raised from 115 to 125 for the tmux passthrough wrapper, which all three scripts carry;
         // zsh and fish absorbed it inside their existing budgets and bash was already the closest
-        // to its ceiling. The budgets exist to keep these scripts readable, not to freeze them.
-        for (Map.Entry<String, Integer> budget : Map.of("jasper.zsh", 90, "jasper.fish", 90, "jasper.bash", 125).entrySet()) {
+        // to its ceiling. Cygwin mount-aware OSC 7 conversion raises bash to 135. The budgets exist to keep these scripts readable, not to freeze them.
+        for (Map.Entry<String, Integer> budget : Map.of("jasper.zsh", 90, "jasper.fish", 90, "jasper.bash", 135).entrySet()) {
             String text = Files.readString(target.resolve(budget.getKey()), StandardCharsets.UTF_8);
             assertThat(text).contains("TERM_PROGRAM").contains("JASPER_INTEGRATION_LOADED").contains("133;C").contains("1341;jasper;cmd;");
             // Without this every mark dies inside a tmux pane, and nothing else here would notice.
@@ -55,7 +55,7 @@ class ShellIntegrationScriptsTest {
             for (String name : List.of("jasper.zsh", "zsh/.zshenv", "zsh/.zprofile", "zsh/.zshrc", "zsh/.zlogin"))
                 assertThat(exit(List.of("/bin/zsh", "-n", target.resolve(name).toString()))).as(name).isZero();
         if (Files.isExecutable(Path.of("/bin/bash")))
-            for (String name : List.of("jasper.bash", "bash/rc.bash"))
+            for (String name : List.of("jasper.bash", "bash/rc.bash", "bash/cygwin.bash"))
                 assertThat(exit(List.of("/bin/bash", "-n", target.resolve(name).toString()))).as(name).isZero();
         Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/zsh")) || Files.isExecutable(Path.of("/bin/bash")), "no shell to syntax-check");
     }

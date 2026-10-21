@@ -68,6 +68,8 @@ final class WorkspaceActions {
             case SPLIT_DOWN -> owner.split(Side.DOWN);
             case MAXIMIZE_PANE -> owner.toggleMaximize();
             case TOGGLE_ZEN_MODE -> owner.toggleZenMode();
+            case TOGGLE_RAIL -> owner.setRailVisible(!owner.railVisible());
+            case TOGGLE_STATUS_BAR -> owner.chooseStatusVisible(!owner.statusVisible());
             case FOCUS_PANE_LEFT -> owner.focusGroup(Side.LEFT);
             case FOCUS_PANE_RIGHT -> owner.focusGroup(Side.RIGHT);
             case FOCUS_PANE_UP -> owner.focusGroup(Side.UP);
@@ -88,6 +90,7 @@ final class WorkspaceActions {
             case FONT_BIGGER -> view.setFontSize(view.fontSize() + 1);
             case FONT_SMALLER -> view.setFontSize(view.fontSize() - 1);
             case FONT_RESET -> view.setFontSize(owner.configuredFontSize());
+            case MANAGE_CYGWIN_PACKAGES -> owner.onManageCygwinPackages.run();
             case OPEN_SETTINGS -> owner.openSettings();
             case RELOAD_CONFIG -> owner.reloadConfiguration();
         }
@@ -116,6 +119,7 @@ final class WorkspaceActions {
                 boolean contentEnabled = content != null && (id == ActionId.CLOSE_PANE
                     || contentKey != null && content.commands().stream().anyMatch(c -> c.id().equals(contentKey) && c.enabled()));
                 boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
+                    case MANAGE_CYGWIN_PACKAGES -> id.availableOn(System.getProperty("os.name", "")) && owner.onManageCygwinPackages != null;
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
                     case COMMAND_PALETTE, NEW_TAB, NEW_TERMINAL_WINDOW, CLOSE_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT,
@@ -127,6 +131,8 @@ final class WorkspaceActions {
                     // A tab's only pane, a pinned item and one being closed stay (workspace plan 8b Rulings 9).
                     case MOVE_PANE_TO_NEW_TAB -> owner.mayMoveToNewTab(owner.selectedTab());
                     case TOGGLE_ZEN_MODE -> owner.isMain();
+                    // A child window has no status bar or rail of its own (workspace tabs spec 6.3).
+                    case TOGGLE_RAIL, TOGGLE_STATUS_BAR -> owner.isMain() && !owner.zenMode();
                     case PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case CLEAR_TERMINAL -> ready && !pane.session().usingAlternateBuffer();

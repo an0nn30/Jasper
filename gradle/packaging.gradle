@@ -35,6 +35,9 @@ def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
 // Workspace-tabs spec 5.4: Jasper appears in Open With and takes drops on its Dock icon for text, source code and
 // folders, without claiming any of them as their default application.
 def macDocumentTypes = '[{"CFBundleTypeName":"Text","CFBundleTypeRole":"Editor","LSHandlerRank":"Alternate","LSItemContentTypes":["public.text","public.source-code"]},{"CFBundleTypeName":"Folder","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["public.folder"]}]'
+// Windows shows it as the launcher's file description, which Task Manager lists as the process name;
+// Linux packages use it as their summary and the menu entry's comment.
+def packageDescription = 'Jasper DevOps workstation'
 // Modern macOS renders the full-canvas tab artwork from this Icon Composer catalog.
 def macIconCatalog = rootProject.file('packaging/icons/macos/Assets.car')
 def macIconName = 'Jasper'
@@ -284,7 +287,7 @@ def packageApp = tasks.register('packageApp') {
         imageDir.mkdirs()
         List<String> args = [context.jpackage.absolutePath, jpackageLauncherOption(), '--type', 'app-image',
             '--name', 'Jasper', '--app-version', context.version,
-            '--description', 'Jasper terminal', '--vendor', 'Jasper',
+            '--description', packageDescription, '--vendor', 'Jasper',
             '--input', inputDirectory.get().asFile.absolutePath, '--dest', imageDir.absolutePath,
             '--main-jar', jarTask.get().archiveFile.get().asFile.name,
             '--main-class', app.mainClass.get(),
@@ -340,12 +343,93 @@ def packageApp = tasks.register('packageApp') {
                 installBundledNatives(new File(imageDir, 'Jasper/app'), context.host)
                 installCommandClient(new File(imageDir, 'Jasper'), 'windows')
                 installWatcher(new File(imageDir, 'Jasper'), 'windows')
+                Files.copy(rootProject.file('packaging/windows/cygwin/installer/provision-cygwin.cmd').toPath(), new File(imageDir, 'Jasper/provision-cygwin.cmd').toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
             }
             marker.text = "${context.version} ${context.host.os} ${context.host.architecture}\n"
         } catch (Exception failure) {
             delete(imageDir, marker)
             throw failure
         }
+    }
+}
+
+// A separate staging tree deliberately excludes the locally compiled launcher, CLI and platform bridges.
+def userInput = packagingRoot.map { it.dir('windows-user/input') }
+def userImage = packagingRoot.map { it.dir('windows-user/image') }
+def stageWindowsUser = tasks.register('stageWindowsUser', Sync) {
+    from(jarTask.flatMap { it.archiveFile })
+    from(configurations.runtimeClasspath)
+    from(tasks.named('stagePlugins')) { into('plugins') }
+    from(rootProject.file('config.example.toml'))
+    into(userInput)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+def packageWindowsUser = tasks.register('packageWindowsUser') {
+    group = 'distribution'
+    description = 'Builds a Windows app image with the standard JBR launcher; no native compiler or installer.'
+    dependsOn(stageWindowsUser)
+    // Always rebuild: this image is a local installation input, not a release artifact.
+    doLast {
+        if (normalizedHost().os != 'windows') throw new GradleException('Windows user installation requires Windows.')
+        def context = nativeContext()
+        File destination = userImage.get().asFile
+        delete(destination)
+        destination.mkdirs()
+        List<String> args = [context.jpackage.absolutePath, '--type', 'app-image',
+            '--name', 'Jasper', '--app-version', context.version, '--vendor', 'Jasper',
+            '--input', userInput.get().asFile.absolutePath, '--dest', destination.absolutePath,
+            '--main-jar', jarTask.get().archiveFile.get().asFile.name, '--main-class', app.mainClass.get(),
+            '--icon', nativeIcon.get().absolutePath,
+            '--add-modules', runtimeRootModules('windows').join(','), '--jlink-options', jlinkOptions]
+        app.applicationDefaultJvmArgs.each { args.addAll(['--java-options', it.toString()]) }
+        bundledNativeJvmOptions('windows').each { args.addAll(['--java-options', it]) }
+        executeNative(args, 'jpackage Windows user app-image')
+        File image = new File(destination, 'Jasper')
+        removePluginClasspath(new File(image, 'app/Jasper.cfg'))
+        installBundledNatives(new File(image, 'app'), context.host)
+        Files.copy(rootProject.file('packaging/windows/cygwin/installer/provision-cygwin.cmd').toPath(), new File(image, 'provision-cygwin.cmd').toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    }
+}
+def userInstallerLibraries = configurations.create('windowsUserInstallerLibraries')
+dependencies.add(userInstallerLibraries.name, 'net.java.dev.jna:jna-platform:5.14.0')
+def userInstallerClasses = layout.buildDirectory.dir('windows-user-installer/classes')
+def compileUserInstaller = tasks.register('compileWindowsUserInstaller', JavaCompile) {
+    source(rootProject.fileTree('packaging/windows/user-install') { include('*.java') })
+    classpath = userInstallerLibraries
+    destinationDirectory = userInstallerClasses
+    javaCompiler = toolchains.compilerFor(java.toolchain)
+}
+def testUserInstaller = tasks.register('verifyWindowsUserInstall', JavaExec) {
+    group = 'verification'
+    description = 'Tests the Java user installer; also exercises Windows shell APIs on Windows.'
+    dependsOn(compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstallTest'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+}
+tasks.named('check') { dependsOn(testUserInstaller) }
+tasks.register('installWindowsUser', JavaExec) {
+    group = 'distribution'
+    description = 'Installs Jasper in APPDATA with a Start Menu shortcut, without MSVC or administrator rights.'
+    dependsOn(packageWindowsUser, compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstall'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+    args('install', new File(userImage.get().asFile, 'Jasper').absolutePath)
+}
+tasks.register('uninstallWindowsUser', JavaExec) {
+    group = 'distribution'
+    description = 'Removes the Windows user installation and its shortcut, preserving Jasper user data.'
+    dependsOn(compileUserInstaller)
+    classpath = files(userInstallerClasses, userInstallerLibraries)
+    javaLauncher = launcher
+    mainClass = 'UserInstall'
+    jvmArgs('--enable-native-access=ALL-UNNAMED')
+    args('uninstall')
+    doFirst {
+        if (normalizedHost().os != 'windows') throw new GradleException('Windows user uninstallation requires Windows.')
     }
 }
 
@@ -718,7 +802,7 @@ if (normalizedHost().os == 'windows') {
     tasks.register('packageInstaller') {
         group = 'distribution'
         description = 'Creates and verifies a per-user Windows setup wizard (requires WiX on PATH).'
-        dependsOn(verifyPackage)
+        dependsOn(verifyPackage, 'compileCygwinBundle')
         inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.file(installerVerifier).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.property('version', version)
@@ -732,14 +816,20 @@ if (normalizedHost().os == 'windows') {
             File temporary = new File(packagingRoot.get().asFile, 'installer-work')
             delete(artifact, temporary)
             temporary.mkdirs()
+            File shortImage = Files.createTempDirectory('jpi').toFile()
             try {
+                executeNative([new File(context.sdkHome, 'bin/java.exe').absolutePath, '-cp', layout.buildDirectory.dir('cygwin/classes').get().asFile.absolutePath,
+                    'CygwinInstallerTemplate', 'stage-image', new File(imageDirectory.get().asFile, 'Jasper').absolutePath, shortImage.absolutePath], 'Stage WiX app image')
                 File output = new File(temporary, 'output')
                 File work = new File(temporary, 'jpackage')
+                File resources = new File(temporary, 'resources')
+                executeNative([new File(context.sdkHome, 'bin/java.exe').absolutePath, '-cp', layout.buildDirectory.dir('cygwin/classes').get().asFile.absolutePath,
+                    'CygwinInstallerTemplate', new File(context.sdkHome, 'jmods/jdk.jpackage.jmod').absolutePath, resources.absolutePath], 'Cygwin installer hook')
                 executeNative([context.jpackage.absolutePath, jpackageLauncherOption(), '--type', 'exe', '--name', 'Jasper',
-                    '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
+                    '--app-version', context.version, '--vendor', 'Jasper', '--description', packageDescription,
                     '--icon', nativeIcon.get().absolutePath,
-                    '--app-image', new File(imageDirectory.get().asFile, 'Jasper').absolutePath,
-                    '--dest', output.absolutePath, '--temp', work.absolutePath,
+                    '--app-image', shortImage.absolutePath,
+                    '--dest', output.absolutePath, '--temp', work.absolutePath, '--resource-dir', resources.absolutePath,
                     '--win-per-user-install', '--install-dir', 'Jasper', '--win-dir-chooser',
                     '--win-menu', '--win-menu-group', 'Jasper', '--win-shortcut', '--win-shortcut-prompt',
                     '--win-upgrade-uuid', upgradeUuid], 'jpackage Windows setup (install WiX and add it to PATH)')
@@ -757,6 +847,7 @@ if (normalizedHost().os == 'windows') {
                 logger.lifecycle(verification.stdout.trim())
                 Files.move(generated.toPath(), artifact.toPath())
             } finally {
+                delete(shortImage)
                 // Keep failed build inputs for diagnosis; never publish an unverified setup.
                 if (artifact.isFile()) delete(temporary)
             }
@@ -783,6 +874,9 @@ if (normalizedHost().os == 'windows') {
         aarch64: [deb: 'arm64', rpm: 'aarch64'],
     ][normalizedHost().architecture]
     def installRoot = '/opt/jasper'
+    // A terminal emulator first (desktops list TerminalEmulator entries as default-terminal choices), and a
+    // remote access tool for its SSH sessions, transfers and tunnels.
+    def menuCategories = 'System;TerminalEmulator;Network;RemoteAccess;'
 
     // jpackage's rpm spec turns rpmbuild's dependency scan off and asks the host's rpm database instead,
     // which is empty on a Debian-family build machine. Require the image's external shared libraries by
@@ -860,7 +954,7 @@ if (normalizedHost().os == 'windows') {
         }
         File desktop = new File(installed, 'lib').listFiles()?.find { it.name.endsWith('.desktop') }
         String entry = desktop?.getText('UTF-8') ?: ''
-        if (!entry.contains("${installRoot}/bin/Jasper") || !entry.contains("${installRoot}/lib/Jasper.png") || !entry.contains('TerminalEmulator')) {
+        if (!entry.contains("${installRoot}/bin/Jasper") || !entry.contains("${installRoot}/lib/Jasper.png") || !entry.contains("Categories=${menuCategories}")) {
             throw new GradleException("${label} verification failed: the desktop entry is missing or incomplete\n${entry}")
         }
     }
@@ -892,13 +986,13 @@ if (normalizedHost().os == 'windows') {
                     Files.copy(nativeIcon.get().toPath(), new File(resources, 'Jasper.png').toPath())
                     writeInstallScripts(context.sdkHome, resources, type)
                     List<String> args = [context.jpackage.absolutePath, jpackageLauncherOption(), '--type', type, '--name', 'Jasper',
-                        '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
+                        '--app-version', context.version, '--vendor', 'Jasper', '--description', packageDescription,
                         '--about-url', 'https://github.com/an0nn30/Jasper',
                         '--icon', nativeIcon.get().absolutePath,
                         '--app-image', image.absolutePath, '--resource-dir', resources.absolutePath,
                         '--dest', output.absolutePath, '--temp', new File(temporary, 'jpackage').absolutePath,
                         '--linux-package-name', 'jasper', '--linux-shortcut',
-                        '--linux-menu-group', 'System;TerminalEmulator;',
+                        '--linux-menu-group', menuCategories,
                         '--linux-app-category', type == 'deb' ? 'x11' : 'Applications/System']
                     if (type == 'rpm') {
                         List<String> requirements = rpmLibraryRequirements(image)

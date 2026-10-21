@@ -2,6 +2,7 @@ package dev.jasper.vault;
 
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.testing.FakePresentations;
 import dev.jasper.vault.api.Credential;
 import dev.jasper.vault.api.LockState;
 import dev.jasper.vault.api.VaultApi;
@@ -52,9 +53,9 @@ class VaultPluginTest {
 
     @Test void aStartUnderEnterpriseReadsTheClassicLayoutOnce() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         try (var host = new FakePluginHost()) {
-            dev.jasper.vault.workstation.FakeEnterprise.start(host);
+            host.setPresentation(FakePresentations.CLASSIC);
             var plugin = plugin();
-            host.start(INFO, Set.of(), Set.of("dev.jasper.enterprise"), plugin);
+            host.start(INFO, Set.of(), Set.of(), plugin);
             assertThat(host.failures()).isEmpty();
             assertThat(plugin.layout()).isEqualTo(dev.jasper.vault.workstation.Layout.CLASSIC);
         }
@@ -63,10 +64,10 @@ class VaultPluginTest {
     /** Plan 10b Rulings 11: under Enterprise, Unlock Vault's footnote is the auto-lock, and none while auto-lock is off. */
     @Test void unlockVaultUnderEnterpriseFootsItsFormWithTheAutoLock() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         for (long minutes : new long[] {0, 15}) try (var host = new FakePluginHost()) {
-            dev.jasper.vault.workstation.FakeEnterprise.start(host);
+            host.setPresentation(FakePresentations.CLASSIC);
             host.setSetting("dev.jasper.vault", "auto_lock_minutes", minutes);
             var plugin = plugin();
-            host.start(INFO, Set.of(), Set.of("dev.jasper.enterprise"), plugin);
+            host.start(INFO, Set.of(), Set.of(), plugin);
             UUID window = host.addTerminalWindow();
             plugin.lockManager().create("test-password".toCharArray(), false);
             host.runBackground();

@@ -40,7 +40,7 @@ class WindowContributionsTest {
             root.putClientProperty(dev.jasper.app.platform.WindowInput.OVERLAY, new Object());
             var event = new java.awt.event.ActionEvent(owner, 0, "native-menu");
             owner.action(dev.jasper.app.commands.ActionId.NEW_TAB).actionPerformed(event);
-            owner.windowCommands().view("view.status_bar").actionPerformed(event);
+            owner.action(dev.jasper.app.commands.ActionId.TOGGLE_STATUS_BAR).actionPerformed(event);
             owner.commands().find("dev.x.run").orElseThrow().action().actionPerformed(event);
             assertThat(owner.tabCount()).isEqualTo(tabs);
             assertThat(owner.status().isVisible()).isEqualTo(status);

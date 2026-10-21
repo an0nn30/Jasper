@@ -26,7 +26,7 @@ final class ShortcutCatalog {
         var resolved = base.withExtensions(actions.stream().filter(a -> KeyBindings.extensionId(a.id()))
             .map(ActionEntry::extension).toList());
         var rows = new ArrayList<ShortcutEntry>();
-        for (ActionId id : ActionId.values()) rows.add(new ShortcutEntry(id.id(), category(id), id.label(),
+        for (ActionId id : ActionId.values()) if (id.availableOn(System.getProperty("os.name", ""))) rows.add(new ShortcutEntry(id.id(), category(id), id.label(),
             resolved.bindings().strokeFor(id).orElse(null), description(id.context(), plugins, panels), id.id().replace('_', ' '),
             true, KeyBindings.effectiveDefaultBinding(id, macOs), where(id.context(), plugins, panels),coreIcon(category(id))));
         for (ActionEntry action : actions) {

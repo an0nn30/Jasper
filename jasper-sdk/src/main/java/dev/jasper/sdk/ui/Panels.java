@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.WindowHandle;
 
-/** Tool window panels. Each registered panel gets a stripe icon in the main window, the only window with tool windows. */
+/** Tool window panels. Each registered panel gets a stripe button in the main window, the only window with tool windows. */
 public interface Panels {
     /**
      * Registers a panel on the UI thread.
@@ -19,6 +19,10 @@ public interface Panels {
     /**
      * Toggles this plugin's registered panel in the main window, creating it lazily; a child window's request shows it and
      * brings the main window to the front. Requests from a closed window have no effect.
+     * Called from the panel's own toggle action ({@link PanelSpec#withToggleActionId}), as its handler runs, under a
+     * look with flush tool windows a toggle that shows the panel also makes it the active tool window, as a stripe click
+     * does, and a toggle of a showing panel that is not the active tool window activates it instead of hiding it
+     * (since 0.18.2).
      * @param panelId a registered panel id owned by this plugin
      * @param window the window the request comes from, the main window or a child window
      * @throws IllegalArgumentException when the panel is not registered by this plugin

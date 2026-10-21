@@ -29,14 +29,65 @@ final class SplitViews {
         /** DOCUMENT: the children that may fill the remaining height (Custom, Empty and Split), in order. */
         final java.util.Set<Component> fills = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
+        private final java.util.Map<String, ActionBarScroll> actionBars = new java.util.HashMap<>();
+        private boolean actionBar(Nodes.Node child) {
+            if (!document() || !(child instanceof Nodes.Stack row) || row.role() != Nodes.LayoutRole.INLINE || row.children().size() < 2) return false;
+            return row.children().getFirst() instanceof Nodes.Text text && text.role() == Nodes.TextRole.CAPTION && text.text().isEmpty()
+                && row.children().subList(1, row.children().size()).stream().allMatch(Nodes.Button.class::isInstance);
+        }
+        private ActionBarScroll actionBarScroll(Nodes.Node child) {
+            return actionBars.computeIfAbsent(child.id(), _ -> new ActionBarScroll());
+        }
+        @Override Container childParent(Nodes.Node child) {
+            return actionBar(child) ? actionBarScroll(child).row : component;
+        }
+
         @Override
         void children(List<ControlRegistry.Control> controls) {
             fills.clear();
             for (var c : controls) if (c.node instanceof Nodes.Custom || c.node instanceof Nodes.Empty || c.node instanceof Nodes.Split) fills.add(c.component);
-            Stacks.mount(component, controls.stream().map(c -> c.component).toList());
+            var mounted = new java.util.ArrayList<JComponent>();
+            for (var control : controls) {
+                if (actionBar(control.node)) {
+                    var scroll = actionBarScroll(control.node);
+                    Stacks.mount(scroll.row, List.of(control.component));
+                    scroll.setVisible(control.component.isVisible());
+                    mounted.add(scroll);
+                } else mounted.add(control.component);
+            }
+            Stacks.mount(component, mounted);
+            actionBars.keySet().removeIf(id -> controls.stream().noneMatch(c -> c.node.id().equals(id) && actionBar(c.node)));
         }
 
         boolean document() { return ((Nodes.Split) node).kind() == Nodes.SplitKind.DOCUMENT; }
+    }
+
+    /** Only a document's empty-caption/action row overflows horizontally; Find keeps its existing field layout. */
+    static final class ActionBarScroll extends JScrollPane {
+        final ActionRow row = new ActionRow();
+        ActionBarScroll() {
+            super(VERTICAL_SCROLLBAR_NEVER, HORIZONTAL_SCROLLBAR_AS_NEEDED);
+            setViewportView(row); setBorder(null); setOpaque(false); getViewport().setOpaque(false);
+            setFocusable(false); getHorizontalScrollBar().setFocusable(false);
+            getHorizontalScrollBar().setUnitIncrement(16);
+        }
+        int heightAt(int width) {
+            return row.getPreferredSize().height + (width < row.getPreferredSize().width ? getHorizontalScrollBar().getPreferredSize().height : 0);
+        }
+        @Override public Dimension getMinimumSize() { return new Dimension(0, heightAt(getWidth())); }
+        @Override public Dimension getPreferredSize() {
+            var preferred = row.getPreferredSize();
+            int width = getParent() == null ? preferred.width : getParent().getWidth();
+            return new Dimension(preferred.width, heightAt(width));
+        }
+    }
+    static final class ActionRow extends JPanel implements Scrollable {
+        ActionRow() { super(new BorderLayout()); setOpaque(false); setFocusable(false); }
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(Rectangle visible, int orientation, int direction) { return 16; }
+        @Override public int getScrollableBlockIncrement(Rectangle visible, int orientation, int direction) { return Math.max(16, visible.width); }
+        @Override public boolean getScrollableTracksViewportWidth() { return getParent() != null && getParent().getWidth() >= getPreferredSize().width; }
+        @Override public boolean getScrollableTracksViewportHeight() { return true; }
     }
 
     /**
@@ -113,7 +164,7 @@ final class SplitViews {
         public int height(Container p, int width) {
             if (owner.document()) {
                 var children = visible(p); int h = rules(children.size());
-                for (Component c : children) h += Composition.height(c, width);
+                for (Component c : children) h += c instanceof ActionBarScroll scroll ? scroll.heightAt(width) : Composition.height(c, width);
                 return h;
             }
             var children = visible(p); var widths = widths(width, children.size());
@@ -128,7 +179,7 @@ final class SplitViews {
             if (!owner.document()) return Composition.WidthLayout.super.minimumLayoutSize(p);
             var children = visible(p); Component fill = fill(children);
             int width = Math.max(1, p.getWidth()), h = rules(children.size());
-            for (Component c : children) h += c == fill ? c.getMinimumSize().height : Composition.height(c, width);
+            for (Component c : children) h += c == fill ? c.getMinimumSize().height : (c instanceof ActionBarScroll scroll ? scroll.heightAt(width) : Composition.height(c, width));
             return new Dimension(0, h);
         }
 
@@ -151,10 +202,10 @@ final class SplitViews {
             if (owner.document()) {
                 var children = visible(p); Component fill = fill(children);
                 int width = p.getWidth(), gap = rules(2), others = rules(children.size());
-                for (Component c : children) if (c != fill) others += Composition.height(c, width);
+                for (Component c : children) if (c != fill) others += (c instanceof ActionBarScroll scroll ? scroll.heightAt(width) : Composition.height(c, width));
                 int y = 0;
                 for (Component c : children) {
-                    int h = c == fill ? Math.max(0, p.getHeight() - others) : Composition.height(c, width);
+                    int h = c == fill ? Math.max(0, p.getHeight() - others) : (c instanceof ActionBarScroll scroll ? scroll.heightAt(width) : Composition.height(c, width));
                     c.setBounds(0, y, width, h);
                     y += h + gap;
                 }

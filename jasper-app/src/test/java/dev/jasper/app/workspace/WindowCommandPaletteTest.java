@@ -588,7 +588,7 @@ class WindowCommandPaletteTest {
             owner.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("status bar");
             // "Status Bar Height…" matches too; follow the visibility toggle's own row.
             java.util.function.Supplier<String> toggle = () -> dev.jasper.app.palette.PaletteTestSupport.rows(owner.commandPalette().component())
-                .stream().filter(row -> row.id().equals("view.status_bar")).findFirst().orElseThrow().title();
+                .stream().filter(row -> row.id().equals("toggle_status_bar")).findFirst().orElseThrow().title();
             assertThat(toggle.get()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
             assertThat(toggle.get()).isEqualTo("Show Status Bar");

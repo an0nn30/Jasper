@@ -27,6 +27,7 @@ class KeymapDefaultsTest {
         new Row("quit", KeyContext.GLOBAL, "cmd+q", "ctrl+alt+shift+q"),                       // 3
         new Row("open_settings", KeyContext.GLOBAL, "cmd+,", "ctrl+shift+,"),                  // 4
         new Row("open_file", KeyContext.GLOBAL, "none", "none"),  // Enterprise spec 13: File › Open File…, unbound
+        new Row("manage_cygwin_packages", KeyContext.GLOBAL, "none", "none"),
         new Row("reload_config", KeyContext.GLOBAL, "none", "none"),                           // 5
         new Row("command_palette", KeyContext.GLOBAL, "cmd+shift+p", "ctrl+shift+p"),          // 14
         new Row("new_tab", KeyContext.GLOBAL, "cmd+t", "ctrl+shift+t"),                        // 22; tabs and panes spec 10
@@ -49,6 +50,8 @@ class KeymapDefaultsTest {
         new Row("maximize_pane", KeyContext.GLOBAL, "cmd+shift+enter", "ctrl+alt+shift+enter"), // 35, parent tabs spec 8
         new Row("move_pane_to_new_tab", KeyContext.GLOBAL, "alt+cmd+t", "ctrl+alt+shift+t"),  // tabs and panes spec 9 and 10
         new Row("toggle_zen_mode", KeyContext.GLOBAL, "none", "none"),                       // Zen follow-up
+        new Row("toggle_rail", KeyContext.GLOBAL, "none", "none"),                           // 57
+        new Row("toggle_status_bar", KeyContext.GLOBAL, "none", "none"),                     // 59
         new Row("focus_pane_left", KeyContext.GLOBAL, "cmd+alt+left", "ctrl+alt+shift+left"),  // 36, parent tabs spec 8
         new Row("focus_pane_right", KeyContext.GLOBAL, "cmd+alt+right", "ctrl+alt+shift+right"),
         new Row("focus_pane_up", KeyContext.GLOBAL, "cmd+alt+up", "ctrl+alt+shift+up"),

@@ -208,6 +208,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private Tab paletteTab;
     private boolean active = true;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
+    public Runnable onManageCygwinPackages;
     private Runnable openSettings, reloadConfiguration, migrateConfiguration;
     private java.util.function.Function<dev.jasper.app.config.SettingsEdit, java.util.concurrent.CompletableFuture<?>> saveSettings;
     private Consumer<String> openSettingsAt;
@@ -377,7 +378,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         stripes = look().dock().stripes(themes.kit(), look().chromeArtwork());
         leftStripe = stripes.left();
         rightStripe = stripes.right();
-        area = new ToolWindowArea(parentTabs, dock, themes.kit(), look().dock().flushFrames());
+        area = new ToolWindowArea(parentTabs, dock, themes.kit(), look().dock().flushFrames(), look().chromeArtwork());
         area.setStatusVisible(chrome.status().isVisible());
         area.setHeaderVisible(true);
         for (DockStripe stripe : stripes.all()) stripe.setVisible(false);
@@ -1698,7 +1699,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 // Plain text: html.disable before the title, as the UI reads it only when the text changes.
                 var entry = new JMenuItem(); entry.putClientProperty("html.disable", true); entry.setText(command.title());
                 entry.setEnabled(command.enabled()); entry.setAccelerator(command.shortcut());
-                entry.addActionListener(event -> command.run().run());
+                // A menu kept open across a selection change runs the command of the content selected now, if enabled.
+                entry.addActionListener(event -> {
+                    Tab current = selectedContent();
+                    if (current == null) return;
+                    current.commands().stream().filter(value -> value.id().equals(command.id()) && value.enabled())
+                        .findFirst().ifPresent(value -> value.run().run());
+                });
                 menu.add(entry);
             }
         });

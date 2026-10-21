@@ -6,9 +6,13 @@ import dev.jasper.remote.client.ConnectionIdentity;
 import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.sftp.EndpointFactory;
+import dev.jasper.remote.sftp.FileEndpoint;
 import dev.jasper.remote.sftp.LocalEndpoint;
 import dev.jasper.remote.sftp.SftpFixture;
+import dev.jasper.sdk.terminal.WindowHandle;
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -26,6 +30,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import org.apache.sshd.server.channel.ChannelSession;
 import org.apache.sshd.server.command.Command;
 import org.apache.sshd.sftp.common.SftpConstants;
@@ -60,6 +66,117 @@ class RemoteDocumentTest {
 
     RemoteDocument document(Path file) { return new RemoteDocument(prod, file.toString(), channels, Optional::empty); }
     <T> T await(Callable<CompletableFuture<T>> call) throws Exception { return ui.submit(call).get(10, TimeUnit.SECONDS).get(10, TimeUnit.SECONDS); }
+
+    @Test void legacyOperationsLinkAgainstTheOriginalEditor0100Api() throws Exception {
+        URL oldApi = getClass().getResource("editor-api-0.10.0.jar");
+        assertThat(oldApi).isNotNull();
+        URL remoteClasses = RemoteDocument.class.getProtectionDomain().getCodeSource().getLocation();
+        // Editor API lookup cannot fall through to the current test runtime's Editor.
+        try (var loader = new URLClassLoader(new URL[] {oldApi, remoteClasses}, getClass().getClassLoader()) {
+            @Override protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                if (name.startsWith("dev.jasper.editor.api.") || name.equals(RemoteDocument.class.getName())
+                        || name.startsWith(RemoteDocument.class.getName() + "$")) {
+                    synchronized (getClassLoadingLock(name)) {
+                        Class<?> type = findLoadedClass(name);
+                        if (type == null) type = findClass(name);
+                        if (resolve) resolveClass(type);
+                        return type;
+                    }
+                }
+                return super.loadClass(name, resolve);
+            }
+        }) {
+            Class<?> legacyApi = loader.loadClass("dev.jasper.editor.api.EditorDocument");
+            assertThat(legacyApi.getClassLoader()).isSameAs(loader);
+            assertThat(legacyApi.getMethods()).noneMatch(method -> method.getName().equals("resolveRelative"));
+            assertThatThrownBy(() -> loader.loadClass("dev.jasper.editor.api.RelativePaths"))
+                .isInstanceOf(ClassNotFoundException.class);
+            Class<?> type = loader.loadClass(RemoteDocument.class.getName());
+            Path file = Files.writeString(temp.toRealPath().resolve("legacy.txt"), "before");
+            Object document = type.getConstructor(ConnectionIdentity.class, String.class, EditChannels.class, Supplier.class)
+                .newInstance(prod, file.toString(), channels, (Supplier<Optional<WindowHandle>>) Optional::empty);
+            assertThat(legacyApi.isInstance(document)).isTrue();
+            assertThat(type.getMethod("name").invoke(document)).isEqualTo("legacy.txt");
+            assertThat(type.getMethod("key").invoke(document)).isEqualTo(RemoteDocument.key(prod, file.toString()));
+            Object content = await(() -> legacyFuture(type.getMethod("read", long.class).invoke(document, 100L)));
+            assertThat(content.getClass().getClassLoader()).isSameAs(loader);
+            assertThat(new String((byte[]) content.getClass().getMethod("bytes").invoke(content), StandardCharsets.UTF_8))
+                .isEqualTo("before");
+            Object revision = await(() -> legacyFuture(type.getMethod("write", byte[].class)
+                .invoke(document, (Object) "after".getBytes(StandardCharsets.UTF_8))));
+            assertThat(revision.getClass().getClassLoader()).isSameAs(loader);
+            assertThat(await(() -> legacyFuture(type.getMethod("revision").invoke(document))))
+                .isEqualTo(Optional.of(revision));
+            assertThat(Files.readString(file)).isEqualTo("after");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static CompletableFuture<Object> legacyFuture(Object result) {
+        return (CompletableFuture<Object>) result;
+    }
+
+    @Test void relativeHandlesKeepOriginalRouteChannelsAndLiveOwnerAfterSavedHostEdits() throws Exception {
+        var seenIdentities = new CopyOnWriteArrayList<ConnectionIdentity>();
+        var seenOwners = new CopyOnWriteArrayList<Optional<WindowHandle>>();
+        var activeOwner = new AtomicReference<Optional<WindowHandle>>(Optional.empty());
+        Supplier<Optional<WindowHandle>> owner = activeOwner::get;
+        java.util.function.BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>> opener = (identity, window) -> {
+            seenIdentities.add(identity);
+            seenOwners.add(window);
+            return CompletableFuture.completedFuture(new LocalEndpoint());
+        };
+        // The quiet opener, a restored document's first read, records the same route and owner.
+        var exactChannels = new EditChannels(opener, opener, identity -> true, background, ui);
+        Path resource = Files.writeString(temp.toRealPath().resolve("a+b caf\u00e9%20.txt"), "resource");
+        var originalHost = prod.host();
+        var jump = EditChannelsTest.identity("jump").hops().getFirst();
+        var route = new ConnectionIdentity(List.of(prod.hops().getFirst(), jump));
+        var document = new RemoteDocument(route, resource.getParent() + "/docs/readme.md", exactChannels, owner);
+        try {
+            var changedSavedHost = originalHost.withEdited("changed", "elsewhere", 2222, "new-login", Auth.AGENT, "", Optional.empty());
+            var changedIdentity = new ConnectionIdentity(List.of(new ConnectionIdentity.Hop(changedSavedHost, "new-login"), jump));
+            var relative = document.resolveRelative("../a+b caf\u00e9%20.txt").orElseThrow();
+            assertThat(relative.key()).isEqualTo(RemoteDocument.key(route, resource.toString()));
+            assertThat(relative.location()).startsWith("deploy@prod:");
+            var window = (WindowHandle) java.lang.reflect.Proxy.newProxyInstance(WindowHandle.class.getClassLoader(),
+                new Class<?>[] {WindowHandle.class}, (proxy, method, args) -> { throw new AssertionError("Only identity is used"); });
+            activeOwner.set(Optional.of(window));
+            assertThat(new String(await(() -> relative.read(100)).bytes(), StandardCharsets.UTF_8)).isEqualTo("resource");
+            assertThat(seenIdentities).singleElement().isSameAs(route);
+            assertThat(seenOwners).singleElement().satisfies(value -> assertThat(value.orElseThrow()).isSameAs(window));
+            assertThat(opened).as("the other channel pool was not used").isEmpty();
+            var editedRouteDocument = new RemoteDocument(changedIdentity, resource.getParent() + "/docs/readme.md", exactChannels, owner);
+            assertThat(editedRouteDocument.resolveRelative("../a+b caf\u00e9%20.txt").orElseThrow().key()).isNotEqualTo(relative.key());
+            var otherRoute = new ConnectionIdentity(List.of(prod.hops().getFirst(), EditChannelsTest.identity("other-jump").hops().getFirst()));
+            var other = new RemoteDocument(otherRoute, resource.getParent() + "/docs/readme.md", exactChannels, owner);
+            assertThat(other.resolveRelative("../a+b caf\u00e9%20.txt").orElseThrow().key()).isNotEqualTo(relative.key());
+        } finally {
+            ui.submit(exactChannels::close).get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test void normalizesRemoteSegmentsAndClampsAtRemoteRootWithoutIo() {
+        var document = new RemoteDocument(prod, "/srv/docs/readme.md", channels, Optional::empty);
+        assertThat(document.resolveRelative(".././caf\u00e9/a+b%20.md").orElseThrow().key())
+            .isEqualTo(RemoteDocument.key(prod, "/srv/caf\u00e9/a+b%20.md"));
+        assertThat(document.resolveRelative("../../../../file.md").orElseThrow().key())
+            .isEqualTo(RemoteDocument.key(prod, "/file.md"));
+        assertThat(document.resolveRelative("dir/a:b").orElseThrow().key())
+            .isEqualTo(RemoteDocument.key(prod, "/srv/docs/dir/a:b"));
+        assertThat(opened).isEmpty();
+    }
+
+    @Test void rejectsMalformedRelativePathsBeforeProviderWork() {
+        var document = new RemoteDocument(prod, "/srv/readme.md", channels, Optional::empty);
+        for (String path : List.of("", "/root", "//host/file", "C:/file", "C:file", "file:a",
+                "C:/outside/line\u2028.txt", "C:/outside/line\u2029.txt", "C:line\u2028.txt", "C:line\u2029.txt",
+                "javascript:line\u2028.txt", "javascript:line\u2029.txt", "a\\b", "a?b", "a#b",
+                "a\u0000b", "a\u001Fb", "a\u007Fb", "a\u0085b", "a\uD800b"))
+            assertThatIllegalArgumentException().as(path).isThrownBy(() -> document.resolveRelative(path));
+        assertThatIllegalArgumentException().isThrownBy(() -> document.resolveRelative(null));
+        assertThat(opened).isEmpty();
+    }
 
     @Test void itIsNamedByItsConnectionAndPath() {
         var document = new RemoteDocument(prod, "/etc/nginx/nginx.conf", channels, Optional::empty);

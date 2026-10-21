@@ -391,8 +391,10 @@ final class StagedRemoteHost implements AutoCloseable {
     @Override public void close() throws Exception {
         var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
         try {
+            var pluginWorkers = PluginShutdownTestSupport.capture(host);
             onEdt(() -> pending.set(host.stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+            pluginWorkers.await();
         } finally {
             onEdt(auxiliary::close);
             loader.close();

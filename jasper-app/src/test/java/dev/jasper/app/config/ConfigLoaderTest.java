@@ -472,7 +472,7 @@ class ConfigLoaderTest {
         assertThat(chosen.snapshot().darkTheme()).isEqualTo("ocean");
         assertThat(chosen.snapshot().lightTheme()).isEqualTo("ocean-dawn");
         var bad = parse("[ui.theme]\ndark = \"Ocean Theme\"\n");
-        assertThat(bad.snapshot().darkTheme()).isEqualTo("slate-cobalt");
+        assertThat(bad.snapshot().darkTheme()).isEqualTo("jasper-meadow");
         assertDiagnostic(bad, "ui.theme.dark", 2, 1, ConfigDiagnostic.Severity.ERROR);
         assertThat(bad.diagnostics().getFirst().message()).isEqualTo("Use a theme id such as \"slate-cobalt\"; using the default.");
     }

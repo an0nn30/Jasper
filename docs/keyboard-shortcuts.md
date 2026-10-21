@@ -1,96 +1,248 @@
 # Keyboard shortcuts
 
-Open **Help → Keyboard Shortcuts…**, or search **Keyboard Shortcuts** / **keymap** in the
-command palette’s **Commands** scope, to browse and edit Jasper's current shortcut mappings.
-Opening it again brings the same window forward and preserves the search. The window
-remembers its size and position through the normal auxiliary-window state.
+Every built-in action, and every action Jasper or a plugin registers, can have a shortcut; the View › Show/Hide ›
+Toolbar items cannot. Built-in actions have one default for macOS and one for Linux and Windows; plugins suggest their
+own. Menus, toolbar tooltips and the command palette always show the shortcut in effect. Change any of them in
+[Settings › Keymap](#settings--keymap) or in [`config.toml`](#in-configtoml).
 
-Rows are grouped by app category or plugin name. The table shows the action, effective
-shortcut, section/plugin and context. The context distinguishes a Jasper-window
-shortcut from a key used only in a particular field or list. Unbound actions show
-**Unassigned**; a plugin default rejected by the shortcut resolver shows its reason
-in Context (hover to read long text).
+macOS shortcuts are written with Cmd (Command), Ctrl (Control), Option and Shift. The Linux and Windows defaults use
+Ctrl+Shift (or Ctrl+Alt+Shift) where macOS uses Cmd, so that plain Ctrl keys such as Ctrl+C and Ctrl+K reach the
+program in the terminal; Ctrl+PageUp, Ctrl+PageDown and Ctrl+1 to Ctrl+9 are the exceptions.
 
-Click a shortcut or **Unassigned** in an app/plugin action row, or select a row and press
-Enter, to edit it. Press the new combination, then click **Save**. The recorder stays
-active until you save, cancel, stop recording, or leave the window, so shortcuts such
-as Cmd+W and Cmd+Q do not execute while recording. You can click the captured shortcut
-or **Record shortcut** to record again. **Cancel** leaves the binding unchanged.
+## Built-in actions
 
-**Remove shortcut** proposes an unassigned binding; **Restore default** proposes the
-app/plugin default. Both require **Save**. A conflicting action is named before saving;
-check **Reassign from conflicting action** to remove its binding and use the shortcut
-for this action. Fixed contextual keys (for example, palette navigation and Find-field
-Enter) are read-only.
+The tables follow the sections of Settings › Keymap. The ID is the name to use under `[keybindings]`.
 
-Saving writes `[keybindings]` in the active `config.toml` and applies the change to all
-Jasper windows immediately. Missing settings files get the normal commented template.
-Unrelated settings and comments are preserved, including edits made outside Jasper.
-An invalid file, a concurrent shortcut edit, or a write failure leaves an error in the
-editor instead of claiming success. If a plugin default cannot be restored because
-another default wins, assign the desired shortcut explicitly. OS-reserved combinations
-may not reach Jasper.
+### Tabs
 
-Type an action name, plugin, category or shortcut such as `cmd+shift+h` in the search
-field. Modifier order is flexible; `command`/`meta`, `control`, and `option` are accepted
-aliases for `cmd`, `ctrl`, and `alt`. **Record shortcut** listens for the keys you press
-in this window and finds exact matches, including Tab and Escape. **Stop recording**
-returns to ordinary text input; **Clear** clears the filter. Leaving the window stops
-recording and releases any held-key state. OS-reserved combinations can still be
-handled by the operating system; use text search for those combinations.
+| Action | ID | macOS | Linux and Windows |
+|---|---|---|---|
+| New Tab | `new_tab` | Cmd+T | Ctrl+Shift+T |
+| Close Tab | `close_tab` | Cmd+Option+W | Ctrl+Alt+Shift+W |
+| Next Tab | `next_tab` | Cmd+Shift+] | Ctrl+PageDown |
+| Previous Tab | `previous_tab` | Cmd+Shift+[ | Ctrl+PageUp |
+| Rename Tab | `rename_tab` | Cmd+I | Ctrl+Shift+I |
+| Move Tab to New Window | `move_tab_to_new_window` | none | none |
+| Select Tab 1 … Select Tab 9 | `select_tab_1` … `select_tab_9` | Cmd+1 … Cmd+9 | Ctrl+1 … Ctrl+9 |
 
-The catalog uses the same resolution as Jasper windows, so app `[keybindings]`
-overrides, plugin defaults, disabled bindings and conflicts are represented accurately.
-Configuration reloads and plugin action changes update an open reference immediately.
-The catalog covers every built-in action and every currently registered contribution,
-plus Jasper's explicit contextual keys for Find, the palette, auxiliary windows, the
-Plugins manager and the bundled SSH Hosts/Vault lists. Private keyboard listeners in
-third-party plugin UI are not exposed by the SDK and cannot be discovered automatically.
-Shell, tmux, editor and operating-system mappings are outside Jasper's catalog.
+### Panes
 
-## Maintenance and verification
+| Action | ID | macOS | Linux and Windows |
+|---|---|---|---|
+| Split Right | `split_right` | Cmd+D | Ctrl+Shift+D |
+| Split Down | `split_down` | Cmd+Shift+D | Ctrl+Alt+Shift+D |
+| Close Pane | `close_pane` | Cmd+W | Ctrl+Shift+W |
+| Maximize Pane | `maximize_pane` | Cmd+Shift+Enter | Ctrl+Alt+Shift+Enter |
+| Focus Pane Left | `focus_pane_left` | Cmd+Option+Left | Ctrl+Alt+Shift+Left |
+| Focus Pane Right | `focus_pane_right` | Cmd+Option+Right | Ctrl+Alt+Shift+Right |
+| Focus Pane Up | `focus_pane_up` | Cmd+Option+Up | Ctrl+Alt+Shift+Up |
+| Focus Pane Down | `focus_pane_down` | Cmd+Option+Down | Ctrl+Alt+Shift+Down |
+| Move Pane to New Tab | `move_pane_to_new_tab` | Cmd+Option+T | Ctrl+Alt+Shift+T |
 
-`shortcuthelp/ShortcutCatalog` derives configurable rows from `ActionId`, contributed
-actions and `KeyBindings.withExtensions`. Update the category switch when adding a new
-app action. Plugin names come from runtime descriptors without disk reads. Contextual
-rows document explicit UI handlers; update them when changing those handlers. This
-feature adds no SDK surface or dependency on plugin implementation classes.
+### Search
 
-`ShortcutHelp` owns the live contribution subscription only while its auxiliary surface
-is open. `ShortcutPanel` installs its keyboard dispatcher, focus listener and native-menu
-recorder property only while mounted, and removes them on disposal. Native auxiliary
-Close and macOS Quit consult that window's recorder before executing.
+| Action | ID | macOS | Linux and Windows |
+|---|---|---|---|
+| Find | `find` | Cmd+F | Ctrl+Shift+F |
+| Find Next | `find_next` | Cmd+G | Ctrl+Shift+G |
+| Find Previous | `find_previous` | Cmd+Shift+G | Ctrl+Alt+Shift+G |
 
-Shortcut edits run on `ConfigService`'s worker and publish through its existing reload
-path. `KeybindingText` patches TOML assignments, including quoted/dotted keys, inline
-tables and multiline strings. `ShortcutEditPanel` owns the pending capture, conflict
-choice and save result; no write occurs until Save. App/plugin actions are editable;
-contextual rows carry an explicit read-only flag. No SDK changes.
+### Clipboard
 
-Run `./gradlew check :jasper-app:installDist`. To inspect the real panel headlessly,
-run `./gradlew :jasper-app:shortcutHelpPreview`; PNGs are written under
-`jasper-app/build/reports/shortcut-help/` for both themes and default/18-point typography.
+| Action | ID | macOS | Linux and Windows |
+|---|---|---|---|
+| Copy | `copy` | Cmd+C | Ctrl+Shift+C |
+| Paste | `paste` | Cmd+V | Ctrl+Shift+V |
 
-Native acceptance (user-run):
+### Appearance
 
-- Open Help → Keyboard Shortcuts and Commands → Keyboard Shortcuts from different
-  Jasper windows; only one editor opens.
-- Click an assigned shortcut and an Unassigned row, record a new combination and save.
-  Verify the menu shortcut and behavior update in both windows and survive a restart.
-- Try a conflicting combination, check Reassign, save and verify the old action is
-  unassigned. Exercise Remove shortcut, Restore default and Cancel.
-- Edit a shortcut while the file is read-only or invalid; Save must show the failure.
-- Repeat capture of Cmd+W and Cmd+Q; neither should close the window or quit while recording.
-- Search `remote`, `find`, and `cmd+shift+h`; record that chord, Tab, Escape, Cmd+W and
-  Cmd+Q while the recorder is active. App commands should not execute during capture.
-- Stop recording, clear the filter, then close the reference normally with Cmd+W.
-- Change an app or Remote shortcut setting while the window is open and check the row.
-- Hold a recorded key, switch away, release it, then return and type in a terminal.
-- Resize the reference and change the app's theme/UI font; headings and controls stay usable.
+| Action | ID | macOS | Linux and Windows |
+|---|---|---|---|
+| Increase Font Size | `font_bigger` | Cmd+= | Ctrl+Shift+= |
+| Decrease Font Size | `font_smaller` | Cmd+- | Ctrl+Shift+- |
+| Reset Font Size | `font_reset` | Cmd+0 | Ctrl+Shift+0 |
 
-## Editor tabs
+### Terminal
 
-The bundled Editor's tabs have their own shortcuts, listed in [Editor](editor.md) and, while the window shows its tab
-strip, in the menu of a file's tab.
-They are its tabs' commands, not registered actions, so they are not in this catalog; the
-action **Open in Editor…** (`dev.jasper.editor.open`, Cmd/Ctrl+O) is.
+These apply only while a terminal pane (or its find bar) has the focus.
+
+| Action | ID | macOS | Linux and Windows |
+|---|---|---|---|
+| Previous Prompt | `previous_prompt` | Cmd+Up | Ctrl+Shift+Up |
+| Next Prompt | `next_prompt` | Cmd+Down | Ctrl+Shift+Down |
+| Clear Scrollback | `clear_scrollback` | Cmd+K | Ctrl+Shift+K |
+| Clear Terminal | `clear_terminal` | none | none |
+
+### Command Palette
+
+| Action | ID | macOS | Linux and Windows |
+|---|---|---|---|
+| Command Palette | `command_palette` | Cmd+Shift+P | Ctrl+Shift+P |
+
+### Application
+
+| Action | ID | macOS | Linux and Windows |
+|---|---|---|---|
+| New Terminal Window | `new_terminal_window` | Cmd+N | Ctrl+Shift+N |
+| Close Window | `close_window` | Cmd+Shift+W | none |
+| Move to Main Window | `move_to_main_window` | none | none |
+| Open File… | `open_file` | none | none |
+| Zen (Enter Zen Mode / Exit Zen Mode) | `toggle_zen_mode` | none | none |
+| Rail (Show Rail / Hide Rail) | `toggle_rail` | none | none |
+| Status Bar (Show Status Bar / Hide Status Bar) | `toggle_status_bar` | none | none |
+| Settings | `open_settings` | Cmd+, | Ctrl+Shift+, |
+| Reload Config | `reload_config` | none | none |
+| Manage Cygwin packages… (Windows only; [Cygwin Bash](terminal.md#cygwin-bash)) | `manage_cygwin_packages` | none | none |
+| Quit | `quit` | Cmd+Q | Ctrl+Alt+Shift+Q |
+
+[The workspace](workspace.md) describes what each action does.
+
+## Jasper's other actions
+
+These actions have no default shortcut; give them one in Settings › Keymap (in the section shown) or under
+`[keybindings]` with the quoted ID.
+
+| Action | ID | Keymap section |
+|---|---|---|
+| Manage Plugins… | `"plugins.manage"` | Application |
+| Keyboard Shortcuts… | `"app.shortcuts"` | Application |
+| Change Memory Settings… | `"app.memory"` | Application |
+| Edit Custom VM Options… | `"app.vmoptions"` | Application |
+| About Jasper | `"app.about"` | Application |
+| Run Garbage Collection | `"app.memory.gc"` | Application |
+| Migrate Config | `"config.migrate"` | config |
+| Install 'jasper' Command in PATH | `"commandline.install"` | commandline |
+| Uninstall 'jasper' Command from PATH | `"commandline.uninstall"` | commandline |
+| Notifications: Show History | `"notifications.history"` | notifications |
+| Notifications: Dismiss Cards | `"notifications.dismiss"` | notifications |
+| Notifications: Show Errors | `"notifications.errors"` | notifications |
+
+A plugin's tool window that has no toggle action of its own gets **Toggle** *title*, with the ID `<panel id>.toggle`.
+Under the [Enterprise look](enterprise.md#windows-and-menus) a tool window's toggle shortcut makes it the active tool
+window; pressed while the window shows but is not the active one, it activates the window instead of hiding it.
+
+The palette's view commands (**Toolbar: Icons and Labels**, **Themes…**, **Terminal Scheme: …** and the like) and the
+View › Show/Hide › Toolbar items are not in the keymap and take no shortcut.
+
+## Bundled plugins
+
+These bundled plugin actions suggest a default shortcut. All other plugin actions have none; Settings › Keymap lists
+them under each plugin's name.
+
+| Plugin | Action | ID | macOS | Linux and Windows | Applies |
+|---|---|---|---|---|---|
+| Remote | Connect to SSH Host... | `dev.jasper.remote.connect` | Cmd+Shift+H | Ctrl+Shift+H | Anywhere |
+| Remote | Toggle SSH hosts | `dev.jasper.remote.hosts` | Cmd+Option+1 | Alt+1 | Anywhere |
+| Remote | Toggle SFTP | `dev.jasper.remote.sftp.toggle` | Cmd+Option+2 | Alt+2 | Anywhere |
+| Remote | Transfers | `dev.jasper.remote.transfers` | Cmd+Option+3 | Alt+3 | Anywhere |
+| Remote | Open SFTP here | `dev.jasper.remote.sftp` | Cmd+Shift+O | Ctrl+Alt+Shift+O | Terminal pane |
+| Remote | SFTP: Back | `dev.jasper.remote.sftp.back` | Option+Left | Alt+Left | SFTP panel |
+| Remote | SFTP: Forward | `dev.jasper.remote.sftp.forward` | Option+Right | Alt+Right | SFTP panel |
+| Remote | SFTP: Parent Folder | `dev.jasper.remote.sftp.parent` | Option+Up | Alt+Up | SFTP panel |
+| Credential Vault | Open Vault... | `dev.jasper.vault.open` | Cmd+Shift+\ | Ctrl+Alt+Shift+\ | Anywhere |
+| Credential Vault | Search Vault Logins | `dev.jasper.vault.search` | Cmd+\ | Ctrl+Shift+\ | Anywhere |
+| Credential Vault | Lock Vault | `dev.jasper.vault.lock` | Cmd+Shift+L | Ctrl+Alt+Shift+L | Anywhere |
+| Editor | Open in Editor… | `dev.jasper.editor.open` | Cmd+O | Ctrl+Shift+O | Anywhere |
+| Project Index | Go to File… | `dev.jasper.indexer.goto` | Cmd+P | Ctrl+Alt+Shift+P | Anywhere |
+| Shell History | Search Shell History | `dev.jasper.history.open` | Cmd+R | Ctrl+Shift+R | Anywhere |
+| Snippets | Snippets… | `dev.jasper.snippets.open` | Cmd+J | Ctrl+Shift+J | Anywhere |
+
+The Sample plugin registers its demo actions only when its demo settings are on: **Run Sample Activity**
+(`dev.jasper.sample.demo`, Cmd+Option+J; Ctrl+Alt+Shift+J) and **Sample Greetings…**
+(`dev.jasper.sample.greetings.open`, Cmd+Option+Y; Ctrl+Alt+Shift+Y).
+
+While an Editor tab is selected, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save. They
+are listed in the Editor tab's right-click menu and in [Editor](editor.md#commands-and-shortcuts), and are not part of
+the keymap. The window's Close Pane, Cmd+W (Ctrl+Shift+W), closes the Editor file's pane.
+
+## Fixed keys
+
+These keys belong to one control and cannot be changed. Settings › Keymap lists those of the find bar, the command
+palette (except Backspace), help windows, the Plugins list and the SSH Hosts and Vault entries lists as
+read-only rows.
+
+| Where | Key | Does |
+|---|---|---|
+| Find bar | Enter, Shift+Enter | Next match, previous match |
+| Find bar | Escape | Closes the find bar |
+| Command palette | Enter, Cmd+Enter (Ctrl+Enter), Shift+Enter | Runs the selected row's first, second or third action |
+| Command palette | Up, Down | Moves the selection |
+| Command palette | Tab, Shift+Tab | Next or previous field of a step form |
+| Command palette | Escape | Leaves a step form, or closes the palette |
+| Command palette | Backspace in an empty query | Removes the scope chip |
+| Terminal pane | Shift+Page Up, Shift+Page Down | Scrolls the pane up or down by a screen less one line |
+| Help windows | Cmd+W (Ctrl+W) | Close Window |
+| Plugins list (Settings › Plugins) | Context Menu, Shift+F10 | Opens the selected plugin's menu |
+| SSH Hosts list (Remote) | Enter | Goes to the host's most recently used running pane, or connects when none runs; on a group, expands or collapses it |
+| SSH Hosts list (Remote) | Up, Down | Next or previous host or group |
+| Vault entries list (Credential Vault) | Enter | Edits the selected credential |
+| Vault entries list (Credential Vault) | Up, Down | Next or previous credential |
+| Editor's Markdown preview | Tab, Shift+Tab | Selects the next or previous link; from the last or first, moves the focus to the next or previous control |
+| Editor's Markdown preview | Enter | Follows the selected link |
+| File chooser | Enter, Escape | The primary button (Open, Save or Choose), Cancel |
+| File chooser | Option+Left, Option+Right (Alt+Left, Alt+Right) | Back, Forward |
+| File chooser | Option+Up (Alt+Up); Backspace in the listing | Up one folder |
+| File chooser | Cmd+L (Ctrl+L) | Type a location |
+| File chooser | Cmd+Shift+. (Ctrl+Shift+.) | Show or hide hidden items |
+| Settings | Enter, Escape | OK, Cancel |
+| Dragging a tool window | Escape | Cancels the drag |
+| Menus in the window (Linux and Windows) | F10 | Opens the first menu (in a terminal pane F10 goes to the program) |
+
+## How shortcuts apply
+
+- A shortcut applies in a place: **Global** (anywhere in a Jasper window), **Terminal** (in a terminal pane and its
+  find bar), or a plugin's own place: its tabs or one of its tool windows. The same key may serve a Global action and
+  a plugin's place, and the most specific place that holds the focus wins; within the Global and Terminal places each
+  key has one action.
+- When the action is unavailable (Copy with nothing selected, for example), the key reaches the focused control, except
+  in a terminal pane: there Jasper takes the key and does nothing, so Ctrl+Shift+C never reaches the shell as Ctrl+C.
+- Copy and Paste in a text field use the field's own copy and paste.
+- On Linux and Windows, Ctrl+PageUp and Ctrl+PageDown switch tabs even while a text field, a list or a table has the
+  focus.
+- While the command palette card is open it takes the keyboard; Jasper's other shortcuts wait until it closes, except
+  Copy and Paste in its query field, the palette's own shortcut (back to All from a scope chip, otherwise closing the
+  card) and the plugin scopes' shortcuts, which switch the open palette to that scope, or close the card when that
+  scope is already showing.
+- Some keys never reach Jasper because the operating system keeps them, such as Cmd+Tab on macOS.
+
+## Changing shortcuts
+
+### Settings › Keymap
+
+Open it with Help › **Keyboard Shortcuts…**, **Keyboard Shortcuts…** in the command palette, or Settings › Keymap. It
+lists every built-in action, every action Jasper and the plugins have registered, and some of the
+[fixed keys](#fixed-keys) as read-only rows, in sections for each area and each plugin. Each row shows where its
+shortcut applies; an unassigned action shows **Unassigned**, and a plugin default that could not be used says why.
+
+- **Search.** Type an action, a plugin, a section or a shortcut. A query with `+`, such as `cmd+shift+h`, matches that
+  shortcut in any modifier order; `command` and `meta` mean `cmd`, `control` means `ctrl`, `option` means `alt`, `esc`
+  and `return` mean Escape and Enter, and the macOS menu symbols for Command, Shift, Option and Control work too.
+  **Record** (in the search field) finds actions by the keys you press, Tab and Escape included, until you click **Stop
+  recording**. **Clear** empties the search; the buttons beside it expand or collapse every section.
+- **Edit.** Click a row's shortcut, or select the row and press Enter. The edit card records the next combination you
+  press: Enter sets it, Escape cancels. **Set** stages the shortcut and **Cancel** drops it. The ⋯ menu has
+  **Record any key…** (the next key is taken literally, even Enter or Escape), **Remove shortcut** and **Restore
+  default**. While Jasper records, keys such as Cmd+W and Cmd+Q are recorded instead of acting.
+- **Conflicts.** If the shortcut is taken, the card says "Already used by: …". Turn on **Reassign from conflicting
+  action** to take it; the other action is left without a shortcut.
+- **Save.** **Apply** or **OK** in Settings writes every staged change to `[keybindings]` in `config.toml` at once, and
+  every window uses it immediately. Changes made to the file outside Jasper show up in the page as it reloads.
+
+Under the Enterprise look the page is a table with Action, Scope and Shortcut columns and text buttons (**Find by
+Shortcut**, **Stop**, **Expand All**, **Collapse All**).
+
+### In config.toml
+
+Each line under `[keybindings]` binds one action by its ID; a plugin action's ID is quoted.
+
+```toml
+[keybindings]
+toggle_zen_mode = "cmd+shift+z"
+clear_terminal = "cmd+alt+k"
+reload_config = "none"
+"dev.jasper.vault.lock" = "cmd+alt+l"
+```
+
+[Shortcut syntax](configuration.md#shortcut-syntax) gives the modifier and key names, and
+[Conflicts and invalid bindings](configuration.md#conflicts-and-invalid-bindings) what happens to a binding Jasper
+cannot use.

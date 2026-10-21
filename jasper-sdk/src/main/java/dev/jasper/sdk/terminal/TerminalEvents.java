@@ -165,7 +165,11 @@ public final class TerminalEvents {
     public static final Topic<TabEvent> TAB_CLOSED = Topic.of(PREFIX + "tab_closed", TabEvent.class);
     /** A window's active tab, the focused pane's item in its shown tab, changed. */
     public static final Topic<TabEvent> TAB_SELECTED = Topic.of(PREFIX + "tab_selected", TabEvent.class);
-    /** A tab moved to another window; see {@link TabMoved}. @since 0.19.0 */
+    /**
+     * A tab moved to another window; see {@link TabMoved}.
+     *
+     * @since 0.19.0
+     */
     public static final Topic<TabMoved> TAB_MOVED = Topic.of(PREFIX + "tab_moved", TabMoved.class);
     /** A pane opened. */
     public static final Topic<PaneEvent> PANE_OPENED = Topic.of(PREFIX + "pane_opened", PaneEvent.class);
@@ -183,7 +187,10 @@ public final class TerminalEvents {
     public static final Topic<CommandStarted> COMMAND_STARTED = Topic.of(PREFIX + "command_started", CommandStarted.class);
     /** A command finished. */
     public static final Topic<CommandFinished> COMMAND_FINISHED = Topic.of(PREFIX + "command_finished", CommandFinished.class);
-    /** A pane's session started or ended. */
+    /**
+     * A pane's session changed state: {@code CONNECTING} when a provided session begins a connection attempt,
+     * {@code RUNNING} when a session starts, {@code EXITED} when a running session ends.
+     */
     public static final Topic<SessionStateChanged> SESSION_STATE_CHANGED = Topic.of(PREFIX + "session_state_changed", SessionStateChanged.class);
     /** A pane rang the bell. */
     public static final Topic<PaneEvent> BELL = Topic.of(PREFIX + "bell", PaneEvent.class);

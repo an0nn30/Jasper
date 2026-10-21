@@ -16,7 +16,7 @@ public final class WorkspaceChrome {
     /** The default look's chrome. */
     public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"),
         WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, DockChrome.STANDARD, PaletteLook.DEFAULT,
-        ChromeArtwork.NEW_UI);
+        ChromeArtwork.NEW_UI, false);
 
     private final MenuBarLayout menus;
     private final TitleFormat title;
@@ -35,9 +35,12 @@ public final class WorkspaceChrome {
     private final PaletteHome paletteHome;
     /** The icon set each window's header and status bar receive: read here once from the look's icons. */
     private final ChromeArtwork artwork;
+    /** Whether the classic header offers Search Everywhere as an icon button: read here once from the look's search. */
+    private final boolean iconSearch;
 
     private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header, WorkspaceLook.Tabs tabs,
-                            WorkspaceLook.Status status, boolean runItem, DockChrome dock, PaletteLook palette, ChromeArtwork artwork) {
+                            WorkspaceLook.Status status, boolean runItem, DockChrome dock, PaletteLook palette, ChromeArtwork artwork,
+                            boolean iconSearch) {
         this.dock = Objects.requireNonNull(dock);
         this.palette = Objects.requireNonNull(palette, "palette");
         this.paletteHome = switch (palette.home()) {
@@ -51,6 +54,7 @@ public final class WorkspaceChrome {
         this.status = Objects.requireNonNull(status);
         this.runItem = runItem;
         this.artwork = Objects.requireNonNull(artwork, "artwork");
+        this.iconSearch = iconSearch;
     }
 
     /**
@@ -81,9 +85,13 @@ public final class WorkspaceChrome {
             case NEW_UI -> ChromeArtwork.NEW_UI;
             case CLASSIC -> ChromeArtwork.CLASSIC;
         };
+        boolean iconSearch = switch (look.search()) {
+            case FIELD -> false;
+            case ICON -> true;
+        };
         return new WorkspaceChrome(menus, title, look.header(), look.tabs(), look.status(), look.runItem(),
             new DockChrome(look.stripes() == WorkspaceLook.Stripes.LABELLED, look.frames() == WorkspaceLook.FrameStyle.FLUSH), palette,
-            artwork);
+            artwork, iconSearch);
     }
 
     MenuBarLayout menus() { return menus; }
@@ -100,7 +108,7 @@ public final class WorkspaceChrome {
     HeaderComposition header() {
         return switch (header) {
             case UNIFIED -> new UnifiedHeader();
-            case CLASSIC -> new ClassicHeader();
+            case CLASSIC -> new ClassicHeader(iconSearch);
         };
     }
 
@@ -135,14 +143,16 @@ public final class WorkspaceChrome {
     }
 
     /**
-     * Two chromes are equal when they choose the same strategies (the strategies hold no state), the same template and the
-     * same icon set.
+     * Two chromes are equal when they choose the same strategies (the strategies hold no state), the same template, the same
+     * icon set and the same toolbar search.
      */
     @Override public boolean equals(Object other) {
         return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && header == chrome.header
             && tabs == chrome.tabs && status == chrome.status && runItem == chrome.runItem && dock.equals(chrome.dock)
-            && title.equals(chrome.title) && palette.equals(chrome.palette) && artwork == chrome.artwork;
+            && title.equals(chrome.title) && palette.equals(chrome.palette) && artwork == chrome.artwork
+            && iconSearch == chrome.iconSearch;
     }
 
-    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, tabs, status, runItem, dock, title, palette, artwork); }
+    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, tabs, status, runItem, dock, title, palette, artwork,
+        iconSearch); }
 }

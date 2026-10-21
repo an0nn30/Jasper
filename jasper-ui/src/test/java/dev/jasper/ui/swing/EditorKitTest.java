@@ -83,10 +83,21 @@ class EditorKitTest {
                         var text = find(view, "text0", JLabel.class);
                         assertThat(text.isEnabled()).as("passive does not dim error text").isTrue();
                         assertThat(text.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.STATUS_DANGER));
-                        var pixels=paint(text,140,28); int opaqueInk=0;
-                        for(int y=0;y<pixels.getHeight();y++)for(int x=0;x<pixels.getWidth();x++)
-                            if((pixels.getRGB(x,y)>>>24)>200)opaqueInk++;
-                        assertThat(opaqueInk).as("passive error glyphs paint at full opacity").isGreaterThan(10);
+                        var pixels=paint(text,140,28);
+                        var reference=new BufferedImage(140,28,BufferedImage.TYPE_INT_ARGB);
+                        var graphics=reference.createGraphics();
+                        try {
+                            ThemePainting.antialias(graphics);
+                            graphics.setFont(text.getFont()); graphics.setColor(text.getForeground());
+                            graphics.drawString(text.getText(),0,graphics.getFontMetrics().getAscent());
+                        } finally { graphics.dispose(); }
+                        long ink=0, referenceInk=0;
+                        for(int y=0;y<pixels.getHeight();y++)for(int x=0;x<pixels.getWidth();x++) {
+                            ink += pixels.getRGB(x,y) >>> 24;
+                            referenceInk += reference.getRGB(x,y) >>> 24;
+                        }
+                        assertThat(referenceInk).isPositive();
+                        assertThat(ink).as("passive error glyphs retain full opacity").isEqualTo(referenceInk);
                         find(view, "action0", AbstractButton.class).doClick();
                         assertThat(events).containsExactly(new UiEvent.Action("copy"));
                         view.reveal("text29");
@@ -253,6 +264,28 @@ class EditorKitTest {
                 var bounds=SwingUtilities.convertRectangle(label.getParent(),label.getBounds(),control.canvas);
                 assertThat(control.scroll.getViewport().getViewRect().intersects(bounds)).isTrue();
             }finally {release(context);}
+        });
+    }
+
+    @Test void specializedContentReceivesCurrentBodyFontAndLiveFamilyChanges() {
+        Edt.run(() -> {
+            var saved=new Object[3];
+            UIManager.getDefaults().forEach((key,value) -> {
+                if("defaultFont".equals(key))saved[0]=value;
+                if("Label.font".equals(key))saved[1]=value;
+                if("Jasper.uiFontFamilyOverride".equals(key))saved[2]=value;
+            });
+            var context=KitFixtures.context();
+            try {
+                UIManager.put("defaultFont",new Font("Serif",Font.PLAIN,17));UIManager.put("Label.font",new Font("Serif",Font.PLAIN,17));UIManager.put("Jasper.uiFontFamilyOverride",true);
+                try(var view=new KitView(context,new ViewSpec(new Custom("node",READY,"content",CustomKind.EDITOR,"Editor")),event -> {})) {
+                    var content=new JComponent() {};var changes=new ArrayList<Font>();content.addPropertyChangeListener("font",event -> changes.add((Font)event.getNewValue()));
+                    view.registerContent("content",content,() -> {});
+                    assertThat(content.getFont().getFamily()).isEqualTo("Serif");
+                    UIManager.put("defaultFont",new Font("SansSerif",Font.PLAIN,20));
+                    assertThat(content.getFont().getFamily()).isEqualTo("SansSerif");assertThat(changes).hasSizeGreaterThanOrEqualTo(2);
+                }
+            }finally{UIManager.put("defaultFont",saved[0]);UIManager.put("Label.font",saved[1]);UIManager.put("Jasper.uiFontFamilyOverride",saved[2]);release(context);}
         });
     }
 

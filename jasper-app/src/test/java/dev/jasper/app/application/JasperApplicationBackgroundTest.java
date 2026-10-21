@@ -735,6 +735,7 @@ class JasperApplicationBackgroundTest {
             edt(application::quitNow);
             // The shutdown writes the plugin's and the window state under the temporary directory.
             assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+            ApplicationPluginCleanup.await(application);
         }
     }
 

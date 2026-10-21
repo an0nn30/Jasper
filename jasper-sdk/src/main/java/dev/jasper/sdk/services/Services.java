@@ -24,8 +24,9 @@ public interface Services {
 
     /**
      * Publishes a per-consumer factory. The runtime calls it on the UI thread once for each plugin
-     * that declares {@code requires} on the provider, just before that consumer starts, with the
-     * consumer's verified identity. This gives caller attribution; it is not a security boundary.
+     * that declares {@code requires} on the provider, optional or not, just before that consumer starts, with the
+     * consumer's verified identity; a factory that returns null or throws gives that consumer no instance. This gives
+     * caller attribution; it is not a security boundary.
      *
      * @param api an interface from one of the provider's exported packages
      * @param perConsumer creates the instance one consumer receives
@@ -36,17 +37,20 @@ public interface Services {
     <T> void publishPerConsumer(Class<T> api, Function<PluginInfo, T> perConsumer);
 
     /**
-     * Looks up a service from a required provider.
+     * Looks up a service published by one of the plugins this plugin {@code requires}, optional or not, and throws when
+     * there is none.
      *
      * @param api the service interface
      * @param <T> service type
      * @return the caller's instance
-     * @throws ServiceUnavailableException when no required, started provider offers it
+     * @throws ServiceUnavailableException when no provider this plugin requires has started and published it
      */
     <T> T require(Class<T> api);
 
     /**
-     * Looks up a service from an optional provider.
+     * Looks up a service as {@link #require} does, empty when there is none. When an optional provider is absent, its
+     * API classes are not visible either: the caller's first executed reference to one, such as the class literal it
+     * passes here, throws {@link NoClassDefFoundError}, so catch that where the API is first used.
      *
      * @param api the service interface
      * @param <T> service type

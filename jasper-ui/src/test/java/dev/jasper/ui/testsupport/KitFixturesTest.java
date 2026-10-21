@@ -34,7 +34,7 @@ class KitFixturesTest {
     @Test void theThemeSetIsTheShippedVariantsThenTheConvertedOnes() {
         assertThat(KitFixtures.themes()).extracting(theme -> theme.name() + (theme.dark() ? " Dark" : " Light")).containsExactly(
             "Slate Cobalt Dark", "Slate Cobalt Light", "Catppuccin Latte Light", "Catppuccin Frappé Dark",
-            "Catppuccin Macchiato Dark", "Catppuccin Mocha Dark", "Ubuntu Yaru Dark", "Ubuntu Yaru Light", "Ocean Dark", "Ocean Dawn Light", "Stray Dark",
+            "Catppuccin Macchiato Dark", "Catppuccin Mocha Dark", "Ubuntu Yaru Dark", "Ubuntu Yaru Light", "Jasper Meadow Dark", "Jasper Meadow Light", "Ocean Dark", "Ocean Dawn Light", "Stray Dark",
             "Enterprise Dark", "Enterprise Light");
         assertThat(KitFixtures.themes().getFirst()).isSameAs(KitFixtures.dark());
     }

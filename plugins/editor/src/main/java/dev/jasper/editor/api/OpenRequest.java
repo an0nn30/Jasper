@@ -5,7 +5,7 @@ import dev.jasper.sdk.terminal.WindowHandle;
 import java.util.Optional;
 
 /**
- * What Open in Editor… was invoked on. Since Editor 0.5.0.
+ * What Open in Editor… was invoked on.
  *
  * @param window the workspace window
  * @param pane the focused terminal pane; empty while another kind of tab is selected. The handle is the Editor's and

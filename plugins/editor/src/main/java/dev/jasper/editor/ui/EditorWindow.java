@@ -54,6 +54,8 @@ public final class EditorWindow {
     private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment", "revert");
 
     private final EditorEnvironment environment;
+    private final dev.jasper.editor.markdown.resources.ImageLoader imageLoader;
+    private final boolean ownsImageLoader;
     private final PluginContext context;
     private final Runnable onClosed;
     private final java.util.function.Consumer<EditorDocument> opened;
@@ -61,6 +63,7 @@ public final class EditorWindow {
     private final Locations locations;
     private final EditorModel model = new EditorModel();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
+    private final java.util.Map<EditorTab, Boolean> markdownCommandsReady = new java.util.HashMap<>();
     private EditorTab selectedTab;
     private WindowOwner origin;
     private WindowOwner promptOwner;
@@ -69,6 +72,7 @@ public final class EditorWindow {
     private final Function<Question, String> ask;
     private final BiFunction<String, CompletableFuture<Boolean>, Boolean> await;
     private final FindBar findBar;
+    private final MarkdownNavigation navigation;
     private final StatusLine status;
     private final List<Command> commands;
     private final LocalWatcher watcher;
@@ -137,6 +141,19 @@ public final class EditorWindow {
      */
     public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
                         Predicate<OpenRequest> openers, Locations locations) {
+        this(environment, onClosed, opened, openers, locations,
+            new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(64L * 1024 * 1024)), true);
+    }
+
+    /** Uses the plugin-wide image loader across every hosted window and tab. */
+    public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                        Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader) {
+        this(environment, onClosed, opened, openers, locations, imageLoader, false);
+    }
+    private EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                         Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader, boolean ownsImageLoader) {
+        this.imageLoader = java.util.Objects.requireNonNull(imageLoader);
+        this.ownsImageLoader = ownsImageLoader;
         this.locations = java.util.Objects.requireNonNull(locations);
         this.environment = environment;
         this.context = environment.context();
@@ -147,7 +164,8 @@ public final class EditorWindow {
         serverIcon = "server";
         ask = question -> environment.askers().apply(owner()).apply(question);
         await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
-        findBar = new FindBar(() -> selected().map(EditorTab::area), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }));
+        navigation = new MarkdownNavigation(this, context.platform()::browse);
+        findBar = new FindBar(() -> selected().flatMap(EditorTab::findTarget), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }), () -> selected().ifPresent(EditorTab::revealSource));
         status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim);
         commands = List.of(
             command("save", "Save", KeyEvent.VK_S, 0, this::save),
@@ -155,13 +173,16 @@ public final class EditorWindow {
             command("save-all", "Save All", KeyEvent.VK_S, InputEvent.ALT_DOWN_MASK, () -> saveAll()),
             new Command("open", "Open…", Optional.empty(), false, this::openChooser),
             command("new", "New File", KeyEvent.VK_N, 0, this::newUntitled),
-            new Command("close-pane", "Close Pane", Optional.of(KeyNames.stroke(KeyEvent.VK_W, 0)), false, this::closeCurrent),
+            new Command("close-pane", "Close Pane", Optional.empty(), false, this::closeCurrent),
             command("find", "Find…", KeyEvent.VK_F, 0, () -> findBar.open(false)),
-            command("replace", "Replace…", KeyEvent.VK_F, InputEvent.ALT_DOWN_MASK, () -> findBar.open(true)),
-            command("find-next", "Find Next", KeyEvent.VK_G, 0, findBar::next),
-            command("find-previous", "Find Previous", KeyEvent.VK_G, InputEvent.SHIFT_DOWN_MASK, findBar::previous),
+            command("replace", "Replace…", KeyEvent.VK_F, InputEvent.ALT_DOWN_MASK, () -> { selected().ifPresent(EditorTab::revealSource); findBar.open(true); }),
+            new Command("find-next", "Find Next", Optional.of(KeyNames.findAgain(false)), true, findBar::next),
+            new Command("find-previous", "Find Previous", Optional.of(KeyNames.findAgain(true)), true, findBar::previous),
             command("go-to-line", "Go to Line…", KeyEvent.VK_L, 0, this::goToLine),
             command("toggle-comment", "Toggle Comment", KeyEvent.VK_SLASH, 0, this::toggleComment),
+            new Command("markdown.source", "Markdown: Source", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.SOURCE)),
+            new Command("markdown.split", "Markdown: Source and Preview", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.SPLIT)),
+            new Command("markdown.preview", "Markdown: Preview", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW)),
             new Command("revert", "Revert to Saved", Optional.empty(), false, this::revert),
             new Command("language", "Language…", Optional.empty(), false, this::chooseLanguage),
             new Command("wrap", "Toggle Soft Wrap", Optional.empty(), false, this::toggleWrap),
@@ -170,7 +191,7 @@ public final class EditorWindow {
         vim = new Vim(new VimHost(SystemClipboard::read, SystemClipboard::write, documents(), actions()));
         watcher = new LocalWatcher(context.background(), environment.ui(), model::sessions);
         ticker = new Timer(2000, event -> watcher.tick());
-        noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> tab.session().clearNotice()));
+        noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> {tab.navigationNotice("");tab.session().clearNotice();}));
         noticeTimer.setRepeats(false);
         closeRegistration = context.windows().onTabsClosing((handles, batch) -> {
             var closing = hosted.entrySet().stream().filter(e -> handles.contains(e.getValue())).map(java.util.Map.Entry::getKey).toList();
@@ -221,6 +242,12 @@ public final class EditorWindow {
         });
         if (existing.isPresent() && session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
         select(session);
+    }
+
+    EditorTab openLinked(EditorTab originTab, EditorDocument document) {
+        open(document, hosted.get(originTab));
+        var session = model.find(document.key()).orElseThrow();
+        return hosted.keySet().stream().filter(tab -> tab.session() == session).findFirst().orElseThrow();
     }
 
     /** Reports a new tab's document the first time it becomes ready: a failed read reports nothing, a successful retry does. */
@@ -364,10 +391,18 @@ public final class EditorWindow {
         if (vimToggled != null && vimToggled == settings.vim()) vimToggled = null;
         for (EditorTab tab : editorTabs()) {
             tab.settings(settings);
+            tab.typography(environment.typography());
             tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         }
         readVimrcOnce();
         refreshStatus();
+    }
+
+    /** Reapplies effective typography to every tab after saved terminal typography changes. */
+    public void typography() {
+        if (disposed) return;
+        var font = environment.typography();
+        for (EditorTab tab : editorTabs()) tab.typography(font);
     }
 
     /** @return whether Vim mode is on: as toggled here, or as the settings say */
@@ -547,8 +582,13 @@ public final class EditorWindow {
         return saveSession(session).thenCompose(saved -> saved ? approveTab(tab) : CompletableFuture.completedFuture(false));
     }
 
+    private void markdownMode(dev.jasper.editor.markdown.MarkdownMode mode) {
+        selected().ifPresent(tab -> { tab.markdownMode(mode, true); refreshStatus(); });
+    }
+
     public void goToLine() {
         selected().filter(tab -> tab.session().state() == DocumentSession.State.READY).ifPresent(tab -> {
+            tab.revealSource();
             RSyntaxTextArea area = tab.area();
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Go to Line", owner(), true));
             var panel = new GoToLinePanel(context.kit(), area.getCaretLineNumber() + 1, area.getLineCount(), line -> {
@@ -577,12 +617,13 @@ public final class EditorWindow {
 
     public void toggleComment() {
         selected().ifPresent(tab -> {
+            tab.revealSource();
             Action action = tab.area().getActionMap().get(RSyntaxTextAreaEditorKit.rstaToggleCommentAction);
             if (action != null) action.actionPerformed(new ActionEvent(tab.area(), ActionEvent.ACTION_PERFORMED, "toggle-comment"));
         });
     }
 
-    public void revert() { selected().ifPresent(tab -> tab.session().revert()); }
+    public void revert() { selected().ifPresent(tab -> { tab.revealSource(); tab.session().revert(); }); }
 
     /**
      * Revert to Saved as an action run in {@code window} does it, from the palette or a key, so that its question shows
@@ -658,6 +699,7 @@ public final class EditorWindow {
         ticker.stop();
         noticeTimer.stop();
         for (DocumentSession session : model.sessions()) session.cancelLoad();
+        if (ownsImageLoader) imageLoader.close();
         onClosed.run();
     }
 
@@ -810,8 +852,22 @@ public final class EditorWindow {
         EditorSettings settings = environment.settings().get();
         session.setWrap(settings.softWrap());
         var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
+        tab.previews(context.background(), environment.ui(), imageLoader);
+        tab.markdownPreferences(environment.markdownPreferences(), failed -> environment.ui().execute(() -> {
+            if (!disposed) context.notifications().group().error("Could not save the Markdown default view", failed);
+        }));
+        tab.modeChanged(() -> activate(tab));
+        tab.noticeChanged(this::refreshStatus);
+        tab.surface().previewCallbacks(id -> {
+            // Resolve IDs only against the currently installed, generation-validated controller result.
+            if (tab.markdown() == null || tab.closed()) return;
+            tab.markdown().currentResult().stream().flatMap(result -> result.links().stream())
+                .filter(link -> link.id() == id).findFirst()
+                .ifPresent(link -> navigation.follow(tab, dev.jasper.editor.markdown.resources.Destinations.parse(link.destination())));
+        }, () -> {});
         tab.appearance(context.appearance());
         tab.settings(settings);
+        tab.typography(environment.typography());
         tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         var tabCommands = commands.stream().map(command -> new Command(command.id(), command.title(), command.stroke(), command.bound(),
             () -> { activate(tab); command.run().run(); })).toList();
@@ -821,6 +877,7 @@ public final class EditorWindow {
         tab.area().addCaretListener(event -> { if (selected().orElse(null) == tab) refreshStatus(); });
         session.addListener(() -> {
             if (!hosted.containsKey(tab)) return;
+            refreshCommands(tab);
             refreshHeaders();
             if (selected().orElse(null) == tab) refreshStatus();
         });
@@ -829,28 +886,63 @@ public final class EditorWindow {
         var spec = new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name());
         var handle = context.windows().openTab(restoreState(session).map(spec::withRestore).orElse(spec), origin, tab.view(), placement);
         hosted.put(tab, handle); ownerRef.set(handle);
-        handle.setFocusTarget(tab::focusText);
+        handle.setFocusTarget(tab::focusContent);
         // A restored document on another host reads when its tab is first active (workspace tabs spec 13).
-        handle.onActive(active -> { if (active) { activate(tab); if (session.deferred()) session.load(); } });
+        handle.onActive(active -> { tab.active(active); if (active) { activate(tab); if (session.deferred()) session.load(); } });
+        tab.active(handle.isActive());
         handle.onClosed(() -> remove(tab));
         // Tabs and panes spec 2.10 and 9: the right-click menu's Split submenu and Move Pane to New Tab.
         PaneItems.install(tab.area().getPopupMenu(), context.windows()::splitChoices, handle);
-        var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
-        for (var command : commands) {
-            if (command.id().equals("next-tab") || command.id().equals("previous-tab")) continue;
-            descriptions.add(new dev.jasper.sdk.ui.ContentCommand(command.id(), command.title(), command.stroke().orElse(null), true,
-                () -> { activate(tab); command.run().run(); }));
-        }
-        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("copy", "Copy", KeyNames.stroke(KeyEvent.VK_C, 0), true, tab.area()::copy));
-        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("paste", "Paste", KeyNames.stroke(KeyEvent.VK_V, 0), true, tab.area()::paste));
-        handle.setCommands(descriptions);
         activate(tab);
         readVimrcOnce();
         refresh();
     }
 
+    private void refreshCommands(EditorTab tab) {
+        var handle = hosted.get(tab);
+        if (handle == null || handle.isClosed()) return;
+        boolean ready = tab.showingText() && tab.markdownEligible();
+        if (Boolean.valueOf(ready).equals(markdownCommandsReady.put(tab, ready))) return;
+        handle.setCommands(contentCommands(tab));
+    }
+
+    /**
+     * Publishes document actions, Close Pane among them without a shortcut (the host's Close Pane binding closes the pane);
+     * the host supplies Close Tab and tab navigation.
+     */
+    List<dev.jasper.sdk.ui.ContentCommand> contentCommands(EditorTab tab) {
+        boolean ready = tab.showingText() && tab.markdownEligible();
+        var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
+        for (var command : commands) {
+            descriptions.add(new dev.jasper.sdk.ui.ContentCommand(command.id(), command.title(), command.stroke().orElse(null),
+                !command.id().startsWith("markdown.") || ready,
+                () -> runHosted(tab, command.run())));
+        }
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("copy", "Copy", KeyNames.stroke(KeyEvent.VK_C, 0), true, () -> runHosted(tab, () -> selected().ifPresent(EditorTab::copy))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("paste", "Paste", KeyNames.stroke(KeyEvent.VK_V, 0), true, () -> runHosted(tab, () -> selected().ifPresent(EditorTab::paste))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("select-all", "Select All", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(EditorTab::selectAll))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("cut", "Cut", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().cut(); }))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("delete", "Delete", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().replaceSelection(""); }))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("undo", "Undo", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().undoLastAction(); }))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("redo", "Redo", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().redoLastAction(); }))));
+        return descriptions;
+    }
+
+    private void runHosted(EditorTab captured, Runnable action) {
+        var owner = hosted.get(captured);
+        if (owner == null || owner.isClosed()) return;
+        if (!owner.isActive()) return;
+        activate(captured); action.run();
+    }
+
     private void remove(EditorTab tab) {
         if (hosted.remove(tab) == null) return;
+        markdownCommandsReady.remove(tab);
         tab.dispose(); tab.session().cancelLoad(); model.remove(tab.session());
         numbers.remove(tab.session());
         newFiles.remove(tab.session());
@@ -893,13 +985,14 @@ public final class EditorWindow {
         status.display(selected(), environment.settings().get().tabSize(), vimOn());
         if (selectedTab != null && hosted.containsKey(selectedTab)) {
             var tab = selectedTab;
+            refreshCommands(tab);
             hosted.get(tab).setStatus(status.items().stream().map(item -> new dev.jasper.sdk.ui.ContentStatus(
                 item.text(), item.tooltip(), item.run() == null ? null : () -> {
                     if (!hosted.containsKey(tab)) return;
                     activate(tab); item.run().run();
                 })).toList());
         }
-        if (environment.timers() && selected().flatMap(tab -> tab.session().notice()).isPresent()) noticeTimer.restart();
+        if (environment.timers() && selected().flatMap(tab -> tab.navigationNotice().or(() -> tab.session().notice())).isPresent()) noticeTimer.restart();
     }
 
     private static Command command(String id, String title, int keyCode, int extraModifiers, Runnable run) {

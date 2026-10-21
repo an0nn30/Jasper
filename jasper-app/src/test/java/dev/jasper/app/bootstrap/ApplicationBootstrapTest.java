@@ -320,11 +320,11 @@ class ApplicationBootstrapTest {
         assertThat(ApplicationBootstrap.attemptBeforePresenting(background, true, true)).isFalse();
     }
 
-    /** Spec 10.11: only a branded start that will open a window shows the splash. */
-    @Test void onlyABrandedStartThatOpensAWindowShowsTheSplash() {
+    /** Windowed starts show Meadow by default or the selected branded splash. */
+    @Test void aWindowedStartShowsTheDefaultOrBrandedSplash() {
         var plain = AppArguments.parse(new String[0], directory);
         assertThat(ApplicationBootstrap.splashWanted(plain, false, true)).isTrue();
-        assertThat(ApplicationBootstrap.splashWanted(plain, false, false)).as("no branding").isFalse();
+        assertThat(ApplicationBootstrap.splashWanted(plain, false, false)).as("default Meadow splash").isTrue();
         assertThat(ApplicationBootstrap.splashWanted(plain, true, true)).as("headless").isFalse();
         for (String flag : java.util.List.of("--background", "--no-window", "--safe-mode"))
             assertThat(ApplicationBootstrap.splashWanted(AppArguments.parse(new String[] {flag}, directory), false, true)).as(flag).isFalse();
@@ -347,7 +347,9 @@ class ApplicationBootstrapTest {
             dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
             var standard = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null,
                 dev.jasper.app.plugins.PluginSelection.none(), null);
-            assertThat(ApplicationBootstrap.openSplash(standard, false)).isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+            var standardSteps = ApplicationBootstrap.openSplash(standard, false);
+            assertThat(standardSteps).isNotSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+            javax.swing.SwingUtilities.invokeAndWait(standardSteps::done);
             assertThat(dev.jasper.app.platform.ApplicationIcon.branded()).as("the default look keeps Jasper's icons").isFalse();
         } finally {
             dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
@@ -387,6 +389,11 @@ class ApplicationBootstrapTest {
         assertThat(calls).containsExactly("show false", "show true", "icon", "show false", "show true", "icon");
     }
 
+    @Test void enterpriseUsesTheSameMeadowSplashBrandingAsNormalMode() {
+        var parsed = dev.jasper.app.testsupport.EnterpriseResources.facts().parsed().orElseThrow();
+        assertThat(parsed.branding()).isSameAs(dev.jasper.app.presentation.Branding.NONE);
+    }
+
     /** Spec 10.11: the splash shows the look's files, the version line and About's copyright. */
     @Test void theSplashContentIsTheLooksBrandingWithAboutsVersionAndCopyright() throws Exception {
         var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));
@@ -404,11 +411,14 @@ class ApplicationBootstrapTest {
         assertThat(content.versionFace()).isEmpty();
     }
 
-    /** Review Focus 1: a splash never outlives the start that opened it. */
-    @Test void theStepsEndWhetherTheStartSucceedsOrFails() {
+    /** Successful composition hands splash ownership to the visible window; failure closes it. */
+    @Test void successfulCompositionKeepsTheSplashUntilTheWindowPaints() {
         var closed = new java.util.concurrent.atomic.AtomicInteger();
         var steps = dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet);
         ApplicationBootstrap.presenting(steps, () -> { });
+        assertThat(closed).hasValue(0);
+        assertThat(steps.active()).isTrue();
+        steps.done();
         assertThat(closed).hasValue(1);
         var failing = dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet);
         assertThatThrownBy(() -> ApplicationBootstrap.presenting(failing, () -> { throw new IllegalStateException("composition failed"); }))

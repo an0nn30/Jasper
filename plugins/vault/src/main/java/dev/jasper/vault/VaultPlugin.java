@@ -26,6 +26,7 @@ import dev.jasper.vault.store.KeychainStore;
 import dev.jasper.vault.store.VaultFile;
 import dev.jasper.vault.ui.CopyCards;
 import dev.jasper.vault.ui.GrantPanel;
+import dev.jasper.vault.ui.LockShortcut;
 import dev.jasper.vault.ui.PasswordPanel;
 import dev.jasper.vault.ui.PickerPanel;
 import dev.jasper.vault.ui.VaultScope;
@@ -107,7 +108,7 @@ public class VaultPlugin implements Plugin {
 
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
-        layout = dev.jasper.vault.workstation.Layout.of(context.services());
+        layout = dev.jasper.vault.workstation.Layout.of(context.appearance().presentation());
         stopped = false;
         Files.createDirectories(context.dataDirectory());
         declared = new VaultSettings.Declared(context.settings());
@@ -132,7 +133,7 @@ public class VaultPlugin implements Plugin {
             .withDefaultBinding("cmd+\\"),
             invoked -> context.palette().open(invoked.window(), VaultScope.ID, Optional.empty(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))
-            .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
+            .withDefaultBinding(LockShortcut.BINDING), invoked -> lock.lock());
         lockAction.setEnabled(false);
         scope = new VaultScope(lock, service, CopyCards.declare(context), this::open, this::unlockThenSearch);
         context.palette().register(scope);

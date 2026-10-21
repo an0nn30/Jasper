@@ -11,8 +11,10 @@ import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
 import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.ui.icons.ChromeArtwork;
+import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.swing.ChromePainter;
 import dev.jasper.ui.theme.PaintPair;
+import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Color;
 import java.awt.Point;
@@ -382,16 +384,42 @@ class DockMockTest {
                 var render = variant.seen(fixture.render(2));
                 // The fixture's panels: SFTP's dot and detail and the others' counts, which the Disconnected mock drops but Sessions'.
                 var counted = connected ? List.of(HeaderText.TITLE, HeaderText.COUNT) : List.of(HeaderText.TITLE);
-                compareHeader(variant, kind + "-sftp-header", render, fixture.header("sftp"), 48, 180, 600, true,
-                    connected ? List.of(HeaderText.TITLE, HeaderText.DOT, HeaderText.DETAIL) : List.of(HeaderText.TITLE));
-                compareHeader(variant, kind + "-servers-header", render, fixture.header("servers"), 48, 944, 600, false, counted);
-                compareHeader(variant, kind + "-tunnels-header", render, fixture.header("tunnels"), 2136, 1014, 700, false, counted);
+                compareHeader(variant, kind + "-sftp-header", render, fixture.header("sftp"), fixture.nativeCount("sftp"), 48, 180, 600, true,
+                    connected ? List.of(HeaderText.TITLE, HeaderText.DOT, HeaderText.DETAIL) : List.of(HeaderText.TITLE), actions(connected, "sftp"));
+                compareHeader(variant, kind + "-servers-header", render, fixture.header("servers"), fixture.nativeCount("servers"), 48, 944, 600, false, counted,
+                    actions(connected, "servers"));
+                compareHeader(variant, kind + "-tunnels-header", render, fixture.header("tunnels"), fixture.nativeCount("tunnels"), 2136, 1014, 700, false, counted,
+                    actions(connected, "tunnels"));
                 fixture.focus("sessions");
                 render = variant.seen(fixture.render(2));
-                compareHeader(variant, kind + "-sessions-header", render, fixture.header("sessions"), 2136, 180, 700, true,
-                    List.of(HeaderText.TITLE, HeaderText.COUNT));
+                compareHeader(variant, kind + "-sessions-header", render, fixture.header("sessions"), fixture.nativeCount("sessions"), 2136, 180, 700, true,
+                    List.of(HeaderText.TITLE, HeaderText.COUNT), actions(connected, "sessions"));
             }
         } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** The fixture panel {@code id}'s own header actions, in their order before Options and Hide. */
+    static List<String> actions(boolean connected, String id) {
+        return DockFixture.panels(connected).stream().filter(panel -> panel.id().equals(id)).findFirst().orElseThrow().actions();
+    }
+
+    /**
+     * The ink of IntelliJ's classic {@code name} art on a header strip, as the variant shows it: the art is authored (the
+     * classic {@code add} is #6E6E6E in Light), so it is painted in its 10 px glyph box at 2x on the strip's surface and
+     * its strongest pixel read as a run's is.
+     */
+    static Color classicInk(Variant variant, String name, boolean focused) {
+        var theme = EnterpriseLook.theme(variant.dark());
+        Color strip = new ChromePainter(EnterpriseLook.kit()).headerSurface(theme, focused);
+        try (var icons = new IconRegistry()) {
+            var icon = icons.classicChromeIcon(name, 20).orElseThrow().icon(theme, SemanticColor.TEXT_PRIMARY);
+            var image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
+            var g = image.createGraphics();
+            try { g.setColor(strip); g.fillRect(0, 0, 20, 20); icon.paintIcon(null, g, 0, 0); } finally { g.dispose(); }
+            var runs = MockCrops.runs(image, false, 60, 10, strip);
+            assertThat(runs).as("the classic %s art has one run", name).hasSize(1);
+            return variant.seen(runs.get(0).ink());
+        }
     }
 
     /** A header strip's text run: its title, connected dot, word detail or count. */
@@ -414,12 +442,14 @@ class DockMockTest {
      * A header strip against its mock crop (2x, its 24 px strip and its rule): the surface and the rule; the ink runs
      * along it, one per title, dot, detail and icon, the title's start within 2 px, each icon's centre within 2 (the icons
      * stand from the trailing edge, whatever the face), each icon's extent within {@link #GLYPH_EXTENT} and its ink within
-     * {@link Variant#glyphInkTolerance} (one glyph box and one ink for every action), and each text run's ink, {@code texts}
+     * {@link Variant#glyphInkTolerance} (one glyph box for every action, and the strip's action ink but for a classic name
+     * among {@code actions}, which has its classic art's ink, {@link #classicInk}), and each text run's ink, {@code texts}
      * in order; the other text edges (a text run's end within 3, a later run's start within 2) and the agreeing pixels of
      * the text, left of the icons, follow the title's advance width and glyphs and are asserted under IBM Plex.
+     * Native count widths match an independent platform label render.
      */
-    static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, int mockX, int mockY, int mockWidth,
-                              boolean focused, List<HeaderText> texts) {
+    static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, String nativeCount, int mockX, int mockY,
+                              int mockWidth, boolean focused, List<HeaderText> texts, List<String> actions) {
         String where = variant.name() + " " + name;
         assertThat(2 * header.width).as(where + ": the frame's width").isEqualTo(mockWidth);
         assertThat(2 * header.height).as(where + ": 24 and the rule").isEqualTo(50);
@@ -435,7 +465,7 @@ class DockMockTest {
         var theirs = MockCrops.runs(MockCrops.crop(mock, 0, 0, mockWidth, 48), false, 60, 10, surface);
         var ours = MockCrops.runs(MockCrops.crop(mine, 0, 0, mockWidth, 48), false, 60, 10, strip);
         assertThat(ours).as(where + ": one run per title, dot, detail and icon").hasSameSizeAs(theirs);
-        int firstIcon = mockWidth;
+        int firstIcon = mockWidth, icons = 0;
         for (int i = 0; i < theirs.size(); i++) {
             var mockRun = theirs.get(i);
             var run = ours.get(i);
@@ -446,13 +476,24 @@ class DockMockTest {
                     .isBetween((mockRun.start() + mockRun.end()) / 2.0 - 2, (mockRun.start() + mockRun.end()) / 2.0 + 2);
                 assertThat(run.length()).as(where + " icon " + i + " extent")
                     .isBetween(mockRun.length() - GLYPH_EXTENT, mockRun.length() + GLYPH_EXTENT);
-                Color action = variant.seen(painter.headerAction(theme, focused));
+                // The user's 2026-10-19 direction: a classic name (the panels' add) draws IntelliJ's classic art, authored,
+                // where the mocks set a glyph in the strip's ink; the other actions keep the strip's ink.
+                String named = icons < actions.size() ? actions.get(icons) : "";
+                icons++;
+                Color action = IconRegistry.classicChromeNames().contains(named) ? classicInk(variant, named, focused)
+                    : variant.seen(painter.headerAction(theme, focused));
                 assertThat(MockCrops.near(run.ink(), action, variant.glyphInkTolerance()))
                     .as(where + " icon " + i + " ink " + run.ink() + " against " + action).isTrue();
             } else {
                 if (i == 0) assertThat(run.start()).as(where + " title starts").isBetween(mockRun.start() - 2, mockRun.start() + 2);
                 else MockProfile.fonts(where + " run " + i + " start", run.start(), mockRun.start(), 2);
-                MockProfile.fonts(where + " run " + i + " end", run.end(), mockRun.end(), 3);
+                if (nativeCount != null && i < texts.size() && texts.get(i) == HeaderText.COUNT) {
+                    // Native JLabel uses integer glyph advances: the same Plex face can make "(2)" narrower on
+                    // Windows than in the browser mock. Keep the mock's start, and require the exact ink width of
+                    // the specified text/COUNT role rendered independently by this platform's label rasterizer.
+                    assertThat(run.length()).as(where + " native count width")
+                        .isEqualTo(nativeCountWidth(nativeCount, strip, run.ink()));
+                } else MockProfile.fonts(where + " run " + i + " end", run.end(), mockRun.end(), 3);
                 assertThat(i).as(where + ": a text run the fixture shows").isLessThan(texts.size());
                 assertThat(MockCrops.near(run.ink(), headerInk(variant, texts.get(i), focused), 24)).as(where + " run " + i + " ink, " + texts.get(i)).isTrue();
             }
@@ -460,6 +501,17 @@ class DockMockTest {
         int text = Math.max(8, firstIcon - 8);
         MockCrops.fontsFloor(where + ": agreeing pixels",
             MockCrops.agreement(MockCrops.crop(mine, 0, 0, text, 50), MockCrops.crop(mock, 0, 0, text, 50), 24), HEADER_FLOOR);
+    }
+
+    private static int nativeCountWidth(String text, Color surface, Color ink) {
+        var label = new javax.swing.JLabel(text);
+        label.setFont(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.COUNT));
+        label.setForeground(ink);
+        label.setBackground(surface);
+        label.setOpaque(true);
+        var runs = MockCrops.runs(MockCrops.render(label, 100, 24, 2), false, 60, 10, surface);
+        assertThat(runs).as("one independently rendered count").hasSize(1);
+        return runs.getFirst().length();
     }
 
     /** The four borrowed kit header strips against the mocks' (every mock header is a plugin panel's). */

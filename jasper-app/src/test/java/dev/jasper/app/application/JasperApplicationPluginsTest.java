@@ -76,6 +76,7 @@ class JasperApplicationPluginsTest {
         assertThat(data.resolve("started")).exists();
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(stoppedBeforeExit[0]).isTrue();
         assertThat(savedBeforeExit[0]).as("the windows saved in the home's workspace.toml").isTrue();
     }
@@ -120,6 +121,7 @@ class JasperApplicationPluginsTest {
             edt(application[0]::quit);
             // Shutdown writes the layout state into the temporary home; let it finish before JUnit deletes that.
             assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+            ApplicationPluginCleanup.await(application[0]);
             worker.shutdownNow();
         }
     }
@@ -136,6 +138,7 @@ class JasperApplicationPluginsTest {
         java.nio.file.Files.delete(dirs.uiState());
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(dirs.uiState()).as("saved again at shutdown, keeping what was loaded").exists()
             .content().contains("rail_visible = false");
     }
@@ -178,6 +181,7 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     @Test void anOutOfMemoryErrorWarnsThatJasperIsLowOnMemory() throws Exception {
@@ -193,6 +197,7 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     @Test void quitReleasesTheHeapWatchAndTheMemoryIndicatorsAction() throws Exception {
@@ -215,6 +220,7 @@ class JasperApplicationPluginsTest {
         assertThat(oldGeneration.getCollectionUsageThreshold()).as("the low-memory watch, installed when start-up settled").isPositive();
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(application[0].contributions().action(MemoryIndicator.COLLECT)).as("closed with the application").isEmpty();
         assertThat(oldGeneration.getCollectionUsageThreshold()).as("the threshold is released").isZero();
     }
@@ -295,6 +301,7 @@ class JasperApplicationPluginsTest {
         java.nio.file.Files.writeString(data.resolve("allow"), "yes");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(spawned).as("the refused restart left no relaunch behind").isEmpty();
     }
 
@@ -312,6 +319,7 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quitNow);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(data.resolve("asked")).as("the guard was never consulted").doesNotExist();
     }
 
@@ -360,13 +368,14 @@ class JasperApplicationPluginsTest {
         assertThat(dirs.plugins().resolve("dev.example.terms/data").resolve("windows")).hasContent("0 false");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     /** The installed LAF is FlatLaf's IntelliJ theme LAF carrying the saved theme's module snapshot; its identity. */
     private static String installedLightLaf() {
         var laf = javax.swing.UIManager.getLookAndFeel();
         assertThat(laf).isInstanceOf(com.formdev.flatlaf.IntelliJTheme.ThemeLaf.class);
-        var light = dev.jasper.ui.theme.JasperTheme.bundled().generated(false);
+        var light = dev.jasper.ui.theme.JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false);
         assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(light);
         assertThat(laf.getDefaults().get("Jasper.installedTheme")).as("the snapshot travels with the LAF itself").isSameAs(light);
         assertThat(laf.getName()).isEqualTo(light.name());
@@ -414,7 +423,7 @@ class JasperApplicationPluginsTest {
             assertThat(dirs.plugins().resolve("dev.example.look/data/appearance")).as("the plugin started under that same LAF")
                 .hasContent("LIGHT\n" + installed[0] + "\ncom.formdev.flatlaf.ui.FlatButtonUI");
         } finally {
-            if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
+            if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); ApplicationPluginCleanup.await(application[0]); }
             service.close();
             edt(() -> ThemeTestSupport.controller(true));
         }
@@ -435,6 +444,7 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     private static final String LINE_EDITOR = """
@@ -483,6 +493,7 @@ class JasperApplicationPluginsTest {
             .containsExactlyInAnyOrder("Foo.java|42", "Foo.java|-");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     /**
@@ -518,6 +529,7 @@ class JasperApplicationPluginsTest {
         assertThat(calls).as("plugins running, none provides an editor").containsExactly("edit:run.command", "reveal:run.command");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     @Test void aRequestedFilesDesktopFallbackOnlyReveals() throws Exception {

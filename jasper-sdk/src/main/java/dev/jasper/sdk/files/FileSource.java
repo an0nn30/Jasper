@@ -50,7 +50,8 @@ public interface FileSource {
      * cancels it to abandon the attempt.
      *
      * @param rootId one of {@link #roots()}
-     * @param owner  the window the chooser belongs to, for sign-in prompts
+     * @param owner  the Jasper window the chooser belongs to (a content tab's, for a chooser the tab owns), for sign-in
+     *               prompts; null when the chooser belongs to none
      * @return completes, on any thread, with a browser the host owns and closes
      */
     CompletionStage<FileBrowser> connect(String rootId, WindowOwner owner);

@@ -5,11 +5,16 @@ import dev.jasper.sdk.Variant;
 import java.util.function.Consumer;
 
 /**
- * Host-owned appearance values. Declarative views follow these automatically; specialized content
- * subscribes to refresh its domain palettes.
+ * Host-owned appearance values, the look Jasper runs with and the saved terminal typography. Declarative views follow
+ * these automatically; specialized content subscribes to refresh its domain palettes.
  */
 public interface Appearance {
-    /** Read a canonical semantic color on the UI thread. @param role canonical role @return current color */
+    /**
+     * Read a canonical semantic color on the UI thread.
+     *
+     * @param role canonical role
+     * @return current color
+     */
     java.awt.Color color(SemanticColor role);
     /**
      * The current variant; safe from any thread.
@@ -73,5 +78,29 @@ public interface Appearance {
      * @return the registration
      */
     Subscription onChanged(Consumer<Variant> handler);
+
+    /** The look Jasper runs with, chosen at start: the same value for every plugin until Jasper restarts. Safe from any thread.
+     * @return the presentation
+     * @since 0.18.2
+     */
+    Presentation presentation();
+
+    /** The saved terminal typography: the font, size, fallback fonts, ligatures and line height of Settings ›
+     * Terminal › Font &amp; Colors ({@code terminal.font} in {@code config.toml}), the same for every window and
+     * plugin. A terminal pane's temporary zoom does not change it. Safe from any thread.
+     * @return the current saved typography
+     * @since 0.18.3
+     */
+    TerminalTypography terminalTypography();
+
+    /** Runs the handler on the UI thread each time the saved terminal typography changes; {@link #terminalTypography()}
+     * already returns the new value when it runs. A saved value equal to the current one notifies nobody, and
+     * registering delivers no initial value, so read {@link #terminalTypography()} first.
+     * @param handler receives the newly saved typography
+     * @return the registration, removed when closed or when the plugin stops; safe to close from any thread
+     * @throws IllegalStateException off the UI thread, or once the plugin has stopped
+     * @since 0.18.3
+     */
+    Subscription onTerminalTypographyChanged(Consumer<TerminalTypography> handler);
 
 }

@@ -51,12 +51,16 @@ public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme
         var theme = library.theme(id);
         if (theme.isPresent() && theme.get().has(dark)) return theme.get();
         // Spec 7.5: the pick of a theme whose plugin is off is kept, and shows the default without a warning.
-        if (theme.isEmpty() && library.dormant().contains(id)) return JasperTheme.bundled();
+        if (theme.isEmpty() && library.dormant().contains(id)) return defaultTheme(dark);
         String reason = theme.isPresent() ? "\"" + id + "\" has no " + (dark ? "Dark" : "Light") + " variant."
             : "\"" + id + "\" is not an installed theme.";
         problems.accept(dark ? "ui.theme.dark" : "ui.theme.light", reason + " Use one of "
             + library.themes(dark).stream().map(found -> "\"" + found.id() + "\"").collect(Collectors.joining(", ")) + "; using the default.");
-        return JasperTheme.bundled();
+        return defaultTheme(dark);
+    }
+
+    private static JasperTheme defaultTheme(boolean dark) {
+        return JasperTheme.builtIn(dark ? JasperTheme.DARK_DEFAULT_ID : JasperTheme.LIGHT_DEFAULT_ID).orElseThrow();
     }
 
     /** The theme shown with the Dark or Light appearance. */

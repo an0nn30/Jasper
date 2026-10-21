@@ -1,0 +1,72 @@
+<section class="guide" id="distribution">
+<h2>Distribution</h2>
+<p>A plugin ships as a zip of its jars: the plugin's own jar, which holds {@code plugin.toml}, and every library it
+bundles. Users install it from Settings › Plugins; Jasper installs it at the next launch into
+{@code plugins/<id>/jars/} in Jasper home.</p>
+
+<h3>Building</h3>
+<p>The <a href="#quick-start">quick start</a>'s build has two packaging tasks, both made of the plugin jar and its runtime
+classpath, the libraries in {@code implementation}:</p>
+<table>
+<thead><tr><th>Task</th><th>Writes</th><th>For</th></tr></thead>
+<tbody>
+<tr><td>{@code stagePlugin}</td><td>{@code build/plugin/<id>/}</td><td>{@code jasper --plugin-dir build/plugin/<id>} while developing</td></tr>
+<tr><td>{@code pluginZip}</td><td>{@code build/distributions/<id>-<version>.zip}</td><td>Users: <b>Install from Zip…</b></td></tr>
+</tbody>
+</table>
+<p>The SDK is {@code compileOnly}: Jasper supplies it, and a plugin must not bundle it. Loading refuses a jar that defines
+classes in {@code dev.jasper.sdk}, {@code dev.jasper.app}, {@code dev.jasper.terminal}, {@code dev.jasper.buddy},
+{@code java}, {@code javax} or {@code jdk}, or in a package one of the plugin's dependencies exports, and a class file
+larger than 16 MiB. A plugin's own packages may be anything else; the bundled plugins use {@code dev.jasper.<name>}.</p>
+
+<h3>The zip</h3>
+<ul>
+<li>The jars lie at the zip's root or all in one folder, nothing deeper. Only {@code .jar} entries are unpacked; other
+files, names starting with {@code .} and anything under {@code __MACOSX} are ignored.</li>
+<li>Jar names use only letters, digits, spaces and {@code .}, {@code _}, {@code +}, {@code -}; no name appears twice.</li>
+<li>At most 4,096 entries, 256 jars and 512 MiB unpacked.</li>
+<li>Exactly one jar holds a valid {@code plugin.toml} at its root, and its {@code sdk} range includes the installing
+Jasper's SDK.</li>
+</ul>
+<p>A zip that breaks a rule is refused with the reason, for example "The zip must hold the plugin's jars at its root or in
+one folder", "Not a Jasper plugin: …" or "<i>Name</i> <i>version</i> needs SDK <i>range</i>; this Jasper has SDK
+{@sdk.version}", and nothing is installed.</p>
+
+<h3>Installing</h3>
+<ol class="steps">
+<li>The user chooses <b>File › Manage Plugins…</b> (or <b>Manage Plugins…</b> in the command palette), then
+<b>Install from Zip…</b> in the Plugins page's <b>Plugin options</b> menu (its More button), and picks the zip.</li>
+<li>Jasper unpacks it into a staging folder and checks it as above.</li>
+<li>The <b>Install <i>name</i></b> sheet shows the name, version, "From <i>vendor</i>", what the plugin asks to do (its
+<a href="#capabilities">capabilities</a> in the user's words) and the warning that a plugin is not sandboxed.
+<b>Install</b> records the user's consent to exactly those capabilities and stages the plugin; the Plugins page shows
+"Install at restart".</li>
+<li>At the next launch, before any plugin loads, the jars move into {@code plugins/<id>/jars/}, and the plugin loads.</li>
+</ol>
+<p>A zip dropped into {@code plugins/} in Jasper home is installed at the next launch with the same checks but without the
+sheet, so a new plugin waits as "Needs review" until the user reviews it; a zip that is not a usable plugin is renamed
+{@code <name>.zip.rejected}. The user's side of all this, including disabling and removing, is in
+<a href="plugins.md">plugins</a>.</p>
+
+<h3>Updating</h3>
+<p>An update is a zip of the same id with a higher version, installed the same way; the sheet adds "This replaces the
+installed version when Jasper restarts." At the next launch its jars replace the old ones; the settings file
+{@code plugins/<id>/<id>.toml} and the {@code data/} folder stay. The install sheet asks for every capability the new
+version declares. A dropped-in update that declares a capability the user has not allowed waits for a review before it
+loads; one that declares the same or fewer keeps the consent. Since each id loads once per launch, the higher version
+wins when the same plugin is also bundled or in {@code --plugin-dir}.</p>
+
+<h3>The Java runtime</h3>
+<p>Packaged Jasper runs plugins on its own trimmed JetBrains Runtime 25; <a href="plugin-authoring.md#the-java-runtime">the
+Java runtime</a> lists exactly the modules a plugin may rely on. That is all of Java SE plus the charsets, locale data,
+ZIP file system, PKCS#11 and smart-card providers, Kerberos and JAAS login modules, DNS and RMI naming, socket options, the JDK HTTP server, {@code sun.misc.Unsafe}, and JFR, JMX and
+attach. The compiler and the other development tools ({@code jdk.compiler}, so
+{@code ToolProvider.getSystemJavaCompiler()} returns {@code null}), the debugger ({@code jdk.jdi}, {@code jdk.jdwp.agent}), {@code jdk.dynalink},
+{@code jdk.incubator.vector} and the JetBrains Runtime's JCEF are not there. A library that needs a missing module fails
+with {@code NoClassDefFoundError} in the packaged application, although it works under a development run on a full JDK;
+bundle a jar that provides it instead.</p>
+<p>On macOS and Windows the packaged JVM loads JNA's native library from Jasper's own copy (JNA 5.14.0). A plugin that
+bundles JNA bundles that version: another version fails to load its native part when it is the first in the process to
+initialise JNA. Start
+terminals through {@link PluginContext#terminals()} rather than a pseudo-terminal library of your own.</p>
+</section>

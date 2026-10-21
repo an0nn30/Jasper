@@ -68,6 +68,7 @@ public final class SplashPainter {
         }
     }
 
+    private final MeadowSplash meadow;
     private final String product, version, copyright;
     private final Image icon;
     private final EncodedArtwork art;
@@ -76,9 +77,31 @@ public final class SplashPainter {
 
     private SplashPainter(String product, String version, String copyright, Image icon, EncodedArtwork art, Font name,
                           Font versionFont, Font stepFont, Font copyrightFont) {
+        this.meadow = null;
         this.product = product; this.version = version; this.copyright = copyright; this.icon = icon; this.art = art;
         this.name = name; this.versionFont = versionFont; this.stepFont = stepFont; this.copyrightFont = copyrightFont;
     }
+
+    private SplashPainter(MeadowSplash meadow) {
+        this.meadow = meadow;
+        product = version = copyright = null;
+        icon = null; art = null;
+        name = versionFont = stepFont = copyrightFont = null;
+    }
+
+    /**
+     * Decodes Jasper's standard Meadow splash before its window opens.
+     * @param version the build version to display
+     * @param scale initial device scale, clamped to 1 through 4
+     * @return the default splash painter
+     */
+    public static SplashPainter meadow(String version, int scale) {
+        return new SplashPainter(new MeadowSplash(version, scale));
+    }
+
+    boolean animated() { return meadow != null; }
+    java.awt.Color background() { return meadow == null ? SplashColors.TOP : SplashColors.MEADOW_PAPER; }
+    void animationFrame(int tick) { if (meadow != null) meadow.frame(tick); }
 
     /**
      * Decodes {@code content} once and draws the art for {@code scale}, so the first paint decodes nothing. Any thread.
@@ -114,6 +137,7 @@ public final class SplashPainter {
         Objects.requireNonNull(step, "step");
         Graphics2D g = (Graphics2D) target.create();
         try {
+            if (meadow != null) { meadow.paint(g, step, fraction); return; }
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);

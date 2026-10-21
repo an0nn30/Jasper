@@ -46,7 +46,7 @@ class EditorWindowTest {
     private PluginContext context;
     private final Deque<String> answers = new ArrayDeque<>();
     private final List<Question> asked = new ArrayList<>();
-    private final AtomicReference<EditorSettings> settings = new AtomicReference<>(new EditorSettings("Monospaced", 13, 4, false, 1, false));
+    private final AtomicReference<EditorSettings> settings = new AtomicReference<>(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, false));
     private EditorWindow window;
     private boolean windowClosed;
     private Runnable duringWait = () -> { };
@@ -264,6 +264,18 @@ class EditorWindowTest {
         assertThat(host.contentOwner(host.contentTabs().getLast())).as("a new document").isEqualTo(used);
     }
 
+    @Test void aTabPublishesItsCommandsButLeavesCloseTabToTheHost() throws Exception {
+        var tab = opened(file("menu.txt", "text"));
+        var published = window.contentCommands(tab);
+        assertThat(published).extracting(dev.jasper.sdk.ui.ContentCommand::id).as("the host's tab menu has its own Close Tab")
+            .doesNotContain("close-tab").contains("save", "find", "find-next", "find-previous", "copy", "paste", "close-pane");
+        assertThat(published).filteredOn(command -> command.id().equals("close-pane")).singleElement()
+            .as("Close Pane shows no shortcut of its own: the host's Close Pane binding closes the pane")
+            .satisfies(command -> assertThat(command.shortcut()).isNull());
+        assertThat(published).filteredOn(command -> command.id().equals("find-previous")).singleElement()
+            .satisfies(command -> assertThat(command.shortcut()).isEqualTo(KeyNames.findAgain(true)));
+    }
+
     @Test void filesUseHostedTabsAndMovingPreservesDirtyTextAndUndo() throws Exception {
         var tab = opened(file("hosted.txt", "before"));
         assertThat(host.windows()).isEmpty();
@@ -280,6 +292,210 @@ class EditorWindowTest {
         assertThat(tab.area().getText()).isEqualTo("before");
         handle.moveToMainWindow();
         assertThat(handle.window().isMain()).isTrue();
+    }
+
+    @Test void markdownActivationFollowsEachHostWindowAndMovesKeepPreviewState() throws Exception {
+        var first = opened(file("first.md", "# First"));
+        var firstHandle = host.contentTabs().getFirst();
+        first.markdown().mode(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        first.area().append(" dirty");
+        var document = first.area().getDocument();
+        var second = opened(file("second.md", "# Second"));
+        var secondHandle = host.contentTabs().getLast();
+        assertThat(first.markdown().active()).isFalse();
+        assertThat(second.markdown().active()).isTrue();
+        firstHandle.moveToNewWindow();
+        assertThat(first.markdown().active()).isTrue();
+        assertThat(second.markdown().active()).as("another window keeps its active tab").isTrue();
+        assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        assertThat(first.area().getDocument()).isSameAs(document);
+        assertThat(first.area().getText()).contains("dirty");
+        firstHandle.moveToMainWindow();
+        assertThat(first.markdown().active()).isTrue();
+        assertThat(second.markdown().active()).isFalse();
+        secondHandle.select();
+        assertThat(first.markdown().active()).isFalse();
+        assertThat(second.markdown().active()).isTrue();
+    }
+
+    @Test void toolbarModeRefreshesSourceCoordinatesAndHostedModesAreUnavailableWhileLoading() throws Exception {
+        window.openLocal(file("pending-mode.md", "# Heading"));
+        var handle = host.contentTabs().getFirst();
+        assertThat(host.contentCommands(handle).stream().filter(command -> command.id().equals("markdown.preview")).findFirst().orElseThrow().enabled()).isFalse();
+        drain(); var tab = window.selected().orElseThrow();
+        Kits.press(tab.view(), "markdown.preview");
+        assertThat(host.contentStatus(handle)).anySatisfy(item -> assertThat(item.text()).startsWith("Source Ln "));
+    }
+    @Test void failedMarkdownPreferenceWritesAreReportedOnUiOnceAndLaterChoicesStillSave() {
+        var ui = new ArrayList<Runnable>();
+        var writes = new ArrayList<dev.jasper.editor.markdown.MarkdownMode>();
+        var saves = new ArrayList<CompletableFuture<Void>>();
+        var preferences = new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.SOURCE, mode -> {
+            writes.add(mode); var save = new CompletableFuture<Void>(); saves.add(save); return save;
+        });
+        var documents = preferenceWindow(preferences, ui);
+        try {
+            documents.newUntitled(); var tab = documents.selected().orElseThrow();
+            tab.session().setStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN);
+            Kits.press(tab.view(), "markdown.preview"); Kits.press(tab.view(), "markdown.split");
+            assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+            assertThat(preferences.current()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+            assertThat(writes).containsExactly(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
+            CompletableFuture.runAsync(() -> saves.getFirst().completeExceptionally(new java.io.IOException("read-only settings"))).join();
+            assertThat(host.notifications().lines()).isEmpty();
+            assertThat(ui).as("the worker hands error presentation to the UI executor").hasSize(1);
+            ui.removeFirst().run();
+            assertThat(host.notifications().lines()).singleElement().asString()
+                .startsWith("dev.jasper.editor|ERROR|Could not save the Markdown default view|").contains("read-only settings");
+            assertThat(writes).containsExactly(dev.jasper.editor.markdown.MarkdownMode.PREVIEW, dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+            saves.get(1).complete(null);
+            assertThat(ui).isEmpty(); assertThat(host.notifications().lines()).hasSize(1);
+            assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+            assertThat(preferences.current()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        } finally { documents.dispose(); }
+    }
+
+    @Test void failedMarkdownSaveReportsAfterTabCloseButNotAfterWindowDisposal() {
+        var ui = new ArrayList<Runnable>(); var saves = new ArrayList<CompletableFuture<Void>>();
+        var preferences = new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.SOURCE, mode -> {
+            var save = new CompletableFuture<Void>(); saves.add(save); return save;
+        });
+        var documents = preferenceWindow(preferences, ui);
+        try {
+            documents.newUntitled(); var tab = documents.selected().orElseThrow();
+            tab.session().setStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN);
+            Kits.press(tab.view(), "markdown.preview"); host.contentTabs().getLast().close();
+            CompletableFuture.runAsync(() -> saves.getFirst().completeExceptionally(new IllegalStateException("after tab close"))).join();
+            assertThat(ui).hasSize(1); ui.removeFirst().run();
+            assertThat(host.notifications().lines()).singleElement().asString().contains("after tab close");
+            documents.newUntitled(); var other = documents.selected().orElseThrow();
+            other.session().setStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN);
+            Kits.press(other.view(), "markdown.source");
+            CompletableFuture.runAsync(() -> saves.get(1).completeExceptionally(new IllegalStateException("after disposal"))).join();
+            assertThat(ui).hasSize(1);
+            documents.dispose(); ui.removeFirst().run();
+            assertThat(host.notifications().lines()).hasSize(1); assertThat(host.failures()).isEmpty();
+        } finally { documents.dispose(); }
+    }
+
+    private EditorWindow preferenceWindow(MarkdownPreferences preferences, List<Runnable> ui) {
+        return new EditorWindow(new EditorEnvironment(context, ui::add, owner -> question -> {
+            throw new AssertionError("Preference failures must not open an owner-bound dialog");
+        }, owner -> (message, saves) -> false, settings::get, on -> CompletableFuture.completedFuture(null), false, preferences), () -> {});
+    }
+
+    @Test void aPendingTabFinishingInAnotherWindowEnablesItsOwnCommands() throws Exception {
+        window.openLocal(file("pending-separate.md", "# Separate"));
+        var first = window.selected().orElseThrow(); var a = host.contentTabs().getFirst();
+        a.moveToNewWindow();
+        window.openLocal(file("pending-main.md", "# Main"));
+        var second = window.selected().orElseThrow();
+        drain();
+        assertThat(first.session().state()).isEqualTo(DocumentSession.State.READY);
+        assertThat(window.selected()).containsSame(second);
+        assertThat(host.contentCommands(a).stream().filter(command -> command.id().equals("markdown.preview")).findFirst().orElseThrow().enabled()).isTrue();
+    }
+
+    @Test void hostedCommandsRetainPreviewSelectionRevealMutationsAndIgnoreInactiveOrClosedCaptures() throws Exception {
+        var first = opened(file("commands-a.md", "# First")); var a = host.contentTabs().getFirst();
+        first.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW, true);
+        first.surface().preview().editor().setText("rendered preview"); first.area().select(0, 2);
+        host.contentCommands(a).stream().filter(command -> command.id().equals("select-all")).findFirst().orElseThrow().run().run();
+        assertThat(first.surface().preview().editor().getSelectedText()).isEqualTo("rendered preview");
+        assertThat(first.area().getSelectionEnd()).isEqualTo(2);
+        var old = host.contentCommands(a).stream().filter(command -> command.id().equals("markdown.source")).findFirst().orElseThrow();
+        var second = opened(file("commands-b.md", "# Second")); var b = host.contentTabs().getLast();
+        old.run().run(); assertThat(window.selected()).containsSame(second);
+        assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
+        a.moveToNewWindow(); assertThat(first.focusedContent()).isSameAs(first.surface().preview().editor());
+        b.select();
+        host.contentCommands(a).stream().filter(command -> command.id().equals("delete")).findFirst().orElseThrow().run().run();
+        assertThat(window.selected()).containsSame(first);
+        assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        assertThat(first.area().getText()).isEqualTo("First"); assertThat(second.area().getText()).isEqualTo("# Second");
+        a.close(); old.run().run(); assertThat(window.selected()).containsSame(second);
+    }
+
+    @Test void sharedFindOwnershipEndsWhenSelectingAnotherTab() throws Exception { sharedFindOwnership("find"); }
+    @Test void sharedReplaceOwnershipEndsWhenSelectingAnotherTab() throws Exception { sharedFindOwnership("replace"); }
+    private void sharedFindOwnership(String command) throws Exception {
+        var first=opened(file("find-a.md","alpha alpha"));var a=host.contentTabs().getFirst();
+        var second=opened(file("find-b.md","beta beta"));var b=host.contentTabs().getLast();
+        a.select();
+        host.contentCommands(a).stream().filter(c -> c.id().equals(command)).findFirst().orElseThrow().run().run();
+        Kits.type(first.view(),FindBar.FIND,"alpha");Kits.type(first.view(),FindBar.REPLACE,"changed");
+        b.select();
+        assertThat(Kits.node(second.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+        Kits.press(second.view(),FindBar.ALL);
+        assertThat(first.area().getText()).isEqualTo("alpha alpha");
+        assertThat(second.area().getText()).isEqualTo("beta beta");
+        host.contentCommands(b).stream().filter(c -> c.id().equals(command)).findFirst().orElseThrow().run().run();
+        Kits.type(second.view(),FindBar.FIND,"beta");
+        assertThat(Kits.node(second.view(),FindBar.STATUS,Nodes.Text.class).text()).isEqualTo("2 matches");
+    }
+
+    @Test void closingCapturedFindTabLeavesNextTabWithFreshSearchOwnership() throws Exception {
+        var first=opened(file("close-find-a.md","alpha"));var a=host.contentTabs().getFirst();
+        var second=opened(file("close-find-b.md","beta"));var b=host.contentTabs().getLast();
+        a.select();host.contentCommands(a).stream().filter(c -> c.id().equals("find")).findFirst().orElseThrow().run().run();
+        Kits.type(first.view(),FindBar.FIND,"alpha");a.close();
+        assertThat(window.selected()).containsSame(second);
+        assertThat(Kits.node(second.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+        host.contentCommands(b).stream().filter(c -> c.id().equals("find")).findFirst().orElseThrow().run().run();
+        Kits.type(second.view(),FindBar.FIND,"beta");
+        assertThat(Kits.node(second.view(),FindBar.STATUS,Nodes.Text.class).text()).isEqualTo("1 match");
+    }
+
+    @Test void applyingPreviewDefaultAfterLanguageChangeDismissesSourceFind() throws Exception {
+        var tab=opened(file("source-find.txt","alpha"));var handle=host.contentTabs().getLast();
+        tab.markdownPreferences(new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.PREVIEW,
+            mode -> CompletableFuture.completedFuture(null)));
+        host.contentCommands(handle).stream().filter(c -> c.id().equals("find")).findFirst().orElseThrow().run().run();
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isTrue();
+        tab.session().setStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN);
+        assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+    }
+
+    @Test void hidingPreviewAfterLanguageChangeDismissesItsFindBar() throws Exception {
+        var tab=opened(file("preview-find.md","alpha"));var handle=host.contentTabs().getLast();
+        tab.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW,false);
+        host.contentCommands(handle).stream().filter(c -> c.id().equals("find")).findFirst().orElseThrow().run().run();
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isTrue();
+        tab.session().setStyle(SYNTAX_STYLE_PYTHON);
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+    }
+
+    @Test void hidingCapturedSourceDismissesReplaceAndReopeningRevealsItsOwner() throws Exception {
+        var tab=opened(file("hidden-replace.md","alpha alpha"));var handle=host.contentTabs().getLast();
+        var replace=host.contentCommands(handle).stream().filter(c -> c.id().equals("replace")).findFirst().orElseThrow();
+        replace.run().run();Kits.type(tab.view(),FindBar.FIND,"alpha");Kits.type(tab.view(),FindBar.REPLACE,"changed");
+        tab.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW,false);
+        assertThat(Kits.node(tab.view(),FindBar.ROOT,Nodes.Stack.class).state().visible()).isFalse();
+        Kits.press(tab.view(),FindBar.ALL);assertThat(tab.area().getText()).isEqualTo("alpha alpha");
+        replace.run().run();Kits.press(tab.view(),FindBar.ALL);
+        assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        assertThat(tab.area().getText()).isEqualTo("changed changed");
+    }
+
+    @Test void replaceAndGoToLineRevealSourceWithoutSavingModePreferences() throws Exception {
+        var tab=opened(file("reveal.md", "# One\n\n# Two\n"));
+        var writes=new ArrayList<dev.jasper.editor.markdown.MarkdownMode>();
+        var preferences=new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.PREVIEW, mode -> {writes.add(mode);return CompletableFuture.completedFuture(null);});
+        tab.markdownPreferences(preferences);
+        tab.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW,false);
+        var handle=host.contentTabs().getLast();
+        host.contentCommands(handle).stream().filter(command -> command.id().equals("replace")).findFirst().orElseThrow().run().run();
+        assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        assertThat(tab.focusedContent()).isSameAs(tab.area());
+        Kits.type(tab.view(),FindBar.FIND,"One");Kits.type(tab.view(),FindBar.REPLACE,"Changed");Kits.press(tab.view(),FindBar.ALL);
+        assertThat(tab.area().getText()).contains("Changed");
+        Kits.press(tab.view(),FindBar.CLOSE);
+        tab.markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW,false);
+        window.goToLine();
+        assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        Kits.escape(host.windowView("dev.jasper.editor","Go to Line").orElseThrow());
+        assertThat(writes).isEmpty();assertThat(preferences.current()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
     }
 
     @Test void openingAFileThatIsStillLoadingSelectsItsTab() throws Exception {
@@ -568,7 +784,7 @@ class EditorWindowTest {
 
     @Test void settingsApplyToOpenTabs() throws Exception {
         EditorTab tab = opened(file("a.json", "{}\n"));
-        settings.set(new EditorSettings("Monospaced", 18, 2, false, 1, false));
+        settings.set(new EditorSettings("Monospaced", 18, java.util.List.of(), false, 1.0, false, 2, false, 1, false));
         window.apply();
         assertThat(tab.area().getFont().getSize()).isEqualTo(18);
         assertThat(tab.area().getTabSize()).isEqualTo(2);
@@ -586,7 +802,7 @@ class EditorWindowTest {
         var item = host.contentStatus(host.contentTabs().getLast()).stream().filter(status -> status.text().startsWith("Vim:")).findFirst().orElseThrow();
         assertThat(item.text()).isEqualTo("Vim: On");
         assertThat(opened(file("three.txt", "three\n")).vimEditor()).as("a new tab follows").isPresent();
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         window.apply();
         assertThat(window.vimOn()).isTrue();
         item.run().run();
@@ -604,7 +820,7 @@ class EditorWindowTest {
     }
 
     @Test void vimKeysEditTheDocumentAndUndoItsChange() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab tab = opened(file("vim.txt", "one two\n"));
         var vim = tab.vimEditor().orElseThrow();
         for (var key : dev.jasper.editor.vim.KeyInput.parse("dw")) vim.feed(key);
@@ -671,7 +887,7 @@ class EditorWindowTest {
 
     @Test void aVimrcThatCannotBeReadIsReported() throws Exception {
         Files.createDirectories(window.vimrcFile());
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         opened(file("rc.txt", "one\n"));
         assertThat(host.notifications().lines()).singleElement().asString()
             .startsWith("dev.jasper.editor|WARNING|Could not read the vimrc|" + window.vimrcFile() + ": ")
@@ -679,7 +895,7 @@ class EditorWindowTest {
     }
 
     @Test void theOpenCommandHasNoKeyButVimStillRunsIt() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab tab = opened(file("from.txt", "one\n"));
         assertThat(tab.area().getInputMap(javax.swing.JComponent.WHEN_FOCUSED).get(KeyNames.stroke(java.awt.event.KeyEvent.VK_O, 0)))
             .as("Cmd/Ctrl+O is left to the Keymap's Open in Editor\u2026").isNotEqualTo("open");
@@ -691,7 +907,7 @@ class EditorWindowTest {
     }
 
     @Test void vimActionsAreTheEditorsCommands() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab tab = opened(file("act.txt", "one\n"));
         vimKeys(tab, ":actionlist vim<CR>");
         assertThat(tab.vimEditor().orElseThrow().output()).extracting(dev.jasper.editor.vim.VimEditor.OutputLine::text)
@@ -704,7 +920,7 @@ class EditorWindowTest {
     }
 
     @Test void vimWritesOpensListsSelectsAndClosesTabs() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         Path one = file("one.txt", "one\n");
         file("two.txt", "two\n");
         EditorTab first = opened(one);
@@ -736,7 +952,7 @@ class EditorWindowTest {
     }
 
     @Test void vimOpensANewFileThatItsFirstWriteCreates() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab first = opened(file("one.txt", "one\n"));
         vimKeys(first, ":e new.txt<CR>");
         EditorTab created = window.selected().orElseThrow();
@@ -753,7 +969,7 @@ class EditorWindowTest {
     }
 
     @Test void anUppercaseMarkSelectsItsTab() throws Exception {
-        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         EditorTab first = opened(file("one.txt", "one\n"));
         EditorTab second = opened(file("two.txt", "a\n  b\nc\n"));
         vimKeys(second, "jlmAgg");

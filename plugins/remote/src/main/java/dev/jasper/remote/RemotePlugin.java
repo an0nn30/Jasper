@@ -168,7 +168,7 @@ public class RemotePlugin implements Plugin {
         context.background().execute(() -> { hostInfo.load(); ui.execute(() -> { if (!stopped) refreshPanels(); }); });
         trust = new KnownHosts(context.dataDirectory().resolve("known_hosts"), () -> settings.connection().readUserKnownHosts() ? Optional.of(sshDir.resolve("known_hosts")) : Optional.empty());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
-        layout = dev.jasper.remote.workstation.Layout.of(context.services());
+        layout = dev.jasper.remote.workstation.Layout.of(context.appearance().presentation());
         Optional<java.util.function.BiFunction<WindowHandle, UUID, CompletableFuture<Optional<dev.jasper.vault.api.Credential>>>> credentialSource = Optional.empty();
         if (vault.isPresent()) credentialSource = Optional.of((owner, id) -> vault.get().credential(owner, id));
         connections = new Connections(settings::connection, trust, agentFactory.apply(context), store::host,

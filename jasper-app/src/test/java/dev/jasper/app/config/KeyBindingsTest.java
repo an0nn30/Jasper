@@ -22,7 +22,7 @@ class KeyBindingsTest {
             ActionId.MOVE_TAB_TO_NEW_WINDOW,
             ActionId.MOVE_TO_MAIN_WINDOW, ActionId.OPEN_FILE,
             ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE, ActionId.MOVE_PANE_TO_NEW_TAB,
-            ActionId.TOGGLE_ZEN_MODE,
+            ActionId.TOGGLE_ZEN_MODE, ActionId.TOGGLE_RAIL, ActionId.TOGGLE_STATUS_BAR,
             ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT,
             ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
             ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB,
@@ -32,7 +32,7 @@ class KeyBindingsTest {
             ActionId.RENAME_TAB, ActionId.FIND, ActionId.FIND_NEXT, ActionId.FIND_PREVIOUS,
             ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT, ActionId.COPY, ActionId.PASTE,
             ActionId.COMMAND_PALETTE, ActionId.CLEAR_SCROLLBACK, ActionId.CLEAR_TERMINAL, ActionId.FONT_BIGGER, ActionId.FONT_SMALLER,
-            ActionId.FONT_RESET, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
+            ActionId.FONT_RESET, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.MANAGE_CYGWIN_PACKAGES, ActionId.QUIT);
         assertThat(ActionId.SPLIT_RIGHT.id()).isEqualTo("split_right");
         assertThat(ActionId.SPLIT_RIGHT.label()).isEqualTo("Split Right");
         assertThat(ActionId.SPLIT_RIGHT.defaultBinding(true)).isEqualTo("cmd+d");

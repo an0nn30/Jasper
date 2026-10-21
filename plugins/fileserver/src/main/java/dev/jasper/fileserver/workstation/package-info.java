@@ -1,5 +1,4 @@
 /**
- * File Server's lookup of the Enterprise look: {@link dev.jasper.fileserver.workstation.Layout}. Only this package may
- * name {@code dev.jasper.enterprise.api} ({@code verifyPluginArchitecture}); the rest of the plugin reads the layout.
+ * File Server's choice of composition for the active presentation: {@link dev.jasper.fileserver.workstation.Layout}.
  */
 package dev.jasper.fileserver.workstation;

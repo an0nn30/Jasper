@@ -19,7 +19,7 @@ public final class ConfigTemplate {
     private static final String HEADER = """
         # Jasper settings
         # Uncomment a setting to change its saved default. Live settings reload across windows.
-        # View menu choices (toolbar, status bar, terminal scheme) are saved here.
+        # View menu choices (toolbar, status bar) and the palette's terminal scheme are saved here.
         # Session and grid defaults affect new panes/windows as described below.
         # Reload Config forces a fresh read.
         # Invalid syntax or types keep the last valid settings; diagnostics explain errors.
@@ -44,7 +44,7 @@ public final class ConfigTemplate {
         text.append("""
 
             [keybindings]
-            # Shortcuts update live. Use "none" to disable an action; shortcuts must be unique.
+            # Shortcuts update live. Use "none" to leave an action without a shortcut; shortcuts must be unique.
             # Modifiers: cmd, ctrl, alt, shift. Brace aliases { and } include shift.
             """);
         text.append(macOs

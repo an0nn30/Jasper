@@ -37,6 +37,8 @@ final class DeclaredSettings implements PluginSettings {
     private final Consumer<Runnable> ui;
     private final Consumer<ConfigDiagnostic> report;
     private final Runnable written;
+    private final Map<String, Object> lookDefaults;
+    private final Consumer<String> problems;
     private final List<DeclaredSetting<?>> handles = new ArrayList<>();
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Runnable> reloadListeners = new CopyOnWriteArrayList<>();
@@ -48,10 +50,12 @@ final class DeclaredSettings implements PluginSettings {
     private volatile SettingsPanel panel;
 
     // written: runs on the UI thread after a save; the host clears the file's reports and reloads it.
+    // lookDefaults: the look's raw defaults for this plugin's keys (spec 5.8); problems hears each one it cannot use.
     DeclaredSettings(String pluginId, PluginSettingsFiles files, Containment containment, Consumer<Runnable> ui,
-                     Consumer<ConfigDiagnostic> report, Runnable written) {
+                     Consumer<ConfigDiagnostic> report, Runnable written, Map<String, Object> lookDefaults, Consumer<String> problems) {
         this.pluginId = pluginId; this.files = files; this.containment = containment; this.ui = ui;
         this.report = report; this.written = written;
+        this.lookDefaults = Map.copyOf(lookDefaults); this.problems = Objects.requireNonNull(problems, "problems");
     }
 
     SettingValues values() { return values; }
@@ -60,7 +64,8 @@ final class DeclaredSettings implements PluginSettings {
         Objects.requireNonNull(spec, "spec");
         if (!open) throw new IllegalStateException("Declare settings while the plugin starts: " + spec.key());
         if (spec.label().isBlank()) throw new IllegalArgumentException("A setting needs a label: " + spec.key());
-        var translated = SettingTranslation.translate(spec, this::guard);
+        var rejected = new ArrayList<String>();
+        var translated = SettingTranslation.translate(spec, this::guard, Optional.ofNullable(lookDefaults.get(spec.key())), rejected::add);
         var settings = new ArrayList<Setting<?>>();
         for (DeclaredSetting<?> handle : handles) settings.add(handle.appSetting());
         settings.add(translated.setting());
@@ -68,6 +73,8 @@ final class DeclaredSettings implements PluginSettings {
         var handle = new DeclaredSetting<T>(this, translated);
         handles.add(handle);
         schema = next;
+        // Reported once the declaration is accepted, so a refused duplicate reports nothing.
+        for (String reason : rejected) problems.accept(pluginId + ": the look's default for " + spec.key() + " is not used: " + reason);
         values = SchemaReader.read(next, files.text(pluginId)).values();
         return handle;
     }
@@ -88,9 +95,15 @@ final class DeclaredSettings implements PluginSettings {
 
     Optional<SettingsPanel> panel() { return Optional.ofNullable(panel); }
 
-    /** The plugin's start returned: declarations close, and the file's problems are reported. UI thread. */
+    /**
+     * The plugin's start returned: declarations close, the look's defaults for keys it never declared are reported once,
+     * and the file's problems are reported. UI thread.
+     */
     void complete() {
         open = false;
+        for (String key : lookDefaults.keySet().stream().sorted().toList())
+            if (handles.stream().noneMatch(handle -> handle.key().equals(key)))
+                problems.accept(pluginId + ": the look gives a default for " + key + ", which the plugin does not declare");
         reload(true);
     }
 

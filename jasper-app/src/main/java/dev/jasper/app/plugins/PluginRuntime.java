@@ -386,11 +386,34 @@ public final class PluginRuntime {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         clipboard = Objects.requireNonNull(value);
     }
-    private dev.jasper.ui.kit.Kit kit;
-    /** Supplies the presentation's kit, which plugins' views are made with, before plugin startup (spec 4.9). */
-    public void presentation(dev.jasper.ui.kit.Kit kit) {
+    private final HostedTypography typography = new HostedTypography();
+
+    /** Publishes saved terminal typography before plugin startup or on configuration changes. UI thread only.
+     * @param value the saved typography
+     */
+    public void terminalTypography(dev.jasper.sdk.ui.TerminalTypography value) { typography.publish(value); }
+
+    /** Converts the application's saved font configuration at the SDK boundary. UI thread only.
+     * @param font saved font settings
+     */
+    public void terminalTypography(dev.jasper.app.config.FontConfig font) {
+        terminalTypography(HostedTypography.from(Objects.requireNonNull(font, "font")));
+    }
+
+    /** The presentation given before plugin startup: its kit, what plugins learn of its look, and its defaults. */
+    private record Given(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) { }
+    private Given given;
+    /**
+     * Supplies the presentation before plugin startup: the kit plugins' views are made with (spec 4.9), and the look and
+     * defaults every plugin's appearance reports (plan 15a).
+     *
+     * @param kit the kit the look installed
+     * @param look what plugins learn of the look
+     * @param defaults the look's defaults
+     */
+    public void presentation(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) {
         if (host != null) throw new IllegalStateException("Plugins have already started");
-        this.kit = Objects.requireNonNull(kit);
+        given = new Given(Objects.requireNonNull(kit, "kit"), Objects.requireNonNull(look, "look"), Objects.requireNonNull(defaults, "defaults"));
     }
     /** Supplies the live application motion policy before plugin startup. */
     public void animations(java.util.function.BooleanSupplier enabled) {
@@ -424,6 +447,8 @@ public final class PluginRuntime {
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<Problem> startupProblems = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
+    private final CompletableFuture<Void> resourcesClosed = new CompletableFuture<>();
+    private boolean stopped;
     private final PluginSettingsFiles settingsFiles;
     private java.util.concurrent.ScheduledExecutorService settingsPoller;
     private volatile Map<String, PluginCandidate> launched = Map.of();
@@ -705,9 +730,14 @@ public final class PluginRuntime {
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
-            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
+            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass), typography);
         created.animations = animations;
-        if (kit != null) { var chosen = kit; created.kit = () -> chosen; }
+        if (given != null) {
+            var chosen = given;
+            created.kit = chosen::kit;
+            created.presentation = HostedPresentation.of(chosen.look(), chosen.kit(), chosen.defaults());
+            created.defaults = chosen.defaults();
+        }
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
         created.commandClient = commandClient;
@@ -915,26 +945,33 @@ public final class PluginRuntime {
     }
 
     /**
-     * Stops plugins in reverse order. The futures complete when background work has drained and the
-     * classloaders are closed; the caller bounds the wait.
+     * Stops plugins in reverse order. The futures bound the background work grace before interruption.
+     * Classloaders close once workers actually terminate, so their cleanup can still load classes.
      *
      * @return asynchronous remainders of the shutdown
      */
     public List<CompletableFuture<?>> stop() {
+        if (stopped) return List.of();
+        stopped = true;
         synchronized(artworkLock){artworkStopped=true;artworkEpoch++;pluginIcons=Map.of();}
         if (settingsPoller != null) settingsPoller.shutdownNow();
         PluginHost current = host;
-        if (current == null) return List.of();
+        if (current == null) { resourcesClosed.complete(null); return List.of(); }
         if (adminWorker != null) adminWorker.shutdown();
         List<CompletableFuture<?>> pending = new ArrayList<>(current.stop());
         List<PluginClassLoader> closing = List.copyOf(loaders);
         loaders.clear();
-        pending.add(CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).whenComplete((done, failure) -> {
+        var adminTerminated = adminWorker == null ? CompletableFuture.completedFuture(null)
+            : HostedContext.terminated(adminWorker, "admin");
+        CompletableFuture.allOf(current.workersTerminated(), adminTerminated,
+            CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new))).whenComplete((done, failure) -> {
+            if (failure != null) { resourcesClosed.completeExceptionally(failure); return; }
             for (PluginClassLoader loader : closing) {
                 try { loader.close(); }
                 catch (IOException ignored) { LOG.log(System.Logger.Level.DEBUG, "Could not close " + loader.getName()); }
             }
-        }));
+            resourcesClosed.complete(null);
+        });
         return pending;
     }
 

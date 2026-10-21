@@ -404,6 +404,26 @@ public final class KitView extends JPanel implements AutoCloseable {
     /** Whether this view is presented as a toolbar strip. */
     public boolean toolbarStrip() { return toolbarStrip; }
     private boolean toolbarStrip;
+    /**
+     * App-only: this view sits in a window whose chrome draws IntelliJ's classic icons. In a toolbar strip and in a
+     * panel's header (its own controls and the host's actions with canonical artwork), a button or menu button named
+     * one of {@link dev.jasper.ui.icons.IconRegistry#classicChromeNames()} draws that classic art; every other name, and
+     * every control in a panel's body, keeps its own. EDT confined.
+     *
+     * @param value whether the classic chrome icons apply
+     */
+    public void classicChromeIcons(boolean value) {
+        requireOpen();
+        if (classicChromeIcons == value) return;
+        classicChromeIcons = value; refresh(); repaint();
+    }
+    /**
+     * Whether this view draws the classic chrome icons.
+     *
+     * @return whether {@link #classicChromeIcons(boolean)} is set
+     */
+    public boolean classicChromeIcons() { return classicChromeIcons; }
+    private boolean classicChromeIcons;
     @Override protected void paintComponent(Graphics graphics) {
         if (!surface) { super.paintComponent(graphics); return; }
         graphics.setColor(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));

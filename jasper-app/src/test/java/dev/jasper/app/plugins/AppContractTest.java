@@ -227,7 +227,22 @@ class AppContractTest extends PluginContractTest {
         Map<String, Map<String, dev.jasper.app.palette.PaletteRow>> lastRows = new java.util.HashMap<>();
         List<Subcommands.Owner> declared = new java.util.concurrent.CopyOnWriteArrayList<>();
         Set<String> bundled = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        List<String> lookProblems = new CopyOnWriteArrayList<>();
+        onEdt(() -> host.lookDefaultProblem = lookProblems::add);
         return new ContractHarness() {
+            @Override public void setKitDefault(String pluginId, String key, Object rawValue) {
+                Object raw = org.tomlj.Toml.parse("v = " + literal(rawValue)).get("v");
+                onEdt(() -> {
+                    var tables = new java.util.HashMap<String, Map<String, Object>>(host.defaults.plugins());
+                    var table = new java.util.LinkedHashMap<String, Object>(host.defaults.plugin(pluginId));
+                    table.put(key, raw);
+                    tables.put(pluginId, table);
+                    host.defaults = new dev.jasper.app.config.DefaultSource(host.defaults.overrides(), tables);
+                });
+            }
+            @Override public List<String> lookDefaultProblems(String pluginId) {
+                return lookProblems.stream().filter(line -> line.startsWith(pluginId + ": ")).toList();
+            }
             @Override public void setSetting(String pluginId, String key, Object rawValue) {
                 Path file = files.file(pluginId);
                 try {
@@ -489,6 +504,8 @@ class AppContractTest extends PluginContractTest {
                 dark.set(variant == dev.jasper.sdk.Variant.DARK);
                 host.bus.publish(EventBus.APP, dev.jasper.sdk.events.AppEvents.THEME_CHANGED, new dev.jasper.sdk.events.AppEvents.ThemeChanged(variant));
             }
+            @Override public void setTerminalTypography(dev.jasper.sdk.ui.TerminalTypography typography) { onEdt(() -> host.typography.publish(typography)); }
+            @Override public void setPresentation(dev.jasper.sdk.ui.Presentation presentation) { onEdt(() -> host.presentation = presentation); }
             @Override public void stopAll() {
                 var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
                 onEdt(() -> pending.set(host.stop()));

@@ -12,26 +12,29 @@ import java.util.Map;
 import java.util.Objects;
 import javax.imageio.ImageIO;
 
-/** The committed pixel-art strip: validates, slices and paints frames without smoothing. */
+/** The shaded pixel-art strip: two source pixels per logical pixel, with stable companion geometry. */
 final class BuddySprite {
     static final int FRAME_WIDTH = 42;
     static final int FRAME_HEIGHT = 48;
+    static final int ART_SCALE = 2;
+    static final int ART_WIDTH = FRAME_WIDTH * ART_SCALE;
+    static final int ART_HEIGHT = FRAME_HEIGHT * ART_SCALE;
     static final String RESOURCE = "jasper-buddy.png";
 
     private final Map<BuddyFrame, BufferedImage> frames = new EnumMap<>(BuddyFrame.class);
 
     BuddySprite(BufferedImage sheet) {
         Objects.requireNonNull(sheet, "sheet");
-        int expectedWidth = FRAME_WIDTH * BuddyFrame.values().length;
-        if (sheet.getWidth() != expectedWidth || sheet.getHeight() != FRAME_HEIGHT) {
-            throw new IllegalStateException("Buddy sprite must be " + expectedWidth + "x" + FRAME_HEIGHT
+        int expectedWidth = ART_WIDTH * BuddyFrame.values().length;
+        if (sheet.getWidth() != expectedWidth || sheet.getHeight() != ART_HEIGHT) {
+            throw new IllegalStateException("Buddy sprite must be " + expectedWidth + "x" + ART_HEIGHT
                 + " but is " + sheet.getWidth() + "x" + sheet.getHeight());
         }
         for (BuddyFrame frame : BuddyFrame.values()) {
-            BufferedImage copy = new BufferedImage(FRAME_WIDTH, FRAME_HEIGHT, BufferedImage.TYPE_INT_ARGB);
+            BufferedImage copy = new BufferedImage(ART_WIDTH, ART_HEIGHT, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = copy.createGraphics();
-            g.drawImage(sheet, 0, 0, FRAME_WIDTH, FRAME_HEIGHT,
-                frame.column() * FRAME_WIDTH, 0, (frame.column() + 1) * FRAME_WIDTH, FRAME_HEIGHT, null);
+            g.drawImage(sheet, 0, 0, ART_WIDTH, ART_HEIGHT,
+                frame.column() * ART_WIDTH, 0, (frame.column() + 1) * ART_WIDTH, ART_HEIGHT, null);
             g.dispose();
             frames.put(frame, copy);
         }
@@ -50,14 +53,17 @@ final class BuddySprite {
 
     BufferedImage frame(BuddyFrame frame) { return frames.get(frame); }
 
-    static Dimension size(int scale) { return new Dimension(FRAME_WIDTH * scale, FRAME_HEIGHT * scale); }
+    static Dimension size(double scale) {
+        return new Dimension((int) Math.round(FRAME_WIDTH * scale), (int) Math.round(FRAME_HEIGHT * scale));
+    }
 
-    /** Draws one frame at an integer scale; every art pixel becomes a solid scale-by-scale block. */
-    void paint(Graphics2D g, BuddyFrame frame, int scale, int x, int y) {
+    /** Draws pixel artwork with hard edges into the existing logical frame size. */
+    void paint(Graphics2D g, BuddyFrame frame, double scale, int x, int y) {
         Graphics2D copy = (Graphics2D) g.create();
         try {
             copy.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            copy.drawImage(frames.get(frame), x, y, FRAME_WIDTH * scale, FRAME_HEIGHT * scale, null);
+            Dimension size = size(scale);
+            copy.drawImage(frames.get(frame), x, y, size.width, size.height, null);
         } finally { copy.dispose(); }
     }
 }

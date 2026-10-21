@@ -24,6 +24,7 @@ public final class ShellProfiles {
     public static final String POWERSHELL = "powershell";
     public static final String PWSH = "pwsh";
     public static final String CMD = "cmd";
+    public static final String CYGWIN = "cygwin";
     public static final String CUSTOM = "custom";
     public static final String WSL_PREFIX = "wsl:";
     private static final Pattern WSL_ID = Pattern.compile("wsl:([A-Za-z0-9._-]+)");
@@ -49,25 +50,27 @@ public final class ShellProfiles {
         return available(osName, environment, distros, findPwsh(osName, environment, ShellProfiles::exists), shell);
     }
 
-    /**
-     * The profiles for {@code osName}, platform default first. Windows: PowerShell, PowerShell 7 when {@code pwsh}
-     * names it, Command Prompt and each distribution; macOS and Linux: the login shell. Custom is always last.
-     */
+    /** Windows profiles, with owned Cygwin Bash after Command Prompt. Discovery runs off the EDT. */
     public static List<ShellProfile> available(String osName, Map<String, String> environment, List<WslDistro> distros,
-                                               Optional<String> pwsh, TerminalConfig.Shell shell) {
+                                               Optional<String> pwsh, Optional<String> cygwinBash, TerminalConfig.Shell shell) {
         var profiles = new ArrayList<ShellProfile>();
         if (windows(osName)) {
             profiles.add(powershell());
             pwsh.ifPresent(program -> profiles.add(pwsh(program)));
             profiles.add(cmd(environment));
+            cygwinBash.ifPresent(program -> profiles.add(cygwin(program)));
             for (WslDistro distro : distros) profiles.add(wsl(distro));
-        } else {
-            profiles.add(login(osName, environment));
-        }
+        } else profiles.add(login(osName, environment));
         profiles.add(custom(osName, environment, shell));
         return List.copyOf(profiles);
     }
-
+    public static List<ShellProfile> available(String osName, Map<String, String> environment, List<WslDistro> distros,
+                                               Optional<String> pwsh, TerminalConfig.Shell shell) {
+        return available(osName, environment, distros, pwsh, Optional.empty(), shell);
+    }
+    private static ShellProfile cygwin(String program) {
+        return new ShellProfile(CYGWIN, "Cygwin Bash", ShellProfile.Kind.LOCAL_SHELL, Optional.empty(), List.of(program));
+    }
     /** {@code powershell} on Windows, {@code login} elsewhere. */
     public static String platformDefault(String osName) { return windows(osName) ? POWERSHELL : LOGIN; }
 
@@ -108,6 +111,7 @@ public final class ShellProfiles {
         if (!detectionComplete && windows(osName)) {
             Matcher wsl = WSL_ID.matcher(id);
             if (wsl.matches()) return new Resolution(wsl(wsl.group(1), Optional.empty()), Optional.empty());
+            if (id.equals(CYGWIN)) return new Resolution(cygwin("cygwin-pending"), Optional.empty());
             if (id.equals(PWSH)) return new Resolution(pwsh("pwsh.exe"), Optional.empty());
         }
         String fallbackId = platformDefault(osName);

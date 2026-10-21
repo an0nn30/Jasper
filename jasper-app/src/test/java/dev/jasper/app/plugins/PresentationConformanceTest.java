@@ -28,7 +28,7 @@ class PresentationConformanceTest {
     /** Every key of spec 5.1's kit file. */
     static final Set<String> KEYS = Set.of("kit", "base",
         "chrome/title_bar", "chrome/menu_bar", "chrome/window_title", "chrome/tool_windows", "chrome/editor_tabs", "chrome/status_bar",
-        "chrome/palette", "chrome/dialogs", "chrome/motion", "chrome/icons",
+        "chrome/palette", "chrome/dialogs", "chrome/motion", "chrome/icons", "chrome/toolbar_search",
         "controls/toggle", "controls/exclusive", "controls/tabs", "controls/group", "controls/form_label", "controls/empty",
         "controls/table", "controls/tree", "controls/stepper", "controls/ordered_list", "controls/buttons", "controls/tag",
         "controls/route", "controls/prompt",
@@ -39,8 +39,7 @@ class PresentationConformanceTest {
         "type/data/family", "type/data/regular", "type/data/medium",
         "colors/dialog_surface", "colors/navigation_surface",
         "defaults/ui.theme.light", "defaults/ui.theme.dark", "defaults/palette.visible_rows", "defaults/window.toolbar_height",
-        "defaults/window.toolbar",
-        "branding/product", "branding/icons", "branding/splash_art");
+        "defaults/window.toolbar", "defaults/dev.jasper.editor/font_family");
     /** The official IBM Plex 1.1.0 files (verified fact 11), by their name in the plugin. */
     static final Map<String, String> SUMS = Map.of(
         "presentation/fonts/ibm-plex-sans-regular.ttf", "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
@@ -53,10 +52,11 @@ class PresentationConformanceTest {
         var descriptor = DescriptorParser.parse(Files.readString(EnterpriseResources.RESOURCES.resolve("plugin.toml")));
         assertThat(descriptor.id()).isEqualTo("dev.jasper.enterprise");
         assertThat(descriptor.name()).isEqualTo("Enterprise");
-        assertThat(descriptor.version()).isEqualTo(Version.parse("0.2.0"));
+        assertThat(descriptor.version()).isEqualTo(Version.parse("0.3.0"));
         assertThat(descriptor.entry()).isEqualTo("dev.jasper.enterprise.EnterprisePlugin");
         assertThat(descriptor.capabilities()).containsExactly(DescriptorParser.PRESENTATION_PROVIDE);
-        assertThat(descriptor.exports()).containsExactly("dev.jasper.enterprise.api");
+        assertThat(descriptor.exports()).as("no API (plan 15a)").isEmpty();
+        assertThat(descriptor.sdk()).as("every bundled range (workspace plan 6a); the kit's plugin defaults need SDK 0.18.2 or later (Rulings 14)").isEqualTo(VersionRange.parse(">=0.21.0, <0.22"));
         assertThat(descriptor.requires()).as("no requirements (spec 14.1)").isEmpty();
         assertThat(descriptor.presentation()).isEqualTo("presentation/enterprise.kit.toml");
         assertThat(descriptor.themes()).containsExactly("themes/enterprise.json");
@@ -78,12 +78,14 @@ class PresentationConformanceTest {
         assertThat(parsed.classicBase()).isTrue();
         assertThat(parsed.chrome().icons()).isEqualTo(ChromeSpec.Icons.CLASSIC);
         assertThat(parsed.dropped()).as("the [defaults] themes resolve").isEmpty();
-        assertThat(parsed.defaults().value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("enterprise");
-        assertThat(parsed.defaults().value(CoreSettings.UI_THEME_DARK)).isEqualTo("enterprise");
+        assertThat(parsed.defaults().value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("jasper-meadow");
+        assertThat(parsed.defaults().value(CoreSettings.UI_THEME_DARK)).isEqualTo("jasper-meadow");
         assertThat(parsed.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(8);
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.
         assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR_HEIGHT)).isEqualTo(28);
         assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR)).isEqualTo(dev.jasper.app.config.ToolbarMode.ICONS);
+        assertThat(parsed.defaults().plugin("dev.jasper.editor")).as("the Editor in the data face (plan 15a)")
+            .containsExactly(java.util.Map.entry("font_family", "IBM Plex Mono"));
     }
 
     @Test void theFontsAreIbmsDecodeAndEveryWeightResolvesToItsFamily() throws Exception {
@@ -127,10 +129,11 @@ class PresentationConformanceTest {
         });
     }
 
-    /** Spec 5.1, 5.9 and 14.1: the branding is the reference artwork the user supplied, each icon a PNG of its size. */
-    @Test void theBrandingIsTheReferenceArtwork() throws Exception {
+    /** Enterprise shares Jasper's icon; its historical reference assets remain intact. */
+    @Test void enterpriseSharesJaspersIconAndPreservesItsReferenceArtwork() throws Exception {
         var branding = EnterpriseResources.facts().parsed().orElseThrow().branding();
-        assertThat(branding.product()).isEqualTo("JasperOps");
+        assertThat(branding).isSameAs(dev.jasper.app.presentation.Branding.NONE);
+        assertThat(branding.iconFiles()).as("use the shared Shell Prompt platform icon").isEmpty();
         Path reference = EnterpriseResources.ROOT.resolve("docs/design/enterprise/reference");
         var sources = new java.util.LinkedHashMap<Integer, String>();
         sources.put(16, "09 App Icon/macOS/AppIcon.iconset/icon_16x16.png");
@@ -145,7 +148,6 @@ class PresentationConformanceTest {
             int size = source.getKey();
             byte[] shipped = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/icons/icon-" + size + ".png"));
             assertThat(shipped).as("icon-%s.png is the reference file", size).isEqualTo(Files.readAllBytes(reference.resolve(source.getValue())));
-            assertThat(branding.icon(size)).isEqualTo(shipped);
             assertThat(shipped.length).isLessThanOrEqualTo(512 * 1024);
             var image = javax.imageio.ImageIO.read(new ByteArrayInputStream(shipped));
             assertThat(image.getWidth()).as("icon-%s.png width", size).isEqualTo(size);
@@ -154,7 +156,6 @@ class PresentationConformanceTest {
         }
         byte[] art = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/splash/art.svg"));
         assertThat(art).as("the splash art is the reference file").isEqualTo(Files.readAllBytes(reference.resolve("10 Boot Splash/extracted/art.svg")));
-        assertThat(branding.splashArt()).isEqualTo(art);
         assertThat(art.length).isLessThanOrEqualTo(256 * 1024);
     }
 

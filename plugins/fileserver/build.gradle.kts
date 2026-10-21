@@ -1,4 +1,4 @@
-// A plugin compiles against the SDK and the exported API of plugins it requires (the Credential Vault and Enterprise, both optional);
+// A plugin compiles against the SDK and the exported API of plugins it requires (the Credential Vault, optional);
 // the application supplies both at run time. Bundled: tomlj for servers.toml; Apache FtpServer (with MINA, and slf4j routed to JUL) for FTP; BouncyCastle for the TLS certificate; Apache MINA sshd for SFTP.
 // HTTP uses the JDK's jdk.httpserver module. stagePlugins copies the runtime classpath beside the plugin jar, and PluginClassLoader loads it.
 plugins { `java-library` }
@@ -6,7 +6,6 @@ plugins { `java-library` }
 dependencies {
     compileOnly(project(":jasper-sdk"))
     compileOnly(project(":jasper-plugin-vault"))
-    compileOnly(project(":jasper-plugin-enterprise"))
     implementation("org.tomlj:tomlj:1.1.1")
     implementation("org.apache.ftpserver:ftpserver-core:1.2.1")
     implementation("org.apache.sshd:sshd-core:2.19.0")
@@ -20,6 +19,5 @@ dependencies {
     testImplementation(testFixtures(project(":jasper-sdk-testkit")))
     testRuntimeOnly("com.formdev:flatlaf:3.7")
     testImplementation(project(":jasper-plugin-vault"))
-    testImplementation(project(":jasper-plugin-enterprise"))
     testImplementation("commons-net:commons-net:3.13.0")
 }
