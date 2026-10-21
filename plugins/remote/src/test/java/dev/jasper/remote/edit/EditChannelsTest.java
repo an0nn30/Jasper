@@ -51,6 +51,22 @@ class EditChannelsTest {
         return onUi(() -> channels.submit(identity, Optional::empty, work));
     }
 
+    /**
+     * Workspace plan 6b Rulings 29: a quiet job, a restored document's first read, opens its channel with the quiet opener,
+     * which asks nothing; any other job opens one with the opener, which may ask.
+     */
+    @Test void aQuietJobOpensItsChannelWithTheQuietOpener() throws Exception {
+        List<String> openedBy = new CopyOnWriteArrayList<>();
+        java.util.function.Function<String, java.util.function.BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>>> opener =
+            name -> (identity, owner) -> { openedBy.add(name + "|" + identity.host().name()); return CompletableFuture.completedFuture(new LocalEndpoint()); };
+        var routed = new EditChannels(opener.apply("asks"), opener.apply("quiet"), identity -> true, background, ui);
+        try {
+            assertThat(onUi(() -> routed.submitQuietly(identity("prod"), Optional::empty, endpoint -> "read")).get(10, TimeUnit.SECONDS)).isEqualTo("read");
+            assertThat(onUi(() -> routed.submit(identity("build"), Optional::empty, endpoint -> "read")).get(10, TimeUnit.SECONDS)).isEqualTo("read");
+            assertThat(openedBy).containsExactly("quiet|prod", "asks|build");
+        } finally { onUi(() -> { routed.close(); return null; }); }
+    }
+
     @Test void oneIdentityRunsOneOperationAtATimeOnOneChannelThenClosesIt() throws Exception {
         var prod = identity("prod");
         var release = new CountDownLatch(1);

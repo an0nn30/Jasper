@@ -1454,7 +1454,8 @@ public final class FakePluginHost implements AutoCloseable {
     public String sessionState(UUID paneId) { return workspace.sessions.state(workspace.anyPane(paneId).orElse(null)); }
 
     /**
-     * The user pressed Cancel. A pane that never showed a session closes; otherwise it returns to the disconnected state.
+     * The user pressed Cancel. A pane that never showed a session closes, unless Jasper restored it with its tab; otherwise
+     * it returns to the disconnected state.
      *
      * @param paneId the pane
      */

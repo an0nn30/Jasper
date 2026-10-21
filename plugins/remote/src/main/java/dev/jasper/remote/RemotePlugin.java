@@ -85,6 +85,8 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.remote.ui.tunnels.TunnelsUi tunnelsUi;
     private dev.jasper.remote.ui.sftp.DirectoryFollower follower;
     private dev.jasper.remote.edit.EditChannels editChannels;
+    /** Opens SFTP endpoints for transfers, the file chooser and remote documents. */
+    private dev.jasper.remote.sftp.EndpointFactory endpoints;
     private dev.jasper.sdk.Subscription reopener;
     private dev.jasper.remote.chooser.RemoteHosts remoteHosts;
     private dev.jasper.sdk.Subscription locations;
@@ -121,8 +123,8 @@ public class RemotePlugin implements Plugin {
     private final Map<UUID, java.util.ArrayDeque<Runnable>> waitingConnects = new HashMap<>();
     /** Windows where a restored document's quiet read opens its channel, how many: their host-key questions answer Cancel. */
     private final Map<UUID, Integer> quietWindows = new HashMap<>();
-    /** Restored SSH tabs' panes and their hosts, until their session attaches (workspace plan 6b Rulings 41). */
-    private final Map<UUID, UUID> restoredPanes = new HashMap<>();
+    /** Restored SSH tabs' panes and their hosts, oldest first, until their session attaches (workspace plan 6b Rulings 41). */
+    private final Map<UUID, UUID> restoredPanes = new java.util.LinkedHashMap<>();
     private final Set<CompletableFuture<HostKeyVerifier.Decision>> questions = new java.util.HashSet<>();
     /** The Sessions panel while it is open: panels live in the main window (workspace tabs spec 14). */
     private HostsPanel sessionsPanel;
@@ -178,7 +180,7 @@ public class RemotePlugin implements Plugin {
         registerNavigation();
 
         Executor transferBackground=transferExecutor.apply(context);
-        var endpoints=new dev.jasper.remote.sftp.EndpointFactory(connections,context.background(),ui,()->settings.sftp().requestTimeout());
+        endpoints=new dev.jasper.remote.sftp.EndpointFactory(connections,context.background(),ui,()->settings.sftp().requestTimeout());
         transfers=new dev.jasper.remote.transfer.TransferCoordinator(context.dataDirectory().resolve("transfers"),transferBackground,ui,(ref,owner)-> {
             try { return endpoints.open(ref.identity(),owner,status->{}); }catch(IOException failure) { return CompletableFuture.failedFuture(failure); }
         },()->settings.sftp().maxParallelFiles());
@@ -211,7 +213,7 @@ public class RemotePlugin implements Plugin {
             if(editor.isPresent()) {
                 // A restored document's quiet read opens its channel asking nothing (workspace plan 6b Rulings 29).
                 editChannels=new dev.jasper.remote.edit.EditChannels((identity,owner)->endpoints.open(Optional.of(identity),owner.orElse(null),status->{}),
-                    (identity,owner)->quietly(owner,()->endpoints.open(Optional.of(identity),owner.orElse(null),status->{})),connections::authenticated,transferBackground,ui);
+                    this::openQuietly,connections::authenticated,transferBackground,ui);
                 // Jasper restores its windows while the saved hosts still load: a remote document finds them when first read
                 // (workspace tabs spec 13), and its first read after a restore asks nothing unless signing in would not.
                 var editing=new dev.jasper.remote.edit.RemoteEditing(editor.orElseThrow(),editChannels,()->context.terminals().activeWindow(),context.notifications().group(),
@@ -282,7 +284,7 @@ public class RemotePlugin implements Plugin {
             event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit(); syncSessions();
         });
         context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); syncSessions(); });
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { attachedPanes.remove(event.paneId()); panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); distroPanes.remove(event.paneId()); refreshPanels(); syncSessions(); });
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { attachedPanes.remove(event.paneId()); restoredPanes.remove(event.paneId()); panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); distroPanes.remove(event.paneId()); refreshPanels(); syncSessions(); });
         context.events().subscribe(TerminalEvents.SESSION_STATE_CHANGED, event -> { if (distroPanes.containsKey(event.paneId())) refreshPanels(); });
         context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
@@ -385,14 +387,16 @@ public class RemotePlugin implements Plugin {
      * with Reconnect, which asks as usual (workspace plan 6b Rulings 29).
      */
     private void connect(PendingSession pending, UUID hostId, Optional<String> folder, boolean quiet) {
+        // A quiet connect's failures all say Not connected, with Reconnect (workspace plan 6b Rulings 45).
+        String failed = quiet ? "Not connected: " : "";
         var host = store.host(hostId);
-        if (host.isEmpty()) { pending.fail("Host not found"); return; }
+        if (host.isEmpty()) { pending.fail(failed + "Host not found"); return; }
         if (pending.isCancelled() || stopped) return;
         WindowHandle window = pending.pane().tab().window();
         if (focusExistingAttempt(window)) { pending.fail("Another connection is already in progress"); return; }
         final ConnectAttempt attempt;
         try { attempt = new ConnectAttempt(window, host.get(), folder, shell -> attach(pending, shell)); }
-        catch (RuntimeException failure) { pending.fail(message(failure)); return; }
+        catch (RuntimeException failure) { pending.fail(failed + message(failure)); return; }
         attempt.quiet = quiet;
         attempt.cancelled = () -> {
             if (stopped) return;
@@ -426,6 +430,32 @@ public class RemotePlugin implements Plugin {
     }
 
     /**
+     * An SSH tab's restore state, as {@link #sshTab} builds it, for a tab about to open: one too large for a restore state
+     * leaves out the folder, and when even that does not fit the tab is not saved, with one warning that names no folder.
+     * Opening a tab never fails for its restore state (workspace plan 6b's review).
+     */
+    private Optional<dev.jasper.sdk.RestoreState> sshRestore(UUID hostId, String name, Optional<String> folder) {
+        try { return Optional.of(sshTab(hostId, name, folder)); }
+        catch (IllegalArgumentException tooLarge) { /* the folder, or the name, is too long: try without the folder */ }
+        if (folder.isPresent()) {
+            try {
+                var state = sshTab(hostId, name, Optional.empty());
+                context.log().log(System.Logger.Level.WARNING, "An SSH tab on host {0} comes back in its default folder: its folder"
+                    + " is too long for a restore state of at most {1} characters", hostId, dev.jasper.sdk.RestoreState.MAX_CHARACTERS);
+                return Optional.of(state);
+            } catch (IllegalArgumentException stillTooLarge) { /* the name alone is too long */ }
+        }
+        context.log().log(System.Logger.Level.WARNING, "An SSH tab on host {0} does not come back at the next start: its restore"
+            + " state would hold more than {1} characters", hostId, dev.jasper.sdk.RestoreState.MAX_CHARACTERS);
+        return Optional.empty();
+    }
+
+    /** Why a saved host is not known while Remote's hosts.toml cannot be read: its error's first line (6b's review). */
+    private Optional<String> hostsUnreadable() {
+        return store.error().map(error -> "Remote's hosts.toml could not be read: " + error.lines().findFirst().orElse(""));
+    }
+
+    /**
      * Opens a saved SSH tab again (workspace tabs spec 13), waiting, as every restored terminal tab does, until it is first
      * shown. Then Remote chooses: it reconnects when every host on the route signs in with nothing to ask (through the SSH
      * agent), after any connection already in progress in that window, and otherwise leaves the tab not connected with
@@ -440,7 +470,7 @@ public class RemotePlugin implements Plugin {
         try { hostId = UUID.fromString(saved.getOrDefault("host", "")); }
         catch (IllegalArgumentException malformed) { return Optional.of("it names no saved host"); }
         // The saved hosts are read in the background at start: once they are, a host that is gone restores nothing.
-        if (hostsLoaded.isDone() && store.host(hostId).isEmpty()) return Optional.of("it names no saved host");
+        if (hostsLoaded.isDone() && store.host(hostId).isEmpty()) return Optional.of(hostsUnreadable().orElse("it names no saved host"));
         Optional<String> folder = Optional.ofNullable(saved.get("folder"));
         String name = saved.getOrDefault("name", "").isBlank() ? request.title() : saved.get("name");
         boolean[] first = {true};
@@ -450,11 +480,11 @@ public class RemotePlugin implements Plugin {
             // The saved hosts are read in the background at start: the choice waits for them.
             hostsLoaded.whenComplete((loaded, failure) -> ui.execute(() -> {
                 if (stopped || pending.isCancelled()) return;
-                if (store.host(hostId).isEmpty()) pending.fail("Its host is no longer saved in Remote");
+                if (store.host(hostId).isEmpty()) pending.fail(hostsUnreadable().orElse("Its host is no longer saved in Remote"));
                 else if (signsInAlone(hostId)) connectWhenFree(pending, hostId, folder);
                 else pending.fail("Not connected: Reconnect to sign in");
             }));
-        }).withRestore(sshTab(hostId, name, folder));
+        }, sshRestore(hostId, name, folder));
         context.terminals().openTab(request.window(), OpenRequest.session(spec)).ifPresent(pane -> restoredPanes.put(pane.id(), hostId));
         return Optional.empty();
     }
@@ -493,6 +523,16 @@ public class RemotePlugin implements Plugin {
         return opened;
     }
 
+    /**
+     * A restored document's quiet channel to {@code identity}, opened asking nothing (workspace plan 6b Rulings 29). Signing
+     * in must still ask nothing as it opens: the connection that let the document read quietly may have closed since its
+     * read was queued, and a Vault login would then ask (6b's review).
+     */
+    CompletableFuture<dev.jasper.remote.sftp.FileEndpoint> openQuietly(dev.jasper.remote.client.ConnectionIdentity identity, Optional<WindowHandle> owner) {
+        if (!signsInAlone(identity)) return CompletableFuture.failedFuture(dev.jasper.remote.edit.RemoteDocument.notSignedIn(identity));
+        return quietly(owner, () -> endpoints.open(Optional.of(identity), owner.orElse(null), status -> { }));
+    }
+
     /** Whether a host-key question for {@code owner} is answered Cancel now: a quiet connect runs there (Rulings 29). */
     private boolean quiet(WindowHandle owner) {
         return owner != null && (quietWindows.containsKey(owner.id())
@@ -526,18 +566,18 @@ public class RemotePlugin implements Plugin {
     }
 
     void activateHost(WindowHandle window, RemoteHost host) {
-        // A restored tab of the host that still waits to be shown, NOT_STARTED, shows: it then connects, or offers
-        // Reconnect, as every restored SSH tab does (workspace plan 6a Task 1's hand-off; Rulings 41).
+        for (UUID id : recentPanes.sequencedKeySet().reversed()) {
+            if (!host.id().equals(panes.get(id))) continue;
+            var pane = context.terminals().pane(id);
+            if (pane.isPresent() && pane.get().info().state() == dev.jasper.sdk.terminal.SessionState.RUNNING) { pane.get().focus(); return; }
+        }
+        // Else the oldest restored tab of the host that still waits to be shown, NOT_STARTED, shows: it then connects, or
+        // offers Reconnect, as every restored SSH tab does (workspace plan 6a Task 1's hand-off; Rulings 41).
         restoredPanes.keySet().removeIf(id -> context.terminals().pane(id).isEmpty());
         for (var entry : restoredPanes.entrySet()) {
             if (!host.id().equals(entry.getValue())) continue;
             var pane = context.terminals().pane(entry.getKey());
             if (pane.isPresent() && pane.get().info().state() == dev.jasper.sdk.terminal.SessionState.NOT_STARTED) { pane.get().focus(); return; }
-        }
-        for (UUID id : recentPanes.sequencedKeySet().reversed()) {
-            if (!host.id().equals(panes.get(id))) continue;
-            var pane = context.terminals().pane(id);
-            if (pane.isPresent() && pane.get().info().state() == dev.jasper.sdk.terminal.SessionState.RUNNING) { pane.get().focus(); return; }
         }
         openHost(window, host);
     }
@@ -595,7 +635,7 @@ public class RemotePlugin implements Plugin {
                 Connections.Shell first = ready.getAndSet(null);
                 if (first == null) connect(pending, host.id(), folder);
                 else ui.execute(() -> attach(pending, first));
-            }).withRestore(sshTab(host.id(), host.name(), folder));
+            }, sshRestore(host.id(), host.name(), folder));
             try {
                 if (open.apply(OpenRequest.session(spec)).isEmpty()) {
                     var unused = ready.getAndSet(null); if (unused != null) unused.connection().close().run();
@@ -611,7 +651,8 @@ public class RemotePlugin implements Plugin {
         attempts.add(attempt); attempt.start();
     }
 
-    private void attach(PendingSession pending, Connections.Shell shell) {
+    /** Gives {@code pending} its connected shell; package-private so a test can make it fail. */
+    void attach(PendingSession pending, Connections.Shell shell) {
         if (stopped || pending.isCancelled()) { shell.connection().close().run(); return; }
         UUID paneId = pending.pane().id();
         attachedPanes.put(paneId, pending);
@@ -684,7 +725,12 @@ public class RemotePlugin implements Plugin {
                 if (failure != null && quiet) { if (!refusedQuietly) reason = Optional.of(message(failure)); close(); return; }
                 if (failure != null) { panel.failed(message(failure)); return; }
                 try { success.accept(shell); delivered = true; close(); }
-                catch (RuntimeException problem) { shell.connection().close().run(); panel.failed(message(problem)); }
+                catch (RuntimeException problem) {
+                    shell.connection().close().run();
+                    // A quiet connect asks nothing more here either: the tab says why, with Reconnect (Rulings 45).
+                    if (quiet) { reason = Optional.of(message(problem)); close(); return; }
+                    panel.failed(message(problem));
+                }
             }));
         }
         void close() {
@@ -952,6 +998,8 @@ public class RemotePlugin implements Plugin {
     GroupNamePanel currentGroupEditor() { return currentGroupEditor; }
     ConnectionPanel currentConnectionPanel() { return currentConnectionPanel; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
+    /** The panes of restored SSH tabs that have not attached yet, oldest first, for tests. */
+    List<UUID> restoredPaneIds() { return List.copyOf(restoredPanes.keySet()); }
     /** The Sessions panel while it is open, for tests. */
     HostsPanel hostsPanel() { return sessionsPanel; }
     dev.jasper.remote.ui.tunnels.TunnelsUi tunnels() { return tunnelsUi; }

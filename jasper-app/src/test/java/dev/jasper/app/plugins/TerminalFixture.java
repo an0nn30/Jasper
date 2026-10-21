@@ -36,7 +36,9 @@ import dev.jasper.terminal.session.AttachedConnection;
  */
 final class TerminalFixture {
     private static final class Pane { UUID id = UUID.randomUUID(); Tab tab; String title; Path directory; String selection; List<String> sent = new ArrayList<>(); dev.jasper.app.terminals.RemoteLocation remote;
-        SessionRequest request; SessionAttempt attempt; AttachedConnection connection; boolean everAttached; String status = ""; String state = ""; String shell = "zsh"; }
+        SessionRequest request; SessionAttempt attempt; AttachedConnection connection; boolean everAttached; String status = ""; String state = ""; String shell = "zsh";
+        /** A restorer's session, which the window restored with its tab (workspace tabs spec 13). */
+        boolean restored; }
     /** One tab of a window's strip: its items, one per pane; {@code recent} holds them most recently selected first. */
     private static final class Group { final List<Tab> recent = new ArrayList<>(); }
     private static final class Tab { UUID id = UUID.randomUUID(); Window window; Group group; TabEntry.Kind kind = TabEntry.Kind.TERMINAL; Supplier<String> title; Pane pane; }
@@ -54,6 +56,10 @@ final class TerminalFixture {
     /** Kept so a test can still read what was sent to a pane that closed, as the testkit's fake allows. */
     private final Map<UUID, Pane> closedPanes = new LinkedHashMap<>();
     private final List<String> opened = new ArrayList<>();
+    /** While a restorer runs in a window, the saved tab a plugin's session opened there takes; none until {@link #restoringSessions}. */
+    private java.util.function.BiFunction<String, UUID, Optional<UUID>> sessionSlot = (provider, window) -> Optional.empty();
+    private java.util.function.BiConsumer<UUID, UUID> sessionRestored = (tab, window) -> { };
+    private java.util.function.Consumer<UUID> restoredTabClosed = tab -> { };
 
     private PaneEntry entry(Pane pane) {
         return new PaneEntry(pane.id, pane.tab.id,
@@ -181,8 +187,9 @@ final class TerminalFixture {
             registry.publish(new TerminalEvent.TabSelected(window.id, tab.id));
         }
         // A held pane starts once its tab is shown, after the selection, as the application starts a restored terminal
-        // tab at the end of the turn that shows it (workspace tabs spec 13).
+        // tab at the end of the turn that shows it (workspace tabs spec 13); a restored session connects then.
         if (tab.pane != null && held(tab.pane)) {
+            if (tab.pane.request != null) { connect(tab.pane); return; }
             tab.pane.state = "";
             registry.publish(new TerminalEvent.SessionStarted(tab.pane.id));
         }
@@ -289,6 +296,7 @@ final class TerminalFixture {
             closedPanes.put(pane.id, pane);
             if (pane.attempt != null) pane.attempt.cancel();
             if (pane.connection != null) { pane.connection.close().run(); pane.connection = null; }
+            if (pane.restored) restoredTabClosed.accept(tab.id);
         }
         registry.atomically(() -> {
             if (pane != null) registry.publish(new TerminalEvent.PaneClosed(tab.id, pane.id));
@@ -370,11 +378,44 @@ final class TerminalFixture {
             Optional.ofNullable(panes.get(paneId)).map(pane -> pane.remote)));
     }
 
-    /** A provided session's terminal tab, opened as {@link #openTerminal} opens one, then connected. */
+    /**
+     * A provided session's terminal tab, opened as {@link #openTerminal} opens one, then connected; a restorer's session in
+     * the window being restored is that window's saved tab instead ({@link #restoringSessions}).
+     */
     private UUID openSession(UUID windowId, SessionRequest request, Tab beside) {
+        Optional<UUID> saved = sessionSlot.apply(request.providerId(), windowId);
+        if (saved.isPresent()) return restoredSession(windowId, saved.get(), request);
         UUID id = openTerminal(windowId, request.title(), null, beside);
         panes.get(id).request = request;
         connect(panes.get(id));
+        return id;
+    }
+
+    /**
+     * Takes restorers' sessions as the application's window does (workspace tabs spec 13): while a restore runs in a window, a
+     * provided session opened there takes the saved tab's id, in a new tab at the end of the strip, not shown, and waits, not
+     * started, until its tab is shown, when it connects.
+     *
+     * @param slot the saved tab's id for a session a plugin opens in a window, while that window is being restored
+     * @param restored told of the saved tab and its window once it is open
+     * @param closed told when such a tab closes
+     */
+    void restoringSessions(java.util.function.BiFunction<String, UUID, Optional<UUID>> slot, java.util.function.BiConsumer<UUID, UUID> restored,
+                           java.util.function.Consumer<UUID> closed) {
+        sessionSlot = slot; sessionRestored = restored; restoredTabClosed = closed;
+    }
+
+    /** A restorer's session: the saved tab, at the end of the strip and not shown, waiting, not started, until it is. */
+    private UUID restoredSession(UUID windowId, UUID tabId, SessionRequest request) {
+        Window window = windows.get(windowId);
+        var tab = new Tab(); tab.id = tabId; tab.title = request::title;
+        tabs.put(tab.id, tab);
+        place(tab, window, null);
+        registry.publish(new TerminalEvent.TabOpened(window.id, tab.id));
+        UUID id = addPane(tab.id, request.title(), null);
+        Pane pane = panes.get(id);
+        pane.request = request; pane.state = "NOT_STARTED"; pane.restored = true;
+        sessionRestored.accept(tabId, windowId);
         return id;
     }
 
@@ -413,8 +454,9 @@ final class TerminalFixture {
         Pane pane = panes.get(paneId);
         if (pane == null || pane.attempt == null) return;
         pane.attempt.cancel();
-        // As in a real pane: with nothing ever shown there is nothing to return to.
-        if (!pane.everAttached) closePane(paneId); else { pane.state = "EXITED"; pane.status = "Connection cancelled"; }
+        // As in a real pane: with nothing ever shown there is nothing to return to, unless the pane came back with its tab to
+        // be reconnected (workspace plan 6b Rulings 44).
+        if (!pane.everAttached && !pane.restored) closePane(paneId); else { pane.state = "EXITED"; pane.status = "Connection cancelled"; }
     }
 
     void reconnectSession(UUID paneId) {

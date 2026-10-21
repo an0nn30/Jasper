@@ -116,8 +116,8 @@ public final class RemoteEditing {
      * @param key a recorded {@link RemoteDocument#key}
      * @return empty when the key is malformed, or a host on its route is no longer saved once the saved hosts have loaded;
      *     otherwise builds the document on the recorded route and logins, with the saved hosts as they are now, for the
-     *     window reopening it. Before the saved hosts have loaded (Jasper restoring its windows at start), the document
-     *     finds them when it is first used.
+     *     window reopening it. Before the saved hosts have loaded (Jasper restoring its windows at start), or while they
+     *     could not be read, the document finds them when it is first used, or says why not.
      */
     Optional<Function<WindowOwner, EditorDocument>> reopen(String key) {
         Optional<RemoteDocument.ParsedKey> parsed = RemoteDocument.parseKey(key);
@@ -125,7 +125,9 @@ public final class RemoteEditing {
         String path = parsed.get().path();
         Optional<ConnectionIdentity> identity = identity(parsed.get());
         if (identity.isPresent()) return Optional.of(owner -> new RemoteDocument(identity.get(), path, channels, owner(owner), silent));
-        if (hostsLoaded.get().isDone()) return Optional.empty();
+        // A host is gone only once the saved hosts have been read; while they cannot be, the document says why when read.
+        CompletableFuture<Void> loaded = hostsLoaded.get();
+        if (loaded.isDone() && !loaded.isCompletedExceptionally()) return Optional.empty();
         return Optional.of(owner -> new SavedRemoteDocument(key, parsed.get(), this::identity,
             found -> new RemoteDocument(found, path, channels, owner(owner), silent), hostsLoaded, ui));
     }

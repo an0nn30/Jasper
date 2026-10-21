@@ -846,9 +846,8 @@ class RemotePluginTest {
     /** Workspace tabs spec 13: restored SSH tabs shown together in one window connect one after another, none refused. */
     @Test void restoredSshTabsShownTogetherInOneWindowAllConnect(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
-            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
             var plugin = plugin(dir, agent(server));
-            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
             var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
             plugin.store().put(saved); settle(host);
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
@@ -871,9 +870,8 @@ class RemotePluginTest {
      */
     @Test void aRestoredSshTabWhoseHostKeyIsUnknownAsksNothingAndOffersReconnect(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
-            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
             var plugin = plugin(dir, agent(server));
-            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
             var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
             plugin.store().put(saved); settle(host);
             UUID window = host.addTerminalWindow();
@@ -907,9 +905,8 @@ class RemotePluginTest {
     /** Workspace plan 6b's review: a restored SSH tab closed while it waits for its window's connection passes its turn on. */
     @Test void aRestoredSshTabClosedWhileItWaitsPassesItsTurnOn(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
-            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
             var plugin = plugin(dir, agent(server));
-            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
             var saved = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
             plugin.store().put(saved); settle(host);
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
@@ -950,6 +947,357 @@ class RemotePluginTest {
             Kits.await(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the shown tab to decide");
             assertThat(host.terminalPanes()).as("no second tab for the host").containsExactly(pane);
             assertThat(host.sessionState(pane)).as("shown, it decides as any restored tab").startsWith("EXITED|Not connected");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** A Vault whose one login counts each time Remote asks for its secret. */
+    record CountedVault(FakeVault vault, UUID login, java.util.concurrent.atomic.AtomicInteger asked) { }
+
+    static CountedVault countedVault(FakePluginHost host) {
+        var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+        UUID login = vault.password("p", "deploy", "s3cret");
+        var secret = vault.secrets.get(login);
+        var asked = new java.util.concurrent.atomic.AtomicInteger();
+        vault.secrets.put(login, () -> { asked.incrementAndGet(); return secret.get(); });
+        return new CountedVault(vault, login, asked);
+    }
+
+    static void trustServer(dev.jasper.sdk.plugin.PluginContext context, LoopbackServer server) throws Exception {
+        new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+    }
+
+    /** Restores an SSH tab of {@code target} in a new window, shows it and waits until it decides: its pane. */
+    static UUID restoredTabDecides(FakePluginHost host, dev.jasper.sdk.plugin.PluginContext context, RemoteHost target) throws Exception {
+        UUID window = host.addTerminalWindow();
+        var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", target.id().toString(), "name", target.name()));
+        UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, target.name(), state)).orElseThrow();
+        UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+        Kits.edt(() -> host.focusTerminalPane(pane));
+        Kits.await(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the restored tab to decide");
+        return pane;
+    }
+
+    /**
+     * Runs the host's background work on this thread, not the EDT, until {@code condition} holds: a handshake's host-key
+     * question then reaches the EDT while its connect waits for the answer, as in Jasper.
+     */
+    static void drainOffTheEdt(FakePluginHost host, java.util.function.BooleanSupplier condition, String what) throws Exception {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(20);
+        while (!Kits.value(condition::getAsBoolean)) {
+            if (System.nanoTime() > deadline) throw new AssertionError("timed out waiting for " + what);
+            host.runBackground();
+            Kits.edt(host::flush);
+            Thread.sleep(10);
+        }
+    }
+
+    /** Workspace plan 6b's review probe: an agent whose key the host does not accept says why, asking nothing. */
+    @Test void aRestoredSshTabWhoseAgentHoldsNoKeyTheHostAcceptsSaysWhy(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var counted = countedVault(host);
+            var generator = java.security.KeyPairGenerator.getInstance("RSA");
+            generator.initialize(2048);
+            var plugin = plugin(dir, new dev.jasper.remote.agent.FakeAgent(generator.generateKeyPair()));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(target); settle(host);
+            trustServer(context, server);
+            UUID pane = restoredTabDecides(host, context, target);
+            assertThat(host.sessionState(pane)).startsWith("EXITED|Not connected: ").isNotEqualTo("EXITED|Not connected: Reconnect to sign in");
+            assertThat(counted.asked()).as("the Vault asked for nothing").hasValue(0);
+            assertThat(host.windows()).as("no window opened").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace plan 6b's review probe: no SSH agent says why, asking nothing. */
+    @Test void aRestoredSshTabWithNoAgentSaysWhy(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var counted = countedVault(host);
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(target); settle(host);
+            trustServer(context, server);
+            UUID pane = restoredTabDecides(host, context, target);
+            assertThat(host.sessionState(pane)).startsWith("EXITED|Not connected: ").isNotEqualTo("EXITED|Not connected: Reconnect to sign in");
+            assertThat(counted.asked()).hasValue(0);
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace plan 6b's review probe: a host whose key changed is refused, asking nothing, and the tab says so. */
+    @Test void aRestoredSshTabWhoseHostKeyChangedSaysSo(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var counted = countedVault(host);
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(target); settle(host);
+            var generator = java.security.KeyPairGenerator.getInstance("RSA");
+            generator.initialize(2048);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty())
+                .trust("127.0.0.1", server.port(), generator.generateKeyPair().getPublic());
+            UUID pane = restoredTabDecides(host, context, target);
+            assertThat(host.sessionState(pane)).startsWith("EXITED|Not connected: ").contains("fingerprint changed");
+            assertThat(counted.asked()).hasValue(0);
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace plan 6b's review probe: a Vault-signed jump host on the route asks the Vault for nothing at restore. */
+    @Test void aRestoredSshTabBehindAVaultSignedJumpHostAsksTheVaultForNothing(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var counted = countedVault(host);
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var jump = RemoteHost.create("bastion", "127.0.0.1", server.port(), "deploy", new Auth.Vault(counted.login()), "", Optional.empty());
+            plugin.store().put(jump); settle(host);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.of(jump.id()));
+            plugin.store().put(target); settle(host);
+            trustServer(context, server);
+            UUID pane = restoredTabDecides(host, context, target);
+            assertThat(host.sessionState(pane)).isEqualTo("EXITED|Not connected: Reconnect to sign in");
+            assertThat(counted.asked()).hasValue(0);
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b's review: a restored tab's unknown host key, answered Cancel quietly mid-handshake, is no reason to
+     * show: the tab offers Reconnect, asking nothing.
+     */
+    @Test void aRestoredSshTabsUnknownHostKeyAnsweredQuietlyMidHandshakeOffersReconnect(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(target); settle(host);
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", target.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> host.focusTerminalPane(pane));
+            drainOffTheEdt(host, () -> host.sessionState(pane).startsWith("EXITED|"), "the handshake to fail on its quiet Cancel");
+            assertThat(host.sessionState(pane)).isEqualTo("EXITED|Not connected: Reconnect to sign in");
+            assertThat(host.windows()).as("no host-key question shown, the overlay closed").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace plan 6b's review: a quiet connect whose attach fails says why, closes its overlay and offers Reconnect. */
+    @Test void aQuietConnectWhoseAttachFailsSaysWhyAndOffersReconnect(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var agent = agent(server);
+            var failing = new java.util.concurrent.atomic.AtomicBoolean(true);
+            var attached = new java.util.concurrent.atomic.AtomicInteger();
+            RemotePlugin plugin = new TestRemotePlugin(Kits.UI, context -> Optional.of(new dev.jasper.remote.agent.AgentClient(agent::handle)),
+                    (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, dir) {
+                @Override void attach(dev.jasper.sdk.terminal.PendingSession pending, dev.jasper.remote.client.Connections.Shell shell) {
+                    attached.incrementAndGet();
+                    if (failing.getAndSet(false)) throw new IllegalStateException("its pane could not take the shell");
+                    super.attach(pending, shell);
+                }
+            };
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(target); settle(host);
+            trustServer(context, server);
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", target.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> host.focusTerminalPane(pane));
+            Kits.await(host, () -> attached.get() == 1, "the shell to reach the tab");
+            settle(host);
+            assertThat(host.sessionState(pane)).isEqualTo("EXITED|Not connected: its pane could not take the shell");
+            assertThat(host.windows()).as("its overlay closed").isEmpty();
+            Kits.edt(() -> host.reconnectSession(pane));
+            Kits.await(host, () -> host.sessionState(pane).equals("RUNNING|"), "Reconnect to connect");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace plan 6b's review: a quiet connect whose host was deleted while it waited says it is not connected. */
+    @Test void aRestoredSshTabWhoseHostIsDeletedWhileItWaitsSaysItIsNotConnected(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            // A host nothing listens on: its connect fails and its overlay stays, with Retry, holding the window.
+            var down = RemoteHost.create("down", "127.0.0.1", 1, "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(target); plugin.store().put(down); settle(host);
+            trustServer(context, server);
+            UUID window = host.addTerminalWindow();
+            Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), down)); settle(host);
+            assertThat(host.windows()).containsExactly("overlay|Connecting to down|true");
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", target.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> host.focusTerminalPane(pane)); settle(host);
+            assertThat(host.sessionState(pane)).as("it waits for the window's connection").startsWith("CONNECTING|");
+            plugin.store().remove(target.id()); settle(host);
+            Kits.edt(() -> cancel(plugin.currentConnectionPanel())); settle(host);
+            assertThat(host.sessionState(pane)).isEqualTo("EXITED|Not connected: Host not found");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b's review: an SSH tab opened in a folder too long for its restore state still opens and connects, and
+     * comes back to its host, without that folder.
+     */
+    @Test void anSshTabWhoseFolderDoesNotFitItsRestoreStateStillOpensAndComesBackWithoutIt(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty()).withFollowDirectory(false);
+            plugin.store().put(target); settle(host);
+            trustServer(context, server);
+            UUID window = host.addTerminalWindow();
+            String folder = "/" + "f".repeat(4100);
+            Kits.edt(() -> plugin.openHostIn(context.terminals().window(window).orElseThrow(), target, folder));
+            Kits.await(host, () -> host.terminalPanes().size() == 1 && host.sessionState(host.terminalPanes().getFirst()).equals("RUNNING|"),
+                "the tab to open and connect");
+            UUID tab = Kits.value(() -> context.terminals().pane(host.terminalPanes().getFirst()).orElseThrow().tab().id());
+            assertThat(Kits.value(() -> host.restoreState(tab))).as("its host and name, without the folder")
+                .contains(new dev.jasper.sdk.RestoreState("ssh", Map.of("host", target.id().toString(), "name", "prod")));
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b's review: while Remote's hosts.toml cannot be read, a restored SSH tab says so, and a restore once
+     * the read has failed declines saying so, rather than that its host is no longer saved.
+     */
+    @Test void aRestoredSshTabSaysWhenHostsTomlCannotBeRead(@TempDir Path dir) throws Exception {
+        Path data = java.nio.file.Files.createDirectories(dir.resolve("plugins").resolve("dev.jasper.remote").resolve("data"));
+        java.nio.file.Files.writeString(data.resolve("hosts.toml"), "[[host]\nname = ");
+        try (var host = new FakePluginHost(dir.resolve("plugins"))) {
+            var plugin = plugin(dir.resolve("ssh"));
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", UUID.randomUUID().toString(), "name", "prod"));
+            // Restored while the saved hosts still load, the tab comes back and decides once they have been read.
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            settle(host);
+            Kits.edt(() -> host.focusTerminalPane(pane)); settle(host);
+            assertThat(host.sessionState(pane)).startsWith("EXITED|Remote's hosts.toml could not be read: ").contains("TOML").doesNotContain("\n");
+            assertThat(Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "again", state))).isEmpty();
+            assertThat(host.declinedRestores()).singleElement().asString().contains("Remote's hosts.toml could not be read: ").contains("TOML");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b's review: picking a host shows its running tab first; a restored tab of that host waiting to be shown
+     * stays waiting, and no second connection starts.
+     */
+    @Test void activatingAHostShowsItsRunningTabBeforeARestoredOneThatWaits(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(target); settle(host);
+            trustServer(context, server);
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), target));
+            Kits.await(host, () -> host.terminalPanes().size() == 1 && host.sessionState(host.terminalPanes().getFirst()).equals("RUNNING|"), "a running tab");
+            UUID running = host.terminalPanes().getFirst();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", target.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID waiting = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            Kits.edt(() -> plugin.activateHost(context.terminals().window(window).orElseThrow(), target)); settle(host);
+            assertThat(Kits.value(() -> context.terminals().activePane().map(dev.jasper.sdk.terminal.PaneHandle::id))).contains(running);
+            assertThat(host.sessionState(waiting)).as("still waiting: no second connection").isEqualTo("NOT_STARTED|");
+            assertThat(host.terminalPanes()).hasSize(2);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Workspace plan 6b's review: a restored SSH tab closed before it connects leaves Remote's waiting tabs. */
+    @Test void aRestoredSshTabClosedBeforeItConnectsLeavesTheWaitingTabs(@TempDir Path dir) throws Exception {
+        try (var host = new FakePluginHost()) {
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", 22, "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(target); settle(host);
+            UUID window = host.addTerminalWindow();
+            var state = new dev.jasper.sdk.RestoreState("ssh", Map.of("host", target.id().toString(), "name", "prod"));
+            UUID tab = Kits.value(() -> host.restoreTab("dev.jasper.remote", window, "prod", state)).orElseThrow();
+            UUID pane = Kits.value(() -> context.terminals().tab(tab).orElseThrow().terminal().orElseThrow().id());
+            assertThat(Kits.value(plugin::restoredPaneIds)).containsExactly(pane);
+            Kits.edt(() -> host.closeTerminalPane(pane)); settle(host);
+            assertThat(Kits.value(plugin::restoredPaneIds)).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b Rulings 29, a document's half: while a restored document's quiet channel opens in a window, a host-key
+     * question there is answered Cancel, unasked; once it has opened, one is asked as usual.
+     */
+    @Test void aDocumentsQuietOpenAnswersItsWindowsHostKeyQuestionsCancelUntilItEnds(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            host.start(RemoteEditingPluginTest.EDITOR, Set.of(), Set.of(), new RemoteEditingPluginTest.FakeEditor());
+            var plugin = plugin(dir, agent(server));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.editor"), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(target); settle(host);
+            UUID window = host.addTerminalWindow();
+            var question = new HostKeyVerifier.Question("127.0.0.1", server.port(), "ssh-ed25519", "SHA256:unknown");
+            Kits.edt(() -> {
+                var handle = context.terminals().window(window).orElseThrow();
+                // The fake's background work is left queued, so the quiet open stays in progress while the question is asked.
+                var opening = plugin.openQuietly(plugin.connections().identity(target.id()), Optional.of(handle));
+                assertThat(plugin.askHostKey(handle, question)).as("Cancel, unasked").isCompletedWithValue(HostKeyVerifier.Decision.CANCEL);
+                assertThat(host.windows()).as("no host-key question shown").isEmpty();
+                opening.cancel(true);
+                var again = plugin.askHostKey(handle, question);
+                assertThat(host.windows()).as("asked as usual once it ended").contains("dialog|Verify host key 127.0.0.1|true");
+                host.requestClose("dialog");
+                assertThat(again).isCompletedWithValue(HostKeyVerifier.Decision.CANCEL);
+            });
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Workspace plan 6b's review: a document's quiet channel checks again, as it opens, that signing in asks nothing; the
+     * connection that let it read quietly may have closed since, and a Vault login would then ask.
+     */
+    @Test void aDocumentsQuietOpenChecksAgainThatSigningInAsksNothing(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var counted = countedVault(host);
+            host.start(RemoteEditingPluginTest.EDITOR, Set.of(), Set.of(), new RemoteEditingPluginTest.FakeEditor());
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin);
+            var target = RemoteHost.create("prod", "127.0.0.1", server.port(), "deploy", new Auth.Vault(counted.login()), "", Optional.empty())
+                .withFollowDirectory(false);
+            plugin.store().put(target); settle(host);
+            trustServer(context, server);
+            UUID window = host.addTerminalWindow();
+            Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), target));
+            Kits.await(host, () -> host.terminalPanes().size() == 1 && host.sessionState(host.terminalPanes().getFirst()).equals("RUNNING|"), "a connection");
+            var identity = plugin.connections().identity(target.id());
+            assertThat(Kits.value(() -> plugin.connections().authenticated(identity))).as("signing in asks nothing while it is open").isTrue();
+            // The connection closes: its last tab closes and its linger ends.
+            Kits.edt(() -> host.closeTerminalPane(host.terminalPanes().getFirst())); settle(host);
+            Kits.edt(() -> List.copyOf(scheduled).forEach(Runnable::run)); settle(host);
+            assertThat(Kits.value(() -> plugin.connections().authenticated(identity))).as("closed").isFalse();
+            counted.asked().set(0);
+            var opening = Kits.value(() -> plugin.openQuietly(identity, context.terminals().window(window)));
+            settle(host);
+            assertThat(opening).isCompletedExceptionally();
+            assertThatThrownBy(opening::join).hasRootCauseMessage("Not signed in to prod; Retry signs in");
+            assertThat(counted.asked()).as("the Vault asked for nothing").hasValue(0);
+            assertThat(host.windows()).isEmpty();
             assertThat(host.failures()).isEmpty();
         }
     }

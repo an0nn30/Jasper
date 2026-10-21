@@ -132,7 +132,17 @@ public final class RemoteDocument implements EditorDocument {
      */
     @Override public CompletableFuture<Content> readQuietly(long limitBytes) {
         if (silent.test(identity)) return channels.submitQuietly(identity, owner, endpoint -> read(endpoint, path, limitBytes));
-        return CompletableFuture.failedFuture(new IOException("Not signed in to " + identity.host().name() + "; Retry signs in"));
+        return CompletableFuture.failedFuture(notSignedIn(identity));
+    }
+
+    /**
+     * Why a quiet read of a document on {@code identity}'s route did not read: signing in would ask.
+     *
+     * @param identity the route
+     * @return the failure, which says that Retry signs in
+     */
+    public static IOException notSignedIn(ConnectionIdentity identity) {
+        return new IOException("Not signed in to " + identity.host().name() + "; Retry signs in");
     }
 
     @Override public CompletableFuture<Optional<Revision>> revision() {

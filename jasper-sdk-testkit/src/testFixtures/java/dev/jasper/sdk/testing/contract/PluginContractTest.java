@@ -2354,6 +2354,39 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThat(pane.isOpen()).isFalse());
     }
 
+    /**
+     * Workspace plan 6b Rulings 44: a restored session's tab came back to be reconnected, so cancelling its first attempt
+     * keeps its pane, which returns to the disconnected state, and Reconnect connects again.
+     */
+    @Test void cancellingARestoredSessionsFirstAttemptKeepsItsPane() {
+        UUID window = h.addTerminalWindow(), keep = h.addTerminalTab(window, "local");
+        h.addTerminalPane(keep, "zsh", Path.of("/"));
+        List<PendingSession> pendings = Collections.synchronizedList(new ArrayList<>());
+        var restored = new AtomicReference<PaneHandle>();
+        h.start(info("test.alpha", Capabilities.SESSION_PROVIDE, Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context ->
+            context.windows().restorer("ssh", request -> {
+                context.terminals().openTab(request.window(), OpenRequest.session(SessionSpec.of(request.title(), pendings::add)
+                    .withRestore(request.state()))).ifPresent(restored::set);
+                return Optional.empty();
+            }));
+        var back = new AtomicReference<Optional<UUID>>();
+        h.ui(() -> back.set(h.restoreTab("test.alpha", window, "build-host",
+            new dev.jasper.sdk.RestoreState("ssh", java.util.Map.of("host", "build-host")))));
+        assertThat(back.get()).as("restored").isPresent();
+        PaneHandle pane = restored.get();
+        assertThat(h.sessionState(pane.id())).as("it waits to be shown").isEqualTo("NOT_STARTED|");
+        h.focusTerminalPane(pane.id());
+        h.flush();
+        assertThat(pendings).as("shown, it connects").hasSize(1);
+        h.cancelSession(pane.id());
+        h.flush();
+        assertThat(pendings.get(0).isCancelled()).isTrue();
+        assertThat(h.sessionState(pane.id())).as("its pane stays, disconnected").isEqualTo("EXITED|Connection cancelled");
+        h.ui(() -> assertThat(pane.isOpen()).isTrue());
+        h.reconnectSession(pane.id());
+        assertThat(pendings).as("Reconnect connects again").hasSize(2);
+    }
+
     @Test void providingSessionsNeedsTheCapabilityAndAThrowingConnectorFailsTheAttempt() {
         UUID window = h.addTerminalWindow(), keep = h.addTerminalTab(window, "local");
         h.addTerminalPane(keep, "zsh", Path.of("/"));

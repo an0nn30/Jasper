@@ -137,6 +137,26 @@ class RemoteEditingTest {
         assertThatThrownBy(() -> failed.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("Its host is no longer saved in Remote");
     }
 
+    /**
+     * Workspace plan 6b's review: a recorded key whose saved hosts could not be read says so when it is read, before and
+     * after that read failed, rather than that its host is no longer saved.
+     */
+    @Test void aKeyWhoseSavedHostsCouldNotBeReadSaysSo() throws Exception {
+        String key = RemoteDocument.key(prod, "/etc/hosts");
+        var pending = new CompletableFuture<Void>();
+        var early = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+            id -> Optional.empty(), () -> pending, ui, route -> true);
+        EditorDocument document = early.reopen(key).orElseThrow().apply(origin);
+        var read = onUi(() -> document.read(1 << 20));
+        pending.completeExceptionally(new java.io.IOException("Invalid TOML at line 2\n  name =\n         ^"));
+        assertThatThrownBy(() -> read.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("Remote's hosts.toml could not be read: Invalid TOML at line 2");
+        var later = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+            id -> Optional.empty(), () -> pending, ui, route -> true);
+        EditorDocument reopened = later.reopen(key).orElseThrow(() -> new AssertionError("a key reopens while its hosts cannot be read")).apply(origin);
+        var again = onUi(() -> reopened.read(1 << 20));
+        assertThatThrownBy(() -> again.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("Remote's hosts.toml could not be read: Invalid TOML at line 2");
+    }
+
     /** Workspace tabs spec 13: a quiet read asks nothing: it reads when signing in would not, and otherwise fails saying so. */
     @Test void aQuietReadSignsInOnlyWhenNothingWouldBeAsked() throws Exception {
         var target = prod.hops().getFirst().host();

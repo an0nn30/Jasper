@@ -53,12 +53,24 @@ final class SavedRemoteDocument implements EditorDocument {
     @Override public CompletableFuture<Optional<Revision>> revision() { return use(RemoteDocument::revision); }
     @Override public CompletableFuture<Revision> write(byte[] content) { return use(found -> found.write(content)); }
 
-    /** {@code operation} on the document once its hosts are known: at once when they are, else after they load. */
+    /**
+     * {@code operation} on the document once its hosts are known: at once when they are, else after they load. A host not
+     * known then fails it: no longer saved, or, when the saved hosts could not be read, why not (6b's review).
+     */
     private <T> CompletableFuture<T> use(Function<RemoteDocument, CompletableFuture<T>> operation) {
         Optional<RemoteDocument> found = now();
         if (found.isPresent()) return operation.apply(found.get());
-        return hostsLoaded.get().handle((done, failure) -> (Void) null).thenComposeAsync(ignored -> now().map(operation)
-            .orElseGet(() -> CompletableFuture.failedFuture(new IOException("Its host is no longer saved in Remote"))), ui);
+        return hostsLoaded.get().handle((done, failure) -> Optional.ofNullable(failure)).thenComposeAsync(failure -> now().map(operation)
+            .orElseGet(() -> CompletableFuture.failedFuture(new IOException(failure.map(SavedRemoteDocument::unreadable)
+                .orElse("Its host is no longer saved in Remote")))), ui);
+    }
+
+    /** Why the saved hosts are not known: Remote's hosts.toml could not be read, with its error's first line. */
+    private static String unreadable(Throwable failure) {
+        Throwable cause = failure;
+        while (cause instanceof java.util.concurrent.CompletionException && cause.getCause() != null) cause = cause.getCause();
+        String message = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+        return "Remote's hosts.toml could not be read: " + message.lines().findFirst().orElse("");
     }
 
     /** The document, once every host on its route is known. */

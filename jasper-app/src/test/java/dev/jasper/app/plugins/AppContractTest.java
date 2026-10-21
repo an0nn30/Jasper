@@ -181,6 +181,17 @@ class AppContractTest extends PluginContractTest {
                 if (main[0] == null) workspace.get();
                 return workspace.get();
             })));
+        // A restorer's session takes the saved tab's id in the window being restored, as WindowContent.openTerminal takes it
+        // (workspace tabs spec 13): registered under that id, it is the tab the restore hands back.
+        onEdt(() -> terminalFixture.restoringSessions(
+            (provider, window) -> contributions.tabs().slot(provider, window).map(dev.jasper.app.layout.TabId::value),
+            (tab, window) -> contributions.tabs().restored(contributions.tabs().add(new dev.jasper.app.layout.TabId(tab),
+                dev.jasper.app.contributions.Tab.Kind.TERMINAL, new dev.jasper.app.contributions.TabContent() {
+                    private final javax.swing.JComponent view = new javax.swing.JPanel();
+                    @Override public javax.swing.JComponent component() { return view; }
+                    @Override public void dispose() { }
+                }, window)),
+            tab -> contributions.tabs().tab(new dev.jasper.app.layout.TabId(tab)).ifPresent(contributions.tabs()::remove)));
         var notifications = new NotificationsFixture();
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();
@@ -424,8 +435,10 @@ class AppContractTest extends PluginContractTest {
                     var restored = contributions.tabs().restore(dev.jasper.app.layout.TabId.random(), pluginId,
                         new dev.jasper.app.contributions.TabRegistry.Restoring(windowId, title,
                             new dev.jasper.app.layout.TabRestore(state.kind(), state.values())));
-                    // The window being restored places the tab; here the scripted workspace shows it in that window.
-                    restored.tab().ifPresent(tab -> terminalFixture.addContentTab(windowId, tab.id().value(), tab::title));
+                    // The window being restored places the tab; here the scripted workspace shows it in that window. A
+                    // session's terminal tab is already there, as the window opened it itself.
+                    restored.tab().filter(tab -> tab.kind() != dev.jasper.app.contributions.Tab.Kind.TERMINAL)
+                        .ifPresent(tab -> terminalFixture.addContentTab(windowId, tab.id().value(), tab::title));
                     return restored.tab().map(tab -> tab.id().value());
                 });
             }
