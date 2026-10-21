@@ -48,7 +48,8 @@ import org.fife.ui.rsyntaxtextarea.RSyntaxTextAreaEditorKit;
 
 /** Document sessions and commands for app-owned tabs, including closing and quitting. UI thread only. */
 public final class EditorWindow {
-    private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment");
+    // Revert to Saved too: the tab strip's menu, its other place, hides with one tab (workspace plan 8b Rulings 20).
+    private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment", "revert");
 
     private final EditorEnvironment environment;
     private final PluginContext context;
@@ -150,7 +151,7 @@ public final class EditorWindow {
             command("save-all", "Save All", KeyEvent.VK_S, InputEvent.ALT_DOWN_MASK, () -> saveAll()),
             new Command("open", "Open…", Optional.empty(), false, this::openChooser),
             command("new", "New File", KeyEvent.VK_N, 0, this::newUntitled),
-            new Command("close-tab", "Close Tab", Optional.of(KeyNames.stroke(KeyEvent.VK_W, 0)), false, this::closeCurrent),
+            new Command("close-pane", "Close Pane", Optional.of(KeyNames.stroke(KeyEvent.VK_W, 0)), false, this::closeCurrent),
             command("find", "Find…", KeyEvent.VK_F, 0, () -> findBar.open(false)),
             command("replace", "Replace…", KeyEvent.VK_F, InputEvent.ALT_DOWN_MASK, () -> findBar.open(true)),
             command("find-next", "Find Next", KeyEvent.VK_G, 0, findBar::next),
@@ -771,6 +772,8 @@ public final class EditorWindow {
         handle.setFocusTarget(tab::focusText);
         handle.onActive(active -> { if (active) activate(tab); });
         handle.onClosed(() -> remove(tab));
+        // Tabs and panes spec 2.10 and 9: the right-click menu's Split submenu and Move Pane to New Tab.
+        PaneItems.install(tab.area().getPopupMenu(), context.windows()::splitChoices, handle);
         var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
         for (var command : commands) {
             if (command.id().equals("next-tab") || command.id().equals("previous-tab")) continue;

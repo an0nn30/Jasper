@@ -34,7 +34,7 @@ public final class PluginPresentationCheck {
         "org/fife/ui/rtextarea/Gutter", Set.of("setOpaque", "setBackground", "putClientProperty"),
         "javax/swing/JViewport", Set.of("setOpaque", "setBackground"),
         "javax/swing/JComponent", Set.of("setOpaque"));
-    private static final Set<String> DOCUMENT_CONSTRUCTORS = Set.of("javax/swing/JComponent", "javax/swing/JMenuItem",
+    private static final Set<String> DOCUMENT_CONSTRUCTORS = Set.of("javax/swing/JComponent", "javax/swing/JMenuItem", "javax/swing/JMenu",
         "org/fife/ui/rtextarea/RTextScrollPane", "dev/jasper/editor/vim/VimTextArea");
 
     static List<String> check(Path classes) throws Exception {
@@ -217,6 +217,7 @@ public final class PluginPresentationCheck {
         cases.put("dev/jasper/editor/ui/Other", "class Other { Object create(){return new javax.swing.JButton();} }");
         cases.put("dev/jasper/editor/ui/EditorTheme", "class EditorTheme { Object create(){return new javax.swing.JButton();} }");
         cases.put("dev/jasper/editor/ui/DocumentArea", "class DocumentArea extends javax.swing.JComponent { Object create(){return new javax.swing.JButton();} }");
+        cases.put("dev/jasper/editor/ui/PaneItems", "class PaneItems { Object create(){return new javax.swing.JMenu(\"Split\");} }");
         var failures = new ArrayList<String>();
         for (var fixture : cases.entrySet()) {
             Path classes = compile(root.resolve(fixture.getKey().replace('/', '_')), fixture.getKey(), fixture.getValue());
@@ -233,7 +234,7 @@ public final class PluginPresentationCheck {
         }
         var positive = Map.of(
             "fixture/Domain", "class Domain { java.awt.Color color = new java.awt.Color(123); java.awt.Point point = new java.awt.Point(1,2); java.awt.Dimension size = new java.awt.Dimension(3,4); javax.swing.Timer timer = new javax.swing.Timer(5,e -> {}); void resize(){size.setSize(7,8);} }",
-            "dev/jasper/editor/ui/DocumentArea", "class DocumentArea extends javax.swing.JComponent { void geometry(){setPreferredSize(new java.awt.Dimension(900,900));} protected void paintComponent(java.awt.Graphics g) {g.setColor(java.awt.Color.RED); g.fillRect(0,0,4,4);} }",
+            "dev/jasper/editor/ui/DocumentArea", "class DocumentArea extends javax.swing.JComponent { void geometry(){setPreferredSize(new java.awt.Dimension(900,900));} protected void paintComponent(java.awt.Graphics g) {g.setColor(java.awt.Color.RED); g.fillRect(0,0,4,4);} Object popup(){return new javax.swing.JMenu(\"Split\");} }",
             "dev/jasper/editor/ui/EditorTheme", "class EditorTheme { void apply(javax.swing.JViewport v){v.setOpaque(false); v.setBackground(new java.awt.Color(123));} }",
             "dev/jasper/editor/ui/SystemClipboard", "class SystemClipboard { Object get() { return java.awt.Toolkit.getDefaultToolkit().getSystemClipboard(); } }");
         for (var fixture : positive.entrySet()) {

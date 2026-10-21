@@ -7,12 +7,15 @@ is the binding reference.
 ## Opening files
 
 - **Open in Editor…** (Cmd+O on macOS, Ctrl+O elsewhere) in the File menu or the
-  palette, and **Open…** in an editor tab's ⋯ menu.
+  palette, and, while the window shows its tab strip, **Open…** in the menu of a file's tab.
 - **Open File…** in the File menu or the palette (no default shortcut) opens the file you choose in
   the [default editor](#default-editor), as a Cmd-click does.
-- **New Editor File**, or **New File** (Cmd/Ctrl+N) inside an editor tab, for an untitled tab; **New Editor Window**
-  in the File menu, the palette or the toolbar's New Editor Window button (no default shortcut) opens the untitled tab in a
-  new child window.
+- **New Editor Tab** in the File menu or the palette, or **New File** (Cmd/Ctrl+N) inside an editor, for an untitled file
+  in a new tab; **Split Right with Editor** (New Editor Pane, also in the File menu) and **Split Down with Editor** put
+  one in a new pane beside the focused pane, from the palette or as Editor Right and Editor Down in the Split submenus of
+  the Tab menu and of a terminal's or an editor's right-click menu; **New Editor Window** in the File menu, the palette or
+  the toolbar's New Editor Window button opens the untitled tab in a new child window. None of them has a default
+  shortcut; Settings › Keymap binds them.
 - Drop files from the desktop onto an editor tab. Folders are ignored.
 - `jasper editor FILE[:LINE[:COLUMN]]...` from a terminal, once the
   [jasper command](configuration.md#the-jasper-command) is installed. The caret goes to the
@@ -33,14 +36,15 @@ is the binding reference.
   Linux and Windows. A pane whose shell reports a directory on another host, and a session a plugin provides, such as
   Remote's ssh, open nothing.
 
-Opening a file that is already open selects its tab. Files larger than `max_file_mib` and binary
+Opening a file that is already open selects its tab; any other file opens in a new tab of the window it was opened
+from. Files larger than `max_file_mib` and binary
 files (a NUL byte near the start) are refused with a message in the tab.
 
 ## Tabs and the window
 
 Each tab shows the file's name, a ● when it has unsaved changes, and, when two open files share a
-name, the parent folder's name. The ⋯ button at the right of the tab row lists every command with
-its shortcut. The status line shows the caret's line and column, the language (click to choose
+name, the parent folder's name. While the window shows its tab strip, the menu of the file's tab
+lists every command with its shortcut. The status line shows the caret's line and column, the language (click to choose
 another), the encoding, the line endings (`Mixed → LF` until the first save converts them), the
 indentation and Wrap (click to toggle soft wrap for the tab).
 
@@ -56,9 +60,12 @@ indentation and Wrap (click to toggle soft wrap for the tab).
 | ⌘G / Ctrl+G, ⇧⌘G / Ctrl+Shift+G | Next, previous match |
 | ⌘L / Ctrl+L | Go to Line |
 | ⌘/ / Ctrl+/ | Toggle Comment |
-| ⇧⌘] / Ctrl+Shift+], ⇧⌘[ / Ctrl+Shift+[ | Next, previous tab |
+| ⇧⌘] / Ctrl+PageDown, ⇧⌘[ / Ctrl+PageUp | Next, previous tab of the window |
 
-Revert to Saved, Language… and Toggle Soft Wrap have no shortcut; they are in the ⋯ menu.
+Revert to Saved has no shortcut; it is in an editor's right-click menu and the palette. Language… and Toggle Soft Wrap
+are in the status line. An editor's right-click menu ends with **Split** (Terminal Right, Terminal Down, Editor Right,
+Editor Down, then each plugin's split items), which opens the choice in a new pane beside the editor, and **Move Pane to
+New Tab**, which gives the editor's pane a tab of its own while its tab holds another pane.
 
 ## Saving
 
@@ -170,7 +177,7 @@ recorded corpus.
   a meaning for it in the current mode, and every key while the strip reads a pattern. In Insert and Replace mode the
   Editor gets the rest. In Normal mode (and after an operator, or `<C-o>` from Insert mode) a key Vim does not use
   never runs one of the text area's own editing actions: Shift+Tab and, on Linux and Windows, Ctrl+D or Alt+Up flash
-  the Vim bar and change nothing. The Editor's commands (Save, Find, Close Tab), Jasper's window shortcuts (such as
+  the Vim bar and change nothing. The Editor's commands (Save, Find, Close Pane), Jasper's window shortcuts (such as
   Ctrl+Shift+T on Linux and Windows) and keys a `sethandler` entry gives the Editor still work; a key nothing takes
   flashes the Vim bar. On Linux and Windows Ctrl+S still saves (Vim has no `<C-s>`), while `<C-r>` redoes in Normal
   mode, `<C-w>` deletes a word in Insert mode, and Tab (`<C-i>`) goes forward in the jumplist.
@@ -207,7 +214,7 @@ recorded corpus.
   `<nowait>`, `<unique>`, `<Plug>`, `<Nop>` and `<Leader>` (`let mapleader`, a backslash by default) work as in Vim. A key that starts a
   mapping is Vim's, even a ⌘ key.
 - The vimrc: `plugins/dev.jasper.editor/data/vimrc` under Jasper's home, in UTF-8, read the first time Vim turns on
-  and again with **Reload vimrc** (in the ⋯ menu and the command palette), which first puts mappings, options and
+  and again with **Reload vimrc** (in the command palette and Settings › Keymap), which first puts mappings, options and
   `sethandler` entries back to their defaults. It holds command lines, as a Vim or IdeaVim vimrc does: `set`,
   `let mapleader = ","`, the mapping commands, `sethandler`, `source ~/.vimrc`, and `if has('ide')` … `endif` blocks
   (true in Jasper, so IdeaVim's blocks apply). Lines Jasper cannot run are skipped: a notice says how many, and

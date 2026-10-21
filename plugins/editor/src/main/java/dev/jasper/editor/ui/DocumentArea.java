@@ -155,6 +155,28 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         return item;
     }
 
+    /**
+     * @param title the submenu's title, shown as plain text, since a split item's label comes from another plugin
+     * @return a submenu for the vendor popup
+     */
+    static JMenu submenu(String title) {
+        var menu = new JMenu(title);
+        menu.putClientProperty("html.disable", true);
+        return menu;
+    }
+
+    /**
+     * @param title the item's title, shown as plain text, since a split item's label comes from another plugin
+     * @param run what the item does, on the UI thread
+     * @return a menu item for the vendor popup, running {@code run}
+     */
+    static JMenuItem plainItem(String title, Runnable run) {
+        var item = new JMenuItem(title);
+        item.putClientProperty("html.disable", true);
+        item.addActionListener(event -> run.run());
+        return item;
+    }
+
     private Color translucent(Color color) {
         return new Color(color.getRed(), color.getGreen(), color.getBlue(), (int) Math.round(255 * opacity));
     }

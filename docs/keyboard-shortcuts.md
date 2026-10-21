@@ -90,6 +90,7 @@ Native acceptance (user-run):
 
 ## Editor tabs
 
-The bundled Editor's tabs have their own shortcuts, listed in its ⋯ menu and in [Editor](editor.md).
+The bundled Editor's tabs have their own shortcuts, listed in [Editor](editor.md) and, while the window shows its tab
+strip, in the menu of a file's tab.
 They are its tabs' commands, not registered actions, so they are not in this catalog; the
 action **Open in Editor…** (`dev.jasper.editor.open`, Cmd/Ctrl+O) is.

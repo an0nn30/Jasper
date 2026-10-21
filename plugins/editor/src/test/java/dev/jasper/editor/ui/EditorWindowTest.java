@@ -60,7 +60,8 @@ class EditorWindowTest {
     @BeforeEach void open() {
         Languages.register();
         host = new FakePluginHost(home.resolve("plugins"));
-        context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
+        // terminal.open, as the Editor's manifest declares: Terminal Right and Down beside an editor need it (plan 8b Rulings 19).
+        context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of("terminal.open")), Set.of(), Set.of(), c -> { });
         var environment = new EditorEnvironment(context, Runnable::run,
             owner -> question -> {
                 asked.add(question);
@@ -758,6 +759,77 @@ class EditorWindowTest {
         assertThat(window.edit(missing, OptionalInt.empty(), Optional.empty())).isTrue();
         assertThat(host.contentTabs()).hasSize(2);
         assertThat(missing).doesNotExist();
+    }
+
+    /**
+     * Review Focus 5 and Rulings 14: a file opened from outside opens in a new tab of its window, never beside a pane, and
+     * a window with no tab, as the main window's empty workspace, takes it as its one tab.
+     */
+    @Test void aFileOpenedFromOutsideOpensInANewTabOfItsWindow() throws Exception {
+        UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
+        WindowHandle handle = context.terminals().window(main).orElseThrow();
+        window.newUntitled(handle, dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+        assertThat(host.windowTabs(main)).as("an editor pane beside the shell").hasSize(1);
+        assertThat(window.edit(file("a.txt", "a\n"), OptionalInt.empty(), Optional.of(handle))).as("a Cmd-click").isTrue();
+        window.openAt(file("b.txt", "b\n"), 1, 1, handle);
+        window.openLocal(file("c.txt", "c\n"));
+        drain();
+        var tabs = host.windowTabs(main);
+        assertThat(tabs).as("each file in a tab of its own").hasSize(4);
+        assertThat(tabs.getFirst()).hasSize(2).startsWith(shell);
+        assertThat(tabs.subList(1, 4)).allSatisfy(tab -> assertThat(tab).hasSize(1));
+        UUID empty = host.addTerminalWindow();
+        window.openAt(file("d.txt", "d\n"), 1, 1, context.terminals().window(empty).orElseThrow());
+        drain();
+        assertThat(host.windowTabs(empty)).as("its one tab").hasSize(1).allSatisfy(tab -> assertThat(tab).hasSize(1));
+    }
+
+    /** Spec 2.10 and 9, Rulings 20: an editor's right-click menu lists Revert to Saved, splits and moves its pane. */
+    @Test void anEditorsRightClickMenuSplitsBesideItAndMovesItsPaneToANewTab() throws Exception {
+        context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("dev.jasper.editor.editor", "Editor"),
+            (shown, placement) -> window.newUntitled(shown, placement));
+        UUID main = host.addTerminalWindow();
+        host.addTerminalTab(main, "zsh");
+        WindowHandle handle = context.terminals().window(main).orElseThrow();
+        window.openLocal(file("a.txt", "a\n"), handle);
+        drain();
+        var popup = window.selected().orElseThrow().area().getPopupMenu();
+        opened(popup);
+        assertThat(texts(submenu(popup, "Split"))).containsExactly("Terminal Right", "Terminal Down", "Editor Right", "Editor Down");
+        assertThat(item(popup.getComponents(), "Revert to Saved").isEnabled()).as("Rulings 20").isTrue();
+        assertThat(item(popup.getComponents(), "Move Pane to New Tab").isEnabled()).as("its tab's only pane").isFalse();
+        item(submenu(popup, "Split").getMenuComponents(), "Editor Right").doClick();
+        UUID editor = host.windowTabs(main).get(1).getFirst();
+        assertThat(host.windowTabs(main).get(1)).as("an untitled editor beside it, in its tab").hasSize(2);
+        item(submenu(popup, "Split").getMenuComponents(), "Terminal Down").doClick();
+        assertThat(host.windowTabs(main).get(1)).as("a terminal beside it").hasSize(3).startsWith(editor);
+        opened(popup);
+        assertThat(item(popup.getComponents(), "Move Pane to New Tab").isEnabled()).isTrue();
+        item(popup.getComponents(), "Move Pane to New Tab").doClick();
+        assertThat(host.windowTabs(main)).as("its own tab, right after its old one").hasSize(3);
+        assertThat(host.windowTabs(main).get(2)).containsExactly(editor);
+    }
+
+    /** The menu opening, as a right-click shows it: the Editor's pane entries are built again. */
+    private static void opened(javax.swing.JPopupMenu popup) {
+        for (var listener : popup.getPopupMenuListeners())
+            if (listener instanceof PaneItems items) items.popupMenuWillBecomeVisible(new javax.swing.event.PopupMenuEvent(popup));
+    }
+
+    private static javax.swing.JMenu submenu(javax.swing.JPopupMenu popup, String text) {
+        for (var child : popup.getComponents()) if (child instanceof javax.swing.JMenu menu && text.equals(menu.getText())) return menu;
+        throw new AssertionError("no " + text + " submenu");
+    }
+
+    private static List<String> texts(javax.swing.JMenu menu) {
+        var texts = new ArrayList<String>();
+        for (var child : menu.getMenuComponents()) if (child instanceof javax.swing.JMenuItem entry) texts.add(entry.getText());
+        return texts;
+    }
+
+    private static javax.swing.JMenuItem item(java.awt.Component[] children, String text) {
+        for (var child : children) if (child instanceof javax.swing.JMenuItem entry && text.equals(entry.getText())) return entry;
+        throw new AssertionError("no " + text);
     }
 
     @Test void editLeavesAFolderAndAFileInAMissingFolderToTheDesktop() {

@@ -25,6 +25,7 @@ import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.PluginMenu;
+import dev.jasper.sdk.ui.SplitItemSpec;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.ToolbarItem;
 import java.awt.GraphicsEnvironment;
@@ -44,8 +45,14 @@ import javax.swing.SwingUtilities;
 
 /** Edits local and remote text files in app-owned workspace tabs; publishes {@link Editor} for other plugins. */
 public final class EditorPlugin implements Plugin {
-    static final String OPEN = "dev.jasper.editor.open", NEW = "dev.jasper.editor.new", SHOW = "dev.jasper.editor.show",
-        NEW_WINDOW = "dev.jasper.editor.new_window";
+    static final String OPEN = "dev.jasper.editor.open", NEW_TAB = "dev.jasper.editor.new_editor_tab", SHOW = "dev.jasper.editor.show",
+        NEW_WINDOW = "dev.jasper.editor.new_window", REVERT = "dev.jasper.editor.revert",
+        RELOAD_VIMRC = "dev.jasper.editor.reload_vimrc";
+    /**
+     * The Editor's split item (tabs and panes spec 8 and 10): Split Right with Editor, which is New Editor Pane, and Split
+     * Down with Editor (workspace plan 8b Rulings 13).
+     */
+    static final SplitItemSpec SPLIT = SplitItemSpec.of("dev.jasper.editor.editor", "Editor").withIcon("file");
 
     private final Executor ui;
     private final BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments;
@@ -106,8 +113,17 @@ public final class EditorPlugin implements Plugin {
         context.actions().register(ActionSpec.of(OPEN, "Open in Editor…").withIcon("file")
                 .withKeywords(List.of("editor", "open", "file", "edit")).withDefaultBinding("cmd+o"),
             invoked -> window().openFrom(invoked.window(), invoked.pane()));
-        context.actions().register(ActionSpec.of(NEW, "New Editor File").withKeywords(List.of("editor", "new", "file", "untitled")),
-            invoked -> window().newUntitled(invoked.window()));
+        // Tabs and panes spec 8 and 10: an untitled file in a new tab, or, through the split item, in a new pane beside the
+        // focused one; none has a default key.
+        context.actions().register(ActionSpec.of(NEW_TAB, "New Editor Tab").withKeywords(List.of("editor", "new", "tab", "file", "untitled")),
+            invoked -> window().newUntitled(invoked.window(), dev.jasper.sdk.ui.TabPlacement.NEW_TAB));
+        context.windows().splitItem(SPLIT, (shown, placement) -> window().newUntitled(shown, placement));
+        // Workspace plan 8b Rulings 20: the tab strip's menu, which hides with one tab, was these two's only place; as
+        // actions with no default key they reach the palette and the keymap.
+        context.actions().register(ActionSpec.of(REVERT, "Revert to Saved").withKeywords(List.of("editor", "revert", "saved", "discard")),
+            invoked -> window().revert());
+        context.actions().register(ActionSpec.of(RELOAD_VIMRC, "Reload vimrc").withKeywords(List.of("editor", "vim", "vimrc", "reload")),
+            invoked -> window().reloadVimrc());
         // Workspace tabs spec 6.5: an untitled document in a child window of its own; no default key. Its icon is the toolbar button's.
         context.actions().register(ActionSpec.of(NEW_WINDOW, "New Editor Window").withIcon("file")
                 .withKeywords(List.of("editor", "new", "window", "untitled")),
@@ -134,7 +150,8 @@ public final class EditorPlugin implements Plugin {
         context.palette().register(scope);
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);
-        file.add(NEW);
+        file.add(NEW_TAB);
+        file.add(SPLIT.rightAction()); // New Editor Pane (workspace plan 8b Rulings 21)
         file.add(NEW_WINDOW);
         context.toolbar().add(ToolbarItem.action(NEW_WINDOW));
     }

@@ -8,6 +8,7 @@ import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.contributions.SplitItem;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.buddy.view.BuddyTestSupport;
@@ -77,6 +78,29 @@ class TabShortcutCollisionTest {
                 var movePane = KeyBindings.parse(mac ? "alt+cmd+t" : "ctrl+alt+shift+t", mac).orElseThrow();
                 assertThat(resolved.bindings().idsFor(movePane)).as("Move Pane to New Tab's keys on %s", platform)
                     .containsExactly(ActionId.MOVE_PANE_TO_NEW_TAB.id());
+            }
+        });
+    }
+
+    /**
+     * Tabs and panes spec 10 and 16 (workspace plan 8b Rulings 12 and 20): the Editor's New Editor Tab, its split item's
+     * two actions, Revert to Saved and Reload vimrc are registered, have no default on either platform, and can be bound.
+     */
+    @Test void theEditorsNewActionsHaveNoDefaultAndCanBeBound() throws Exception {
+        var extensions = started();
+        var ids = List.of("dev.jasper.editor.new_editor_tab", "dev.jasper.editor.split_right_editor",
+            "dev.jasper.editor.split_down_editor", "dev.jasper.editor.revert", "dev.jasper.editor.reload_vimrc");
+        onEdt(() -> {
+            assertThat(contributions.splitItems()).extracting(SplitItem::label).as("the Editor's split item").contains("Editor");
+            assertThat(extensions).extracting(KeyBindings.Extension::id).containsAll(ids);
+            for (boolean mac : new boolean[]{true, false}) {
+                var defaults = KeyBindings.defaults(mac).withExtensions(extensions).bindings();
+                for (String id : ids) assertThat(defaults.strokeFor(id)).as("%s has no default", id).isEmpty();
+                String key = mac ? "ctrl+cmd+e" : "ctrl+alt+shift+e";
+                for (String id : ids) {
+                    var bound = KeyBindings.withOverrides(mac, Map.of(id, key)).withExtensions(extensions).bindings();
+                    assertThat(bound.strokeFor(id)).as("%s can be bound", id).isEqualTo(KeyBindings.parse(key, mac));
+                }
             }
         });
     }

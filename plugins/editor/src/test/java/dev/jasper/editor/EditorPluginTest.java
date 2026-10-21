@@ -200,8 +200,8 @@ class EditorPluginTest {
         try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             assertThat(host.actions()).contains("dev.jasper.editor.open|Open in Editor…|true",
-                "dev.jasper.editor.new|New Editor File|true", "dev.jasper.editor.show|Show Editor|true");
-            assertThat(host.menu("FILE")).contains("item:dev.jasper.editor.open", "item:dev.jasper.editor.new");
+                "dev.jasper.editor.new_editor_tab|New Editor Tab|true", "dev.jasper.editor.show|Show Editor|true");
+            assertThat(host.menu("FILE")).contains("item:dev.jasper.editor.open", "item:dev.jasper.editor.new_editor_tab");
             var consumer = new AtomicReference<PluginContext>();
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
             Editor editor = consumer.get().services().require(Editor.class);
@@ -210,6 +210,42 @@ class EditorPluginTest {
             assertThat(host.contentTabs()).hasSize(1);
             while (host.runBackground() > 0) { }
             assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Tabs and panes spec 8 and 10: New Editor Tab opens an untitled file in a new tab, and the Editor's split item, whose
+     * Split Right is New Editor Pane, one in a new pane beside the focused pane; the File menu offers both (Rulings 21).
+     * None has a default key, nor have the actions Revert to Saved and Reload vimrc (Rulings 20).
+     */
+    @Test void newEditorTabOpensATabAndTheEditorsSplitItemAPaneBesideTheFocusedOne() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
+            UUID pane = host.addTerminalPane(shell, dev.jasper.sdk.terminal.PaneInfo.unknown());
+            assertThat(host.actions()).contains("dev.jasper.editor.new_editor_tab|New Editor Tab|true",
+                "dev.jasper.editor.split_right_editor|Split Right with Editor|true",
+                "dev.jasper.editor.split_down_editor|Split Down with Editor|true",
+                "dev.jasper.editor.revert|Revert to Saved|true", "dev.jasper.editor.reload_vimrc|Reload vimrc|true");
+            for (String id : List.of("dev.jasper.editor.new_editor_tab", "dev.jasper.editor.split_right_editor",
+                    "dev.jasper.editor.split_down_editor", "dev.jasper.editor.revert", "dev.jasper.editor.reload_vimrc"))
+                assertThat(host.actionSpec(id)).as(id).hasValueSatisfying(spec -> assertThat(spec.defaultBinding()).as("no default key").isEmpty());
+            assertThat(host.actionSpec("dev.jasper.editor.split_right_editor")).hasValueSatisfying(spec ->
+                assertThat(spec.keywords()).as("the palette finds New Editor Pane").contains("new", "editor", "pane"));
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of(), Set.of(), consumer::set);
+            assertThat(consumer.get().windows().splitChoices()).containsExactly(dev.jasper.sdk.ui.SplitChoice.TERMINAL,
+                new dev.jasper.sdk.ui.SplitChoice("Editor", "dev.jasper.editor.split_right_editor", "dev.jasper.editor.split_down_editor"));
+            assertThat(host.invoke("dev.jasper.editor.new_editor_tab", main, null)).isTrue();
+            assertThat(host.windowTabs(main)).as("a new tab").hasSize(2);
+            host.focusTerminalPane(pane);
+            assertThat(host.invoke("dev.jasper.editor.split_right_editor", main, pane)).isTrue();
+            assertThat(host.windowTabs(main).getFirst()).as("Editor Right: a pane beside the focused shell").hasSize(2).startsWith(shell);
+            assertThat(host.invoke("dev.jasper.editor.split_down_editor", main, null)).isTrue();
+            assertThat(host.windowTabs(main).getFirst()).as("Editor Down: beside the focused editor").hasSize(3);
+            assertThat(host.contentTabs()).hasSize(3).allSatisfy(tab -> assertThat(host.contentPresentation(tab).title()).startsWith("Untitled"));
+            assertThat(host.menu("FILE")).as("New Editor Tab, then New Editor Pane").containsSubsequence("item:dev.jasper.editor.open",
+                "item:dev.jasper.editor.new_editor_tab", "item:dev.jasper.editor.split_right_editor", "item:dev.jasper.editor.new_window");
         }
     }
 
@@ -222,7 +258,7 @@ class EditorPluginTest {
                 assertThat(spec.title()).isEqualTo("New Editor Window");
                 assertThat(spec.defaultBinding()).as("no default key").isEmpty();
             });
-            assertThat(host.menu("FILE")).containsSubsequence("item:dev.jasper.editor.new", "item:dev.jasper.editor.new_window");
+            assertThat(host.menu("FILE")).containsSubsequence("item:dev.jasper.editor.new_editor_tab", "item:dev.jasper.editor.new_window");
             assertThat(host.invoke("dev.jasper.editor.new_window", main, null)).isTrue();
             var tab = host.contentTabs().getFirst();
             assertThat(host.contentTabs()).hasSize(1);
@@ -264,7 +300,7 @@ class EditorPluginTest {
             assertThat(host.contentOwner(host.contentTabs().getFirst())).isInstanceOf(dev.jasper.sdk.terminal.WindowHandle.class);
             assertThat(host.contentTabs().getFirst().requestClose().join()).isTrue();
             assertThat(host.windows()).isEmpty();
-            assertThat(host.invoke("dev.jasper.editor.new", terminal, null)).isTrue();
+            assertThat(host.invoke("dev.jasper.editor.new_editor_tab", terminal, null)).isTrue();
             assertThat(host.windows()).isEmpty();
             assertThat(host.contentTabs()).hasSize(1);
         }

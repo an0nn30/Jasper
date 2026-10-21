@@ -530,7 +530,7 @@ ordinary-control attempts. This is a build-time ownership check, not a reflectiv
 Exact custom sources are `plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java` and
 `plugins/editor/src/main/java/dev/jasper/editor/vim/VimTextArea.java` (including nested classes whose
 SourceFile agrees). DocumentArea may construct its JComponent canvas, VimTextArea, RTextScrollPane and
-vendor-popup JMenuItem; VimTextArea may construct RSyntaxTextArea and its exact RSyntaxTextAreaUI
+vendor-popup JMenuItem and JMenu; VimTextArea may construct RSyntaxTextArea and its exact RSyntaxTextAreaUI
 subclass. EditorTab may construct DocumentArea to register it. Even these owners cannot construct
 ordinary JButton/JPanel controls. No package exemption exists.
 
