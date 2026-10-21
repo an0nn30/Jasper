@@ -60,7 +60,9 @@ and shows it in two panes; section 6 is that part, and it is a plan of its own s
 - **The tab's right-click menu.** **Move Tab Into ▸** lists the window's other tabs.
   - Choosing one moves every pane of the tab to the right of the target tab's active pane, as one nested split that
     keeps their arrangement and sizes.
-  - The moved tab's entry goes, and so does a name you gave it. The target tab keeps its own name.
+  - The moved tab's entry goes. Names stay with their panes: a tab is named after its active pane, so the merged tab
+    shows the moved tab's active pane's name, which takes the focus (amended 2026-10-21, plan 9a's spec issue; a tab has
+    no name of its own to keep or drop).
   - The moved tab's active pane takes the focus.
 - **Dragging a tab's entry.** On a strip it does exactly what it does today. Two things are new:
   - **Over a pane** of any window's shown tab, the landing overlay shows the side nearest the cursor, as in a pane
