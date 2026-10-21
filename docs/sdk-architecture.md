@@ -397,7 +397,9 @@ status controls and native window lifetime. Keys are scoped to the contributing 
 opening an existing key selects its live tab. Null or closed originating windows use the
 main window, restoring it when needed; a `TabPlacement` (SDK 0.20) opens the tab in a new tab
 of the window, a new pane beside the focused one or a new child window. Foreign
-owners are rejected.
+owners are rejected. A split item (`Windows.splitItem`, SDK 0.21) joins every window's Split lists through the
+application's contributions model, its two actions registered as the plugin's own; `ContentTab.split` and
+`moveToNewTab` reach the item's window through the tab registry.
 
 `ContentTab` updates literal presentation, commands and typed status items, supplies its
 focus callback, and moves its retained component to a new child window or the main window.

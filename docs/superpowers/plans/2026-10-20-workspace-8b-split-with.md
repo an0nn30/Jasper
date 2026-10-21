@@ -1,8 +1,23 @@
 # Workspace tabs 8b: split with a choice Implementation Plan
 
-**Status: not executed.** Written against `claude/workspace-tabs` at `c1540b4e9` ("Docs: workspace tabs plan 8a, tabs
-hold panes"; its code is `2d7233474`'s) with plan 8a's text, its review fixes included, applied on top (see Workspace).
-Record every deviation from this text here and in `docs/STATUS.md`.
+**Status: executed on 2026-10-20** (`ee3cd8989..62287a388`); see `docs/STATUS.md`. Written against
+`claude/workspace-tabs` at `c1540b4e9` ("Docs: workspace tabs plan 8a, tabs hold panes"; its code is `2d7233474`'s) with
+plan 8a's text, its review fixes included, applied on top (see Workspace). Deviations from the plan's text: (1) Task 1's
+review: `FakePluginHost.windowTabs` is empty for a window that is not open, as `ContractHarness.windowTabs` says, pinned
+on both runtimes. (2) Task 2: `WindowChromeHintTest` binds New Tab to `cmd+alt+y`, since Move Pane to New Tab takes ⌥⌘T,
+and `ShortcutEditorIntegrationTest` searches "new_tab tabs", which Move Pane to New Tab's row also matched. (3) Task 4's
+review: `ContentTab.split(SplitChoice.TERMINAL, …)` checks `terminal.open` before anything else, a closed tab's too;
+`HostedUi.terminalOpen` is a `Function<String, Runnable>` that refuses until `HostedContext` sets it, and its audit runs
+only once a window opened the terminal (`TabRegistry.splitTerminal` says whether one did); a tab waiting on a close
+decision splits nothing (`TabRegistry.splittable`, the part of `movable` a split shares; a pinned tab still splits); the
+fake's `split` is quiet once its plugin stops; the testkit's open requests record `beside|<tab>|<RIGHT or DOWN>`. (4)
+Task 6: the Editor's right-click Split submenu is built through `DocumentArea.submenu` and `plainItem`, since the plugin
+presentation check refuses Swing controls elsewhere; the check's `DocumentArea` exception gains `JMenu`, with one
+fixture each way. Its review: `html.disable` goes in before the text in those factories, `WindowChrome.fillSplit` and
+`WindowContent.tabMenu`, since Swing reads it only on a later text change, so a plugin's "<html>" label is plain text
+(other app sites with the old order are left for a separate sweep); Revert to Saved and Reload vimrc from the palette or
+a key act on the file of the window they run in; Vim's `:q` and `ZQ` read "close the pane" (the Vim reference
+regenerated).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

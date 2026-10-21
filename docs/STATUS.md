@@ -1,5 +1,78 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 8b: split with a choice — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `ee3cd8989..62287a388`, then this documentation commit;
+[plan](superpowers/plans/2026-10-20-workspace-8b-split-with.md),
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). A new pane can hold a terminal, an editor or a
+plugin's view. The SDK (0.21.0, unreleased) renames `TabPlacement.ACTIVE_GROUP` to `NEW_TAB` and gains split items:
+`Windows.splitItem(SplitItemSpec, opener)` lists a plugin's view in every Split list and registers its Split Right with
+and Split Down with actions, which bind like any action and call the opener with the window and `SPLIT_RIGHT` or
+`SPLIT_DOWN`; `Windows.splitChoices()`, `ContentTab.split` (the terminal's needs `terminal.open`), `moveToNewTab` and
+`mayMoveToNewTab` let a plugin build the same entries into its own menu. The testkit's fake and the app's contract
+fixture hold a window's tabs of panes and show them through `windowTabs`, and the contract pins the placements, the
+split items and the pane commands on both runtimes. The app keeps split items in `Contributions` (`SplitItem`); the Tab
+menu and a terminal's context menu show one Split submenu (Terminal Right, Terminal Down, then each item's Right and
+Down, the bundled plugins' first, with no icons). Move Pane to New Tab (`move_pane_to_new_tab`, Option+Cmd+T,
+Ctrl+Alt+Shift+T elsewhere) gives the focused pane a tab of its own right after its tab, from the Tab menu, the context
+menus and the palette. The Editor (0.12.0) has New Editor Tab
+(`dev.jasper.editor.new_editor_tab`, was New Editor File) and a split item whose actions are Split Right with Editor (New
+Editor Pane, in the File menu after New Editor Tab) and Split Down with Editor; Revert to Saved
+(`dev.jasper.editor.revert`) and Reload vimrc (`dev.jasper.editor.reload_vimrc`) are actions too; every file it opens
+from outside opens in a new tab; its right-click menu lists Revert to Saved and ends with Split and Move Pane to New Tab;
+its Cmd+W command is Close Pane. Rulings (plan, "Rulings"): (1) `NEW_TAB`, with no `KitCompatibility` entry; (2) the
+fakes take the two levels; (3) split items and their actions' ids and titles; (4)
+plugins reach the Split lists through `splitChoices` and `ContentTab.split`; (5) the lists put the bundled plugins'
+items first; (6) one Split submenu everywhere, replacing Split Right and Split Down in the menus; (7) the toolbar's
+Split button stays; (8) the palette lists every entry as its action; (9) Move Pane to New Tab and what stays; (10) the
+menus' order; (11) `ContentTab.moveToNewTab` and `mayMoveToNewTab`; (12) the Editor's commands; (13) New Editor Pane is
+Split Right with Editor; (14) every Editor open uses `NEW_TAB`; (15) the Editor's Close Pane and its guide's keys; (16)
+only the Editor's version moves; (17) split items live in `Contributions`; (18) a content tab reaches its window through
+the registry; (19) a terminal beside a content tab needs `terminal.open`; (20) Revert to Saved and Reload vimrc are Editor
+actions; (21) the Editor's File menu offers New Editor Tab and Split Right with Editor; (22) the Split submenus show no
+icons. Spec issues: none. Deviations: (1) Task 1's review: `FakePluginHost.windowTabs` is empty for a window that is not
+open, as `ContractHarness.windowTabs` says, pinned on both runtimes. (2) Task 2: `WindowChromeHintTest` binds New Tab to
+`cmd+alt+y`, since Move Pane to New Tab takes ⌥⌘T, and `ShortcutEditorIntegrationTest` searches "new_tab tabs", which
+Move Pane to New Tab's row also matched. (3) Task 4's review: `ContentTab.split(SplitChoice.TERMINAL, …)` checks
+`terminal.open` before anything else, a closed tab's too; `HostedUi.terminalOpen` is a `Function<String, Runnable>` that
+refuses until `HostedContext` sets it, and its audit runs only once a window opened the terminal
+(`TabRegistry.splitTerminal` says whether one did); a tab waiting on a close decision splits nothing
+(`TabRegistry.splittable`, the part of `movable` a split shares; a pinned tab still splits); the fake's `split` is quiet
+once its plugin stops; the testkit's open requests record `beside|<tab>|<RIGHT or DOWN>`. (4) Task 6: the Editor's
+right-click Split submenu is built through `DocumentArea.submenu` and `plainItem`, since the plugin presentation check
+refuses Swing controls elsewhere; the check's `DocumentArea` exception gains `JMenu`, with one fixture each way. Its
+review: `html.disable` goes in before the text in those factories, `WindowChrome.fillSplit` and `WindowContent.tabMenu`,
+since Swing reads it only on a later text change, so a plugin's "<html>" label is plain text (other app sites with the
+old order are left for a separate sweep); Revert to Saved and Reload vimrc from the palette or a key act on the file of
+the window they run in; Vim's `:q` and `ZQ` read "close the pane" (the Vim reference regenerated).
+`./gradlew check --continue`: **12,063 tests, 0 failures, 25 skipped, BUILD SUCCESSFUL** (SDK 95, testkit 213, app
+4,077, Editor 4,918, terminal 459, UI 930, Buddy 151, the other plugins 1,220); the example external plugin's
+`check pluginZip` passes.
+GUI checks for the user:
+- the Tab menu's Split submenu and a terminal's right-click Split submenu: Terminal Right (Cmd+D) and Terminal Down
+  (Cmd+Shift+D) with their keys, then Editor Right and Editor Down, none with an icon; each opens its pane beside the
+  focused one;
+- a terminal's right-click Split ▸ Terminal Right or Editor Right on the unfocused pane of a split tab opens beside that
+  pane;
+- under the Enterprise look the Window menu, which holds the Tab menu's items, shows the same Split submenu;
+- in the packaged Jasper.app on macOS (the screen menu bar), Tab ▸ Split loses and regains the Editor's entries when the
+  Editor is disabled and enabled in Settings › Plugins, with no duplicate or missing Split; rebinding Split Right in
+  Settings › Keymap updates the glyph in the reopened submenu;
+- an editor's right-click menu: Split opens a terminal or an editor beside that editor, also when another pane had the
+  focus; Move Pane to New Tab is disabled while the editor is its tab's only pane; Revert to Saved asks before
+  discarding edits;
+- Option+Cmd+T (Ctrl+Alt+Shift+T on Linux and Windows) moves the focused pane into a tab right after its own, every
+  shell running, and typing then reaches the moved pane; a maximized pane's old tab shows the rest;
+- New Editor Tab, Split Right with Editor and Split Down with Editor from the palette; typing "new editor pane" finds
+  the split;
+- a Cmd-click on a file, `jasper editor FILE`, Open in Editor… and Recent Files each open a new tab, also while an
+  editor pane of a split tab has the focus, and while the main window shows its empty workspace the file fills it, as
+  the window's one tab, with no empty tab beside it (Review Focus 5);
+- the File menu reads Open in Editor…, New Editor Tab, Split Right with Editor, New Editor Window;
+- Settings › Keymap lists Move Pane to New Tab with its keys and the Editor's five new actions (New Editor Tab, Split
+  Right and Split Down with Editor, Revert to Saved, Reload vimrc) unbound, and binding one works.
+
+Not merged, not pushed.
+
 **Workspace tabs, plan 8a: tabs hold panes — 2026-10-20** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `c1540b4e9..a49e33f69`, then the documentation commit and its final-review fix wave;
 [plan](superpowers/plans/2026-10-20-workspace-8a-tabs-hold-panes.md),

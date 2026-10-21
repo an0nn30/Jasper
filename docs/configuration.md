@@ -710,7 +710,7 @@ or **Exit Zen Mode**, and the menu toggle remains usable even after removing its
 
 ## Shortcuts
 
-The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_terminal_window`, `close_window`, `close_pane`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `select_tab_1`, `move_tab_to_new_window`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `clear_terminal`, `open_settings` and `reload_config`.
+The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_terminal_window`, `close_window`, `close_pane`, `close_tab`, `split_right`, `split_down`, `move_pane_to_new_tab`, `next_tab`, `previous_tab`, `select_tab_1`, `move_tab_to_new_window`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `clear_terminal`, `open_settings` and `reload_config`.
 
 Settings › Keymap edits these bindings without opening the file; it writes the same `[keybindings]` entries.
 

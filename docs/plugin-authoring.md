@@ -699,7 +699,8 @@ try (var host = new FakePluginHost()) {
 `<panel id>.toggle` action or View › Tool Windows menu; `host.panels()` lists `id|title|ANCHOR`, with
 `+split` after the anchor for a split panel and `|<action id>` for a panel that names its own toggle.
 `host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`,
-`moveTab`, `activateTerminalWindow`, `focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
+`moveTab`, `activateTerminalWindow`, `focusTerminalPane` and `closeTerminalPane` script a workspace;
+`host.windowTabs(windowId)` lists a window's tabs, each its items pane by pane; `host.sent(paneId)` and
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
 `titleChanged`, `cwdChanged`, `sessionExited` and `bell` publish terminal events, delivered by
 `flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory.
@@ -921,9 +922,17 @@ and set a focus callback. Pass the handle as the owner of save pickers and dialo
 follow moves to another window. `moveToNewWindow()` moves the tab to a new child window, and leaves a child window's
 only tab where it is; `moveToMainWindow()` moves it to the main window, and `window()` is the window that holds it; since
 SDK 0.20 `openTab(spec, owner, view, placement)` opens
-it in a new tab of the window (`TabPlacement.ACTIVE_GROUP`), in a new pane beside the focused one (`SPLIT_RIGHT`,
+it in a new tab of the window (`TabPlacement.NEW_TAB`), in a new pane beside the focused one (`SPLIT_RIGHT`,
 `SPLIT_DOWN`) or in a new child window (`NEW_WINDOW`). Preserve the component/session during moves. The tab is a
 content tab of its window: `WindowHandle.tabs()` lists it and the `TAB_*` topics report it.
+
+Since SDK 0.21, `Windows.splitItem(SplitItemSpec.of(id, label), (window, placement) -> ...)` puts a plugin's view in every
+Split list (the Tab menu's and the right-click menus' Split submenus) after the terminal, with two actions, "Split Right
+with" and "Split Down with" the label, that users bind under `[keybindings]` and the plugin may place in its menus; the
+opener receives the window and `SPLIT_RIGHT` or `SPLIT_DOWN` and opens its view there with `openTab`. A plugin that
+builds its own right-click menu, as the Editor does, lists `Windows.splitChoices()` and runs one with
+`ContentTab.split(choice, direction)` (the terminal's needs `terminal.open`), and offers Move Pane to New Tab with
+`ContentTab.moveToNewTab()`, disabled while `mayMoveToNewTab()` is false.
 
 Register one `onTabsClosing` guard per plugin. It receives the closing subset and a batch
 flag. Complete false on cancellation or save failure. Recheck edits made during an async

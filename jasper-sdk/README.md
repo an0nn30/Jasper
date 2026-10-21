@@ -18,7 +18,7 @@ plugins built outside this repository; `./gradlew sdkRelease` builds them into `
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `ToolbarViewFactory`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `DialogSpec`, `OverlaySpec`, `PluginDialog`, `ContentTab`, `TabPlacement`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform`, `FileEditor` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `ToolbarViewFactory`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `DialogSpec`, `OverlaySpec`, `PluginDialog`, `ContentTab`, `TabPlacement`, `SplitItemSpec`, `SplitChoice`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform`, `FileEditor` |
 | `dev.jasper.sdk.notifications` | `Notifications`, `NotificationGroup`, `GroupSpec`, `NotificationSpec`, `NotificationAction`, `NotificationHandle`, `Severity`, `DisplayMode` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
@@ -53,13 +53,25 @@ Appearance icon loaders, arbitrary Icon arguments and palette fallback readers w
 Jasper has one main window, which keeps an empty workspace when its last tab leaves, and any number of child windows,
 which close with their last tab; `WindowHandle.isMain()` tells them apart. Panels, the toolbar and the status bar are the
 main window's: a panel has one instance, there, and a toggle from a child window shows it in the main window.
-`Windows.openTab(spec, owner, view, placement)` takes a `TabPlacement`: `ACTIVE_GROUP` (the three-argument form: a new
+`Windows.openTab(spec, owner, view, placement)` takes a `TabPlacement`: `NEW_TAB` (the three-argument form: a new
 tab of the window), `SPLIT_RIGHT` or `SPLIT_DOWN` (a new pane beside the focused one) or `NEW_WINDOW` (a new child window).
 `ContentTab.moveToNewWindow()` moves a tab to a new child window, `moveToMainWindow()` to the main window, and `window()`
 is the window that holds it. A plugin's own view is a panel or a content tab; a dialog belongs to a Jasper window, a
 content tab or an anchor, and a shortcut context is global, a terminal, the plugin's content tabs or one of its panels.
 In the testkit the first window `FakePluginHost.addTerminalWindow` adds while no main window is open is the main window,
-a window's tabs sit in groups, and `contentTab` and `contentView` find a plugin's content tab by its title.
+a window holds tabs of panes, which `windowTabs` lists, and `contentTab` and `contentView` find a plugin's content tab
+by its title.
+
+## Tabs, panes and split items (SDK 0.21.0)
+
+A window holds tabs, each holding panes; a `TabHandle` is the item one pane shows, and `WindowHandle.tabs()` lists them
+tab by tab, then pane by pane. `Windows.splitItem(SplitItemSpec, opener)` adds a plugin's view to every Split list
+(after the terminal, the bundled plugins' items first) with two bindable actions, `Split Right with` and `Split Down
+with` the item's label, whose ids follow from the item's (`dev.example.notes.notes` gives
+`dev.example.notes.split_right_notes`); running one calls the opener with the window and `SPLIT_RIGHT` or `SPLIT_DOWN`.
+`Windows.splitChoices()` lists the Split choices for a menu a plugin builds itself, `ContentTab.split(choice, direction)`
+opens one beside that item's pane (the terminal's needs `terminal.open`), and `ContentTab.moveToNewTab()` (with
+`mayMoveToNewTab()`) gives its pane a tab of its own.
 
 ## Tabs of every kind (SDK 0.19.0)
 
