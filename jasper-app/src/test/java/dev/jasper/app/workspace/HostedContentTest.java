@@ -32,6 +32,42 @@ class HostedContentTest {
             entry.requestClose();assertThat(owner.currentTerminal()).isSameAs(terminal);
         });
     }
+    /**
+     * What a plugin item's view hears (the merge fix wave's L1): a pane beside the focused one shows, though its item is
+     * not the window's active one; hiding its tab, another tab of the window shown, tells the view it no longer shows
+     * ({@code SHOWING_CHANGED}), and showing the tab again tells it it shows. The Editor's Markdown preview suspends,
+     * releasing its pixels, and renders again on exactly that.
+     */
+    @Test void anItemBesideTheFocusedPaneShowsAndHidingItsTabTellsItsViewItNoLongerShows() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var model = new Contributions(); owner.connectContributions(model);
+            var view = new JPanel();
+            var heard = new ArrayList<Boolean>();
+            view.addHierarchyListener(event -> {
+                if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0) heard.add(view.isShowing());
+            });
+            var entry = model.tabs().open("dev.editor", "notes", "notes.md", owner.id(), view);
+            owner.addNotify();
+            try {
+                assertThat(view.isShowing()).isTrue();
+                owner.split(dev.jasper.app.layout.Side.RIGHT);
+                assertThat(owner.workspace().model().groups()).as("[item | terminal] in one tab").hasSize(2);
+                assertThat(entry.active()).as("the terminal's pane has the focus").isFalse();
+                assertThat(view.isShowing()).as("a pane beside the focused one shows").isTrue();
+                heard.clear();
+                owner.newTab(HOME);
+                assertThat(view.isShowing()).isFalse();
+                assertThat(heard).as("its view hears its tab hide").containsExactly(false);
+                entry.select();
+                assertThat(view.isShowing()).isTrue();
+                assertThat(heard).as("and show again").containsExactly(false, true);
+            } finally {
+                owner.removeNotify();
+            }
+        });
+    }
+
     @Test void documentOnlyShortcutIsInstalledAndRemovedOnSelectionChange() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));

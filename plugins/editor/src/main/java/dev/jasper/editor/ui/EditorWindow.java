@@ -888,8 +888,10 @@ public final class EditorWindow {
         hosted.put(tab, handle); ownerRef.set(handle);
         handle.setFocusTarget(tab::focusContent);
         // A restored document on another host reads when its tab is first active (workspace tabs spec 13).
-        handle.onActive(active -> { tab.active(active); if (active) { activate(tab); if (session.deferred()) session.load(); } });
-        tab.active(handle.isActive());
+        handle.onActive(active -> { if (active) { activate(tab); if (session.deferred()) session.load(); } });
+        // The preview follows whether its view shows, not which pane has the focus: it is active while hosted, and its
+        // controller suspends it, releasing its pixels, while its view does not show, as when another tab of its window shows.
+        tab.active(true);
         handle.onClosed(() -> remove(tab));
         // Tabs and panes spec 2.10 and 9: the right-click menu's Split submenu and Move Pane to New Tab.
         PaneItems.install(tab.area().getPopupMenu(), context.windows()::splitChoices, handle);
@@ -906,14 +908,12 @@ public final class EditorWindow {
         handle.setCommands(contentCommands(tab));
     }
 
-    /**
-     * Publishes document actions, Close Pane among them without a shortcut (the host's Close Pane binding closes the pane);
-     * the host supplies Close Tab and tab navigation.
-     */
+    /** Publishes document actions; the host supplies Close Pane, Close Tab and tab navigation. */
     List<dev.jasper.sdk.ui.ContentCommand> contentCommands(EditorTab tab) {
         boolean ready = tab.showingText() && tab.markdownEligible();
         var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
         for (var command : commands) {
+            if (command.id().equals("close-pane")) continue;
             descriptions.add(new dev.jasper.sdk.ui.ContentCommand(command.id(), command.title(), command.stroke().orElse(null),
                 !command.id().startsWith("markdown.") || ready,
                 () -> runHosted(tab, command.run())));

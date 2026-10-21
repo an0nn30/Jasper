@@ -237,6 +237,7 @@ class JasperApplicationWorkspaceTest {
     private static void quitAndAwait(JasperApplication application, CountDownLatch terminated) throws Exception {
         edt(application::quitNow);
         assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application);
     }
 
     private static dev.jasper.app.commandline.Invocation editorCall(Path home, StringBuilder err) {
@@ -315,6 +316,7 @@ class JasperApplicationWorkspaceTest {
             call[0] = application.commands().dispatch(editorCall(home, err));
         });
         assertThat(terminated.await(10, TimeUnit.SECONDS)).as("the process ended").isTrue();
+        ApplicationPluginCleanup.await(application);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> call[0].toCompletableFuture().get(10, TimeUnit.SECONDS))
             .hasRootCauseInstanceOf(IllegalStateException.class).hasRootCauseMessage("Jasper is quitting; run the command again");
         edt(() -> assertThat(application.windows().isEmpty()).as("nothing was restored").isTrue());

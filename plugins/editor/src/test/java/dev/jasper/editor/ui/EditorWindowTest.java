@@ -267,11 +267,8 @@ class EditorWindowTest {
     @Test void aTabPublishesItsCommandsButLeavesCloseTabToTheHost() throws Exception {
         var tab = opened(file("menu.txt", "text"));
         var published = window.contentCommands(tab);
-        assertThat(published).extracting(dev.jasper.sdk.ui.ContentCommand::id).as("the host's tab menu has its own Close Tab")
-            .doesNotContain("close-tab").contains("save", "find", "find-next", "find-previous", "copy", "paste", "close-pane");
-        assertThat(published).filteredOn(command -> command.id().equals("close-pane")).singleElement()
-            .as("Close Pane shows no shortcut of its own: the host's Close Pane binding closes the pane")
-            .satisfies(command -> assertThat(command.shortcut()).isNull());
+        assertThat(published).extracting(dev.jasper.sdk.ui.ContentCommand::id).as("the host's tab menu has its own Close Pane and Close Tab")
+            .doesNotContain("close-tab", "close-pane").contains("save", "find", "find-next", "find-previous", "copy", "paste");
         assertThat(published).filteredOn(command -> command.id().equals("find-previous")).singleElement()
             .satisfies(command -> assertThat(command.shortcut()).isEqualTo(KeyNames.findAgain(true)));
     }
@@ -294,7 +291,12 @@ class EditorWindowTest {
         assertThat(handle.window().isMain()).isTrue();
     }
 
-    @Test void markdownActivationFollowsEachHostWindowAndMovesKeepPreviewState() throws Exception {
+    /**
+     * A preview's activity follows whether its item is hosted, not which item is active (the merge fix wave's L1): a hosted
+     * tab's preview stays active in every window, beside the window's active item and across moves, and whether its view
+     * shows decides the rest ({@code MarkdownController}). Moves keep the preview's state.
+     */
+    @Test void markdownStaysActiveWhileHostedInEachWindowAndMovesKeepPreviewState() throws Exception {
         var first = opened(file("first.md", "# First"));
         var firstHandle = host.contentTabs().getFirst();
         first.markdown().mode(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
@@ -302,20 +304,27 @@ class EditorWindowTest {
         var document = first.area().getDocument();
         var second = opened(file("second.md", "# Second"));
         var secondHandle = host.contentTabs().getLast();
-        assertThat(first.markdown().active()).isFalse();
+        assertThat(firstHandle.isActive()).as("the second is its window's active item").isFalse();
+        assertThat(first.markdown().active()).as("the first is still hosted").isTrue();
         assertThat(second.markdown().active()).isTrue();
         firstHandle.moveToNewWindow();
+        assertThat(firstHandle.window().isMain()).isFalse();
         assertThat(first.markdown().active()).isTrue();
-        assertThat(second.markdown().active()).as("another window keeps its active tab").isTrue();
+        assertThat(second.markdown().active()).as("the window it left keeps its tab active").isTrue();
         assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
         assertThat(first.area().getDocument()).isSameAs(document);
         assertThat(first.area().getText()).contains("dirty");
         firstHandle.moveToMainWindow();
+        assertThat(firstHandle.window().isMain()).isTrue();
+        assertThat(firstHandle.isActive()).isTrue();
+        assertThat(secondHandle.isActive()).isFalse();
         assertThat(first.markdown().active()).isTrue();
-        assertThat(second.markdown().active()).isFalse();
+        assertThat(second.markdown().active()).as("beside the window's active item").isTrue();
         secondHandle.select();
-        assertThat(first.markdown().active()).isFalse();
+        assertThat(firstHandle.isActive()).isFalse();
+        assertThat(first.markdown().active()).isTrue();
         assertThat(second.markdown().active()).isTrue();
+        assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
     }
 
     @Test void toolbarModeRefreshesSourceCoordinatesAndHostedModesAreUnavailableWhileLoading() throws Exception {
