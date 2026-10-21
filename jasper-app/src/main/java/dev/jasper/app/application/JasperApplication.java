@@ -472,6 +472,7 @@ public final class JasperApplication {
                     case RUNNING -> WindowManager.PluginState.Kind.RUNNING;
                     case NEEDS_CONSENT -> WindowManager.PluginState.Kind.NEEDS_CONSENT;
                     case TURNED_OFF -> WindowManager.PluginState.Kind.TURNED_OFF;
+                    case SAFE_MODE -> WindowManager.PluginState.Kind.SAFE_MODE;
                     case FAILED -> WindowManager.PluginState.Kind.FAILED;
                 }))
                 .orElseGet(() -> new WindowManager.PluginState(id, WindowManager.PluginState.Kind.NOT_INSTALLED));
@@ -764,8 +765,18 @@ public final class JasperApplication {
                 invocation.err("jasper: Jasper's plugins are not running\n");
                 return CompletableFuture.completedFuture(1);
             }
+            // A plugin's subcommand while no main window is open restores the windows first, as every request does (spec
+            // 6.4), so the restore never runs inside the plugin's own call (workspace plan 6b's final review, I1).
+            if (subcommand.test(invocation.arguments().getFirst()))
+                return onEventThread(SwingUtilities::invokeLater, this::acceptsRequests, this::restoreForSubcommand)
+                    .thenCompose(restored -> runtime.commands().dispatch(invocation));
             return runtime.commands().dispatch(invocation);
         };
+    }
+
+    /** The main window and its full windows, restored as {@link #open} restores them when none is open (or it closes). EDT. */
+    private void restoreForSubcommand() {
+        if (windows.main().filter(window -> !window.closed()).isEmpty()) windows.ensureMain(HANDOFF, null);
     }
 
     /**

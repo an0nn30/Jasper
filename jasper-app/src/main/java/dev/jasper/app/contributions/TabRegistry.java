@@ -256,6 +256,9 @@ public final class TabRegistry {
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component, Placement placement) {
         requireEdt();
         Objects.requireNonNull(placement, "placement");
+        // An open for the main window while none is open restores it first, before the (plugin, key) is looked for: an item
+        // that restore brought back is selected, never opened twice (workspace plan 6b's final review, I1).
+        if (restoresMainFirst(owner, placement)) main();
         for (var tab : tabs) if (tab.kind() == Tab.Kind.HOSTED && tab.plugin().equals(plugin) && tab.key().equals(key)) {
             if (tab.window() == null) {
                 // While a saved tab is rebuilt there, the window being restored takes no other tab (workspace plan 6b Rulings 24).
@@ -316,6 +319,16 @@ public final class TabRegistry {
         }
         select(tab);
         return tab;
+    }
+
+    /**
+     * Whether an open goes to the main window while none is open, so that asking for the main window restores it (workspace
+     * tabs spec 6.4): it names no live owner window and no new window, and no saved tab is being restored.
+     */
+    private boolean restoresMainFirst(UUID owner, Placement placement) {
+        if (windows == null || slot != null || placement == Placement.NEW_WINDOW) return false;
+        if (owner != null && hosts.containsKey(owner)) return false;
+        return hosts.keySet().stream().noneMatch(windows.isMain());
     }
 
     private static void rollbackAttach(WorkspaceHost host, Tab tab, Throwable failure) {
@@ -637,8 +650,9 @@ public final class TabRegistry {
     /**
      * Rebuilds one saved tab through its plugin's restorer (workspace tabs spec 13). The tab the plugin opens meanwhile
      * takes {@code id} and the window being restored, whatever window it named, and is not shown: that window places it.
-     * It stays there while the restorer runs, whatever move it asks for, and closes when {@code restorer} throws, before
-     * the failure goes on.
+     * It stays there while the restorer runs, whatever move it asks for, and closes when {@code restorer} throws. An
+     * exception or a {@link VirtualMachineError} then goes on; another {@link Error} is the plugin's restore failure, and
+     * restores nothing (workspace plan 6b's final review, M1).
      *
      * @param id the saved tab's id
      * @param plugin the plugin that saved it
@@ -664,7 +678,11 @@ public final class TabRegistry {
             if (rebuilding.taken != null) {
                 try { rebuilding.taken.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); }
             }
-            throw failure;
+            if (failure instanceof RuntimeException || failure instanceof VirtualMachineError) throw failure;
+            // Only one plugin's restore failed: its saved tab comes back as a placeholder, the rest of the windows as saved.
+            if (failure.getSuppressed().length > 0) LOG.log(System.Logger.Level.WARNING, "A failed restorer's item did not close", failure);
+            String message = failure.getMessage();
+            return new Restored(Optional.empty(), message == null || message.isBlank() ? failure.getClass().getSimpleName() : message);
         } finally {
             slot = null;
         }

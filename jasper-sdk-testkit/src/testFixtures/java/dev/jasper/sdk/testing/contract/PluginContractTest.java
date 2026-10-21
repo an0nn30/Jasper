@@ -1719,6 +1719,36 @@ public abstract class PluginContractTest {
         });
     }
 
+    /**
+     * Workspace plan 6b's final review M1: an Error a restorer throws, other than a VirtualMachineError, is that plugin's
+     * restore failure, as an exception is: the tab it opened closes, it restores nothing, and the next saved tab restores.
+     */
+    @Test void aRestorersErrorClosesTheTabItOpenedAndTheNextTabStillRestores() {
+        UUID main = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        var broken = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.windows().restorer("broken", request -> {
+                broken.set(context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("broken", request.title()), request.window(),
+                    kitView(context)));
+                throw new AssertionError("the restorer broke");
+            });
+            context.windows().restorer("note", request -> {
+                context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("note", request.title()), request.window(), kitView(context));
+                return Optional.empty();
+            });
+        });
+        h.ui(() -> {
+            assertThat(h.restoreTab("test.alpha", main, "Broken", new dev.jasper.sdk.RestoreState("broken", java.util.Map.of())))
+                .as("restores nothing").isEmpty();
+            assertThat(broken.get().isClosed()).as("the tab it opened closed").isTrue();
+            assertThat(h.restoreTab("test.alpha", main, "Note", new dev.jasper.sdk.RestoreState("note", java.util.Map.of())))
+                .as("the next saved tab restores").isPresent();
+            assertThat(alpha.get().terminals().window(main).orElseThrow().tabs()).hasSize(1);
+        });
+    }
+
     /** Workspace tabs spec 13 and 14: a provided session's tab gives the restore state its spec carries. */
     @Test void aSessionsTabGivesTheRestoreStateOfItsSpec() {
         UUID main = h.addTerminalWindow();

@@ -813,6 +813,8 @@ public final class PluginRuntime {
             NEEDS_CONSENT,
             /** The user turned it off. */
             TURNED_OFF,
+            /** Safe mode keeps it off at this launch. */
+            SAFE_MODE,
             /** It was skipped or failed to load or start. */
             FAILED
         }
@@ -834,7 +836,8 @@ public final class PluginRuntime {
             Standing.Kind kind = switch (status.state()) {
                 case ACTIVE -> Standing.Kind.RUNNING;
                 case NEEDS_CONSENT -> Standing.Kind.NEEDS_CONSENT;
-                case DISABLED -> Standing.Kind.TURNED_OFF;
+                case DISABLED -> status.reason().equals(PluginStatus.SAFE_MODE) || status.reason().equals(PluginStatus.SAFE_MODE_LOOK)
+                    ? Standing.Kind.SAFE_MODE : Standing.Kind.TURNED_OFF;
                 case SKIPPED, FAILED -> Standing.Kind.FAILED;
             };
             if (found == null || kind.ordinal() < found.kind().ordinal()) found = new Standing(status.name(), kind);
@@ -1146,7 +1149,7 @@ public final class PluginRuntime {
         if (status.superseded()) return false;
         return switch (status.state()) {
             case NEEDS_CONSENT, SKIPPED, FAILED -> true;
-            case DISABLED -> status.reason().equals("safe mode");
+            case DISABLED -> status.reason().equals(PluginStatus.SAFE_MODE);
             case ACTIVE -> false;
         };
     }

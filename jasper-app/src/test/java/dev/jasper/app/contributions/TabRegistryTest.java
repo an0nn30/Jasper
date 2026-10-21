@@ -583,6 +583,34 @@ class TabRegistryTest {
         assertThat(mounted).as("each window being restored places its item; no move attached one").isEmpty();
     }
 
+    /**
+     * Workspace plan 6b's final review I1: a plugin's tab asked for while no main window is open restores the main window
+     * first, before the registry looks for that (plugin, key): the item that restore brought back is selected, never
+     * opened a second time.
+     */
+    @Test void aRestoreInsideAnOpenForTheMainWindowLeavesOneItemPerPluginAndKey() {
+        TabId saved = TabId.random();
+        UUID[] open = {null};
+        registry.addHost(new WorkspaceHost(detached, mounted::add, mounted::remove, tab -> {}, () -> {}));
+        registry.windows(new TabRegistry.Windows(() -> {
+            if (open[0] == null) {
+                // The window manager restores the main window, whose saved item comes back through its plugin.
+                registry.addHost(new WorkspaceHost(main, mounted::add, mounted::remove, tab -> {}, () -> {}));
+                open[0] = main;
+                registry.restore(saved, "plugin.notes", new TabRegistry.Restoring(main, "Todo", new dev.jasper.app.layout.TabRestore("note", Map.of())));
+            }
+            return open[0];
+        }, window -> window.equals(open[0]), tab -> {}));
+        registry.restorer("plugin.notes", "note", restoring -> {
+            registry.open("plugin.notes", "note:todo", restoring.title(), restoring.window(), new JPanel());
+            return Optional.empty();
+        });
+        Tab opened = registry.open("plugin.notes", "note:todo", "Todo", null, new JPanel());
+        assertThat(registry.hosted()).as("one item for the key").containsExactly(opened);
+        assertThat(opened.id()).as("the restored one").isEqualTo(saved);
+        assertThat(opened.window()).isEqualTo(main);
+    }
+
     /** 6b Task 1's review: an Error a restorer lets out, which no containment holds, takes the item it opened with it. */
     @Test void aRestorerThatOpensItsItemAndThrowsAnErrorLeavesNoTab() {
         hosts();

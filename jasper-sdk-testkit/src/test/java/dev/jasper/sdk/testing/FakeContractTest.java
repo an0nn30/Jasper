@@ -255,12 +255,14 @@ class FakeContractTest extends PluginContractTest {
 
     /**
      * 6b Task 1's review, the fake alone, as the application: a restorer's reason is recorded only when no tab came back, a
-     * checked exception is contained as Jasper's containment holds one, and an Error closes the tab it opened and goes on.
+     * checked exception is contained as Jasper's containment holds one, and an Error closes the tab it opened: a
+     * VirtualMachineError goes on, another is recorded as the plugin's restore failure (6b's final review, M1).
      */
     @org.junit.jupiter.api.Test void aRestorersReasonCountsOnlyWithoutATabAndAnErrorClosesTheTabItOpened() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             java.util.UUID window = host.addTerminalWindow();
             var fatal = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            var broken = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.ui.ContentTab>();
             host.start(new PluginInfo("test.alpha", "Alpha", "1.0.0", Set.of()), Set.of(), Set.of(), context -> {
                 var windows = context.windows();
                 windows.restorer("kept", request -> {
@@ -273,6 +275,10 @@ class FakeContractTest extends PluginContractTest {
                     fatal.set(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("fatal", request.title()), request.window(), view(context)));
                     throw new InternalError("the restorer broke");
                 });
+                windows.restorer("broken", request -> {
+                    broken.set(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("broken", request.title()), request.window(), view(context)));
+                    throw new AssertionError("the index is broken");
+                });
             });
             org.assertj.core.api.Assertions.assertThat(host.restoreTab("test.alpha", window, "Kept", new dev.jasper.sdk.RestoreState("kept", java.util.Map.of())))
                 .as("its tab came back").isPresent();
@@ -283,6 +289,10 @@ class FakeContractTest extends PluginContractTest {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> host.restoreTab("test.alpha", window, "Fatal",
                 new dev.jasper.sdk.RestoreState("fatal", java.util.Map.of()))).isInstanceOf(InternalError.class).hasMessage("the restorer broke");
             org.assertj.core.api.Assertions.assertThat(fatal.get().isClosed()).as("the tab it opened closed").isTrue();
+            org.assertj.core.api.Assertions.assertThat(host.restoreTab("test.alpha", window, "Broken", new dev.jasper.sdk.RestoreState("broken", java.util.Map.of())))
+                .as("another Error restores nothing").isEmpty();
+            org.assertj.core.api.Assertions.assertThat(broken.get().isClosed()).as("the tab it opened closed").isTrue();
+            org.assertj.core.api.Assertions.assertThat(host.failures()).as("the plugin's failure").last().asString().contains("the index is broken");
             org.assertj.core.api.Assertions.assertThat(host.contentTabs()).as("only the kept tab").singleElement().satisfies(tab -> org.assertj.core.api.Assertions.assertThat(tab.isClosed()).isFalse());
         } });
     }

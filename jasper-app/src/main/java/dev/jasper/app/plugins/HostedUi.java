@@ -801,11 +801,21 @@ final class HostedUi {
                     var request = new dev.jasper.sdk.ui.RestoreRequest(terminals.windowHandle(saved.window()), saved.title(), state);
                     // A reason the restorer gives is expected, and no failure; what it throws is the plugin's failure.
                     var said = new java.util.concurrent.atomic.AtomicReference<Optional<String>>(Optional.empty());
-                    Throwable thrown = containment.attempt(pluginId, "tab restorer", () -> {
-                        Optional<String> declined = restorer.restore(request);
-                        said.set(declined == null ? Optional.empty() : declined.filter(reason -> !reason.isBlank()));
-                        return null;
-                    });
+                    Throwable thrown;
+                    try {
+                        thrown = containment.attempt(pluginId, "tab restorer", () -> {
+                            Optional<String> declined = restorer.restore(request);
+                            said.set(declined == null ? Optional.empty() : declined.filter(reason -> !reason.isBlank()));
+                            return null;
+                        });
+                    } catch (VirtualMachineError fatal) {
+                        throw fatal;
+                    } catch (Error failure) {
+                        // The plugin's restore failure, reported as a throw is; the registry closes the item it opened and
+                        // the rest of the windows restore (workspace plan 6b's final review, M1).
+                        containment.record(pluginId, "tab restorer", failure);
+                        throw failure;
+                    }
                     return thrown == null ? said.get() : Optional.of(problem(thrown));
                 });
                 return tracked(registration::close);

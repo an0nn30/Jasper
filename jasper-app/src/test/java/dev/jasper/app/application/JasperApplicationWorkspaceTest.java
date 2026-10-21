@@ -198,6 +198,58 @@ class JasperApplicationWorkspaceTest {
         }
     }
 
+    /**
+     * Workspace-tabs spec 6.4, workspace plan 6b's final review I1: a plugin's subcommand while Jasper is resident with no
+     * window open restores the windows first, then runs. The staged Editor's saved tab for a file comes back in its saved
+     * pane, and {@code jasper editor} for that file selects it: one tab for the file, and no placeholder.
+     */
+    @Test void aPluginsSubcommandWhileNoWindowIsOpenRestoresTheWindowsBeforeItRuns() throws Exception {
+        Path notes = Files.writeString(home.resolve("notes.md"), "# Notes\n");
+        var shell = dev.jasper.app.layout.TabId.random();
+        var document = dev.jasper.app.layout.TabId.random();
+        var one = dev.jasper.app.layout.Layout.of(shell);
+        var tab = new dev.jasper.app.layout.ParentTab(dev.jasper.app.layout.ParentTabId.random(), one.split(document, one.activeGroup(), Side.RIGHT));
+        var saved = new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN, java.util.Optional.empty(), 0,
+            dev.jasper.app.layout.ParentTabs.of(tab), java.util.Map.of(shell, new WorkspaceFile.TabRecord.Terminal("", home.toString(), ""),
+                document, new WorkspaceFile.TabRecord.Content("notes.md", "dev.jasper.editor", "document",
+                    java.util.Map.of("key", "local:" + notes))));
+        var dirs = new dev.jasper.app.platform.AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        WorkspaceFile.write(dirs.workspaceState(), new WorkspaceFile.Snapshot(List.of(saved)));
+        Path editor = Path.of(System.getProperty("jasper.stagedPlugins")).resolve("dev.jasper.editor");
+        JasperApplication[] held = new JasperApplication[1];
+        var terminated = new CountDownLatch(1);
+        edt(() -> {
+            held[0] = new JasperApplication(null, DesktopTestSupport.idleLauncher(pending), new CommandHistory(), null, terminated::countDown);
+            held[0].frames = window -> new WindowShell(() -> { }, () -> { }, () -> { }, () -> { }, () -> null,
+                component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            held[0].residency(true);
+            held[0].startPlugins(null, editor, false, dirs);
+        });
+        JasperApplication application = held[0];
+        try {
+            edt(() -> assertThat(application.windows().isEmpty()).as("resident, no window open").isTrue());
+            var err = new StringBuilder();
+            var exit = application.commands().dispatch(new dev.jasper.app.commandline.Invocation(List.of("editor", "notes.md"), home,
+                java.util.Optional.empty(), text -> { }, err::append));
+            assertThat(exit.toCompletableFuture().get(10, TimeUnit.SECONDS)).as("exit code; %s", err).isZero();
+            edt(() -> {
+                MainWindow main = application.windows().main().orElseThrow(() -> new AssertionError("the main window was restored"));
+                var tabs = application.contributions().tabs();
+                assertThat(tabs.tabs()).as("no placeholder").noneMatch(item -> item.kind() == dev.jasper.app.contributions.Tab.Kind.PLACEHOLDER);
+                assertThat(tabs.hosted()).as("one Editor tab for the file: the saved one").singleElement().satisfies(item -> {
+                    assertThat(item.id()).isEqualTo(document);
+                    assertThat(item.window()).isEqualTo(main.id());
+                });
+                assertThat(main.content().windowLayout()).as("in its saved tab and pane").isEqualTo(saved.layout());
+            });
+            launch();
+        } finally {
+            edt(application::quitNow);
+            // The plugins' shutdown writes their state into the temporary home; it ends before the process does.
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
     @Test void theWarmUpNeverReadsOrWritesTheWorkspace() throws Exception {
         Files.writeString(file(), "version = 1\n[[windows]]\nrole = ");
         byte[] before = Files.readAllBytes(file());

@@ -1800,10 +1800,12 @@ public final class FakePluginHost implements AutoCloseable {
      * @param title the tab's saved title
      * @param state its saved restore state
      * @return the tab the restorer opened, content or terminal, while it is open in that window, whatever the restorer then
-     *     returned or threw; empty when the plugin is not running or has no restorer for the kind, or its restorer opened
-     *     nothing: it declined (recorded in {@link #declinedRestores()}), threw an exception or a {@link LinkageError}
-     *     (recorded in {@link #failures()}, as Jasper contains them) or returned empty, where Jasper shows a placeholder
-     * @throws Error another {@link Error} the restorer threw, as Jasper lets it through, once the tab it opened has closed
+     *     returned or threw, except another {@link Error}; empty when the plugin is not running or has no restorer for the
+     *     kind, or its restorer opened nothing: it declined (recorded in {@link #declinedRestores()}), threw an exception
+     *     or a {@link LinkageError} (recorded in {@link #failures()}, as Jasper contains them) or returned empty, where
+     *     Jasper shows a placeholder; empty too when it threw another {@link Error}, the plugin's restore failure, which
+     *     closes the tab it opened and is recorded in {@link #failures()}
+     * @throws VirtualMachineError one the restorer threw, as Jasper lets it through, once the tab it opened has closed
      * @since 0.21.0
      */
     public java.util.Optional<UUID> restoreTab(String pluginId, UUID windowId, String title, dev.jasper.sdk.RestoreState state) {
@@ -1821,13 +1823,22 @@ public final class FakePluginHost implements AutoCloseable {
             // Contained as Jasper's containment holds it: a checked exception too, which another JVM language may throw.
             failures.add(pluginId + " restorer " + state.kind() + ": " + failure);
             return java.util.Optional.ofNullable(slot.taken).filter(tab -> tab.open && tab.window == window).map(tab -> tab.id);
-        } catch (Error fatal) {
+        } catch (VirtualMachineError fatal) {
             // What Jasper lets through takes the tab the restorer opened with it.
             workspace.slot = null;
             if (slot.taken != null) {
                 try { closeRestored(slot.taken); } catch (RuntimeException | Error closing) { fatal.addSuppressed(closing); }
             }
             throw fatal;
+        } catch (Error failure) {
+            // Another Error is the plugin's restore failure, as Jasper contains it: the tab it opened closes, and the rest of
+            // the windows restore (workspace plan 6b's final review, M1).
+            failures.add(pluginId + " restorer " + state.kind() + ": " + failure);
+            workspace.slot = null;
+            if (slot.taken != null) {
+                try { closeRestored(slot.taken); } catch (RuntimeException | Error closing) { failures.add(pluginId + " restorer close: " + closing); }
+            }
+            return java.util.Optional.empty();
         } finally {
             workspace.slot = null;
         }

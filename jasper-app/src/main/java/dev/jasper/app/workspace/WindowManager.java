@@ -77,6 +77,8 @@ public final class WindowManager {
             NOT_INSTALLED,
             /** The user turned it off. */
             TURNED_OFF,
+            /** It is off because Jasper runs in safe mode. */
+            SAFE_MODE,
             /** It waits for the user's review of what it asks to do. */
             NEEDS_CONSENT,
             /** It could not start at this launch. */
@@ -870,12 +872,16 @@ public final class WindowManager {
         return text.endsWith(".") || text.endsWith("?") || text.endsWith("!") ? text : text + ".";
     }
 
-    /** Why a plugin that does not run restores nothing, as a placeholder says it. */
+    /**
+     * Why a plugin that does not run restores nothing, as a placeholder says it, and what the user can do about it: a change
+     * in Manage Plugins takes effect when Jasper next starts (workspace plan 6b's final review, M3).
+     */
     private static String reason(PluginState state) {
         return switch (state.kind()) {
             case NOT_INSTALLED -> "The plugin " + state.name() + " is not installed.";
-            case TURNED_OFF -> state.name() + " is turned off.";
-            case NEEDS_CONSENT -> state.name() + " waits for your review in Manage Plugins.";
+            case TURNED_OFF -> state.name() + " is turned off. Turn it on in Manage Plugins and restart Jasper.";
+            case SAFE_MODE -> state.name() + " is off in safe mode. Restart Jasper normally to restore this tab.";
+            case NEEDS_CONSENT -> state.name() + " waits for your review in Manage Plugins. Review it there and restart Jasper.";
             case FAILED -> state.name() + " could not start.";
             case RUNNING -> state.name() + " runs.";
         };

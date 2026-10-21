@@ -287,6 +287,36 @@ class PluginTabRestoreTest {
         windows.launch();
     }
 
+    /**
+     * Workspace plan 6b's final review M1: an Error a restorer throws, other than a VirtualMachineError, is that plugin's
+     * restore failure, as an exception is: the item it opened closes, its pane holds a placeholder that says why, and the
+     * rest of the workspace comes back, nothing kept aside.
+     */
+    @Test void aRestorersErrorLeavesAPlaceholderInItsPaneAndTheRestOfTheWorkspaceComesBack() throws Exception {
+        TabId shell = TabId.random(), saved = TabId.random();
+        Layout one = Layout.of(shell);
+        var snapshot = new WorkspaceFile.Snapshot(List.of(main(Map.of(shell, new WorkspaceFile.TabRecord.Terminal("build", HOME.toString(), ""),
+            saved, NOTE), new ParentTab(ParentTabId.random(), one.split(saved, one.activeGroup(), Side.RIGHT)))));
+        windows(snapshot, Map.of(NOTES, "Notes"));
+        Tab[] opened = new Tab[1];
+        edt(() -> windows.model.tabs().restorer(NOTES, "note", restoring -> {
+            opened[0] = windows.model.tabs().open(NOTES, "note:todo", restoring.title(), restoring.window(), new javax.swing.JPanel());
+            throw new AssertionError("the note's index is broken");
+        }));
+        edt(() -> {
+            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            assertThat(opened[0].closed()).as("the item it opened closed").isTrue();
+            Tab placeholder = windows.model.tabs().tab(saved).orElseThrow();
+            assertThat(placeholder.kind()).isEqualTo(Tab.Kind.PLACEHOLDER);
+            assertThat(((PlaceholderContent) placeholder.content()).reason()).isEqualTo("Notes could not restore this tab: the note's index is broken.");
+            assertThat(main.content().windowLayout()).as("in its saved pane").isEqualTo(snapshot.main().layout());
+            assertThat(((TerminalContent) windows.model.tabs().tab(shell).orElseThrow().content()).renamed())
+                .as("the renamed terminal came back").contains("build");
+            assertThat(setAside).as("nothing kept aside").isEmpty();
+        });
+        windows.launch();
+    }
+
     @Test void aPlaceholderSaysHowItsPluginStandsAndOffersRetryOnlyWhileItRuns() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         plugins.put(NOTES, new WindowManager.PluginState("Notes", WindowManager.PluginState.Kind.TURNED_OFF));
@@ -299,7 +329,7 @@ class PluginTabRestoreTest {
         edt(() -> {
             MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
             var content = (PlaceholderContent) main.content().selectedTab().content();
-            assertThat(content.reason()).isEqualTo("Notes is turned off.");
+            assertThat(content.reason()).isEqualTo("Notes is turned off. Turn it on in Manage Plugins and restart Jasper.");
             assertThat(content.retryable()).isFalse();
             plugins.put(NOTES, new WindowManager.PluginState("Notes", WindowManager.PluginState.Kind.RUNNING));
             content.shown();
@@ -312,7 +342,11 @@ class PluginTabRestoreTest {
             assertThat(content.retryable()).isFalse();
             plugins.put(NOTES, new WindowManager.PluginState("Notes", WindowManager.PluginState.Kind.NEEDS_CONSENT));
             content.shown();
-            assertThat(content.reason()).isEqualTo("Notes waits for your review in Manage Plugins.");
+            assertThat(content.reason()).isEqualTo("Notes waits for your review in Manage Plugins. Review it there and restart Jasper.");
+            plugins.put(NOTES, new WindowManager.PluginState("Notes", WindowManager.PluginState.Kind.SAFE_MODE));
+            content.shown();
+            assertThat(content.reason()).isEqualTo("Notes is off in safe mode. Restart Jasper normally to restore this tab.");
+            assertThat(content.retryable()).isFalse();
         });
         windows.launch();
     }

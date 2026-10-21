@@ -274,6 +274,9 @@ class PluginRuntimeTest {
         PluginRuntime safe = runtime(null, user, null, true, new ArrayList<>());
         onEdt(() -> safe.start(Map.of(), true));
         assertThat(safe.statusLines()).singleElement().asString().contains("DISABLED", "safe mode");
+        // Workspace plan 6b's final review M3: a saved tab's placeholder says safe mode keeps it off, not the user.
+        assertThat(safe.standing("dev.example.probe")).hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.SAFE_MODE));
     }
 
     private static String declaring(String id, String command, String summary) {

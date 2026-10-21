@@ -63,7 +63,7 @@ final class PluginResolver {
                 continue;
             }
             if (safeMode && candidate.origin() == PluginCandidate.Origin.USER) {
-                rejected.add(PluginStatus.of(candidate, PluginStatus.State.DISABLED, "safe mode"));
+                rejected.add(PluginStatus.of(candidate, PluginStatus.State.DISABLED, PluginStatus.SAFE_MODE));
                 continue;
             }
             PluginCandidate rival = chosen.get(candidate.id());

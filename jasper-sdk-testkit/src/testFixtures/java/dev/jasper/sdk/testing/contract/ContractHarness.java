@@ -161,7 +161,7 @@ public interface ContractHarness extends AutoCloseable {
      *
      * @return the tab the restorer opened in the window, whatever it then returned or threw; empty when the plugin has no
      *     restorer for the kind, or its restorer opened nothing before it returned or threw. An {@link Error} other than a
-     *     {@link LinkageError} closes the tab and is thrown on.
+     *     {@link LinkageError} closes the tab, and gives empty; a {@link VirtualMachineError} is thrown on.
      */
     java.util.Optional<java.util.UUID> restoreTab(String pluginId, java.util.UUID windowId, String title, dev.jasper.sdk.RestoreState state);
 

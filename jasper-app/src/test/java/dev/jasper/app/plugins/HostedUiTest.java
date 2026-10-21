@@ -505,6 +505,30 @@ class HostedUiTest {
         assertThat(model.tabs().tabs()).as("nothing registered").isEmpty();
     }
 
+    /**
+     * Workspace plan 6b's final review M1: an Error other than a VirtualMachineError from a restorer is the plugin's restore
+     * failure, as a throw is: an incident, its item closed, and its message the placeholder's reason, so the rest restores.
+     */
+    @Test void aRestorersErrorIsAnIncidentClosesItsItemAndGivesItsReason() {
+        var windows = ui.windows();
+        var owner = terminals.windowHandle(terminalFixture.addWindow());
+        var opened = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        windows.restorer("broken", request -> {
+            opened.set(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("broken", request.title()), request.window(), view()));
+            throw new AssertionError("the index is broken");
+        });
+        try (var log = dev.jasper.app.testsupport.LogRecorder.of("dev.jasper.plugins.dev.x.tool")) {
+            var outcome = model.tabs().restore(dev.jasper.app.layout.TabId.random(), "dev.x.tool", new dev.jasper.app.contributions.TabRegistry.Restoring(
+                owner.id(), "Saved", new dev.jasper.app.layout.TabRestore("broken", java.util.Map.of())));
+            assertThat(outcome.tab()).isEmpty();
+            assertThat(outcome.problem()).isEqualTo("the index is broken");
+            assertThat(containment.failures("dev.x.tool")).as("an incident").isEqualTo(1);
+            assertThat(log.warnings()).hasSize(1);
+        }
+        assertThat(opened.get().isClosed()).as("its item closed").isTrue();
+        assertThat(model.tabs().tabs()).as("nothing registered").isEmpty();
+    }
+
     @Test void dialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {
         var owner = terminals.windowHandle(terminalFixture.addWindow());
         List<String> events = new ArrayList<>();
