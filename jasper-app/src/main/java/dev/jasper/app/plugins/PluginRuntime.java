@@ -576,6 +576,19 @@ public final class PluginRuntime {
         return current != null && current.commands.declares(name);
     }
 
+    /**
+     * Whether a call to subcommand {@code name} would run in its plugin now, which has registered its handler, rather than
+     * answer that the plugin is off. Any thread: it is the registry's answer at that moment, and the plugin can stop before
+     * the call gets there. False before the plugins start.
+     *
+     * @param name the first argument of a call
+     * @return true when a running plugin has a handler for it
+     */
+    public boolean runsSubcommand(String name) {
+        PluginHost current = host;
+        return current != null && current.commands.answers(name);
+    }
+
     /** Runs {@code jasper <subcommand>} calls in the plugins that answer them. */
     public dev.jasper.app.commandline.CommandDispatcher commands() {
         return invocation -> {
@@ -813,6 +826,8 @@ public final class PluginRuntime {
             NEEDS_CONSENT,
             /** The user turned it off. */
             TURNED_OFF,
+            /** The user marked it for removal at the next launch. */
+            MARKED_FOR_REMOVAL,
             /** Safe mode keeps it off at this launch. */
             SAFE_MODE,
             /** It was skipped or failed to load or start. */
@@ -836,8 +851,11 @@ public final class PluginRuntime {
             Standing.Kind kind = switch (status.state()) {
                 case ACTIVE -> Standing.Kind.RUNNING;
                 case NEEDS_CONSENT -> Standing.Kind.NEEDS_CONSENT;
-                case DISABLED -> status.reason().equals(PluginStatus.SAFE_MODE) || status.reason().equals(PluginStatus.SAFE_MODE_LOOK)
-                    ? Standing.Kind.SAFE_MODE : Standing.Kind.TURNED_OFF;
+                case DISABLED -> switch (status.reason()) {
+                    case PluginStatus.SAFE_MODE, PluginStatus.SAFE_MODE_LOOK -> Standing.Kind.SAFE_MODE;
+                    case PluginStatus.MARKED_FOR_REMOVAL -> Standing.Kind.MARKED_FOR_REMOVAL;
+                    default -> Standing.Kind.TURNED_OFF;
+                };
                 case SKIPPED, FAILED -> Standing.Kind.FAILED;
             };
             if (found == null || kind.ordinal() < found.kind().ordinal()) found = new Standing(status.name(), kind);

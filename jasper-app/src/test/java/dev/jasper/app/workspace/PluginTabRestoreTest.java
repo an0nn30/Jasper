@@ -347,6 +347,10 @@ class PluginTabRestoreTest {
             content.shown();
             assertThat(content.reason()).isEqualTo("Notes is off in safe mode. Restart Jasper normally to restore this tab.");
             assertThat(content.retryable()).isFalse();
+            plugins.put(NOTES, new WindowManager.PluginState("Notes", WindowManager.PluginState.Kind.MARKED_FOR_REMOVAL));
+            content.shown();
+            assertThat(content.reason()).as("no advice to turn it on: it is going").isEqualTo("Notes is marked for removal in Manage Plugins.");
+            assertThat(content.retryable()).isFalse();
         });
         windows.launch();
     }

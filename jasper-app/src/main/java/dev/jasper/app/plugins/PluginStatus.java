@@ -6,6 +6,8 @@ record PluginStatus(String id, String name, String version, PluginCandidate.Orig
 
     /** How the reason of a copy that lost to another copy of the same plugin begins. */
     static final String SUPERSEDED = "superseded by";
+    /** Why a plugin the user marked for removal is disabled. */
+    static final String MARKED_FOR_REMOVAL = "marked for removal";
     /** Why safe mode disables a user's plugin. */
     static final String SAFE_MODE = "safe mode";
     /** Why safe mode disables a presentation provider. */

@@ -77,6 +77,8 @@ public final class WindowManager {
             NOT_INSTALLED,
             /** The user turned it off. */
             TURNED_OFF,
+            /** The user marked it for removal at the next launch. */
+            MARKED_FOR_REMOVAL,
             /** It is off because Jasper runs in safe mode. */
             SAFE_MODE,
             /** It waits for the user's review of what it asks to do. */
@@ -880,6 +882,7 @@ public final class WindowManager {
         return switch (state.kind()) {
             case NOT_INSTALLED -> "The plugin " + state.name() + " is not installed.";
             case TURNED_OFF -> state.name() + " is turned off. Turn it on in Manage Plugins and restart Jasper.";
+            case MARKED_FOR_REMOVAL -> state.name() + " is marked for removal in Manage Plugins.";
             case SAFE_MODE -> state.name() + " is off in safe mode. Restart Jasper normally to restore this tab.";
             case NEEDS_CONSENT -> state.name() + " waits for your review in Manage Plugins. Review it there and restart Jasper.";
             case FAILED -> state.name() + " could not start.";

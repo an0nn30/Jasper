@@ -472,6 +472,7 @@ public final class JasperApplication {
                     case RUNNING -> WindowManager.PluginState.Kind.RUNNING;
                     case NEEDS_CONSENT -> WindowManager.PluginState.Kind.NEEDS_CONSENT;
                     case TURNED_OFF -> WindowManager.PluginState.Kind.TURNED_OFF;
+                    case MARKED_FOR_REMOVAL -> WindowManager.PluginState.Kind.MARKED_FOR_REMOVAL;
                     case SAFE_MODE -> WindowManager.PluginState.Kind.SAFE_MODE;
                     case FAILED -> WindowManager.PluginState.Kind.FAILED;
                 }))
@@ -746,8 +747,9 @@ public final class JasperApplication {
      * What the command socket runs (workspace-tabs spec 5.4): no arguments raises or opens a window, as a launch would;
      * a subcommand a plugin declares runs in that plugin; otherwise arguments that all name existing files or folders
      * open as a launch's paths do ({@code commandPaths}), and a call whose first argument names one while others name
-     * nothing says which ({@code missingPaths}). A raise or a path call is answered once it has run. Called on listener
-     * threads.
+     * nothing says which ({@code missingPaths}). A raise or a path call is answered once it has run. A plugin's subcommand
+     * that will run (its plugin has registered its handler) first restores the windows when no main window is open; one
+     * whose plugin does not run answers that it is unavailable and opens no window. Called on listener threads.
      */
     public CommandDispatcher commands() {
         return invocation -> {
@@ -766,8 +768,9 @@ public final class JasperApplication {
                 return CompletableFuture.completedFuture(1);
             }
             // A plugin's subcommand while no main window is open restores the windows first, as every request does (spec
-            // 6.4), so the restore never runs inside the plugin's own call (workspace plan 6b's final review, I1).
-            if (subcommand.test(invocation.arguments().getFirst()))
+            // 6.4), so the restore never runs inside the plugin's own call (workspace plan 6b's final review, I1). Only one
+            // that will run does: a call that answers "unavailable" opens no window (the residual round, item 1).
+            if (!invocation.arguments().isEmpty() && runtime.runsSubcommand(invocation.arguments().getFirst()))
                 return onEventThread(SwingUtilities::invokeLater, this::acceptsRequests, this::restoreForSubcommand)
                     .thenCompose(restored -> runtime.commands().dispatch(invocation));
             return runtime.commands().dispatch(invocation);

@@ -279,6 +279,30 @@ class PluginRuntimeTest {
             assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.SAFE_MODE));
     }
 
+    /**
+     * Workspace plan 6b's residual round, items 3 and 4: outside safe mode, a plugin the user turned off stands as turned off,
+     * never as held back by safe mode, and one marked for removal as that, which a placeholder says without advising to turn
+     * it on. In safe mode the plugin the user turned off is still held back by safe mode.
+     */
+    @Test void aPluginTheUserTurnedOffOrMarkedForRemovalStandsAsThatAndNotAsSafeMode() throws Exception {
+        Path user = root.resolve("user");
+        probe(user, "dev.example.off");
+        probe(user, "dev.example.gone");
+        Files.writeString(root.resolve("plugins.toml"), "version = 1\n"
+            + "[plugins.\"dev.example.off\"]\nenabled = false\nconsented = []\n"
+            + "[plugins.\"dev.example.gone\"]\nenabled = true\nconsented = []\nremove = true\n");
+        PluginRuntime normal = runtime(null, user, null, false, new ArrayList<>());
+        onEdt(() -> normal.start(Map.of(), true));
+        assertThat(normal.standing("dev.example.off")).as("turned off by the user").hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.TURNED_OFF));
+        assertThat(normal.standing("dev.example.gone")).as("marked for removal").hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.MARKED_FOR_REMOVAL));
+        PluginRuntime safe = runtime(null, user, null, true, new ArrayList<>());
+        onEdt(() -> safe.start(Map.of(), true));
+        assertThat(safe.standing("dev.example.off")).as("safe mode holds back every user plugin").hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.SAFE_MODE));
+    }
+
     private static String declaring(String id, String command, String summary) {
         return PluginJars.descriptor(id, "1.0.0", "fix.probe.Main") + "\n[[subcommands]]\nname = \"" + command + "\"\nsummary = \"" + summary + "\"\n";
     }
@@ -302,6 +326,7 @@ class PluginRuntimeTest {
         PluginRuntime runtime = runtime(bundled, user, null, false, new ArrayList<>());
         onEdt(() -> runtime.subcommandList(list));
         assertThat(runtime.declaresSubcommand("alpha")).as("before the plugins start").isFalse();
+        assertThat(runtime.runsSubcommand("alpha")).as("before the plugins start").isFalse();
         onEdt(() -> runtime.start(Map.of(), true));
         assertThat(runtime.statusLines())
             .anySatisfy(line -> assertThat(line).contains("dev.example.alpha", "ACTIVE"))
@@ -312,6 +337,10 @@ class PluginRuntimeTest {
         assertThat(runtime.declaresSubcommand("alpha")).isTrue();
         assertThat(runtime.declaresSubcommand("beta")).as("declared, though its plugin waits for consent").isTrue();
         assertThat(runtime.declaresSubcommand("gamma")).isFalse();
+        // Workspace plan 6b's residual round: only a call whose plugin registered its handler runs, and restores windows first.
+        assertThat(runtime.runsSubcommand("alpha")).as("running, but it never called handle").isFalse();
+        assertThat(runtime.runsSubcommand("beta")).as("its plugin waits for consent").isFalse();
+        assertThat(runtime.runsSubcommand("gamma")).as("declared by none").isFalse();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (!Files.exists(list) && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(dev.jasper.app.commandline.SubcommandList.read(list)).as("--help lists only what runs").containsExactly(

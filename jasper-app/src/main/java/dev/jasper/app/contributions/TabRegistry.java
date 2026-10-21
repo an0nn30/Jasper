@@ -240,8 +240,9 @@ public final class TabRegistry {
     /**
      * Opens a plugin's view in a new tab of {@code owner}'s window, or of the main window when {@code owner} is null or
      * not registered, and shows it (tabs and panes spec 13). A (plugin, key) already open is selected again, and
-     * attached to a window again when it lost its own. While the main window is being composed, a tab for it waits
-     * ({@link #mainOpened}, {@link #mainFailed}).
+     * attached to a window again when it lost its own. Asked for the main window while none is open, it restores the windows
+     * first, so an item that restore brings back under the same (plugin, key) is the one selected, never a second. While
+     * the main window is being composed, a tab for it waits ({@link #mainOpened}, {@link #mainFailed}).
      */
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component) {
         return open(plugin, key, title, owner, component, Placement.NEW_TAB);
@@ -675,12 +676,14 @@ public final class TabRegistry {
             // What gets past the plugin's containment, an Error, takes the item the restorer opened with it, so its saved
             // id is free again (6b Task 1's review).
             slot = null;
+            boolean closed = true;
             if (rebuilding.taken != null) {
-                try { rebuilding.taken.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); }
+                try { rebuilding.taken.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); closed = false; }
             }
             if (failure instanceof RuntimeException || failure instanceof VirtualMachineError) throw failure;
             // Only one plugin's restore failed: its saved tab comes back as a placeholder, the rest of the windows as saved.
-            if (failure.getSuppressed().length > 0) LOG.log(System.Logger.Level.WARNING, "A failed restorer's item did not close", failure);
+            // Only a close that failed is logged: the Error may carry suppressed exceptions of the plugin's own.
+            if (!closed) LOG.log(System.Logger.Level.WARNING, "A failed restorer's item did not close", failure);
             String message = failure.getMessage();
             return new Restored(Optional.empty(), message == null || message.isBlank() ? failure.getClass().getSimpleName() : message);
         } finally {

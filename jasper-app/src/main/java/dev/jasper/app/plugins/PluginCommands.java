@@ -57,6 +57,13 @@ final class PluginCommands implements CommandDispatcher {
     boolean declares(String name) { return table.owner(name).isPresent(); }
 
     /**
+     * Whether a plugin has a handler registered for {@code name} now, so that a call to it runs rather than says its plugin
+     * is off. Any thread: the answer is the registry's at that moment, and a plugin can stop before the call it was asked
+     * for gets there.
+     */
+    boolean answers(String name) { return handlers.containsKey(name); }
+
+    /**
      * Registers a plugin's handler.
      *
      * @return removes it

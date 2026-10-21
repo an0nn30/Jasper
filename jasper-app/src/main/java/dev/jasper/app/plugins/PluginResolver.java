@@ -168,7 +168,7 @@ final class PluginResolver {
         if (!candidate.descriptor().sdk().contains(sdk))
             return PluginStatus.of(candidate, PluginStatus.State.SKIPPED,
                 "needs SDK " + candidate.descriptor().sdk() + "; this is SDK " + sdk);
-        if (entry != null && entry.remove()) return PluginStatus.of(candidate, PluginStatus.State.DISABLED, "marked for removal");
+        if (entry != null && entry.remove()) return PluginStatus.of(candidate, PluginStatus.State.DISABLED, PluginStatus.MARKED_FOR_REMOVAL);
         if (!PluginStateStore.effective(entry, candidate))
             return PluginStatus.of(candidate, PluginStatus.State.DISABLED, entry == null ? "off by default" : "disabled by the user");
         if (candidate.origin() != PluginCandidate.Origin.USER) return null;

@@ -198,13 +198,13 @@ class JasperApplicationWorkspaceTest {
         }
     }
 
-    /**
-     * Workspace-tabs spec 6.4, workspace plan 6b's final review I1: a plugin's subcommand while Jasper is resident with no
-     * window open restores the windows first, then runs. The staged Editor's saved tab for a file comes back in its saved
-     * pane, and {@code jasper editor} for that file selects it: one tab for the file, and no placeholder.
-     */
-    @Test void aPluginsSubcommandWhileNoWindowIsOpenRestoresTheWindowsBeforeItRuns() throws Exception {
-        Path notes = Files.writeString(home.resolve("notes.md"), "# Notes\n");
+    private static final String EDITOR_OFF = "version = 1\n[plugins.\"dev.jasper.editor\"]\nenabled = false\nconsented = []\n";
+
+    /** A saved main window and the id of its Editor tab. */
+    private record SavedEditor(WorkspaceFile.WindowRecord window, dev.jasper.app.layout.TabId document) { }
+
+    /** Saves a main window of a terminal and a split-off Editor tab for {@code notes}, as a previous run left it. */
+    private SavedEditor savedEditorTab(dev.jasper.app.platform.AppDirs dirs, Path notes) throws Exception {
         var shell = dev.jasper.app.layout.TabId.random();
         var document = dev.jasper.app.layout.TabId.random();
         var one = dev.jasper.app.layout.Layout.of(shell);
@@ -213,11 +213,16 @@ class JasperApplicationWorkspaceTest {
             dev.jasper.app.layout.ParentTabs.of(tab), java.util.Map.of(shell, new WorkspaceFile.TabRecord.Terminal("", home.toString(), ""),
                 document, new WorkspaceFile.TabRecord.Content("notes.md", "dev.jasper.editor", "document",
                     java.util.Map.of("key", "local:" + notes))));
-        var dirs = new dev.jasper.app.platform.AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
         WorkspaceFile.write(dirs.workspaceState(), new WorkspaceFile.Snapshot(List.of(saved)));
+        return new SavedEditor(saved, document);
+    }
+
+    private dev.jasper.app.platform.AppDirs dirs() { return new dev.jasper.app.platform.AppDirs(home, home.resolve("config.toml"), home.resolve("logs")); }
+
+    /** A resident application whose only plugin is the staged Editor, started in {@code dirs}; {@code terminated} counts down when its process would end. */
+    private JasperApplication withEditor(dev.jasper.app.platform.AppDirs dirs, CountDownLatch terminated) throws Exception {
         Path editor = Path.of(System.getProperty("jasper.stagedPlugins")).resolve("dev.jasper.editor");
         JasperApplication[] held = new JasperApplication[1];
-        var terminated = new CountDownLatch(1);
         edt(() -> {
             held[0] = new JasperApplication(null, DesktopTestSupport.idleLauncher(pending), new CommandHistory(), null, terminated::countDown);
             held[0].frames = window -> new WindowShell(() -> { }, () -> { }, () -> { }, () -> { }, () -> null,
@@ -225,28 +230,126 @@ class JasperApplicationWorkspaceTest {
             held[0].residency(true);
             held[0].startPlugins(null, editor, false, dirs);
         });
-        JasperApplication application = held[0];
+        return held[0];
+    }
+
+    /** Quits {@code application}; the plugins' shutdown writes their state into the temporary home, and ends before the process does. */
+    private static void quitAndAwait(JasperApplication application, CountDownLatch terminated) throws Exception {
+        edt(application::quitNow);
+        assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+    }
+
+    private static dev.jasper.app.commandline.Invocation editorCall(Path home, StringBuilder err) {
+        return new dev.jasper.app.commandline.Invocation(List.of("editor", "notes.md"), home, java.util.Optional.empty(), text -> { }, err::append);
+    }
+
+    /**
+     * Workspace-tabs spec 6.4, workspace plan 6b's final review I1: a plugin's subcommand while Jasper is resident with no
+     * window open restores the windows first, then runs. The staged Editor's saved tab for a file comes back in its saved
+     * pane, and {@code jasper editor} for that file selects it: one tab for the file, and no placeholder.
+     */
+    @Test void aPluginsSubcommandWhileNoWindowIsOpenRestoresTheWindowsBeforeItRuns() throws Exception {
+        Path notes = Files.writeString(home.resolve("notes.md"), "# Notes\n");
+        var dirs = dirs();
+        var saved = savedEditorTab(dirs, notes);
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = withEditor(dirs, terminated);
         try {
             edt(() -> assertThat(application.windows().isEmpty()).as("resident, no window open").isTrue());
             var err = new StringBuilder();
-            var exit = application.commands().dispatch(new dev.jasper.app.commandline.Invocation(List.of("editor", "notes.md"), home,
-                java.util.Optional.empty(), text -> { }, err::append));
+            var exit = application.commands().dispatch(editorCall(home, err));
             assertThat(exit.toCompletableFuture().get(10, TimeUnit.SECONDS)).as("exit code; %s", err).isZero();
             edt(() -> {
                 MainWindow main = application.windows().main().orElseThrow(() -> new AssertionError("the main window was restored"));
                 var tabs = application.contributions().tabs();
                 assertThat(tabs.tabs()).as("no placeholder").noneMatch(item -> item.kind() == dev.jasper.app.contributions.Tab.Kind.PLACEHOLDER);
                 assertThat(tabs.hosted()).as("one Editor tab for the file: the saved one").singleElement().satisfies(item -> {
-                    assertThat(item.id()).isEqualTo(document);
+                    assertThat(item.id()).isEqualTo(saved.document());
                     assertThat(item.window()).isEqualTo(main.id());
                 });
-                assertThat(main.content().windowLayout()).as("in its saved tab and pane").isEqualTo(saved.layout());
+                assertThat(main.content().windowLayout()).as("in its saved tab and pane").isEqualTo(saved.window().layout());
             });
             launch();
         } finally {
-            edt(application::quitNow);
-            // The plugins' shutdown writes their state into the temporary home; it ends before the process does.
-            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+            quitAndAwait(application, terminated);
+        }
+    }
+
+    /**
+     * Workspace plan 6b's residual round, item 1: a subcommand whose plugin does not run answers that it is unavailable and
+     * opens no window; only a call that will run restores the windows first.
+     */
+    @Test void aSubcommandWhosePluginDoesNotRunOpensNoWindow() throws Exception {
+        Path notes = Files.writeString(home.resolve("notes.md"), "# Notes\n");
+        var dirs = dirs();
+        savedEditorTab(dirs, notes);
+        Files.writeString(dirs.pluginState(), EDITOR_OFF);
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = withEditor(dirs, terminated);
+        try {
+            var err = new StringBuilder();
+            var exit = application.commands().dispatch(editorCall(home, err));
+            assertThat(exit.toCompletableFuture().get(10, TimeUnit.SECONDS)).as("exit code").isEqualTo(1);
+            assertThat(err.toString()).isEqualTo("jasper: editor is unavailable (the Editor plugin is off)\n");
+            edt(() -> assertThat(application.windows().isEmpty()).as("no window opened for a call that does not run").isTrue());
+        } finally {
+            quitAndAwait(application, terminated);
+        }
+    }
+
+    /**
+     * Workspace plan 6b's residual round, item 2a: a subcommand that reaches an application that is quitting fails with the
+     * message every request after quit gets, and restores nothing.
+     */
+    @Test void aPluginsSubcommandWhileTheApplicationQuitsFailsAndRestoresNothing() throws Exception {
+        Path notes = Files.writeString(home.resolve("notes.md"), "# Notes\n");
+        var dirs = dirs();
+        savedEditorTab(dirs, notes);
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = withEditor(dirs, terminated);
+        java.util.concurrent.CompletionStage<Integer>[] call = new java.util.concurrent.CompletionStage[1];
+        var err = new StringBuilder();
+        // One turn of the event thread: the quit has begun (its shutdown is queued first), the plugins have not stopped yet.
+        edt(() -> {
+            application.quitNow();
+            call[0] = application.commands().dispatch(editorCall(home, err));
+        });
+        assertThat(terminated.await(10, TimeUnit.SECONDS)).as("the process ended").isTrue();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> call[0].toCompletableFuture().get(10, TimeUnit.SECONDS))
+            .hasRootCauseInstanceOf(IllegalStateException.class).hasRootCauseMessage("Jasper is quitting; run the command again");
+        edt(() -> assertThat(application.windows().isEmpty()).as("nothing was restored").isTrue());
+        assertThat(err.toString()).isEmpty();
+    }
+
+    /**
+     * Workspace plan 6b's residual round, item 2b: with the main window open a subcommand restores nothing. The window is
+     * the one that was open, and no frame is made for another.
+     */
+    @Test void aPluginsSubcommandWithTheMainWindowOpenRestoresNothing() throws Exception {
+        Files.writeString(home.resolve("notes.md"), "# Notes\n");
+        var dirs = dirs();
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = withEditor(dirs, terminated);
+        int[] frames = {0};
+        edt(() -> {
+            var making = application.frames;
+            application.frames = window -> { frames[0]++; return making.apply(window); };
+        });
+        try {
+            MainWindow[] main = new MainWindow[1];
+            edt(() -> main[0] = application.openFirstWindow(List.of()).orElseThrow());
+            launch();
+            assertThat(frames[0]).as("the main window's frame").isEqualTo(1);
+            var err = new StringBuilder();
+            var exit = application.commands().dispatch(editorCall(home, err));
+            assertThat(exit.toCompletableFuture().get(10, TimeUnit.SECONDS)).as("exit code; %s", err).isZero();
+            edt(() -> {
+                assertThat(application.windows().windows()).as("the window count is unchanged").containsExactly(main[0]);
+                assertThat(application.windows().main().orElseThrow()).as("the same main window").isSameAs(main[0]);
+            });
+            assertThat(frames[0]).as("no frame for another window").isEqualTo(1);
+        } finally {
+            quitAndAwait(application, terminated);
         }
     }
 

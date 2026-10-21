@@ -628,6 +628,63 @@ class TabRegistryTest {
         assertThat(registry.restoring(main)).as("the restore ended").isFalse();
     }
 
+    /** What {@link TabRegistry} logs while {@code action} runs. */
+    private static List<java.util.logging.LogRecord> logged(Runnable action) {
+        var logger = java.util.logging.Logger.getLogger(TabRegistry.class.getName());
+        var records = new ArrayList<java.util.logging.LogRecord>();
+        var handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        boolean parents = logger.getUseParentHandlers();
+        logger.setUseParentHandlers(false);
+        logger.addHandler(handler);
+        try {
+            action.run();
+        } finally {
+            logger.removeHandler(handler);
+            logger.setUseParentHandlers(parents);
+        }
+        return records;
+    }
+
+    /**
+     * Workspace plan 6b's residual round, item 5: an Error a restorer lets out costs only its tab, and the warning that its
+     * item did not close is for a close that failed, not for exceptions the plugin's own Error already carried.
+     */
+    @Test void aRestorersErrorWarnsThatItsItemDidNotCloseOnlyWhenClosingItFailed() {
+        hosts();
+        var state = new dev.jasper.app.layout.TabRestore("broken", Map.of());
+        Tab[] opened = new Tab[1];
+        boolean[] closeFails = {false};
+        registry.restorer("plugin.notes", "broken", restoring -> {
+            opened[0] = registry.open("plugin.notes", "broken", restoring.title(), null, new JPanel());
+            if (closeFails[0]) opened[0].onClosed(() -> { throw new IllegalStateException("close failed"); });
+            var failure = new AssertionError("the index is broken");
+            failure.addSuppressed(new IllegalStateException("the plugin's own earlier failure"));
+            throw failure;
+        });
+        TabRegistry.Restored[] restored = new TabRegistry.Restored[1];
+
+        var quiet = logged(() -> restored[0] = registry.restore(TabId.random(), "plugin.notes", new TabRegistry.Restoring(main, "Broken", state)));
+        assertThat(restored[0].tab()).isEmpty();
+        assertThat(restored[0].problem()).isEqualTo("the index is broken");
+        assertThat(opened[0].closed()).as("its item closed").isTrue();
+        assertThat(quiet).as("the close succeeded: nothing did not close").isEmpty();
+
+        closeFails[0] = true;
+        var warned = logged(() -> restored[0] = registry.restore(TabId.random(), "plugin.notes", new TabRegistry.Restoring(main, "Broken", state)));
+        assertThat(restored[0].problem()).as("still only its tab").isEqualTo("the index is broken");
+        assertThat(opened[0].closed()).isTrue();
+        assertThat(warned).as("the close failed: logged").singleElement().satisfies(record -> {
+            assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+            assertThat(record.getMessage()).isEqualTo("A failed restorer's item did not close");
+            assertThat(record.getThrown().getSuppressed()).extracting(Throwable::getMessage)
+                .contains("the plugin's own earlier failure", "close failed");
+        });
+    }
+
     @Test void aHostedTabHasAnIdItsKindAndItsContent() {
         hosts();
         var panel = new JPanel();
