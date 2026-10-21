@@ -32,12 +32,13 @@ final class ClassicToolbarButton extends JButton {
     private java.util.function.Supplier<String> tooltip;
 
     ClassicToolbarButton(Action action, String label, boolean caret, Icon icon) {
-        super(action);
         this.caret = caret; this.icon = icon;
+        // A plugin's label is plain text: html.disable first, as the UI reads it only when the text changes.
+        putClientProperty("html.disable", true);
         setHideActionText(true);
+        setAction(action);
         setText(label);
         putClientProperty("label", label);
-        putClientProperty("html.disable", true);
         setFocusable(false); setRolloverEnabled(true); setOpaque(false); setContentAreaFilled(false); setBorderPainted(false);
         setToolTipText(label);
         getAccessibleContext().setAccessibleName(label);
@@ -54,6 +55,8 @@ final class ClassicToolbarButton extends JButton {
     void tooltip(java.util.function.Supplier<String> source) { tooltip = source; }
 
     @Override public String getToolTipText() { return tooltip != null ? tooltip.get() : super.getToolTipText(); }
+
+    @Override public javax.swing.JToolTip createToolTip() { return PlainText.plain(super.createToolTip()); }
 
     /** Whether the button ends in a ▼ (a dropdown). */
     boolean caret() { return caret; }

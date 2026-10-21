@@ -288,6 +288,7 @@ class ClassicTabsTest {
                     .isEqualTo(entry.getFontMetrics(entry.getFont()).stringWidth(WindowTabs.capped(title)));
                 var item = (JMenuItem) strip.tabList().getComponent(0);
                 assertThat(item.getText()).hasSizeLessThanOrEqualTo(201).startsWith("<html><img").endsWith("\u2026");
+                assertThat(item.getClientProperty(BasicHTML.propertyKey)).as("the tab list renders the title literally").isNull();
                 owner.currentTerminal().rename("short");
                 owner.update();
                 String shortcut = owner.tabShortcut(0);

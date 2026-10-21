@@ -295,10 +295,7 @@ final class WindowToolbar extends JToolBar {
     }
 
     static JMenuItem menuItem(Action action) {
-        JMenuItem item = action.getValue(Action.SELECTED_KEY) instanceof Boolean
-            ? new JCheckBoxMenuItem(action) : new JMenuItem(action);
-        item.putClientProperty("html.disable", true);
-        return item;
+        return action.getValue(Action.SELECTED_KEY) instanceof Boolean ? PlainText.checkBox(action) : PlainText.item(action);
     }
 
     JPopupMenu overflowMenu() {

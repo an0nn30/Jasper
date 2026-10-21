@@ -200,6 +200,8 @@ final class Buttons {
         ThemePainting.Focus focus;
         KitButton(KitContext context) {
             this.context = context;
+            // Plain text: html.disable before any text, as the UI reads it only when the text changes.
+            putClientProperty("html.disable", true);
             // Leaving the view (this button or an ancestor removed) erases the drop the view painted for it.
             addHierarchyListener(event -> {
                 if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.PARENT_CHANGED) == 0) return;

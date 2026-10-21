@@ -27,9 +27,7 @@ import java.util.Optional;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
 import javax.swing.Icon;
-import javax.swing.JButton;
 import javax.swing.JSeparator;
-import javax.swing.JToggleButton;
 import javax.swing.UIManager;
 
 /**
@@ -141,7 +139,7 @@ final class ToolStripe extends DockStripe {
     }
 
     private AbstractButton toggle(Button window) {
-        var button = new JToggleButton();
+        var button = PlainText.toggle();
         style(button);
         decorate(button, window);
         button.setSelected(window.selected());
@@ -184,7 +182,8 @@ final class ToolStripe extends DockStripe {
     }
 
     private AbstractButton action(Action action) {
-        var button = new JButton(action);
+        var button = PlainText.button();
+        button.setAction(action);
         Icon icon = actionIcon(action);
         style(button);
         button.setIcon(icon);

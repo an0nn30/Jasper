@@ -63,6 +63,7 @@ final class ToolWindowHeader extends JPanel {
             // A header strip's word detail ("Mac") is in the label face; a count keeps the count face (the mock).
             setFont(ThemeZone.font(flush && presentation != null && !presentation.detail().matches("\\d+") ? Typography.Role.LABEL : Typography.Role.COUNT));
         }
+        @Override public javax.swing.JToolTip createToolTip() { return PlainText.plain(super.createToolTip()); }
         @Override public java.awt.Color getForeground() {
             // A header strip's detail is muted, and a count (a parenthesised number) more so (spec 10.7).
             if (flush && painter != null) return painter.headerDetail(ThemeZone.theme(this), focused, presentation.detail().matches("\\d+"));
@@ -237,7 +238,7 @@ final class ToolWindowHeader extends JPanel {
             var action = state.actions().get(i);
             if (i == actionButtons.size()) {
                 int index = i;
-                var button = new JButton();
+                var button = PlainText.button();
                 NativeStyles.installed().button(button, () -> ThemeZone.theme(button));
                 button.addActionListener(event -> {
                     if (index < presentation.actions().size()) presentation.actions().get(index).invoke().run();

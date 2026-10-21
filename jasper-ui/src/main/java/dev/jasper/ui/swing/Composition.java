@@ -116,6 +116,13 @@ final class Composition {
             setOpaque(false);
         }
 
+        @Override
+        public JToolTip createToolTip() {
+            var tip = super.createToolTip();
+            tip.putClientProperty("html.disable", true);
+            return tip;
+        }
+
         void text(String value) {
             text = value;
             getAccessibleContext().setAccessibleName(value);

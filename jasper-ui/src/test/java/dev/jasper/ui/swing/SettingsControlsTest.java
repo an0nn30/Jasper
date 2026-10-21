@@ -138,6 +138,17 @@ class SettingsControlsTest {
             assertThat(find(view,"themes.option.dark",JButton.class)).isSameAs(button);
         }
     }); }
+    @Test void aPreviewTilesTooltipIsPlainText() { Edt.run(() -> {
+        var palette = new Option.Palette(0xff111111,0xff222222,0xff333333,0xffdddddd,0xff5588ee);
+        var options = List.of(new Option("dark","Dark",Optional.empty(),"","<html><b>x</b>",Optional.of(new Option.Preview(palette,Optional.empty()))));
+        var choice = new Nodes.Choice("themes",ControlState.READY,Nodes.ChoiceKind.PREVIEWS,options,"dark","Appearance policy","");
+        try (var view = new KitView(dev.jasper.ui.testsupport.KitFixtures.context(),new ViewSpec(choice),e -> {})) {
+            var tile = find(view,"themes.option.dark",JButton.class);
+            var tip = tile.createToolTip(); tip.setTipText(tile.getToolTipText());
+            assertThat(tip.getTipText()).isEqualTo("<html><b>x</b>");
+            assertThat(tip.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).as("a plugin's option description builds no HTML view").isNull();
+        }
+    }); }
     @Test void flatLafChoicePaddingDoesNotAddASecondRendererInset() { Edt.run(() -> {
         Object before=UIManager.get("ComboBox.padding");UIManager.put("ComboBox.padding",new java.awt.Insets(2,6,2,6));
         try {

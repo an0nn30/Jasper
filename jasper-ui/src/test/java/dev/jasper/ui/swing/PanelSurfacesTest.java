@@ -214,6 +214,20 @@ class PanelSurfacesTest {
         });
     }
 
+    @Test void aFormRowCaptionsTooltipIsPlainText() {
+        Edt.run(() -> {
+            var ctx = KitFixtures.context();
+            var row = new FormRow("row", READY, "Forward To", "<html><b>x</b>",
+                new Field("host", READY, FieldKind.TEXT, "localhost", "", "Target host", ""), Optional.empty());
+            try (var view = new KitView(ctx, new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(row))), e -> {})) {
+                var caption = find(view, "row.caption", JComponent.class);
+                var tip = caption.createToolTip(); tip.setTipText(caption.getToolTipText());
+                assertThat(tip.getTipText()).isEqualTo("<html><b>x</b>");
+                assertThat(tip.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).as("a plugin's caption builds no HTML view").isNull();
+            } finally { release(ctx); }
+        });
+    }
+
     @Test void aFormRowCaptionIsOneLineShortenedAtItsEnd() {
         Edt.run(() -> {
             var ctx = KitFixtures.context();
