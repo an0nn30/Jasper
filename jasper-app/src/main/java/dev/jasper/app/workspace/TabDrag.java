@@ -140,12 +140,17 @@ final class TabDrag {
      */
     Supplier<List<Rectangle>> otherWindows = this::auxiliaryFrames;
     private final KeyEventDispatcher escape = this::dispatchKeyEvent;
+    /** After Esc ended a drag: the rest of that keystroke ({@link #escapeRest}). */
+    private final KeyEventDispatcher escapeRest = this::escapeRest;
     private final AWTEventListener lostRelease = this::lostRelease;
     /** The focus manager the Esc dispatcher went to, while a drag runs. */
     private KeyboardFocusManager keys;
+    /** The focus manager {@link #escapeRest} went to, until Esc's release or the next other key. */
+    private KeyboardFocusManager restKeys;
     /**
-     * While a press is pending or a drag runs: the drag's window; the dragged tab; the item its entry shows; the
-     * component the press reached; the press on screen.
+     * While a press is pending or a drag runs: the drag's window; the dragged tab, or the tab of a pane drag's item;
+     * the item its entry shows, or the item whose pane a pane drag carries; the component the press reached; the press
+     * on screen.
      */
     private WindowContent from;
     private ParentTabId parentTab;
@@ -187,7 +192,7 @@ final class TabDrag {
     /** @return whether a drag runs: from the threshold to its release or its end */
     boolean active() { return dragging; }
 
-    /** @return the item the dragged tab's entry shows, while a drag runs; else null */
+    /** @return while a drag runs, the item the dragged tab's entry shows or whose pane it carries; else null */
     Tab dragged() { return dragging ? tab : null; }
 
     /** @return the dragged tab while a drag runs, else null */
@@ -196,7 +201,7 @@ final class TabDrag {
     /** @return whether a running drag carries a pane (tabs and panes spec 7) */
     boolean movingPane() { return dragging && pane; }
 
-    /** @return where a release would put the tab now */
+    /** @return where a release would put the dragged tab or pane now */
     Optional<Target> target() { return target; }
 
     DockDropOverlay overlay() { return overlay; }
@@ -241,8 +246,10 @@ final class TabDrag {
             : InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
         int keys = event.getModifiersEx() & KEYS;
         // macOS reports the right Option key as AltGraph; it has no AltGr of its own, so either Option counts.
-        if (macOs && (keys & InputEvent.ALT_GRAPH_DOWN_MASK) != 0) keys = keys & ~InputEvent.ALT_GRAPH_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
-        return SwingUtilities.isLeftMouseButton(event) && keys == modifier;
+        if (macOs && (keys & InputEvent.ALT_GRAPH_DOWN_MASK) != 0)
+            keys = (keys & ~InputEvent.ALT_GRAPH_DOWN_MASK) | InputEvent.ALT_DOWN_MASK;
+        // The left button's own press or click: another button's, the left one held, is none.
+        return event.getButton() == MouseEvent.BUTTON1 && keys == modifier;
     }
 
     /**
@@ -292,7 +299,8 @@ final class TabDrag {
 
     /**
      * The left button's release on the pressed component: a running drag drops where its target says. The label and the
-     * landing go whatever happens.
+     * landing go whatever happens. The window the drop is for keeps the tab a pane drag showed there while the drop
+     * shows the item there; after a drop that does nothing or fails, the tab that showed before shows again.
      */
     void released(MouseEvent event) {
         if (tab == null || event.getComponent() != source || event.getButton() != MouseEvent.BUTTON1) return;
@@ -304,13 +312,42 @@ final class TabDrag {
         WindowContent home = from;
         ParentTabId parent = parentTab;
         Optional<Target> where = Optional.empty();
+        WindowContent kept = null;
+        ParentTabId before = null;
         try {
             update(screen(event));
             where = target;
+            kept = where.map(TabDrag::window).orElse(null);
+            before = hovered.get(kept);
         } finally {
-            finish(where.map(TabDrag::window).orElse(null));
+            finish(kept);
         }
-        where.ifPresent(place -> drop(moving, home, parent, place));
+        if (where.isEmpty()) return;
+        try {
+            drop(moving, home, parent, where.get());
+        } catch (RuntimeException | Error failure) {
+            try {
+                unhover(kept, before, home, moving);
+            } catch (RuntimeException | Error late) {
+                // The drop's own failure stays the one that propagates.
+                failure.addSuppressed(late);
+            }
+            throw failure;
+        }
+        unhover(kept, before, home, moving);
+    }
+
+    /**
+     * After a drop for {@code window}, whose tab {@code before} showed there before a pane drag showed another (tabs
+     * and panes spec 13): unless the drop landed {@code moving} in the window's shown tab, {@code before} shows again,
+     * its active item focused in {@code home}, the drag's own window, as {@link #restore} shows it. Nothing for a
+     * window the drag showed no other tab of, or one that closed.
+     */
+    private static void unhover(WindowContent window, ParentTabId before, WindowContent home, Tab moving) {
+        if (window == null || before == null || window.closed()) return;
+        if (window.parentTabOf(moving).filter(window.activeParentTab()::equals).isPresent()) return;
+        if (window == home) window.selectParentTab(before);
+        else window.parentTabs().select(before);
     }
 
     /** Ends a running drag or a pending press without a drop. */
@@ -321,11 +358,43 @@ final class TabDrag {
         if (window != null && from == window) cancel();
     }
 
-    /** While a drag runs it owns Esc, wherever the focus is: Esc ends it. */
+    /**
+     * While a drag runs it owns Esc, wherever the focus is: Esc ends it, and the rest of that keystroke reaches no
+     * component either ({@link #escapeRest}).
+     */
     boolean dispatchKeyEvent(KeyEvent event) {
         if (!dragging || event.getKeyCode() != KeyEvent.VK_ESCAPE) return false;
-        if (event.getID() == KeyEvent.KEY_PRESSED) cancel();
+        if (event.getID() == KeyEvent.KEY_PRESSED) {
+            // Taken before the drag ends, so that whatever ending it throws, the rest of the keystroke is still taken.
+            endEscape();
+            restKeys = keys;
+            restKeys.addKeyEventDispatcher(escapeRest);
+            cancel();
+        }
         return true;
+    }
+
+    /**
+     * The rest of the Esc keystroke that ended a drag (workspace plan 8c's final review): its typed ESC, which a
+     * terminal writes to its program while Ctrl is down, its repeats and its release reach no component; the modifier's
+     * own keys pass. Esc's release ends it, or, when that release went elsewhere (the focus moved away), the next other
+     * key.
+     */
+    private boolean escapeRest(KeyEvent event) {
+        int code = event.getKeyCode();
+        if (code == KeyEvent.VK_SHIFT || code == KeyEvent.VK_CONTROL || code == KeyEvent.VK_ALT
+            || code == KeyEvent.VK_META || code == KeyEvent.VK_ALT_GRAPH) return false;
+        boolean escape = event.getID() == KeyEvent.KEY_TYPED ? event.getKeyChar() == '\u001b'
+            : code == KeyEvent.VK_ESCAPE;
+        if (!escape || event.getID() == KeyEvent.KEY_RELEASED) endEscape();
+        return escape;
+    }
+
+    /** The Esc keystroke that ended a drag is over: nothing claims a key any more. */
+    private void endEscape() {
+        if (restKeys == null) return;
+        restKeys.removeKeyEventDispatcher(escapeRest);
+        restKeys = null;
     }
 
     /**
@@ -408,6 +477,8 @@ final class TabDrag {
     /** Starts the drag: what ends it is in place before anything shows, so {@link #finish} can always take it away. */
     private void start(Point at) {
         dragging = true;
+        // An earlier drag's Esc whose release went elsewhere claims no key of this drag's.
+        endEscape();
         keys = KeyboardFocusManager.getCurrentKeyboardFocusManager();
         keys.addKeyEventDispatcher(escape);
         Toolkit.getDefaultToolkit().addAWTEventListener(lostRelease, AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
@@ -514,8 +585,12 @@ final class TabDrag {
                 return window != from || from.mayMoveToNewTab(tab) ? Optional.of(new Target.NewTab(window, place.getAsInt())) : Optional.empty();
             List<Rectangle> entries = window.tabBar().tabBounds();
             List<Tab> listed = parents.bar().tabs();
-            for (int i = 0; i < Math.min(entries.size(), listed.size()); i++)
-                if (entries.get(i).contains(inStrip)) hover(window, parents.bar().id(listed.get(i)));
+            // The point is on the strip, so an entry's x range alone counts: the row below the entries is theirs.
+            for (int i = 0; i < Math.min(entries.size(), listed.size()); i++) {
+                Rectangle entry = entries.get(i);
+                if (inStrip.x >= entry.x && inStrip.x < entry.x + entry.width)
+                    hover(window, parents.bar().id(listed.get(i)));
+            }
             return Optional.empty();
         }
         WorkspaceView workspace = parents.active();
@@ -544,7 +619,7 @@ final class TabDrag {
 
     /**
      * Each window a pane drag showed another tab of shows the tab that showed before (tabs and panes spec 13; workspace
-     * plan 8c Rulings 5), except {@code kept}, the window its drop lands in, which shows what the drop shows; in
+     * plan 8c Rulings 5), except {@code kept}, the window its drop is for, which shows what the drop shows; in
      * {@code home}, the drag's own window, that tab's active item takes the focus again. A tab gone meanwhile stays gone.
      */
     private void restore(WindowContent home, WindowContent kept) {
@@ -636,7 +711,7 @@ final class TabDrag {
 
     /**
      * As {@link #finish()}; the windows a pane drag showed another tab of show the tab that showed before, except
-     * {@code kept}, the window the drop lands in (tabs and panes spec 13).
+     * {@code kept}, the window the drop is for (tabs and panes spec 13).
      */
     private void finish(WindowContent kept) {
         boolean wasDragging = dragging;

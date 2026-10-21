@@ -2,16 +2,25 @@
 
 **Status: executed on 2026-10-20** (`107b7eb55..5ec032b5b`); see `docs/STATUS.md`. Written against
 `claude/workspace-tabs` at `c1540b4e9` ("Docs: workspace tabs plan 8a, tabs hold panes"; its code is `2d7233474`'s) with
-plan 8a's committed text and then plan 8b's text applied on top (see Workspace). Record every deviation from this text
-here and in `docs/STATUS.md`. Amendment 1 (2026-10-20, from plan 8b's final review, I2; the controller's ruling): a pane
-moving between tabs of its window is announced once, where it lands, and one that fails to land goes back where it was
-(Rulings 17; Tasks 2 and 3). Its case for plan 8b's Move Pane to New Tab is Task 2's, with the hold, because that
-command announces its old tab's next pane before this plan: that RED exists before Task 3. Deviations from the plan's
-text: (1) amendment 1, above; no other: Tasks 1-3 ran their text verbatim. Known: a Cmd+Option-click (Ctrl+Alt-click on
-Linux and Windows) starts the pane gesture, so it no longer opens a link or reaches a program that reads the mouse, and
-Cmd-click, Ctrl-click and Alt-drag keep their meanings; on Windows only the left Alt counts, since Java reports the
-right one as AltGraph; a move to another window that fails lands its item in a new tab of its old window (the registry's
-recovery), and nothing closes.
+plan 8a's committed text and then plan 8b's text applied on top (see Workspace). Amendment 1 (2026-10-20, from plan 8b's
+final review, I2; the controller's ruling): a pane moving between tabs of its window is announced once, where it lands,
+and one that fails to land goes back where it was (Rulings 17; Tasks 2 and 3). Its case for plan 8b's Move Pane to New
+Tab is Task 2's, with the hold, because that command announces its old tab's next pane before this plan: that RED exists
+before Task 3. Deviations from the plan's text: (1) amendment 1, above; Tasks 1-3 ran their text verbatim. (2) The
+final-review fix wave: the Esc keystroke that ends a drag is swallowed whole, its typed ESC and its release too, so
+Ctrl+Alt+Esc sends a terminal nothing; a pane press is the left button's own (`getButton`, as `SwingUtilities` already
+reads a press on JBR 25), so a second button's press mid-drag ends the drag and starts none; a modifier press focuses
+its pane; a drop that does nothing or fails shows the earlier tab again; each restore of a failed move runs on its own;
+the classic strip has no dead zones (a divider is the place between its tabs, and the row below them theirs); the new
+pins (Esc's whole keystroke, a second button mid-drag, the window's keymap through `paneClicks`, Cmd+Option+Ctrl and
+Ctrl+Alt+Meta, an item being closed, a move into another window raising it and focusing the item, focus loss and a lost
+release mid-hover, a failed move to another window, odd and narrow entries, a full window's only pane into a new tab,
+one `TAB_MOVED` for the empty workspace, `atOnce` after a throw). Known: a Cmd+Option-click (Ctrl+Alt-click on Linux and
+Windows) starts the pane gesture, so it no longer opens a link or reaches a program that reads the mouse, and Cmd-click,
+Ctrl-click and Alt-drag keep their meanings; on Windows only the left Alt counts, since Java reports the right one as
+AltGraph; a move to another window that fails lands its item in a new tab of its old window (the registry's recovery),
+and nothing closes; a Cmd+Option-click (Ctrl+Alt-click) whose keys are let go before the button reaches the item as a
+plain click, which can select a row, sort a column or toggle a fold.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

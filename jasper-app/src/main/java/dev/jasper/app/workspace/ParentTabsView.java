@@ -244,13 +244,20 @@ final class ParentTabsView extends JPanel {
 
     /**
      * Takes back a pane move whose landing failed (workspace plan 8c Rulings 17): {@code to}, when it was to take the pane,
-     * and {@code from} return to the layouts they had, {@code from} holding {@code tab} again, so nothing closes. A
-     * failure of that is suppressed under {@code failure}, which the caller rethrows.
+     * and {@code from} return to the layouts they had, {@code from} holding {@code tab} again, so nothing closes. Each
+     * goes back whatever the other's throws; a failure of either is suppressed under {@code failure}, which the caller
+     * rethrows.
      */
     private static void undo(Throwable failure, Tab tab, WorkspaceView from, Layout fromBefore, WorkspaceView to,
                              Layout toBefore) {
+        if (to != null) {
+            try {
+                to.restore(tab, toBefore);
+            } catch (RuntimeException | Error undone) {
+                failure.addSuppressed(undone);
+            }
+        }
         try {
-            if (to != null) to.restore(tab, toBefore);
             from.restore(tab, fromBefore);
         } catch (RuntimeException | Error undone) {
             failure.addSuppressed(undone);

@@ -73,7 +73,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * A left press on a pane's item makes its pane the active one, a view that takes no focus too (tabs and panes spec 5;
      * workspace plan 8a Rulings 21). With the pane drag's modifier ({@link TabDrag#movesPane}) the press and its click are
      * the pane drag's (spec 7; workspace plan 8c Rulings 2): consumed before the item hears them, the press handing the
-     * drag its gesture.
+     * drag its gesture and focusing the item, as any press would, its pane already the active one or not (Rulings 14).
      */
     private final AWTEventListener paneClicks = event -> {
         if (closed() || !(event instanceof MouseEvent press) || !SwingUtilities.isLeftMouseButton(press)
@@ -88,7 +88,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 // A dock drag still running lost its release: it ends first, as a press on a strip's entry ends it.
                 dockDrag().cancel();
                 tabDrag().pressedPane(this, tab, press);
+                // The item hears no press that would focus it: the window does.
+                if (tab != selectedTab()) selectTab(tab);
+                else focusSelected();
             }
+            return;
         }
         if (id == MouseEvent.MOUSE_PRESSED && tab != selectedTab()) selectTab(tab);
     };

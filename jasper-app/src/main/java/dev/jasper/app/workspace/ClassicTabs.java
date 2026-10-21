@@ -101,11 +101,19 @@ final class ClassicTabs extends JPanel implements TabStrip {
     @Override public List<Rectangle> tabBounds() { return entries.stream().map(Entry::getBounds).toList(); }
 
     @Override public OptionalInt newTabPlace(Point point) {
-        if (!new Rectangle(getSize()).contains(point)) return OptionalInt.empty();
+        // The caller found the point on the strip, so its x alone counts: a divider and the row below the tabs too.
+        if (point.x < 0 || point.x >= getWidth()) return OptionalInt.empty();
         int end = entries.isEmpty() ? 0 : entries.getLast().getX() + entries.getLast().getWidth();
         // The "+" and the room after the last tab; a crowded strip's "+" stands over the tabs it clips.
         if (point.x >= (add.covering ? add.getX() : end)) return OptionalInt.of(entries.size());
-        return WorkspaceDropResolver.newTabPlace(point, tabBounds());
+        for (int i = 0; i < entries.size(); i++) {
+            Rectangle entry = entries.get(i).getBounds();
+            // The divider before a tab is the place before it.
+            if (point.x < entry.x) return OptionalInt.of(i);
+            if (point.x < entry.x + entry.width)
+                return WorkspaceDropResolver.newTabPlace(new Point(point.x, entry.y), tabBounds());
+        }
+        return OptionalInt.of(entries.size());
     }
 
     List<Entry> entries() { return List.copyOf(entries); }

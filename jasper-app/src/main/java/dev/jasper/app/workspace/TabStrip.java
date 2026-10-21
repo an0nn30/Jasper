@@ -31,8 +31,9 @@ sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs 
     /**
      * Where a dragged pane at {@code point}, in this strip's coordinates, becomes a new tab (tabs and panes spec 7;
      * workspace plan 8c Rulings 3): an entry's leading quarter is the place before it and its trailing quarter the place
-     * after it, and under the classic tabs the "+" and the room after the last entry are the end; empty over an entry's
-     * middle half, which shows its tab, and off the strip.
+     * after it, and under the classic tabs the "+" and the room after the last entry are the end, and a divider the
+     * place between the entries either side of it; empty over an entry's middle half, which shows its tab, and off the
+     * strip. The caller passes a point it found on the strip, of which the classic tabs read the x alone.
      */
     OptionalInt newTabPlace(Point point);
     /** Releases the tabs. */

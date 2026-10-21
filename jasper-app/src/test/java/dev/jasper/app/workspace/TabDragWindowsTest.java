@@ -59,6 +59,8 @@ class TabDragWindowsTest {
     /** Where the window manager put tear-out windows' frames on the pretend screen, and the cursor it gave with each. */
     private final List<Rectangle> placed = new ArrayList<>();
     private final List<Point> cursors = new ArrayList<>();
+    /** Each window a move brought to the front, in order. */
+    private final List<WindowContent> raised = new ArrayList<>();
     private WindowManager manager;
     private MainWindow main;
     private ChildWindow child;
@@ -94,7 +96,7 @@ class TabDragWindowsTest {
             directory -> manager.openTerminalWindow(directory), () -> { }, opening.emptied(), ThemeTestSupport.controller(true),
             KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
         content.connectContributions(model);
-        content.connectTerminals(terminals, () -> { });
+        content.connectTerminals(terminals, () -> raised.add(content));
         // A tab opening in a laid-out strip would move into its place over several EDT turns: tests take it at once.
         content.setAnimations(new AnimationSettings(false, 0, 0, 0));
         return content;
@@ -937,6 +939,7 @@ class TabDragWindowsTest {
             Tab moving = from.workspace().tabs().get(1);
             var parents = empty.parentTabs();
             Point anywhere = inside(onScreen(parents, new Rectangle(parents.getSize())), 0.3, 0.7);
+            facts.clear();
             Component source = startPane(from, moving, anywhere);
             assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.NewTab(empty, 0));
             assertThat(manager.tabDrag().overlay().highlight()).as("all of the empty workspace").isEqualTo(SwingUtilities
@@ -945,6 +948,137 @@ class TabDragWindowsTest {
             assertThat(empty.workspace().tabs()).containsExactly(moving);
             assertThat(tabIds(empty)).as("in its one tab's place, under its id").containsExactly(only);
             assertThat(from.workspace().tabs()).hasSize(1);
+            assertThat(moves()).as("exactly one TAB_MOVED").containsExactly(new TerminalEvent.TabMoved(moving.id().value(),
+                child.id(), main.id()));
+        });
+    }
+
+    /**
+     * Tabs and panes spec 7 and workspace plan 8c Rulings 4 and 12 (its final review, T2 M6): a pane dropped on a pane of a
+     * tab it showed in another window lands there, shown, the window raised and the item focused.
+     */
+    @Test void aPaneMovedIntoAnotherWindowRaisesItAndTakesTheFocusThere() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            ids[0] = child.content().activeParentTab();
+            ids[1] = secondTab(child);
+            main.content().split(Side.RIGHT);
+            relayout(frameOf(main));
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            Tab moving = from.workspace().tabs().get(1), there = entryOf(to, ids[0]);
+            int[] focused = {0};
+            moving.focusTarget(() -> focused[0]++);
+            Component source = startPane(from, moving, onEntry(to, there, 0.5));
+            assertThat(to.activeParentTab()).as("the hovered tab").isEqualTo(ids[0]);
+            Point right = inside(pane(to, there.group().orElseThrow()), 0.9, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, right, PANE);
+            focused[0] = 0;
+            raised.clear();
+            mouse(source, MouseEvent.MOUSE_RELEASED, right, PANE);
+            assertThat(to.activeParentTab()).as("the tab it landed in shows").isEqualTo(ids[0]);
+            assertThat(to.workspace().tabs()).containsExactly(there, moving);
+            assertThat(to.selectedTab()).isSameAs(moving);
+            assertThat(focused[0]).as("the item takes the focus where it lands").isPositive();
+            assertThat(raised).as("its new window comes to the front").endsWith(to);
+        });
+    }
+
+    /**
+     * Tabs and panes spec 13 and workspace plan 8c Rulings 5 (its final review, T2 M6): a drag that showed a tab in its own
+     * window and one in another window and then ends by its window losing the focus, or by a lost release, shows the tabs
+     * that showed before again in both.
+     */
+    @Test void focusLossOrALostReleaseMidHoverBringsBackTheEarlierTabs() throws Exception {
+        ParentTabId[] ids = new ParentTabId[4];
+        edt(() -> {
+            ids[0] = main.content().activeParentTab();
+            main.content().split(Side.RIGHT);
+            ids[1] = secondTab(main);
+            ids[2] = child.content().activeParentTab();
+            ids[3] = secondTab(child);
+            main.content().selectParentTab(ids[0]);
+            relayout(frameOf(main));
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            Tab moving = from.workspace().tabs().get(1);
+            Point own = onEntry(from, entryOf(from, ids[1]), 0.5), there = onEntry(to, entryOf(to, ids[2]), 0.5);
+            Component source = startPane(from, moving, own, there);
+            assertThat(from.activeParentTab()).as("its own window's hovered tab").isEqualTo(ids[1]);
+            assertThat(to.activeParentTab()).as("the other window's").isEqualTo(ids[2]);
+            from.setActive(false);
+            assertThat(manager.tabDrag().active()).as("its window lost the focus").isFalse();
+            assertThat(from.activeParentTab()).as("its own window's earlier tab").isEqualTo(ids[0]);
+            assertThat(to.activeParentTab()).as("the other window's").isEqualTo(ids[3]);
+            mouse(source, MouseEvent.MOUSE_RELEASED, there, PANE);
+            from.setActive(true);
+            startPane(from, moving, own, there);
+            assertThat(to.activeParentTab()).isEqualTo(ids[2]);
+            broadcast(new MouseEvent(from, MouseEvent.MOUSE_MOVED, 0, 0, 5, 5, 0, false, MouseEvent.NOBUTTON));
+            assertThat(manager.tabDrag().active()).as("a lost release").isFalse();
+            assertThat(from.activeParentTab()).isEqualTo(ids[0]);
+            assertThat(to.activeParentTab()).isEqualTo(ids[3]);
+            assertThat(from.workspace().tabs()).contains(moving);
+        });
+    }
+
+    /**
+     * STATUS, plan 8c's Known (its final review, T2 M6): a pane whose move to another window fails lands in a new tab of
+     * its old window, the registry's recovery; nothing closes, and the failure propagates.
+     */
+    @Test void aFailedMoveToAnotherWindowLandsTheItemInANewTabOfItsOldWindow() throws Exception {
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            var refusing = new PaneDragTest.Refusing();
+            Tab notes = model.tabs().open("dev.example.notes", "notes", "notes", main.id(), refusing,
+                dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT);
+            relayout(frameOf(main));
+            ParentTabId own = from.activeParentTab();
+            Tab there = to.selectedTab();
+            Point right = inside(pane(to, there.group().orElseThrow()), 0.9, 0.5);
+            Component source = startPane(from, notes, right);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.Beside(to, there.group().orElseThrow(), Side.RIGHT));
+            refusing.armed = true;
+            assertThatThrownBy(() -> mouse(source, MouseEvent.MOUSE_RELEASED, right, PANE)).hasMessage("refused");
+            assertThat(notes.closed()).as("nothing closes").isFalse();
+            assertThat(notes.window()).isEqualTo(main.id());
+            assertThat(tabIds(from)).as("a new tab of its old window").hasSize(2);
+            assertThat(from.parentTabOf(notes)).isPresent().isNotEqualTo(java.util.Optional.of(own));
+            assertThat(from.parentTabs().view(own).orElseThrow().tabs()).as("its old tab keeps its terminal").hasSize(1);
+            assertThat(to.workspace().tabs()).containsExactly(there);
+            assertThat(main.closed()).isFalse();
+            assertThat(child.closed()).isFalse();
+        });
+    }
+
+    /**
+     * Review Focus 5 and workspace plan 8c Rulings 3 (its final review, T3 M2): a full window's only pane dropped on a
+     * new-tab place of another window becomes a tab there, and its window closes after the move's TAB_MOVED.
+     */
+    @Test void aFullWindowsOnlyPaneDroppedOnANewTabPlaceClosesItAfterTheMove() throws Exception {
+        ParentTabId[] ids = new ParentTabId[1];
+        edt(() -> ids[0] = secondTab(main));
+        launch();
+        edt(() -> {
+            WindowContent from = child.content(), to = main.content();
+            Tab moving = from.selectedTab();
+            Point after = onEntry(to, entryOf(to, ids[0]), 0.9);
+            facts.clear();
+            Component source = startPane(from, moving, after);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.NewTab(to, 2));
+            mouse(source, MouseEvent.MOUSE_RELEASED, after, PANE);
+            assertThat(tabIds(to)).hasSize(3);
+            assertThat(to.workspace().tabs()).as("its own tab, last, shown").containsExactly(moving);
+            assertThat(child.closed()).as("its only pane moved out").isTrue();
+            int moved = facts.indexOf(new TerminalEvent.TabMoved(moving.id().value(), child.id(), main.id()));
+            int closed = facts.indexOf(new TerminalEvent.WindowClosed(child.id()));
+            assertThat(moved).as("TAB_MOVED").isNotNegative();
+            assertThat(closed).as("then WINDOW_CLOSED").isGreaterThan(moved);
+            assertThat(moves()).as("one TAB_MOVED").hasSize(1);
         });
     }
 }

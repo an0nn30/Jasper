@@ -149,4 +149,29 @@ class WorkspaceDropResolverTest {
         assertThat(WorkspaceDropResolver.newTabPlace(new Point(450, 30), entries)).as("nor the bottom edge").isEmpty();
         assertThat(WorkspaceDropResolver.newTabPlace(new Point(10, 10), List.of())).as("no entry").isEmpty();
     }
+
+    /**
+     * Workspace plan 8c Rulings 3 (its final review, T3 M2): a quarter is a whole number of pixels, the width over four
+     * rounded down, so an odd width's middle takes the rest; an entry under 4 px wide has no quarter, only a middle.
+     */
+    @Test void oddWidthsRoundTheQuartersDownAndANarrowEntryIsAllMiddle() {
+        List<Rectangle> odd = List.of(new Rectangle(10, 0, 7, 30));
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(10, 15), odd)).as("7 px: the one leading pixel").hasValue(0);
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(11, 15), odd)).as("then the middle's five").isEmpty();
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(15, 15), odd)).isEmpty();
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(16, 15), odd)).as("the one trailing pixel").hasValue(1);
+        List<Rectangle> wider = List.of(new Rectangle(0, 0, 301, 30));
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(74, 15), wider)).as("301 px: quarters of 75").hasValue(0);
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(75, 15), wider)).isEmpty();
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(225, 15), wider)).as("the middle takes 151").isEmpty();
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(226, 15), wider)).hasValue(1);
+        for (int width = 1; width < 4; width++) {
+            List<Rectangle> narrow = List.of(new Rectangle(0, 0, width, 30));
+            for (int x = 0; x < width; x++)
+                assertThat(WorkspaceDropResolver.newTabPlace(new Point(x, 15), narrow)).as("%d px wide, at %d", width, x).isEmpty();
+        }
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(0, 15), List.of(new Rectangle(0, 0, 4, 30)))).as("4 px: a quarter")
+            .hasValue(0);
+        assertThat(WorkspaceDropResolver.newTabPlace(new Point(0, 15), List.of(new Rectangle(0, 0, 0, 30)))).as("no width").isEmpty();
+    }
 }

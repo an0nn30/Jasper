@@ -4,7 +4,9 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.presentation.TitleFormat;
@@ -17,6 +19,8 @@ import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Component;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
@@ -24,6 +28,7 @@ import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleState;
 import javax.swing.AbstractButton;
 import javax.swing.JMenuItem;
+import javax.swing.JPanel;
 import javax.swing.JToolTip;
 import javax.swing.plaf.basic.BasicHTML;
 import org.junit.jupiter.api.AfterEach;
@@ -327,6 +332,76 @@ class ClassicTabsTest {
                 assertThat(strip.entries().getLast().getX()).as("crowded: the last tabs clip").isGreaterThan(600);
                 assertThat(strip.newTabPlace(new java.awt.Point(crowded.x + crowded.width / 2, crowded.height / 2)))
                     .as("the +, over the clipped tabs").hasValue(15);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /**
+     * Workspace plan 8c's final review (M-e): the classic strip has no dead zone for a dragged pane. A divider is the place
+     * between the tabs either side of it, the strip's bottom row below the tabs is theirs, the last tab's trailing quarter
+     * is the end, and a crowded strip's end starts at its "+".
+     */
+    @Test void theClassicStripHasNoDeadZoneForANewTab() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                var strip = tabs(owner, 800);
+                var first = strip.entries().getFirst().getBounds();
+                var last = strip.entries().getLast().getBounds();
+                int bottom = strip.getHeight() - 1;
+                assertThat(first.height).as("the tabs stop above the strip's rule").isLessThan(strip.getHeight());
+                assertThat(last.x).as("a divider between the tabs").isGreaterThan(first.x + first.width);
+                assertThat(strip.newTabPlace(new Point(first.x + first.width, 5))).as("the divider").hasValue(1);
+                assertThat(strip.newTabPlace(new Point(last.x - 1, 5))).as("its last pixel").hasValue(1);
+                assertThat(strip.newTabPlace(new Point(first.x + 1, bottom))).as("the bottom row of a leading quarter").hasValue(0);
+                assertThat(strip.newTabPlace(new Point(first.x + first.width / 2, bottom))).as("of a middle").isEmpty();
+                assertThat(strip.newTabPlace(new Point(last.x + last.width - 1, last.height / 2))).as("the last tab's trailing quarter")
+                    .hasValue(2);
+                for (int i = owner.tabCount(); i < 15; i++) owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                tabs(owner, 600);
+                var crowded = strip.add().getBounds();
+                assertThat(strip.newTabPlace(new Point(crowded.x, bottom))).as("the crowded +'s first pixel").hasValue(15);
+                assertThat(strip.newTabPlace(new Point(crowded.x - 1, 5))).as("a clipped tab's, just before it")
+                    .isNotEqualTo(java.util.OptionalInt.of(15));
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 4 and its final review (M-e): a dragged pane over the strip's bottom row, below a tab's
+     * middle, shows that tab, as over the tab itself; it gives way when the drag ends there.
+     */
+    @Test void aDraggedPaneOverTheBottomRowBelowATabsMiddleShowsItsTab() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var model = new Contributions();
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.connectContributions(model);
+                Tab notes = model.tabs().open("dev.example.notes", "notes", "notes", owner.id(), new JPanel(),
+                    TabRegistry.Placement.SPLIT_RIGHT);
+                var shown = owner.activeParentTab();
+                owner.newTab(DesktopTestSupport.HOME);
+                var other = owner.activeParentTab();
+                owner.selectParentTab(shown);
+                TabDragTestSupport.frame(owner, 100, 50, 1208, 760);
+                var strip = (ClassicTabs) owner.tabBar();
+                Rectangle entry = TabDragTestSupport.onScreen(strip, strip.entries().getLast().getBounds());
+                Rectangle whole = TabDragTestSupport.onScreen(strip, new Rectangle(strip.getSize()));
+                Point below = new Point(entry.x + entry.width / 2, whole.y + whole.height - 1);
+                assertThat(entry.contains(below)).as("below the tab itself").isFalse();
+                Component source = TabDragTestSupport.startPane(owner, notes, below);
+                try {
+                    assertThat(owner.tabDrag().active()).isTrue();
+                    assertThat(owner.activeParentTab()).as("its tab shows").isEqualTo(other);
+                } finally {
+                    TabDragTestSupport.mouse(source, MouseEvent.MOUSE_RELEASED, below, TabDragTestSupport.PANE);
+                }
+                assertThat(owner.activeParentTab()).as("and gives way when the drag ends there").isEqualTo(shown);
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }

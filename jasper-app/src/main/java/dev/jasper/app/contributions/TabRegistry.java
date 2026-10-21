@@ -450,7 +450,7 @@ public final class TabRegistry {
      * @param tab the tab
      * @param window the window to move it to
      * @param group a pane of that window
-     * @param side where the new group goes
+     * @param side where the new pane goes
      * @throws IllegalArgumentException when no workspace {@code window} is registered
      */
     public void move(Tab tab, UUID window, GroupId group, Side side) {

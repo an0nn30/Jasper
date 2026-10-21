@@ -323,6 +323,8 @@ class TabDragTest {
             assertThat(drag.active()).isFalse();
             assertThat(drag.label().showing()).isFalse();
             assertThat(drag.overlay().getParent()).isNull();
+            assertThat(keys.send(new KeyEvent(owner, KeyEvent.KEY_RELEASED, 0, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED)))
+                .as("its release too").isTrue();
             assertThat(keys.dispatchers).isEmpty();
             mouse(source, MouseEvent.MOUSE_RELEASED, pastThird);
             assertThat(ids()).as("the release after Esc drops nothing").containsExactly(first, second, third);

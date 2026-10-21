@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 8c: moving panes — 2026-10-20** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `107b7eb55..5ec032b5b`, then this documentation commit;
+`.claude/worktrees/workspace-tabs`, `107b7eb55..5ec032b5b`, then the documentation commit and its final-review fix wave;
 [plan](superpowers/plans/2026-10-20-workspace-8c-moving-panes.md),
 [spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). Holding Cmd+Option (Ctrl+Alt on Linux and
 Windows) and dragging inside a pane moves it, the iTerm way: the tab drag (`TabDrag`) carries a pane too. A window's
@@ -33,26 +33,38 @@ action is added; (16) a text view's text drag sits out the gesture; (17) a pane 
 announced once, where it lands, and goes back if its landing fails. Spec issues: (1) the equal tabs have no empty end
 and no "+"; ruled by the controller: an entry's outer quarters are new-tab places in either look. Deviations: (1)
 amendment 1, from plan 8b's final review (I2, left for this plan): plan 8b's Move Pane to New Tab announced its old
-tab's next pane on the way; Task 2 holds it with the pane drops, so its case comes before Task 3; no other: Tasks 1-3
-ran their text verbatim. Known: a Cmd+Option-click (Ctrl+Alt-click on Linux and Windows) starts the pane gesture, so it
-no longer opens a link or reaches a program that reads the mouse, and Cmd-click, Ctrl-click and Alt-drag keep their
-meanings; on Windows only the left Alt counts, since Java reports the right one as AltGraph; a move to another window
-that fails lands its item in a new tab of its old window (the registry's recovery), and nothing closes. `./gradlew check
---continue`: **12,108 tests, 0 failures, 0 errors, 25 skipped, BUILD SUCCESSFUL** (app 4,119, Editor 4,920, UI 930,
-terminal 460, testkit 213, Buddy 151, SDK 95, the other plugins 1,220; the plugin, Buddy, SDK and testkit test tasks
-were up to date from the same sources).
+tab's next pane on the way; Task 2 holds it with the pane drops, so its case comes before Task 3; Tasks 1-3 ran their
+text verbatim. (2) The final-review fix wave: the Esc keystroke that ends a drag is swallowed whole, its typed ESC and
+its release too, so Ctrl+Alt+Esc sends a terminal nothing; a pane press is the left button's own (`getButton`, as
+`SwingUtilities` already reads a press on JBR 25), so a second button's press mid-drag ends the drag and starts none; a
+modifier press focuses its pane; a drop that does nothing or fails shows the earlier tab again; each restore of a failed
+move runs on its own; the classic strip has no dead zones (a divider is the place between its tabs, and the row below
+them theirs); the new pins (Esc's whole keystroke, a second button mid-drag, the window's keymap through `paneClicks`,
+Cmd+Option+Ctrl and Ctrl+Alt+Meta, an item being closed, a move into another window raising it and focusing the item,
+focus loss and a lost release mid-hover, a failed move to another window, odd and narrow entries, a full window's only
+pane into a new tab, one `TAB_MOVED` for the empty workspace, `atOnce` after a throw). Known: a Cmd+Option-click
+(Ctrl+Alt-click on Linux and Windows) starts the pane gesture, so it no longer opens a link or reaches a program that
+reads the mouse, and Cmd-click, Ctrl-click and Alt-drag keep their meanings; on Windows only the left Alt counts, since
+Java reports the right one as AltGraph; a move to another window that fails lands its item in a new tab of its old
+window (the registry's recovery), and nothing closes; a Cmd+Option-click (Ctrl+Alt-click) whose keys are let go before
+the button reaches the item as a plain click, which can select a row, sort a column or toggle a fold. `./gradlew check
+--continue`: **12,125 tests, 0 failures, 0 errors, 25 skipped, BUILD SUCCESSFUL** (app 4,136, Editor 4,920, UI 930,
+terminal 460, testkit 213, Buddy 151, SDK 95, the other plugins 1,220).
 GUI checks for the user:
 - Cmd+Option-drag (Ctrl+Alt on Linux and Windows) a terminal pane onto another pane of its tab, then of another window:
   it splits beside that pane on the side nearest the cursor, the landing showing where, and the shell keeps running;
-- the same drag in a terminal running tmux or vim with the mouse on, with Esc mid-drag before the release: nothing
-  reaches the program and no selection starts; without the modifier a drag selects or reaches the program as before;
+- the same drag in a terminal running tmux or vim with the mouse on, where mid-drag you release Cmd+Option (Ctrl+Alt)
+  first, then press Esc, before the release: nothing reaches the program and no selection starts; without the modifier
+  a drag selects or reaches the program as before;
+- on Linux and Windows, Esc pressed with Ctrl+Alt still held ends the drag and sends nothing to vim;
+- a right press mid-drag ends the drag;
 - an editor pane with a selection: a Cmd+Option-drag over the selection moves the pane and never drags the text; a
   plain drag still selects or drags the text; with `vim = true`, in Visual mode, a Cmd+Option-drag over the selection
   moves the pane and never moves the text;
-- Cmd and the right Option key drag a pane on macOS; on Windows the left Alt key with Ctrl does, and AltGr does not;
+- Cmd and either Option key drag a pane on macOS; on Windows the left Alt key with Ctrl does, and AltGr does not;
 - hovering the middle of a tab's entry shows that tab at once and dropping on one of its panes moves the pane there;
-  Esc, or a release over a title bar, brings back the tab that showed before, in the drag's window and in another
-  window;
+  releasing Cmd+Option (Ctrl+Alt) first, then pressing Esc, or a release over a title bar, brings back the tab that
+  showed before, in the drag's window and in another window;
 - dragging a pane over another tab of its own window keeps the drag running (the pressed view hides while the hovered
   tab shows) until the drop;
 - a drop on any entry's outer quarter, in either look, or on the "+" or the room after the tabs under Enterprise, makes

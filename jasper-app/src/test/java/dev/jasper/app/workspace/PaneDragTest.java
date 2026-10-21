@@ -4,6 +4,7 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static dev.jasper.app.workspace.TabDragTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
@@ -32,6 +33,7 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
@@ -90,7 +92,12 @@ class PaneDragTest {
                 assertThat(keys.dispatchers).as("no Esc dispatcher is left behind").isEmpty();
                 assertThat(motionListeners()).as("no gesture or lost-release listener is left behind").isEqualTo(listeners);
             } finally {
-                KeyboardFocusManager.setCurrentKeyboardFocusManager(previousKeys);
+                try {
+                    // A plain move: a gesture a failed test left behind lost its release, so it ends and skews no later test.
+                    broadcast(new MouseEvent(owner, MouseEvent.MOUSE_MOVED, 0, 0, 0, 0, 0, false, MouseEvent.NOBUTTON));
+                } finally {
+                    KeyboardFocusManager.setCurrentKeyboardFocusManager(previousKeys);
+                }
             }
         });
         closeOwners();
@@ -116,9 +123,15 @@ class PaneDragTest {
 
     private List<TerminalEvent> moves() { return facts.stream().filter(TerminalEvent.TabMoved.class::isInstance).toList(); }
 
+    /** Esc pressed and let go: whether the drag took its press. */
     private boolean esc() {
-        return keys.send(new KeyEvent(owner, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
+        boolean taken = keys.send(key(KeyEvent.KEY_PRESSED, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
+        keys.send(key(KeyEvent.KEY_RELEASED, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
+        return taken;
     }
+
+    /** A key event of the window's with {@code held} keys down, not dispatched. */
+    private KeyEvent key(int id, int held, int code, char typed) { return new KeyEvent(owner, id, 0, held, code, typed); }
 
     /** A left press on {@code source} with {@code held} keys, not dispatched. */
     private static MouseEvent press(Component source, int held) {
@@ -153,6 +166,49 @@ class PaneDragTest {
             assertThat(drag.label().showing()).isFalse();
             assertThat(shape(owner)).as("released over its own pane: nothing moves").isEqualTo("H[a, V[b, c]]");
             assertThat(motionListeners()).as("the release ended the gesture").isEqualTo(listeners);
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 14 and its final review (M-b): with the focus in a tool window, a modifier press on the
+     * pane that already is the active one focuses its item, as any press does.
+     */
+    @Test void aModifierPressOnTheActivePaneFocusesItsItem() throws Exception {
+        edt(() -> {
+            owner.selectTab(b);
+            keys.own(new JPanel());
+            int[] focused = {0};
+            b.focusTarget(() -> focused[0]++);
+            Component source = inPane(owner, b);
+            mouse(source, MouseEvent.MOUSE_PRESSED, middle(source), PANE);
+            assertThat(focused[0]).as("the press focuses its item").isEqualTo(1);
+            mouse(source, MouseEvent.MOUSE_RELEASED, middle(source), PANE);
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 14 and its final review (T2 M4): with the focus outside the workspace, a modifier press on
+     * the active pane, a hover on another tab of its window, then Esc: the dragged item has the focus, as the press gave it.
+     */
+    @Test void afterAHoverInItsOwnWindowEscLeavesTheDraggedItemFocused() throws Exception {
+        edt(() -> {
+            owner.selectTab(b);
+            keys.own(new JPanel());
+            int[] focused = {0};
+            b.focusTarget(() -> focused[0]++);
+            Component source = inPane(owner, b);
+            Point press = middle(source), entry = onEntry(owner, d, 0.5);
+            mouse(source, MouseEvent.MOUSE_PRESSED, press, PANE);
+            assertThat(focused[0]).as("the press").isEqualTo(1);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x, press.y + 12), PANE);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, entry, PANE);
+            assertThat(owner.activeParentTab()).as("the hovered tab").isEqualTo(second);
+            focused[0] = 0;
+            assertThat(esc()).isTrue();
+            assertThat(owner.activeParentTab()).isEqualTo(first);
+            assertThat(owner.selectedTab()).isSameAs(b);
+            assertThat(focused[0]).as("the dragged item has the focus again").isPositive();
+            mouse(source, MouseEvent.MOUSE_RELEASED, entry, PANE);
         });
     }
 
@@ -198,9 +254,133 @@ class PaneDragTest {
         assertThat(TabDrag.movesPane(press(panel, InputEvent.META_DOWN_MASK | InputEvent.ALT_GRAPH_DOWN_MASK), true))
             .as("Cmd and the right Option key on macOS (Rulings 1)").isTrue();
         assertThat(TabDrag.movesPane(press(panel, InputEvent.ALT_DOWN_MASK), false)).as("Alt alone").isFalse();
+        assertThat(TabDrag.movesPane(press(panel, mac | InputEvent.CTRL_DOWN_MASK), true)).as("Cmd+Option+Ctrl").isFalse();
+        assertThat(TabDrag.movesPane(press(panel, other | InputEvent.META_DOWN_MASK), false)).as("Ctrl+Alt+Meta").isFalse();
         var right = new MouseEvent(panel, MouseEvent.MOUSE_PRESSED, 0, other | InputEvent.BUTTON3_DOWN_MASK, 1, 1, 1, false,
             MouseEvent.BUTTON3);
         assertThat(TabDrag.movesPane(right, false)).as("another button").isFalse();
+        var second = new MouseEvent(panel, MouseEvent.MOUSE_PRESSED, 0, other | InputEvent.BUTTON1_DOWN_MASK
+            | InputEvent.BUTTON3_DOWN_MASK, 1, 1, 1, false, MouseEvent.BUTTON3);
+        assertThat(TabDrag.movesPane(second, false)).as("another button's press, the left one held").isFalse();
+    }
+
+    /**
+     * Workspace plan 8c's final review (M-a): a second button's press while a pane drag runs, the left one still held,
+     * over the drag's own pane, ends the drag, as a lost release does, and starts no other; the gesture's rest moves
+     * nothing.
+     */
+    @Test void aSecondButtonsPressMidDragEndsItAndStartsNoOther() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Point low = inside(pane(owner, a.group().orElseThrow()), 0.5, 0.8);
+            Component source = startPane(owner, a, low);
+            assertThat(drag.active()).isTrue();
+            Point at = new Point(low);
+            SwingUtilities.convertPointFromScreen(at, source);
+            source.dispatchEvent(new MouseEvent(source, MouseEvent.MOUSE_PRESSED, 0, PANE | InputEvent.BUTTON1_DOWN_MASK
+                | InputEvent.BUTTON3_DOWN_MASK, at.x, at.y, 1, false, MouseEvent.BUTTON3));
+            assertThat(drag.active()).as("the press ends the drag").isFalse();
+            Point over = inside(pane(owner, c.group().orElseThrow()), 0.5, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, over, PANE);
+            assertThat(drag.active()).as("and starts none").isFalse();
+            mouse(source, MouseEvent.MOUSE_RELEASED, over, PANE);
+            assertThat(shape(owner)).isEqualTo("H[a, V[b, c]]");
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 1 and Review Focus 1: the window's keymap, not the host, picks the modifier its
+     * {@code paneClicks} hands the drag: this host's other platform's in a window with that platform's keymap.
+     */
+    @Test void theWindowsKeymapPicksTheModifier() throws Exception {
+        edt(() -> {
+            boolean hostMac = (PANE & InputEvent.META_DOWN_MASK) != 0;
+            int foreign = hostMac ? InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK
+                : InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
+            WindowContent other = content(idleLauncher(pending), !hostMac);
+            other.connectContributions(model);
+            Tab notes = model.tabs().open("dev.example.notes", "notes", "notes", other.id(), new JPanel(),
+                TabRegistry.Placement.SPLIT_RIGHT);
+            frame(other, 100, 900, 800, 500);
+            Component source = inPane(other, notes);
+            Point press = middle(source);
+            assertThat(mouse(source, MouseEvent.MOUSE_PRESSED, press, PANE).isConsumed()).as("this host's modifier").isFalse();
+            mouse(source, MouseEvent.MOUSE_RELEASED, press, PANE);
+            assertThat(motionListeners()).as("no gesture began").isEqualTo(listeners);
+            assertThat(mouse(source, MouseEvent.MOUSE_PRESSED, press, foreign).isConsumed()).as("its keymap's").isTrue();
+            assertThat(motionListeners()).as("the gesture listens").isEqualTo(listeners + 1);
+            assertThat(mouse(source, MouseEvent.MOUSE_RELEASED, press, foreign).isConsumed()).isTrue();
+            assertThat(motionListeners()).isEqualTo(listeners);
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 11 and its final review (T1 M5): an item whose close waits for its guard never starts a
+     * pane drag; its gesture is still the drag's.
+     */
+    @Test void anItemBeingClosedNeverStartsAPaneDrag() throws Exception {
+        edt(() -> {
+            var answer = new CompletableFuture<Boolean>();
+            model.tabs().guard("dev.example.notes", (tabs, batch) -> answer);
+            var closing = a.requestClose();
+            try {
+                assertThat(closing).as("the guard has not answered").isNotDone();
+                Point over = inside(pane(owner, c.group().orElseThrow()), 0.5, 0.5);
+                Component source = startPane(owner, a, over);
+                assertThat(owner.tabDrag().active()).isFalse();
+                assertThat(owner.tabDrag().label().showing()).isFalse();
+                assertThat(mouse(source, MouseEvent.MOUSE_RELEASED, over, PANE).isConsumed()).isTrue();
+                assertThat(shape(owner)).isEqualTo("H[a, V[b, c]]");
+            } finally {
+                answer.complete(false);
+            }
+            assertThat(closing).isCompletedWithValue(false);
+        });
+    }
+
+    /**
+     * Workspace plan 8c's final review (I1): Esc pressed with the modifier still held ends the drag, and the rest of that
+     * keystroke reaches no component: neither its typed ESC, which a terminal writes to its program while Ctrl is down,
+     * nor a repeat nor its release; the modifier's own keys pass. After the release Esc is the focused component's again.
+     */
+    @Test void escWithTheModifierHeldEndsTheDragAndTakesItsWholeKeystroke() throws Exception {
+        edt(() -> {
+            int held = InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
+            Point low = inside(pane(owner, a.group().orElseThrow()), 0.5, 0.8);
+            Component source = startPane(owner, a, low);
+            assertThat(keys.send(key(KeyEvent.KEY_PRESSED, held, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).as("Esc").isTrue();
+            assertThat(owner.tabDrag().active()).isFalse();
+            assertThat(keys.send(key(KeyEvent.KEY_TYPED, held, KeyEvent.VK_UNDEFINED, '\u001b'))).as("its typed ESC").isTrue();
+            assertThat(keys.send(key(KeyEvent.KEY_PRESSED, held, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).as("a repeat").isTrue();
+            assertThat(keys.send(key(KeyEvent.KEY_TYPED, held, KeyEvent.VK_UNDEFINED, '\u001b'))).isTrue();
+            assertThat(keys.send(key(KeyEvent.KEY_RELEASED, InputEvent.ALT_DOWN_MASK, KeyEvent.VK_CONTROL, KeyEvent.CHAR_UNDEFINED)))
+                .as("Ctrl let go first").isFalse();
+            assertThat(keys.send(key(KeyEvent.KEY_RELEASED, InputEvent.ALT_DOWN_MASK, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED)))
+                .as("its release").isTrue();
+            assertThat(keys.dispatchers).as("nothing claims Esc after its release").isEmpty();
+            assertThat(keys.send(key(KeyEvent.KEY_TYPED, held, KeyEvent.VK_UNDEFINED, '\u001b'))).as("the next typed ESC").isFalse();
+            mouse(source, MouseEvent.MOUSE_RELEASED, low, PANE);
+        });
+    }
+
+    /**
+     * I1: an Esc whose release went elsewhere (the focus moved away) claims nothing past the next other key, and a drag
+     * that starts meanwhile still ends on Esc.
+     */
+    @Test void anEscWhoseReleaseWentElsewhereClaimsNoOtherKey() throws Exception {
+        edt(() -> {
+            Point low = inside(pane(owner, a.group().orElseThrow()), 0.5, 0.8);
+            Component source = startPane(owner, a, low);
+            assertThat(keys.send(key(KeyEvent.KEY_PRESSED, PANE, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).isTrue();
+            mouse(source, MouseEvent.MOUSE_RELEASED, low, PANE);
+            Component again = startPane(owner, a, low);
+            assertThat(owner.tabDrag().active()).isTrue();
+            assertThat(keys.send(key(KeyEvent.KEY_PRESSED, PANE, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).as("Esc").isTrue();
+            assertThat(owner.tabDrag().active()).as("ends the new drag").isFalse();
+            mouse(again, MouseEvent.MOUSE_RELEASED, low, PANE);
+            assertThat(keys.send(key(KeyEvent.KEY_PRESSED, 0, KeyEvent.VK_A, KeyEvent.CHAR_UNDEFINED))).as("another key").isFalse();
+            assertThat(keys.dispatchers).as("nothing claims a key after it").isEmpty();
+        });
     }
 
     /**
@@ -559,7 +739,7 @@ class PaneDragTest {
     }
 
     /** A plugin's view whose next showing throws once armed, as a view that fails to take its new pane does. */
-    private static final class Refusing extends JPanel {
+    static final class Refusing extends JPanel {
         boolean armed;
 
         @Override public void setVisible(boolean visible) {
@@ -639,6 +819,58 @@ class PaneDragTest {
             assertThat(owner.windowLayout()).isEqualTo(before);
             assertThat(owner.parentTabs().views()).as("no tab stays behind").hasSize(2);
             assertThat(c.component().getParent()).as("back in its pane").isSameAs(owner.workspace().groupView(pane));
+        });
+    }
+
+    /**
+     * Workspace plan 8c's final review (M-c): a drop that fails after a hover shows the tab that showed before again, its
+     * item back in its pane there and the selected one, and the failure propagates.
+     */
+    @Test void aDropThatFailsAfterAHoverShowsTheTabThatShowedBefore() throws Exception {
+        edt(() -> {
+            var refusing = new Refusing();
+            Tab notes = view("notes", refusing, TabRegistry.Placement.SPLIT_RIGHT);
+            relayout(frame);
+            var pane = notes.group().orElseThrow();
+            Component source = startPane(owner, notes, onEntry(owner, d, 0.5));
+            assertThat(owner.activeParentTab()).as("the hovered tab").isEqualTo(second);
+            Point right = inside(pane(owner, d.group().orElseThrow()), 0.9, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, right, PANE);
+            refusing.armed = true;
+            assertThatThrownBy(() -> mouse(source, MouseEvent.MOUSE_RELEASED, right, PANE)).hasMessage("refused");
+            assertThat(owner.activeParentTab()).as("the tab that showed before").isEqualTo(first);
+            assertThat(owner.selectedTab()).isSameAs(notes);
+            assertThat(refusing.getParent()).as("back in its pane").isSameAs(owner.workspace().groupView(pane));
+            owner.selectParentTab(second);
+            assertThat(shape(owner)).as("the hovered tab as it was").isEqualTo("d");
+        });
+    }
+
+    /**
+     * Workspace plan 8c's final review (M-d): when the tab a pane was to join fails to take its layout back too, the tab
+     * the pane left still gets its own back, holding the item again, and that later failure is suppressed under the first.
+     */
+    @Test void aFailedUndoOfTheJoinedTabStillRestoresTheTabThePaneLeft() throws Exception {
+        edt(() -> {
+            int[] refusals = {0};
+            owner.parentTabs().view(second).orElseThrow().addContainerListener(new java.awt.event.ContainerAdapter() {
+                @Override public void componentAdded(java.awt.event.ContainerEvent event) {
+                    if (refusals[0] == 0) return;
+                    refusals[0]--;
+                    throw new IllegalStateException("refused " + refusals[0]);
+                }
+            });
+            var before = owner.windowLayout();
+            var pane = c.group().orElseThrow();
+            refusals[0] = 2;
+            Throwable failure = catchThrowable(() -> owner.movePane(c, d.group().orElseThrow(), Side.RIGHT));
+            assertThat(failure).as("the landing's failure").hasMessage("refused 1");
+            assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).as("the joined tab's undo").contains("refused 0");
+            assertThat(c.component().getParent()).as("back in its pane").isNotNull()
+                .isSameAs(owner.parentTabs().view(first).orElseThrow().groupView(pane));
+            assertThat(owner.parentTabs().view(first).orElseThrow().model()).as("its tab's layout")
+                .isEqualTo(before.parentTabs().getFirst().layout());
+            assertThat(c.closed()).as("nothing closes").isFalse();
         });
     }
 

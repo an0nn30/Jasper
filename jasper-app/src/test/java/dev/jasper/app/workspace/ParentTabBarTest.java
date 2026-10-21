@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
@@ -118,6 +119,25 @@ class ParentTabBarTest {
     }
 
     /** Spec 5: an entry shows its tab's active pane's item, and its tip carries Select Tab's shortcut. */
+    /**
+     * Workspace plan 8c Rulings 9 (its final review, T3 M2): the strip takes changes at once only while
+     * {@code atOnce} runs, and moves again after a change that throws.
+     */
+    @Test void aChangeThatThrowsLeavesTheStripMovingAgain() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(pending));
+            ParentTabBar bar = owner.parentTabs().bar();
+            assertThat(bar.animates()).as("the window's tabs animate").isTrue();
+            boolean[] during = {true};
+            assertThatThrownBy(() -> bar.atOnce(() -> {
+                during[0] = bar.animates();
+                throw new IllegalStateException("refused");
+            })).hasMessage("refused");
+            assertThat(during[0]).as("during the change").isFalse();
+            assertThat(bar.animates()).as("after it threw").isTrue();
+        });
+    }
+
     @Test void eachTabShowsAsItsActivePanesItem() throws Exception {
         edt(() -> {
             var owner = content(idleLauncher(pending));
