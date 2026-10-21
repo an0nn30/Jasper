@@ -231,9 +231,11 @@ Measure a trained image, as users get it: build it with `./gradlew :jasper-app:p
 
 By default every run of one invocation shares one isolated home in a new folder under `/tmp` (`-Duser.home`), with an
 empty `jasper.vmoptions` (through `JASPER_VM_OPTIONS`), so the user's configuration, VM options, logs and login items
-are untouched. Warm mode always uses an isolated home, whose `config.toml` turns residency on. `--real-home` measures
-the user's own setup and warns when the configured terminal program looks like tmux or screen, whose servers keep a
-session per launch.
+are untouched. Before each launch, priming launches included, the isolated home's `workspace.toml` is replaced with the
+one AOT training restores (one main window with one terminal tab), so every run restores the same window, whatever the
+run before it saved as it quit. Warm mode always uses an isolated home, whose `config.toml` turns residency on.
+`--real-home` measures the user's own setup, its saved windows included, and warns when the configured terminal
+program looks like tmux or screen, whose servers keep a session per launch.
 
 The benchmark refuses to start while any Jasper is running ("quit every Jasper (including a resident one) first",
 exit status 3): choose **Quit Jasper Completely** in Jasper's menu bar item, since Jasper stays resident by default.
@@ -247,6 +249,6 @@ whole report `incomplete` and the exit status 1. The JSON at the output path hol
 milliseconds from the click, plus the count, median, minimum and maximum per milestone; a `.json.md` companion lists the
 same summary as a table.
 
-Cold launches include residency's start-up work (the handoff endpoint is bound before the first window), which the
-[start-up baseline](benchmarks/2026-10-02-startup-baseline.md) predates, so its numbers are not strictly comparable
-with later cold runs. The AOT training launch is not resident.
+Cold launches include residency's start-up work (the handoff endpoint is bound before the first window) and restore
+the saved windows, both of which the [start-up baseline](benchmarks/2026-10-02-startup-baseline.md) predates, so its
+numbers are not strictly comparable with later cold runs. The AOT training launch is not resident.

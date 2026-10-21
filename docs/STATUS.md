@@ -72,7 +72,8 @@ Open items, as the entries below record them:
   Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
   Meadow splash and the Rail and Status Bar shortcuts (2026-10-20) await theirs. The workspace tabs series awaits the
   checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only tab, plans 7a to 8c, 6a and 6b; plan 2 had
-  none), and so do its two merge entries ("local main merged in", 2026-10-19, and the second sync, 2026-10-21).
+  none), and so do its two merge entries ("local main merged in", 2026-10-19, and the second sync, 2026-10-21). One
+  AOT training run should confirm the seeded `workspace.toml` (2026-10-21).
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
@@ -94,6 +95,35 @@ Open items, as the entries below record them:
 ## Handoff log
 
 Newest first. Each entry describes its change as it stood when the entry was written.
+
+**AOT training restores a seeded workspace.toml — 2026-10-21** (`claude/hopeful-newton-94a051`, off
+`claude/workspace-tabs` at `2b168a6af`; plan 6a's follow-up). The AOT training home now holds a `workspace.toml` with
+one main window (960 by 600 points at 100, 100) whose one tab holds one terminal item, so the training launch restores
+it as every start after the first does, and the cache holds the restore path's classes: `WorkspaceFile`'s reader,
+`WindowManager`'s and `WindowContent`'s restore, `WindowPlacement.restore`, and the `Layout` and `ParentTabs` read from
+the file. Placeholders stay untrained (the seed has no plugin item), and the training no longer takes the first
+start's path (`openNewMain`), whose terminal code the restore shares. The seed is the checked-in
+`jasper-app/src/main/resources/dev/jasper/app/benchmark/startup-workspace.toml` (`aotTrainingWorkspace` in
+`gradle/packaging-support.gradle`; `runAotTraining` copies it beside the training `config.toml`). `StartupBenchTest`
+checks that `WorkspaceFile.read` restores it as that snapshot with nothing kept aside and that its text is exactly what
+`WorkspaceFile.write` writes for it, so a format change fails the test until the seed is written again;
+`verifyPackagingSupport` checks that the training home holds it. The start-up benchmark re-seeds rather than deletes:
+`StartupRuns.seedWorkspace` copies the same file over the isolated home's `workspace.toml` before every launch,
+priming launches included, so every run restores the window the cache was trained on, whatever the run before saved
+as it quit (deleting it would measure the first start's path instead); `--real-home` leaves the user's file alone.
+`StartupBenchTest` pins this for cold and warm runs with a fake host that replaces the file as a quitting Jasper does.
+Guides: `packaging.md` (the training home, and where its window now appears), `benchmarks.md` and `app-maintenance.md`
+(the seed and its regeneration). `./gradlew check --continue`, run while other worktrees' builds held the 12-core
+Mac at load averages of 140 to 200: **12,609 tests, 39 failures, 0 errors, 29 skipped**, every other task passing. One
+failure was this change's: `ThemeMigrationCoverageTest`, because the new test's `new ArrayList` matched the consumer
+ledger's pattern; it now writes `new java.util.ArrayList`, as the file already did. The other 38, in `jasper-app` (the
+Settings mocks, the staged Remote surfaces, `StagedTransferLifecycleTest`, `WindowContentFirstTerminalTest` and
+others) and `jasper-plugin-remote` (`PublicationCrashTest`, `TransferStoreTest`, `AnchoredImportIntegrationTest`),
+touch nothing this change does; re-run by class, with the fixed test and the benchmark tests, all passed. No second
+full run. Not run, as briefed: AOT training (`trainAotCache`, `packageDist`, `-Pjasper.aot=true`), the GUI and any
+benchmark. For the user: run `./gradlew :jasper-app:trainAotCache` once (a
+window for a few seconds) to confirm that the restored start settles with its window shown, output painted and plugins
+bound, and that `verifyAotCache` accepts the cache. Not merged or pushed.
 
 **Workspace tabs: origin/main merged in (the second sync) — 2026-10-21** (`claude/workspace-tabs`, the merge of
 `origin/main` at `8c8776e7e` into `154aaf27b`, plan 6b's close; the merge base was the first sync's `f78bb0385`). Main

@@ -159,6 +159,11 @@ ext.aotTrainingConfig = { File shell ->
         '[terminal.shell]\nprogram = "/bin/sh"\nargs = ["' + path + '"]\n'
 }
 
+// The training launch's workspace.toml: one main window with one terminal tab, which it restores as a normal start
+// restores the saved windows, so the restore path's classes are in the cache. The start-up benchmark restores the same
+// file before each run (StartupRuns.WORKSPACE_SEED), and StartupBenchTest checks it is what WorkspaceFile writes.
+ext.aotTrainingWorkspace = project.file('src/main/resources/dev/jasper/app/benchmark/startup-workspace.toml')
+
 // Why a settled start-up trace (Plan 1's JSON) is unfit to train from, or null: it must be this launch's, and a cold
 // start that showed its window, painted the shell's output and bound every plugin.
 ext.trainingTraceProblem = { Map trace, long pid ->
@@ -185,10 +190,10 @@ ext.aotTrainingEnvironment = { Map<String, String> inherited, String javaToolOpt
 }
 
 // One training launch of launcher (Contents/MacOS/Jasper of the copy trainInCopy makes, so jpackage's launcher sets
-// everything a real launch has) in work, isolated like startupBench: user.home is work/home with the training configuration, and
-// JAVA_TOOL_OPTIONS asks for the cache, the start-up trace and no Dock icon. Once the trace has settled, SIGTERM; the
-// JVM assembles the cache while it exits, running the runtime's bin/java (whose output lands in the same log, and
-// whose JAVA_TOOL_OPTIONS the JVM replaces). Returns the cache; throws with the log's tail on any failure. The
+// everything a real launch has) in work, isolated like startupBench: user.home is work/home with the training configuration
+// and aotTrainingWorkspace, and JAVA_TOOL_OPTIONS asks for the cache, the start-up trace and no Dock icon. Once the trace
+// has settled, SIGTERM; the JVM assembles the cache while it exits, running the runtime's bin/java (whose output lands in
+// the same log, and whose JAVA_TOOL_OPTIONS the JVM replaces). Returns the cache; throws with the log's tail on any failure. The
 // seconds are boxed: Groovy 4.0.32 compiles a closure with two primitive long parameters to bytecode the verifier rejects.
 ext.runAotTraining = { File launcher, File work, Long settleSeconds, Long exitSeconds ->
     work.deleteDir()
@@ -199,6 +204,7 @@ ext.runAotTraining = { File launcher, File work, Long settleSeconds, Long exitSe
     shell.setText(aotTrainingShell, 'UTF-8')
     shell.setExecutable(true, false)
     config.setText(aotTrainingConfig(shell), 'UTF-8')
+    Files.copy(aotTrainingWorkspace.toPath(), new File(config.parentFile, 'workspace.toml').toPath())
     File trace = new File(work, 'startup-trace.json')
     File cache = new File(work, 'jasper.aot')
     File log = new File(work, 'training.log')

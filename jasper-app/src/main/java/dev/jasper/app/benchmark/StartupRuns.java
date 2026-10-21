@@ -3,9 +3,11 @@ package dev.jasper.app.benchmark;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.startup.StartupTraceFile;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -21,7 +23,9 @@ import java.util.function.Supplier;
 
 /**
  * Runs the start-up benchmark: each launch goes through LaunchServices ({@code open}), like a Dock click, with the trace
- * file and, by default, an isolated home passed in {@code JAVA_TOOL_OPTIONS}. Never part of the headless check.
+ * file and, by default, an isolated home passed in {@code JAVA_TOOL_OPTIONS}. Before each launch in the isolated home
+ * its saved windows are re-seeded ({@link #seedWorkspace}), so every run restores the same window; {@code --real-home}
+ * restores the user's own. Never part of the headless check.
  */
 final class StartupRuns {
     /** Process control, injected so the planning code stays testable. */
@@ -71,6 +75,32 @@ final class StartupRuns {
     /** The empty options file an isolated home gives Jasper's launcher, so the developer's jasper.vmoptions never applies. */
     static Path isolatedVmOptions(Path home) {
         return home.resolve(".config/jasper/jasper.vmoptions");
+    }
+
+    /**
+     * The saved windows every run in an isolated home restores, a resource beside this class: one main window with one
+     * terminal tab, the file AOT training restores too ({@code aotTrainingWorkspace} in
+     * {@code gradle/packaging-support.gradle}).
+     */
+    static final String WORKSPACE_SEED = "startup-workspace.toml";
+
+    /** Where an isolated home keeps Jasper's saved windows. */
+    static Path isolatedWorkspace(Path home) {
+        return home.resolve(".config/jasper/workspace.toml");
+    }
+
+    /**
+     * Replaces the isolated home's saved windows with {@link #WORKSPACE_SEED}, whatever the run before saved as it quit:
+     * every run then restores the same window, as a normal start restores the saved windows and as the AOT cache was
+     * trained.
+     */
+    static void seedWorkspace(Path home) throws IOException {
+        Path file = isolatedWorkspace(home);
+        Files.createDirectories(file.getParent());
+        try (InputStream seed = StartupRuns.class.getResourceAsStream(WORKSPACE_SEED)) {
+            if (seed == null) throw new IOException("No " + WORKSPACE_SEED + " beside " + StartupRuns.class.getName());
+            Files.copy(seed, file, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     static List<String> openCommand(Path app, String javaToolOptions, Path home, boolean background) {
@@ -149,6 +179,7 @@ final class StartupRuns {
             List<Map<String, Double>> measured = new ArrayList<>();
             String status = "ok";
             for (int index = 0; index < options.prime() + options.runs(); index++) {
+                if (home != null) seedWorkspace(home);
                 Map<String, Object> result = options.mode().equals("warm") ? warm(root, home, index) : cold(root, home, index);
                 if (index < options.prime()) continue;
                 runs.add(result);
