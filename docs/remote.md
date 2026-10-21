@@ -451,8 +451,8 @@ How copies behave:
 
 The queue is `plugins/dev.jasper.remote/data/transfers/queue.sqlite`, with `queue.lock` and SQLite's journal files. It
 holds paths, the route and logins and the decisions you made, never credentials or file contents, and it records which
-partial files are Remote's: keep it to clean up later. While another Jasper holds the lock, or the queue is damaged,
-transfers are unavailable (the status bar reads "Transfers unavailable") and SSH still works.
+partial files are Remote's: keep it to clean up later. While the queue cannot be locked or is damaged, transfers are
+unavailable (the status bar reads "Transfers unavailable") and SSH still works.
 
 ### Editing remote files
 

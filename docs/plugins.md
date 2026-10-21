@@ -180,8 +180,7 @@ rename it to the plugin id" and skips it.
 
 ### plugins.toml
 
-Jasper changes `plugins.toml` only as a locked read-modify-write, so several Jasper processes can share it. Each plugin
-with saved state has one table:
+Jasper changes `plugins.toml` only as a locked read-modify-write. Each plugin with saved state has one table:
 
 ```toml
 version = 1
@@ -206,7 +205,7 @@ counts as empty, so installed plugins wait for a review again rather than load u
 
 **File › Manage Plugins…** (also **Manage Plugins…** in the command palette) opens Settings at the Plugins page. The
 action's id is `plugins.manage`; it has no default shortcut. The page reads the disk again each time it is shown, so it
-also reflects changes another Jasper process made.
+also reflects changes made there since.
 
 The restart banner ([restarting](#restarting)), when there is one, runs across the top. Above the list are a **Search
 plugins** field, which matches a plugin's name, vendor, description or id, and a More button (**Plugin options**) that
@@ -395,8 +394,8 @@ active at a time; the restart banner names them.
 **Remove…** is offered for installed plugins only. Its sheet asks "Remove *name* *version*?" and explains: "Its jars,
 settings and data in *folder* are deleted the next time Jasper starts. Keep undoes this until then." **Remove** marks it;
 the row shows **Remove at restart** and its menu offers **Keep**. At the next launch, before any plugin loads, Jasper
-deletes the whole `plugins/<id>/` folder. A folder it cannot delete, for example because another Jasper process has its
-jars open, stays marked and the plugin does not load.
+deletes the whole `plugins/<id>/` folder. A folder it cannot delete, for example because another program has one of its
+files open, stays marked and the plugin does not load.
 
 Bundled plugins can be disabled but not removed; their details say "Bundled with Jasper; disable it here, or remove it
 from the application image." Removing an installed copy of a bundled plugin's id deletes `plugins/<id>/`, which holds

@@ -240,9 +240,10 @@ option:
 | Linux | `/opt/jasper/bin/Jasper --safe-mode` |
 | Windows | `Jasper.exe --safe-mode`, from Jasper's installation folder or the portable folder |
 
-A safe-mode Jasper starts as a separate process even while another Jasper runs in the background, and it never stays
-in the background itself. Settings › Plugins then shows "Safe mode: installed plugins are not loaded." Disable or
-remove the plugin there, then click **Restart Normally**. See [safe mode](plugins.md#safe-mode) in the plugins
+`--safe-mode` applies only to a Jasper that starts, so quit Jasper completely first: a launch while Jasper runs, in
+the background too, hands off to it, and the running Jasper says to quit it first. A safe-mode Jasper never stays in
+the background. Settings › Plugins then shows "Safe mode: installed plugins are not loaded." Disable or remove the
+plugin there, then click **Restart Normally**. See [safe mode](plugins.md#safe-mode) in the plugins
 guide.
 
 If Jasper itself does not start, its launcher tries again without its start-up cache and without your custom VM

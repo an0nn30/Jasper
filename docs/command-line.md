@@ -78,16 +78,16 @@ Usage: jasper [PATH...]
        jasper COMMAND [ARGUMENTS...]
        jasper --help
 
-With no arguments, brings Jasper forward. With PATH arguments, opens each file in the editor and each folder as
-a terminal tab; a COMMAND of the same name wins, so write ./NAME for such a file. With options, starts Jasper
-with them; a Jasper that is already running keeps its own and says so. With a COMMAND, runs it in the running
-Jasper. Jasper is started first when it is not running.
+With no arguments, brings Jasper forward. With PATH arguments, opens each file in the editor (or reveals it when
+no editor plugin runs) and each folder as a terminal tab; a COMMAND of the same name wins, so write ./NAME for
+such a file. With options, starts Jasper with them; a Jasper that is already running keeps its own and says so.
+With a COMMAND, runs it in the running Jasper. Jasper is started first when it is not running.
 ```
 
 | Form | What it does |
 |---|---|
 | `jasper` | Opens a Jasper window, or brings the last active one to the front, starting Jasper first when none is running, and exits with status 0. A window it opens does not start in the caller's working directory. |
-| `jasper PATH...` | Opens each file in the [Editor](editor.md#opening-files) and each folder as a terminal tab, in the running Jasper, starting it first when none is running. A subcommand of the same name wins, so `jasper ./editor` opens a file named `editor`. |
+| `jasper PATH...` | Opens each file in the [Editor](editor.md#opening-files), or reveals it when no editor plugin runs, and each folder as a terminal tab, in the running Jasper, starting it first when none is running. A subcommand of the same name wins, so `jasper ./editor` opens a file named `editor`. |
 | `jasper --help` | Prints the usage and the subcommands of the plugins that were running when Jasper last started, read from `daemon/subcommands` in Jasper home, without contacting Jasper. Before that file exists it prints "Start Jasper once to list the plugin commands." |
 | `jasper --<option> ...` | Any first argument starting with `--`, other than `--help`, starts Jasper with all the arguments (at most 64; with more it exits with status 1 and starts nothing), detached, in the caller's working directory and environment, so relative paths resolve there. Every [launcher option](#launching-jasper-with-options) works, including those the usage leaves out; while Jasper runs, the launch hands off and the running Jasper says that it keeps its own options. It exits with status 0 once it has started the launcher and does not wait, so a Jasper that rejects its arguments shows nothing. |
 | `jasper COMMAND [ARGUMENTS...]` | Runs a plugin's subcommand in the running Jasper. Its output reaches the caller's standard output and error as it is written, and `jasper` exits with the subcommand's exit code. Ctrl+C, or any other end of the `jasper` process, cancels the call. |

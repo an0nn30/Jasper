@@ -827,7 +827,7 @@ and the ghost is `StripeSet.ghost(icon)`.
 
 Under the default look the workspace boundaries are continuous chrome instead of painted rules: rail, toolbar, title
 bar and status bar have no edge strokes, and dock dividers paint nothing, so no UI update can give them a border or
-grip; terminal-internal splits keep their visible indicators. Under flush frames (a stripes look) each divider is a
+grip; the workspace's pane splits keep their visible dividers. Under flush frames (a stripes look) each divider is a
 painted 1 px rule, and the classic header and status bar draw their own rules. There `ToolWindowArea` activates a frame
 on any mouse press inside it, through an AWT event listener added in `addNotify` and removed in `removeNotify`, and
 `WindowContributions.toggleAndActivate` does so for a stripe click, `activatingToggle` for an `ACTIVATING_TOGGLE`

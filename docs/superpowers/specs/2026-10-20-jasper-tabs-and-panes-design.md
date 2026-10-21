@@ -132,7 +132,8 @@ type names (`TabHandle` is an item), and its Javadoc says what each one is.
     The landing overlay shows where.
   - **A tab in any window's strip:** hovering over it shows that tab, so the pane can then be dropped beside one of its
     panes.
-  - **A strip's empty end, or its "+":** the pane becomes a new tab there.
+  - **A strip's empty end, its "+", or an entry's outer quarter:** the pane becomes a new tab there (the equal tabs have
+    no "+" or empty end; amended 2026-10-21, plan 8c's ruling).
 - **Not a target:** outside every window, nothing happens. Panes never become windows, by the user's rule above. iTerm2
   would make a window here; Jasper does not.
 - **Ending a drag:**

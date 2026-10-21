@@ -122,8 +122,10 @@ Each tab holds one or more panes, and each pane one terminal, Editor file or plu
 - Hold Cmd+Option (Ctrl+Alt on Linux and Windows; on Windows the left Alt key) and drag inside a pane to move it: onto
   another pane of any window, which it splits on the side nearest the cursor; over the middle of a tab's entry, which
   shows that tab for the drop; or onto the outer quarter of a tab's entry (under the Enterprise look also its "+" or
-  the room after the tabs), where it becomes a new tab. Let go of the keys before pressing Escape to cancel. A pane
-  never becomes a window.
+  the room after the tabs), where it becomes a new tab. A pane never becomes a window. The keys start the drag; let go
+  of them before pressing Escape to cancel it, as Cmd+Option+Esc is Force Quit on macOS and Ctrl+Alt+Esc kills a window
+  on some Linux desktops (KDE, Xfce). A Linux desktop that moves windows with Ctrl+Alt-drag keeps that gesture for
+  itself.
 - Drag the line between two panes to resize them; each side keeps between 10 % and 90 %.
 - Click a pane to focus it, or use **Focus Pane Left**, **Right**, **Up** and **Down** (Cmd+Option+Arrow;
   Ctrl+Alt+Shift+Arrow), which pick the nearest pane in that direction.
@@ -303,9 +305,9 @@ next start uses the last saved layout.
 `toggle_zen_mode`) hides the status bar, both rails and every tool window that was showing, which Jasper remembers.
 The header, toolbar and tabs stay. A tool window you open while in Zen shows in its slot as usual, without the
 rails. Leaving Zen hides those and shows the remembered ones again. View › Show/Hide › Status Bar and Rail, and their
-shortcuts, are unavailable in Zen. Zen applies to the window you toggle it in; Jasper saves the last choice in
-`ui-state.toml`, and new windows and the next start begin in it. The saved layout keeps the tool windows that showed
-before Zen, so one opened in Zen is not saved as showing.
+shortcuts, are unavailable in Zen. Zen is the main window's: the main window opens in the Zen saved in
+`ui-state.toml` and saves it when it closes, and a child window has no Zen. The saved layout keeps the tool windows that
+showed before Zen, so one opened in Zen is not saved as showing.
 
 **Compact** (Settings › Appearance › View mode, `window.view_mode = "compact"`, after a restart) uses the system's
 title bar on every platform and removes the header row, so there is no search field or toolbar; the command palette

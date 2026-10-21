@@ -225,10 +225,10 @@ summary = "Run the deploy checks for the current folder"</code></pre>
 and the caller's standard output and error. The stage's value is the exit code (0 to 255; anything else is 1); a handler
 that throws, or a stage that fails, prints {@code jasper: <name> failed: <message>} and exits 1.
 {@link CommandCall#onCancelled(Runnable)} hears Ctrl+C. While no handler is registered, the command prints
-{@code jasper: <name> is unavailable (the <Name> plugin is off)} and exits 1; an unknown name exits 2. A Jasper started with
-{@code --plugin-dir}, {@code --safe-mode}, {@code --config} or {@code --standalone} answers {@code jasper} only in its own
-shells, so try a plugin's subcommand from a shell inside the {@code --plugin-dir} Jasper. {@code jasper --help} lists the
-subcommands of the plugins that were running when Jasper last started without those options.
+{@code jasper: <name> is unavailable (the <Name> plugin is off)} and exits 1; an unknown name exits 2. The Jasper that
+owns the home answers {@code jasper}, one started with {@code --plugin-dir} too, so a plugin's subcommand can be tried
+from any shell. {@code jasper --help} lists the subcommands of the plugins that were running when Jasper
+last started.
 {@link CommandLine#client()} is the path of the {@code jasper} command itself, for a plugin that writes it into another
 program's settings. See <a href="command-line.md">the command line</a>.</p>
 

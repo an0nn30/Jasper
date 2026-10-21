@@ -81,8 +81,8 @@ started. The plugin side is under
 [command-line subcommands](../../docs/plugin-authoring.md#command-line-subcommands).
 
 Other arguments go to Jasper as given, with the caller's working directory, and Jasper decides: a subcommand a plugin
-declares runs; otherwise, when every argument names an existing file or folder, each file opens in the editor and each
-folder as a terminal tab. No arguments bring Jasper forward.
+declares runs; otherwise, when every argument names an existing file or folder, each file opens in the editor, or is
+revealed when no editor plugin runs, and each folder as a terminal tab. No arguments bring Jasper forward.
 
 ## Sources and tests
 

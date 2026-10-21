@@ -20,12 +20,11 @@ Errors tab (**Notifications: Show Errors** in the command palette) shows the fol
 reads "Could not open the log folder".
 
 The files are named `jasper-<u>-<g>.log`, UTF-8; while a Jasper writes them, a `jasper-<u>-0.log.lck` lock file sits
-beside them. `<u>` is 0 for the first Jasper of that home running at the time, and another number for each Jasper
-running beside it. `<g>` is the generation: Jasper appends to generation 0 across launches and, once it reaches about
-1 MiB, renames it to 1 (and 1 to 2) and starts a new 0. Three generations are kept, so one Jasper's log never exceeds
-about 3 MiB. A launch that ends early writes no log: one that handed its request to a running Jasper, a `--background`
-launch that found a resident Jasper, a `--no-window` launch that found a Jasper serving the `jasper` command, and one
-that printed `--help` or rejected its arguments.
+beside them. `<u>` is 0: only the Jasper that owns the home writes its logs. `<g>` is the generation: Jasper appends
+to generation 0 across launches and, once it reaches about 1 MiB, renames it to 1 (and 1 to 2) and starts a new 0.
+Three generations are kept, so one Jasper's log never exceeds about 3 MiB. A launch that ends early writes no log: one
+that handed its request to the Jasper that owns the home, a `--background` or `--no-window` launch that found that
+Jasper running, and one that printed `--help` or rejected its arguments.
 
 Only records from Jasper's own loggers are written: names under `dev.jasper`, which include the terminal library,
 Buddy and each plugin's logger, `dev.jasper.plugins.<plugin id>` (what a plugin's `PluginContext.log()` returns).

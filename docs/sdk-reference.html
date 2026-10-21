@@ -1190,7 +1190,7 @@ windows and dialogs, palette scopes, file sources, subcommand handlers and event
 activities end as failed with "Plugin failed to start" and connections close; its notifications expire; staged services
 are discarded, so no other plugin ever sees them; its background tasks are interrupted; and the context closes. The
 plugin is reported as failed with "<i>Name</i> failed to start" (with <b>Disable Plugin</b> and <b>Show more…</b>, which
-opens the Errors window at its stack trace), and plugins that require it are skipped. <code>stop</code> is never called
+opens the Errors tab at its stack trace), and plugins that require it are skipped. <code>stop</code> is never called
 after a failed start.</p>
 
 <h3>stop</h3>
@@ -1247,11 +1247,12 @@ user removes an installed plugin. The settings file beside it, <code>plugins/&lt
 <h3>Safe mode and --plugin-dir</h3>
 <p><code>jasper --safe-mode</code> starts Jasper without any plugin installed in Jasper home and without any look; bundled
 plugins that provide no look, and a <code>--plugin-dir</code> plugin, still load. <code>jasper --plugin-dir &lt;folder&gt;</code> loads the
-plugin in that folder beside the others, without a capability review, as a separate, standalone Jasper that never hands
-off to the one already running. Use it to run the plugin you are building; see <a href="command-line.md">the command line</a>.
-A Jasper started with <code>--plugin-dir</code>, <code>--safe-mode</code>, <code>--config</code> or <code>--standalone</code> answers the
-<code>jasper</code> command only in its own shells and does not update the subcommand list <code>jasper --help</code> prints: try
-a plugin's subcommand from a shell inside the <code>--plugin-dir</code> Jasper.</p>
+plugin in that folder beside the others, without a capability review. Use it to run the plugin you are building; see
+<a href="command-line.md">the command line</a>. One Jasper runs per Jasper home: <code>--plugin-dir</code>, <code>--safe-mode</code>
+and <code>--config</code> apply only to a Jasper that starts, which is then never resident, and a launch while Jasper runs
+hands its request to that Jasper, which ignores the options and says to quit it first. The Jasper that owns the home
+serves <code>daemon/commands</code>, so <code>jasper</code> in any shell reaches it, and each Jasper that starts updates the
+subcommand list <code>jasper --help</code> prints.</p>
 </section>
 
 <section class="guide" id="threading">
@@ -1680,10 +1681,10 @@ degraded or down, until the plugin closes it; Desk Buddy shows a card per connec
 and the caller's standard output and error. The stage's value is the exit code (0 to 255; anything else is 1); a handler
 that throws, or a stage that fails, prints <code>jasper: &lt;name&gt; failed: &lt;message&gt;</code> and exits 1.
 <a href="#dev.jasper.sdk.cli.CommandCall.onCancelled(Runnable)"><code>CommandCall.onCancelled(Runnable)</code></a> hears Ctrl+C. While no handler is registered, the command prints
-<code>jasper: &lt;name&gt; is unavailable (the &lt;Name&gt; plugin is off)</code> and exits 1; an unknown name exits 2. A Jasper started with
-<code>--plugin-dir</code>, <code>--safe-mode</code>, <code>--config</code> or <code>--standalone</code> answers <code>jasper</code> only in its own
-shells, so try a plugin's subcommand from a shell inside the <code>--plugin-dir</code> Jasper. <code>jasper --help</code> lists the
-subcommands of the plugins that were running when Jasper last started without those options.
+<code>jasper: &lt;name&gt; is unavailable (the &lt;Name&gt; plugin is off)</code> and exits 1; an unknown name exits 2. The Jasper that
+owns the home answers <code>jasper</code>, one started with <code>--plugin-dir</code> too, so a plugin's subcommand can be tried
+from any shell. <code>jasper --help</code> lists the subcommands of the plugins that were running when Jasper
+last started.
 <a href="#dev.jasper.sdk.cli.CommandLine.client()"><code>CommandLine.client()</code></a> is the path of the <code>jasper</code> command itself, for a plugin that writes it into another
 program's settings. See <a href="command-line.md">the command line</a>.</p>
 
@@ -1708,8 +1709,8 @@ notification group, never thrown.</p>
 <a href="#dev.jasper.sdk.ui.ViewSpec"><code>ViewSpec</code></a>; its <a href="#dev.jasper.sdk.ui.UiKit"><code>UiKit</code></a> turns the tree into a <a href="#dev.jasper.sdk.ui.UiView"><code>UiView</code></a> that Jasper draws. Jasper owns every pixel:
 colours, fonts, spacing, focus, keyboard behaviour and the current look's control styles, so a plugin's tool window
 looks and behaves like Jasper's own, in every theme and look. The plugin receives typed <a href="#dev.jasper.sdk.ui.UiEvent"><code>UiEvent</code></a>s and answers
-with <a href="#dev.jasper.sdk.ui.UiView.update(ViewSpec)"><code>UiView.update(ViewSpec)</code></a>. The same views fill tool windows, plugin windows, dialogs, overlays, popovers,
-content tabs, toolbar groups and settings pages. For worked compositions, see <a href="plugin-ui.md">plugin UI</a>.</p>
+with <a href="#dev.jasper.sdk.ui.UiView.update(ViewSpec)"><code>UiView.update(ViewSpec)</code></a>. The same views fill tool windows, dialogs, overlays, popovers, content tabs,
+toolbar groups and settings pages. For worked compositions, see <a href="plugin-ui.md">plugin UI</a>.</p>
 
 <h3>A view</h3>
 <p>This tool window lists deploy targets and filters them as the user types. The plugin keeps the state (the query and

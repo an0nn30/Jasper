@@ -77,8 +77,8 @@ Jasper build, or any change to the look's files, gives the look a fresh try by i
 | `state` | `pending`, `proven` or `failed` |
 | `announced` | the digest whose invalid kit file was last reported |
 
-The file starts with `version = 1`. Several Jasper processes can write it, so each change is made under
-`presentation-attempt.lock`; content Jasper cannot read counts as empty.
+The file starts with `version = 1`. Each change is made under `presentation-attempt.lock`; content Jasper cannot read
+counts as empty.
 
 ### Other problems
 

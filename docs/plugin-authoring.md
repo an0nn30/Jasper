@@ -501,6 +501,12 @@ tabs, dialogs, overlays and popovers when the plugin stops. A view of the plugin
 form's Escape runs the form's cancel action. A dialog also closes, running its `onClosed` handlers, when the Jasper
 window that owns it closes, and Jasper does not restore it with its windows. Dialogs do not remember their bounds.
 
+`onClosing(guard)` adds a guard asked when the user closes the dialog: one returning false keeps it open, and one that
+throws allows the close; an overlay has no close of the user's own. `close()` closes it at once, without asking the
+guards, and does nothing once it has closed. `onClosed(handler)` runs once after it has closed, for any reason.
+`setTitle` changes its title. `toFront()` brings a dialog to the front, restoring it if minimized, and focuses an
+overlay's content.
+
 | [`DialogSpec.Presentation`](sdk-reference.html#dev.jasper.sdk.ui.DialogSpec.Presentation) | What the default look draws |
 | --- | --- |
 | `CENTERED` | A dialog centred over its owner, sized to its content; the user cannot resize it. |
@@ -577,10 +583,10 @@ the tab strip, the window, its menus and the status bar; the plugin provides the
   the item to close, and Close Tab every item of its tab.
 - `setStatus(List<ContentStatus>)`: items in the status bar while the tab is active, each plain text or a button.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new child window
-  and `moveToMainWindow()` to the main window, keeping the view and its state, and `window()` is the window that holds
-  it (`WindowHandle.isMain()` tells the main window from a child window). `moveToNewTab()` gives its pane a tab of its
-  own, disabled while `mayMoveToNewTab()` is false. The tab is an item of its window: `WindowHandle.tabs()` lists it and
-  the `TAB_*` topics report it.
+  (a child window's only tab stays where it is) and `moveToMainWindow()` to the main window, keeping the view and its
+  state, and `window()` is the window that holds it (`WindowHandle.isMain()` tells the main window from a child window).
+  `moveToNewTab()` gives its pane a tab of its own, disabled while `mayMoveToNewTab()` is false. The tab is an item of
+  its window: `WindowHandle.tabs()` lists it and the `TAB_*` topics report it.
 - Pass the `ContentTab` as the owner of dialogs and pickers, so they follow the tab to another window.
 - `windows().onTabsClosing((tabs, batch) -> future)` registers the plugin's one close guard. It receives the tabs about
   to close and whether a window, quit or restart is closing them; complete the future with false to keep them, for
@@ -880,7 +886,7 @@ private static void installTerminalDemo(PluginContext context) {
 | --- | --- | --- |
 | `WINDOW_OPENED`, `WINDOW_CLOSED`, `WINDOW_ACTIVATED` | `WindowEvent` | A Jasper window opens, closes, becomes active; the main window stays open when its last tab closes. |
 | `TAB_OPENED`, `TAB_CLOSED`, `TAB_SELECTED` | `TabEvent` | An item, terminal or content, opens, closes, or becomes its window's active one. |
-| `TAB_MOVED` | `TabMoved` | An item moves to another window, instead of a close and an open: a moved terminal reports no `PANE_OPENED` or `PANE_CLOSED`, and its pane keeps its id. A window the move empties reports `WINDOW_CLOSED`, and a window opened for the move `WINDOW_OPENED`, before the `TAB_MOVED`; ask `pane.tab().window()` again rather than keeping a pane's window. |
+| `TAB_MOVED` | `TabMoved` | An item moves to another window, instead of a close and an open: a moved terminal reports no `PANE_OPENED` or `PANE_CLOSED`, and its pane keeps its id. A window opened for the move reports `WINDOW_OPENED` before the `TAB_MOVED`, and a window the move empties `WINDOW_CLOSED` after it; ask `pane.tab().window()` again rather than keeping a pane's window. |
 | `PANE_OPENED`, `PANE_CLOSED`, `PANE_FOCUSED`, `BELL` | `PaneEvent` | A pane opens, closes, takes the focus, rings its bell. |
 | `ACTIVE_PANE_CHANGED` | `ActivePaneChanged` | The active pane changes, or there is none. |
 | `TITLE_CHANGED` | `TitleChanged` | A pane's title changes. |

@@ -1,15 +1,15 @@
 # Notifications
 
 Jasper and its plugins tell you about errors and results with notifications instead of dialogs that stop your work.
-A notification shows as a card in a window, waits in the Notifications panel until you have read it, and, while
+A notification shows as a card in the main window, waits in the Notifications panel until you have read it, and, while
 Jasper is in the background, also shows as the operating system's own notification. Notifications are kept in memory
 only, at most the latest 500: they start fresh every time Jasper starts, and a resident Jasper (one still running with
 no window open) keeps them until it quits completely.
 
 ## Cards
 
-A card appears in the bottom-right corner of the tool window area of the window it concerns, or of the window you used
-last, above the status bar and over any tool window docked there. It shows:
+A card appears in the bottom-right corner of the main window's tool window area, above the status bar and over any tool
+window docked there. It shows:
 
 - an icon for its severity (information, warning or error), or one its sender chose, in the severity's colour;
 - a bold title, followed by `×N` when it arrived more than once;
@@ -97,10 +97,10 @@ on screen stays. The same choices live in `config.toml` under
 A command that ran at least `notifications.long_command_seconds` (10 seconds by default) and finished anywhere but the
 pane you were typing in, a visible but unfocused split pane included, is posted in Long-running commands. The title is
 the command on one line ("Command" when it shows nothing), and the details read "Finished in 1m 12s" (information) or
-"Exited 2 · 45s" (warning). Its card shows in the pane's window, and clicking the card focuses the pane; while Jasper
-is in the background its [system notification](#system-notifications) does. Closing the pane expires the
-notification. The same command finishing with the same result and the same duration text within a minute counts on one
-entry, which then points at the pane it last came from.
+"Exited 2 · 45s" (warning). Clicking its card focuses the pane; while Jasper is in the background its
+[system notification](#system-notifications) does. Closing the pane expires the notification. The same command
+finishing with the same result and the same duration text within a minute counts on one entry, which then points at the
+pane it last came from.
 
 This needs [shell integration](terminal.md#shell-integration): the duration is measured between the command marks
 its scripts emit, so a shell without them produces no notifications. `0` turns these notifications off. The
@@ -127,15 +127,16 @@ When something fails unexpectedly, in Jasper or in a plugin, Jasper records it a
 error notification: "Unexpected error in Jasper", or, for a plugin, "<name> failed to start", "<name> failed to stop"
 or "<name> failed in <operation>". A plugin's offers **Disable Plugin**, and both offer **Show more…**, which opens the
 Errors tab at that incident, in the main window. **Notifications: Show Errors** in the command palette opens the tab too. A shell that
-could not start is recorded as well: each failure is announced as "Could not start the terminal" in the window it
-happened in, with its folder and cause, and offers **Show more…**.
+could not start is recorded as well: each failure is announced as "Could not start the terminal", with its folder and
+cause, and offers **Show more…**.
 
-The **Errors** window lists this session's incidents, most recently seen first: each row shows the summary, the
+The **Errors** tab lists this session's incidents, most recently seen first: each row shows the summary, the
 source (Jasper or the plugin's name), "×N" once it happened more than once, and the time. When the same failure
 happens again (the same source, exception and top frames of its root cause), its row counts up and moves to the top
 instead of a new row appearing. For a failure of Jasper or of a plugin, its notification counts up too, at most once a
 second, and its card shows again at most once a minute. The right side shows the selected incident: who failed and
-what it was doing, when it was first and last seen and how often, its **Message** and its **Stack Trace**.
+what it was doing, when it was first and last seen and how often, its **Message** and its **Stack Trace**. The footer
+counts this session's errors ("No errors this session"). The tab closes like any other tab.
 
 - **Copy** puts a report on the clipboard: Jasper's version, your OS and Java runtime, the plugin and its version for a
   plugin's incident, the operation and thread, how often it happened, and the stack trace. Paste it into a bug report.
@@ -144,7 +145,6 @@ what it was doing, when it was first and last seen and how often, its **Message*
 - **Open Log Folder** shows Jasper's [log files](diagnostics.md#logs).
 - **Clear** empties the list. Notifications of cleared incidents stay in the Notifications panel with their links
   disabled.
-- **Done** or Escape closes the window. The footer counts this session's errors ("No errors this session").
 
 Incidents are kept in memory only, at most the latest 100, with a message of up to 16,384 characters and a stack trace
 of up to 262,144 characters each. They are gone when Jasper quits completely; a resident Jasper keeps them, like the
@@ -188,7 +188,7 @@ opens [finished-command notifications](configuration.md#finished-command-notific
 | Command | Does |
 |---|---|
 | Notifications: Show History | Opens or closes the Notifications panel |
-| Notifications: Dismiss Cards | Marks every card in the window read, showing or waiting, and closes them |
+| Notifications: Dismiss Cards | Marks every card in the main window read, showing or waiting, and closes them |
 | Notifications: Show Errors | Opens the Errors tab |
 
 None has a default shortcut; assign one in Settings › Keymap.
@@ -202,7 +202,7 @@ ended is a notification.
 ### Showing him
 
 Turn him on with **Show Jasper** (`buddy.enabled`, off by default) in Settings › Appearance & Behavior › **Desk
-Buddy**; the change applies at once. He shows while at least one workspace window is open and not minimised. The palette
+Buddy**; the change applies at once. He shows while the main window is open and not minimised. The palette
 command **Show Jasper** / **Hide Jasper**, and **Hide Jasper** on his right-click menu, show or hide him for this
 session only; saving a new `buddy.enabled` value ends that choice. When the system has no always-on-top or translucent
 windows, he stays off for the session and the log says "Desk buddy disabled".
@@ -217,9 +217,9 @@ windows, he stays off for the session and the log says "Desk buddy disabled".
 | right-click | shows a bubble with **Hide Jasper**, which hides after five seconds or when the pointer leaves it |
 | drag (3 px or more) | moves; letting go saves his place |
 
-He fades in with sparkles and a wave when he appears, and greets you when you come back to a workspace window. Left
+He fades in with sparkles and a wave when he appears, and greets you when you come back to a Jasper window. Left
 alone he blinks every few seconds, sits down after 20 seconds, and after a minute tucks into his shell and sleeps;
-typing in a workspace window wakes him.
+typing in a Jasper window wakes him.
 
 ### Capsules and the drawer
 

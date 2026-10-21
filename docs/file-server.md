@@ -61,10 +61,10 @@ No File Server command has a default shortcut; assign one in
 
 ## The File Servers tool window
 
-**Toggle File Servers** shows or hides the tool window. It starts in the left side's top slot, and each window has its
-own (see [Tool windows and the dock](workspace.md#tool-windows-and-the-dock)). Its header shows how many servers there
-are and **New File Server…** (**+**). With no servers it shows "No File Servers" and **Share Folder…**, which opens New
-File Server.
+**Toggle File Servers** shows or hides the tool window. It starts in the left side's top slot of the main window, which
+alone has tool windows (see [Tool windows and the dock](workspace.md#tool-windows-and-the-dock)). Its header shows how
+many servers there are and **New File Server…** (**+**). With no servers it shows "No File Servers" and **Share
+Folder…**, which opens New File Server.
 
 Saved servers are listed in the order of `servers.toml`, then a **Temporary** heading and the temporary servers. Each
 row shows the server's name; its protocol (HTTP blue, FTP amber, SFTP green, TFTP purple); its address (the first

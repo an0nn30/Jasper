@@ -60,7 +60,7 @@ windows and dialogs, palette scopes, file sources, subcommand handlers and event
 activities end as failed with "Plugin failed to start" and connections close; its notifications expire; staged services
 are discarded, so no other plugin ever sees them; its background tasks are interrupted; and the context closes. The
 plugin is reported as failed with "<i>Name</i> failed to start" (with <b>Disable Plugin</b> and <b>Show more…</b>, which
-opens the Errors window at its stack trace), and plugins that require it are skipped. {@code stop} is never called
+opens the Errors tab at its stack trace), and plugins that require it are skipped. {@code stop} is never called
 after a failed start.</p>
 
 <h3>stop</h3>
@@ -117,9 +117,10 @@ user removes an installed plugin. The settings file beside it, {@code plugins/<i
 <h3>Safe mode and --plugin-dir</h3>
 <p>{@code jasper --safe-mode} starts Jasper without any plugin installed in Jasper home and without any look; bundled
 plugins that provide no look, and a {@code --plugin-dir} plugin, still load. {@code jasper --plugin-dir <folder>} loads the
-plugin in that folder beside the others, without a capability review, as a separate, standalone Jasper that never hands
-off to the one already running. Use it to run the plugin you are building; see <a href="command-line.md">the command line</a>.
-A Jasper started with {@code --plugin-dir}, {@code --safe-mode}, {@code --config} or {@code --standalone} answers the
-{@code jasper} command only in its own shells and does not update the subcommand list {@code jasper --help} prints: try
-a plugin's subcommand from a shell inside the {@code --plugin-dir} Jasper.</p>
+plugin in that folder beside the others, without a capability review. Use it to run the plugin you are building; see
+<a href="command-line.md">the command line</a>. One Jasper runs per Jasper home: {@code --plugin-dir}, {@code --safe-mode}
+and {@code --config} apply only to a Jasper that starts, which is then never resident, and a launch while Jasper runs
+hands its request to that Jasper, which ignores the options and says to quit it first. The Jasper that owns the home
+serves {@code daemon/commands}, so {@code jasper} in any shell reaches it, and each Jasper that starts updates the
+subcommand list {@code jasper --help} prints.</p>
 </section>

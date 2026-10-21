@@ -141,10 +141,11 @@ Its read is strict (exactly `version = 1` and integer `x` and `y`, at most 4 KiB
 unreadable file is logged and ignored. Its write goes to a temporary file moved into place,
 atomically where the file system allows. BuddyIntegration shows Buddy while he is enabled
 (`buddy.enabled`, or the session toggle flipped by the menu bubble's **Hide Jasper** and
-the **Show Jasper**/**Hide Jasper** command) and at least one workspace window
-(a `workspace.JasperWindow`) is showing and not minimized; auxiliary windows do not count. It
-calls `greet` when a workspace window becomes active, and owns the key listener that pokes
-on key presses in workspace windows at most once a second. Visibility reasons live in
+the **Show Jasper**/**Hide Jasper** command) and the main window is showing and not
+minimized, as `JasperApplication.windowStateChanged` reports it; child and auxiliary windows
+do not count. It calls `greet` when a Jasper window (a `workspace.JasperWindow`) becomes
+active, and owns the key listener that pokes on key presses in Jasper windows at most once a
+second. Visibility reasons live in
 [BuddyVisibility](../jasper-app/src/main/java/dev/jasper/app/notifications/BuddyVisibility.java).
 
 Two producers post notices. [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java)

@@ -40,8 +40,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** This branch after the second sync (2026-10-21): 12,600 tests, 0 failures, 0 errors, 29
-  skipped. `./gradlew check` on local `main` with the Editor's typography and Markdown preview and the
+- **Last recorded checks.** This branch after the second sync's fix wave (2026-10-21): 12,604 tests, 0 failures, 0
+  errors, 29 skipped. `./gradlew check` on local `main` with the Editor's typography and Markdown preview and the
   bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in
   Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
   `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
@@ -70,7 +70,9 @@ Open items, as the entries below record them:
   Enterprise look's, in the series entry (2026-10-18, spec 16.2); the side stripes entry and plans 13, 14, 15a and 15b
   add their own, plan 14's starting with the classic title band in the packaged macOS app. The Editor's fonts and
   Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
-  Meadow splash and the Rail and Status Bar shortcuts (2026-10-20) await theirs.
+  Meadow splash and the Rail and Status Bar shortcuts (2026-10-20) await theirs. The workspace tabs series awaits the
+  checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only tab, plans 7a to 8c, 6a and 6b; plan 2 had
+  none), and so does its second sync's merge entry (2026-10-21).
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
@@ -117,7 +119,8 @@ Main's new guides (`workspace.md`, `command-line.md`, `getting-started.md`, `plu
 window and child windows, tabs of panes, the Split submenu and pane drags, `workspace.toml`, one Jasper per home (no
 `--standalone`), the Errors tab and the Vault manager as a dialog. Plan 6b's three hand-offs are done here:
 `docs/sdk-reference.html` regenerated, `EditorDocument.readQuietly` in `plugin-apis.md`, `SavedRemoteDocument` in
-`AGENTS.md`. Nothing of main's was left out. Versions: SDK 0.21.0 (main's 0.18.2 and 0.18.3 additions included;
+`AGENTS.md`. Nothing of main's was left out except what plan 1 removed (`--standalone`, Launch Anyway, Quit It and
+Restart). Versions: SDK 0.21.0 (main's 0.18.2 and 0.18.3 additions included;
 every bundled range `sdk = ">=0.21.0, <0.22"`), Editor 0.13.0, Remote 0.16.0, sample 0.5.0, Enterprise 0.3.0 (main's,
 with the branch's range), Credential Vault 0.7.0 and File Server 0.6.0 (the same number on both sides, now holding
 both sides' changes; neither shipped). The first `./gradlew check --continue` after resolving: 12,600 tests, 7
@@ -128,8 +131,14 @@ main window has painted; View › Show/Hide › Rail and Status Bar, and their b
 disabled in a child window and in Zen; under Enterprise the toolbar's Search Everywhere icon sits before Settings… and
 the window's ⋮; a tool window's own toggle shortcut activates it under Enterprise, also from a child window; a
 Markdown file in a pane beside a terminal shows its preview, and Split Right with Editor beside it opens a new file; a
-restored Markdown file comes back in its saved view; the Editor's tab menu shows Close Pane with no shortcut and Cmd+W
-closes the pane; on Windows, Manage Cygwin packages… from a child window. Not merged into `main`, not pushed.
+restored Markdown file comes back in its saved view; the Editor's tab menu lists no Close Pane of its own and Cmd+W
+closes the pane; on Windows, Manage Cygwin packages… from a child window. The merge's fix wave (its code and docs
+reviews): a Markdown preview follows whether its pane shows, not the focus (`EditorWindow` keeps a hosted tab's preview
+active and `MarkdownController` suspends a view that does not show), so one beside a focused terminal keeps its images
+and one restored into a pane without the focus renders; the Editor no longer publishes Close Pane (main's rule; the
+host's Close Pane closes the pane, and Vim's `:action close-pane` still runs it); the guides, the SDK reference guide
+pages and the `jasper` usage text match the merged code; `./gradlew check --continue`: **12,604 tests, 0 failures, 0
+errors, 29 skipped**. Not merged into `main`, not pushed.
 
 **Workspace tabs, plan 6b: plugins' tabs come back — 2026-10-21** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `eefe0324e..b22836d14`, then this documentation commit and its final-review fix

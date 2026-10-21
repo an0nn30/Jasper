@@ -15,6 +15,7 @@ Planned **after the Enterprise presentation series** (its plans 6–11) has merg
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
 Amended 2026-10-19 (approved): parent tabs, panes, pane windows and the window menu, in
 [`2026-10-19-jasper-parent-tabs-design.md`](2026-10-19-jasper-parent-tabs-design.md), which wins where the two disagree.
+Amended 2026-10-20 by the [tabs and panes spec](2026-10-20-jasper-tabs-and-panes-design.md), which wins where they disagree.
 
 ## 1. Intent and decisions
 

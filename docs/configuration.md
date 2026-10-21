@@ -43,7 +43,7 @@ option and the `jasper` command.
 | `ui-state.toml`, `command-history.toml`, `buddy.toml` | [Application state](#application-state-files). |
 | `logs/` | Jasper's log files ([Diagnostics](diagnostics.md)). |
 | `shell-integration/` | The [shell integration](#shell-integration) scripts, extracted at every start. |
-| `daemon/` | The resident process's socket, token and lock, the `jasper` command's sockets, and the plugin commands `jasper --help` lists ([Command line](command-line.md)). |
+| `daemon/` | Owner-only. The instance lock (`instance.lock`), which the Jasper that owns the home holds whether or not it is resident; its two sockets and their tokens, the handoff socket a second launch hands its request to before it exits and the `jasper` command's socket (`commands`); and the plugin commands `jasper --help` lists. On macOS a Dock click reaches the running Jasper and never creates a process ([one Jasper per home](command-line.md#one-jasper-per-home)). |
 | `jasper-aot.failed` | On macOS, the record that the start-up cache failed, so Jasper starts without it ([Diagnostics](diagnostics.md#start-up-cache-packaged-macos-app)). |
 | `presentation-attempt.toml`, `presentation-attempt.lock` | Whether the last start with a plugin's look finished, and the lock held while that file changes ([Looks](looks.md#the-attempt-record)). |
 | `notification-icon.png` | Jasper's icon for `notify-send` on Linux. |
@@ -268,7 +268,7 @@ size = 14
 search field, and opens the command palette as a floating card; `"normal"` (the default) keeps the full workspace
 header. The change applies after a restart, and `window.toolbar` keeps its value for a return to Normal.
 
-Zen (View › View Modes › Zen) hides the status bar and tool windows in one window. It is not a setting: Jasper keeps it
+Zen (View › View Modes › Zen) hides the main window's status bar and tool windows. It is not a setting: Jasper keeps it
 as `zen_mode` in [`ui-state.toml`](#ui-statetoml). Its action, `toggle_zen_mode`, has no default shortcut.
 [The workspace](workspace.md) describes both modes.
 
@@ -337,7 +337,7 @@ kept in [`ui-state.toml`](#ui-statetoml). [Command palette](command-palette.md) 
 
 ### Desk buddy
 
-`buddy.enabled` shows the pixel-art Jasper who floats above your windows while a workspace window is open and not
+`buddy.enabled` shows the pixel-art Jasper who floats above your windows while the main window is open and not
 minimised. The command palette's **Show Jasper**/**Hide Jasper** and his right-click **Hide Jasper** show or hide him
 for the session only; a saved change to `buddy.enabled` replaces that choice. His position is kept in `buddy.toml` in
 Jasper's home. [Notifications](notifications.md) describes what he shows.

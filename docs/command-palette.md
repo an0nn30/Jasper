@@ -205,7 +205,7 @@ scope. A file with no uses is written as `version = 1` with `recent` alone. The 
 128 KiB; a missing file means no history, and an unreadable or invalid one is logged and ignored.
 
 Jasper writes the file after every change, on a background thread, through a temporary file that replaces it. Quitting
-waits up to two seconds for the last write. Separate Jasper processes do not lock the file: the last one to write wins.
+waits up to two seconds for the last write.
 
 ## Settings and saved state
 
