@@ -162,6 +162,11 @@ class AppContractTest extends PluginContractTest {
                 tab -> {
                     terminalFixture.moveToNewTab(tab.id().value());
                     for (var other : tabs.inWindow(id)) other.active(other == tab);
+                },
+                tab -> terminalFixture.tabChoices(tab.id().value()),
+                (tab, number) -> {
+                    terminalFixture.moveToTab(tab.id().value(), number);
+                    for (var other : tabs.inWindow(id)) other.active(other == tab);
                 }));
             terminalFixture.onWindowClosed(id, () -> {
                 registration.close();

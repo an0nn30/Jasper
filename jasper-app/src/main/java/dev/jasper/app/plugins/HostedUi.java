@@ -599,6 +599,11 @@ final class HostedUi {
         public void moveToMainWindow() { requireUi("move content"); entry.moveToMainWindow(); }
         public void moveToNewTab() { requireUi("move content"); model.tabs().moveToNewTab(entry); }
         public boolean mayMoveToNewTab() { requireUi("move content"); return model.tabs().mayMoveToNewTab(entry); }
+        public List<dev.jasper.sdk.ui.TabChoice> tabChoices() {
+            requireUi("move content");
+            return model.tabs().tabChoices(entry).stream().map(other -> new dev.jasper.sdk.ui.TabChoice(other.number(), other.title())).toList();
+        }
+        public void moveToTab(int number) { requireUi("move content"); model.tabs().moveToTab(entry, number); }
         public void split(dev.jasper.sdk.ui.SplitChoice choice, dev.jasper.sdk.terminal.Direction direction) {
             requireUi("split content");
             java.util.Objects.requireNonNull(choice, "choice");

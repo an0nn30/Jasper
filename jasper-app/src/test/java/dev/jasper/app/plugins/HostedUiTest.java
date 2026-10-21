@@ -632,7 +632,8 @@ class HostedUiTest {
             return splits[0];
         };
         model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
-            tab -> Optional.empty(), (tab, group, side) -> { }, split::test, tab -> false, tab -> { }));
+            tab -> Optional.empty(), (tab, group, side) -> { }, split::test, tab -> false, tab -> { }, tab -> java.util.List.of(),
+            (tab, number) -> { }));
         var notes = ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), terminals.windowHandle(window), view());
         UUID id = model.tabs().inWindow(window).getFirst().id().value();
         assertThatIllegalStateException().as("no gate set")

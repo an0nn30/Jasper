@@ -286,6 +286,33 @@ final class FakeWorkspace {
         select(tab);
     }
 
+    /** The window's tabs in strip order. */
+    List<Group> strip(Window window) {
+        var groups = new ArrayList<Group>();
+        for (Tab tab : window.tabs) if (groups.isEmpty() || groups.getLast() != tab.group) groups.add(tab.group);
+        return groups;
+    }
+
+    /**
+     * Move Pane to Tab (pane flexibility spec 4): {@code tab} leaves its tab for a new pane right after the shown item of
+     * the tab numbered {@code number} in its window's strip, where it is selected; its old tab goes with its last pane.
+     * Its own tab's number and one no tab has move nothing.
+     */
+    void moveToTab(Tab tab, int number) {
+        Window window = tab.window;
+        List<Group> strip = strip(window);
+        if (!tab.open || number < 1 || number > strip.size() || strip.get(number - 1) == tab.group) return;
+        Group to = strip.get(number - 1), from = tab.group;
+        Tab beside = to.recent.getFirst();
+        window.tabs.remove(tab);
+        from.recent.remove(tab);
+        if (from.recent.isEmpty()) window.recent.remove(from);
+        tab.group = to;
+        to.recent.add(tab);
+        window.tabs.add(window.tabs.indexOf(beside) + 1, tab);
+        select(tab);
+    }
+
     /** A pane closes with its item. */
     void close(Pane pane) { if (pane.open) close(pane.tab); }
 

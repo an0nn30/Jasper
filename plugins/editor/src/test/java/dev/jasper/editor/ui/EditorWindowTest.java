@@ -1350,6 +1350,40 @@ class EditorWindowTest {
         assertThat(host.fileChoices()).as("the entry runs its action, which asks").hasSize(1);
     }
 
+    /**
+     * Pane flexibility spec 4: an editor's right-click menu lists the window's other tabs after Move Pane to New Tab, as
+     * plain text, and moves its pane into one; in a window of one tab the submenu shows disabled.
+     */
+    @Test void anEditorsRightClickMenuMovesItsPaneIntoAnotherTab() throws Exception {
+        UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
+        UUID bold = host.addTerminalTab(main, "<html><b>B");
+        WindowHandle handle = context.terminals().window(main).orElseThrow();
+        window.openLocal(file("a.txt", "a"), handle);
+        drain();
+        UUID editor = host.windowTabs(main).get(2).getFirst();
+        var popup = window.selected().orElseThrow().area().getPopupMenu();
+        opened(popup);
+        var moves = submenu(popup, "Move Pane to Tab");
+        assertThat(texts(moves)).containsExactly("1 zsh", "2 <html><b>B");
+        assertThat(moves.isEnabled()).isTrue();
+        for (var child : moves.getMenuComponents())
+            assertThat(((javax.swing.JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
+                .as("%s renders no HTML", ((javax.swing.JMenuItem) child).getText()).isNull();
+        var children = List.of(popup.getComponents());
+        assertThat(children.indexOf(moves)).as("after Move Pane to New Tab")
+            .isEqualTo(children.indexOf(item(popup.getComponents(), "Move Pane to New Tab")) + 1);
+        item(moves.getMenuComponents(), "1 zsh").doClick();
+        assertThat(host.windowTabs(main)).as("to the right of the shell, its old tab gone")
+            .containsExactly(List.of(shell, editor), List.of(bold));
+        var lone = host.addTerminalWindow();
+        window.openLocal(file("b.txt", "b"), context.terminals().window(lone).orElseThrow());
+        drain();
+        var only = window.selected().orElseThrow().area().getPopupMenu();
+        opened(only);
+        assertThat(submenu(only, "Move Pane to Tab").isEnabled()).as("a window of one tab").isFalse();
+        assertThat(texts(submenu(only, "Move Pane to Tab"))).isEmpty();
+    }
+
     /** The menu opening, as a right-click shows it: the Editor's pane entries are built again. */
     private static void opened(javax.swing.JPopupMenu popup) {
         for (var listener : popup.getPopupMenuListeners())

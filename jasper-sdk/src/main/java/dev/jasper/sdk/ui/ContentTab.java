@@ -85,6 +85,25 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     boolean mayMoveToNewTab();
     /**
+     * Move Pane to Tab's choices (pane flexibility spec 4): the other tabs of this item's window, in strip order, for a
+     * menu the plugin builds, which shows disabled while there is none.
+     *
+     * @return the choices; none while the window has one tab, and none for a tab with a modal prompt open, a tab being
+     *     closed or a closed one
+     * @since 0.21.0
+     */
+    List<TabChoice> tabChoices();
+    /**
+     * Move Pane to Tab (pane flexibility spec 4): the pane showing this item moves to the right of the active pane of the
+     * tab numbered {@code number} in its window's strip, which then shows, this item focused; no item closes or leaves the
+     * window; its old tab closes with its last pane, and a maximized pane of the tab it joins stops being maximized. The
+     * number of its own tab, a number no tab has, and an item {@link #tabChoices()} offers none for move nothing.
+     *
+     * @param number a tab's place in its window's strip, from 1, as {@link TabChoice#number()} gives it
+     * @since 0.21.0
+     */
+    void moveToTab(int number);
+    /**
      * Split with a choice beside this item (tabs and panes spec 8): selects it, then opens {@code choice} in a new pane on
      * {@code direction}'s side of its pane, as the Split lists' entries do: a terminal for {@link SplitChoice#TERMINAL},
      * else the split item's view, through its action. A closed tab, or one being closed, opens nothing. Whoever calls it,

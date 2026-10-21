@@ -64,6 +64,25 @@ final class FakeContent implements ContentTab {
     /** Tabs and panes spec 9: its tab's only pane, a pinned item and one waiting on a close decision stay. */
     public boolean mayMoveToNewTab(){return movable()&&tab.group.recent.size()>1;}
     public void moveToNewTab(){if(!mayMoveToNewTab())return;ui.host.workspace.moveToNewTab(tab);select();}
+    /** Pane flexibility spec 4: its window's other tabs, numbered from 1 in strip order; none for an item that may not move. */
+    public List<TabChoice> tabChoices(){
+        if(!movable())return List.of();
+        var strip=ui.host.workspace.strip(tab.window);
+        var choices=new ArrayList<TabChoice>();
+        for(int i=0;i<strip.size();i++)if(strip.get(i)!=tab.group)choices.add(new TabChoice(i+1,capped(strip.get(i).recent.getFirst().title)));
+        return List.copyOf(choices);
+    }
+    /** Past 200 characters a title's start and an ellipsis within that limit, as Jasper's menus cut a tab's title. */
+    private static String capped(String title){
+        if(title.length()<=200)return title;
+        int end=Character.isHighSurrogate(title.charAt(198))?198:199;
+        return title.substring(0,end)+"…";
+    }
+    /** Move Pane to Tab: a number it offers moves its pane right after that tab's shown item, where it is selected. */
+    public void moveToTab(int number){
+        if(tabChoices().stream().noneMatch(choice->choice.number()==number))return;
+        ui.host.workspace.moveToTab(tab,number);select();
+    }
     /** Spec 8: selected first, then the terminal beside it, or the split item's action, as the application runs them. */
     public void split(SplitChoice choice,dev.jasper.sdk.terminal.Direction direction){
         Objects.requireNonNull(choice,"choice");Objects.requireNonNull(direction,"direction");

@@ -509,6 +509,34 @@ public final class TabRegistry {
     }
 
     /**
+     * The tabs Move Pane to Tab offers {@code tab} (pane flexibility spec 4; {@code ContentTab.tabChoices()}): the other
+     * tabs of its window, numbered from 1 in strip order; none for a tab that may not move ({@link #movable}) or that no
+     * window holds.
+     *
+     * @param tab the tab
+     * @return the tabs
+     */
+    public List<OtherTab> tabChoices(Tab tab) {
+        requireEdt();
+        var host = movable(tab) ? hosts.get(tab.window()) : null;
+        return host == null ? List.of() : host.tabChoices().apply(tab);
+    }
+
+    /**
+     * {@code ContentTab.moveToTab(int)} (pane flexibility spec 4): the tab's pane moves to the right of the active pane of
+     * the tab numbered {@code number} in its window, which shows it; nothing for a tab that may not move, its own tab's
+     * number or a number no tab has.
+     *
+     * @param tab the tab
+     * @param number a tab's place in the window's strip, from 1
+     */
+    public void moveToTab(Tab tab, int number) {
+        requireEdt();
+        var host = movable(tab) ? hosts.get(tab.window()) : null;
+        if (host != null) host.moveToTab().accept(tab, number);
+    }
+
+    /**
      * Moves a tab of any kind to {@code window}, in a new tab of that window, and selects it there; its
      * content and session are untouched. A pinned tab, one being closed, a restorer's item while its restore runs or one
      * already there stays.

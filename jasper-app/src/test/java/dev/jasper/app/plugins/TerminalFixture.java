@@ -40,7 +40,11 @@ final class TerminalFixture {
         /** A restorer's session, which the window restored with its tab (workspace tabs spec 13). */
         boolean restored; }
     /** One tab of a window's strip: its items, one per pane; {@code recent} holds them most recently selected first. */
-    private static final class Group { final List<Tab> recent = new ArrayList<>(); }
+    private static final class Group {
+        final List<Tab> recent = new ArrayList<>();
+        /** The tab's id, which Move Pane to Tab's choices carry (pane flexibility spec 4). */
+        final dev.jasper.app.layout.ParentTabId id = dev.jasper.app.layout.ParentTabId.random();
+    }
     private static final class Tab { UUID id = UUID.randomUUID(); Window window; Group group; TabEntry.Kind kind = TabEntry.Kind.TERMINAL; Supplier<String> title; Pane pane; }
     private static final class Window {
         UUID id = UUID.randomUUID(); boolean main; List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; Runnable closed = () -> { };
@@ -357,6 +361,58 @@ final class TerminalFixture {
         group.recent.add(tab);
         window.tabs.add(end, tab);
         select(tab);
+    }
+
+    /**
+     * Move Pane to Tab's choices for the item {@code tabId} (pane flexibility spec 4): its window's other tabs, numbered from
+     * 1 in strip order and titled after their shown items; none for an item the fixture does not hold.
+     */
+    List<dev.jasper.app.contributions.OtherTab> tabChoices(UUID tabId) {
+        Tab tab = tabs.get(tabId);
+        if (tab == null) return List.of();
+        List<Group> strip = strip(tab.window);
+        var choices = new ArrayList<dev.jasper.app.contributions.OtherTab>();
+        for (int i = 0; i < strip.size(); i++)
+            if (strip.get(i) != tab.group)
+                choices.add(new dev.jasper.app.contributions.OtherTab(strip.get(i).id, i + 1, capped(strip.get(i).recent.getFirst().title.get())));
+        return choices;
+    }
+
+    /** {@code title}, or past 200 characters its start and an ellipsis within that limit, as the window's menus cut it. */
+    private static String capped(String title) {
+        if (title.length() <= 200) return title;
+        int end = 199;
+        if (Character.isHighSurrogate(title.charAt(end - 1))) end--;
+        return title.substring(0, end) + "…";
+    }
+
+    /**
+     * Move Pane to Tab: the item {@code tabId} leaves its tab for a new pane right after the shown item of the tab numbered
+     * {@code number}, where it is selected; its old tab goes with its last pane. Its own tab's number and one no tab has
+     * move nothing.
+     */
+    void moveToTab(UUID tabId, int number) {
+        Tab tab = tabs.get(tabId);
+        if (tab == null) return;
+        Window window = tab.window;
+        List<Group> strip = strip(window);
+        if (number < 1 || number > strip.size() || strip.get(number - 1) == tab.group) return;
+        Group to = strip.get(number - 1), from = tab.group;
+        Tab beside = to.recent.getFirst();
+        window.tabs.remove(tab);
+        from.recent.remove(tab);
+        if (from.recent.isEmpty()) window.recent.remove(from);
+        tab.group = to;
+        to.recent.add(tab);
+        window.tabs.add(window.tabs.indexOf(beside) + 1, tab);
+        select(tab);
+    }
+
+    /** A window's tabs in strip order. */
+    private static List<Group> strip(Window window) {
+        var groups = new ArrayList<Group>();
+        for (Tab tab : window.tabs) if (groups.isEmpty() || groups.getLast() != tab.group) groups.add(tab.group);
+        return groups;
     }
 
     /** A window's tabs in strip order, each its items' ids pane by pane (tabs and panes spec 4); empty for a closed window. */

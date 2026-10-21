@@ -1241,7 +1241,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 selectTab(tab);
                 return split(side) != null;
             },
-            this::mayMoveToNewTab, this::moveToNewTab);
+            this::mayMoveToNewTab, this::moveToNewTab,
+            // Move Pane to Tab, as ContentTab.moveToTab asks, numbered from 1 (pane flexibility spec 4).
+            this::paneTargets, (tab, number) -> moveToTab(tab, number - 1));
     }
 
     /**

@@ -3,12 +3,14 @@ package dev.jasper.app.contributions;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 
 /**
@@ -27,10 +29,15 @@ import java.util.function.Predicate;
  *     whether it did
  * @param mayMoveToNewTab whether Move Pane to New Tab would move a tab of this window (tabs and panes spec 9)
  * @param moveToNewTab Move Pane to New Tab: a tab's pane leaves its tab for a new tab right after it, which shows
+ * @param tabChoices the tabs Move Pane to Tab offers a tab of this window (pane flexibility spec 4): the window's other
+ *     tabs, numbered from 1 in strip order
+ * @param moveToTab Move Pane to Tab: a tab's pane moves to the right of the active pane of the tab numbered as given,
+ *     which shows
  */
 public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach, Consumer<Tab> select,
                             Runnable toFront, Function<TabId, Optional<GroupId>> groupOf, Beside attachBeside,
-                            BiPredicate<Tab, Side> splitTerminal, Predicate<Tab> mayMoveToNewTab, Consumer<Tab> moveToNewTab) {
+                            BiPredicate<Tab, Side> splitTerminal, Predicate<Tab> mayMoveToNewTab, Consumer<Tab> moveToNewTab,
+                            Function<Tab, List<OtherTab>> tabChoices, ObjIntConsumer<Tab> moveToTab) {
     /** Shows a tab in a new pane beside a pane of the window (workspace tabs spec 14's split placements). */
     @FunctionalInterface
     public interface Beside {
@@ -50,10 +57,12 @@ public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach,
         Objects.requireNonNull(select, "select"); Objects.requireNonNull(toFront, "toFront"); Objects.requireNonNull(groupOf, "groupOf");
         Objects.requireNonNull(attachBeside, "attachBeside"); Objects.requireNonNull(splitTerminal, "splitTerminal");
         Objects.requireNonNull(mayMoveToNewTab, "mayMoveToNewTab"); Objects.requireNonNull(moveToNewTab, "moveToNewTab");
+        Objects.requireNonNull(tabChoices, "tabChoices"); Objects.requireNonNull(moveToTab, "moveToTab");
     }
 
     /**
-     * A workspace that opens no terminal beside a tab and moves no pane to a new tab, as a fake window in a test does.
+     * A workspace that opens no terminal beside a tab and moves no pane to a new tab or another tab, as a fake window in a
+     * test does.
      *
      * @param id the window's id
      * @param attach shows a tab the registry placed in this window
@@ -65,7 +74,8 @@ public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach,
      */
     public WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach, Consumer<Tab> select, Runnable toFront,
                          Function<TabId, Optional<GroupId>> groupOf, Beside attachBeside) {
-        this(id, attach, detach, select, toFront, groupOf, attachBeside, (tab, side) -> false, tab -> false, tab -> { });
+        this(id, attach, detach, select, toFront, groupOf, attachBeside, (tab, side) -> false, tab -> false, tab -> { },
+            tab -> List.of(), (tab, number) -> { });
     }
 
     /**

@@ -49,6 +49,13 @@ class UiValuesTest {
         assertThat(SplitChoice.TERMINAL.downLabel()).isEqualTo("Terminal Down");
     }
 
+    /** Pane flexibility spec 4: a tab choice is numbered from 1 and worded "N title". */
+    @Test void aTabChoiceIsNumberedFromOneAndWordedNumberThenTitle() {
+        assertThat(new TabChoice(3, "notes.txt").label()).isEqualTo("3 notes.txt");
+        assertThatIllegalArgumentException().isThrownBy(() -> new TabChoice(0, "zsh"));
+        assertThatNullPointerException().isThrownBy(() -> new TabChoice(1, null));
+    }
+
     @Test void actionSpecValidatesAndCopies() {
         var keywords = new ArrayList<>(List.of("connect"));
         ActionSpec spec = ActionSpec.of("dev.x.tool.run", "Run Tool").withKeywords(keywords).withDefaultBinding("cmd+alt+j");

@@ -29,7 +29,8 @@ class TabRegistryTest {
 
     /**
      * Workspace plan 8b Rulings 18: a tab reaches its window for a terminal beside it and for Move Pane to New Tab; the
-     * registry reports whether the window split (its final review).
+     * registry reports whether the window split (its final review). Pane flexibility spec 4: and for Move Pane to Tab,
+     * whose choices a pinned or closed tab does not get.
      */
     @Test void aTabReachesItsWindowForATerminalBesideItAndMovePaneToNewTab() {
         var heard = new ArrayList<String>();
@@ -39,25 +40,33 @@ class TabRegistryTest {
             return splits[0];
         };
         registry.addHost(new WorkspaceHost(main, tab -> {}, tab -> {}, tab -> {}, () -> {}, tab -> Optional.empty(),
-            (tab, group, side) -> {}, split::test, tab -> shares[0], tab -> heard.add("new tab " + tab.title())));
+            (tab, group, side) -> {}, split::test, tab -> shares[0], tab -> heard.add("new tab " + tab.title()),
+            tab -> List.of(new OtherTab(dev.jasper.app.layout.ParentTabId.random(), 2, "zsh")),
+            (tab, number) -> heard.add("tab " + number + " " + tab.title())));
         Tab notes = registry.open("dev.example.editor", "notes", "Notes", main, new JPanel());
         assertThat(registry.splitTerminal(notes, Side.DOWN)).as("its window took it").isTrue();
         splits[0] = false;
         assertThat(registry.splitTerminal(notes, Side.RIGHT)).as("its window split nothing").isFalse();
         assertThat(registry.mayMoveToNewTab(notes)).isTrue();
         registry.moveToNewTab(notes);
+        assertThat(registry.tabChoices(notes)).extracting(OtherTab::label).containsExactly("2 zsh");
+        registry.moveToTab(notes, 2);
         shares[0] = false;
         assertThat(registry.mayMoveToNewTab(notes)).as("its tab's only pane").isFalse();
         registry.moveToNewTab(notes);
         shares[0] = true;
         var pin = notes.pin();
         assertThat(registry.mayMoveToNewTab(notes)).as("a pinned tab").isFalse();
+        assertThat(registry.tabChoices(notes)).as("a pinned tab").isEmpty();
+        registry.moveToTab(notes, 2);
         pin.close();
         notes.close();
         assertThat(registry.splitTerminal(notes, Side.RIGHT)).as("a closed tab").isFalse();
         registry.moveToNewTab(notes);
-        assertThat(heard).as("a closed tab reaches nothing")
-            .containsExactly("terminal DOWN of Notes", "terminal RIGHT of Notes", "new tab Notes");
+        assertThat(registry.tabChoices(notes)).as("a closed tab").isEmpty();
+        registry.moveToTab(notes, 2);
+        assertThat(heard).as("a pinned or closed tab reaches nothing")
+            .containsExactly("terminal DOWN of Notes", "terminal RIGHT of Notes", "new tab Notes", "tab 2 Notes");
     }
 
     /**

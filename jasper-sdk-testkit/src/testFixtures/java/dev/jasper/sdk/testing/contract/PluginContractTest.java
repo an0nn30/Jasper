@@ -2164,6 +2164,75 @@ public abstract class PluginContractTest {
     }
 
     /**
+     * Pane flexibility spec 4 and 8 and workspace plan 9a Rulings 8: a content tab lists the other tabs of its window,
+     * numbered as Select Tab numbers them and titled after their shown items, and Move Pane to Tab moves its pane into
+     * one, to the right of that tab's shown pane, which shows, the item selected. Its own tab's number, a number no tab
+     * has and an item with a modal prompt open move nothing, and a window of one tab offers none. Once its plugin stops,
+     * its closed handle offers and moves nothing, quietly.
+     */
+    @Test void aContentTabMovesItsPaneIntoAnotherTabOfItsWindow() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        var notes = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        var note = new AtomicReference<UUID>();
+        h.ui(() -> {
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            notes.set(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), owner, kitView(alpha.get())));
+            note.set(owner.activeTab().orElseThrow().id());
+            assertThat(notes.get().tabChoices()).as("the window's other tab").containsExactly(new dev.jasper.sdk.ui.TabChoice(1, "zsh"));
+            assertThat(notes.get().tabChoices().getFirst().label()).isEqualTo("1 zsh");
+            notes.get().moveToTab(2);
+            notes.get().moveToTab(5);
+        });
+        assertThat(h.windowTabs(main)).as("its own tab's number, and one no tab has, move nothing")
+            .containsExactly(List.of(shell), List.of(note.get()));
+        h.ui(() -> {
+            notes.get().moveToTab(1);
+            assertThat(alpha.get().terminals().window(main).orElseThrow().activeTab().map(TabHandle::id)).as("selected there")
+                .contains(note.get());
+            assertThat(notes.get().tabChoices()).as("a window of one tab offers none").isEmpty();
+        });
+        assertThat(h.windowTabs(main)).as("to the right of the shell, its old tab gone").containsExactly(List.of(shell, note.get()));
+        UUID top = h.addTerminalTab(main, "top");
+        h.ui(() -> {
+            assertThat(notes.get().tabChoices()).containsExactly(new dev.jasper.sdk.ui.TabChoice(2, "top"));
+            var prompt = alpha.get().windows().dialog(new DialogSpec("Question", notes.get(), true));
+            assertThat(notes.get().tabChoices()).as("a pane with a modal prompt offers none").isEmpty();
+            notes.get().moveToTab(2);
+            prompt.close();
+        });
+        assertThat(h.windowTabs(main)).containsExactly(List.of(shell, note.get()), List.of(top));
+        h.ui(() -> notes.get().moveToTab(2));
+        assertThat(h.windowTabs(main)).as("its old tab keeps its other pane").containsExactly(List.of(shell), List.of(top, note.get()));
+        h.stopAll();
+        var before = h.windowTabs(main);
+        h.ui(() -> {
+            assertThat(notes.get().tabChoices()).as("a closed handle offers none").isEmpty();
+            assertThatNoException().as("a closed handle's move").isThrownBy(() -> notes.get().moveToTab(1));
+        });
+        assertThat(h.windowTabs(main)).as("nothing moves once its plugin stops").isEqualTo(before);
+    }
+
+    /**
+     * Workspace plan 9a Rulings 8: a tab choice's title past 200 characters is its start and an ellipsis within that
+     * limit, as Jasper's own menus show a tab's title.
+     */
+    @Test void aTabChoicesLongTitleIsCutAsJaspersMenusCutIt() {
+        String title = "x".repeat(250);
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, title);
+        h.addTerminalPane(shell, title, Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            var notes = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), owner, kitView(alpha.get()));
+            assertThat(notes.tabChoices()).containsExactly(new dev.jasper.sdk.ui.TabChoice(1, "x".repeat(199) + "…"));
+        });
+    }
+
+    /**
      * Workspace plan 8b Rulings 19: Terminal Right and Terminal Down beside a content tab open a local shell, so they need
      * {@code terminal.open}, as {@code Terminals.split} does; without it the call is refused, and nothing opens or is
      * selected. The capability comes first, as in {@code Terminals}, so a closed tab's split is refused too.

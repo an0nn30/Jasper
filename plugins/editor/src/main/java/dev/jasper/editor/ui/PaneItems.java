@@ -3,6 +3,7 @@ package dev.jasper.editor.ui;
 import dev.jasper.sdk.terminal.Direction;
 import dev.jasper.sdk.ui.ContentTab;
 import dev.jasper.sdk.ui.SplitChoice;
+import dev.jasper.sdk.ui.TabChoice;
 import java.awt.Component;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,10 +14,11 @@ import javax.swing.event.PopupMenuListener;
 
 /**
  * The pane entries of an editor's right-click menu (tabs and panes spec 2.10 and 9; workspace plan 8b Rulings 10): after
- * a rule, a Split submenu with Jasper's Split choices, each Right and Down, and Move Pane to New Tab, which shows
- * disabled while the editor is its tab's only pane. They are built again each time the menu opens, so a split item that
- * registers or goes later shows at once. {@link DocumentArea} builds the menu and its items, as the plugin presentation
- * check lets only it construct the vendor popup's controls. UI thread only.
+ * a rule, a Split submenu with Jasper's Split choices, each Right and Down, Move Pane to New Tab, which shows disabled
+ * while the editor is its tab's only pane, and Move Pane to Tab, the window's other tabs, which shows disabled while
+ * there is none (pane flexibility spec 4). They are built again each time the menu opens, so a split item that
+ * registers or goes later, and a tab that opens or closes, shows at once. {@link DocumentArea} builds the menu and its
+ * items, as the plugin presentation check lets only it construct the vendor popup's controls. UI thread only.
  */
 final class PaneItems implements PopupMenuListener {
     private final JPopupMenu popup;
@@ -59,10 +61,15 @@ final class PaneItems implements PopupMenuListener {
         }
         var move = DocumentArea.plainItem("Move Pane to New Tab", pane::moveToNewTab);
         move.setEnabled(pane.mayMoveToNewTab());
+        var moves = DocumentArea.submenu("Move Pane to Tab");
+        List<TabChoice> targets = pane.tabChoices();
+        for (TabChoice target : targets) moves.add(DocumentArea.plainItem(target.label(), () -> pane.moveToTab(target.number())));
+        moves.setEnabled(!targets.isEmpty());
         popup.addSeparator();
         added.add(popup.getComponent(popup.getComponentCount() - 1));
         add(split);
         add(move);
+        add(moves);
     }
 
     /** Splits beside the pane, unless the choice is no longer listed: an entry whose split item went does nothing. */
