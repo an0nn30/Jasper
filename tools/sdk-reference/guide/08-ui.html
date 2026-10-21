@@ -1,0 +1,224 @@
+<section class="guide" id="ui">
+<h2>UI</h2>
+<p>Plugin UI is declarative. A plugin describes what to show as an immutable tree of {@link Nodes} records, a
+{@link ViewSpec}; its {@link UiKit} turns the tree into a {@link UiView} that Jasper draws. Jasper owns every pixel:
+colours, fonts, spacing, focus, keyboard behaviour and the current look's control styles, so a plugin's tool window
+looks and behaves like Jasper's own, in every theme and look. The plugin receives typed {@link UiEvent}s and answers
+with {@link UiView#update(ViewSpec)}. The same views fill tool windows, plugin windows, dialogs, overlays, popovers,
+content tabs, toolbar groups and settings pages. For worked compositions, see <a href="plugin-ui.md">plugin UI</a>.</p>
+
+<h3>A view</h3>
+<p>This tool window lists deploy targets and filters them as the user types. The plugin keeps the state (the query and
+the selection), rebuilds the whole tree from it, and hands the tree to {@code update}:</p>
+<pre><code class="language-java">/** A tool window listing deploy targets, filtered by a search field. */
+final class TargetsPanel {
+    private final List&lt;String&gt; targets = List.of("staging", "production", "canary");
+    private final UiView view;
+    private String query = "";
+    private Set&lt;String&gt; selected = Set.of();
+
+    TargetsPanel(UiKit kit) { view = kit.create(spec(), this::handle); }
+
+    UiView view() { return view; }
+
+    private void handle(UiEvent event) {
+        switch (event) {
+            case UiEvent.Edited edited when edited.id().equals("targets.search") -&gt; { query = edited.text(); view.update(spec()); }
+            case UiEvent.Selected chosen when chosen.id().equals("targets.rows") -&gt; { selected = chosen.ids(); view.update(spec()); }
+            case UiEvent.Action action when action.id().equals("open") -&gt; selected.forEach(this::open);
+            default -&gt; { }
+        }
+    }
+
+    private void open(String target) { /* the row was activated: Enter or a double click */ }
+
+    private ViewSpec spec() {
+        var rows = new ArrayList&lt;ListItem&gt;();
+        for (String target : targets) {
+            if (!target.contains(query.strip())) continue;
+            rows.add(new ListItem(target,
+                Optional.of(new Nodes.Icon(target + ".icon", ControlState.READY, "server", Nodes.Hue.GREEN, Nodes.IconSize.CONTROL, "Target")),
+                List.of(new Nodes.Text(target + ".name", ControlState.READY, target, Nodes.TextRole.BODY)), List.of(), List.of()));
+        }
+        // A selected id must name a row in this tree.
+        var shown = new HashSet&lt;String&gt;();
+        rows.forEach(row -&gt; shown.add(row.id()));
+        var keep = new HashSet&lt;&gt;(selected);
+        keep.retainAll(shown);
+        var header = new Nodes.Header("targets.header", ControlState.READY, "Targets", OptionalInt.of(targets.size()),
+            Optional.empty(), Optional.empty(), List.of());
+        var search = new Nodes.Field("targets.search", ControlState.READY, Nodes.FieldKind.SEARCH, query, "Search targets",
+            "Search targets", "");
+        var list = new Nodes.ItemList("targets.rows", ControlState.READY, Nodes.ListKind.SINGLE, rows, keep, "open", List.of(),
+            Nodes.SelectionMode.SINGLE, Optional.empty());
+        return new ViewSpec(new Nodes.Panel("targets", ControlState.READY, header, Optional.of(search), list, Optional.empty()));
+    }
+}</code></pre>
+<p>Registered as a tool window, each window gets its own instance:</p>
+<pre><code class="language-java">context.panels().register(new PanelSpec("dev.example.tool.targets", "Targets", "server", Anchor.LEFT),
+    host -&gt; new TargetsPanel(context.kit()).view());</code></pre>
+
+<h3>Kit and views</h3>
+<p>{@link PluginContext#kit()} is the plugin's kit. {@link UiKit#create(ViewSpec,Consumer)} makes a view the plugin owns,
+with a handler that receives its events on the UI thread; a handler that throws is contained. Kit and view methods run on
+the UI thread. A view is mounted in one place: a {@link PanelFactory} or {@link ToolbarViewFactory} returns it,
+{@link WindowSurface#setContent(UiView)}, {@link PluginPopover#setContent(UiView)},
+{@link PluginWindow#setTitleActions(Optional)} and {@link Windows#openTab(ContentSpec,WindowOwner,UiView)} take it, and
+{@link SettingsPanel#create(SettingsPanelHost)} returns it. Mounting a view already mounted elsewhere, or another
+plugin's view, is refused. Replacing a surface's content or closing the surface closes its view; closing a view is idempotent, and the plugin's
+views close when it stops.</p>
+<table>
+<thead><tr><th>View method</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td>{@link UiView#update(ViewSpec)}</td><td>Replaces the tree, reconciling by node id and kind. Calling it from inside an update throws.</td></tr>
+<tr><td>{@link UiView#spec()}</td><td>The tree as last given, without the user's pending edits or any secret.</td></tr>
+<tr><td>{@link UiView#focus(String)}, {@link UiView#reveal(String)}</td><td>Focus a node; scroll one into view without moving focus.</td></tr>
+<tr><td>{@link UiView#selectAll(String)}</td><td>Select a field's text without editing it or moving focus.</td></tr>
+<tr><td>{@link UiView#composing(String)}</td><td>Whether an input method holds uncommitted text in a field; leave keys to it while true.</td></tr>
+<tr><td>{@link UiView#anchor(String)}</td><td>A {@link UiAnchor} on a mounted button or PICKER choice, for a popover or a dialog attached to it.</td></tr>
+<tr><td>{@link UiView#withSecret(String,Consumer)}, {@link UiView#clearSecret(String)}, {@link UiView#replaceSecret(String,char[])}</td><td>Read a secret field's characters (erased after the callback), clear it, or set it without an edit event.</td></tr>
+<tr><td>{@link UiView#registerContent(CustomContent)}</td><td>Fill a {@link Nodes.Custom} node with a component; see below.</td></tr>
+</tbody>
+</table>
+
+<h3>Reconciliation</h3>
+<p>A view never mutates in place: the plugin builds the next tree and calls {@code update}. The kit matches the new tree
+to the mounted one by node id and kind, so a node that keeps its id and kind keeps what the user is doing in it, such as
+text being typed, focus and selection, while new ids are created and missing ones removed. Give nodes ids derived from
+the data they show ({@code target + ".name"}), not from their position, and keep them stable across updates. A field's
+{@code value} is what the plugin last set; the user's typing arrives as {@link UiEvent.Edited} and the plugin puts it in
+the next tree.</p>
+
+<h3>Nodes</h3>
+<table>
+<thead><tr><th>Kind</th><th>Nodes</th></tr></thead>
+<tbody>
+<tr><td>Text and status</td><td>{@link Nodes.Text} (sixteen roles; the MONO roles mark data values such as hosts, paths and commands, drawn in the data face), {@link Nodes.Icon}, {@link Nodes.StatusDot}, {@link Nodes.Chip}, {@link Nodes.Progress}, {@link Nodes.Strength}, {@link Nodes.Notice}, {@link Nodes.Properties}, {@link Nodes.Separator}</td></tr>
+<tr><td>Controls</td><td>{@link Nodes.Button} (PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), {@link Nodes.MenuButton}, {@link Nodes.Field} (TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER), {@link Nodes.Secret}, {@link Nodes.Choice} (DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS, TABS), {@link Nodes.PickerMenu}, {@link Nodes.Toggle}, {@link Nodes.Breadcrumbs}</td></tr>
+<tr><td>Collections</td><td>{@link Nodes.ItemList} with {@link ListItem} rows (SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS), {@link Nodes.Table} with {@link Column}s and {@link TableRow}s, {@link Nodes.Tree} with {@link TreeItem}s</td></tr>
+<tr><td>Layout</td><td>{@link Nodes.Stack} (a {@link Nodes.LayoutRole} such as VERTICAL, INLINE or ACTIONS), {@link Nodes.Card}, {@link Nodes.Section}, {@link Nodes.FormRow}, {@link Nodes.SettingRow}, {@link Nodes.Split}, {@link Nodes.Empty}</td></tr>
+<tr><td>Compositions</td><td>{@link Nodes.Panel} with its {@link Nodes.Header}, for tool windows; {@link Nodes.Form} (PROMPT, PROMPT_COMPACT, SHEET, FULL, SETTINGS, WINDOW), for dialogs, windows and pages</td></tr>
+<tr><td>Custom</td><td>{@link Nodes.Custom}, a slot for a registered component</td></tr>
+</tbody>
+</table>
+<p>Every node has an id and a {@link ControlState}: {@code visible}, {@code enabled}, {@code busy} and {@code error}, the
+validation message the control shows. {@link ControlState#READY} is visible, enabled, not busy and without an error.
+Unless its submission is {@code NONE}, a form presses its single PRIMARY button on Enter, except when the focused control
+takes Enter itself (a field with a {@code trailingAction}, a secret with a {@code submitAction}, a PICKER choice,
+breadcrumbs being edited, or a list, table or tree row with an activate or Enter action), a popup is open, focus is in a
+text area, or the form or a visible, enabled control in it is busy or shows an error; Escape runs its cancel action.</p>
+
+<h3>Events</h3>
+<p>A control that runs something reports {@link UiEvent.Action} with the action key the plugin configured on it (a
+button's {@code action}, a list's {@code activateAction}), not its node id. The other events carry the id of the node
+they concern; item, option, row and column ids in them are local to that node.</p>
+<table>
+<thead><tr><th>Event</th><th>From</th></tr></thead>
+<tbody>
+<tr><td>{@link UiEvent.Action}</td><td>Buttons, menu items, a field's Enter, Shift+Enter and Escape actions, a secret's copy and submit actions, a PICKER choice, picker menu rows, a list's, table's or tree's activate and key actions, a form's or stack's cancel action</td></tr>
+<tr><td>{@link UiEvent.Edited}</td><td>Fields, a searchable choice's free text, a picker menu's query, breadcrumbs being edited</td></tr>
+<tr><td>{@link UiEvent.Selected}</td><td>Choices, lists, tables, trees, a breadcrumb, the active row of a picker menu</td></tr>
+<tr><td>{@link UiEvent.Toggled}</td><td>Toggles; the event carries the toggle's node id and the new state</td></tr>
+<tr><td>{@link UiEvent.Expanded}</td><td>Tree branches</td></tr>
+<tr><td>{@link UiEvent.Removed}, {@link UiEvent.Reordered}</td><td>ORDERED lists</td></tr>
+<tr><td>{@link UiEvent.SecretChanged}</td><td>Secret fields; it never carries the value</td></tr>
+<tr><td>{@link UiEvent.Clicked}</td><td>A plain left click on a list, table or tree row, after its {@code Selected}</td></tr>
+<tr><td>{@link UiEvent.Sorted}</td><td>A table or tree column header</td></tr>
+</tbody>
+</table>
+<p>The kit reports what the user asked for; the plugin decides. A toggle's {@code checked} is the state the plugin's tree
+last confirmed, and an ORDERED list's row goes when the plugin's next tree leaves it out.</p>
+
+<h3>What a tree may not contain</h3>
+<p>Records and {@link ViewSpec} check a tree when it is built and throw {@code IllegalArgumentException} naming the
+problem; the kit checks icon names when a view is created or updated. A tree is refused when:</p>
+<ul>
+<li>an id or a required label is blank, or a button without a label lacks an icon or a tooltip;</li>
+<li>two nodes share an id (item, option, crumb, column and row ids need only be unique within their node, tree item ids
+within their tree), or two {@code Custom} nodes share a content id;</li>
+<li>it is deeper than 128 levels or has more than 100,000 nodes;</li>
+<li>a selected or expanded id names no item, a choice's selected id is not one of its options, an expanded id is not a
+tree branch, or a table cell names no column;</li>
+<li>an EXCLUSIVE choice does not have two to four options, or a TABS choice fewer than two;</li>
+<li>a field's list id names no {@code ItemList} in the same view;</li>
+<li>a {@code Notice} stands outside a form's sections or a VERTICAL stack, or a {@code Separator} outside an INLINE or
+ACTIONS stack, first, last or beside another separator;</li>
+<li>it names an icon that is neither built in nor registered by the plugin ("Unknown icon: <i>name</i>").</li>
+</ul>
+<p>Each record's own rules, such as which presentations a field kind takes, are in its entry in the API reference.</p>
+
+<h3>Icons</h3>
+<p>Icons are names. Jasper's built-in names are {@code add}, {@code appearance}, {@code application},
+{@code arrow.right}, {@code back}, {@code bell}, {@code bookmark}, {@code brightness}, {@code check},
+{@code chevron.down}, {@code chevron.left}, {@code chevron.right}, {@code chevron.up}, {@code clock}, {@code close},
+{@code collapse}, {@code collapse.all}, {@code command-palette}, {@code copy}, {@code cursor}, {@code delete},
+{@code desktop}, {@code download}, {@code edit}, {@code error}, {@code expand.all}, {@code file}, {@code folder},
+{@code folder.add}, {@code folder.filled}, {@code font}, {@code forward}, {@code help}, {@code hidden}, {@code history},
+{@code home}, {@code import}, {@code info}, {@code key}, {@code keyboard}, {@code laptop}, {@code link}, {@code lock},
+{@code lock.keyhole}, {@code login}, {@code logout}, {@code match.case}, {@code match.word}, {@code menu}, {@code more},
+{@code more.vertical}, {@code network}, {@code none}, {@code note}, {@code notification.card},
+{@code notification.history}, {@code notification.off}, {@code notification.sticky}, {@code paste}, {@code pause},
+{@code play}, {@code play.filled}, {@code plugin}, {@code preview}, {@code question}, {@code refresh}, {@code regex},
+{@code remove}, {@code reset}, {@code reveal}, {@code run}, {@code save}, {@code search}, {@code server},
+{@code settings}, {@code shield}, {@code sparkle}, {@code split}, {@code star}, {@code star.filled}, {@code target},
+{@code terminal}, {@code triangle.down}, {@code tunnel}, {@code unlock}, {@code upload}, {@code user}, {@code warning},
+{@code window}, {@code window.add} and {@code zoom}.
+They follow the theme and the look. {@code run}, IntelliJ's classic Run triangle, and {@code application}, its
+run-configuration icon, are authored artwork: controls draw them in their own colours, and panels, prompts and tiles
+draw a monochrome glyph of the same name. These two names need SDK 0.18.1. Under the Enterprise look a tool
+window's stripe label starts with its icon, and IntelliJ's classic art draws {@code network}, {@code folder},
+{@code tunnel}, {@code download}, {@code server} and {@code bell} there, and {@code add}, {@code split}, {@code zoom},
+{@code settings}, {@code window.add} and {@code search} in the toolbar, toolbar views, the status bar and tool-window
+headers; view bodies keep the ordinary art.</p>
+<p>A plugin adds its own with {@link UiKit#registerIcon(IconAsset)}. An {@link IconAsset}'s name is
+{@code <plugin id>:<name>}, the name a lowercase letter followed by lowercase letters, digits, dots and dashes; its artwork is SVG path data on a 16-unit grid, starting
+with a move and using only the M, L, H, V, C, S, Q, T, A and Z commands, at most 8,192 characters and 2,048 commands, with
+at least one drawn segment. Jasper strokes it as an outline in its own colour, size and stroke width, so it matches the
+built-in icons. Register icons in {@code start}, before anything names them:</p>
+<pre><code class="language-java">context.kit().registerIcon(new IconAsset("dev.example.tool:rocket",
+    "M 8 1.5 C 10.5 3 11.5 5.5 11.5 8.5 L 9.5 11 H 6.5 L 4.5 8.5 C 4.5 5.5 5.5 3 8 1.5 Z M 6.5 11 L 5.5 14.5 M 9.5 11 L 10.5 14.5"));</code></pre>
+<p>Action, panel, status item, toolbar menu, palette and content tab icons take the same names. The plugin's own
+identity icon is a file in its jar, named by the manifest's {@code icon} key. See <a href="sdk-icons.md">plugin icons</a>.</p>
+
+<h3>Custom content</h3>
+<p>For what descriptors cannot express, such as a text editor, a chart or a preview, a tree holds a {@link Nodes.Custom}
+node and the plugin registers a component for it with {@link UiView#registerContent(CustomContent)}. The
+{@link CustomContent}'s id and kind ({@code EDITOR}, {@code TERMINAL}, {@code CHART} or {@code PREVIEW}) match the node's;
+its {@code lifetime} closes when the node leaves the tree or the view closes. Jasper admits a purpose-built canvas, a
+{@code JComponent} that is not a panel, label, button, list, table, tree, combo box, spinner, slider or text component
+(a {@code JScrollPane} is judged by what it scrolls); an {@code EDITOR} may also be a {@code JTextArea},
+{@code JTextPane} or {@code JEditorPane}. Anything else is refused ("Ordinary plugin controls require kit descriptors").
+Jasper sets the component's foreground and background from the theme whenever the theme changes, with the workspace's
+opacity in a translucent window; the component paints the rest from {@link Appearance}.</p>
+
+<h3>Colours</h3>
+<p>Views take their colours from the theme without help. Custom content reads them from {@link PluginContext#appearance()}:
+{@link Appearance#color(SemanticColor)} for one of the theme's semantic colours, {@link Appearance#workspacePalette()},
+{@link Appearance#editorPalette()} and {@link Appearance#syntaxPalette()} for the workspace, where terminals and content
+tabs live, and {@link Appearance#workspaceOpacity(Component)} for the alpha of a translucent workspace. Read them on the UI
+thread, and again after {@link Appearance#onChanged(Consumer)} or {@link Appearance#onWorkspaceChanged(Consumer)}: the
+user can change the theme, and the chrome and the workspace can follow different themes. On the event bus,
+{@link AppEvents#THEME_CHANGED} announces each change of the chrome's theme or the interface font.</p>
+
+<h3>The look</h3>
+<p>Views follow the look without help too. A plugin that composes differently under a look, or custom content that needs
+the look's faces, reads {@link Appearance#presentation()}: a {@link dev.jasper.sdk.ui.Presentation} that says whether
+the look starts from the classic catalog, its icon set, whether tool windows are reached by icon rails or labelled
+stripes, the title bar and where the menus are on this platform, whether the toolbar offers Search Everywhere as a
+field or an icon, the look's UI and data faces (empty for the platform's), its body text size and its default toolbar
+height. Jasper chooses the look at start, so the value is the same for every plugin until it restarts, and it is safe
+from any thread: read it once in {@code start}. It reports the look's own faces, sizes, title bar and menus, not the
+user's font, toolbar height, decoration or view settings. Remote, Credential Vault and File Server compose their
+classic layouts when {@link dev.jasper.sdk.ui.Presentation#classic()} is true, and the Sample starts its tool window in
+the bottom strip under labelled stripes:</p>
+<pre><code class="language-java">boolean classic = context.appearance().presentation().classic();
+Anchor side = context.appearance().presentation().toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;</code></pre>
+<p>{@link Appearance#terminalTypography()} (SDK 0.18.3) reads the saved terminal family, fractional point size,
+ordered fallbacks, ligatures and line height from any thread. Register {@link Appearance#onTerminalTypographyChanged(Consumer)}
+on the UI thread; it delivers changed values there after the getter updates, with no initial replay. Closing the
+subscription or stopping the plugin removes it. Temporary pane zoom leaves this saved value unchanged.
+{@link FakePluginHost#setTerminalTypography(TerminalTypography)} queues a value for the next {@code flush()}.</p>
+<p>{@link Appearance#presentation()} needs SDK 0.18.2. In a test,
+{@link dev.jasper.sdk.testing.FakePluginHost#setPresentation(Presentation)} with
+{@link dev.jasper.sdk.testing.FakePresentations#CLASSIC} runs the plugin under the Enterprise look's values.</p>
+</section>

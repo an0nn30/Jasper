@@ -1,0 +1,107 @@
+<section class="guide" id="services">
+<h2>Services</h2>
+<p>Plugins build on each other through services: a provider publishes an interface from a package it exports, and a
+plugin that requires the provider looks the service up. This is how Jasper's own features compose: Remote and File
+Server take credentials from the Credential Vault, Remote opens remote files in the Editor, Project Index lists projects
+on Remote's saved hosts, and Shell History saves commands as snippets. A third-party plugin can use those services, or
+publish its own, the same way. {@link PluginContext#services()} is the plugin's {@link Services}.</p>
+
+<h3>Providing a service</h3>
+<p>Put the interface, and the values it uses, in a package of their own and list it under {@code exports}. Only that
+exact package is visible to other plugins; a subpackage must be listed too, and everything else in the plugin stays
+private.</p>
+<pre><code class="language-toml">id = "dev.example.notes"
+exports = ["dev.example.notes.api"]</code></pre>
+<pre><code class="language-java">package dev.example.notes.api;
+
+import java.util.List;
+
+/** What other plugins may ask of Notes. Call it on the UI thread. */
+public interface NotesApi {
+    /** @return the titles of the saved notes */
+    List&lt;String&gt; titles();
+}</code></pre>
+<p>Publish during {@code start}, on the UI thread:</p>
+<pre><code class="language-java">List&lt;String&gt; titles = new ArrayList&lt;&gt;(List.of("Runbook", "On-call rota"));
+context.services().publish(NotesApi.class, () -&gt; List.copyOf(titles));</code></pre>
+<p>{@link Services#publish(Class,Object)} gives every consumer the same instance;
+{@link Services#publishPerConsumer(Class,Function)} gives each consumer its own, made by a factory that Jasper calls on the
+UI thread just before that consumer starts, with the consumer's {@link PluginInfo}, so the provider knows who is asking
+(the Vault's grants are per plugin this way). A factory that returns {@code null} gives that consumer nothing. Jasper
+refuses a publication outside {@code start}, of a class that is not an interface, of an interface that is not in one of
+the provider's exported packages, and of an interface another plugin already published. Publications become visible only
+when {@code start} returns normally, so no consumer sees a service from a plugin that failed to start; they last until
+Jasper quits, with no withdrawal.</p>
+
+<h3>Using a service</h3>
+<p>A consumer lists the provider under {@code requires} and compiles against its exported package. Its class loader then
+sees that package, and only while the provider is loaded.</p>
+<pre><code class="language-toml">requires = [{ id = "dev.example.notes", version = "&gt;=1.0", optional = true }]</code></pre>
+<pre><code class="language-java">/** Every line that names Notes's classes is in here, so a missing Notes plugin is caught in one place. */
+final class NotesStatus {
+    static String summary(Services services) {
+        try {
+            return services.find(NotesApi.class).map(api -&gt; api.titles().size() + " notes").orElse("Notes is not running");
+        } catch (NoClassDefFoundError absent) {
+            return "Notes is not installed";
+        }
+    }
+}</code></pre>
+<p>Look services up in {@code start}: Jasper starts the providers a plugin requires first and prepares its instances before
+its {@code start}, and {@link Services#find(Class)} and {@link Services#require(Class)} are then cache reads, safe from
+any thread. {@code find} is empty when no provider the plugin requires offers the interface; {@code require} throws
+{@link ServiceUnavailableException}. A plugin sees services only from plugins it lists under {@code requires}.</p>
+<p>A hard requirement guarantees the provider: the consumer does not load without it. With {@code optional = true} the
+consumer loads either way, so it must survive the provider's absence. When the provider did not load, its classes do not
+exist for the consumer, and the first line that names them throws {@code NoClassDefFoundError}, even a lambda that only
+takes one as a parameter; keep every use of them behind one guard, as above. An optional requirement's {@code version} range is not checked, so
+a consumer that calls a method added in a later provider version catches {@code NoSuchMethodError} too, as Remote does
+for newer Editor methods.</p>
+
+<h3>Topics between plugins</h3>
+<p>A provider can also publish events: a plugin publishes on topics whose id starts with its own id and a dot, and any
+plugin may subscribe. Put the {@link Topic} constant and its payload type in the exported package; the Vault's
+{@link dev.jasper.vault.api.VaultApi#LOCK_STATE_CHANGED} ({@code dev.jasper.vault.lock-state}) is one.</p>
+<pre><code class="language-java">package dev.example.notes.api;
+
+import dev.jasper.sdk.events.Topic;
+
+/** The topics Notes publishes. */
+public final class NotesEvents {
+    /** @param count how many notes there are now */
+    public record NotesChanged(int count) { }
+
+    /** Published after every change to the notes. */
+    public static final Topic&lt;NotesChanged&gt; CHANGED = Topic.of("dev.example.notes.changed", NotesChanged.class);
+
+    private NotesEvents() { }
+}</code></pre>
+<pre><code class="language-java">// The provider, from any thread:
+context.events().publish(NotesEvents.CHANGED, new NotesEvents.NotesChanged(3));
+
+// A consumer, on the UI thread (behind the same guard when its requirement is optional):
+context.events().subscribe(NotesEvents.CHANGED,
+    changed -&gt; context.log().log(System.Logger.Level.INFO, changed.count() + " notes"));</code></pre>
+<p>Delivery is queued: handlers run later on the UI thread, in one order for the whole application, never during
+{@link Events#publish(Topic,Object)}. There is no replay, so a late subscriber reads the current state from the service
+and then listens. One topic id carries one payload type; using it with another throws. Jasper's own topics are
+{@link AppEvents} ({@code jasper.app.theme-changed} and {@code jasper.app.config-reloaded}), {@link Activities#TOPIC},
+{@link Activities#CONNECTIONS} and the {@link TerminalEvents}, which need {@code terminal.observe}.</p>
+
+<h3>The bundled plugins' APIs</h3>
+<p>Four bundled plugins export an API package. Their types are in the <a href="#group-plugins">Bundled plugin APIs</a> part
+of this reference; how each behaves for its users is in <a href="plugin-apis.md">plugin APIs</a>.</p>
+<table>
+<thead><tr><th>Package</th><th>Service</th><th>What it offers</th><th>Requires line</th></tr></thead>
+<tbody>
+<tr><td><a href="#package-dev.jasper.vault.api"><code>dev.jasper.vault.api</code></a></td><td>{@link dev.jasper.vault.api.VaultApi}, one instance per consumer</td><td>The vault's lock state and its topic; unlocking; the credentials' descriptors, without secrets; a credential once the user allows the consumer to use it, once or always; a credential picker anchored on a control; importing SSH keys as managed keys</td><td><code>{ id = "dev.jasper.vault", version = "&gt;=0.2", optional = true }</code></td></tr>
+<tr><td><a href="#package-dev.jasper.editor.api"><code>dev.jasper.editor.api</code></a></td><td>{@link dev.jasper.editor.api.Editor}</td><td>Opening a local file, or a document the consumer reads and writes ({@link dev.jasper.editor.api.EditorDocument}), in an editor tab; reopening the consumer's documents from Recent Files; answering Open in Editor… first; offering a file source's places in the Editor's chooser</td><td><code>{ id = "dev.jasper.editor", version = "&gt;=0.7", optional = true }</code></td></tr>
+<tr><td><a href="#package-dev.jasper.remote.api"><code>dev.jasper.remote.api</code></a></td><td>{@link dev.jasper.remote.api.RemoteProjects}</td><td>The saved host and folder of an SSH pane; whether a host is connected; listing a remote work tree; looking for marker files; opening a remote file in the Editor or a terminal in a remote folder</td><td><code>{ id = "dev.jasper.remote", version = "&gt;=0.12", optional = true }</code></td></tr>
+<tr><td><a href="#package-dev.jasper.snippets.api"><code>dev.jasper.snippets.api</code></a></td><td>{@link dev.jasper.snippets.api.SnippetService}</td><td>Looking a snippet up by name; appending a snippet; the Snippets palette scope's id and row ids, for reopening the palette on a snippet</td><td><code>{ id = "dev.jasper.snippets", version = "&gt;=0.1", optional = true }</code></td></tr>
+</tbody>
+</table>
+<p>The ranges shown are the highest a bundled consumer declares; Remote declares {@code >=0.2} for the Editor. The SDK release carries no jar for these packages: their
+classes are in each provider's plugin jar, which the application holds in its bundled {@code plugins/<id>/} folder
+(on macOS {@code Jasper.app/Contents/app/plugins/<id>/}). Compile against that jar as {@code compileOnly}, never bundle
+it, and test with a fake of the interface.</p>
+</section>

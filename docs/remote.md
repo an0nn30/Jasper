@@ -1,372 +1,676 @@
 # Remote: SSH, SFTP and tunnels
 
-Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or type `>ssh` in the
-command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
-split beside the current pane, Shift+Enter edits the host. The **Sessions** panel shows searchable
-compact tree-style rows grouped by folder, favorites first, with slightly larger text.
-Choose **Session › Toggle SSH hosts** or press **Cmd+Alt+1** (Alt+1 elsewhere) to show or hide
-the panel in the current window. Opening the sidebar highlights the first visible host and focuses
-the list, ready for arrow keys and Enter. Both navigation shortcuts are configurable below.
-A small dot marks an active session; multiple sessions show a count. Selecting a host shows its
-address and detected OS/IP below the list.
-The same details are available in the row tooltip and remain searchable. Double-click or Enter returns to the most recently used running pane for
-that host, or connects when none is open. **Connect** and the **Connect in new tab** context action
-always open another session; the menu also offers Connect in split, Edit, Duplicate and Delete.
-Click the star to toggle a favorite. Right-click the default group header (**Other** initially)
-and choose **Rename group…**; that name also applies to future hosts without an explicit group.
+Remote (`dev.jasper.remote`) is a bundled plugin, on by default. It keeps your SSH hosts and opens SSH terminal tabs and
+splits on them, browses their files over SFTP with a persistent transfer queue, opens remote files in the Editor, runs
+local, remote and SOCKS tunnels, imports hosts from `~/.ssh/config` with their keys stored in Credential Vault, and
+lists Windows' WSL distributions beside your hosts. Turn it off or on in Settings › Plugins (see [Plugins](plugins.md)).
 
-The toolbar’s **Sessions** dropdown lists saved hosts alphabetically with their addresses.
-Choose a host to focus its most recently used running session, or connect in a new tab if none
-is open. **Manage Sessions...** opens the hosts panel, including when no hosts are saved.
-The list updates when hosts are added, edited, imported or removed.
+Remote works with two other bundled plugins when they are on: [Credential Vault](credential-vault.md) holds the
+passwords and keys hosts sign in with (the SSH agent works without it), and the [Editor](editor.md) edits remote files.
+Under a classic look, such as [Enterprise](enterprise.md), Remote's tool windows take their classic layout
+([below](#under-a-classic-look)).
 
-Under the Enterprise look the toolbar shows the session combo (saved hosts, then WSL distributions, then
-**Manage Sessions…**) and the Run button, tooltip **Connect**, which focuses a running pane for the chosen host or opens one. The Sessions panel
-is a Name/Host/Port tree over the selected host's Properties, Tunnels is a Type/Local/Remote/Via table whose rows start
-or stop on Enter or a double click, SFTP's tools read **Hidden files** and **Upload** over a Modified column, and
-Transfers (**Cmd+Alt+3**, Alt+3 elsewhere) is a bottom panel. The panels start with Sessions and Tunnels on the right,
-SFTP on the left.
+## Commands and shortcuts
 
-On Windows with WSL installed, the Sessions panel starts with a read-only **WSL** group: the
-distributions Jasper detected for its shell profiles, each with its WSL version (WSL 1 or WSL 2) as a
-badge. Double-click or Enter, **Open** on the card, or **Open in new tab** in the context menu opens
-the distribution in a new local tab; **Open in split** splits the current pane. A dot and count mark
-the panes Remote opened for it whose shell still runs. Distributions are never saved in `hosts.toml`
-and cannot be edited, duplicated, deleted or browsed with SFTP; the group's collapsed state is saved
-as its own `wsl_collapsed` flag in `panel-state.toml` (a host group named "wsl" keeps its own state),
-and **Search sessions...** matches distribution names. With no SSH hosts saved, the hint under the
-group reads "No SSH hosts yet — Add or Import from ~/.ssh/config". The Sessions dropdown lists
-them first, titled with their version, and `>ssh` lists them as rows tagged `WSL`, matched on their
-names; distributions come first but keep up to half the rows (rounded down) for matching hosts. To make a
-distribution the default shell for new panes, choose it under Settings › Terminal › Shell. The status
-bar still counts SSH sessions only. Without WSL, nothing here changes.
+| Command | Action id | macOS | Linux and Windows |
+|---|---|---|---|
+| Connect to SSH Host... | `dev.jasper.remote.connect` | Cmd+Shift+H | Ctrl+Shift+H |
+| Toggle SSH hosts | `dev.jasper.remote.hosts` | Cmd+Option+1 | Alt+1 |
+| Toggle SFTP | `dev.jasper.remote.sftp.toggle` | Cmd+Option+2 | Alt+2 |
+| Transfers | `dev.jasper.remote.transfers` | Cmd+Option+3 | Alt+3 |
+| Open SFTP here (in a terminal) | `dev.jasper.remote.sftp` | Cmd+Shift+O | Ctrl+Alt+Shift+O |
+| SFTP: Back (in the SFTP panel) | `dev.jasper.remote.sftp.back` | Option+Left | Alt+Left |
+| SFTP: Forward (in the SFTP panel) | `dev.jasper.remote.sftp.forward` | Option+Right | Alt+Right |
+| SFTP: Parent Folder (in the SFTP panel) | `dev.jasper.remote.sftp.parent` | Option+Up | Alt+Up |
+| Split with Same Host (in a terminal) | `dev.jasper.remote.split` | | |
+| New Host... | `dev.jasper.remote.hosts.new` | | |
+| Import from ~/.ssh/config... | `dev.jasper.remote.import` | | |
+| Manage Sessions... | `dev.jasper.remote.sessions.manage` | | |
+| Cancel transfer | `dev.jasper.remote.transfers.cancel` | | |
+| Toggle Tunnels | `dev.jasper.remote.tunnels` | | |
+| Show Tunnels | `dev.jasper.remote.tunnels.show` | | |
+| Start or Stop a Tunnel... | `dev.jasper.remote.tunnels.pick` | | |
+| New Tunnel... | `dev.jasper.remote.tunnels.new` | | |
+| Forward a Port... | `dev.jasper.remote.tunnels.forward` | | |
+| Stop All Tunnels | `dev.jasper.remote.tunnels.stop-all` | | |
 
-Connecting shows a centered overlay inside the owning app window, with an explicit **Cancel**
-button. It stays centered on resize and blocks underlying input; Escape and outside clicks do not
-dismiss it. The tab or split appears once the SSH shell is ready. Failures offer **Retry** and
-**Close**. Reconnect uses the overlay while preserving the existing pane. Host-key and Vault prompts
-remain native dialogs above it. A second connection request in that window focuses the current attempt.
-The **Session** menu carries the connection commands, **New Host...** (`dev.jasper.remote.hosts.new`, the Sessions
-panel's **+** without opening the panel; unbound by default), **Import from ~/.ssh/config...** and the tunnel commands; the **Transfer**
-menu carries **Open SFTP here** and **Transfers**.
+Rebind any of them in Settings › Keymap or under `[keybindings]` in `config.toml`
+(see [Shortcuts](configuration.md#shortcuts)). Every saved host and every WSL distribution is an action too
+(`dev.jasper.remote.session.h<host id>` and `dev.jasper.remote.session.w<id>`), titled like its entry in the toolbar's
+Sessions menu, so the palette's Commands scope finds them and Keymap can bind them.
 
-A host is a name, hostname, port, username, group, an optional jump host and how it authenticates:
-a **Vault credential** (a login with a password, a key or both, or a standalone key with the host's
-username) or the **SSH agent** (`SSH_AUTH_SOCK`, or the OpenSSH agent pipe on Windows). Hosts live in
-`plugins/dev.jasper.remote/data/hosts.toml`, which you may edit; Jasper notices the change within a
-second. The file never holds a secret. A jump host makes the connection go through that host first,
-with its own authentication and host-key check. In the Add Host form, **Add and Connect** saves the host and then
-connects to it in a new tab, as the palette's Connect does; if the save fails, nothing connects.
+The **Session** menu holds Connect to SSH Host..., Toggle SSH hosts, Split with Same Host, New Host..., Import from
+~/.ssh/config..., Toggle Tunnels, Start or Stop a Tunnel..., New Tunnel..., Forward a Port... and Stop All Tunnels. The
+**Transfer** menu holds Open SFTP here and Transfers. A terminal's right-click menu offers Forward a Port... and Open
+SFTP here. View › Tool Windows (the Window menu under the Enterprise look) lists Toggle SSH hosts, Toggle SFTP and
+Toggle Tunnels.
 
-**Import** reads `~/.ssh/config` (`Host`, `HostName`, `Port`, `User`, `ProxyJump`, ordered
-`IdentityFile` directives and one level of `Include`). Wildcard hosts and `Match` blocks are
-listed as unsupported. Select the hosts to import; existing aliases start unchecked and can be
-selected for **Update**. Updates preserve their UUID, creation date, group and favorite.
+## Opening sessions
 
-Vault creates or unlocks its encrypted store, reads only the selected keys and asks for encrypted
-key passphrases. Review the fingerprints and press **Import and use** to save the key material,
-passphrases and Remote's grants. Repeated keys are deduplicated by fingerprint. A matching standalone
-file-based Vault key is promoted while preserving its UUID and grants. Source files are untouched.
-Hosts with no IdentityFile require a chosen stored Vault key or password. Unsupported paths,
-unreadable keys and unresolved jump hosts block the affected selection; there is no Agent fallback.
+### From the command palette
 
-Imported hosts authenticate from Vault even after a restart without their original files or the
-system agent. To repair an earlier Agent import, re-import and check **Update** for that host.
-Multiple identities stay ordered and can be reordered in the host editor. Existing manual Agent,
-password and path-based Vault hosts continue to work. Each development worktree has its own Jasper
-home and Vault; this operation imports into the home of the app you are running.
+**Connect to SSH Host...** opens the palette on the SSH scope; typing `ssh >` in the palette does the same. It lists the
+WSL distributions first, then your hosts, favourites first and then by name, each with `user@host:port` and its group.
+Matching hosts keep up to half the rows. A search matches a host's name, hostname, username or group, and a
+distribution's name.
 
-Keys are saved before hosts. If the hosts file changes or cannot be saved, the keys remain safely
-in Vault; **Refresh** and retry to reuse them. Cancellation before host saving leaves hosts unchanged.
-Once a durable write starts it completes; cancelling cannot undo keys already saved.
+| Key | Verb |
+|---|---|
+| Enter | **Connect**: a new SSH tab, or a new tab on the distribution |
+| Cmd+Enter (Ctrl+Enter) | **Connect in split**: the same, beside the current pane |
+| Shift+Enter | **Edit host…** (hosts only) |
 
-The first managed key upgrades the inner Vault payload to version 2 and preserves an encrypted,
-owner-readable `vault.jv.v1-backup` beside `vault.jv`. Backup failure aborts the upgrade. Older Vault
-versions cannot read version 2: to downgrade, stop Jasper and restore that backup, accepting that it
-contains only pre-upgrade credentials and may require the previous master password/device binding.
-Generated and unrelated path-based credentials remain as they were. No decrypted key files are created.
+### The Sessions panel
 
-The first connection to a host shows its key type and SHA256 fingerprint with **Cancel**,
-**Connect once** and **Trust and connect**; trusting writes `plugins/dev.jasper.remote/data/known_hosts`.
-Keys already in `~/.ssh/known_hosts` (hashed entries included) connect without asking. A key that
-differs from either file is rejected. A corrupt Jasper `known_hosts` refuses every connection until
-it is fixed.
+**Toggle SSH hosts** shows or hides the Sessions tool window, which starts on the left. Opening it selects the first
+host or distribution and puts the keyboard in the list, ready for the arrow keys and Enter. Its header shows how many
+hosts and distributions there are, with **New session** (+) and **Import sessions**.
 
-An SSH connection is shared by tabs, splits, SFTP browsers and transfers using the same
-connection identity; it stays open for a few seconds after its last use. When it drops, every pane on that host
-shows the disconnected banner and Reconnect makes a new connection. The status bar shows how many
-SSH sessions are open; clicking it toggles the panel. Locking the Vault leaves live sessions alone;
-only new connections need it.
+- **Search sessions** filters by name, hostname, username, group and the OS and address Remote learned for a host
+  ([Host information](#host-information)).
+- Rows: the [WSL group](#wsl-distributions) first, then your groups in alphabetical order with the default group last
+  (**Other** until you rename it), hosts alphabetical within each. While every host is ungrouped and the default group
+  is still **Other**, the list has no group headers.
+- A click on a group header collapses or expands it, as do Enter and a double click. Collapsed groups are remembered;
+  a search shows their hosts.
+- A host row shows a dot (green while one of its SSH panes runs), its name and hostname, and a star: click the star to
+  make it a favourite or not. The row's tooltip adds `user@host:port`, the learned OS and address, the jump host and
+  the number of sessions.
+- Enter or a double click on a host returns to its most recently used running pane, or connects in a new tab when none
+  runs.
+- A host's right-click menu: **Connect in new tab** and **Connect in split** (always a new session), **Browse files**
+  (its home folder in [SFTP](#sftp)), **Edit…**, **Duplicate**, **Delete…** and **Add to favorites** or **Remove from
+  favorites**; while the list has no headers, also **Rename group…**.
 
-Host information is best-effort. After a successful user-initiated connection, a separate SSH exec
-channel reads `uname -s`, Linux `/etc/os-release`, or Windows `ver`; these commands never enter the
-interactive shell. The probe has time and output limits and cannot prevent using the shell. Results
-are cached in `data/host-info.properties`, refreshed on the next authenticated transport, and hidden
-when the saved endpoint changes. Direct connections can show the connected IP when it differs from
-the configured hostname; jump connections never show their local forwarding address as the host IP.
-Key-based connections use the same flow; opening the panel does not initiate network connections.
+Under the list, the selected host's card shows its name, `user@host:port` and how it signs in: the credential's name,
+"*n* Vault key(s)", "SSH agent", "credential missing", "needs Credential Vault" or "Vault locked". While the host has a
+running pane the card reads "Connected" and its button **Open Shell** goes to that pane; otherwise the button is
+**Connect**. The pencil edits the host.
 
-Settings live in `plugins/dev.jasper.remote/dev.jasper.remote.toml`; change them in Settings › Tools › Remote or in the
-file (Plugins manager > Open Settings):
+### The toolbar's Sessions menu
 
-```toml
-connect_timeout_seconds = 10    # 0 to 3600
-auth_timeout_seconds = 30       # 0 to 3600
-keepalive_seconds = 30          # 0 disables
-session_linger_seconds = 5
-read_user_known_hosts = true
-use_ssh_agent = true
-```
+The toolbar's **Sessions** menu lists the WSL distributions ("Ubuntu (WSL 2)"), then your hosts alphabetically
+("prod-web (deploy@web1:22)"), then **Manage Sessions...**, which shows the Sessions panel. Choosing a host goes to its
+most recently used running pane, or connects in a new tab when none runs; choosing a distribution opens a new tab on it.
 
-Connection settings apply to the next connection. A value out of range is reported and its default used.
-Toggle SSH Hosts (Cmd+Alt+1), Connect to SSH Host… (Cmd+Shift+H) and Toggle SFTP (Cmd+Alt+2) are bound in
-Settings › Keymap like any other action; `cmd` means Command on macOS and Ctrl+Shift elsewhere. A `[shortcuts]`
-table from an older Remote is reported as unknown; delete it and rebind in Keymap.
+### Split with Same Host
 
-The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split`,
-`dev.jasper.remote.hosts.new` and `dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
-contributed actions. Tunnels have their own section at the end of this guide.
+**Split with Same Host** splits the active pane to the right with a new session on the same host. It is enabled while
+the active pane is an SSH pane Remote opened.
 
-## Native acceptance
+## Saved hosts
 
-Headless tests cover the store, the config import, trust decisions, the agent protocol, the shared
-session, ProxyJump and every failure message against an SSH server on loopback. The following need a
-real desktop and a host you control:
+### Adding and editing a host
 
-1. Connect to a real host with a Vault login (password), a Vault key and the system agent; verify the
-   fingerprint prompt against the server's own, then that Trust and connect stops the prompt.
-2. Connect through a real bastion (jump host); confirm two host-key prompts on first use and one
-   saved trust entry for each host. The status count tracks shell channels, not jump transports.
-3. Open a second tab and a split on the same host: no new authentication, both interactive; close all
-   and confirm the session drops after the linger.
-4. Import your `~/.ssh/config`; check the mapped fields and the "not importable" list.
-5. Pull the network or stop `sshd`: every pane on that host shows the banner; Reconnect works after.
-6. Lock the Vault while connected (sessions stay), then Connect a Vault host (unlock prompt appears).
+**New Host...**, the Sessions panel's **+** and **Edit…** open the host form (**Add Host**, or **Edit** *name*):
 
-For the host-list/dialog follow-up, also check:
+| Field | What it holds |
+|---|---|
+| Name | Required and unique, ignoring case ("e.g. homelab") |
+| Host, Port | The hostname or IP address (required) and the port (1 to 65535, default 22) |
+| Username | The login. May be blank with a Vault login, whose username is then used; an SSH-agent host needs one |
+| Jump host | **None**, or another saved host to connect through ([Jump hosts](#jump-hosts)) |
+| Authentication | **Vault Credential** or **SSH Agent** ([Authentication](#authentication)) |
+| Credential | With Vault: one Vault entry, chosen with **Choose…** |
+| Keys | With Vault: SSH keys stored in the vault, "Tried in order"; **Add Stored Key…** adds one, and the list can be reordered and trimmed |
+| Group | A group name, or blank for the default group |
+| Add to Favorites | The host's star |
+| Track shell folder | On by default: SFTP follows the terminal's current directory ([Following the terminal](#following-the-terminal)) |
 
-7. Rename **Other**, restart, and add another ungrouped host; both use the saved name.
-8. Cancel a slow connection and retry a rejected login; no empty tab should appear.
-9. Open two sessions for one host, focus each in turn, then double-click its row; the last used
-   running pane is selected. Close both; double-click now starts a new connection.
-10. Connect to Linux/macOS/Windows hosts and search by the learned OS or IP. An SSH server that
-    disallows exec requests should still provide its normal terminal.
+A new host defaults to **Vault Credential** when Credential Vault is on, otherwise to **SSH Agent**; without the Vault
+the option reads "Vault credential (needs Credential Vault)" and cannot be chosen. A credential and stored keys are
+alternatives: choosing one clears the other. The footer shows the equivalent command (`ssh deploy@web1 -p 2222`) or
+what is wrong ("A host needs a name", "The port must be a number from 1 to 65535", "Choose a credential, or use the SSH
+agent", "A host named prod-web exists"). **Add Host** (or **Save**) saves; **Add and Connect**, offered when adding,
+saves and then connects in a new tab, and connects nothing when the save fails. Enter saves nothing; Escape cancels.
 
-For the WSL group (Windows with at least one WSL 1 and one WSL 2 distribution), also check:
+### Groups and favourites
 
-11. The panel is titled **Sessions** and starts with a WSL group listing each distribution with the
-    right WSL 1 or WSL 2 badge; `docker-desktop` is absent. A Mac or a Windows machine without WSL
-    shows no group.
-12. Double-click a distribution: a tab titled with its name runs that distribution's shell, and the
-    row shows a dot. **Open in split** adds a second pane (count 2). Exit one shell and close the other
-    pane: the dot disappears.
-13. Install or remove a distribution, then click **Detect shells again** (↻) under Settings › Terminal › Shell: the
-    group, the Sessions dropdown and `>ssh` follow without a restart.
-14. Collapse the WSL group, restart Jasper, and confirm it stays collapsed. A host group named `wsl`
-    collapses and expands on its own, without moving the WSL group.
-15. The toolbar's **Sessions** dropdown lists the distributions first (for example "Ubuntu (WSL 2)");
-    choosing one opens it in a new tab. In `>ssh`, distributions are rows tagged `WSL`: Enter opens a
-    tab, Cmd/Ctrl+Enter splits the current pane, and Shift+Enter (edit) does nothing.
+Every host with a blank group belongs to the default group. Right-click its header and choose **Rename group…** to
+rename it (1 to 80 characters, not the name of another group); the name also applies to hosts added later. Favourites
+lead the palette's SSH scope and show a filled star in the panel.
 
-For native acceptance of the UI changes, resize the app while connecting and confirm the overlay
-stays centered; Escape/outside clicks and underlying menus should not interrupt it. Cancel should
-leave no new tab, while success should focus the connected pane. Confirm host-key/Vault prompts
-remain usable. Edit `[ui.font]` in the app configuration while Hosts is open and verify the list,
-menus, palette and subsequent connection overlay follow the new family/size.
+### Duplicating and deleting
 
-## SFTP browsing and transfers
+**Duplicate** saves "*name* copy" ("*name* copy 2", …) with the same address, port, username, authentication, group and
+jump host; the copy is not a favourite and tracks the shell folder. **Delete…** asks "Delete the saved host *name*? Open
+sessions stay connected." and names the tunnels that go through the host; they stay, marked "Host missing". A host that
+another host uses as its jump host cannot be deleted until that host no longer jumps through it.
 
-Remote 0.4 includes SFTP in the same plugin as SSH. Choose **Transfer > Open SFTP here**, **View > SFTP**,
-**Open SFTP here** in a terminal's context menu, or **Browse files** on a saved host.
-Connecting a shell does not automatically open the browser. There is one remote browser in
-each window, with an editable path, compact file list, Up, Upload, Download, Refresh,
-New folder, Delete and Copy path controls. Select multiple rows for file operations. Hidden items (names starting with
-a dot) stay out of the list until the **Show hidden items** toggle beside Refresh is pressed; the choice is remembered.
-The context menu also offers **Upload folder** and **Copy to host**.
-Opening a directory link deliberately resolves its path; recursive copy/delete still treat it as a link.
+### Importing from ~/.ssh/config
 
-The browser remembers each remote pane's directory and Follow terminal folder choice.
-Following uses the pane's own directory reports (OSC 7) when its shell sends them. Otherwise,
-on Linux and macOS hosts, Remote reads the shell's folder after you press Enter or focus the
-pane, with a fixed read-only script on a separate SSH exec channel: nothing is typed into your
-shell. For this, each pane of a host with **Track shell folder for SFTP follow** (on by default,
-in the host editor) has its own SSH connection. Windows hosts are not followed. A host that
-refuses exec channels shows "This host does not report the shell's folder". Entering a path or
-navigating a folder turns following off; Refresh preserves it. Selecting a local terminal
-leaves the last remote browser available. When the SSH session of the pane the browser shows
-ends (its tab or pane closes, the shell exits or the connection drops), the browser disconnects
-and clears, showing "SSH session closed"; transfers already queued keep running. Browsing and transfers hold their own SSH leases, so
-closing the source terminal does not cancel a copy.
+**Import from ~/.ssh/config...** (or **Import sessions** in the panel) reads your OpenSSH configuration and shows each
+host it can import. Import needs Credential Vault: imported hosts always sign in with credentials stored in the vault,
+never through the SSH agent.
 
-- **Upload** opens the owning window's native file picker; the selection goes into the
-  displayed remote directory. **Upload folder** picks a local directory recursively.
-- **Download** sends the selected remote files/folders into a chosen local directory.
-- **Copy to host** opens a destination chooser with a saved-host selector and one folder
-  browser. Confirm **Copy here** to copy the captured selection. Remote-to-remote data streams
-  through Jasper; it is not staged as a local file.
-- **Delete** requires confirmation and removes the captured selection recursively. It is
-  cancellable, but already deleted entries cannot be recovered. Links themselves are deleted;
-  their targets are not traversed. Copy path writes plain paths to the clipboard.
+- Read: `Host` blocks with `HostName`, `Port`, `User`, `ProxyJump` and `IdentityFile`. The first value of a key wins;
+  `IdentityFile` lines add up in order (`IdentityFile none` is ignored). Lines before the first `Host` apply to every
+  host and come first; a `Host *` block applies to every host at its place in the file. `Include` is followed one level
+  deep, relative to `~/.ssh`, with wildcards in the file name.
+- Defaults: the hostname is the alias, the port 22 and the user your local user name. `IdentityFile` may use `~`, `%d`,
+  `%u`, `%r`, `%h`, `%p` and `%%`; a relative path is relative to your home folder.
+- Listed under "Not importable": other `Host` patterns with `*`, `?` or `!`, `Match` blocks, a bad `Port` and lines with
+  invalid quoting. A row with an unsupported `IdentityFile` (`${…}`, `~user`) or `ProxyJump` cannot be chosen.
+  `ProxyJump` must be the alias of one host in the file or already saved ("Unsupported ProxyJump expression", "ProxyJump
+  host missing"). A host whose jump host is not imported with it and signs in through the agent is refused: "Select and
+  import the jump host too: *name*".
 
-### Editing remote files
+Rows read "New: *alias* — *user@host:port*" (checked) or "Update: …" for an alias you already have (unchecked), with the
+key files below. A host without `IdentityFile` needs a **Credential**: a Vault password login, or a key stored in the
+vault. **Import** then hands the key files to Credential Vault, which opens (creating or unlocking the vault), reads
+each key, asks for the passphrase of an encrypted one (**Unlock key**), and shows **Import SSH keys** with each key's
+fingerprint. **Import and use** stores the keys inside the vault and allows Remote to use them. A key whose fingerprint
+the vault already holds is reused; a path key with that fingerprint (see
+[Credential Vault](credential-vault.md#other-plugins-and-grants)) becomes a stored key and keeps its id and grants. The
+key files are only read.
 
-With the bundled Editor installed, double-click a file in the SFTP browser, or select it and press Enter, to open it
-in a tab of the Editor window; saving writes it back to the host. A link to a file opens the file it leads to (saving
-changes that file, and the link stays a link); a link to a folder navigates as before. **Open in Editor** in the
-right-click menu opens the selected files and links to files, at most 20 at a time, and says so ("Opened 20 of 57
-files.") when there were more. Without the Editor, double-clicking a file does nothing and the menu item is hidden.
+Remote then saves the hosts, signing in with their stored keys in the config's order, and reports "*n* new, *m* updated
+SSH hosts saved using Vault credentials". An update replaces the host's address, port, user, jump host and keys, keeps
+its group, favourite, id and creation date, and turns **Track shell folder** on. Because the keys live in the vault,
+imported hosts connect without the original key files or the SSH agent. Keys are saved before hosts: if the hosts cannot
+be saved ("Keys were saved in Vault, but hosts.toml was not. Refresh the import and retry."), **Refresh** and import
+again to reuse them. When hosts changed while the preview was open, the import asks you to refresh it.
 
-Saving follows the Editor's safe write. The new content goes to a hidden, owner-only sibling
-(`.<name>.jasper-<random>.tmp`) beside the file, which gets the file's permissions and atomically replaces it through
-the `posix-rename@openssh.com` extension. Remote writes the file in place instead, keeping its owner, group and links,
-when the folder does not allow the sibling, when the sibling would get another owner or group, when the server does not
-report the file's permissions, or when the server has no atomic rename; an interrupted write in place may leave a
-partial file, and the tab stays unsaved so you can retry.
-The atomic replacement gives the file a new inode: other hard links to it keep the old content (SFTP cannot report
-link counts), and a file bind-mounted into a container keeps showing the old content until the container reopens it.
-A read-only file is refused. Before saving, the Editor compares the file's modification time and size with what it
-opened and asks when someone else changed it; SFTP reports times to the second, so a change within the same second
-that keeps the size goes unnoticed. Remote files are not watched for outside changes; Revert re-reads them.
+### hosts.toml
 
-Editor operations for one connection run one at a time on one SFTP channel of the live SSH connection, opened for the
-first and closed when none are left. When the connection has closed, the next operation reconnects; sign-in prompts
-appear in the terminal window the file was opened from, or else in the active one. With no terminal window open it
-fails with "Reconnecting to prod-web needs an open terminal window for the sign-in prompt."
-
-Transfers appear at the bottom of the SFTP sidebar (the Transfers panel under the Enterprise look), in every window: what is copying and where,
-a progress bar, speed and time left, and **×** to cancel. A transfer that needs you shows one
-button — **Resume** (paused or interrupted), **Resolve…**, **Retry failed** or **Retry cleanup**.
-A finished transfer shows "Done" for a few seconds and leaves; failed or cancelled ones stay until
-dismissed with ×. The strip hides when nothing is queued. Before copying onto items that already
-exist, Remote asks once: **Replace** (files replaced, folders merged), **Skip existing** or
-**Cancel**. **Transfer > Transfers** shows the sidebar. The status bar displays aggregate progress,
-confirmed-data speed and bytes remaining; scanning has an unknown total. Click it to show the
-sidebar. Its cancel control cancels the sole active job, or shows the sidebar when several jobs
-are active.
-
-Pause retains partial files and checkpoints. Resume rechecks the source and destination
-prefixes before appending; a large retained prefix takes time to validate. Cancel stops new
-work and attempts to remove only verified, owned temporary files. Already published files
-remain. A cancelled transfer whose cleanup could not finish offers **Retry cleanup** on its row
-in the strip. **×** dismisses a finished or cancelled transfer; it removes queue history only, and
-asks first when cleanup remains unresolved.
-
-After a restart, unfinished jobs are **Paused**, with no automatic authentication or network
-reconnect. Resume is explicit. A changed saved host, login account or jump route requires
-attention rather than silently changing the copy's endpoint. Conflict choices are Replace,
-Skip or Rename for files; Merge, Skip or Rename for folders; and Skip or Rename for type
-mismatches. Applying a decision to remaining conflicts is scoped to that conflict type.
-Independent files continue while other entries need a decision. Completed directory listings are
-retained when a scan resumes. Potential case/Unicode-normalization aliases within one job are
-rejected before copying, conservatively even on a case-sensitive server; rename or split the
-selection instead of risking one sibling replacing another.
-
-Copies preserve links as links, and attempt modification times and ordinary rwx permissions.
-Unsupported metadata becomes a warning; ownership, ACLs, extended attributes and special mode
-bits are not copied. Special files are reported as issues. Servers without safe atomic replace
-cannot replace an existing file. Jasper never substitutes a delete-then-copy operation.
-Files are published from exclusive sibling temporary files after validation. Ambiguous partial
-ownership or a changed final file requires attention; Jasper does not guess and delete it.
-External programs can still race namespace changes, so avoid modifying a destination during a
-copy. SFTP protocol limitations can make an interrupted partial unverifiable; restarting that
-file may be necessary rather than resuming it.
-
-The private persistent queue is `plugins/dev.jasper.remote/data/transfers/queue.sqlite`, beside
-its lifetime lock and SQLite journal files. It stores paths, route/account identity, checkpoint
-hashes and decisions, not credentials or file payloads. A corrupt/newer queue or a second
-process holding its lock disables transfers with an error while ordinary SSH remains available.
-Do not remove the queue to resolve a cleanup issue: it contains the partial-file ownership record.
-
-SFTP limits are in the same file, and apply at once:
+Hosts are saved in `plugins/dev.jasper.remote/data/hosts.toml` under the
+[Jasper home](configuration.md#location-and-startup-options). You may edit it; Remote reads it again within a second of
+a change, and rewrites it when you save from Jasper. It holds references to Vault entries, never a secret.
 
 ```toml
-[sftp]
-max_parallel_files = 2           # 1 to 8; at most two copies per endpoint
-request_timeout_seconds = 30    # 1 to 300
-```
-
-Shortcut changes apply live; app-level keybindings retain precedence. Actions are
-`dev.jasper.remote.sftp`, `.sftp.toggle`, `.transfers` and
-`.transfers.cancel` (each suffix uses the `dev.jasper.remote` prefix). Controls inherit the
-app UI font and use SDK semantic icons. Native acceptance and the
-verified build commands are in [SFTP verification](remote-7c-verification.md).
-
-## Tunnels
-
-Remote 0.10 adds SSH tunnels. Open the **Tunnels** panel from its rail button or **Session > Toggle Tunnels**
-(the palette's **Show Tunnels** command opens it too). A tunnel goes through a saved host: its credential, host-key
-trust and jump host apply. It has its own life: starting one never opens a terminal, closing terminals never stops it,
-and it shares the host's SSH connection with any terminals that are open.
-
-- **Local** (`-L`): a port on this computer reaches a target as seen from the host, such as
-  `localhost:5432 → db.internal:5432`.
-- **Remote** (`-R`): a port on the server comes back to a target as seen from this computer. Allowing other computers to
-  connect needs the server's `GatewayPorts` to permit it.
-- **Dynamic** (`-D`): a SOCKS5 proxy on this computer (no authentication, CONNECT only); names resolve on the server.
-
-Click **+** (or **Session > New Tunnel...**) to add one: a name, the host to go through, the type, where to listen (port 0
-means any free port) and where to forward to. Start and stop a tunnel with the button at the end of its row, Enter or
-Space. The palette's Tunnels scope (`tunnels >`, or **Session > Start or Stop a Tunnel...**) lists the same tunnels: Enter starts or stops, Cmd/Ctrl+Enter opens a
-running local tunnel in the browser, Shift+Enter edits a saved tunnel. Double-clicking a saved tunnel edits it. A
-running row shows its open connections, the bytes moved each way and its uptime; right-click for Start or Stop, Open
-in Browser, Copy Address, Edit, Duplicate and Delete. The status bar counts running tunnels and failures. A tunnel
-whose host was deleted stays in the list, marked "Host missing"; edit it to choose another host.
-
-**Forward a Port...** (a terminal's context menu, the Session menu or the palette) forwards a remote port to the same port
-on this computer's loopback (the next free one if it is taken) through the SSH pane's host, or through a host you choose
-when the command does not start from an SSH pane. **More** reveals a *Forward to host* field for a target other than the
-server itself, named as the server sees it. It starts a quick forward, listed under *Quick forwards* until you stop it
-or Jasper quits; **Save as Tunnel…** in its right-click menu (or double-clicking it) names it and keeps it, and **Keep
-as a saved tunnel** in the dialog saves it from the start.
-
-A row reports what went wrong: a busy port ("Port 5432 is already in use on this computer"), a port that needs
-administrator rights, a refused remote port ("The server refused port 8080: already in use or not allowed"), a lost
-connection ("Connection lost"), or the errors SSH sessions report. In this release a tunnel that loses its connection
-stops; start it again. When a connection cannot be forwarded (for example the server has `AllowTcpForwarding no`, or the
-target is unreachable) the tunnel stays up and its row says "Connections are being refused: <reason>" until a later
-connection succeeds.
-
-Tunnels are saved in `plugins/dev.jasper.remote/data/tunnels.toml`:
-
-```toml
-[[tunnel]]
-id = "…"                      # optional; when absent it is derived from the name, so keep names unique
-name = "pg-prod"
-host = "5f2c…"                # a saved host's id
-kind = "local"                # local | remote | dynamic
-bind_address = "localhost"    # localhost, an IP address, or * for all interfaces
-bind_port = 5432              # 0 = any free port
-target_host = "db.internal"   # local and remote only
-target_port = 5432
-start = "manual"              # manual | launch (launch is stored; nothing starts it yet)
+[[host]]
+id = "5f2c…"                  # when absent, a new one on each read until Jasper saves the file
+name = "prod-web"             # required, unique ignoring case
+hostname = "web1.example.com" # required
+port = 22                     # default 22
+username = "deploy"           # may be blank with a Vault login
+auth = "vault-keys"           # "agent" (default), "vault" or "vault-keys"
+credentials = ["…", "…"]      # vault-keys: stored Vault keys, tried in order
+# credential = "…"            # vault: one Vault entry
+group = "Production"          # blank or absent: the default group
+favorite = true
+jump = "…"                    # another saved host's id
+follow_directory = false      # Track shell folder; written only when off
 created = 2026-10-01T09:00:00Z
 updated = 2026-10-01T09:00:00Z
 ```
 
-Edits to the file apply within a second: a running tunnel whose forwarding changed restarts, and a removed one stops.
-A file that does not parse keeps the last good tunnels and shows one error row ("tunnels.toml has errors: …"). While
-the file has entries Remote cannot read (they are reported in the log), saves from Jasper are refused until you fix or
-remove them. The actions are `dev.jasper.remote.tunnels` (Toggle Tunnels), `.tunnels.show` (Show Tunnels),
-`.tunnels.pick` (Start or Stop a Tunnel...), `.tunnels.new` (New Tunnel...), `.tunnels.forward` (Forward a Port...) and `.tunnels.stop-all` (Stop All Tunnels),
-none bound by default.
+Give a host you add by hand an `id` before a tunnel, a Keymap binding or [Project Index](project-index.md) refers to
+it: they all name the host by its id.
 
-Native acceptance for tunnels (user-run):
+An entry Remote cannot read (a missing name, a bad id, a duplicate name or id) is skipped and logged. Saving from Jasper
+writes only the hosts it read, so a skipped entry is dropped from the file: fix it before you change hosts in Jasper. A
+file that is not valid TOML, cannot be read or is larger than 4 MiB keeps the last good hosts: the Sessions panel shows
+the error, the palette shows "hosts.toml has errors: …", and saving from Jasper is refused until the file is fixed.
+Saving also refuses a jump host that is missing or a chain of jump hosts that loops ("Jump hosts form a cycle at
+*name*").
 
-1. A local tunnel to a real database or web server through a real host; Open in Browser for a web one.
-2. A dynamic tunnel as a browser's SOCKS proxy with remote DNS: sites load and names resolve on the server.
-3. A remote tunnel from the server back to a local web server; `curl localhost:<port>` on the server.
-4. Forward a Port from an SSH pane, then Save as Tunnel; restart Jasper and find it saved.
-5. Stop the network or `sshd`: the tunnel shows "Connection lost" and its port closes.
-6. "Allow other computers to connect" on a local tunnel: macOS asks once to accept incoming connections.
+## Connecting
 
-## For plugins: projects on saved hosts
+Connecting shows **Connecting to** *name* centred in the window: the host, `user@host:port`, what is happening and a
+progress bar, over the window's content. **Cancel** (or Escape) stops it. The tab or split appears only once the shell
+is ready, so a cancelled or failed attempt leaves no pane. After a failure, **Retry** tries again and **Close** (or
+Escape) dismisses it. A second connection request in the same window brings the current one forward. Host-key and
+Vault prompts appear while it waits.
 
-Remote 0.12 exports `dev.jasper.remote.api`. Its `RemoteProjects` service (published with `Services.publish`; require
-`dev.jasper.remote` `>=0.12`, optionally) lets a plugin find where an SSH pane is (`locate`), check markers in a list of
-folders with one command (`exists`), list a project's files (`list`: Git, then `find`, then an SFTP walk), and open a
-file in the Editor or an SSH tab in a folder. Calls without a window use only an already authenticated connection and
-fail with `NotConnectedException` otherwise; `list` with a window may connect and ask the user to sign in. Remote runs
-fixed scripts as `sh -s` with every path single-quoted and never types into the user's shell. `exists` needs a POSIX
-`sh` on the host, so marker detection does not work on Windows OpenSSH hosts; `list` falls back to an SFTP walk where
-`sh`, Git or `find` is missing. `locate` attributes a pane's folder to the pane's saved host: after a nested `ssh`
-inside an SSH pane, the folder reported is still read as one on the saved host. Project Index is the bundled consumer.
+The status line reads "Preparing connection…", "Connecting…", "Verifying host key…" (a key Jasper does not know yet),
+"Authenticating…" and "Opening shell…".
+
+### Authentication
+
+| Authentication | How it signs in |
+|---|---|
+| Vault Credential: one entry | A Vault login (a password, a key, or both) or an SSH key. A blank username takes the login's |
+| Vault Credential: stored keys | The keys stored in the vault, offered in order |
+| SSH Agent | The keys of the agent at `SSH_AUTH_SOCK`, or on Windows, without it, the OpenSSH agent pipe `\\.\pipe\openssh-ssh-agent` |
+
+Credential Vault asks, as for any plugin, whether Remote may use an entry (once, always for that entry, or not), and
+asks you to unlock the vault first when it is locked. Remote reads the secret only to sign in. Locking the vault
+afterwards leaves open sessions connected; the next connection needs it unlocked again.
+
+Remote only lists the agent's keys and asks it to sign. It does not forward the agent to the server and never adds or
+removes agent keys. With `use_ssh_agent = false` agent hosts do not connect.
+
+### Jump hosts
+
+A host with a jump host connects to the jump host first, then reaches the host through a port forward on that
+connection. Each hop signs in with its own authentication and checks its own host key, so a first connection through a
+new jump host asks about two keys. A jump host may itself have a jump host.
+
+### Host keys
+
+A host key Jasper does not know opens **Verify host key** *host*: "The authenticity of *host* port *port* can't be
+established.", the key type and its SHA256 fingerprint, and "Compare it with the server's before trusting."
+
+- **Trust and connect** saves the key in Remote's own `known_hosts` (`plugins/dev.jasper.remote/data/known_hosts`, the
+  OpenSSH format, `[host]:port` for a port other than 22) and connects. When the file cannot be written, the
+  connection stops ("Could not save the host key: …").
+- **Connect once** connects without saving it.
+- **Cancel**, Escape or closing the dialog stops the connection ("Host key not trusted"). No button answers Enter. An
+  answer that does not come within `auth_timeout_seconds` counts as Cancel.
+
+Keys in `~/.ssh/known_hosts` connect without asking, hashed entries included, while `read_user_known_hosts` is on;
+Remote never writes that file. There, an `@revoked` entry for the key rejects it, `@cert-authority` lines are ignored
+and lines Remote cannot read are skipped. A key that differs from the one either file holds for the host is rejected
+("Host key rejected: fingerprint changed (known …, offered …)"). Remote's own file is strict: while any line in it does
+not parse, every connection is refused ("known_hosts line 3 is not a known_hosts entry") until you fix or remove it.
+
+### When a connection fails
+
+| Message | Meaning |
+|---|---|
+| Could not resolve host *host* | The hostname did not resolve |
+| No route to host *host*. On macOS, allow Jasper under System Settings > Privacy & Security > Local Network. | The address is unreachable; on macOS, Local Network access may be off for Jasper |
+| Connection refused | Nothing accepts connections on that port |
+| Timed out after *n* s | The server did not answer within `connect_timeout_seconds`, or signing in took longer than `auth_timeout_seconds` |
+| Connection lost | The connection closed or was reset |
+| Authentication failed (tried publickey, password) | The server refused every method offered; the list names those tried |
+| SSH agent has no usable keys; load a key or choose Vault. | The agent holds no keys |
+| SSH agent unavailable: … | The agent did not answer |
+| SSH agent not available | No agent was found, or `use_ssh_agent` is off |
+| needs Credential Vault | A Vault host while Credential Vault is off |
+| Credential denied | Remote was not allowed to use the entry, or it is gone |
+| Could not read the Vault key *name* | The key could not be loaded (a wrong passphrase, an unsupported format) |
+| Import this key into Vault before connecting | A **Keys** entry is not a key stored in the vault |
+| No username for *host* | No username, and the Vault entry has none |
+| Vault username changed; reopen this host before connecting | The Vault login's username changed while connecting |
+| Host key not trusted, Host key rejected: …, Could not save the host key: … | See [Host keys](#host-keys) |
+
+## SSH sessions
+
+An SSH pane's terminal type is `xterm-256color`, and Remote asks the server to set `COLORTERM=truecolor`. A pane Remote
+opens in a folder (as [Project Index](project-index.md#projects-on-remote-hosts) does) starts the login shell there, or
+in the home folder when the folder cannot be entered.
+
+### Connections
+
+Each SSH pane of a host with **Track shell folder** on (the default) has its own SSH connection, closed with the pane,
+so each such pane signs in again. Hosts Remote has found to run Windows are the exception. All other use of a host
+(panes of hosts with Track shell folder off, the SFTP browser, transfers, tunnels and the Editor) shares one connection
+per host and login, which stays open for `session_linger_seconds` (5) after its last user. Remote sends a keepalive
+every `keepalive_seconds` (30) and gives the connection up after three unanswered ones.
+
+When the shell exits or the connection drops, the pane stays with "Disconnected (exit 0)" or "Disconnected: …",
+**Reconnect** and **Close**. Reconnect connects again into the same pane, through the same progress overlay; a pane
+opened in a folder starts there again. When a shared connection drops, every pane using it shows the notice.
+
+The status bar's "*n* SSH sessions" item counts the SSH panes whose shell runs and is hidden at none; clicking it
+toggles the Sessions panel.
+
+### Host information
+
+After a successful connection Remote reads the host's OS on a separate SSH command channel, never in your shell: `uname
+-s`, then on Linux the `PRETTY_NAME` in `/etc/os-release`, or on Windows `cmd /c ver`. A direct connection also notes
+the server's IP address when it differs from the hostname. The reads time out after a few seconds and a host that
+refuses them still gives you its shell. Results are kept in `data/host-info.properties` and shown in the host's tooltip
+and the Sessions search; they are hidden once the host's address, port or jump host changes, and refreshed on the next
+connection. Opening the Sessions panel connects to nothing.
+
+## WSL distributions
+
+On Windows with WSL, the Sessions panel starts with a **WSL** group: the distributions Jasper found for its shell
+profiles (Docker Desktop's are left out), each with a badge such as "WSL 2" or "WSL 2 · default". Enter, a double
+click, **Open** on the card or **Open in new tab** in the right-click menu opens one in a new local tab; **Open in
+split** splits the current pane. A dot, and a count above one, marks the panes Remote opened for it whose shell still
+runs. Distributions are not saved hosts: they cannot be edited, duplicated, deleted or browsed with SFTP, and the status
+bar's SSH count leaves them out. The group's collapsed state is kept apart from host groups (a host group named "wsl"
+has its own), and the search matches distribution names and "WSL". With no SSH hosts saved, the hint reads "No SSH
+hosts yet — Add or Import from ~/.ssh/config".
+
+The toolbar's Sessions menu and the palette's SSH scope list them too (tagged `WSL`; Shift+Enter does nothing). The
+list follows **Detect shells again** in Settings › Terminal › Shell without a restart. To make a distribution the shell
+of new panes, choose it there (see [Shell, environment and history](configuration.md#shell-environment-and-history)).
+
+## SFTP
+
+### Opening the browser
+
+Each window has one SFTP browser, in the SFTP tool window (in the lower half of the left side to start with). It shows
+the SSH pane you focus: focusing another SSH pane switches it, and focusing a local pane leaves it as it is.
+
+- **Open SFTP here** (Cmd+Shift+O, Ctrl+Alt+Shift+O; the Transfer menu or a terminal's right-click menu) opens the
+  current SSH pane's folder. From any other pane it shows the browser, and when it shows nothing, asks **Browse files
+  on SSH host** for a saved host.
+- **Browse files** on a host in the Sessions panel opens the host's home folder.
+- **Toggle SFTP** (Cmd+Option+2, Alt+2) shows or hides the tool window. While nothing is connected it reads "Not
+  Connected" with **Choose Session**, a menu of your saved hosts.
+
+The browser connects through the host's shared connection. When the SSH session of the pane it shows ends (the pane
+closes, the shell exits or the connection drops), it clears and reads "SSH session closed"; transfers already queued go
+on.
+
+### Browsing
+
+The tool window's header shows the host. The tools are **Back**, **Forward**, **Refresh**, **Show hidden items** and
+**Upload** (a click uploads files; its menu holds the folder's other actions), over the path as breadcrumbs. Click a
+crumb to open that folder, or click beside the crumbs to type a path (Enter goes, Escape cancels). Back and Forward
+retrace the folders you visited in this pane; Option+Left, Option+Right and Option+Up on macOS, Alt+Left, Alt+Right
+and Alt+Up on Linux and Windows (Back, Forward, Parent Folder) work anywhere in the panel.
+
+The list shows Name and Size, folders first, then by name ignoring case, with each entry's modified time in its tooltip.
+Select several rows for the file actions. A folder of more than 200 entries is shown 200 at a time ("1–200 of 950",
+**Previous page**, **Next page**). Names starting with a dot stay hidden until you press **Show hidden items**; the
+choice is remembered and applies to every browser opened afterwards. Enter or a double click opens a folder, opens a
+file in the Editor ([Editing remote files](#editing-remote-files)), and follows a link to where it leads. A line under the list says what
+is loading (with **Cancel**) and how the last action went.
+
+### Following the terminal
+
+**Follow terminal folder** ("Keep the SFTP browser in the active SSH terminal's folder"), at the foot of the panel, is
+on for each pane until you change it. The browser remembers each pane's folder and choice.
+
+- A shell that reports its folder (OSC 7) is followed from those reports.
+- Otherwise, on Linux and macOS hosts with **Track shell folder** on, Remote reads the shell's folder with a fixed
+  read-only script on a separate SSH command channel of the pane's own connection, a moment after you press Enter and
+  when the browser is shown or the pane focused. Nothing is typed into your shell. The folder found this way is also
+  the folder Jasper shows for the pane.
+- Windows hosts are not followed. A host that does not let Remote read the folder shows "This host does not report the
+  shell's folder".
+
+Typing a path, opening a folder, **Up**, Back and Forward turn following off for that pane; **Refresh** keeps it.
+Turning it back on returns to the shell's folder.
+
+### File actions
+
+A row's right-click menu acts on the selection when the row is selected, otherwise on that row; right-clicking beside
+the rows acts on the selection.
+
+| Item | What it does |
+|---|---|
+| Open in Editor | Opens the selected files, and links to files, in the Editor, at most 20 at a time ("Opened 20 of 57 files."); shown only with the Editor on |
+| Up | The parent folder |
+| New folder… | Asks for one folder name and creates it |
+| Upload folder… | Uploads a local folder and everything in it |
+| Download selected… | Copies the selection into a local folder you choose |
+| Copy to host… | Copies the selection to another saved host |
+| Copy paths | Puts the selected entries' full paths on the clipboard, one per line |
+| Delete selected… | After "Delete *n* selected items from *host*:*folder*?", deletes them and everything in them |
+
+**Copy to host** asks for the **Destination host** and a folder there, with **New folder**; **Copy here** queues the
+copy. The data streams through Jasper without being saved on this computer. **Delete** checks each entry again first,
+deletes links themselves and never what they lead to, and can be cancelled; what it already deleted stays deleted
+("Cancelled; completed deletions were kept"). New folder and Delete are refused where they overlap a running transfer.
+
+### Transfers
+
+Uploads, downloads and host-to-host copies go into one queue that every window shows: at the foot of the SFTP panel
+(three rows at a time), or in the Transfers tool window under a classic look. **Transfers** (Cmd+Option+3, Alt+3, or
+Transfer › Transfers) shows them.
+
+Before queueing, Remote checks whether the selected names already exist at the destination and asks once: **Replace**
+(files are replaced, folders merged), **Skip existing** (existing files are kept, folders merged) or **Cancel**.
+
+A row shows the direction (↑ upload, ↓ download, ⇄ host to host), what goes where ("logs (12 items) → prod-web:/srv"), a
+progress bar and the status: "Queued", "Scanning… *n* items found", "Checking partial file…", "42% · 3.1 MiB/s · 2 min
+left", "Paused", "Cancelling…", "Done", "Done · 2 failed · 1 skipped", "Needs attention — …", "Interrupted — …" or
+"Failed — …". **×** cancels a transfer that has not finished (paused, interrupted and failed ones included) and removes
+a finished one from the list. A row that needs you shows one link:
+
+| Link | When |
+|---|---|
+| Resume | Paused, interrupted or failed |
+| Resolve… | It needs a decision |
+| Retry failed | It finished with items that failed |
+| Retry cleanup | Cancelled with temporary files it could not remove yet |
+
+**Resolve…** shows the conflicting file or folder and why: **Replace** (a file onto a file), **Merge** (a folder onto a
+folder), **Skip**, **Rename…** (another name at the destination), **Restart file** or **Cancel**. **Apply to the rest of
+this transfer** uses the answer for the other conflicts of the same kind, files or folders. Other files go on copying
+while one waits.
+
+A transfer that finished cleanly says "Done" for five seconds and leaves the list; cancelled ones, and finished ones
+with failed items, stay until you remove them. Removing one whose cleanup is unfinished asks first, since partial files
+may remain. The status bar shows the queue's progress, speed and what is left ("2 transfers", "1.2 MiB/s · 40 MiB left ·
+7 files"), or what waits ("1 need attention", "2 paused"); clicking it shows the transfers, and its cancel control
+cancels the only running transfer, or shows the list when several run. Up to `max_parallel_files` files copy at once, at
+most two per transfer and two to or from any one host or this computer.
+
+How copies behave:
+
+- Each file is written to a hidden `.jasper-<id>.partial` file in the destination folder and put in place only when it
+  is complete and checked. Replacing an existing file needs a server with atomic rename; Remote never deletes the old
+  file first.
+- Unfinished transfers are **Paused** when Jasper quits; nothing reconnects by itself at the next start. **Resume**
+  checks the partial file's content before going on, which takes a while for a large one. When the saved host, its
+  login or its jump host changed, Resume refuses ("Saved host or authentication identity changed; queue a new
+  transfer").
+- A source that changed during the copy, or a destination that changed since you decided, asks again. Two names in
+  one transfer that could stand for the same file on a case-insensitive or Unicode-normalising system (`Readme` and
+  `README`) stop it until you rename or leave out one of them.
+- Links are copied as links. Modification times and the read, write and execute permissions are copied where the
+  destination allows ("Metadata warning: …" otherwise); owners, ACLs, extended attributes and special mode bits are
+  not. Special files are not transferable.
+- Cancel stops the transfer and removes the temporary files it can prove are its own; files already put in place stay.
+
+The queue is `plugins/dev.jasper.remote/data/transfers/queue.sqlite`, with `queue.lock` and SQLite's journal files. It
+holds paths, the route and logins and the decisions you made, never credentials or file contents, and it records which
+partial files are Remote's: keep it to clean up later. While another Jasper holds the lock, or the queue is damaged,
+transfers are unavailable (the status bar reads "Transfers unavailable") and SSH still works.
+
+### Editing remote files
+
+With the Editor on, Enter or a double click on a file in the SFTP browser, or **Open in Editor**, opens it in an Editor
+tab; saving writes it back to the host. A link to a file opens the file it leads to (the link stays a link). Without the
+Editor, opening a file does nothing.
+
+Saving writes the new content to a hidden, owner-only `.<name>.jasper-<random>.tmp` beside the file, gives it the file's
+permissions and replaces the file with it atomically (the `posix-rename@openssh.com` extension). Remote writes the file
+in place instead, keeping its owner, group and links, when the folder does not allow the sibling, the sibling would get
+another owner or group, the server does not report the file's permissions or it cannot rename atomically. An interrupted
+write in place may leave a partial file; the tab stays unsaved, so you can save again. A read-only file is refused.
+
+An atomic replacement gives the file a new inode: other hard links to it keep the old content, and a file bind-mounted
+into a container shows the old content until the container opens it again. Before saving, the Editor compares the
+file's modification time and size with what it opened and asks when someone else changed it; SFTP reports times to the
+second, so a change within the same second that keeps the size goes unnoticed. Remote files are not watched; **Revert to
+Saved** reads them again.
+
+The Editor's reads and writes for one host and login go one at a time over one SFTP channel of the shared connection,
+opened for the first and closed when none are left. When the connection has closed, the next one reconnects and asks
+you to sign in in the window the file was opened from, or the active one; with no terminal window open it fails
+("Reconnecting to prod-web needs an open terminal window for the sign-in prompt.").
+
+Remote files also reopen from the Editor's recent files, and Jasper's file chooser lists your saved hosts under
+**Remote**, so **Open in Editor…** can open a file on a host and Save As can save there. Choosing a host connects to
+it, and may ask you to sign in. See [Editor](editor.md).
+
+## Tunnels
+
+A tunnel forwards connections through a saved host, with its credentials, host-key trust and jump host. It runs on its
+own: starting one opens no terminal, closing terminals does not stop it, and it uses the host's shared connection.
+
+| Type | What it does |
+|---|---|
+| Local (`-L`) | A port on this computer reaches a target as the host sees it: `localhost:5432 → db.internal:5432` |
+| Remote (`-R`) | A port on the server reaches a target as this computer sees it. Letting other computers use the server's port needs the server's `GatewayPorts` to allow it |
+| Dynamic (`-D`) | A SOCKS5 proxy on this computer (no authentication, CONNECT only); names resolve on the server |
+
+### The Tunnels panel
+
+**Toggle Tunnels**, its rail button or the status bar item shows or hides the Tunnels tool window, which starts on the
+left; **Show Tunnels** shows it without hiding it. It lists saved tunnels by name, then **Quick forwards**, with
+**Filter tunnels** (name, host, addresses, ports and type). A row shows a state dot, the name and "via *host*" (or what is happening or wrong), the mapping and a switch. The
+switch, Enter or Space starts or stops a tunnel; a double click edits a saved one; Delete or Backspace deletes it, after
+asking. The row's tooltip carries its counters: open connections, bytes each way and uptime.
+
+The right-click menu offers **Start** or **Stop**, **Open in Browser** (a running local tunnel, at
+`http://localhost:<port>/`), **Copy Address**, and **Edit…**, **Duplicate** and **Delete…** for a saved tunnel or
+**Save as Tunnel…** for a quick forward. Deleting a running tunnel stops it. A tunnel whose host was deleted stays,
+marked "Host missing · Edit to choose a host".
+
+The status bar shows "2 tunnels", "2 tunnels · 1 failing" or "1 tunnel failing" while any runs or failed, with the state
+of each running, starting or failed tunnel in its tooltip; clicking it toggles the panel. **Stop All Tunnels** stops
+them all.
+
+### Adding a tunnel
+
+**+**, **New Tunnel...** (which starts with the current SSH pane's host) or **Edit…** opens the tunnel form:
+
+| Field | What it holds |
+|---|---|
+| Name | Required and unique ("e.g. Postgres") |
+| Via host | The saved host to go through |
+| Type | **Local**, **Remote** or **Dynamic (SOCKS)** |
+| Listen on | `localhost`, `*` or an IP address, and the port (0 is any free port) |
+| Forward to | The target host and port (Local and Remote only), as the host sees it (Local) or as this computer sees it (Remote) |
+| Allow other computers to connect | Listens on every interface (`*`) |
+
+A route under the ports shows the path from listener to target, and the footer shows the equivalent `ssh -L`, `-R` or
+`-D` command, or a warning when another tunnel listens on the same port.
+
+### Forward a Port
+
+**Forward a Port...** (a terminal's right-click menu, the Session menu or the palette) forwards a port on a host to the
+same port on this computer's loopback, or the next free port above it. From an SSH pane it uses that pane's host;
+otherwise choose one. **More ▸** reveals **Forward to host** for a target other than the server itself, named as the
+server sees it. The forward starts at once and is listed under Quick forwards until you stop it or Jasper quits; **Save
+as Tunnel…** (or a double click) names and keeps it, and **Keep as a saved tunnel** saves it from the start.
+
+### When a tunnel fails
+
+| Message | Meaning |
+|---|---|
+| Port 5432 is already in use on this computer | Another program listens on the port |
+| Port 80 needs administrator rights | The port is privileged |
+| Cannot listen on *address*: not an address of this computer | The listen address belongs to another computer |
+| The server refused port 8080: already in use or not allowed | The server would not open the remote port |
+| Connection lost | The host's connection closed; the tunnel stops, start it again |
+| Host missing | The tunnel's host was deleted |
+| Connections are being refused: *reason* | The tunnel is up but cannot reach its target (for example `AllowTcpForwarding no`, or an unreachable target), until a connection succeeds |
+
+### tunnels.toml
+
+Saved tunnels are in `plugins/dev.jasper.remote/data/tunnels.toml`:
+
+```toml
+[[tunnel]]
+id = "…"                    # optional; when absent it is derived from the name
+name = "pg-prod"            # required, unique
+host = "5f2c…"              # required: a saved host's id
+kind = "local"              # local (default), remote or dynamic
+bind_address = "localhost"  # localhost (default), * or an IP address
+bind_port = 5432            # required; 0 is any free port
+target_host = "db.internal" # local and remote
+target_port = 5432          # local and remote
+start = "manual"            # manual (default) or launch
+created = 2026-10-01T09:00:00Z
+updated = 2026-10-01T09:00:00Z
+```
+
+Tunnels start only when you start them; `start = "launch"` is kept but starts nothing. Edits apply within a second: a
+running tunnel whose forwarding changed restarts, and a removed one stops. A file that does not parse (or is larger than
+1 MiB) keeps the last good tunnels and shows "tunnels.toml has errors: …"; while it has entries Remote cannot read
+(reported in the log), saving from Jasper is refused until you fix or remove them.
+
+## Palette scopes
+
+| Scope | Prefix | Enter | Cmd+Enter (Ctrl+Enter) | Shift+Enter |
+|---|---|---|---|---|
+| SSH | `ssh >`, or **Connect to SSH Host...** | Connect | Connect in split | Edit host… |
+| Tunnels | `tunnels >`, or **Start or Stop a Tunnel...** | Start or stop | Open in browser (a running local tunnel) | Edit tunnel… (a saved tunnel) |
+
+The Tunnels scope lists saved tunnels, then quick forwards, with the mapping, state and host. See
+[Command palette](command-palette.md).
+
+## Settings
+
+Change Remote's settings in Settings › Tools › Remote, or in `plugins/dev.jasper.remote/dev.jasper.remote.toml` under
+the Jasper home. Jasper reads the file live; a value outside its range is reported and the default used (see
+[Plugins](configuration.md#plugins)).
+
+| Key | Default | Range | Label | Applies |
+|---|---|---|---|---|
+| `connect_timeout_seconds` | `10` | 0 to 3600 | Connect timeout | To the next connection, and to tunnels started afterwards |
+| `auth_timeout_seconds` | `30` | 0 to 3600 | Authentication timeout | To the next connection: signing in, agent requests and the host-key question |
+| `keepalive_seconds` | `30` | 0 to 3600; 0 turns keepalives off | Keepalive interval | To the next connection |
+| `session_linger_seconds` | `5` | 0 to 3600 | Session linger | The next time a shared connection is left unused |
+| `read_user_known_hosts` | `true` | | Read ~/.ssh/known_hosts | To the next host-key check |
+| `use_ssh_agent` | `true` | | Use the SSH agent | To the next connection |
+| `[sftp]` `max_parallel_files` | `2` | 1 to 8 | Parallel files | At once |
+| `[sftp]` `request_timeout_seconds` | `30` | 1 to 300 | Request timeout | To SFTP channels opened afterwards |
+
+Remote's messages (a host that could not be saved, a file that could not be opened) are posted in the Remote
+[notification group](notifications.md#groups) (`dev.jasper.remote`), and tunnel failures in the Tunnels group
+(`dev.jasper.remote.tunnels`); change how each shows in Settings › Notifications › Groups.
+
+## Files
+
+Under `plugins/dev.jasper.remote/` in the Jasper home:
+
+| File | Holds |
+|---|---|
+| `dev.jasper.remote.toml` | The [settings](#settings) |
+| `data/hosts.toml` | Saved hosts ([hosts.toml](#hoststoml)) |
+| `data/tunnels.toml` | Saved tunnels ([tunnels.toml](#tunnelstoml)) |
+| `data/known_hosts` | The host keys you trusted, in the OpenSSH format |
+| `data/panel-state.toml` | The default group's name (`default_group`), collapsed groups (`collapsed`, `wsl_collapsed`) and `sftp_show_hidden`; written by Jasper, and a broken file reads as defaults |
+| `data/host-info.properties` | The OS and address learned per host; safe to delete |
+| `data/transfers/` | The transfer queue (`queue.sqlite` and its journal files, `queue.lock`) |
+| `data/browser-cache/` | Folder listings while the SFTP browser shows them, deleted after use |
+
+Remote reads `~/.ssh/config` and the files it includes only when you import, and `~/.ssh/known_hosts` while
+`read_user_known_hosts` is on; it writes neither.
+
+## Under a classic look
+
+Under a classic look, one whose [kit file starts from the classic base](looks.md#kit-and-base) as the
+[Enterprise look](enterprise.md)'s does, Remote's tool windows take their classic layout. Remote chooses its layout
+when it starts, so it follows a change of look at the next start of Jasper.
+
+- **Toolbar**: the session combo, drawn as IntelliJ's run-configuration combo: the application icon and the chosen
+  row's name (a long one cut with an ellipsis), over a list of your hosts ("prod-web (web1.example.com)"), then the WSL
+  distributions ("No saved sessions" when there are neither), then **Manage Sessions…**, which shows the Sessions
+  panel. Beside it the Run button, a green triangle with the tooltip **Connect**, goes to the chosen host's most
+  recently used running pane or opens one, or opens the distribution; it is disabled while there is nothing to run.
+  The combo and the window's Sessions tree share the chosen row; until you choose, it is the current SSH pane's host,
+  else the first.
+- **Sessions** starts on the right, with its count beside the title: **Filter sessions** over a Name, Host and Port tree
+  (favourites marked ★, groups opened and closed with their disclosure triangle, Enter or a double click), and below
+  it the selected host's **Properties** (Host, User, Port, Credentials) with **Edit…** and **Connect** (**Open Shell**
+  while it runs), or a distribution's Distribution, Version and Command with **Open**.
+- **Tunnels** starts on the right, under Sessions: a Type, Local, Remote and Via table. Enter or a double click starts
+  or stops a row, the right-click menu holds the rest, and the line below reads "pg-prod — active. Click to toggle."
+- **SFTP** starts on the left: Back, Forward, Refresh, **Hidden files** and **Upload** over the breadcrumbs, and a
+  Name, Size and Modified ("Sep 28") table. While nothing is connected, a **Choose Session…** dropdown lists your hosts.
+- **Transfers** is a bottom tool window ("No Transfers" when the queue is empty), listed with the other toggles in the
+  Window menu; **Transfers** (Cmd+Option+3, Alt+3) shows it.
+
+Under labelled tool window stripes, as in Enterprise, **Toggle SSH hosts**, **Toggle SFTP**, **Toggle Tunnels** and
+**Transfers** make the tool window they show the active one, which takes the keyboard. A toggle of a shown tool window
+that is not the active one activates it instead of hiding it; **Transfers** only shows, so it activates its tool window
+each time.
+
+## For plugin authors: dev.jasper.remote.api
+
+Remote exports `dev.jasper.remote.api`, which names only JDK and SDK types, so other plugins can work with projects on
+saved hosts; Project Index uses it. Declare Remote in your `plugin.toml`, as Project Index does:
+
+```toml
+requires = [{ id = "dev.jasper.remote", version = ">=0.12", optional = true }]
+```
+
+Compile against it with `compileOnly` and look the service up inside `try … catch (NoClassDefFoundError)`, so your
+plugin runs without Remote ([reference](sdk-reference.html#package-dev.jasper.remote.api); [using an exported
+API](plugin-apis.md#using-an-exported-api)).
+
+Find `RemoteProjects` with [`Services.find`](sdk-reference.html#dev.jasper.sdk.services.Services) (Remote publishes it
+with `Services.publish`). Call it on the UI thread. A stage completes on a worker thread once its remote work has
+started; one that fails before then (no connection, or a failed sign-in) completes on the UI thread and may already be
+complete when returned. Methods that take no window never connect or ask the user to sign in: `exists`, and `list`
+without a window, fail with `NotConnectedException` ("*host* is not connected") while no connection is open.
+
+| Method | What it does |
+|---|---|
+| `locate(UUID paneId)` | The saved host and folder of an SSH pane Remote opened, once its folder is known, as a [`RemoteFolder`](sdk-reference.html#dev.jasper.remote.api.RemoteFolder) (host id, host name, absolute path) |
+| `connected(UUID hostId)` | Whether an authenticated connection to the host is open |
+| `hostName(UUID hostId)` | The host's name; empty once it is no longer saved |
+| `fileSourceId()` | Remote's file source id, `dev.jasper.remote.hosts`, for [`FileChoice`](sdk-reference.html#dev.jasper.sdk.files.FileChoice) sources |
+| `folder(FileLocation.Sourced)` | The host and folder of a [location](sdk-reference.html#dev.jasper.sdk.files.FileLocation.Sourced) the file chooser returned from Remote's source |
+| `exists(hostId, folders, names)` | Which names (`*` globs) exist in which absolute folders, in one command on the host (needs a POSIX `sh`, 10 s at most); the file-system root, the login's home folder and its ancestors report nothing |
+| `list(hostId, root, ListOptions, Optional<WindowHandle>)` | A project's files, within its [`ListOptions`](sdk-reference.html#dev.jasper.remote.api.ListOptions) (folder names to exclude, at most `maxFiles` files, one timeout for all strategies, a cancellation check polled from a worker thread): Git's tracked and untracked files without ignored ones (unless the work tree is the home folder), else `find`, else an SFTP walk, as a `RemoteListing` with its strategy and whether it was cut short; with a window it may connect and ask the user to sign in |
+| `open(hostId, path, window)` | Opens a remote file in the Editor; may ask the user to sign in, and reports failures itself |
+| `openTerminal(hostId, folder, window)` | Opens an SSH tab whose shell starts in the folder |
+
+Remote runs its commands with `sh -s`, every path single-quoted, and never types into the user's shell. `locate` reads
+the pane's folder as one on its saved host, even after a nested `ssh` inside the pane. The [plugin APIs](plugin-apis.md)
+guide covers the exported APIs together.

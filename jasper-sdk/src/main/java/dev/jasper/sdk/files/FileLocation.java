@@ -30,7 +30,11 @@ public sealed interface FileLocation {
      * @param path     an absolute path in that root, using {@code /}, or {@link #HOME}
      */
     record Sourced(String sourceId, String rootId, String path) implements FileLocation {
-        /** The root's home folder, for a source that cannot name it before connecting. @since 0.10.1 */
+        /**
+         * The root's home folder, for a source that cannot name it before connecting.
+         *
+         * @since 0.10.1
+         */
         public static final String HOME = "~";
 
         /** Rejects blank ids and a path that is neither absolute nor {@link #HOME}. */

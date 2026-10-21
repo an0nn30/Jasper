@@ -30,11 +30,14 @@ class AppDocumentationTest {
         source += "\n" + Files.readString(ROOT.resolve("plugins/sample/src/main/java/dev/jasper/sample/SamplePlugin.java"));
         source += "\n" + Files.readString(ROOT.resolve("jasper-app/src/test/java/dev/jasper/app/documentation/PluginUiExamplesTest.java"));
         var guides = new java.util.ArrayList<>(GUIDES);
-        // Dated records retain old code examples: they get the link check only, not the example snippets.
-        for (String directory : List.of("docs/superpowers", "docs/design", "docs/benchmarks")) {
-            try (var files = Files.walk(ROOT.resolve(directory))) {
-                guides.addAll(files.filter(path -> path.toString().endsWith(".md")).toList());
-            }
+        // Every other guide gets the link check only, not the example snippets: the remaining user guides and READMEs,
+        // and the dated records under docs/superpowers, docs/design and docs/benchmarks, which retain old code examples.
+        try (var files = Files.walk(ROOT.resolve("docs"))) {
+            files.filter(path -> path.toString().endsWith(".md")).filter(path -> !GUIDES.contains(path)).forEach(guides::add);
+        }
+        for (String readme : List.of("jasper-terminal/README.md", "jasper-ui/README.md", "jasper-sdk-testkit/README.md",
+                "packaging/cli/README.md", "packaging/launcher/README.md", "tools/visual/README.md")) {
+            if (!GUIDES.contains(ROOT.resolve(readme))) guides.add(ROOT.resolve(readme));
         }
         for (Path guide : guides) {
             assertThat(guide).exists();

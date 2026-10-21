@@ -46,6 +46,8 @@ class KeymapDefaultsTest {
         new Row("close_pane", KeyContext.GLOBAL, "cmd+w", "ctrl+shift+w"),                     // 34
         new Row("zoom_pane", KeyContext.GLOBAL, "cmd+shift+enter", "ctrl+alt+shift+enter"),    // 35
         new Row("toggle_zen_mode", KeyContext.GLOBAL, "none", "none"),                       // Zen follow-up
+        new Row("toggle_rail", KeyContext.GLOBAL, "none", "none"),                           // 57
+        new Row("toggle_status_bar", KeyContext.GLOBAL, "none", "none"),                     // 59
         new Row("focus_pane_left", KeyContext.GLOBAL, "cmd+alt+left", "ctrl+alt+shift+left"),  // 36
         new Row("focus_pane_right", KeyContext.GLOBAL, "cmd+alt+right", "ctrl+alt+shift+right"),
         new Row("focus_pane_up", KeyContext.GLOBAL, "cmd+alt+up", "ctrl+alt+shift+up"),

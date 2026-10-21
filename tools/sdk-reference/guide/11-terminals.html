@@ -1,0 +1,172 @@
+<section class="guide" id="terminals">
+<h2>Terminals</h2>
+<p>{@link PluginContext#terminals()} is the plugin's view of Jasper's terminal windows, tabs and panes. Finding them needs
+no capability; reading what a pane runs, typing into it, opening terminals and providing sessions do (see
+<a href="#capabilities">Capabilities</a>). Every call is on the UI thread except the three that send input. For the
+user's side of panes and shell integration, see <a href="terminal.md">the terminal</a>.</p>
+
+<h3>Windows, tabs and panes</h3>
+<p>{@link Terminals#activeWindow()} is the window the user used last, even while Jasper is in the background, and
+{@link Terminals#activePane()} the focused pane of its selected tab. {@link Terminals#windows()} lists the open windows in
+opening order, and {@link Terminals#window(UUID)}, {@link Terminals#tab(UUID)} and {@link Terminals#pane(UUID)} find one by
+the id an event names. An action's {@link ActionContext} gives the window it ran in and the pane it concerns.</p>
+<p>{@link WindowHandle}, {@link TabHandle} and {@link PaneHandle} keep only an id; two handles for the same target are
+equal. A target can close at any moment: {@code isOpen()} tells, queries return the last known value, and commands to it
+are ignored. {@link WindowHandle#tabs()} lists a window's terminal tabs in display order (content tabs are not terminal
+tabs), {@link TabHandle#panes()} a tab's panes in creation order. {@link PaneHandle#focus()} selects a pane's tab and
+focuses it, {@link TabHandle#select()} selects a tab, and {@link WindowHandle#toFront()} raises a window. A window handle
+is also a {@link WindowOwner}, for dialogs and choosers over it.</p>
+
+<h3>Reading a pane</h3>
+<p>With {@code terminal.observe}, {@link PaneHandle#info()} returns a {@link PaneInfo} snapshot:</p>
+<table>
+<thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>{@code title}</td><td>The title the program set, or the running command when it set none.</td></tr>
+<tr><td>{@code workingDirectory}</td><td>The local folder the shell last reported, a hint that may no longer exist. A report counts as local only from a local shell whose report names no host, {@code localhost} or this machine.</td></tr>
+<tr><td>{@code remoteDirectory}</td><td>A {@link RemoteDirectory} (host and path) the shell reported, or the session's provider when the shell reports none; for display only. At most one of the two directories is present.</td></tr>
+<tr><td>{@code columns}, {@code rows}</td><td>The grid size; 0 before the session starts.</td></tr>
+<tr><td>{@code shellIntegration}</td><td>Whether the shell reports its prompts and commands, which the command events need.</td></tr>
+<tr><td>{@code kind}, {@code providerPluginId}</td><td>{@link SessionKind#LOCAL} or {@link SessionKind#PLUGIN}, and the providing plugin.</td></tr>
+<tr><td>{@code state}, {@code exitStatus}</td><td>{@link SessionState#CONNECTING}, {@code RUNNING} or {@code EXITED}, and the exit status once it exited with a known one.</td></tr>
+<tr><td>{@code shell}</td><td>The shell or program's label, such as {@code zsh}, or a provided session's title.</td></tr>
+</tbody>
+</table>
+<p>{@link PaneHandle#foregroundJob()} asks the operating system for the program in the foreground and completes on a
+worker thread. {@link TabHandle#title()} is the tab's title as its header shows it. Both need {@code terminal.observe};
+{@link PaneHandle#selection()}, the selected text, needs {@code terminal.selection}.</p>
+
+<h3>Typing and pasting</h3>
+<p>With {@code terminal.inject}, {@link PaneHandle#sendText(String)} types text as UTF-8 and adds nothing: end a command
+with {@code "\r"} to run it, or leave it at the prompt for the user. {@link PaneHandle#sendBytes(byte[])} writes raw bytes,
+and {@link PaneHandle#paste(String)} pastes the way the user's paste does, bracketed when the program asked for that. The
+three are safe from any thread, and calls from one thread keep their order. Input to a pane whose session is not running
+(still connecting, or exited) is dropped.</p>
+
+<h3>Opening tabs, splits and programs</h3>
+<p>{@link Terminals#openTab(WindowHandle,OpenRequest)} opens and selects a tab; {@link Terminals#split(PaneHandle,Direction,OpenRequest)}
+splits a pane {@link Direction#RIGHT} or {@link Direction#DOWN}. Both return the new pane, or empty when the window or
+pane is gone (or, for a split, its session has ended) or the request names a profile Jasper does not list. A local request
+needs {@code terminal.open}:</p>
+<table>
+<thead><tr><th>Request</th><th>Starts</th></tr></thead>
+<tbody>
+<tr><td>{@link dev.jasper.sdk.terminal.OpenRequest#local()}</td><td>The user's shell, where New Tab would start it. A split starts in the target pane's folder.</td></tr>
+<tr><td>{@link dev.jasper.sdk.terminal.OpenRequest#localIn(Path)}</td><td>The user's shell in an absolute folder.</td></tr>
+<tr><td>{@link dev.jasper.sdk.terminal.OpenRequest#localProfile(String)}</td><td>A detected shell profile, such as PowerShell 7 or a WSL distribution.</td></tr>
+<tr><td>{@link dev.jasper.sdk.terminal.OpenRequest#local(LocalSpec)} with {@link LocalSpec#running(List,Optional)}</td><td>A program instead of the shell, with the shell's environment. Each word is passed as it is, with no shell parsing it. Its pane closes when it exits with status 0 and stays open otherwise.</td></tr>
+<tr><td>{@link dev.jasper.sdk.terminal.OpenRequest#session(SessionSpec)}</td><td>A session the plugin provides; needs {@code session.provide}. See below.</td></tr>
+</tbody>
+</table>
+<pre><code class="language-java">context.actions().register(ActionSpec.of("dev.example.tool.top", "Show Processes"), invoked -&gt;
+    context.terminals().openTab(invoked.window(),
+        dev.jasper.sdk.terminal.OpenRequest.local(LocalSpec.running(List.of("top"), Optional.empty()))));</code></pre>
+<p>A local request without a profile starts the user's default shell profile, for a split too, where the user's own
+Split repeats the target pane's profile. A profile id Jasper does not list opens nothing and is logged.</p>
+
+<h3>Shell profiles</h3>
+<p>{@link Terminals#profiles()} lists the shells Jasper detected for local panes, in the order its settings list them, as
+{@link ShellProfileInfo}s with an id, a name, a {@link ShellProfileInfo.Kind} and a detail. On Windows they are
+{@code powershell}, {@code pwsh} (when PowerShell 7 is installed), {@code cmd} and {@code wsl:<name>} for each WSL
+distribution; elsewhere {@code login}, the login shell; and last {@code custom}, the user's custom command. Detection can
+finish after the plugin starts: {@link Terminals#onProfilesChanged(Runnable)} runs after the first detection and after each
+later one whose result differs. Both need {@code terminal.open}. Remote lists the WSL distributions this way and opens them
+with {@code localProfile}.</p>
+
+<h3>Shell environment</h3>
+<pre><code class="language-java">String home = context.dataDirectory().toString();
+context.terminals().environment(jasper -&gt; Map.of("DEPLOY_TOOL_HOME", home));</code></pre>
+<p>With {@code terminal.environment}, {@link Terminals#environment(Function)} adds variables to each new local shell and to
+each program a tab or split runs. The contributor runs on the UI thread for every launch, receives Jasper's own
+environment (read-only) and returns the variables to add, or {@code null} for none; it must not block or do I/O. A shell's
+environment is Jasper's own, then Jasper's variables, then the contributions, then the user's {@code [terminal.env]}, then
+{@code TERM} and {@code COLORTERM}, so the user's settings win. A name must match {@code [A-Za-z_][A-Za-z0-9_]*};
+{@code TERM}, {@code COLORTERM}, {@code TERM_PROGRAM}, {@code TERM_PROGRAM_VERSION} and names starting {@code JASPER_} are
+reserved. Invalid names, reserved names and values holding NUL are dropped and logged once; when two plugins set one name,
+the first by plugin id wins. WSL profiles and provided sessions get no contributions. The Editor sets {@code EDITOR}
+this way.</p>
+
+<h3>Terminal events</h3>
+<p>Subscribing to any {@link TerminalEvents} topic needs {@code terminal.observe}. Events name windows, tabs and panes by
+id and arrive later on the UI thread; there is no replay, so read the current state from {@link Terminals} first.</p>
+<table>
+<thead><tr><th>Topic</th><th>Payload</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>{@link TerminalEvents#WINDOW_OPENED}, {@link TerminalEvents#WINDOW_CLOSED}, {@link TerminalEvents#WINDOW_ACTIVATED}</td><td>{@link TerminalEvents.WindowEvent}</td><td>A terminal window opened, closed or became the active one.</td></tr>
+<tr><td>{@link TerminalEvents#TAB_OPENED}, {@link TerminalEvents#TAB_CLOSED}, {@link TerminalEvents#TAB_SELECTED}</td><td>{@link TerminalEvents.TabEvent}</td><td>A tab opened, closed or was selected.</td></tr>
+<tr><td>{@link TerminalEvents#PANE_OPENED}, {@link TerminalEvents#PANE_CLOSED}, {@link TerminalEvents#PANE_FOCUSED}, {@link TerminalEvents#BELL}</td><td>{@link TerminalEvents.PaneEvent}</td><td>A pane opened, closed, got focus or rang its bell.</td></tr>
+<tr><td>{@link TerminalEvents#ACTIVE_PANE_CHANGED}</td><td>{@link TerminalEvents.ActivePaneChanged}</td><td>{@link Terminals#activePane()} changed; empty when there is none.</td></tr>
+<tr><td>{@link TerminalEvents#TITLE_CHANGED}</td><td>{@link TerminalEvents.TitleChanged}</td><td>A pane's title changed.</td></tr>
+<tr><td>{@link TerminalEvents#CWD_CHANGED}</td><td>{@link TerminalEvents.CwdChanged}</td><td>The shell reported a new folder, local or remote.</td></tr>
+<tr><td>{@link TerminalEvents#COMMAND_STARTED}, {@link TerminalEvents#COMMAND_FINISHED}</td><td>{@link TerminalEvents.CommandStarted}, {@link TerminalEvents.CommandFinished}</td><td>A command started, and finished with its exit status, duration and folder. Shell integration only.</td></tr>
+<tr><td>{@link TerminalEvents#SESSION_STATE_CHANGED}</td><td>{@link TerminalEvents.SessionStateChanged}</td><td>{@code CONNECTING} at each connect of a provided session, {@code RUNNING} when a session starts, {@code EXITED} when it ends.</td></tr>
+</tbody>
+</table>
+<p>Shell History adds each command to its index from {@code COMMAND_FINISHED} as it finishes, beside what it reads from
+the shells' history files.</p>
+
+<h3>Providing a session</h3>
+<p>A plugin with {@code session.provide} can be a pane's session, as Remote is for SSH. Jasper owns everything a pane
+needs (the emulator, reading and writing, resizing, the status line while it connects, the Disconnected banner with
+Reconnect, closing); the plugin connects and hands over two streams. This example opens a TCP console port, such as a
+serial console server's:</p>
+<pre><code class="language-java">public final class ConsolePlugin implements Plugin {
+    @Override public void start(PluginContext context) {
+        context.actions().register(ActionSpec.of("dev.example.console.open", "Open Console Port"), invoked -&gt;
+            context.terminals().openTab(invoked.window(), dev.jasper.sdk.terminal.OpenRequest.session(
+                new SessionSpec("console-1:7001", Optional.of("server"), ExitPolicy.KEEP_OPEN,
+                    // Called on the UI thread for the first connect and every Reconnect: hand the work over at once.
+                    pending -&gt; context.background().execute(() -&gt; connect(pending, "console-1", 7001))))));
+    }
+
+    private static void connect(PendingSession pending, String host, int port) {
+        pending.status("Connecting to " + host + "…");
+        Socket socket = new Socket();
+        Subscription cancel = pending.onCancelled(() -&gt; close(socket));
+        try {
+            socket.connect(new InetSocketAddress(host, port), 10_000);
+            var exited = new CompletableFuture&lt;Integer&gt;();
+            // From here on Jasper owns the connection and calls close exactly once.
+            pending.attach(new TerminalConnection(socket.getInputStream(), socket.getOutputStream(),
+                (columns, rows) -&gt; { }, exited, () -&gt; { close(socket); exited.complete(0); }));
+        } catch (IOException failure) {
+            pending.fail("Could not reach " + host + ":" + port + ": " + failure.getMessage());
+        } finally {
+            cancel.close();
+        }
+    }
+
+    private static void close(Socket socket) {
+        try { socket.close(); } catch (IOException ignored) { }
+    }
+}</code></pre>
+<p>The pane appears at once, showing the status text (initially "Connecting…") and <b>Cancel</b>. The
+{@link SessionSpec}'s connector is called on the UI thread while {@code openTab} runs, and again for every Reconnect or
+Retry, each time with a fresh {@link PendingSession}; it must not block. The spec's title is the pane's title until the
+program sets one, its icon (a semantic icon name) is the tab's, and its {@link ExitPolicy} decides what happens when the
+session ends: {@code KEEP_OPEN} shows how it ended and offers <b>Reconnect</b>, {@code CLOSE_PANE} closes the pane.</p>
+<ul>
+<li><b>One outcome per attempt.</b> Exactly one of {@link PendingSession#attach(TerminalConnection)},
+{@link PendingSession#fail(String)} and cancellation takes effect; later calls are ignored. Every method is safe from any
+thread, also after the plugin stopped. {@code fail} shows the message with <b>Retry</b> (or <b>Reconnect</b> after an
+earlier session); a connector that throws fails the attempt with its message.</li>
+<li><b>Cancellation.</b> The user's Cancel, the pane closing, the plugin stopping or Jasper quitting cancels the attempt.
+{@link PendingSession#onCancelled(Runnable)} handlers run once, on Jasper's cleanup thread, to abort a blocking connect.
+Cancelling before any session was shown closes the pane.</li>
+<li><b>Ownership.</b> {@code attach} hands the connection over whatever happens: when the attempt was already cancelled
+or ended, Jasper closes it at once without reading it. Jasper calls {@code close} exactly once, on its cleanup thread;
+release everything the session holds there.</li>
+<li><b>Threads.</b> {@link TerminalConnection}'s {@code output} is read on the session's reader thread and may block;
+{@code close} must unblock it. {@code input} and {@code resize} are used only on the session's writer thread, which flushes
+after every write. Input waits in a 4 MiB queue; a write that does not fit is dropped whole and the pane says "Input
+dropped: the remote side is not accepting input". Request {@link TerminalConnection#TERM} ({@code xterm-256color}) for a
+remote pseudo-terminal, and pass {@link PendingSession#columns()} and {@link PendingSession#rows()} as its first size.</li>
+<li><b>Ending.</b> When {@code exited} completes, Jasper keeps reading output for up to two seconds, then closes the
+connection; when the output ends first, it waits up to two seconds for {@code exited}, then closes it. The pane shows "Disconnected (exit <i>N</i>)", "Disconnected: The connection ended:
+<i>message</i>" when {@code exited} completed exceptionally, or "Disconnected: The connection ended without an exit
+status" when the output ended without one.</li>
+<li><b>Folders.</b> {@link PendingSession#reportRemoteDirectory(RemoteDirectory)} gives the pane a remote folder to show
+until the shell reports its own; it never becomes a local folder. A remote shell with Jasper's shell integration reports
+its folder and commands, and they arrive as remote folders and command events.</li>
+</ul>
+</section>

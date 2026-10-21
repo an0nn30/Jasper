@@ -1,0 +1,118 @@
+<section class="guide" id="settings">
+<h2>Settings</h2>
+<p>A plugin's settings live in its own TOML file, {@code plugins/<id>/<id>.toml} in Jasper home, not in
+{@code config.toml}. The plugin declares each setting while it starts: its key, kind, default and how Settings shows it.
+Jasper then reads the file, checks every value against its kind, reports what it rejects, reads the file again whenever it
+changes, and gives the plugin a page in Settings › Tools under its name. {@link PluginContext#settings()} is the plugin's
+{@link PluginSettings}.</p>
+
+<h3>Declaring</h3>
+<pre><code class="language-java">PluginSettings settings = context.settings();
+Setting&lt;Integer&gt; parallel = settings.declare(SettingSpec.of("transfers.parallel", SettingKind.integer(1, 16), 4)
+    .label("Parallel transfers").description("Files copied at the same time.").section("Transfers"));
+Setting&lt;String&gt; target = settings.declare(SettingSpec.of("target", SettingKind.choice(List.of(
+        Choice.of("staging", "Staging", "staging"), Choice.of("production", "Production", "production"))), "staging")
+    .label("Deploy target").section("Deploys"));
+Setting&lt;List&lt;String&gt;&gt; checks = settings.declare(SettingSpec.of("checks", SettingKind.stringList(), List.of("lint", "test"))
+    .label("Checks to run").section("Deploys").applies(Applies.RESTART));
+parallel.onChanged(value -&gt; context.log().log(System.Logger.Level.INFO, "Parallel transfers: " + value));</code></pre>
+<p>The file the user edits, or Settings writes:</p>
+<pre><code class="language-toml">target = "production"
+checks = ["lint", "test", "smoke"]
+
+[transfers]
+parallel = 8</code></pre>
+<p>{@link PluginSettings#declare(SettingSpec)} works only on the UI thread while {@code start} runs, and returns a
+{@link Setting} that already holds the file's value. A declaration needs a {@link SettingSpec#label(String) label}; a
+key declared twice, or a key inside another declared key, is refused. Keys are dotted: each part is letters, digits,
+{@code _} and {@code -}, and each dot but the last names a TOML table. Do not change a {@link SettingSpec} after
+declaring it: Settings reads its section, description, editor hint and unit again whenever it shows the page. Its
+builder methods are:</p>
+<table>
+<thead><tr><th>Method</th><th>Settings shows</th></tr></thead>
+<tbody>
+<tr><td>{@link SettingSpec#label(String)}</td><td>The row's name. Required.</td></tr>
+<tr><td>{@link SettingSpec#description(String)}</td><td>A note under the control.</td></tr>
+<tr><td>{@link SettingSpec#keywords(String[])}</td><td>Extra words Settings' search matches.</td></tr>
+<tr><td>{@link SettingSpec#section(String)}</td><td>A heading on the plugin's page; a new heading starts wherever the section changes, in declaration order.</td></tr>
+<tr><td>{@link SettingSpec#applies(Applies)}</td><td>{@link Applies#RESTART} marks the row "Takes effect after restart". It changes only the label: the value and its listeners still change at once, and a plugin that reads the value only in {@code start} picks it up at the next launch.</td></tr>
+<tr><td>{@link SettingSpec#editor(EditorHint)}</td><td>{@link EditorHint#font(boolean)}: a font family picker, monospaced families only when asked. {@link EditorHint#file()}: a path field with Browse ("Choose a file"). {@link EditorHint#technical()}: a text field in the data face, for hosts, ports, paths and commands. {@link EditorHint#directory()} shows the kind's own control.</td></tr>
+<tr><td>{@link SettingSpec#unit(String)}</td><td>A unit after a number, such as {@code min} or {@code MiB}, at most 16 characters.</td></tr>
+</tbody>
+</table>
+
+<h3>Kinds</h3>
+<table>
+<thead><tr><th>Kind</th><th>Value</th><th>In the file</th><th>On the page</th><th>Jasper reports a rejected value as</th></tr></thead>
+<tbody>
+<tr><td>{@link SettingKind#bool()}</td><td>{@code Boolean}</td><td>{@code true} or {@code false}</td><td>A switch or check box, as the look draws it</td><td></td></tr>
+<tr><td>{@link SettingKind#integer(int,int)}</td><td>{@code Integer}</td><td>An integer</td><td>A stepper with the unit</td><td>"Use an integer from <i>min</i>–<i>max</i>; using the default."</td></tr>
+<tr><td>{@link SettingKind#number(double,double)}</td><td>{@code Double}</td><td>A finite number</td><td>A decimal field that steps by 0.1, with the unit</td><td>"Use a finite number from <i>min</i>–<i>max</i>; using the default."</td></tr>
+<tr><td>{@link SettingKind#text()}, {@link SettingKind#text(Predicate,String)}</td><td>{@code String}</td><td>A string</td><td>A text field</td><td>The kind's message, "Not an allowed value." for {@code text()}</td></tr>
+<tr><td>{@link SettingKind#choice(List)}</td><td>The {@link Choice}'s value</td><td>The choice's token</td><td>A picker of the choices' display names</td><td>"Use <i>tokens</i>; using the default.", the tokens sorted and separated by commas</td></tr>
+<tr><td>{@link SettingKind#stringList()}, {@link SettingKind#stringList(Predicate)}</td><td>{@code List<String>}</td><td>An array of strings</td><td>An ordered list, with a field that adds an entry</td><td>"Invalid string array element; using the default list."</td></tr>
+</tbody>
+</table>
+<p>A text rule is plugin code: one that throws rejects the value. A default the kind rejects throws when the spec is
+built. Within Jasper a {@code number} setting's value is kept in single precision, so {@code 0.1} reads back as
+{@code 0.10000000149011612}; round it where that matters.</p>
+
+<h3>Reading the file</h3>
+<p>Jasper checks the file once a second and reads it again when it changed; <b>Reload Config</b> reads every plugin's
+file again and then publishes {@link AppEvents#CONFIG_RELOADED}. Problems appear with Jasper's other configuration
+problems, naming the file and, for a value, its line and column:</p>
+<ul>
+<li>A value its kind rejects is replaced by the setting's default and reported as the table above shows.</li>
+<li>A key nothing declares is reported as "Unknown setting or table; ignored."</li>
+<li>A value of the wrong TOML type, such as a string where an integer belongs, rejects the whole file ("Expected
+<i>type</i>; configuration was not applied."), and so does a TOML syntax error, a file larger than 1 MiB or one that cannot
+be read ("<i>file</i> could not be read: <i>why</i>; the last good settings stay in force."). Every setting keeps its last
+good value until the file is fixed.</li>
+</ul>
+<p>{@link Setting#get()} is the value in force, safe from any thread. {@link Setting#onChanged(Consumer)} runs on the UI
+thread when that setting's value changes, whether the file changed or the plugin saved it;
+{@link PluginSettings#onChanged(Runnable)} runs once after any declared value changed. The runtime closes these
+registrations when the plugin stops.</p>
+<p>When the file is missing, the first launch that finds the plugin creates it: a copy of the {@code settings.toml} at the
+root of the plugin's jar, or a one-line header, "# Settings for <i>name</i> <i>version</i> (<i>id</i>). Jasper reads
+this file live." Jasper never overwrites an existing file. Ship a {@code settings.toml} of commented examples so users who
+open the file see every setting.</p>
+
+<h3>The look's defaults</h3>
+<p>The active look's kit file may hold a table for the plugin, {@code [defaults."<plugin id>"]}, keyed as the plugin's
+settings file writes its keys. When the plugin declares a key and the value suits its kind, that value is the
+setting's default while the look is active: a key the file leaves out reads it, and Reset returns to it, while a saved
+value still wins. A value the kind rejects, and a key the plugin does not declare, are logged as warnings and ignored,
+and the plugin starts as usual. The Enterprise look gives the Editor's {@code font_family} IBM Plex Mono this way. In a
+test, {@link dev.jasper.sdk.testing.FakePluginHost#setKitDefault(String,String,Object)} gives a look default and
+{@link dev.jasper.sdk.testing.FakePluginHost#lookDefaultProblems(String)} lists the ones the plugin could not use.</p>
+
+<h3>Saving</h3>
+<p>{@link Setting#set(Object)} writes a new value to the file, keeping its comments, and returns a
+{@code CompletableFuture} that completes on the UI thread once the setting's handle shows the value. It fails with
+{@code IllegalArgumentException} when the kind rejects the value, with the message {@link SettingKind#check(Object)}
+gives (for an integer, "Use a whole number from <i>min</i>–<i>max</i>."), and with {@code IllegalStateException} or
+{@code IOException} when the file changed on disk since it was read ("<i>key</i> changed on disk. Review the new value and
+try again."), has errors ("<i>file</i> has errors; fix them before saving settings."), would exceed 1 MiB, or the plugin has
+stopped. It is safe from any thread; the write itself happens off the UI thread.</p>
+
+<h3>The plugin's page</h3>
+<p>A running plugin that declared settings gets a generated page, Settings › Tools › <i>name</i>: one row per setting in
+declaration order, with its label, control, description and a way to reset it to its default, and a heading wherever the
+section changes.
+Apply saves the changed values to the file. A plugin the user meant to run but that is not running (waiting for a
+review, skipped, failed or held back by safe mode) gets a page that says "Start <i>name</i> to edit its settings.", gives
+the reason and offers <b>Open in Editor</b> for the file.</p>
+<p>A plugin that needs more than rows gives a page of its own with {@link PluginSettings#page(SettingsPanel)}, once, while
+it starts. Settings calls {@link SettingsPanel#create(SettingsPanelHost)} the first time the page is shown in each
+opening of Settings; the page returns a <a href="#ui">view</a>. {@link SettingsPanelHost#row(Setting)} gives the standard
+row for a declared setting, bound to the page's unsaved value, and Settings saves those on Apply itself.
+{@link SettingsPanelHost#stage(Setting,Object)} sets an unsaved value from a control of the plugin's own and
+{@link SettingsPanelHost#changed()} says the page's modified state changed. {@link SettingsPanel#modified()},
+{@link SettingsPanel#apply()} and {@link SettingsPanel#reset()} cover only state of the plugin's own beyond its declared
+settings; {@link SettingsPanel#dispose()} runs when Settings closes the page.</p>
+<p>The default {@link SettingsPanel#pendingChanged()} callback (SDK 0.18.3) runs after a standard row edit, list action
+or Reset, with the pending value and validation already updated. Rebuild dependent descriptors here, reading
+{@link SettingsPanelHost#pending(Setting)}. Invalid edits can leave the pending value unchanged; plugin calls to
+{@code host.stage} leave refreshing to the plugin.</p>
+</section>

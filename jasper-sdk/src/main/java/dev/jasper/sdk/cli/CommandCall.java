@@ -12,13 +12,27 @@ import java.util.Optional;
  * @since 0.17.0
  */
 public interface CommandCall {
-    /** @return the arguments after the subcommand's name */
+    /**
+     * The words the caller typed after {@code jasper <name>}, as its shell passed them.
+     *
+     * @return the arguments after the subcommand's name
+     */
     List<String> arguments();
 
-    /** @return the caller's working directory, absolute */
+    /**
+     * The directory the {@code jasper} command ran in; resolve relative paths in {@link #arguments()} against it.
+     *
+     * @return the caller's working directory, absolute
+     */
     Path workingDirectory();
 
-    /** @return the window of the Jasper pane the command ran in, while that window is open; empty when it ran elsewhere */
+    /**
+     * The terminal window holding the Jasper pane the command ran in, found through the pane's {@code JASPER_PANE}
+     * variable when the call starts; an owner for a dialog or chooser the call opens.
+     *
+     * @return the window of the Jasper pane the command ran in, as found when the call started; empty when it ran
+     *         elsewhere or that window was not open then
+     */
     Optional<WindowOwner> window();
 
     /**
@@ -36,7 +50,7 @@ public interface CommandCall {
     void err(String text);
 
     /**
-     * Runs {@code listener} on the UI thread when the caller goes away before the call completes, for example on Ctrl-C.
+     * Runs {@code listener} on the UI thread when the caller goes away before the call completes, for example on Ctrl+C.
      *
      * @param listener called once
      * @return removes the listener

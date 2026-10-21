@@ -10,10 +10,7 @@ import java.util.OptionalInt;
 import java.util.TreeMap;
 
 /**
- * Immutable tablerow descriptor. A {@code muted} row shows its plain cells and Text cell nodes in the de-emphasized
- * text color (for example entries that cannot be chosen); a present {@code contextActions} replaces the table's context menu for this row, and
- * an empty list means the row has none. {@code tooltip} is the row's literal tooltip and accessible description, shown
- * over every cell; blank shows none.
+ * Immutable table row descriptor: one row of a {@link Nodes.Table}.
  * <p>
  * A column's content is a plain cell ({@code cells}) or a cell node ({@code cellNodes}), never both. A cell node is a
  * {@link Nodes.Text}, {@link Nodes.StatusDot}, {@link Nodes.Icon} or {@link Nodes.Chip}, an INLINE {@link Nodes.Stack}
@@ -24,6 +21,20 @@ import java.util.TreeMap;
  * A heading row ({@link #heading(String, String, OptionalInt, String)}) has a {@link Heading} and nothing else: it
  * spans the row, groups the rows below it, and is never selected or activated.
  *
+ * @param id the row's id, unique in its table; reported in {@link UiEvent.Selected} and {@link UiEvent.Clicked}, and
+ *     named by the table's {@code selectedIds}
+ * @param cells each column's plain text by column id, drawn in the column's text role; a column with neither a cell nor
+ *     a cell node is empty
+ * @param icon the name of an icon drawn before the first column's text when that column is a plain cell; absent for
+ *     none
+ * @param muted true draws the plain cells and Text cell nodes in the de-emphasized text colour while the row is not
+ *     selected, for example entries that cannot be chosen
+ * @param contextActions present is the row's own menu with unique ids, offered on it whether or not it is selected,
+ *     and empty means the row has none; absent, the table's menu, which acts on the selection, is offered while the
+ *     row is selected
+ * @param tooltip the row's literal tooltip and accessible description, shown over every cell; blank for none
+ * @param cellNodes each column's cell node by column id
+ * @param heading present makes this a heading row
  * @since 0.18.0 for {@code cellNodes} and {@code heading}
  */
 public record TableRow(String id, Map<String,String> cells, Optional<String> icon, boolean muted, Optional<List<MenuItem>> contextActions, String tooltip,
@@ -32,6 +43,10 @@ public record TableRow(String id, Map<String,String> cells, Optional<String> ico
      * A heading row's title and an optional count, shown muted at the row's end and followed by {@code countNoun}: a
      * lowercase singular noun to which the presentation adds "s" unless the count is 1 ("6 groups", "1 group"). A blank
      * noun shows the bare number; a noun needs a count.
+     *
+     * @param title the group's title, drawn in strong text across the row; not blank
+     * @param count how many the group holds, not negative; absent shows no count
+     * @param countNoun the lowercase singular noun after the count, without surrounding spaces; blank for the bare number
      */
     public record Heading(String title, OptionalInt count, String countNoun) {
         public Heading {
@@ -59,14 +74,38 @@ public record TableRow(String id, Map<String,String> cells, Optional<String> ico
         if (heading.isPresent() && (!cells.isEmpty() || !cellNodes.isEmpty() || icon.isPresent() || muted || contextActions.isPresent() || !tooltip.isBlank()))
             throw new IllegalArgumentException("A heading row has a title and a count only");
     }
-    /** A row without cell nodes that is not a heading. */
+    /**
+     * A row without cell nodes that is not a heading.
+     *
+     * @param id the row's id, unique in its table
+     * @param cells each column's plain text by column id
+     * @param icon the name of an icon drawn before the first column's text; absent for none
+     * @param muted true draws the cells in the de-emphasized text colour while the row is not selected
+     * @param contextActions the row's own menu, empty for none; absent for the table's menu
+     * @param tooltip the row's literal tooltip; blank for none
+     */
     public TableRow(String id, Map<String,String> cells, Optional<String> icon, boolean muted, Optional<List<MenuItem>> contextActions, String tooltip) {
         this(id, cells, icon, muted, contextActions, tooltip, Map.of(), Optional.empty());
     }
-    /** A row without a tooltip. */
+    /**
+     * A row without a tooltip.
+     *
+     * @param id the row's id, unique in its table
+     * @param cells each column's plain text by column id
+     * @param icon the name of an icon drawn before the first column's text; absent for none
+     * @param muted true draws the cells in the de-emphasized text colour while the row is not selected
+     * @param contextActions the row's own menu, empty for none; absent for the table's menu
+     */
     public TableRow(String id, Map<String,String> cells, Optional<String> icon, boolean muted, Optional<List<MenuItem>> contextActions) {
         this(id, cells, icon, muted, contextActions, "");
     }
+    /**
+     * A row of plain cells that is not muted, has no tooltip and offers the table's menu.
+     *
+     * @param id the row's id, unique in its table
+     * @param cells each column's plain text by column id
+     * @param icon the name of an icon drawn before the first column's text; absent for none
+     */
     public TableRow(String id, Map<String,String> cells, Optional<String> icon) {
         this(id, cells, icon, false, Optional.empty());
     }

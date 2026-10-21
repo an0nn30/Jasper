@@ -27,7 +27,8 @@ public interface Setting<T> {
     /**
      * Saves a new value to the plugin's settings file, keeping the file's comments. The future completes after this
      * setting's handle shows the new value. It fails with {@link IllegalArgumentException} when the kind rejects the
-     * value, and otherwise when the file changed on disk, has errors or cannot be written. Safe from any thread.
+     * value, and otherwise when the file changed on disk, has errors or cannot be written, or the plugin has stopped.
+     * Safe from any thread.
      *
      * @param value the new value
      * @return the save's completion

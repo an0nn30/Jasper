@@ -38,7 +38,7 @@ public record ActionSpec(String id, String title, Optional<String> icon, List<St
     }
 
     /**
-     * A Global action whose default, if any, applies on every platform: the form SDK 0.10 had.
+     * A global action whose default, if any, applies on every platform.
      *
      * @param id namespaced id
      * @param title non-blank title

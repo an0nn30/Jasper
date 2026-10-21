@@ -13,7 +13,8 @@ import java.util.Optional;
  * @param title one visible line of at most 200 characters; say what happened, and keep paths, host names and messages
  *     for the content
  * @param content more detail, possibly several lines, at most 4,000 characters; may be empty
- * @param icon a 16 px icon instead of the severity's
+ * @param icon a semantic icon name, drawn at 16 px instead of the severity's icon; posting a name the host does not
+ *     know throws {@link IllegalArgumentException}
  * @param actions links, at most 8, or 7 with a cause, since the host then adds Show more… after them
  * @param activate what a click on the body does
  * @param cause the failure behind an error: the host records it as an incident attributed to the plugin and offers
@@ -68,7 +69,7 @@ public record NotificationSpec(Severity severity, String title, String content, 
     /**
      * A copy with this icon.
      *
-     * @param value a 16 px icon
+     * @param value a semantic icon name
      * @return the copy
      */
     public NotificationSpec withIcon(String value) {

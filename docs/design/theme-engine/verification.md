@@ -19,7 +19,7 @@ FlatLaf differential checks do not establish full admitted-expression parity; se
 Final stabilized `./gradlew check` passed in **1m 56s**, 99 tasks (15 executed, 84 up-to-date).
 Counts from **682 XML reports**, independently summed by the controller: **9,063 tests, 9,057 passed,
 zero failures/errors, six existing environment skips**. Exact module totals are retained in
-[UI maintenance](../../ui-maintenance.md#combined-final-review-fix-verification). Architecture,
+[UI maintenance](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/ui-maintenance.md#combined-final-review-fix-verification). Architecture,
 doclint and compiled documentation gates passed. The affected UI/SDK/testkit/host and distribution
 gate passed; the affected geometry/choices/secrets/rows run at `-Dflatlaf.uiScale=2` passed all **42** tests.
 Documentation-only finalization after that tree did not rerun the full suite; diff and local-link
@@ -56,7 +56,7 @@ The first incorrectly scales hue rotation; the other two differ by one channel u
 Plan 2 Task 2 theme integration, before Task 3 imported-theme visual acceptance.** Add differential
 regressions, preserve absolute spin rotation and match pinned materialization or obtain an explicit
 rounding-policy ruling. Affected expressions must not receive exact parity acceptance until corrected.
-See [maintenance reproduction](../../ui-maintenance.md#known-minor-expression-parity-gap) and
+See [maintenance reproduction](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/ui-maintenance.md#known-minor-expression-parity-gap) and
 [Plan 2](../../superpowers/plans/2026-10-04-theme-engine-2-consumer-migration.md).
 
 This residual is distinct from the approved compatibility policy: canonical roles intentionally

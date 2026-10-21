@@ -6,7 +6,9 @@ import java.nio.file.Path;
 /**
  * A plugin's settings, kept in {@code plugins/<id>/<id>.toml} under Jasper's home. A plugin declares every setting
  * while it starts; the runtime then reads their values, reports values their kinds reject and keys nothing declares,
- * and shows them in Settings.
+ * and shows them in Settings. Jasper reads the file again whenever it changes. A file that is not valid TOML, or that
+ * gives a setting a value of the wrong TOML type, is reported and not applied: every setting keeps its last good
+ * value.
  */
 public interface PluginSettings {
     /**

@@ -803,7 +803,7 @@ class ConfigurationControllerTest {
             first.windowCommands().view("view.toolbar.hidden").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu"));
         });
         until(() -> !seen.isEmpty() && seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TOOLBAR) == ToolbarMode.HIDDEN);
-        edt(() -> first.windowCommands().view("view.status_bar").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
+        edt(() -> first.action(dev.jasper.app.commands.ActionId.TOGGLE_STATUS_BAR).actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
         until(() -> Boolean.FALSE.equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_STATUS_BAR)));
         edt(() -> first.windowCommands().view("view.terminal_scheme.slate-cobalt.dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
         until(() -> "slate-cobalt/dark".equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME)));
@@ -824,12 +824,11 @@ class ConfigurationControllerTest {
         edt(() -> {
             owner.onError = (title, message) -> errors.add(title + ": " + message);
             owner.setActive(true);
-            var status = owner.windowCommands().view("view.status_bar");
-            status.putValue(javax.swing.Action.SELECTED_KEY, false); // what a clicked check box does before the action runs
-            status.actionPerformed(new java.awt.event.ActionEvent(owner, 0, "menu"));
+            var status = ZenModeTest.item(ZenModeTest.child(ZenModeTest.view(owner), "Show/Hide"), "Status Bar");
+            status.doClick();
             assertThat(errors).containsExactly("Settings not saved: config.toml has errors, so changes can't be saved until they're fixed.");
             assertThat(owner.status().isVisible()).isTrue();
-            assertThat(status.getValue(javax.swing.Action.SELECTED_KEY)).isEqualTo(true);
+            assertThat(status.isSelected()).isTrue();
         });
     }
 

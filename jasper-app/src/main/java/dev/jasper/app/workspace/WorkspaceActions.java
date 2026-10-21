@@ -58,6 +58,8 @@ final class WorkspaceActions {
             case SPLIT_DOWN -> tab.split(SplitTree.Axis.DOWN);
             case ZOOM_PANE -> tab.toggleZoom();
             case TOGGLE_ZEN_MODE -> owner.toggleZenMode();
+            case TOGGLE_RAIL -> owner.setRailVisible(!owner.railVisible());
+            case TOGGLE_STATUS_BAR -> owner.chooseStatusVisible(!owner.statusVisible());
             case FOCUS_PANE_LEFT -> tab.navigate(SplitTree.Direction.LEFT);
             case FOCUS_PANE_RIGHT -> tab.navigate(SplitTree.Direction.RIGHT);
             case FOCUS_PANE_UP -> tab.navigate(SplitTree.Direction.UP);
@@ -121,6 +123,7 @@ final class WorkspaceActions {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
                     case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, OPEN_FILE, QUIT, TOGGLE_ZEN_MODE -> true;
+                    case TOGGLE_RAIL, TOGGLE_STATUS_BAR -> !owner.zenMode();
                     case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case CLEAR_TERMINAL -> ready && !pane.session().usingAlternateBuffer();

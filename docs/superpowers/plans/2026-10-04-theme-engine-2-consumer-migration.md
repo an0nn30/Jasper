@@ -150,7 +150,7 @@ known Minor pure evaluator parity gap. Bounded final-review probes found
 Add differential regressions, make spin's hue rotation absolute despite `relative`, and match pinned
 channel materialization or obtain an explicit documented rounding-policy ruling. Until corrected,
 affected imported themes cannot receive exact parity acceptance. This is separate from the approved
-Carbon/vendor-heuristic distinction. [Evidence and ownership](../../ui-maintenance.md#known-minor-expression-parity-gap).
+Carbon/vendor-heuristic distinction. [Evidence and ownership](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/ui-maintenance.md#known-minor-expression-parity-gap).
 
 **Files:** Modify `APP/appearance/{Theme,ThemeCatalog,ThemeController,ThemeState,ResolvedTheme,BuiltInThemes,ThemeManager}.java`, `APP/config/{TerminalColors,UiFontConfig,WorkspaceThemeChoice}.java` as type adaptation requires, `APP/application/{JasperApplication,ThemeUpgrade}.java`; create `APP/appearance/{TerminalPaletteAdapter,AppearanceBindings}.java`; remove extracted algorithm copies when no references remain.
 **Interfaces:** App `ThemeController` remains the public app selection owner. `TerminalPaletteAdapter.toTerminal(dev.jasper.ui.theme.TerminalColors): dev.jasper.terminal.config.Palette`; `AppearanceBindings.context(ThemeRoute): KitContext` routes app-owned bindings without SDK types.

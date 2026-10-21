@@ -5,13 +5,15 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * A session your plugin provides. The pane appears first, waiting; {@code connector} is then called on the
- * event thread, once for the first connect and once for every Reconnect, each time with a fresh
- * {@link PendingSession}. It must not block: start the connection on {@code context.background()}.
+ * A session your plugin provides. The pane appears first, showing "Connecting…" and Cancel; {@code connector} is
+ * then called on the event thread, before {@code openTab} or {@code split} returns, and again for every Retry or
+ * Reconnect the user chooses, each time with a fresh {@link PendingSession}. It must not block: start the connection
+ * on {@code context.background()}. A connector that throws fails that attempt with the exception's message.
  *
  * @param title the pane's title until the remote program sets one
- * @param icon the tab's icon (since 0.7.6), drawn in a 16 &times; 16 logical-pixel slot; empty shows
- *     Jasper's terminal icon
+ * @param icon a semantic icon name for the tab (since 0.7.6), drawn in a 16 &times; 16 logical-pixel slot; empty
+ *     shows Jasper's terminal icon, and a name the host does not know makes {@code openTab} or {@code split} throw
+ *     {@link IllegalArgumentException}
  * @param onExit what happens to the pane when the session ends
  * @param connector starts one connection attempt
  */

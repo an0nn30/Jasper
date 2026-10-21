@@ -4,7 +4,9 @@ import java.util.Objects;
 import javax.swing.KeyStroke;
 
 /** Command belonging only to an active content tab.
- * @param id content-local command identity, e.g. save, find, copy, paste
+ * @param id content-local command identity, such as save; while the tab is selected, Jasper's Copy, Paste, Find, Find
+ *     Next and Find Previous run the enabled command whose id is copy, paste, find, find-next or find-previous (see
+ *     {@link ContentTab#setCommands})
  * @param title literal menu text
  * @param shortcut key binding or null
  * @param enabled whether the command is available

@@ -29,6 +29,20 @@ class WindowCommandsTest {
         });
     }
 
+    @Test void railAndStatusBarAreFoundByTheirViewMenuNames() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()))) {
+                var entries = owner.commands().entries();
+                assertThat(CommandSearch.find(entries, "view rail", java.util.List.of(), 5).stream().map(Command::id))
+                    .contains("toggle_rail");
+                assertThat(CommandSearch.find(entries, "tool window bars", java.util.List.of(), 5).stream().map(Command::id))
+                    .contains("toggle_rail");
+                assertThat(CommandSearch.find(entries, "view status bar", java.util.List.of(), 5).stream().map(Command::id))
+                    .contains("toggle_status_bar");
+            }
+        });
+    }
+
     @Test void showJasperCommandTogglesThroughTheOwnerHookAndReportsItsState() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()))) {

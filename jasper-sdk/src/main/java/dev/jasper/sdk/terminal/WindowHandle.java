@@ -15,16 +15,17 @@ public interface WindowHandle extends WindowOwner {
     UUID id();
 
     /**
-     * The window's tabs, in display order; empty once the window is closed.
+     * The window's terminal tabs, in display order; content tabs, such as Editor documents, are not listed. Empty once
+     * the window is closed.
      *
      * @return the tabs
      */
     List<TabHandle> tabs();
 
     /**
-     * The selected tab.
+     * The selected terminal tab.
      *
-     * @return the tab, or empty once the window is closed
+     * @return the tab; empty while a content tab is selected or once the window is closed
      */
     Optional<TabHandle> activeTab();
 
