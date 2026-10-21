@@ -27,6 +27,7 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.palette.PaletteKeyRouter;
@@ -1286,6 +1287,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // Every parent tab's layout change and every parent-tab change ends here (workspace plan 6a Rulings 8 and 28): the
         // save is asked for once the model has it, so a listener below that throws costs no save.
         layoutChanged();
+        startShown();
         if (terminals != null) terminals.tabSelected();
         Tab now = selectedTab();
         if (commandPalette != null && now != paletteTab) { paletteTab = now; commandPalette.tabChanged(); }
@@ -1295,6 +1297,89 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /** Something {@code workspace.toml} saves of this window changed (workspace tabs spec 13). */
     void layoutChanged() { if (!closed) onLayoutChanged.run(); }
+
+    /** Whether the start of the shown restored terminals waits for the end of this EDT turn (workspace plan 6a Rulings 31). */
+    private boolean startPending;
+
+    /**
+     * Starts, once this EDT turn ends, each restored terminal of the tab this window shows then, every pane of it, a
+     * maximize's hidden ones too; the others wait until their tab first shows (workspace tabs spec 13; tabs and panes
+     * spec 12; workspace plan 6a Rulings 4 and 31). A gesture that moves several tabs one at a time shows each for an
+     * instant: the start, asked for once per turn, reads what shows when the gesture has ended, so those stay unstarted.
+     */
+    private void startShown() {
+        if (startPending) return;
+        startPending = true;
+        SwingUtilities.invokeLater(() -> {
+            startPending = false;
+            if (closed) return;
+            for (Tab tab : workspace().tabs())
+                if (tab.content() instanceof TerminalContent terminal) terminal.startIfWaiting();
+        });
+    }
+
+    /**
+     * Shows a saved window in this window, which holds no item yet (workspace tabs spec 13; tabs and panes spec 12): its
+     * tabs under their saved ids, in strip order, with the saved one shown, each with its split layout and active pane;
+     * each terminal with its saved id, renamed title, profile and last local directory, its shell not started until its
+     * tab first shows. An item this window cannot rebuild is left out as closing it would leave it out
+     * ({@code WorkspaceFile.keeping}).
+     *
+     * @param record the window as saved
+     * @return how many items came back
+     */
+    int restore(WorkspaceFile.WindowRecord record) {
+        if (closed || !parentTabs.isEmpty()) throw new IllegalStateException("Only an empty open window restores");
+        var restored = new LinkedHashMap<TabId, Tab>();
+        try {
+            for (TabId saved : record.layout().tabs())
+                if (record.tabs().get(saved) instanceof WorkspaceFile.TabRecord.Terminal terminal) restored.put(saved, restoredTerminal(saved, terminal));
+            Optional<ParentTabs> shown = WorkspaceFile.keeping(record.layout(), restored::containsKey, isMain());
+            if (shown.isEmpty()) return 0;
+            Runnable show = () -> {
+                for (Tab tab : restored.values()) mount(tab);
+                parentTabs.restore(shown.get(), restored);
+            };
+            if (terminals != null) terminals.atomically(show); else show.run();
+        } catch (RuntimeException | Error failure) {
+            // Nothing half-restored stays: each item closes, and is announced closed where it was announced.
+            for (Tab tab : restored.values()) {
+                try { tab.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); }
+            }
+            throw failure;
+        }
+        return restored.size();
+    }
+
+    /** A saved terminal whose shell waits until its tab first shows (workspace tabs spec 13). */
+    private Tab restoredTerminal(TabId tabId, WorkspaceFile.TabRecord.Terminal saved) {
+        Path directory = null;
+        try { if (!saved.directory().isEmpty()) directory = Path.of(saved.directory()); }
+        catch (java.nio.file.InvalidPathException unusable) { /* where a new shell starts */ }
+        Optional<String> profile = saved.profile().isEmpty() ? Optional.empty() : Optional.of(saved.profile());
+        TerminalContent terminal = new TerminalContent(tabId, directory, launcher, null, profile, Optional.empty());
+        terminal.pane().restored();
+        if (!saved.title().isEmpty()) terminal.rename(saved.title());
+        Tab tab;
+        try {
+            // Under its saved id, straight into this window: never through TabRegistry.open (workspace plan 4b's hand-off).
+            tab = registry.add(tabId, Tab.Kind.TERMINAL, terminal, id);
+        } catch (RuntimeException | Error failure) {
+            // Not registered, so no item closes it: its pane is closed here.
+            try { terminal.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); }
+            throw failure;
+        }
+        tab.focusTarget(terminal::focusTerminal);
+        return tab;
+    }
+
+    /** Wires a restored item to this window as {@link #attach(Tab)} does, without placing it: the restore places every one at once. */
+    private void mount(Tab tab) {
+        WorkspaceTheme.apply(tab.component(), themes.current());
+        tabListeners.put(tab, tab.onChanged(this::update));
+        if (terminals != null) terminals.tabArrived(tab, Optional.empty());
+        tabHost.attach(tab, true);
+    }
 
     /**
      * Runs {@code move}, a pane moving between tabs of this window, as one change (workspace plan 8c Rulings 17): while it

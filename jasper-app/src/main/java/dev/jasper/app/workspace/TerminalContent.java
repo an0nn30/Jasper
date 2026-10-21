@@ -66,6 +66,8 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
     /** @return the tab's one pane */
     public TerminalPane pane() { return pane; }
     void start() { pane.start(); }
+    /** Starts a restored terminal's shell the first time its tab shows (workspace tabs spec 13). */
+    void startIfWaiting() { if (!closed && pane.waiting()) pane.start(); }
     /** The tab's title: the name the user gave it, else the shell's title, else its folder's name, else "Terminal". */
     String title() { return state.title(pane.tabTitle(), pane.directory()); }
     /** Names the tab; blank goes back to the automatic title. */

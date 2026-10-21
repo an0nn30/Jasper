@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -84,6 +85,19 @@ final class WorkspaceView extends JPanel {
     void openBeside(Tab tab, GroupId group, Side side) {
         if (layout.isEmpty()) open(tab);
         else place(tab, layout.split(tab.id(), group, side));
+    }
+
+    /**
+     * Shows a saved tab's layout over {@code restored}, items no window showed before, in this workspace, which holds none
+     * (workspace tabs spec 13; tabs and panes spec 12): each item takes its saved pane at once.
+     */
+    void restoreSaved(Layout saved, List<Tab> restored) {
+        if (!tabs.isEmpty() || !layout.isEmpty()) throw new IllegalStateException("Only an empty workspace restores");
+        var placed = new HashMap<TabId, Tab>();
+        for (Tab tab : restored) placed.put(tab.id(), tab);
+        if (!placed.keySet().equals(Set.copyOf(saved.tabs()))) throw new IllegalArgumentException("The layout places other items");
+        tabs.putAll(placed);
+        apply(saved);
     }
 
     private void place(Tab tab, Layout next) {

@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import javax.swing.SwingUtilities;
 
 /**
@@ -40,7 +41,7 @@ public final class WindowManager {
      * @param trigger what asked for it, for its start-up timing line
      * @param emptied what its content runs when its last tab has gone
      * @param bounds where a child window's workspace opens on screen, a torn-out tab's (workspace tabs plan 5); empty
-     *     for where the platform puts it
+     *     for where the platform puts a new window, or where a restored window's saved place puts it
      * @param cursor where the cursor released that tab on screen, present with the bounds: the window opens on the
      *     display there
      */
@@ -89,6 +90,7 @@ public final class WindowManager {
         }
     }
 
+    private static final System.Logger LOG = System.getLogger(WindowManager.class.getName());
     private final Contributions model;
     private final Hooks hooks;
     private final List<ChildWindow> children = new ArrayList<>();
@@ -199,12 +201,14 @@ public final class WindowManager {
     }
 
     /**
-     * The main window, opened first when none is open (workspace tabs spec 6.4: every request restores it first). The
-     * tabs a plugin asked for while it was being composed open in it once it shows, or go with it when it fails to
-     * open, their failures under its own.
+     * The main window, restored first when none is open (workspace tabs spec 6.4 and 13: every request restores it first):
+     * as the store has it, with its full windows, else a new main window with one terminal tab. The tabs a plugin asked
+     * for while it was being composed open in it once it shows, or go with it when it fails to open, their failures
+     * under its own.
      *
      * @param trigger what asked, for the new window's start-up timing line
-     * @param directory where a new main window's terminal tab starts; null for where a new shell starts
+     * @param directory where a new main window's terminal tab starts, or, when the main window is restored, where a
+     *     terminal starts in a new tab after the restored ones; null for where a new shell starts, or no new tab
      * @return the main window; empty while Jasper quits, the main window closes or every window closes
      * @throws IllegalStateException when asked again while the main window is still opening
      */
@@ -218,8 +222,9 @@ public final class WindowManager {
         openingMain = true;
         Optional<MainWindow> opened;
         try {
-            opened = open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty(),
-                Optional.empty()), content -> main = new MainWindow(this, content));
+            // The one place a main window is made (workspace tabs spec 6.1; verifyApplicationArchitecture pins this method).
+            Function<WindowContent, MainWindow> make = content -> main = new MainWindow(this, content);
+            opened = openMain(trigger, directory, make);
         } catch (RuntimeException | Error failure) {
             // Still opening: a waiting tab's close listener cannot ask for another main window.
             model.tabs().mainFailed(failure);
@@ -230,6 +235,81 @@ public final class WindowManager {
         // A main window its own opening closed again leaves the waiting tabs to the next one.
         opened.filter(window -> !window.closed()).ifPresent(window -> model.tabs().mainOpened(window.id()));
         return opened;
+    }
+
+    /**
+     * The main window as the store has it (workspace tabs spec 13; tabs and panes spec 12): the saved main window, then
+     * each saved full window, each where it was with its tabs, splits and panes and its items, the main window in front;
+     * with nothing to restore, or a main window that cannot be restored, a new main window with one terminal tab in
+     * {@code directory}. A restored main window opens {@code directory} in a new tab after its own. A window that cannot
+     * be restored is not lost: the store keeps the saved windows as {@code workspace.toml.bad} and says so (spec 15).
+     * {@code make} is {@link #ensureMain}'s, the one place a main window is made; the store is read here, after
+     * {@link #ensureMain}'s checks, since reading it ends its hold.
+     */
+    private Optional<MainWindow> openMain(String trigger, Path directory, Function<WindowContent, MainWindow> make) {
+        WorkspaceFile.Loaded loaded = store == null ? new WorkspaceFile.Loaded.Fresh(Optional.empty()) : store.load();
+        if (!(loaded instanceof WorkspaceFile.Loaded.Restore restore)) return openNewMain(trigger, directory, make);
+        WorkspaceFile.Snapshot saved = restore.snapshot();
+        boolean[] restored = new boolean[1];
+        Optional<MainWindow> opened = open(new Opening(WindowRole.MAIN, true, null, trigger, () -> { }, Optional.empty(),
+            Optional.empty()), make, window -> {
+                try {
+                    window.restore(saved.main());
+                    restored[0] = true;
+                } catch (RuntimeException failure) {
+                    // It opens as a new main window instead, never discarded: the closed hook of the last window ends a
+                    // Jasper that is not resident. Its restore closed what it made; the saved windows are kept before this
+                    // window's first save replaces them.
+                    LOG.log(System.Logger.Level.WARNING, "Could not restore the main window; it opens as a new one", failure);
+                    store.setAside(saved);
+                    window.content().newTab(directory);
+                }
+                return true;
+            });
+        if (opened.isEmpty() || !restored[0]) return opened;
+        boolean whole = true;
+        var back = new ArrayList<ChildWindow>();
+        for (WorkspaceFile.WindowRecord child : saved.children()) {
+            try {
+                restoreChild(child).ifPresent(back::add);
+            } catch (RuntimeException failure) {
+                // A full window that cannot come back costs only itself, and the saved windows are kept.
+                LOG.log(System.Logger.Level.WARNING, "Could not restore a full window", failure);
+                whole = false;
+            }
+        }
+        if (!whole) store.setAside(saved);
+        if (directory != null) {
+            // The main window has shown: a new tab that fails costs only itself, never the window (workspace plan 6a Rulings 41).
+            try { opened.get().content().newTab(directory); }
+            catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "Could not open the requested directory in a new tab", failure); }
+        }
+        // In front when a full window came back (workspace plan 6a Rulings 12).
+        if (!back.isEmpty()) opened.get().toFront();
+        return opened;
+    }
+
+    /** A new main window with one terminal tab in {@code directory}, made by {@link #ensureMain}'s {@code make}. */
+    private Optional<MainWindow> openNewMain(String trigger, Path directory, Function<WindowContent, MainWindow> make) {
+        return open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty(), Optional.empty()), make);
+    }
+
+    /**
+     * A saved full window, where it was with its tabs and items; one with no item that can come back is left out. Its
+     * timing line says {@code restore}, which no benchmark reads as a menu's window (workspace plan 6a Rulings 16).
+     *
+     * @return the window, once it shows; empty when it was left out
+     */
+    private Optional<ChildWindow> restoreChild(WorkspaceFile.WindowRecord record) {
+        ChildWindow[] made = new ChildWindow[1];
+        // Its saved place reaches its frame through its placement, checked against today's displays, never as a tear-out's
+        // workspace bounds, which its frame would grow by its chrome (workspace plan 6a Rulings 21).
+        return open(new Opening(WindowRole.CHILD, true, null, "restore", () -> { if (made[0] != null) made[0].emptied(); }, Optional.empty(),
+            Optional.empty()), content -> {
+            made[0] = new ChildWindow(this, content);
+            children.add(made[0]);
+            return made[0];
+        }, window -> window.restore(record) > 0);
     }
 
     /**
@@ -549,6 +629,14 @@ public final class WindowManager {
 
     /** Composes, frames and shows one window; a failure on the way discards it and propagates. */
     private <W extends JasperWindow> Optional<W> open(Opening opening, Function<WindowContent, W> make) {
+        return open(opening, make, window -> true);
+    }
+
+    /**
+     * As {@link #open(Opening, Function)}; {@code prepare} readies the window before its frame exists, as a restore does,
+     * and a window it refuses is discarded unshown.
+     */
+    private <W extends JasperWindow> Optional<W> open(Opening opening, Function<WindowContent, W> make, Predicate<? super W> prepare) {
         requireEdt();
         openings++;
         W window = null;
@@ -561,6 +649,10 @@ public final class WindowManager {
             content.manager(this);
             window = make.apply(content);
             content.onLayoutChanged = this::changed;
+            if (!prepare.test(window)) {
+                window.discard();
+                return Optional.empty();
+            }
             window.shell(hooks.frames().apply(window));
             // A torn-out tab's window opens where it was dropped, on the cursor's display (workspace tabs plan 5).
             if (opening.bounds().isPresent())

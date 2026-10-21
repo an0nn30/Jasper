@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.persistence.WorkspaceFile;
 import java.awt.Component;
 import java.util.Objects;
 import java.util.Optional;
@@ -129,6 +130,17 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
     abstract void closeRequested();
 
     final WindowManager manager() { return manager; }
+
+    /**
+     * Restores the window as it was saved (workspace tabs spec 13; tabs and panes spec 12): where it was, its tabs and
+     * its items. Before its frame exists, which takes the saved place from {@link #placement()}.
+     *
+     * @return how many items came back
+     */
+    final int restore(WorkspaceFile.WindowRecord record) {
+        placement = new Placement(record.bounds(), record.extendedState());
+        return content.restore(record);
+    }
 
     /** The frame the manager built for this window. */
     final void shell(WindowShell value) { shell = Objects.requireNonNull(value, "value"); }

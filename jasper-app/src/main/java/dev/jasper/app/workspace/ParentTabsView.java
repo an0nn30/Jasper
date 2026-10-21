@@ -376,6 +376,43 @@ final class ParentTabsView extends JPanel {
         return view;
     }
 
+    /**
+     * Shows saved tabs in this window, which holds no item yet (workspace tabs spec 13; tabs and panes spec 12): a
+     * workspace under each saved id, with the window's theme and glass, showing its saved layout over {@code tabs}, in
+     * strip order, and the saved one shown, all at once (workspace plan 6a Rulings 30). The window's empty tab gives way
+     * to them; a failure while the saved tabs' workspaces are built leaves it as it was.
+     *
+     * @param saved the tabs as saved
+     * @param tabs the restored items by id: every one the tabs place
+     */
+    void restore(ParentTabs saved, Map<TabId, Tab> tabs) {
+        if (closed || !isEmpty()) throw new IllegalStateException("Only an empty window restores its tabs");
+        var made = new ArrayList<WorkspaceView>();
+        try {
+            for (ParentTab parent : saved.parentTabs()) {
+                // The one helper for every tab's workspace gives it the window's theme and glass (workspace plan 7b).
+                var view = workspace(parent.id());
+                made.add(view);
+                view.restoreSaved(parent.layout(), parent.layout().tabs().stream().map(tabs::get).toList());
+            }
+        } catch (RuntimeException | Error failure) {
+            for (WorkspaceView view : made) view.close();
+            throw failure;
+        }
+        WorkspaceView empty = active();
+        views.remove(empty.id());
+        super.remove(empty);
+        empty.close();
+        // In strip order, ahead of the strip, which stays the last child (workspace plan 7a Rulings 19).
+        for (int i = 0; i < made.size(); i++) {
+            views.put(made.get(i).id(), made.get(i));
+            add(made.get(i), i);
+        }
+        model = saved;
+        reveal(active());
+        bar.atOnce(() -> owner.workspaceChanged(active(), false));
+    }
+
     /** A parent tab's layout changed: the model takes it. A workspace that is not, or no longer, a parent tab's is ignored. */
     void changed(WorkspaceView view) {
         if (!closed && views.get(view.id()) == view) model = model.replace(new ParentTab(view.id(), view.model()));
