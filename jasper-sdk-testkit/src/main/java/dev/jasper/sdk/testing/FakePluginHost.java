@@ -1243,20 +1243,19 @@ public final class FakePluginHost implements AutoCloseable {
      * A window's tabs as its strip shows them (tabs and panes spec 4), each tab's items pane by pane: the ids
      * {@code TabHandle.id()} reports.
      *
-     * @param windowId an open window
-     * @return the tabs in strip order, each a list of item ids
+     * @param windowId a window
+     * @return the tabs in strip order, each a list of item ids; empty for a window that is not open
      * @since 0.21.0
      */
     public List<List<UUID>> windowTabs(UUID windowId) {
-        return workspace.tabsOf(workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No such window: " + windowId)));
+        return workspace.window(windowId).map(workspace::tabsOf).orElse(List.of());
     }
 
     /**
      * Moves a tab the test added to a new tab at the end of another open window's strip, where it is selected, as
-     * dragging it there does: a terminal
-     * tab's pane keeps its id and session with no {@code PANE_OPENED} or {@code PANE_CLOSED}, the move is announced on
-     * {@code TAB_MOVED}, and a child window left with no tab closes after it. A plugin moves its own content tab with
-     * {@code ContentTab.moveToNewWindow} or {@code moveToMainWindow}.
+     * dragging it there does: a terminal tab's pane keeps its id and session with no {@code PANE_OPENED} or
+     * {@code PANE_CLOSED}, the move is announced on {@code TAB_MOVED}, and a child window left with no tab closes after
+     * it. A plugin moves its own content tab with {@code ContentTab.moveToNewWindow} or {@code moveToMainWindow}.
      *
      * @param tabId an open tab the test added
      * @param windowId another open window

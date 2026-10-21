@@ -1741,6 +1741,8 @@ public abstract class PluginContractTest {
         assertThat(h.windowTabs(main)).as("a moved tab arrives as a tab of its own")
             .containsExactly(List.of(first, right, down), List.of(tab), List.of(moving));
         assertThat(h.windowTabs(other)).containsExactly(List.of(stays));
+        h.closeTab(stays);
+        assertThat(h.windowTabs(other)).as("a child window closed with its last tab has none").isEmpty();
     }
 
     @Test void openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane() {

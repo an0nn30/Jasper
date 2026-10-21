@@ -315,8 +315,8 @@ final class TerminalFixture {
     /** A window's tabs in strip order, each its items' ids pane by pane (tabs and panes spec 4); empty for a closed window. */
     List<List<UUID>> windowTabs(UUID windowId) {
         Window window = windows.get(windowId);
+        if (window == null) return List.of();
         var result = new ArrayList<List<UUID>>();
-        if (window == null) return result;
         Group current = null;
         for (Tab tab : window.tabs) {
             if (tab.group != current) { result.add(new ArrayList<>()); current = tab.group; }
