@@ -133,6 +133,19 @@ public final class FakePluginContext implements PluginContext {
                     return host.provideEditor(FakePluginContext.this, editor);
                 }
                 @Override public void browse(java.net.URI uri) { requireOpen(); host.browsed.add(webAddress(uri)); }
+                @Override public void openInBrowser(java.net.URI uri) {
+                    requireOpen();
+                    java.net.URI address = webAddress(uri);
+                    // As the application: the browser a plugin provides first, as a click in the active window; here on the caller's thread.
+                    if (!host.openLink(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, host.activeWindowId())) host.browsed.add(address);
+                }
+                @Override public Subscription browser(dev.jasper.sdk.ui.WebBrowser browser) {
+                    requireOpen();
+                    if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.BROWSER_PROVIDE))
+                        throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.BROWSER_PROVIDE);
+                    Objects.requireNonNull(browser, "browser");
+                    return host.provideBrowser(FakePluginContext.this, browser);
+                }
                 @Override public boolean copy(String text) { requireOpen(); return copied(text, false); }
                 @Override public boolean copySecret(String text) { requireOpen(); return copied(text, true); }
                 @Override public Optional<String> clipboardText() {

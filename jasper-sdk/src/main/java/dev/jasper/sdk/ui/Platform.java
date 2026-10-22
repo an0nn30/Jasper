@@ -20,7 +20,8 @@ public interface Platform {
     void openInEditor(Path file);
 
     /**
-     * Opens a web address in the user's browser. Runs in the background; a failure is posted in the plugin's
+     * Opens a web address in the system browser, even when a plugin provides Jasper's web browser
+     * ({@link #openInBrowser} asks that one first). Runs in the background; a failure is posted in the plugin's
      * notification group, never thrown.
      *
      * @param uri an absolute {@code http} or {@code https} address
@@ -28,6 +29,18 @@ public interface Platform {
      * @since 0.10.2
      */
     void browse(URI uri);
+
+    /**
+     * Opens a web address the user asked for, such as a link clicked in the plugin's view: the web browser a plugin
+     * provides (see {@link #browser}), asked on the UI thread with {@link LinkOrigin#CLICK} and the active Jasper
+     * window, then the system browser, as {@link #browse} opens it. Returns at once; a failure is posted in the
+     * plugin's notification group, never thrown.
+     *
+     * @param uri an absolute {@code http} or {@code https} address
+     * @throws IllegalArgumentException when the address is not an absolute http or https one
+     * @since 0.21.0
+     */
+    void openInBrowser(URI uri);
 
     /**
      * Puts text on the system clipboard. UI thread only; elsewhere it throws {@code IllegalStateException}. When the
@@ -91,10 +104,11 @@ public interface Platform {
     /**
      * Makes this plugin the web browser Jasper opens web addresses with: an {@code http} or {@code https} link
      * Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, with that window; every plugin's
-     * {@code openInBrowser} and Jasper's own web links, such as Settings' Help, with the active window; and the
+     * {@link #openInBrowser} and Jasper's own web links, such as Settings' Help, with the active window; and the
      * addresses given to the {@code jasper} command, with the window of the pane it ran in, go to {@code browser} first,
      * on the UI thread, with who asked ({@link LinkOrigin}).
-     * A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown. Other
+     * A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown, so a browser
+     * should treat the address as untrusted input from the terminal or the page, and show it before acting on it. Other
      * schemes, such as {@code mailto}, and {@link #browse} always go to the system browser. One at a time: a bundled
      * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
      * plugin's own included, throws. When the browser returns false or throws, and when no plugin provides one, the

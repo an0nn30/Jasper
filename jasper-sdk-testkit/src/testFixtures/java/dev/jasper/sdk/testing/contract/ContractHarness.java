@@ -308,7 +308,10 @@ public interface ContractHarness extends AutoCloseable {
         /** UI thread: clicks the body of the newest notification with this title; false when there is none or it expired. */
         boolean clickNotification(String title);
         List<java.nio.file.Path> openedInEditor();
-        /** Every web address a plugin asked to open in the browser, in request order. */
+        /**
+         * Every web address that reached the system browser, in request order: each {@code Platform.browse}, and each
+         * {@code Platform.openInBrowser} that no provided browser opened.
+         */
         List<java.net.URI> browsed();
         /** What the clipboard holds now; empty when it holds no text. */
         java.util.Optional<String> clipboard();
@@ -333,13 +336,21 @@ public interface ContractHarness extends AutoCloseable {
         java.util.Map<String, String> shellVariables(java.util.Map<String, String> jasperEnvironment);
         /** The values plugins' tab name pieces hold for a tab, by piece name; asked on the UI thread. */
         java.util.Map<String, String> tabNamePieces(java.util.UUID tabId);
-        /** Marks a plugin as one that ships with Jasper, whose editor replaces a non-bundled plugin's; before that plugin starts. */
+        /**
+         * Marks a plugin as one that ships with Jasper, whose editor and browser replace a non-bundled plugin's; before that
+         * plugin starts.
+         */
         void declareBundled(String pluginId);
         /**
          * Opens a file as Jasper's own opens do, with the editor a plugin provides; false when none does, or it declined or
          * threw. Asked on the UI thread.
          */
         boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId);
+        /**
+         * Opens a web address as Jasper's own routes do (a link clicked in a terminal, the {@code jasper} command), with the
+         * browser a plugin provides; false when none does, or it declined or threw. Asked on the UI thread.
+         */
+        boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, java.util.Optional<java.util.UUID> windowId);
         /** Sets the {@code jasper} command {@code CommandLine.client()} names, as the application names its installed or built one. */
         void commandClient(java.nio.file.Path client);
 }

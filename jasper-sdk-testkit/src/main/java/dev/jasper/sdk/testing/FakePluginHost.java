@@ -914,6 +914,8 @@ public final class FakePluginHost implements AutoCloseable {
         shellContributors.removeIf(entry -> entry.context() == context);
         ProvidedEditor provided = providedEditor;
         if (provided != null && provided.context() == context) providedEditor = null;
+        ProvidedBrowser browser = providedBrowser;
+        if (browser != null && browser.context() == context) providedBrowser = null;
         for (RunningCall running : List.copyOf(runningCalls))
             if (running.context() == context) running.call().stopped(running.name());
         notifications.stopped(context.plugin().id());
@@ -1936,7 +1938,8 @@ public final class FakePluginHost implements AutoCloseable {
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }
 
     /**
-     * Every web address a plugin asked to open in the browser.
+     * Every web address that reached the system browser: each {@code Platform.browse}, and each
+     * {@code Platform.openInBrowser} that no provided browser opened.
      *
      * @return the addresses in request order
      */
@@ -2255,8 +2258,9 @@ public final class FakePluginHost implements AutoCloseable {
     final Set<String> bundledPlugins = ConcurrentHashMap.newKeySet();
 
     /**
-     * Marks a plugin as one that ships with Jasper, before it starts: its {@code Platform.editor} registration replaces
-     * a non-bundled plugin's, and its split items come first in the Split lists, as the application's bundled plugins' do.
+     * Marks a plugin as one that ships with Jasper, before it starts: its {@code Platform.editor} and
+     * {@code Platform.browser} registrations replace a non-bundled plugin's, and its split items come first in the Split
+     * lists, as the application's bundled plugins' do.
      *
      * @param pluginId the plugin
      * @since 0.17.1
@@ -2319,6 +2323,63 @@ public final class FakePluginHost implements AutoCloseable {
      * @since 0.17.1
      */
     public Optional<String> editorPlugin() { return Optional.ofNullable(providedEditor).map(provided -> provided.context().plugin().id()); }
+
+    /** The web browser a plugin provides ({@code Platform.browser}) and the plugin that registered it. */
+    record ProvidedBrowser(FakePluginContext context, dev.jasper.sdk.ui.WebBrowser browser) { }
+    private volatile ProvidedBrowser providedBrowser;
+
+    /** Makes a plugin's browser the one web addresses open with, under the application's one-at-a-time rule. */
+    Subscription provideBrowser(FakePluginContext context, dev.jasper.sdk.ui.WebBrowser browser) {
+        String pluginId = context.plugin().id();
+        ProvidedBrowser current = providedBrowser;
+        if (current != null && (!bundledPlugins.contains(pluginId) || bundledPlugins.contains(current.context().plugin().id())))
+            throw new IllegalStateException("The browser is already provided by " + current.context().plugin().id());
+        var provided = new ProvidedBrowser(context, browser);
+        providedBrowser = provided;
+        Subscription subscription = () -> { if (providedBrowser == provided) providedBrowser = null; };
+        context.own(subscription);
+        return subscription;
+    }
+
+    /** The open window the user activated last, as {@code Platform.openInBrowser} reads it; empty when none is. */
+    Optional<UUID> activeWindowId() {
+        return Optional.ofNullable(workspace.lastActive).filter(window -> window.open).map(window -> window.id);
+    }
+
+    /**
+     * Opens a web address as Jasper's own routes do (a link clicked in a terminal, the {@code jasper} command): with the
+     * browser a plugin provides through {@code Platform.browser}, given that plugin's handle for {@code windowId} while
+     * the window is open.
+     *
+     * @param address an absolute http or https address
+     * @param origin who asked for it
+     * @param windowId the Jasper window the address came from, or empty
+     * @return what the browser answered; false when no plugin provides one, or it threw, which {@link #failures()} records
+     * @since 0.21.0
+     */
+    public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> windowId) {
+        Objects.requireNonNull(address, "address");
+        Objects.requireNonNull(origin, "origin");
+        Objects.requireNonNull(windowId, "windowId");
+        ProvidedBrowser provided = providedBrowser;
+        if (provided == null) return false;
+        Optional<dev.jasper.sdk.WindowOwner> window = windowId.flatMap(id -> provided.context().terminals.window(id))
+            .map(handle -> (dev.jasper.sdk.WindowOwner) handle);
+        try {
+            return provided.browser().open(address, origin, window);
+        } catch (RuntimeException failure) {
+            failures.add(provided.context().plugin().id() + " web browser: " + failure);
+            return false;
+        }
+    }
+
+    /**
+     * Which plugin provides the web browser now.
+     *
+     * @return its id, or empty
+     * @since 0.21.0
+     */
+    public Optional<String> browserPlugin() { return Optional.ofNullable(providedBrowser).map(provided -> provided.context().plugin().id()); }
 
     volatile Optional<Path> commandClient = Optional.empty();
 

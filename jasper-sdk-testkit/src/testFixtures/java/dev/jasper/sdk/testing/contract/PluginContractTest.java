@@ -3994,6 +3994,123 @@ public abstract class PluginContractTest {
         assertThat(h.openedInEditor()).as("only the declined file reaches the desktop").containsExactly(HERE.resolve("declined.txt"));
     }
 
+    /** A browser that records {@code <address>|<origin>|<window id or ->} and answers {@code answer}. */
+    private static dev.jasper.sdk.ui.WebBrowser recordingBrowser(List<String> calls, boolean answer) {
+        return (address, origin, window) -> {
+            calls.add(address + "|" + origin + "|"
+                + window.map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-"));
+            return answer;
+        };
+    }
+
+    private static final java.net.URI PAGE = java.net.URI.create("https://example.com/page");
+
+    /** Browser plan 3: the web browser role needs its capability, and one plugin provides it at a time. */
+    @Test void providingTheBrowserNeedsTheCapabilityAndOnePluginProvidesItAtATime() {
+        var bare = new AtomicReference<PluginContext>();
+        var a = new AtomicReference<PluginContext>();
+        var b = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.b", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), b::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("no plugin provides one").isFalse();
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().platform().browser(recordingBrowser(calls, true)))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("browser.provide"));
+            a.get().platform().browser(recordingBrowser(calls, true));
+            assertThatIllegalStateException().isThrownBy(() -> b.get().platform().browser(recordingBrowser(calls, true)))
+                .withMessage("The browser is already provided by test.a");
+            assertThatIllegalStateException().as("the same plugin twice").isThrownBy(() -> a.get().platform().browser(recordingBrowser(calls, true)))
+                .withMessage("The browser is already provided by test.a");
+            assertThatThrownBy(() -> a.get().platform().browser(null)).isInstanceOf(NullPointerException.class);
+        });
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.PROGRAM, Optional.empty())).isTrue();
+        assertThat(calls).containsExactly(PAGE + "|CLICK|-", PAGE + "|PROGRAM|-");
+    }
+
+    /** Browser plan 3: a bundled plugin's browser replaces another plugin's, and the role ends with its plugin. */
+    @Test void aBundledPluginsBrowserReplacesAnotherPluginsAndEndsWithItsPlugin() {
+        h.declareBundled("test.z");
+        var a = new AtomicReference<PluginContext>();
+        var z = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.z", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), z::set);
+        List<String> byA = new CopyOnWriteArrayList<>(), byZ = new CopyOnWriteArrayList<>();
+        var replaced = new AtomicReference<Subscription>();
+        h.ui(() -> {
+            replaced.set(a.get().platform().browser(recordingBrowser(byA, true)));
+            z.get().platform().browser(recordingBrowser(byZ, true));
+            assertThatIllegalStateException().isThrownBy(() -> a.get().platform().browser(recordingBrowser(byA, true)))
+                .withMessage("The browser is already provided by test.z");
+        });
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        h.ui(() -> replaced.get().close());
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.PROGRAM, Optional.empty()))
+            .as("closing the replaced registration leaves the bundled one").isTrue();
+        assertThat(byA).isEmpty();
+        assertThat(byZ).containsExactly(PAGE + "|CLICK|-", PAGE + "|PROGRAM|-");
+        h.stopAll();
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("the registration ends with its plugin").isFalse();
+    }
+
+    /** Browser plan 3, Review Focus 2: a browser that throws or declines gives false; one gets its plugin's window handle. */
+    @Test void aBrowserThatThrowsOrDeclinesGivesFalseAndOneGetsItsPluginsHandleForAnOpenWindow() {
+        UUID window = h.addTerminalWindow();
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.WebBrowser recording = recordingBrowser(calls, true);
+        h.ui(() -> a.get().platform().browser((address, origin, owner) -> {
+            if (address.getPath().equals("/broken")) throw new IllegalStateException("the browser broke");
+            if (address.getPath().equals("/declined")) return false;
+            return recording.open(address, origin, owner);
+        }));
+        assertThat(h.openLink(java.net.URI.create("https://example.com/broken"), dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty()))
+            .as("a browser that throws").isFalse();
+        assertThat(h.openLink(java.net.URI.create("https://example.com/declined"), dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.of(window)))
+            .as("a browser that declines").isFalse();
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.of(window))).isTrue();
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.PROGRAM, Optional.of(UUID.randomUUID())))
+            .as("a window that is not open is no window").isTrue();
+        assertThat(calls).containsExactly(PAGE + "|CLICK|" + window, PAGE + "|PROGRAM|-");
+    }
+
+    /**
+     * Browser plan 3, Review Focus 2: {@code openInBrowser} asks the provided browser as a click in the active window, and
+     * an address it declines reaches the system browser; {@code browse} never asks it.
+     */
+    @Test void openInBrowserAsksTheProvidedBrowserAsAClickInTheActiveWindowAndBrowseNever() {
+        UUID window = h.addTerminalWindow();
+        h.activateTerminalWindow(window);
+        var a = new AtomicReference<PluginContext>();
+        var user = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.user"), Set.of(), Set.of(), user::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.WebBrowser recording = recordingBrowser(calls, true);
+        h.ui(() -> a.get().platform().browser((address, origin, owner) ->
+            recording.open(address, origin, owner) && !address.getPath().equals("/declined")));
+        java.net.URI declined = java.net.URI.create("https://example.com/declined");
+        java.net.URI direct = java.net.URI.create("http://localhost:5432/");
+        h.ui(() -> {
+            user.get().platform().openInBrowser(PAGE);
+            user.get().platform().openInBrowser(declined);
+            user.get().platform().browse(direct);
+            assertThatIllegalArgumentException().isThrownBy(() -> user.get().platform().openInBrowser(java.net.URI.create("mailto:someone@example.com")));
+            assertThatIllegalArgumentException().isThrownBy(() -> user.get().platform().openInBrowser(java.net.URI.create("/relative")));
+            assertThatThrownBy(() -> user.get().platform().openInBrowser(null)).isInstanceOf(NullPointerException.class);
+        });
+        h.flush();
+        // Up to 10 s: the app host hops to the UI thread and then to the plugin's worker, which a loaded CI can delay.
+        for (int i = 0; i < 1000 && (calls.size() < 2 || h.browsed().size() < 2); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        assertThat(calls).containsExactly(PAGE + "|CLICK|" + window, declined + "|CLICK|" + window);
+        assertThat(h.browsed()).as("the declined address and browse reach the system browser").containsExactlyInAnyOrder(declined, direct);
+    }
+
     @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {
         PluginContext a = started("test.a", Set.of());
         assertThat(a.commandLine().client()).as("no client yet").isEmpty();

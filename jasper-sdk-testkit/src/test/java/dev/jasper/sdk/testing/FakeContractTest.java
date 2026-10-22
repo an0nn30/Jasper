@@ -154,6 +154,9 @@ class FakeContractTest extends PluginContractTest {
             @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId) {
                 return host.edit(file, line, windowId);
             }
+            @Override public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, java.util.Optional<java.util.UUID> windowId) {
+                return host.openLink(address, origin, windowId);
+            }
             @Override public void commandClient(java.nio.file.Path client) { host.setCommandClient(client); }
             @Override public void close() { host.close(); }
         };
