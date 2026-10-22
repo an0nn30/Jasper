@@ -124,6 +124,17 @@ class EditorViewsTest {
         assertThat(item(b, "Split File Right")).isNotNull();
     }
 
+    /** Each view has its own font size: Increase Font Size in one leaves the file's other views as they were. */
+    @Test void increaseFontSizeInOneViewLeavesTheFilesOtherViews() throws Exception {
+        EditorTab first = opened(file("a.txt", "a\n"));
+        EditorTab second = split(TabPlacement.SPLIT_RIGHT);
+        float saved = first.area().getFont().getSize2D();
+        host.contentCommands(handle(1)).stream().filter(command -> command.id().equals("font-bigger")).findFirst()
+            .orElseThrow().run().run();
+        assertThat(second.area().getFont().getSize2D()).as("the selected view").isEqualTo(saved + 1);
+        assertThat(first.area().getFont().getSize2D()).as("the file's other view").isEqualTo(saved);
+    }
+
     /** The html.disable sweep's rule: the right-click menu's Split File items take the property before their title. */
     @Test void theRightClickMenusSplitFileItemsArePlainText() throws Exception {
         EditorTab tab = opened(file("a.txt", "a\n"));
