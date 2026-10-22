@@ -1,6 +1,10 @@
 package dev.jasper.editor.vim;
 
+import java.awt.AWTEvent;
 import java.awt.Point;
+import java.awt.Toolkit;
+import java.awt.event.InvocationEvent;
+import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -59,6 +63,36 @@ class VimUndoManagerTest {
         var port = (JViewport) area.getParent();
         try { return line(area, area.getLineOfOffset(area.viewToModel2D(new Point(0, port.getViewPosition().y)))); }
         catch (BadLocationException bad) { throw new AssertionError(bad); }
+    }
+
+    /** @return whether {@code reference} is cleared within {@code tries} collections, the event thread left free between */
+    private static boolean collected(WeakReference<?> reference, int tries) throws Exception {
+        for (int n = 0; n < tries && reference.get() != null; n++) {
+            System.gc();
+            onEdt(() -> { });
+            Thread.sleep(100);
+        }
+        return reference.get() == null;
+    }
+
+    /** A text area of 600 lines in a scroll pane, Vim on in it, and another area that shares its document. */
+    private record VimViews(VimTextArea shown, VimTextArea other, VimEditor editor) {
+        JViewport port() { return (JViewport) shown.getParent(); }
+
+        /** @return whether the cursor's line is shown whole */
+        boolean cursorShown() {
+            var rect = port().getViewRect();
+            int y = yFor(shown, editor.cursor().line);
+            return y >= rect.y && y + shown.getLineHeight() <= rect.y + rect.height;
+        }
+    }
+
+    private static VimViews vimViews() {
+        var shown = lines();
+        var other = new VimTextArea();
+        other.share(shown);
+        scrolled(shown, new JViewport());
+        return new VimViews(shown, other, new VimEditor(new Vim(VimHost.detached()), shown, EditorDefaults.VIM));
     }
 
     /** A viewport that counts the moves the undo history asks of it, not the scroll pane's echoes of them. */
@@ -422,9 +456,11 @@ class VimUndoManagerTest {
                 ports.get(n).setViewPosition(new Point(0, yFor(shown.get(n), 299)));
             }
         });
+        var queued = new int[1];
         onEdt(() -> {
             ports.forEach(port -> port.moves = 0);
             var area = editing.get();
+            int before = area.vimUndo().putBacksQueued();
             area.beginAtomicEdit();
             try {
                 for (int n = 0; n < 1000; n++) {
@@ -432,9 +468,11 @@ class VimUndoManagerTest {
                     area.replaceSelection("x\n");
                 }
             } finally { area.endAtomicEdit(); }
+            queued[0] = area.vimUndo().putBacksQueued() - before;
         });
         onEdt(() -> { });
         onEdt(() -> {
+            assertThat(queued[0]).as("one put-back queued for each other view in the event").isEqualTo(2);
             for (int n = 0; n < 2; n++) {
                 assertThat(ports.get(n).moves).as("one put-back for view %d", n).isEqualTo(1);
                 assertThat(top(shown.get(n))).isEqualTo("line 300");
@@ -516,6 +554,196 @@ class VimUndoManagerTest {
             assertThat(c.getText()).isEqualTo("x");
             assertThat(c.canUndo()).isFalse();
         });
+    }
+
+    /**
+     * Pane flexibility spec 6 and Vim's mark_adjust with update_topline: an edit in another view that pushes a Vim
+     * view's cursor out of its window leaves the cursor on its text, and the window scrolls the least to show it.
+     */
+    @Test void anEditThatPushesAVimCursorOutOfItsWindowScrollsTheWindowToIt() throws Exception {
+        var v = new AtomicReference<VimViews>();
+        onEdt(() -> {
+            v.set(vimViews());
+            type(v.get().editor(), "300Gzt318G");
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(top(v.get().shown())).isEqualTo("line 300");
+            assertThat(line(v.get().shown(), v.get().editor().cursor().line)).isEqualTo("line 318");
+            assertThat(v.get().cursorShown()).isTrue();
+            v.get().other().setCaretPosition(lineStart(v.get().other(), 305));
+            v.get().other().replaceSelection("new\n".repeat(10));
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var editor = v.get().editor();
+            assertThat(line(v.get().shown(), editor.cursor().line)).as("the cursor stays on its text").isEqualTo("line 318");
+            assertThat(v.get().cursorShown()).as("and in sight").isTrue();
+            assertThat(editor.view().botline - 1).as("the window scrolls the least: the cursor on its last line")
+                .isEqualTo(editor.cursor().line + 1);
+        });
+    }
+
+    /** The window that scrolls to an edited-away cursor keeps 'scrolloff' lines below it, as Vim's update_topline does. */
+    @Test void aVimWindowScrollingToItsCursorKeepsScrolloff() throws Exception {
+        var v = new AtomicReference<VimViews>();
+        var cursorText = new String[1];
+        onEdt(() -> {
+            v.set(vimViews());
+            type(v.get().editor(), ":set scrolloff=3<CR>300Gzt");
+            type(v.get().editor(), (v.get().editor().view().botline - 1 - 3) + "G");
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var editor = v.get().editor();
+            assertThat(editor.view().botline - 1 - (editor.cursor().line + 1)).as("the cursor as low as 'scrolloff' lets it").isEqualTo(3);
+            cursorText[0] = line(v.get().shown(), editor.cursor().line);
+            v.get().other().setCaretPosition(lineStart(v.get().other(), 305));
+            v.get().other().replaceSelection("new\n".repeat(10));
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var editor = v.get().editor();
+            assertThat(line(v.get().shown(), editor.cursor().line)).as("the cursor stays on its text").isEqualTo(cursorText[0]);
+            assertThat(v.get().cursorShown()).isTrue();
+            assertThat(editor.view().botline - 1 - (editor.cursor().line + 1)).as("'scrolloff' lines below the cursor").isEqualTo(3);
+        });
+    }
+
+    /** A view without Vim keeps its first line through an edit inside its window, though its caret is pushed out. */
+    @Test void aViewWithoutVimKeepsItsFirstLineThoughItsCaretLeavesTheWindow() throws Exception {
+        var shown = new AtomicReference<VimTextArea>();
+        var other = new AtomicReference<VimTextArea>();
+        var y = new int[1];
+        onEdt(() -> {
+            shown.set(lines());
+            other.set(new VimTextArea());
+            other.get().share(shown.get());
+            scrolled(shown.get(), new JViewport());
+        });
+        onEdt(() -> {
+            y[0] = yFor(shown.get(), 299);
+            ((JViewport) shown.get().getParent()).setViewPosition(new Point(0, y[0]));
+            shown.get().setCaretPosition(lineStart(shown.get(), 317));
+        });
+        onEdt(() -> {
+            other.get().setCaretPosition(lineStart(other.get(), 305));
+            other.get().replaceSelection("new\n".repeat(30));
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(((JViewport) shown.get().getParent()).getViewPosition().y).isEqualTo(y[0]);
+            assertThat(line(shown.get(), shown.get().getCaretLineNumber())).as("the caret keeps its text, out of sight").isEqualTo("line 318");
+        });
+    }
+
+    /** An insert exactly at the start of a view's first shown line keeps that line on top (Vim shows the new line). */
+    @Test void anInsertAtAViewsFirstLineKeepsThatLineOnTop() throws Exception {
+        var shown = new AtomicReference<VimTextArea>();
+        var other = new AtomicReference<VimTextArea>();
+        onEdt(() -> {
+            shown.set(lines());
+            other.set(new VimTextArea());
+            other.get().share(shown.get());
+            scrolled(shown.get(), new JViewport());
+        });
+        onEdt(() -> ((JViewport) shown.get().getParent()).setViewPosition(new Point(0, yFor(shown.get(), 299))));
+        onEdt(() -> {
+            other.get().setCaretPosition(lineStart(other.get(), 299));
+            other.get().replaceSelection("new\n".repeat(3));
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(top(shown.get())).isEqualTo("line 300");
+            assertThat(((JViewport) shown.get().getParent()).getViewPosition().y).isEqualTo(yFor(shown.get(), 302));
+        });
+    }
+
+    /** The same rule at the start of the text: a view at the top keeps its first line on top too. */
+    @Test void anInsertAtTheStartOfTheTextKeepsAViewAtTheTopOnItsFirstLine() throws Exception {
+        var shown = new AtomicReference<VimTextArea>();
+        var other = new AtomicReference<VimTextArea>();
+        onEdt(() -> {
+            shown.set(lines());
+            other.set(new VimTextArea());
+            other.get().share(shown.get());
+            scrolled(shown.get(), new JViewport());
+        });
+        onEdt(() -> {
+            assertThat(((JViewport) shown.get().getParent()).getViewPosition().y).isZero();
+            other.get().setCaretPosition(0);
+            other.get().replaceSelection("new\n".repeat(3));
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(top(shown.get())).isEqualTo("line 1");
+            assertThat(((JViewport) shown.get().getParent()).getViewPosition().y).isEqualTo(yFor(shown.get(), 3));
+        });
+    }
+
+    /** Undoing and redoing a replace of the whole text keeps another view on its line, as the replace itself does. */
+    @Test void undoingAndRedoingAWholeReplaceLeaveAViewOnItsLine() throws Exception {
+        var shown = new AtomicReference<VimTextArea>();
+        var other = new AtomicReference<VimTextArea>();
+        var y = new int[1];
+        onEdt(() -> {
+            shown.set(lines());
+            other.set(new VimTextArea());
+            other.get().share(shown.get());
+            scrolled(shown.get(), new JViewport());
+        });
+        onEdt(() -> {
+            y[0] = yFor(shown.get(), 299) + 3;
+            ((JViewport) shown.get().getParent()).setViewPosition(new Point(0, y[0]));
+        });
+        onEdt(() -> {
+            // One step, as a paste over Select All is.
+            other.get().beginAtomicEdit();
+            try {
+                other.get().selectAll();
+                other.get().replaceSelection("row\n".repeat(400));
+            } finally { other.get().endAtomicEdit(); }
+        });
+        onEdt(() -> { });
+        onEdt(() -> assertThat(((JViewport) shown.get().getParent()).getViewPosition().y).as("the replace").isEqualTo(y[0]));
+        onEdt(() -> other.get().undoLastAction());
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(shown.get().getText()).startsWith("line 1\n");
+            assertThat(((JViewport) shown.get().getParent()).getViewPosition().y).as("its undo").isEqualTo(y[0]);
+        });
+        onEdt(() -> other.get().redoLastAction());
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(shown.get().getText()).startsWith("row\n");
+            assertThat(((JViewport) shown.get().getParent()).getViewPosition().y).as("its redo").isEqualTo(y[0]);
+        });
+    }
+
+    /**
+     * A view that edited in an event it was the source of (a key typed in it) is not kept by the other views once it
+     * lets go of the document: the event its put-back was queued in goes with the put-back. The control shows that an
+     * event whose source is the area keeps it.
+     */
+    @Test void aViewThatEditedAndLetGoIsNotKeptByTheOthers() throws Exception {
+        var kept = new AtomicReference<VimTextArea>();
+        var gone = new AtomicReference<WeakReference<VimTextArea>>();
+        var event = new AtomicReference<AWTEvent>();
+        onEdt(() -> {
+            kept.set(lines());
+            scrolled(kept.get(), new JViewport());
+            var editing = new VimTextArea();
+            editing.share(kept.get());
+            gone.set(new WeakReference<>(editing));
+            event.set(new InvocationEvent(editing, () -> editing.replaceSelection("x")));
+            Toolkit.getDefaultToolkit().getSystemEventQueue().postEvent(event.get());
+        });
+        onEdt(() -> { });
+        onEdt(() -> gone.get().get().unshare());
+        assertThat(collected(gone.get(), 5)).as("control: the event keeps the area").isFalse();
+        event.set(null);
+        assertThat(collected(gone.get(), 50)).as("nothing else keeps it").isTrue();
+        onEdt(() -> assertThat(kept.get().getText()).startsWith("xline 1"));
     }
 
     private static long registrations(AbstractDocument document, VimUndoManager history) {

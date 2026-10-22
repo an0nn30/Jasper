@@ -247,6 +247,29 @@ class TextViewsTest {
         assertThat(two.vimEditor().orElseThrow().message()).isEmpty();
     }
 
+    /** A view in Preview comes back to its source on the text it showed, though another view added lines above it. */
+    @Test void aPreviewComesBackToItsSourceOnTheTextItShowed() throws Exception {
+        var one = first(DocumentSession.untitled("Untitled", environment));
+        var two = second(one);
+        for (EditorTab view : List.of(one, two)) view.previews(background::add, Runnable::run);
+        one.session().setStyle(SYNTAX_STYLE_MARKDOWN);
+        var text = new StringBuilder();
+        for (int i = 1; i <= 600; i++) text.append("line ").append(i).append('\n');
+        two.area().setText(text.toString());
+        one.surface().setSize(400, 300);
+        one.surface().doLayout();
+        one.scroll().doLayout();
+        var port = one.scroll().getViewport();
+        port.doLayout();
+        port.setViewPosition(new java.awt.Point(0, one.area().yForLine(299) + 3));
+        one.markdownMode(MarkdownMode.PREVIEW, false);
+        two.area().setCaretPosition(0);
+        two.area().replaceSelection("new\n".repeat(100));
+        one.markdownMode(MarkdownMode.SOURCE, false);
+        one.surface().doLayout();
+        assertThat(port.getViewPosition().y).as("the source shows the text it showed").isEqualTo(one.area().yForLine(399) + 3);
+    }
+
     /** Each view has its own Markdown mode: the preview in one and the source in the other, each switched on its own. */
     @Test void aMarkdownPreviewInOneViewAndTheSourceInTheOther() {
         var one = first(DocumentSession.untitled("Untitled", environment));

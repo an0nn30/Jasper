@@ -8,6 +8,8 @@ import java.util.List;
 import javax.swing.JViewport;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.event.UndoableEditEvent;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
@@ -34,8 +36,14 @@ import org.fife.ui.rtextarea.RUndoManager;
  *
  * <p>Every other view stays on the text it showed. An edit that adds or removes lines above a view's first shown line
  * moves the view with its text, as Vim's mark_adjust moves another window's topline; an edit inside or below its window
- * leaves it where it is. An undo or redo moves only its own view's caret to the change: every other view keeps its
- * caret, its selection and its place on the text.
+ * leaves it where it is. Two edits depart from mark_adjust: an insert exactly at the start of the first shown line
+ * keeps that line on top, where Vim shows the new line, and an edit that takes away the first shown line's start shows
+ * the text after the deletion, where Vim shows the line before it. Text replaced whole (a reload) leaves each view on
+ * its line's number, as each caret keeps its line. A Vim view's cursor, which moves with its text as Vim's w_cursor
+ * does, stays on it: when the edit leaves it outside the window, the window scrolls as little as Vim's update_topline
+ * scrolls it into sight, with 'scrolloff'; a view without Vim keeps its first line, and its caret may leave it. An undo
+ * or redo moves only its own view's caret to the change: every other view keeps its caret, its selection and its
+ * place on the text.
  */
 final class VimUndoManager extends RUndoManager {
     /** One undo step, remembering where the cursor was before it, for Vim's cursor placement after undo. */
@@ -53,6 +61,29 @@ final class VimUndoManager extends RUndoManager {
         void take(UndoableEdit edit) {
             addEdit(edit);
             edits++;
+        }
+
+        /**
+         * @param undo whether the step is undone, or else redone
+         * @param length the document's length now
+         * @return whether undoing or redoing the step takes away the whole text at some point, as undoing a paste over
+         *     Select All does
+         */
+        boolean takesWhole(boolean undo, int length) {
+            // CompoundEdit's list of edits: this class's own field of that name counts them.
+            List<UndoableEdit> order = new ArrayList<>(super.edits);
+            if (undo) java.util.Collections.reverse(order);
+            for (UndoableEdit edit : order) {
+                if (!(edit instanceof DocumentEvent change)) continue;
+                // An undo takes out what an insert put in, a redo what a removal took.
+                if ((change.getType() == DocumentEvent.EventType.INSERT) == undo) {
+                    if (change.getOffset() == 0 && change.getLength() == length) return true;
+                    length -= change.getLength();
+                } else {
+                    length += change.getLength();
+                }
+            }
+            return false;
         }
 
         // The manager treats a step as finished; addEdit above still works until end() because it reads the field.
@@ -100,6 +131,9 @@ final class VimUndoManager extends RUndoManager {
             }
         }
 
+        /** @return this place on the line that starts at {@code start} */
+        Place at(Position start) { return new Place(port, shown, start, number, below); }
+
         /** @return this place, keeping its line's number from now on: the whole text is about to be replaced */
         Place byNumber(RTextArea area) {
             return number >= 0 ? this : new Place(port, shown, line, area.getDocument().getDefaultRootElement().getElementIndex(line.getOffset()), below);
@@ -127,15 +161,38 @@ final class VimUndoManager extends RUndoManager {
 
         private final AbstractDocument document;
         private final DocumentFilter inner;
+        /**
+         * Text inserted at the document's start, by an edit or an undo: a Swing position at offset 0 stays there, where
+         * one anywhere else moves past text inserted at it, so a place held at the start moves past it here.
+         */
+        private final DocumentListener start = new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent event) { if (event.getOffset() == 0) insertedAtStart(event.getLength()); }
+            @Override public void removeUpdate(DocumentEvent event) { }
+            @Override public void changedUpdate(DocumentEvent event) { }
+        };
 
         Places(AbstractDocument document) {
             this.document = document;
             inner = document.getDocumentFilter();
             document.setDocumentFilter(this);
+            document.addDocumentListener(start);
         }
 
-        /** The document hands its edits to the filter it had before. */
-        void lift() { if (document.getDocumentFilter() == this) document.setDocumentFilter(inner); }
+        /** The document hands its edits to the filter it had before, and nothing here listens to it. */
+        void lift() {
+            if (document.getDocumentFilter() == this) document.setDocumentFilter(inner);
+            document.removeDocumentListener(start);
+        }
+
+        private void insertedAtStart(int length) {
+            for (View other : views) {
+                if (other.held == null || other.held.number() >= 0 || other.held.line().getOffset() != 0) continue;
+                try { other.held = other.held.at(document.createPosition(length)); }
+                catch (BadLocationException impossible) {
+                    // The inserted text is in the document.
+                }
+            }
+        }
 
         /** @param whole whether the edit takes away the whole text */
         private void around(boolean whole, Edit edit) throws BadLocationException {
@@ -170,6 +227,8 @@ final class VimUndoManager extends RUndoManager {
     private final List<View> views = new ArrayList<>();
     /** The document's filter while several views show it. */
     private Places places;
+    /** How many put-backs have been queued: one for each other view in each event that edits. */
+    private int putBacksQueued;
     /** The view that edits now. */
     private View view;
     private Step typing;
@@ -295,6 +354,9 @@ final class VimUndoManager extends RUndoManager {
         addEdit(step);
     }
 
+    /** @return how many put-backs have been queued, one for each other view in each event that edits the document */
+    int putBacksQueued() { return putBacksQueued; }
+
     /** @return the change numbers of the done steps, oldest first */
     List<Integer> doneSeqs() { return List.copyOf(seqs.subList(0, done)); }
 
@@ -395,7 +457,7 @@ final class VimUndoManager extends RUndoManager {
         View in = view;
         int depth = in.stepDepth;
         closeAll(in);
-        Runnable keep = keepOthers(in);
+        Runnable keep = keepOthers(in, editToBeUndone() instanceof Step step && step.takesWhole(true, in.area.getDocument().getLength()));
         try {
             super.undo();
             done--;
@@ -410,7 +472,7 @@ final class VimUndoManager extends RUndoManager {
         View in = view;
         int depth = in.stepDepth;
         closeAll(in);
-        Runnable keep = keepOthers(in);
+        Runnable keep = keepOthers(in, editToBeRedone() instanceof Step step && step.takesWhole(false, in.area.getDocument().getLength()));
         try {
             super.redo();
             done++;
@@ -445,21 +507,29 @@ final class VimUndoManager extends RUndoManager {
             if (other == acting || other.held == null || now != null && now == other.queuedIn) continue;
             other.queuedIn = now;
             int number = ++other.queued;
+            putBacksQueued++;
             SwingUtilities.invokeLater(() -> putBack(other, number));
         }
     }
 
-    /** Shows {@code other}'s held place's line where it was shown, unless a later put-back is queued for it. */
+    /**
+     * Shows {@code other}'s held place's line where it was shown, unless a later put-back is queued for it; a Vim view's
+     * engine then keeps its cursor in sight.
+     */
     private static void putBack(View other, int number) {
         Place place = other.held;
         if (number != other.queued || place == null) return;
         other.held = null;
+        // The event goes with the put-back: for typing, its source is the text area that edited.
+        other.queuedIn = null;
         RTextArea area = other.area;
         if (area.getParent() != place.port()) return;
         // The lines an edit added must be laid out before a line below the old end can be shown (a view in a hidden
         // tab is not laid out by itself), or the scroll pane would pull the view back.
         if (area.getHeight() < area.getPreferredSize().height) place.port().doLayout();
-        place.port().setViewPosition(place.now(area));
+        Point position = place.now(area);
+        if (area instanceof VimTextArea text && text.vim().isPresent()) text.vim().get().keepPlace(position);
+        else place.port().setViewPosition(position);
     }
 
     /**
@@ -468,10 +538,11 @@ final class VimUndoManager extends RUndoManager {
      * that did not undo go back to the text they were on, as an edit elsewhere leaves them. An undo does not reach the
      * document's filter, so the places are held here.
      *
+     * @param whole whether the undo or redo takes away the whole text, so that the places keep their lines' numbers
      * @return puts them back
      */
-    private Runnable keepOthers(View acting) {
-        hold(acting, false);
+    private Runnable keepOthers(View acting, boolean whole) {
+        hold(acting, whole);
         List<Runnable> back = new ArrayList<>();
         for (View other : views) {
             if (other == acting) continue;

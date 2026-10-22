@@ -118,18 +118,37 @@ final class ViewportSync {
     /** The user scrolled: the view's first line follows, and the cursor moves inside the window. */
     private void userScrolled() {
         if (moving || viewport == null) return;
-        Point at = viewport.getViewPosition();
-        int offset = area.viewToModel2D(new Point(0, at.y));
+        int top = topline(viewport.getViewPosition().y);
+        if (top < 0 || top == editor.view().topline) return;
+        editor.viewScrolled(top);
+    }
+
+    /**
+     * Another view's edit puts the viewport back on the line it showed first (pane flexibility spec 6): it shows
+     * {@code position}, and the cursor does not follow, as it follows a user's scroll; the editor places it after.
+     *
+     * @param position the viewport position to show
+     * @return the window's first line there, as Vim numbers lines; -1 when the text area is in no viewport
+     */
+    int keep(Point position) {
+        JViewport port = viewport();
+        if (port == null) return -1;
+        moving = true;
+        try { port.setViewPosition(position); } finally { moving = false; }
+        return topline(position.y);
+    }
+
+    /** @return the first line shown whole from {@code y} down, as Vim numbers lines; -1 when there is none */
+    private int topline(int y) {
+        int offset = area.viewToModel2D(new Point(0, y));
         int line;
         try { line = area.getLineOfOffset(Math.max(0, offset)); }
-        catch (BadLocationException bad) { return; }
-        View view = editor.view();
+        catch (BadLocationException bad) { return -1; }
         int top = line + 1;
         // The first line only partly shown does not count, as Vim shows whole lines.
         try {
-            if (area.yForLine(line) < at.y && top < editor.buffer().count()) top++;
+            if (area.yForLine(line) < y && top < editor.buffer().count()) top++;
         } catch (BadLocationException ignored) { }
-        if (top == view.topline) return;
-        editor.viewScrolled(top);
+        return top;
     }
 }

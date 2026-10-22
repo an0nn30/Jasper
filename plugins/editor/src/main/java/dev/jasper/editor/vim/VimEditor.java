@@ -302,6 +302,29 @@ public final class VimEditor {
         if (!was) fire();
     }
 
+    /**
+     * Another view of the document edited it, and the viewport goes back to {@code position}, which shows the line this
+     * view showed first (pane flexibility spec 6). The cursor, which moved with its text as Vim's mark_adjust moves
+     * another window's w_cursor, stays on it: when that leaves it outside the window, the window scrolls as
+     * update_topline scrolls it into sight, with 'scrolloff'.
+     *
+     * @param position the viewport position that shows the view's first line where it was shown
+     */
+    void keepPlace(java.awt.Point position) {
+        int top = viewport.keep(position);
+        if (top < 0) return;
+        view.topline(top);
+        view.compBotline();
+        int lnum = cursor().line + 1;
+        boolean outside = lnum < view.topline || lnum >= view.botline && view.botline <= buffer.count();
+        if (outside && !commandLine.active()) {
+            view.updateTopline();
+            view.cursColumns();
+            viewport.show();
+        }
+        if (!busy) fire();
+    }
+
     /** The viewport's size changed the view's: outside a command, the view scrolls to keep the cursor shown. */
     void viewResized() {
         // The constructor sizes the view before it has its viewport sync.

@@ -36,8 +36,35 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private double dividerRatio = .5;
     private boolean restoringDivider;
     private boolean sourceFocused = true;
-    private java.awt.Point sourcePosition;
+    /**
+     * Where the source showed the text when Preview took its place: the viewport's position, the start of the first
+     * line it showed, as a position that moves with the text, and how far below that line's top the viewport began.
+     * The source comes back on that text, though other views of the file edited it meanwhile (pane flexibility spec 6).
+     */
+    private record SourcePlace(java.awt.Point shown, javax.swing.text.Position line, int below) { }
+    private SourcePlace sourcePlace;
     private boolean restoreSourcePosition;
+    /** @return where the source shows the text now */
+    private SourcePlace sourceShown() {
+        var shown = scroll.getViewport().getViewPosition();
+        try {
+            int line = area.getLineOfOffset(Math.max(0, area.viewToModel2D(new java.awt.Point(0, shown.y))));
+            int top = area.yForLine(line);
+            return new SourcePlace(shown, area.getDocument().createPosition(area.getLineStartOffset(line)), top < 0 ? 0 : shown.y - top);
+        } catch (javax.swing.text.BadLocationException impossible) {
+            return new SourcePlace(shown, null, 0);
+        }
+    }
+    /** @return where the viewport shows the held place's line as it was shown; its old position when the line is folded away */
+    private java.awt.Point sourcePosition() {
+        if (sourcePlace.line() == null) return sourcePlace.shown();
+        try {
+            int top = area.yForLine(area.getLineOfOffset(sourcePlace.line().getOffset()));
+            return top < 0 ? sourcePlace.shown() : new java.awt.Point(sourcePlace.shown().x, top + sourcePlace.below());
+        } catch (javax.swing.text.BadLocationException impossible) {
+            return sourcePlace.shown();
+        }
+    }
     void focusSource(boolean value) { sourceFocused = value; }
     javax.swing.text.JTextComponent focusedContent() {
         return mode == MarkdownMode.PREVIEW || mode == MarkdownMode.SPLIT && !sourceFocused ? preview.editor() : area;
@@ -61,7 +88,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     double dividerRatio() { return dividerRatio; }
     void mode(MarkdownMode value) {
         if (closed || mode==value) return;
-        if (value == MarkdownMode.PREVIEW) sourcePosition = scroll.getViewport().getViewPosition();
+        if (value == MarkdownMode.PREVIEW) sourcePlace = sourceShown();
         else if (mode == MarkdownMode.PREVIEW) restoreSourcePosition = true;
         mode=value;removeAll();split.setLeftComponent(null);split.setRightComponent(null);
         if(value==MarkdownMode.SOURCE){preview.cancelInstall();add(scroll,BorderLayout.CENTER);}
@@ -73,9 +100,9 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     @Override public void doLayout() {
         restoringDivider=true;
         try {super.doLayout();if(mode==MarkdownMode.SPLIT){split.setDividerLocation(dividerRatio);split.doLayout();}
-            if (restoreSourcePosition && sourcePosition != null) {
+            if (restoreSourcePosition && sourcePlace != null) {
                 scroll.doLayout(); scroll.getViewport().doLayout();
-                scroll.getViewport().setViewPosition(sourcePosition); restoreSourcePosition = false;
+                scroll.getViewport().setViewPosition(sourcePosition()); restoreSourcePosition = false;
             }
         }
         finally{restoringDivider=false;}
