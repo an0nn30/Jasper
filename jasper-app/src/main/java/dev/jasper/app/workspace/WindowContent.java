@@ -1728,10 +1728,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var moves = new JMenu("Move Tab Into");
         var targets = tabTargets(parent);
         for (OtherTab target : targets) {
-            var entry = new JMenuItem();
-            // A tab's title is plain text: html.disable before the text, as the UI reads it only when the text changes.
-            entry.putClientProperty("html.disable", true);
-            entry.setText(target.label());
+            var entry = PlainText.item(target.label());
             entry.addActionListener(event -> moveTabInto(parent, target.id()));
             moves.add(entry);
         }
@@ -1843,8 +1840,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             menu.add(tabMenuItem(ActionId.CLOSE_TAB.label(), ActionId.CLOSE_TAB, () -> closeParentTab(parent)));
             if (!item.commands().isEmpty()) menu.addSeparator();
             for (var command : item.commands()) {
-                // Plain text: html.disable before the title, as the UI reads it only when the text changes.
-                var entry = new JMenuItem(); entry.putClientProperty("html.disable", true); entry.setText(command.title());
+                var entry = PlainText.item(command.title());
                 entry.setEnabled(command.enabled()); entry.setAccelerator(command.shortcut());
                 // A menu kept open across a selection change runs the command of the content selected now, if enabled.
                 entry.addActionListener(event -> {

@@ -320,10 +320,10 @@ final class DocumentArea extends JComponent implements AutoCloseable {
 
     /**
      * @param command a command
-     * @return a menu item titled with it, with its shortcut as the accelerator, running it
+     * @return a menu item titled with it as plain text, with its shortcut as the accelerator, running it
      */
     public static JMenuItem menuItem(Command command) {
-        var item = new JMenuItem(command.title());
+        var item = plainItem(command.title());
         command.stroke().ifPresent(item::setAccelerator);
         item.addActionListener(event -> command.run().run());
         return item;
@@ -347,10 +347,16 @@ final class DocumentArea extends JComponent implements AutoCloseable {
      * @return a menu item for the vendor popup, running {@code run}
      */
     static JMenuItem plainItem(String title, Runnable run) {
+        var item = plainItem(title);
+        item.addActionListener(event -> run.run());
+        return item;
+    }
+
+    private static JMenuItem plainItem(String title) {
+        // The text goes in after html.disable: the UI reads the property only when the text, font or foreground changes.
         var item = new JMenuItem();
         item.putClientProperty("html.disable", true);
         item.setText(title);
-        item.addActionListener(event -> run.run());
         return item;
     }
 

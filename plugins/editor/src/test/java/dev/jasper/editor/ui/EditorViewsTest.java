@@ -124,6 +124,16 @@ class EditorViewsTest {
         assertThat(item(b, "Split File Right")).isNotNull();
     }
 
+    /** The html.disable sweep's rule: the right-click menu's Split File items take the property before their title. */
+    @Test void theRightClickMenusSplitFileItemsArePlainText() throws Exception {
+        EditorTab tab = opened(file("a.txt", "a\n"));
+        for (String title : List.of("Split File Right", "Split File Down")) {
+            JMenuItem entry = item(tab, title);
+            assertThat(entry.getClientProperty("html.disable")).as("%s is text", title).isEqualTo(Boolean.TRUE);
+            assertThat(entry.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).as("%s renders no HTML", title).isNull();
+        }
+    }
+
     /** Vim's {@code :action split-file-down} is the Editor's Split File Down, for the view Vim is in (Rulings 9). */
     @Test void vimsActionSplitFileDownShowsTheFileInAnotherView() throws Exception {
         settings.set(new EditorSettings("Monospaced", 13, List.of(), false, 1.0, false, 4, false, 1, true));

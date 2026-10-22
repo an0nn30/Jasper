@@ -737,11 +737,11 @@ final class WindowChrome {
             menu.add(owner.action(id));
         // The Split list, as the Tab menu has it (tabs and panes spec 2.10; workspace plan 8b Rulings 6).
         JMenu split = new JMenu("Split");
-        fillSplit(split, JMenuItem::new);
+        fillSplit(split, PlainText::item);
         menu.add(split);
         menu.add(owner.action(ActionId.MOVE_PANE_TO_NEW_TAB));
         // Move Pane to Tab follows Move Pane to New Tab (pane flexibility spec 4).
-        menu.add(paneMoves(new JMenu("Move Pane to Tab"), JMenuItem::new));
+        menu.add(paneMoves(new JMenu("Move Pane to Tab"), PlainText::item));
         for (ActionId id : new ActionId[]{ActionId.MAXIMIZE_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
         // The window menu's entries, for a window whose strip hides (tabs and panes spec 6).
         menu.addSeparator();
