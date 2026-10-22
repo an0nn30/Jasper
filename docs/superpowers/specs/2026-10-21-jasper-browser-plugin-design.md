@@ -198,7 +198,8 @@ the host's routing. Zoom uses the same actions Editor tabs answer.
 ## 6. Link routing
 
 - **Where URLs come from:**
-  - **Links the user clicks:** http and https links in a terminal, and links other plugins hand over.
+  - **Links the user clicks:** http and https links in a terminal, links other plugins hand over, and Jasper's own web
+    links: Settings' Help button and the Licenses window's and the plugin manager's homepages *(user)*.
   - **URLs a program opens**, such as `gh auth login` and `aws sso login`, through `BROWSER`.
 
   Only http and https are routed. File paths keep opening in the Editor, as the tabs and panes spec decides.
@@ -216,22 +217,31 @@ the host's routing. Zoom uses the same actions Editor tabs answer.
     - terminal link clicks go straight to the desktop browser through jasper-terminal's own default opener
       (`DesktopServices.openBrowser`). `TerminalView.setLinkOpener` is package-private and only tests use it;
     - the SDK has only `Platform.browse(URI)`;
-    - `jasper <url>` fails with "no such file or folder".
-  - **The design adds** a link-handler contribution. A plugin claims http(s) URLs, and the host consults it before
-    falling back to the desktop browser. Terminal link clicks and `jasper` CLI URLs go through it.
-  - **jasper-terminal also needs** a supported way for the app to set a view's link opener. That is an addition to its
-    app-facing API and to the documented allowlist in `docs/terminal-architecture.md`. With the Browser
+    - `jasper <url>` ends as `jasper: unknown command <url>` (exit 2), or before the plugins start as "Jasper's plugins
+      are not running" (exit 1).
+  - **The design adds** the web browser role (plan 3): `Platform.browser(WebBrowser)`, which needs `browser.provide`,
+    one plugin at a time. It hears each http(s) address with who asked (`LinkOrigin.CLICK` or `PROGRAM`), and the host
+    asks it before falling back to the desktop browser. Terminal link clicks, plugins' `Platform.openInBrowser` and
+    `jasper` CLI URLs go through it.
+  - **jasper-terminal also needs** a supported way for the app to set a view's link opener: `TerminalView.setLinkOpener`
+    becomes public. The app-facing allowlist is type-level and already lists `TerminalView`. With the Browser
     plugin off, nothing is claimed and everything goes to the system browser, as today.
-- **`BROWSER`.** Jasper sets `BROWSER` in its local shells to the `jasper` command, so a program's URL reaches the
-  running app. The app applies the program-opened rule.
+- **`BROWSER`** (plan 4). Jasper sets `BROWSER` in its local shells to `jasper open-url`, so a program's URL reaches the
+  running app as `LinkOrigin.PROGRAM`. The app applies the program-opened rule.
+  - Python's `webbrowser` takes a `BROWSER` entry without `%s` as a single program name, and `gh` splits it with
+    shlex, so plan 4 settles the value's form against the real `gh` and `aws`.
   - `gh` reads `GH_BROWSER`, then `BROWSER`; the AWS CLI goes through Python's `webbrowser`, which reads `BROWSER`.
     Confirm both on all three platforms, including how a Windows `BROWSER` value with spaces in its path is quoted.
-  - Programs that call macOS `open` or Windows' `start` directly are not caught. That is accepted.
+  - Programs that call macOS `open` or Windows' `start` directly are not caught, nor are addresses opened outside
+    Jasper: it registers no URL scheme handler (the launcher's second-launch path, `setOpenURIHandler`). That is
+    accepted.
   - Remote (SSH) shells are not affected.
 - **The `jasper` command:**
   - `jasper browser <url>` is a plugin subcommand (`[[subcommands]]` in `plugin.toml`, as `jasper editor` is). It opens
     the URL in Jasper's browser.
-  - Plain `jasper <url>` recognises http(s) and goes through the link-handler route.
+  - Plain `jasper <url>` recognises http(s) and goes through the web browser role.
+  - `jasper open-url <url>` (plan 3) is the route programs use: one address, as `LinkOrigin.PROGRAM`. It is reserved,
+    so no plugin can declare it, and `jasper --help` does not list it.
 
 ## 7. Features
 
@@ -370,9 +380,10 @@ Proposed plans, in order:
    - whether Chromium's sandbox runs on each platform.
 2. **Runtime switch.** The `jbrsdk_jcef` toolchain for development, CI and packaging, plus Chromium's native parts in
    every package and the licence notices.
-3. **Link routing.** The SDK link-handler contribution, jasper-terminal's link-opener API, terminal link clicks
-   through them, `BROWSER` in local shells, `jasper <url>`, and the fallback to `Platform.browse`.
+3. **Link routing.** The SDK's web browser role, jasper-terminal's link-opener API, terminal link clicks through them,
+   `jasper <url>`, `jasper open-url`, and the fallback to the system browser.
 4. **The browser plugin core.** `plugins/browser` (`:jasper-plugin-browser`, exporting `dev.jasper.browser.api`), with:
+   - `BROWSER` in local shells, checked against the real `gh` and `aws` on all three platforms;
    - the item, the document bar, navigation and the shortcuts;
    - the split item, the toolbar item and New Browser Tab;
    - the first-click prompt and the settings;

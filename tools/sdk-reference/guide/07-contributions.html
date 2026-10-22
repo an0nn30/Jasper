@@ -28,6 +28,7 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <tr><td>Shell environment</td><td>{@link Terminals#environment(Function)}</td><td>{@code terminal.environment}</td><td>Variables in new local shells (not WSL profiles) and programs</td></tr>
 <tr><td>Subcommands</td><td>{@code [[subcommands]]} in the manifest and {@link CommandLine#handle(String,CommandHandler)}</td><td></td><td>{@code jasper <name>} in a shell</td></tr>
 <tr><td>The editor role</td><td>{@link Platform#editor(FileEditor)}</td><td>{@code editor.provide}</td><td>The files Jasper opens for editing, and Cmd-click (Ctrl-click on Linux and Windows) on paths in terminals</td></tr>
+<tr><td>The web browser role</td><td>{@link Platform#browser(WebBrowser)}</td><td>{@code browser.provide}</td><td>The http and https addresses Jasper opens: Cmd-click (Ctrl-click on Linux and Windows) on links in terminals, plugins' {@link Platform#openInBrowser(URI)}, Jasper's own Help and homepage links, and the {@code jasper} command's addresses</td></tr>
 <tr><td>Settings</td><td>{@link PluginSettings#declare(SettingSpec)}, {@link PluginSettings#page(SettingsPanel)}</td><td></td><td>The plugin's page in Settings › Tools; see <a href="#settings">Settings</a></td></tr>
 <tr><td>Icons</td><td>{@link UiKit#registerIcon(IconAsset)}</td><td></td><td>Anywhere the plugin names an icon</td></tr>
 <tr><td>Services and topics</td><td>{@link Services#publish(Class,Object)}, {@link Events#publish(Topic,Object)}</td><td></td><td>Other plugins; see <a href="#services">Services</a></td></tr>

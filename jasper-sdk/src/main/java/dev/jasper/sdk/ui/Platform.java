@@ -108,7 +108,7 @@ public interface Platform {
      * addresses given to the {@code jasper} command, with the window of the pane it ran in, go to {@code browser} first,
      * on the UI thread, with who asked ({@link LinkOrigin}).
      * A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown, so a browser
-     * should treat the address as untrusted input from the terminal or the page, and show it before acting on it. Other
+     * should treat the address as untrusted input and show it before acting on it. Other
      * schemes, such as {@code mailto}, and {@link #browse} always go to the system browser. One at a time: a bundled
      * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
      * plugin's own included, throws. When the browser returns false or throws, and when no plugin provides one, the

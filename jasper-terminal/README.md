@@ -237,6 +237,7 @@ The view's hooks, all on the EDT:
 | --- | --- |
 | `setShortcutHandler(Predicate<KeyEvent>)` | sees each key press before the program; `true` consumes it and the character it would type. `null` restores the standalone shortcuts |
 | `setContextMenuHandler(Consumer<MouseEvent>)` | called once per right-click gesture the view keeps local: when the program has not enabled mouse reporting, or with Shift held |
+| `setLinkOpener(Consumer<String>)` | receives each URL a Cmd-click (macOS) or Ctrl-click (Linux and Windows) opens: an `http`, `https` or `ftp` URL written in the output, or an OSC 8 link whose target is `http`, `https`, `ftp` or `mailto`, as the program wrote it, which may not parse as a URI. `null` restores the default, the desktop's browser |
 | `setFileLinkHandler(Consumer<FileLink>)` | receives the path, or local `file:` link, a Cmd-click (macOS) or Ctrl-click (Linux and Windows) names when no URL is under the pointer; without a handler that click starts a selection. A Ctrl-click without Shift goes to a program that enabled mouse reporting |
 | `setFindResultListener(Consumer<FindResult>)` | receives `FindResult(0, 0, null)` when a width reflow, history reset or alternate-screen switch drops the matches |
 | `setOnCloseRequest(Runnable)` | called on a key press other than a modifier once the exit future has completed normally; the view then consumes every key |

@@ -288,7 +288,8 @@ A left press with Cmd+Option held (Ctrl+Alt on Linux and Windows) starts a
 Cmd-click (macOS) or Ctrl-click (Linux, Windows) opens what is under the pointer:
 
 1. An OSC 8 link whose target is `http`, `https`, `ftp` or `mailto` opens with the desktop's handler, normally your
-   browser. A link with any other target opens nothing as a web link, whatever its text says.
+   browser; when a plugin provides Jasper's web browser, an `http` or `https` link opens there first. A link with any
+   other target opens nothing as a web link, whatever its text says.
 2. A URL written as text, starting `http://`, `https://` or `ftp://`, opens the same way. It can wrap across rows; it
    ends at whitespace or at `<`, `>`, `"`, `'` or a backtick, and loses trailing `.,;:!?)]}'"`.
 3. Otherwise a file opens: an OSC 8 `file:` link, a `file://` URL written as text (which can end in `:LINE` or

@@ -142,7 +142,7 @@ Bundled manifests write the same tables inline:
 
 | Key | Type | Rules |
 | --- | --- | --- |
-| `name` | string | Required. `[a-z][a-z0-9-]*`, not `help` or `version`, at most once per manifest. The user runs `jasper <name>`. |
+| `name` | string | Required. `[a-z][a-z0-9-]*`, not `help`, `version` or `open-url`, at most once per manifest. The user runs `jasper <name>`. |
 | `summary` | string | Required. One visible line without tabs, which `jasper --help` lists. |
 
 ## The entry point and lifecycle
@@ -213,7 +213,7 @@ has its own, so every registration is attributed to it.
 | `fileSources()` | [Places in Jasper's file chooser](#file-sources). |
 | `notifications()` | [Notification groups](#notifications). |
 | `commandLine()` | [`jasper` subcommands](#command-line-subcommands). |
-| `platform()` | [Opening files and web addresses](#opening-files-and-web-addresses), [the clipboard](#the-clipboard) and [the file editor role](#the-file-editor-role). |
+| `platform()` | [Opening files and web addresses](#opening-files-and-web-addresses), [the clipboard](#the-clipboard), [the file editor role](#the-file-editor-role) and [the web browser role](#the-web-browser-role). |
 
 ## Capabilities and consent
 
@@ -235,6 +235,7 @@ window (actions, menus, tool windows, content tabs, dialogs, notifications, sett
 | `terminal.environment` | call `Terminals.environment` | Set environment variables in new terminal shells |
 | `editor.provide` | call `Platform.editor` | Open the files Jasper opens for editing |
 | `presentation.provide` | nothing at run time: it goes with the manifest's `presentation` key | Change Jasper's window chrome and controls after a restart |
+| `browser.provide` | call `Platform.browser` | Open the web addresses Jasper opens, such as links you click in a terminal |
 
 - The declared capabilities are the granted ones. An installed plugin loads only after the user allows everything it
   declares on its review sheet ("Needs review" until then); bundled and `--plugin-dir` plugins need no review. A new
@@ -1091,9 +1092,13 @@ one.
   [provides the editor](#the-file-editor-role) (normally the Editor, [default editor](editor.md)), then the desktop's
   edit or open action, then revealing the file. A failure is posted in the plugin's group as "Could not open a file in
   an editor".
-- `context.platform().browse(uri)` opens an `http` or `https` address in the user's browser, in the background; any
-  other address throws `IllegalArgumentException`, and a failure is posted as "Could not open a web address".
-- Both work from any thread.
+- `context.platform().openInBrowser(uri)` opens an `http` or `https` address the user asked for, such as a link they
+  clicked in the plugin's view: the plugin that [provides the web browser](#the-web-browser-role) first, as a click in
+  the active window, then the system browser, as `browse` opens it.
+- `context.platform().browse(uri)` opens an `http` or `https` address in the system browser, in the background, even
+  when a plugin provides the web browser; any other address throws `IllegalArgumentException` (from `openInBrowser`
+  too), and a failure is posted as "Could not open a web address".
+- All three work from any thread.
 
 ## The clipboard
 
@@ -1152,6 +1157,25 @@ terminal pane, with the path's line and the clicked window. The Editor takes thi
   file and never run it.
 - One plugin at a time: a bundled plugin's registration replaces one that is not bundled; otherwise a later
   registration throws `IllegalStateException` ("The editor is already provided by *id*"). The role ends with the
+  plugin.
+
+## The web browser role
+
+`context.platform().browser(webBrowser)` (`browser.provide`) makes the plugin the web browser Jasper opens web
+addresses with: an `http` or `https` link Cmd-clicked (Ctrl-clicked on Linux and Windows) in any terminal pane, with the
+clicked window; every plugin's `openInBrowser` and Jasper's own web links (Settings' Help button, the Licenses
+window's and the plugin manager's homepages), with the active window; `jasper <address>…`, with the window of the pane
+it ran in; and `jasper open-url <address>`, the command programs use ([command line](command-line.md#the-jasper-command)).
+
+- [`WebBrowser`](sdk-reference.html#dev.jasper.sdk.ui.WebBrowser)`.open(address, origin, window)` runs on the UI thread,
+  must not block, and returns whether it opened the address. `origin` is
+  [`LinkOrigin`](sdk-reference.html#dev.jasper.sdk.ui.LinkOrigin)`.CLICK` when the user asked for the address and
+  `PROGRAM` when a program did, through `jasper open-url`; a program's sign-in page usually works only in the system
+  browser. `false`, or a handler that throws, hands the address to the system browser.
+- A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown.
+- `ftp` and `mailto` links, and `Platform.browse`, always go to the system browser.
+- One plugin at a time: a bundled plugin's registration replaces one that is not bundled; otherwise a later
+  registration throws `IllegalStateException` ("The browser is already provided by *id*"). The role ends with the
   plugin.
 
 ## Looks and themes
@@ -1411,7 +1435,7 @@ try (var host = new FakePluginHost()) {
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
 | Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()` |
-| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor registration wins), `shellEnvironment(map)`, `edit(file, line, windowId)`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
+| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
 
 Where the fake differs from Jasper:
 

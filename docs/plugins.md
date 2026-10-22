@@ -377,6 +377,7 @@ terminal-event subscription and list of other tabs' titles for a plugin's Move P
 | `terminal.environment` | Set environment variables in new terminal shells | |
 | `editor.provide` | Open the files Jasper opens for editing | One plugin at a time |
 | `presentation.provide` | Change Jasper's window chrome and controls after a restart | Declared by a look; one look at a time |
+| `browser.provide` | Open the web addresses Jasper opens, such as links you click in a terminal | One plugin at a time |
 
 Each description is followed on the sheet by the capability's name in brackets. A capability this Jasper does not know
 is shown by name.

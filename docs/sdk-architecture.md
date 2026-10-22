@@ -421,6 +421,19 @@ differ from the text shown, so that fallback is the desktop's edit or reveal act
 plugin's editor should edit the file and never run it. A failed `Platform.openInEditor` is posted in the plugin's
 notification group, as is a failed `Platform.browse`, which accepts only an absolute http or https address.
 
+`Platform.browser` (needs `browser.provide`) registers a `WebBrowser` in `plugins.WebBrowsers`, one at a time, by the
+same bundled rule; it runs on the UI thread and must not block, so nothing waits for it. `PluginRuntime.openLink` and
+`openProgramLink` ask it on the UI thread with `LinkOrigin.CLICK` or `PROGRAM`, and hand the address to the system
+browser when no plugin provides one, it declines or it throws; before the plugins start, the system browser opens it.
+A Cmd-click (Ctrl-click on Linux and Windows) on a URL in any terminal pane reaches `TerminalView.setLinkOpener`, which
+`TabHost` points at the window's `WindowContent.onOpenLink`; `JasperApplication.openLink` sends an absolute `http` or
+`https` address the role's way with the clicked window, and any other link the terminal opens (`ftp`, an OSC 8 `mailto`)
+to the system browser. `JasperApplication.commands()` sends `jasper <address>…`, when every argument is one, as clicks
+in the calling pane's window, and `jasper open-url <address>` as a program's, before the path and subcommand handling.
+`Platform.openInBrowser` asks the role as a click in the active window, then opens the system browser on the plugin's
+worker as `Platform.browse` does. `JasperApplication.browse`, which Settings' Help button, the Licenses window and the
+plugin manager use for Jasper's own links, sends them the clicks' way with the active window.
+
 `LocalSpec.command` becomes `terminals.OpenSpec.Local.program`; the workspace launches it through `ShellLauncher`
 with the default profile's environment, each word passed as is, closes the pane when the program exits with status 0
 and keeps it open otherwise, whatever `terminal.on_exit` says. `CommandLine.client()` comes from

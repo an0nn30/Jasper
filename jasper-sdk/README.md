@@ -22,7 +22,7 @@ third-party plugin. The SDK depends only on the JDK.
 
 | Package | Contents |
 | --- | --- |
-| [`dev.jasper.sdk`](../docs/sdk-reference.html#package-dev.jasper.sdk) | `JasperSdk.VERSION`; `PluginInfo` (a plugin's id, name, version and capabilities); `Capabilities`, the twelve capability strings, and `MissingCapabilityException`; `Subscription`, which every registration returns; `Variant` (dark or light); `WindowOwner`, which dialogs, choosers and content tabs belong to; `RestoreState`, how a plugin's tab comes back when Jasper restores its windows |
+| [`dev.jasper.sdk`](../docs/sdk-reference.html#package-dev.jasper.sdk) | `JasperSdk.VERSION`; `PluginInfo` (a plugin's id, name, version and capabilities); `Capabilities`, the thirteen capability strings, and `MissingCapabilityException`; `Subscription`, which every registration returns; `Variant` (dark or light); `WindowOwner`, which dialogs, choosers and content tabs belong to; `RestoreState`, how a plugin's tab comes back when Jasper restores its windows |
 | [`dev.jasper.sdk.plugin`](../docs/sdk-reference.html#package-dev.jasper.sdk.plugin) | `Plugin`, the entry point a plugin implements, and `PluginContext`, the plugin's own context, which reaches every other package |
 | [`dev.jasper.sdk.events`](../docs/sdk-reference.html#package-dev.jasper.sdk.events) | `Topic`, `Events` (the queued event bus) and `AppEvents` (the application's topics) |
 | [`dev.jasper.sdk.activity`](../docs/sdk-reference.html#package-dev.jasper.sdk.activity) | Activities, shown on Buddy and posted when they end (`Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`), and connections such as tunnels (`ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent`) |
@@ -44,10 +44,10 @@ third-party plugin. The SDK depends only on the JDK.
 | Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelPlacement`, `PanelMode`, `PanelHeader` |
 | Dialogs, content tabs and split items | `Windows`, `WindowSurface`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `TabPlacement`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `SplitItemSpec`, `SplitChoice`, `TabChoice`, `TabRestorer`, `RestoreRequest` |
 | Colours for custom content and the look | `Appearance`, `SemanticColor`, `WorkspacePalette`, `EditorPalette`, `EditorScheme`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Presentation`, `TerminalTypography` |
-| Desktop integration | `Platform`, `FileEditor` |
+| Desktop integration | `Platform`, `FileEditor`, `WebBrowser`, `LinkOrigin` |
 
 A plugin implements `Plugin`, `PaletteScope`, `FileSource`, `FileBrowser` and `SettingsPanel`, the functional
-`CommandHandler`, `FileEditor`, `PanelFactory`, `TabRestorer` and `ToolbarViewFactory`, and the service interfaces it
+`CommandHandler`, `FileEditor`, `WebBrowser`, `PanelFactory`, `TabRestorer` and `ToolbarViewFactory`, and the service interfaces it
 publishes.
 Jasper and the testkit implement the other service interfaces; `FileLocation`, `OpenRequest`, `ToolbarItem`, `UiEvent`,
 `SettingKind`, `EditorHint` and `Nodes.Node` are sealed, and the SDK's own records implement them.

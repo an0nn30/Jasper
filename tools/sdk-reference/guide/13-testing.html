@@ -164,7 +164,7 @@ rejections with the kind's own message, where Jasper uses its own wording (see <
 is listed by {@link FakePluginHost#lookDefaultProblems(String)}, where Jasper logs it as a warning.</li>
 <li>Palette calls receive {@code maxResults} 5 and macOS glyphs, and
 {@link FakePluginHost#executeInScope(String,String,String,UUID,UUID)} skips the {@code available} check.</li>
-<li>{@link Platform#openInEditor(Path)} runs on the calling thread; {@link FileSource#connect(String,WindowOwner)} always
+<li>{@link Platform#openInEditor(Path)} and {@link Platform#openInBrowser(URI)} run on the calling thread; {@link FileSource#connect(String,WindowOwner)} always
 receives a window; provided panes report 80 × 24; cancellation handlers run at once.</li>
 <li>An unavailable subcommand's message names the plugin's id rather than its name.</li>
 <li>{@link FakePluginHost#restoreTab(String,UUID,String,RestoreState)} puts the restored tab in a new tab at the end of

@@ -119,8 +119,9 @@ A mouse event an earlier listener consumed, such as the application's pane drag,
 is not the terminal's: the view neither reports nor selects with it.
 Without reporting, the wheel scrolls the view three lines per notch, or sends Up/Down arrow
 keys on the alternate screen; on macOS a Shift-wheel is ignored.
-A Cmd-click (Ctrl-click elsewhere) opens the URL under the pointer in the browser;
-otherwise, once the application set `setFileLinkHandler`, it reports the path or
+A Cmd-click (Ctrl-click elsewhere) hands the URL under the pointer to the link opener,
+the desktop's browser unless the application set `setLinkOpener`; otherwise, once the
+application set `setFileLinkHandler`, it reports the path or
 local `file:` link there as a `FileLink`; otherwise it starts a selection. On macOS
 a Cmd-click stays local even while the program asks for mouse reports; on Linux and
 Windows a Ctrl-click is reported to such a program unless Shift is held.
@@ -196,7 +197,7 @@ sequenceDiagram
 
 OSC 7 and 133 are rewritten because the pinned emulator swallows them. OSC 8
 links use the installed hyperlink filter: `http`, `https`, `ftp` and `mailto`
-targets open in the browser, a `file:` target that the OSC 7 host rule places on
+targets go to the link opener, a `file:` target that the OSC 7 host rule places on
 this machine is a file link, and other targets open nothing. CSI `q` lacking a space intermediate
 is dropped so XTVERSION/DECLL cannot override the configured cursor. DECSCUSR 0
 is followed by a cursor-reset command that restores the configured cursor. An OSC 7 or 133 sequence longer than 4096

@@ -383,7 +383,7 @@ and before the first; Enter follows the selected link.
 
 | Link | Followed by |
 |---|---|
-| `https://…` or `http://…`, with a host | Opening it in your browser |
+| `https://…` or `http://…`, with a host | Opening it in the web browser a plugin provides, else in your browser |
 | `#heading` | Going to that heading in this document |
 | A relative path, such as `notes.md`, `../README.md` or `guide.md#setup` | Opening the file in an Editor tab in the same window, then going to the heading after `#`, if any. A file that is already open has its tab selected, unsaved changes and all. |
 
