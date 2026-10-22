@@ -19,16 +19,19 @@ Shortcuts below are given as macOS / Linux and Windows.
 ## What a plugin can add
 
 - Actions, listed in the command palette and in Settings › Keymap, with default shortcuts.
-- Items in the File, Edit, View, Pane, Tab, Tools, Session and Transfer menus, a menu of its own, and items in the
+- Items in the File, Edit, View, Tab, Tools, Session and Transfer menus, a menu of its own, and items in the
   terminal's context menu. Jasper has no Tools, Session or Transfer items of its own, so those menus appear only while
   a plugin has entries in them.
-- Toolbar buttons, buttons on the left tool window stripe, status-bar items, windows, dialogs and document tabs in the
-  workspace.
+- Toolbar buttons, buttons on the left tool window stripe and status-bar items, all in the main window, and dialogs.
+- Content tabs: its own views in tabs and panes beside terminals, in any window. They can open a terminal or another
+  item beside themselves, can be offered in the Split menus, and can come back when Jasper restores its windows.
 - Background activities, shown on [Desk Buddy](notifications.md#desk-buddy) while they run and posted in the plugin's
   "*name* activities" notification group when they succeed or fail.
-- Tool windows, each with a toggle in View › Tool Windows (in the Window menu under the Enterprise look).
+- Tool windows in the main window, each with a toggle in View › Tool Windows (in the Window menu under the Enterprise
+  look).
 - Command palette scopes, and places in Jasper's file chooser.
-- Terminal sessions of its own, such as SSH, and variables in the environment of new shells.
+- Terminal sessions of its own, such as SSH, which can come back when Jasper restores its windows, and variables in
+  the environment of new shells.
 - The editor Jasper opens files with, `jasper` commands, notifications in its own groups, a page in Settings › Tools,
   themes and a look.
 
@@ -42,27 +45,26 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 
 | Plugin | Id | Version | On by default | Guide |
 |---|---|---|---|---|
-| Remote | `dev.jasper.remote` | 0.15.1 | Yes | [Remote](remote.md) |
+| Remote | `dev.jasper.remote` | 0.16.0 | Yes | [Remote](remote.md) |
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | Yes | [Credential Vault](credential-vault.md) |
-| Editor | `dev.jasper.editor` | 0.11.0 | Yes | [Editor](editor.md) |
+| Editor | `dev.jasper.editor` | 0.15.0 | Yes | [Editor](editor.md) |
 | File Server | `dev.jasper.fileserver` | 0.6.0 | Yes | [File Server](file-server.md) |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | Yes | [Project Index](project-index.md) |
 | Shell History | `dev.jasper.history` | 0.3.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
 | Snippets | `dev.jasper.snippets` | 0.3.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | No | [The Enterprise look](enterprise.md) |
-| Sample | `dev.jasper.sample` | 0.4.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
+| Sample | `dev.jasper.sample` | 0.5.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
-Remote, Credential Vault, File Server, Enterprise and Sample declare `sdk = ">=0.18.2, <0.19"`; Editor declares
-`sdk = ">=0.18.3, <0.19"`; Project Index, Shell History and Snippets declare `sdk = ">=0.18.0, <0.19"`. A plugin uses
-another plugin it lists under "Uses, when present" only while that plugin is running; without it, the features that
-need it are missing.
+Every bundled plugin declares `sdk = ">=0.21.0, <0.22"`. A plugin uses another plugin it lists under "Uses, when
+present" only while that plugin is running; without it, the features that need it are missing.
 
 ### Remote
 
 SSH, SFTP and tunnels: saved hosts with groups, favourites and ProxyJump jump hosts, host-key trust, Vault or SSH-agent
-authentication, SSH terminal tabs and splits, an SFTP browser with persistent file transfers, local, remote and SOCKS
-tunnels with live counters, import from `~/.ssh/config`, a Sessions tool window that also lists the WSL distributions on
-Windows, the `ssh >` and `tunnels >` palette scopes, and saved hosts as places in Jasper's file chooser.
+authentication, SSH terminal tabs and splits that come back when Jasper restores its windows, an SFTP browser with
+persistent file transfers, local, remote and SOCKS tunnels with live counters, import from `~/.ssh/config`, a Sessions
+tool window that also lists the WSL distributions on Windows, the `ssh >` and `tunnels >` palette scopes, and saved
+hosts as places in Jasper's file chooser.
 
 - **Start with** Session › Connect to SSH Host... (Cmd+Shift+H / Ctrl+Shift+H).
 - **Capabilities** `terminal.open`, `session.provide`, `terminal.observe`, `palette.contribute`, `files.source`.
@@ -71,7 +73,7 @@ Windows, the `ssh >` and `tunnels >` palette scopes, and saved hosts as places i
 
 ### Credential Vault
 
-Logins, SSH keys and secure notes in one encrypted file, which can be bound to this device: a manager window, a lock
+Logins, SSH keys and secure notes in one encrypted file, which can be bound to this device: a manager dialog, a lock
 item in the status bar, a palette scope that copies a login's password or username, SSH key generation and a master
 password change. Other plugins, such as Remote and File Server, get a credential only after you allow it in a grant
 dialog, once or always; File › Vault Plugin Grants... shows the grants. Secure notes are never handed to other plugins.
@@ -82,10 +84,11 @@ dialog, once or always; File › Vault Plugin Grants... shows the grants. Secure
 
 ### Editor
 
-Local and remote text files in workspace tabs, with syntax highlighting, find and replace, a Markdown preview that
-follows relative links and shows images, its own fonts or the terminal's, recent files in the command palette and an
-optional Vim mode. It is the editor Jasper opens files with (or it hands them to another editor you choose), it can
-set `EDITOR` for Jasper's shells, and it adds the `jasper editor` command.
+Local and remote text files in workspace tabs and panes, a file in several views that share its text and undo history,
+with syntax highlighting, find and replace, a Markdown preview that follows relative links and shows images, its own
+fonts or the terminal's, recent files in the command palette and an optional Vim mode. It is the editor Jasper opens
+files with (or it hands them to another editor you choose), it can set `EDITOR` for Jasper's shells, and it adds the
+`jasper editor` command.
 
 - **Start with** File › Open in Editor… (Cmd+O / Ctrl+Shift+O).
 - **Capabilities** `palette.contribute`, `terminal.environment`, `editor.provide`, `terminal.open`.
@@ -148,8 +151,9 @@ plugin's code does nothing; Credential Vault, Remote and File Server use their c
 
 The smallest complete plugin: the runtime's end-to-end test fixture and the source of the compiled examples in
 [plugin authoring](plugin-authoring.md). It is enabled but does nothing until you set one of its `demo_*` settings in
-Settings › Tools › Sample (or its settings file): a demonstration activity, toolbar, menu and status-bar items, a
-terminal greeting, an echo session and a "Greetings" palette scope.
+Settings › Tools › Sample (or its settings file): a demonstration activity; toolbar, menu and status-bar items with a
+Sample tool window and an **About Sample** tab that comes back when Jasper restores its windows; a terminal greeting; an
+echo session; and a "Greetings" palette scope.
 
 - **Capabilities** `terminal.observe`, `terminal.inject`, `terminal.open`, `session.provide`, `palette.contribute`.
 
@@ -204,8 +208,7 @@ counts as empty, so installed plugins wait for a review again rather than load u
 ## The Plugins page
 
 **File › Manage Plugins…** (also **Manage Plugins…** in the command palette) opens Settings at the Plugins page. The
-action's id is `plugins.manage`; it has no default shortcut. The page reads the disk again each time it is shown, so it
-also reflects changes made there since.
+action's id is `plugins.manage`; it has no default shortcut. The page reads the disk again each time it is shown.
 
 The restart banner ([restarting](#restarting)), when there is one, runs across the top. Above the list are a **Search
 plugins** field, which matches a plugin's name, vendor, description or id, and a More button (**Plugin options**) that
@@ -271,7 +274,7 @@ badge when there is one, **Enabled** for a running plugin, and otherwise the sta
 | Active | Running |
 | Disabled | Off: "off by default", "disabled by the user", "marked for removal", "safe mode" or "safe mode uses the standard look" |
 | Needs review | Waiting for your review: "not reviewed yet" or "new capabilities: …" |
-| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.18.3", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
+| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.21.0", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
 | Failed | Its classes could not be loaded, or its start failed |
 | Not loaded yet | Not present when this launch began, such as a plugin installed since |
 
@@ -290,11 +293,11 @@ checks it before it asks you anything:
 - Jar names use only letters, digits, spaces and `.`, `_`, `+`, `-`; no name may appear twice.
 - At most 4096 entries, 256 jars and 512 MiB once unpacked.
 - Exactly one jar holds a valid `plugin.toml` at its root, and the plugin's SDK range includes this Jasper's SDK,
-  0.18.3.
+  0.21.0.
 
 A zip that fails is refused on the message line with the reason, for example "The zip holds no jar files", "The zip
 must hold the plugin's jars at its root or in one folder", "Not a Jasper plugin: no plugin.toml in any jar" or "Tool
-1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.18.3", and nothing is installed.
+1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.21.0", and nothing is installed.
 
 A zip that passes opens the **Install *name*** sheet: the plugin's name and version, "From *vendor*", what it
 [asks to do](#capabilities) and the warning that a plugin is not sandboxed. **Install** stages the plugin in
@@ -361,7 +364,7 @@ terminal-event subscription and list of other tabs' titles for a plugin's Move P
 
 | Capability | The sheet says | Notes |
 |---|---|---|
-| `terminal.observe` | See your terminals: titles, folders, the commands you run and how they end | Also every terminal event a plugin can subscribe to. Without it a plugin's Move Pane to Tab menu still works, listing other tabs as "Tab 2" instead of by title |
+| `terminal.observe` | See your terminals: titles, folders, the commands you run and how they end | Also every terminal event a plugin can subscribe to. Without it a plugin's Move Pane to Tab menu still works, listing a tab as "Tab 2" instead of by title unless the tab shows one of the plugin's own items |
 | `terminal.selection` | Read the text you select in a terminal | |
 | `terminal.inject` | Type into your terminals | Typing and pasting into a pane |
 | `terminal.open` | Open terminal tabs, splits and windows, and run programs in them | |
@@ -407,9 +410,9 @@ The banner "Restart Jasper to apply your changes." with **Restart Now** appears 
 different set of plugins, or different versions, than this process did, or an install is waiting. When you turned on a
 look, it adds "*Name* was turned off: one look can be active at a time."
 
-**Restart Now** quits Jasper and starts it again with the same options, except `--background` and `--no-window`. When
-Jasper cannot tell how it was started, the banner says "Jasper could not work out how it was started. Quit and reopen
-it to apply your changes." with **Quit Jasper**.
+**Restart Now** quits Jasper and starts it again with the same options, except `--background` and `--no-window`; the
+new Jasper waits for this one to exit. When Jasper cannot tell how it was started, the banner says "Jasper could not
+work out how it was started. Quit and reopen it to apply your changes." with **Quit Jasper**.
 
 ## Safe mode
 
@@ -420,8 +423,8 @@ working. In safe mode:
 - No look loads, bundled ones included ("safe mode uses the standard look"), so Jasper uses its default look. Safe mode
   shows no splash screen.
 - Bundled plugins without a look, and a `--plugin-dir` plugin, still load.
-- It applies only when Jasper starts: a launch while Jasper runs hands off, and the running Jasper says to quit it first.
-  A Jasper in safe mode is never resident.
+- It applies only when Jasper starts: a launch while Jasper runs hands off, and the running Jasper says "Jasper is
+  already running: quit it first to start with --safe-mode". A Jasper in safe mode is never resident.
 
 The Plugins page shows "Safe mode: installed plugins are not loaded." with **Restart Normally**. You can still enable,
 disable, review and remove plugins; they apply at the next launch, but in safe mode the page shows no **Restart Now**
@@ -503,19 +506,19 @@ takes a restart. A theme setting that names a theme of a plugin that is off uses
 ## Plugin commands
 
 A plugin can add commands to the `jasper` command, such as the Editor's `jasper editor`. `jasper --help` lists the
-commands of the plugins that were running at the last launch. A command whose plugin is off, waiting for a review or failed answers
-"jasper: *command* is unavailable (the *name* plugin is off)". When two plugins declare the same command, a
-bundled plugin keeps it, otherwise the lowest plugin id, and the other is reported as "A plugin command was not added".
-See [the command line](command-line.md).
+commands of the plugins that were running at the last launch. A command whose plugin is off, waiting for a review or
+failed answers "jasper: *command* is unavailable (the *name* plugin is off)". When two plugins declare the same
+command, a bundled plugin keeps it, otherwise the lowest plugin id, and the other is reported as "A plugin command was
+not added". See [the command line](command-line.md).
 
 ## Developing a plugin
 
 `jasper --plugin-dir <dir>` starts Jasper with one more plugin, from a folder that holds its jars directly or in
 `jars/`; the folder's name is free. The plugin is listed under **Development** ("Loaded from --plugin-dir."), needs no
 review, and keeps its settings and data in `plugins/<id>/` in Jasper home like any other. Like `--safe-mode`, the
-option applies only when Jasper starts, and a Jasper started with it is never resident. A bundled or installed copy with a higher version of the same id is loaded instead. An
-id you disabled in Settings › Plugins stays off, from `--plugin-dir` too ("disabled by the user"); enable it there
-first.
+option applies only when Jasper starts, and a Jasper started with it is never resident. A bundled or installed copy
+with a higher version of the same id is loaded instead. An id you disabled in Settings › Plugins stays off, from
+`--plugin-dir` too ("disabled by the user"); enable it there first.
 
 Plugins for this Jasper (SDK 0.21.0) declare a range such as `sdk = ">=0.21.0, <0.22"` in `plugin.toml`, raising the
 floor to the SDK version that added the newest API they use ([the manifest](plugin-authoring.md#the-manifest));

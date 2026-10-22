@@ -11,10 +11,10 @@ and [the SDK reference](sdk-reference.html) the complete API.
 | --- | --- | --- |
 | `jasper-sdk` | Interfaces and values plugins compile against ([README](../jasper-sdk/README.md)) | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the other fakes; the contract suites as test fixtures ([README](../jasper-sdk-testkit/README.md)) | JDK, SDK |
-| `dev.jasper.app.plugins` | The runtime. `PluginRuntime`, `PluginSelection` (the bootstrap pre-pass) and `GlassSource` are its public types | SDK, `dev.jasper.terminal.session`, the `jasper-ui` kit, model, swing, theme and icons, and the app packages `appearance`, `commandline`, `commands`, `config`, `contributions`, `dock`, `files`, `launch`, `lifecycle`, `notifications`, `palette`, `persistence`, `platform`, `presentation`, `settings`, `settingsui`, `startup`, `terminals`, `windows` |
+| `dev.jasper.app.plugins` | The runtime. `PluginRuntime`, `PluginSelection` (the bootstrap pre-pass) and `GlassSource` are its public types | SDK, `dev.jasper.terminal.session`, the `jasper-ui` kit, model, swing, theme and icons, and the app packages `appearance`, `commandline`, `commands`, `config`, `contributions`, `dock`, `files`, `launch`, `layout`, `lifecycle`, `notifications`, `palette`, `persistence`, `platform`, `presentation`, `settings`, `settingsui`, `startup`, `terminals`, `windows` |
 | `dev.jasper.app.presentation` | The look a process runs with: the kit file parser, the attempt record and each consumer's projection | `config`, `settings`, `persistence`, `dock`, the `jasper-ui` kit, metrics, theme and icons |
 | `dev.jasper.app.terminals` | App-native registry of Jasper windows, their tabs and terminal tabs' panes: pull-based entries, id-only events, the derived active pane | `layout`, `lifecycle`, `dev.jasper.terminal.session` (attached connections) |
-| `dev.jasper.app.contributions` | App-native UI-thread model of what plugins contribute: actions, toolbar entries, menu sections, status entries, panels, rail actions, palette scopes, file-chooser sources, content tabs and quit guards | `commands`, `config`, `dock`, `files`, `lifecycle`, `palette` |
+| `dev.jasper.app.contributions` | App-native UI-thread model of what plugins contribute: actions, toolbar entries, menu sections, status entries, panels, rail actions, split items, palette scopes, file-chooser sources and quit guards; and the tab registry that owns every window's tabs and their content | `commands`, `config`, `dock`, `files`, `layout`, `lifecycle`, `palette` |
 | `dev.jasper.app.dock` | The tool window dock model: the six slots, each window's `DockState`, the pure `DockGeometry`; the tab and pane drag's pure `WorkspaceDropResolver`; JDK only | `layout` |
 | `dev.jasper.app.windows` | Application-built windows and dialogs: the headless `AuxiliarySurface`, `NativeShells` | `appearance`, `files`, `lifecycle`, `persistence`, `platform`, `presentation`, the `jasper-ui` model, swing and theme |
 | `dev.jasper.app.pluginmanager` | The Settings dialog's Plugins page, its consent and removal sheets and its controller | `presentation`, `plugins`, `restart`, `settingsui`, `windows`, the `jasper-ui` model, swing, theme, icons and metrics |
@@ -160,13 +160,15 @@ checks the open context and the UI thread, enforces namespaces (ids start with `
 the plugin's own actions, contains callbacks, and writes the single application-wide `Contributions` model. Everything
 a plugin registered is removed, newest first, when it stops or fails to start. Each `WindowContent` connects to the
 model once: `WindowContributions` turns every contributed action into a Swing `Action` in the window's
-`CommandRegistry` (so each is also a command palette command), and the window's chrome and status bar rebuild only
-their plugin sections when the model changes. Workspace code never sees an SDK type.
+`CommandRegistry` (so each is also a command palette command), and the window's chrome, and the main window's status
+bar, rebuild only their plugin sections when the model changes. A child window takes the actions, the menus and the
+palette scopes; panels and status entries are the main window's. Workspace code never sees an SDK type.
 
-A toolbar view (`ToolbarItem.View`) is built once per window, when the window opens, by the plugin's factory, inside
-containment. `ToolbarViewAdmission` admits only an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER
-`Choice`, at most one PRIMARY `Button`, icon-only GHOST `Button`s (a blank label), `MenuButton`s and `Separator`s, when
-the view is built and on every update; a refused or throwing factory leaves that window without the view.
+A toolbar view (`ToolbarItem.View`) is built by the plugin's factory, inside containment, each time the main window
+opens; a child window has no toolbar. `ToolbarViewAdmission` admits only an INLINE `Stack` of LABEL `Text`, DROPDOWN,
+SEARCHABLE or PICKER `Choice`, at most one PRIMARY `Button`, icon-only GHOST `Button`s (a blank label), `MenuButton`s
+and `Separator`s, when the view is built and on every update; a refused or throwing factory leaves that main window
+without the view.
 
 `KeyBindings` is keyed by action id. The user's `[keybindings]` entry for a contributed action wins; otherwise the
 plugin's default for the platform applies unless it is invalid or a binding in a conflicting context already holds the
@@ -249,27 +251,27 @@ where the look draws one (`TitleInset`).
 
 ## Content tabs
 
-`Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)` mounts a plugin's view as an item in a workspace
+`Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)` mounts a plugin's view as an item in a Jasper
 window, translated to `contributions.TabRegistry` and `Tab`. Keys are scoped to the plugin; opening a key that is open
 selects its tab and returns its handle. A missing or closed owner window uses the main window, restoring it when
-needed; a `TabPlacement` (SDK 0.20) opens the item in a new tab of the window, a new pane beside the focused one or a
-new child window. A foreign owner is refused. A split item (`Windows.splitItem`, SDK 0.21) joins every window's Split
-lists through the application's contributions model, its two actions registered as the plugin's own; `ContentTab.split`
-and `moveToNewTab` reach the item's window through the tab registry. `WindowContent` hosts terminal and plugin items
-alike in its `WorkspaceView`. Content views take the workspace theme.
+needed; a `TabPlacement` opens the item in a new tab of the window, a new pane beside the focused one or a new child
+window. A foreign owner is refused. A split item (`Windows.splitItem`) joins every window's Split lists through the
+application's contributions model, its two actions registered as the plugin's own; `ContentTab.split`, `moveToNewTab`,
+`tabChoices` and `moveToTab` reach the item's window through the tab registry. `WindowContent` hosts terminal and
+plugin items alike in its `WorkspaceView`. Content views take the workspace theme.
 
-`ContentTab` updates its literal presentation, commands and status items, moves to a new child window or the main
-window without disposing the content, and is a dialog and chooser owner whose later prompts follow its current
-window. A move is ignored while a close decision or a modal prompt is pending. `requestClose` asks the plugin's
+`ContentTab` updates its literal presentation, commands and status items, moves to a new child window, the main
+window, a new tab or another tab of its window without disposing the content, and is a dialog and chooser owner whose
+later prompts follow its current window. A move is ignored while a close decision or a modal prompt is pending. `requestClose` asks the plugin's
 `Windows.onTabsClosing` guard, which gets the affected tabs and whether the request closes a window, quits or
 restarts; an exception or a false decision keeps the content. Repeated requests share the pending result; `close`
 disposes once without asking, for plugin shutdown. `WindowHandle.tabs()` lists content tabs as items, and the
 active-pane APIs report terminal panes only, so a plugin sees an empty active pane while one of its tabs is active.
 
-Since SDK 0.21.0 a tab carries its plugin's restore state (`Tab.restore()`, the app's `layout.TabRestore`), and the
-registry keeps each plugin's restorers (`Windows.restorer`). `WindowManager.snapshot()` saves a plugin's tab as a
-`TabRecord.Content` of its window while its plugin has a restorer for its kind, never Jasper's own tabs, and leaves out
-tabs, plugins' first, when the file would pass `WorkspaceFile.MAX_BYTES`. Restoring a window, `WindowContent.restore`
+A tab carries its plugin's restore state (`Tab.restore()`, the app's `layout.TabRestore`), and the registry keeps
+each plugin's restorers (`Windows.restorer`). `WindowManager.snapshot()` saves a plugin's tab as a `TabRecord.Content`
+of its window while its plugin has a restorer for its kind, never Jasper's own tabs, and leaves out tabs, plugins'
+first, when the file would pass `WorkspaceFile.MAX_BYTES`. Restoring a window, `WindowContent.restore`
 asks the window manager for each such record; `TabRegistry.restore` runs the restorer with a slot set (one at a time),
 and the first content tab the plugin opens meanwhile (`TabRegistry.open`), or the first session it opens in the window
 being restored (`WindowContent.openTerminal`), takes the saved id, while it is free, and that window, before any
@@ -349,8 +351,8 @@ resolves once per process, never on the UI thread (the `hostname` program and th
 variables, which is what the bundled shell integration reports). Locality rests on those names alone.
 `PaneInfo.shell` is `PaneSnapshot.shell`, the pane's launcher label.
 
-`Terminals.profiles()` lists the shells `launch.ShellProfileCatalog` detected (PowerShell, PowerShell 7, Command Prompt
-and each WSL distribution on Windows, the login shell elsewhere, and Custom last) as `ShellProfileInfo`, and
+`Terminals.profiles()` lists the shells `launch.ShellProfileCatalog` detected (PowerShell, PowerShell 7, Command Prompt,
+Cygwin Bash from Jasper's own Cygwin and each WSL distribution on Windows, the login shell elsewhere, and Custom last) as `ShellProfileInfo`, and
 `onProfilesChanged` fires after the first detection completes and after each later one whose result differs; edits to
 the Custom shell settings may not be reported. Both need `terminal.open`. The catalog reaches the runtime as
 `PluginRuntime.ShellProfiles`. `HostedTerminals` checks a `LocalSpec` profile against the catalog: an id it does not
@@ -370,7 +372,8 @@ a plugin cancels what it is still connecting; attached sessions belong to their 
 
 `workspace.TerminalPane` shows a provided session in three states around one view: pending (status line, Cancel),
 running, and disconnected (how it ended, Reconnect or Retry, Close). Cancelling an attempt in a pane that never showed
-a session closes the pane.
+a session closes the pane, except in a pane Jasper restored with its tab, which shows "Connection cancelled" with
+Reconnect.
 
 `PendingSession.reportRemoteDirectory` is accepted only from the pane's current attached attempt while its session
 runs. The host posts it to the UI thread and keeps it as display metadata in `PaneInfo.remoteDirectory()` until the

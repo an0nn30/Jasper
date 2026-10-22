@@ -7,8 +7,9 @@ lists Windows' WSL distributions beside your hosts. Turn it off or on in Setting
 
 Remote works with two other bundled plugins when they are on: [Credential Vault](credential-vault.md) holds the
 passwords and keys hosts sign in with (the SSH agent works without it), and the [Editor](editor.md) edits remote files.
-Under a classic look, such as [Enterprise](enterprise.md), Remote's tool windows take their classic layout
-([below](#under-a-classic-look)).
+Remote's tool windows are in the main window ([Tool windows and the dock](workspace.md#tool-windows-and-the-dock)): from
+a child window, their commands bring the main window forward and show them there. Under a classic look, such as
+[Enterprise](enterprise.md), they take their classic layout ([below](#under-a-classic-look)).
 
 ## Commands and shortcuts
 
@@ -76,8 +77,8 @@ hosts and distributions there are, with **New session** (+) and **Import session
 - A host row shows a dot (green while one of its SSH panes runs), its name and hostname, and a star: click the star to
   make it a favourite or not. The row's tooltip adds `user@host:port`, the learned OS and address, the jump host and
   the number of sessions.
-- Enter or a double click on a host returns to its most recently used running pane, or connects in a new tab when none
-  runs.
+- Enter or a double click on a host returns to its most recently used running pane. When none runs, it shows the
+  host's oldest [restored tab](#restored-ssh-tabs) that has not been shown yet, and otherwise connects in a new tab.
 - A host's right-click menu: **Connect in new tab** and **Connect in split** (always a new session), **Browse files**
   (its home folder in [SFTP](#sftp)), **Edit…**, **Duplicate**, **Delete…** and **Add to favorites** or **Remove from
   favorites**; while the list has no headers, also **Rename group…**.
@@ -91,7 +92,8 @@ running pane the card reads "Connected" and its button **Open Shell** goes to th
 
 The toolbar's **Sessions** menu lists the WSL distributions ("Ubuntu (WSL 2)"), then your hosts alphabetically
 ("prod-web (deploy@web1:22)"), then **Manage Sessions...**, which shows the Sessions panel. Choosing a host goes to its
-most recently used running pane, or connects in a new tab when none runs; choosing a distribution opens a new tab on it.
+most recently used running pane, else to its oldest [restored tab](#restored-ssh-tabs) not shown yet, or connects in a
+new tab; choosing a distribution opens a new tab on it.
 
 ### Split with Same Host
 
@@ -294,13 +296,6 @@ When the shell exits or the connection drops, the pane stays with "Disconnected 
 **Reconnect** and **Close**. Reconnect connects again into the same pane, through the same progress overlay; a pane
 opened in a folder starts there again. When a shared connection drops, every pane using it shows the notice.
 
-When Jasper restores its windows, each SSH tab comes back to its host, in the folder it was opened in, if any (a folder
-too long to save is left out), and waits until it is first shown. Then it connects at once when signing in asks nothing
-(every host on its route signs in through the SSH agent), after any connection in progress in that window; otherwise (a
-Vault login, locked or not), or when its host's key is not trusted yet, it shows Not connected with **Reconnect**, which
-asks as usual. An SSH agent that confirms each use (`ssh-add -c`, 1Password, Secretive) prompts outside Jasper when a
-restored tab connects.
-
 The status bar's "*n* SSH sessions" item counts the SSH panes whose shell runs and is hidden at none; clicking it
 toggles the Sessions panel.
 
@@ -313,16 +308,28 @@ refuses them still gives you its shell. Results are kept in `data/host-info.prop
 and the Sessions search; they are hidden once the host's address, port or jump host changes, and refreshed on the next
 connection. Opening the Sessions panel connects to nothing.
 
+### Restored SSH tabs
+
+When Jasper [restores its windows](workspace.md#saving-and-restoring-the-windows), each SSH tab comes back to its host,
+named after it, in the folder it was opened in, if any (a folder too long to save is left out), and waits until it is
+first shown. Then it connects at once when signing in asks nothing (every host on its route signs in through the SSH
+agent), after any connection in progress in that window. Otherwise, for example with a Vault login, locked or not, it
+shows "Not connected: Reconnect to sign in" with **Reconnect** and **Close**; Reconnect connects and asks as usual. A
+restored tab's own connection never asks: a host key that is not trusted yet, or cancelling the progress overlay, leaves
+the same notice, and a failure "Not connected: *reason*". A tab whose host is no longer saved says "Its host is no longer
+saved in Remote", or comes back as a placeholder that says why. An SSH agent that confirms each use (`ssh-add -c`,
+1Password, Secretive) prompts outside Jasper when a restored tab connects.
+
 ## WSL distributions
 
 On Windows with WSL, the Sessions panel starts with a **WSL** group: the distributions Jasper found for its shell
 profiles (Docker Desktop's are left out), each with a badge such as "WSL 2" or "WSL 2 · default". Enter, a double
 click, **Open** on the card or **Open in new tab** in the right-click menu opens one in a new local tab; **Open in
-split** opens it in a new pane beside the current one. A dot, and a count above one, marks the panes Remote opened for it whose shell still
-runs. Distributions are not saved hosts: they cannot be edited, duplicated, deleted or browsed with SFTP, and the status
-bar's SSH count leaves them out. The group's collapsed state is kept apart from host groups (a host group named "wsl"
-has its own), and the search matches distribution names and "WSL". With no SSH hosts saved, the hint reads "No SSH
-hosts yet — Add or Import from ~/.ssh/config".
+split** opens it in a new pane beside the current one. A dot, and a count above one, marks the panes Remote opened for
+it whose shell still runs. Distributions are not saved hosts: they cannot be edited, duplicated, deleted or browsed with
+SFTP, and the status bar's SSH count leaves them out. The group's collapsed state is kept apart from host groups (a
+host group named "wsl" has its own), and the search matches distribution names and "WSL". With no SSH hosts saved, the
+hint reads "No SSH hosts yet — Add or Import from ~/.ssh/config".
 
 The toolbar's Sessions menu and the palette's SSH scope list them too (tagged `WSL`; Shift+Enter does nothing). The
 list follows **Detect shells again** in Settings › Terminal › Shell without a restart. To make a distribution the shell
@@ -332,8 +339,9 @@ of new panes, choose it there (see [Shell, environment and history](configuratio
 
 ### Opening the browser
 
-There is one SFTP browser, in the main window's SFTP tool window (in the lower half of the left side to start with). It shows
-the SSH pane you focus: focusing another SSH pane switches it, and focusing a local pane leaves it as it is.
+There is one SFTP browser, in the main window's SFTP tool window (in the lower half of the left side to start with). It
+shows the SSH pane you focus in any window: focusing another SSH pane switches it, and focusing a local pane leaves it
+as it is.
 
 - **Open SFTP here** (Cmd+Shift+O, Ctrl+Alt+Shift+O; the Transfer menu or a terminal's right-click menu) opens the
   current SSH pane's folder. From any other pane it shows the browser, and when it shows nothing, asks **Browse files
@@ -478,6 +486,11 @@ remote file's relative links and images open from the same host, over that chann
 connection has closed, the next one reconnects and asks you to sign in in the window the file was opened from, or the
 active one; with no Jasper window open it fails ("Reconnecting to prod-web needs an open Jasper window for the sign-in
 prompt.").
+
+When Jasper restores its windows, a remote file's Editor tab reads the file only when signing in asks nothing (an open
+connection, or the SSH agent for every host on its route), and answers a host-key question with Cancel; otherwise it
+says "Not signed in to prod-web; Retry signs in", and **Retry** signs in as usual. A file whose host is no longer saved
+says "Its host is no longer saved in Remote", or comes back as a placeholder ([Editor tabs](editor.md#tabs)).
 
 Remote files also reopen from the Editor's recent files, and Jasper's file chooser lists your saved hosts under
 **Remote**, so **Open in Editor…** can open a file on a host and Save As can save there. Choosing a host connects to
@@ -630,10 +643,10 @@ when it starts, so it follows a change of look at the next start of Jasper.
   run-configuration icon and the chosen row's name (a long one cut with an ellipsis), over a list of your hosts
   ("prod-web (web1.example.com)"), then the WSL distributions ("No saved sessions" when there are neither), then
   **Manage Sessions…**, which shows the Sessions panel. Beside it the Run button, a green triangle with the tooltip
-  **Connect**, goes to the chosen host's most recently used running pane or opens one, or opens the distribution; it is
-  disabled while there is nothing to run.
-  The combo and the window's Sessions tree share the chosen row; until you choose, it is the current SSH pane's host,
-  else the first.
+  **Connect**, goes to the chosen host's most recently used running pane, else to its oldest
+  [restored tab](#restored-ssh-tabs) not shown yet, or opens one, or opens the distribution; it is disabled while there
+  is nothing to run. The combo and the Sessions tree share the chosen row; until you choose, it is the current SSH
+  pane's host, else the first.
 - **Sessions** starts on the right, with its count beside the title: **Filter sessions** over a Name, Host and Port tree
   (favourites marked ★, groups opened and closed with their disclosure triangle, Enter or a double click), and below
   it the selected host's **Properties** (Host, User, Port, Credentials) with **Edit…** and **Connect** (**Open Shell**

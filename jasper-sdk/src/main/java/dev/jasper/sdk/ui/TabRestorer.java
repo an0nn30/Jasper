@@ -1,7 +1,7 @@
 package dev.jasper.sdk.ui;
 
 /**
- * Rebuilds a plugin's saved tabs when Jasper restores its windows (workspace tabs spec 13 and 14): at start, and whenever
+ * Rebuilds a plugin's saved tabs when Jasper restores its windows: at start, and whenever
  * the main window opens again after it closed. Registered with {@link Windows#restorer} for one restorer kind; called on
  * the UI thread for a saved tab of that kind:
  * <ul>

@@ -1,8 +1,8 @@
 <section class="guide" id="capabilities">
 <h2>Capabilities</h2>
 <p>A capability names something a plugin does that the user cannot see in the window, such as reading what a terminal
-runs or typing into it, or a role only one plugin at a time can take. Adding actions, menu items, tool windows, windows,
-status items, notifications, settings and services needs none. A plugin declares its capabilities in
+runs or typing into it, or a role only one plugin at a time can take. Adding actions, menu items, tool windows, content tabs,
+dialogs, status items, notifications, settings and services needs none. A plugin declares its capabilities in
 {@code plugin.toml}:</p>
 <pre><code class="language-toml">capabilities = ["terminal.observe", "terminal.inject", "palette.contribute"]</code></pre>
 <p>The names are the constants of {@link Capabilities}; {@link Capabilities#ALL} lists them. An unknown name makes the
@@ -29,7 +29,7 @@ fewer keeps the consent. Bundled plugins and the {@code --plugin-dir} plugin nee
 <tr><td>{@code terminal.observe}</td><td>See your terminals: titles, folders, the commands you run and how they end</td><td>{@link PaneHandle#info()}, {@link PaneHandle#foregroundJob()}, {@link TabHandle#title()}, other tabs' titles in {@link ContentTab#tabChoices()} (without it a choice reads "Tab N"), and subscribing to any {@link TerminalEvents} topic (every id starting {@code jasper.terminal.})</td><td>The first terminal subscription, and the first {@code tabChoices()} answer with other tabs' titles</td></tr>
 <tr><td>{@code terminal.selection}</td><td>Read the text you select in a terminal</td><td>{@link PaneHandle#selection()}</td><td>Each read, with the number of characters</td></tr>
 <tr><td>{@code terminal.inject}</td><td>Type into your terminals</td><td>{@link PaneHandle#sendText(String)}, {@link PaneHandle#sendBytes(byte[])}, {@link PaneHandle#paste(String)}, also on a palette query's target pane</td><td>Each call, with the number of bytes</td></tr>
-<tr><td>{@code terminal.open}</td><td>Open terminal tabs, splits and windows, and run programs in them</td><td>{@link Terminals#openTab(WindowHandle,OpenRequest)} and {@link Terminals#split(PaneHandle,Direction,OpenRequest)} with a local request (a shell, a shell profile or a program), {@link Terminals#profiles()}, {@link Terminals#onProfilesChanged(Runnable)}</td><td>Each open, with the program's file name when it runs one</td></tr>
+<tr><td>{@code terminal.open}</td><td>Open terminal tabs, splits and windows, and run programs in them</td><td>{@link Terminals#openTab(WindowHandle,OpenRequest)} and {@link Terminals#split(PaneHandle,Direction,OpenRequest)} with a local request (a shell, a shell profile or a program), {@link ContentTab#split(SplitChoice,Direction)} with {@link SplitChoice#TERMINAL}, {@link Terminals#profiles()}, {@link Terminals#onProfilesChanged(Runnable)}</td><td>Each open, with the program's file name when it runs one</td></tr>
 <tr><td>{@code session.provide}</td><td>Run its own terminal sessions, such as remote connections</td><td>{@code openTab} and {@code split} with {@link dev.jasper.sdk.terminal.OpenRequest#session(SessionSpec)}</td><td>Each open</td></tr>
 <tr><td>{@code palette.contribute}</td><td>Add scopes to the command palette and open it</td><td>{@link Palette#register(PaletteScope)} and {@link Palette#open(WindowHandle,String,Optional,Optional)}</td><td>The first use</td></tr>
 <tr><td>{@code files.source}</td><td>Add places, such as saved hosts, to the file chooser</td><td>{@link FileSources#register(FileSource)}</td><td>The first registration</td></tr>

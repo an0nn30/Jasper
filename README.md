@@ -17,8 +17,10 @@ grow with what you need: the bundled plugins use the same API as any plugin you 
   integration for zsh, bash and fish: jumps between prompts, new tabs and splits in the same folder, and a
   notification when a long command finishes. See [the terminal](docs/terminal.md).
 - **Workspace**: a main window and child windows whose tabs hold split panes, each pane a terminal, an Editor file or a
-  plugin's view, with pane maximize; Jasper restores its windows, tabs and panes at the next start. The main window has
-  a dock of tool windows that you drag between its left, right and bottom edges. See [the workspace](docs/workspace.md).
+  plugin's view. Drag a tab along its strip, into another tab or window, or out into a window of its own, drag a pane
+  beside another, and maximise a pane; Jasper saves its windows, tabs and panes and restores them at the next start. The
+  main window has a dock of tool windows that you drag between its left, right and bottom edges. See
+  [the workspace](docs/workspace.md).
 - **Command palette**: one search surface for commands and the plugins' scopes: saved hosts, shell history,
   snippets, vault logins, project files and more. Under the Enterprise look it is the Run window. See
   [the command palette](docs/command-palette.md).
@@ -30,8 +32,9 @@ grow with what you need: the bundled plugins use the same API as any plugin you 
   Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru built in; import further Jasper theme files. A *look* sets the
   chrome and controls: the default look, or a plugin's look such as Enterprise. See [themes](docs/themes.md) and
   [looks](docs/looks.md).
-- **The `jasper` command**: open a window, start Jasper with options, or run plugin commands such as
-  `jasper editor FILE:LINE` from any shell. See [the command line](docs/command-line.md).
+- **The `jasper` command**: bring Jasper forward, open files and folders in it (`jasper <path>...`), start Jasper
+  with options, or run plugin commands such as `jasper editor FILE:LINE` from any shell. One Jasper runs per home:
+  launching it again hands what you asked for to the running Jasper. See [the command line](docs/command-line.md).
 - **Background residency**: by default on macOS and Windows, Jasper keeps running when its last window closes, so the
   next window opens at once. See [running in the background](docs/getting-started.md#running-in-the-background).
 - **Desk Buddy**: an optional pixel-art companion above your windows that shows long-running commands and plugin work;
@@ -45,7 +48,7 @@ Everything below ships with Jasper as a bundled plugin, listed in Settings › P
 | --- | --- | --- | --- |
 | Remote | `dev.jasper.remote` | SSH terminals, an SFTP browser with persistent transfers, local, remote and SOCKS tunnels, saved hosts with groups, favourites and jump hosts, host-key trust, Vault or SSH-agent authentication, import from `~/.ssh/config`, and a Sessions tool window that also lists WSL distributions | Yes |
 | Credential Vault | `dev.jasper.vault` | Logins, SSH keys and secure notes in one encrypted file, which can be bound to this device; other plugins fetch credentials under per-plugin grants | Yes |
-| Editor | `dev.jasper.editor` | Local and remote text files in workspace tabs, with syntax highlighting, a Markdown preview, its own fonts or the terminal's, a Vim mode and the `jasper editor` command | Yes |
+| Editor | `dev.jasper.editor` | Local and remote text files in workspace panes (one file can show in several), with syntax highlighting, a Markdown preview, its own fonts or the terminal's, a Vim mode and the `jasper editor` command | Yes |
 | File Server | `dev.jasper.fileserver` | Shares a local folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP; servers are read-only and reachable from this computer only until you change that | Yes |
 | Project Index | `dev.jasper.indexer` | Offers to index the project a terminal enters, locally or on a saved host, and finds its files from the command palette | Yes |
 | Shell History | `dev.jasper.history` | Searches every shell's history from the command palette, to paste or run a command or save it as a snippet | Yes |

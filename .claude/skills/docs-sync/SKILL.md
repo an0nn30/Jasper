@@ -37,8 +37,10 @@ python3 .claude/skills/docs-sync/scripts/last_sync.py            # the main comm
 python3 .claude/skills/docs-sync/scripts/doc_areas.py <base> <source>
 ```
 
-`last_sync.py` reads the `Docs-Synced-Through:` trailer of the last sync commit. Without one, use the main commit the
-previous sync merged. `doc_areas.py` groups the range's changed files into areas, names the guides each area needs,
+`last_sync.py` finds the last sync commit (the one whose message carries a `Docs-Synced-Through:` trailer) and prints
+it: everything before it is documented, so it is the base. Without one, use the main commit the previous sync merged.
+When a version boundary passes (the SDK's minor version or a plugin's), grep the guides for the old numbers: a
+"needs SDK 0.x.y" note older than the range every plugin must now declare is history and goes. `doc_areas.py` groups the range's changed files into areas, names the guides each area needs,
 lists the current guides the range edited (feature authors often update docs in the same commit, and their wording
 still needs the convention check) and the paths no rule covers. Read the commit messages and the STATUS.md entries of
 the range too: they say what each change meant. When a module, package or plugin appears that no rule covers, add a

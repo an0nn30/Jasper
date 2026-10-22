@@ -136,7 +136,7 @@ and `surface.card`.
 
 ## Metrics and density
 
-`DesignMetrics` holds one logical integer per `DesignMetrics.Role`: 707 roles covering heights, paddings, gaps,
+`DesignMetrics` holds one logical integer per `DesignMetrics.Role`: 706 roles covering heights, paddings, gaps,
 radii, widths, icon sizes, shadow and tint percentages and motion durations. `DesignMetrics.DEFAULT` is each role's
 declared value and is Jasper's compact geometry (frozen by `compact-roles.tsv`). `DesignMetrics.CLASSIC` is the default
 catalog with the classic look's delta, measured on the Enterprise references (frozen by `classic-roles.tsv`). Density
@@ -333,6 +333,10 @@ copy of the context, so `route(ThemeRoute)` re-routes only that view.
   (`setAvailableHeight`); the host owns window chrome, sheet and scrim lifetime and cancellation cleanup.
 - **Pointer-only views.** `new KitView(context, spec, events, true)` mounts controls that never take keyboard focus but
   stay operable by pointer, for host overlays such as notification cards over a terminal.
+- **Plain text.** A descriptor's text shows as typed: the kit's labels, buttons, menu items and dropdown renderers set
+  Swing's `html.disable` before their first text, and so do the tooltips they create (`createToolTip`), so a text that
+  starts with `<html>` is not rendered as HTML. Swing reads the property only when a component's UI is installed or
+  its text, font or foreground changes, and a tooltip does not take it from its component.
 
 `KitOwnership.owns(component)` says whether the kit created a component; `KitOwnership.CONTEXT_MENU`
 (`"Jasper.kit.contextMenu"`) is the client property that holds a row collection's, breadcrumbs' or setting row's
@@ -368,7 +372,7 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 | `paintsSurface(true)` | Paints the route's `surface.panel` opaque behind the view (workspace content tabs) |
 | `panelSurface(false)` | Leaves a body panel's rounded surface to a native host that already paints it |
 | `managerColumn(RAIL \| LIST)` | Presents the whole view as a manager column: RAIL rows (a tree's branches become flat `SECTION_LABEL` headings) or LIST rows (rounded selection, a table's header on the row inset) |
-| `titleStrip(true)`, `toolbarStrip(true)` | A window title action strip or a main-toolbar view: icon-only menu buttons show their indicator on the borderless control surface; a toolbar strip keeps the kit's control height, draws an icon-only button's glyph at `ICON_RAIL`, and under the classic buttons face draws a DROPDOWN with a `PickerFace` as IntelliJ's run-configuration combo (`TOOLBAR_COMBO_*`: 24 px, the face's icon, the name cut with an ellipsis at 240 px, an arrow box) |
+| `toolbarStrip(true)` | A main-toolbar view: icon-only menu buttons show their indicator on the borderless control surface; the view keeps the kit's control height, draws an icon-only button's glyph at `ICON_RAIL`, and under the classic buttons face draws a DROPDOWN with a `PickerFace` as IntelliJ's run-configuration combo (`TOOLBAR_COMBO_*`: 24 px, the face's icon, the name cut with an ellipsis at 240 px, an arrow box) |
 | `hostTitled(true)` | The host shows the form title, so the form draws neither its title label nor a hero that only repeats it |
 | `dialogBand(true)` | The form footer is a band on `surface.footer` under a `border.window` rule, footnote leading, actions trailing |
 | `dialogCard(true)` | A classic dialog's card paints the form's fill and frame |

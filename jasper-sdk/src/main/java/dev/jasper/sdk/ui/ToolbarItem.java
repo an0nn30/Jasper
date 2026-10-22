@@ -71,7 +71,7 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
     static ToolbarItem menu(String icon, String title, List<String> actionIds) { return new Dropdown(icon, title, actionIds); }
 
     /**
-     * A group of the plugin's own controls, one per window.
+     * A group of the plugin's own controls in the main window's toolbar.
      *
      * @param factory builds one window's view
      * @return the item

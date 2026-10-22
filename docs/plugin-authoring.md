@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.18.3, task by task.
+describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.21.0, task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.
@@ -116,7 +116,7 @@ notifications, naming the folder and the problem, for example `Unknown key: colo
 folder, a plugin's folder must be named after its id ("directory *x* holds plugin *y*; rename it to the plugin id").
 
 A plugin whose `sdk` range excludes this Jasper's SDK is skipped and reported as "*name* was not started": "needs SDK
-*range*; this is SDK 0.18.3".
+*range*; this is SDK *version*".
 
 ### requires
 
@@ -208,7 +208,7 @@ has its own, so every registration is attributed to it.
 | `windows()` | [Dialogs, overlays and popovers](#dialogs-overlays-and-popovers), [content tabs](#content-tabs), [split items](#split-items), restorers and file pickers. |
 | `kit()` | The factory for every view a plugin shows ([Building plugin UI](plugin-ui.md)). |
 | `appearance()` | Theme colours for [custom content](plugin-ui.md#custom-content), [the look Jasper runs with](#adapting-to-the-look) and [the terminal font](#the-terminal-font). |
-| `terminals()` | [Terminal windows, tabs and panes](#terminals), [provided sessions](#providing-a-session) and [shell variables](#shell-variables-and-program-tabs). |
+| `terminals()` | [Jasper's windows, tabs and panes](#terminals), [provided sessions](#providing-a-session) and [shell variables](#shell-variables-and-program-tabs). |
 | `palette()` | [Command palette scopes](#palette-scopes). |
 | `fileSources()` | [Places in Jasper's file chooser](#file-sources). |
 | `notifications()` | [Notification groups](#notifications). |
@@ -218,7 +218,7 @@ has its own, so every registration is attributed to it.
 ## Capabilities and consent
 
 Capabilities cover effects the user cannot see, and the roles one plugin at a time takes over. Contributions to the
-window (actions, menus, tool windows, windows, notifications, settings) need none. The constants are in
+window (actions, menus, tool windows, content tabs, dialogs, notifications, settings) need none. The constants are in
 [`Capabilities`](sdk-reference.html#dev.jasper.sdk.Capabilities); `Capabilities.ALL` lists them.
 
 | Capability | Lets the plugin | The review sheet says |
@@ -226,7 +226,7 @@ window (actions, menus, tool windows, windows, notifications, settings) need non
 | `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()` (which does not throw without it: its other tabs read "Tab N"), and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end |
 | `terminal.selection` | read `PaneHandle.selection()` | Read the text you select in a terminal |
 | `terminal.inject` | call `PaneHandle.sendText`, `sendBytes` and `paste` | Type into your terminals |
-| `terminal.open` | open tabs and splits with a local request (the shell, a profile or a program), and read `Terminals.profiles()` and `onProfilesChanged` | Open terminal tabs, splits and windows, and run programs in them |
+| `terminal.open` | open tabs and splits with a local request (the shell, a profile or a program), open a terminal beside a content tab with `ContentTab.split(SplitChoice.TERMINAL, …)`, and read `Terminals.profiles()` and `onProfilesChanged` | Open terminal tabs, splits and windows, and run programs in them |
 | `session.provide` | open tabs and splits with `OpenRequest.session(...)` | Run its own terminal sessions, such as remote connections |
 | `palette.contribute` | call `Palette.register` and `Palette.open` | Add scopes to the command palette and open it |
 | `files.source` | call `FileSources.register` | Add places, such as saved hosts, to the file chooser |
@@ -296,6 +296,9 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **The handler** gets an [`ActionContext`](sdk-reference.html#dev.jasper.sdk.ui.ActionContext): `window()`, the
   window it was invoked in, and `pane()`, the pane under a terminal's right-click menu, or else the focused pane.
 - **Placements** name only actions the plugin registered.
+- **Plain text.** Jasper shows the text a plugin supplies as written: menu titles and items, toolbar items and
+  dropdowns, status items, tooltips, tab and window titles, and the text of [kit views](plugin-ui.md). A string
+  starting with `<html>` shows its markup instead of being rendered as HTML.
 - **Threads.** Register and change contributions on the UI thread. Event handlers already run there, so updating a
   status item from one, as the Sample does, needs no hand-over.
 
@@ -348,13 +351,12 @@ macOS while the look puts them there, and has no menu row anywhere else.
 - `ToolbarItem.view(window -> context.kit().create(spec, events))` places a small group of the plugin's own controls in
   the main window's toolbar (a child window has none): the factory runs when the main window opens, and while it is
   open from inside `toolbar().add(...)`, so finish setting up what it reads before adding the view. The view closes with
-  its window or the registration; a factory that throws is not asked again for that window. Its root is an INLINE `Stack` of LABEL
-  `Text`s, DROPDOWN, SEARCHABLE or PICKER `Choice`s, `MenuButton`s, `Separator`s, at most one PRIMARY `Button` and
-  any number of icon-only GHOST `Button`s: a blank label with an icon and a tooltip. A labelled GHOST `Button` is
-  refused. Icon-only GHOST buttons need SDK 0.18.1 or later; the bundled plugins declare `sdk = ">=0.21.0, <0.22"`.
-  When a window mounts the view, Jasper refuses any other tree by logging it, naming the node, and closing the view,
-  and that window shows none; `update` throws `IllegalArgumentException` naming the node. A view never moves into the
-  More actions menu: it hides while the toolbar is too narrow for it.
+  its window or the registration; a factory that throws is not asked again for that window. Its root is an INLINE
+  `Stack` of LABEL `Text`s, DROPDOWN, SEARCHABLE or PICKER `Choice`s, `MenuButton`s, `Separator`s, at most one PRIMARY
+  `Button` and any number of icon-only GHOST `Button`s: a blank label with an icon and a tooltip. A labelled GHOST
+  `Button` is refused. When a window mounts the view, Jasper refuses any other tree by logging it, naming the node, and
+  closing the view, and that window shows none; `update` throws `IllegalArgumentException` naming the node. A view never
+  moves into the More actions menu: it hides while the toolbar is too narrow for it.
 
 ### The status bar
 
@@ -388,8 +390,8 @@ built-in names and the artwork rules.
 
 A tool window is a view of the plugin's docked in the main window, the only window with tool windows, as in IntelliJ.
 Register it once with `context.panels().register(new PanelSpec(id, title, icon, Anchor.LEFT), factory)`. Jasper asks
-the factory for it once, on the UI thread, the first time the tool window is shown (a toggle from a child window shows
-it in the main window); the factory returns a view made
+the factory for it on the UI thread the first time the tool window is shown (a toggle from a child window shows it in
+the main window), and again after the main window closed and opened anew; the factory returns a view made
 with the plugin's kit, and one that throws shows "This panel could not be loaded." Jasper adds:
 
 - a stripe button, the spec's icon (under the Enterprise look a label that starts with the icon and reads the title),
@@ -499,7 +501,9 @@ tabs, dialogs, overlays and popovers when the plugin stops. A view of the plugin
 [content tab](#content-tabs) (a modal dialog pins the tab to its window) or a
 [`UiAnchor`](sdk-reference.html#dev.jasper.sdk.ui.UiAnchor). A modal dialog's `show()` returns after it closes, and its
 form's Escape runs the form's cancel action. A dialog also closes, running its `onClosed` handlers, when the Jasper
-window that owns it closes, and Jasper does not restore it with its windows. Dialogs do not remember their bounds.
+window that owns it closes, and Jasper does not restore it with its windows. A modeless dialog whose content is a
+`FormKind.WINDOW` form, such as the Credential Vault manager, opens at a window's size, can be resized and
+remembers its bounds under the plugin's id and its title; other dialogs remember nothing.
 
 `onClosing(guard)` adds a guard asked when the user closes the dialog: one returning false keeps it open, and one that
 throws allows the close; an overlay has no close of the user's own. `close()` closes it at once, without asking the
@@ -509,7 +513,7 @@ overlay's content.
 
 | [`DialogSpec.Presentation`](sdk-reference.html#dev.jasper.sdk.ui.DialogSpec.Presentation) | What the default look draws |
 | --- | --- |
-| `CENTERED` | A dialog centred over its owner, sized to its content; the user cannot resize it. |
+| `CENTERED` | A dialog centred over its owner, sized to its content; the user cannot resize it, except a modeless `FormKind.WINDOW` dialog (above). |
 | `ATTACHED_SHEET` | A sheet hanging from the owner's title edge. Modal only. |
 | `OVERLAY` | The dialog inside the owner's window: the rest of the window dims under a scrim and the dialog, centred above it, fades and rises 16 pixels into place in about 220 ms, then rises on as it fades out in about 200 ms; both are instant with animations off (`ui.animations.enabled = false`). The window takes no other input meanwhile. Modal only. |
 
@@ -566,11 +570,12 @@ normalised; do the file work in the background.
 
 ## Content tabs
 
-A content tab is a document of the plugin's in a pane of a workspace tab, as the Editor's files are. Jasper provides
-the tab strip, the window, its menus and the status bar; the plugin provides the view.
+A content tab is a document of the plugin's in a pane, beside terminals, as the Editor's files are. Jasper provides the
+tab strip, the window and its menus, and in the main window the status bar; the plugin provides the view.
 
 - `windows().openTab(new ContentSpec(key, title), owner, view)` opens the view in a new tab of the owner's window, or
-  of the main window, and returns a [`ContentTab`](sdk-reference.html#dev.jasper.sdk.ui.ContentTab).
+  of the main window when the owner is null or closed (Jasper restores its windows first when none is open), and
+  returns a [`ContentTab`](sdk-reference.html#dev.jasper.sdk.ui.ContentTab).
   `openTab(spec, owner, view, placement)` takes a
   [`TabPlacement`](sdk-reference.html#dev.jasper.sdk.ui.TabPlacement): `NEW_TAB` (the three-argument form),
   `SPLIT_RIGHT` or `SPLIT_DOWN` (a new pane beside the focused one) or `NEW_WINDOW` (a new child window). Reopening a
@@ -582,11 +587,13 @@ the tab strip, the window, its menus and the status bar; the plugin provides the
   `find-previous`, `copy`, `paste`, `font-bigger`, `font-smaller` and `font-reset` answer Jasper's Find, Find Next,
   Find Previous, Copy, Paste, Increase Font Size, Decrease Font Size and Reset Font Size; Close Pane asks the item to
   close, and Close Tab every item of its tab.
-- `setStatus(List<ContentStatus>)`: items in the status bar while the tab is active, each plain text or a button.
+- `setStatus(List<ContentStatus>)`: items in the main window's status bar while the tab is active there (a child
+  window has none), each plain text or a button.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new child window
   (a child window's only tab stays where it is) and `moveToMainWindow()` to the main window, keeping the view and its
   state, and `window()` is the window that holds it (`WindowHandle.isMain()` tells the main window from a child window).
-  `moveToNewTab()` gives its pane a tab of its own, disabled while `mayMoveToNewTab()` is false; `tabChoices()` lists the
+  `moveToNewTab()` gives its pane a tab of its own (`mayMoveToNewTab()` says whether it would, for a menu entry that
+  shows disabled otherwise); `tabChoices()` lists the
   other tabs of its window as [`TabChoice`](sdk-reference.html#dev.jasper.sdk.ui.TabChoice)s, numbered as Select Tab
   numbers them and worded by `label()` ("2 notes.txt"), none while the item may not move or its window has one tab. A
   choice carries its tab's title only when the plugin holds `terminal.observe` (as `TabHandle.title()` needs it) or the
@@ -627,7 +634,7 @@ when the tab comes to stand for something else, and register the restorer for th
 `context.windows().restorer("document", request -> openDocument(request.state().values().get("path"), request.window()))`.
 A restore state holds a kind and at most 32 entries and 4,096 characters in all (keys and values); a larger state, or a
 key holding a lone surrogate, throws `IllegalArgumentException`. It is written into `workspace.toml`: keep it small, and
-never put a secret in it. A tab without one is not saved.
+never put a secret in it. A tab without one is not saved, and neither is one whose plugin has no restorer for its kind.
 
 The restorer gets a [`RestoreRequest`](sdk-reference.html#dev.jasper.sdk.ui.RestoreRequest) (the window being
 restored, the saved title and the state) on the UI thread, before its window shows or when the user presses Retry, and
@@ -635,13 +642,15 @@ must not block: it may check quickly that a local file exists, but reading its c
 the tab is shown. It opens the tab the way the plugin's action does, with the same restore state, and returns
 `Optional.empty()`; Jasper places it where it was saved, in whichever window, tab and pane held it. When the tab cannot
 come back now (its file is gone), return why instead, `Optional.of("its file is gone")`: its placeholder says so with
-Retry, and nothing reports a failure. A tab whose plugin is not installed, turned off, waiting for review or failed to
-start, has no restorer for its kind, or whose restorer throws before it opens its tab, throws an `Error` that closes it
-(any but a `LinkageError`, which stays contained like an exception and keeps the tab, and a `VirtualMachineError`,
-which is not contained), or opens nothing comes back as a placeholder that says why, with Close and, while the plugin
-runs, Retry. Open only that tab: the window being restored takes no other while the restorer runs, so another tab opens
-where an owner-less one would. Ask the user nothing here (no dialog, sign-in or prompt); a tab that needs one opens
-waiting, as a session that offers Reconnect does.
+Retry, and nothing reports a failure. Open only that tab: the window being restored takes no other while the restorer
+runs, so another tab opens where an owner-less one would. Ask the user nothing here (no dialog, sign-in or prompt); a
+tab that needs one opens waiting, as a session that offers Reconnect does.
+
+A saved tab comes back as a placeholder that says why, with **Close** and, while the plugin runs, **Retry**, when its
+plugin is not installed, is turned off, waits for review or failed to start, has no restorer for its kind, or when the
+restorer opens nothing or throws before it opens the tab. A restorer that has opened its tab keeps it whatever it then
+returns or throws, except an `Error` other than a `LinkageError`, which closes the tab and leaves a placeholder; a
+throw is reported as the plugin's failure. A `VirtualMachineError` is not contained: the restore of that window fails.
 
 ## Notifications
 
@@ -945,14 +954,15 @@ private static void connectEcho(PendingSession pending, long stepMillis) {
 - **One attempt, one outcome.** Exactly one of `attach`, `fail(message)` and cancellation takes effect; the first wins
   and later calls are ignored. Every `PendingSession` method is safe from any thread, also after the plugin stopped.
   `status(text)` updates the pane's line; `fail` shows its message (blank: "The connection failed") with Retry, or
-  Reconnect after a session ran. A connector that throws fails the attempt with the exception's message.
+  Reconnect after a session ran and in a pane Jasper restored with its tab. A connector that throws fails the attempt
+  with the exception's message.
 - **Ownership moves at `attach`, whatever the outcome.** Jasper calls the connection's `close` exactly once: when the
   pane closes, when the session ends, or at once if the attempt was already cancelled. Release everything that belongs
   to the session there, and never count on `attach` having "worked".
 - **Cancellation** happens when the user presses Cancel, the pane closes, the plugin stops or Jasper quits.
   `onCancelled` handlers run at most once, on Jasper's cleanup thread, and at once when registered late; use them to
-  abort a blocking connect. Cancelling before any session ran closes the pane, unless Jasper restored it with its tab;
-  cancelling a reconnect shows "Connection cancelled" with Reconnect.
+  abort a blocking connect. Cancelling before any session ran closes the pane, except in a pane Jasper restored with
+  its tab; cancelling there, or cancelling a reconnect, shows "Connection cancelled" with Reconnect.
 - **Threads.** [`TerminalConnection`](sdk-reference.html#dev.jasper.sdk.terminal.TerminalConnection)'s `output` is read
   on the session's reader thread and may block; `close` must unblock it. `input` and `resize` are used only on Jasper's
   writer thread for that session, so a stalled network never freezes the user's typing; when its 4 MiB queue is full,
@@ -1102,9 +1112,7 @@ terminal pane, with the path's line and the clicked window. The Editor takes thi
   settings file writes its keys, gives the plugin's settings the look's defaults: when the plugin declares a key, a
   value its kind accepts becomes that setting's default, a saved value still wins, and Reset returns to the look's
   value. A value the kind rejects, or a key the plugin does not declare, is logged as a warning and ignored, and the
-  plugin starts. Enterprise's table gives the Editor's `font_family` IBM Plex Mono. A Jasper older than SDK 0.18.2
-  accepts such a plugin by its `sdk` range and then refuses its kit file, so a look whose kit file holds one starts its
-  `sdk` range at 0.18.2 or later, as Enterprise's `sdk = ">=0.21.0, <0.22"` does.
+  plugin starts. Enterprise's table gives the Editor's `font_family` IBM Plex Mono.
 - **Themes.** `themes` lists Jasper theme files in the plugin's jars ([creating themes](creating-themes.md)); a file's
   name is its theme's id (`themes/look.json` is `look`). Jasper reads them once at start. While the plugin loads, its
   themes are listed in Settings › Appearance after the built-in ones, captioned "From the *name* plugin", and cannot be
@@ -1145,7 +1153,6 @@ The faces, sizes, title bar and menus are the look's own: the user's interface f
 and view mode settings are not reported, though custom content gets the interface font as its component's font
 ([custom content](plugin-ui.md#custom-content)). Test both looks by calling
 `FakePluginHost.setPresentation(FakePresentations.CLASSIC)` before the plugin starts ([testing](#testing)).
-`presentation()` needs SDK 0.18.2 or later; the bundled plugins that read it declare `sdk = ">=0.21.0, <0.22"`.
 
 ### The terminal font
 
@@ -1170,9 +1177,8 @@ Apply it to a component inside your registered content, as the Editor does for i
 registered component's own font to the interface font at every update ([custom content](plugin-ui.md#custom-content)).
 
 The Editor shows its text in the terminal font this way while its **Follow terminal font** setting is on
-([Editor](editor.md)). Both methods need SDK 0.18.3 or later; the Editor, which calls them, declares `sdk = ">=0.21.0, <0.22"`.
-In a test, `FakePluginHost.setTerminalTypography(value)` publishes a saved value on the next `flush()`; until then the
-fake reports Jasper's defaults.
+([Editor](editor.md)). In a test, `FakePluginHost.setTerminalTypography(value)` publishes a saved value on the next
+`flush()`; until then the fake reports Jasper's defaults.
 
 ## Declared settings
 
@@ -1236,7 +1242,7 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
   `host.changed()` tells Settings to ask `modified()` again; call it whenever state of the plugin's own changes.
   `pendingChanged()` runs after a standard row handles the user's edit, choice, list action, Browse… or Reset, once
   `host.pending` returns the result (an invalid edit leaves it as it was): rebuild there whatever depends on pending
-  values, as the Editor's page does. The plugin's own `host.stage` calls do not trigger it; it needs SDK 0.18.3. Use
+  values, as the Editor's page does. The plugin's own `host.stage` calls do not trigger it. Use
   `modified`, `apply` and `reset` only for state of the plugin's own, and `keywords` and `highlight` for search. The
   panel lives as long as the plugin, so Settings calls `reset` before `dispose` whenever it closes a page without a
   successful Apply, as on Cancel. Compose the page as the generated ones are
@@ -1297,7 +1303,7 @@ catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
 
 | Runs on, or may be called from | What |
 | --- | --- |
-| The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, windows, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
+| The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
 | Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
 
 - **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
@@ -1340,8 +1346,8 @@ try (var host = new FakePluginHost()) {
 | Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView` (an event a standard row handles there calls `pendingChanged()`), `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
 | The look and the terminal font | `setPresentation(presentation)` before any plugin starts, with `FakePresentations.STANDARD` (what the fake reports until told otherwise) or `CLASSIC`; `presentation()`; `setTerminalTypography(value)`, delivered by `flush()` |
 | Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `status()`, `progress()`, `rail()` |
-| Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the main window), `panelView`, `panelHeader`, `closePanel`; `windows()` (the dialogs), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
-| Terminals | `addTerminalWindow()` (the first one added while no main window is open is the main window), `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`, `moveTab`, `windowTabs(windowId)` (a window's tabs, each its items pane by pane), `focusTerminalPane`, `closeTerminalPane`, `holdPane` (a local pane that waits, `NOT_STARTED`, until its tab is shown), `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
+| Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the main window), `panelView`, `panelHeader`, `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
+| Terminals | `addTerminalWindow()` (the first one added while no main window is open is the main window), `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`, `moveTab`, `closeTab`, `windowTabs(windowId)` (a window's tabs, each its items pane by pane), `focusTerminalPane`, `closeTerminalPane`, `holdPane` (a local pane that waits, `NOT_STARTED`, until its tab is shown), `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
 | Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()` |
@@ -1360,6 +1366,7 @@ Where the fake differs from Jasper:
   cannot use is listed by `lookDefaultProblems`, where Jasper logs it as a warning, with a reason worded its own way.
 - Palette calls get `maxResults` 5 and `macOs` true, and `executeInScope` skips `available`.
 - `FileSource.connect` always gets a window.
+- `restoreTab` puts the restored tab in a new tab at the end of the window's strip, not in its saved tab and pane.
 
 ## Building the in-repo plugins
 

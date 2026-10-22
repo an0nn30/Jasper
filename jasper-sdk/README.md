@@ -64,15 +64,7 @@ sdk = ">=0.21.0, <0.22"
 ```
 
 A plugin that uses something only a later 0.21 version has starts its range there. Every bundled plugin declares
-`sdk = ">=0.21.0, <0.22"`. 0.19.0, 0.20.0 and 0.21.0 are breaking boundaries: 0.19.0 makes a window's tabs terminal
-and content tabs alike (`TabHandle.kind()` and `terminal()` in place of a tab's pane list, no Pane menu); 0.20.0 gives
-Jasper one main window and child windows in place of plugin windows (`WindowHandle.isMain()`, `TabPlacement`,
-`ContentTab.moveToNewWindow()` and `moveToMainWindow()` in place of `move(boolean)`, no window shortcut context); 0.21.0
-makes tabs hold panes, adds split items (`Windows.splitItem`, `splitChoices`, `ContentTab.split`, `moveToNewTab`,
-`tabChoices` and `moveToTab`, whose choices carry another tab's title only with `terminal.observe` or when that tab
-shows the plugin's own content) and saves the workspace (`RestoreState`, `Windows.restorer`,
-`SessionState.NOT_STARTED`).
-[Writing a plugin](../docs/plugin-authoring.md) describes each.
+`sdk = ">=0.21.0, <0.22"`.
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›
 Plugins shows it as Skipped with the reason "needs SDK *range*; this is SDK *version*". Install from Zip… refuses such a

@@ -10,8 +10,8 @@ public enum StandardMenu {
     /** The View menu. */
     VIEW,
     /**
-     * The Tab menu: the Split submenu, Move Pane to New Tab, Move Pane to Tab, focusing panes, moving between prompts,
-     * and the tab commands.
+     * The Tab menu: the Split submenu, Move Pane to New Tab, Move Pane to Tab, Move Tab Into, focusing panes, moving
+     * between prompts, Rename Tab and the tab commands.
      */
     TAB,
     /**

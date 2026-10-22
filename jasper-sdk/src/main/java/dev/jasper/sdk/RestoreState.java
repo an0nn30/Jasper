@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * How a plugin's tab comes back when Jasper restores its windows (workspace tabs spec 13 and 14): the kind of restorer the
+ * How a plugin's tab comes back when Jasper restores its windows: the kind of restorer the
  * plugin registered with {@code Windows.restorer} and a small map of strings the restorer rebuilds the tab from, such as a
  * file's path. Jasper writes it into {@code workspace.toml} with the tab, so it holds no secret. A content tab gives it in
  * its {@code ContentSpec} or later with {@code ContentTab.setRestore}; a provided session gives it in its

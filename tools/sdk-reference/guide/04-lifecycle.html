@@ -56,7 +56,7 @@ it requires: Jasper prepares them before it calls {@code start}, and {@link Serv
 <h3>When start fails</h3>
 <p>When {@code start} throws, or the entry class cannot be created, Jasper rolls the plugin back completely: everything
 the context handed out goes, not only its registrations. Its actions, menus, toolbar and status items, tool windows,
-windows and dialogs, palette scopes, file sources, subcommand handlers and event subscriptions are removed; open
+content tabs, split items, restorers and dialogs, palette scopes, file sources, subcommand handlers and event subscriptions are removed; open
 activities end as failed with "Plugin failed to start" and connections close; its notifications expire; staged services
 are discarded, so no other plugin ever sees them; its background tasks are interrupted; and the context closes. The
 plugin is reported as failed with "<i>Name</i> failed to start" (with <b>Disable Plugin</b> and <b>Show more…</b>, which
@@ -85,7 +85,7 @@ deadline. See <a href="#threading">Threading</a> for the shutdown order.</p>
 <tr><td>{@link PluginContext#activities()}</td><td>Activities and connections shown on Desk Buddy.</td></tr>
 <tr><td>{@link PluginContext#notifications()}</td><td>Its notification groups.</td></tr>
 <tr><td>{@link PluginContext#actions()}, {@link PluginContext#menus()}, {@link PluginContext#toolbar()}, {@link PluginContext#statusBar()}, {@link PluginContext#rail()}</td><td>Commands and where they appear; see <a href="#contributions">Contributions</a>.</td></tr>
-<tr><td>{@link PluginContext#panels()}, {@link PluginContext#windows()}</td><td>Tool windows, windows, dialogs, overlays, popovers, content tabs and file choosers.</td></tr>
+<tr><td>{@link PluginContext#panels()}, {@link PluginContext#windows()}</td><td>Tool windows, dialogs, overlays, popovers, content tabs, split items, restorers and file choosers.</td></tr>
 <tr><td>{@link PluginContext#kit()}, {@link PluginContext#appearance()}</td><td>Its <a href="#ui">view kit</a>, the current theme's colours, the look Jasper runs with and the saved terminal font.</td></tr>
 <tr><td>{@link PluginContext#terminals()}</td><td>Windows, tabs and panes; see <a href="#terminals">Terminals</a>.</td></tr>
 <tr><td>{@link PluginContext#palette()}</td><td>Command palette scopes; see <a href="#palette">Palette</a>.</td></tr>

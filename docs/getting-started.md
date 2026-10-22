@@ -64,8 +64,9 @@ desktop menu. The package is named `jasper`. The packages are unsigned.
 Jasper opens its main window with one tab running your shell: your login shell on macOS and Linux, PowerShell on
 Windows (Settings › Terminal › Shell chooses another, such as [Cygwin Bash](terminal.md#cygwin-bash)). The first window
 is sized for 100 columns by 35 rows of the terminal font, bundled Cousine Nerd Font Mono at 12 points; after that,
-Jasper restores its windows, tabs and panes as you left them at each start. On macOS Jasper follows the system's dark or light appearance; on
-Linux and Windows it shows Dark until you choose Light. The default theme is Jasper Meadow in both Dark and Light.
+Jasper [restores its windows, tabs and panes](workspace.md#saving-and-restoring-the-windows) as you left them at each
+start. On macOS Jasper follows the system's dark or light appearance; on Linux and Windows it shows Dark until you
+choose Light. The default theme is Jasper Meadow in both Dark and Light.
 
 While Jasper starts, a splash shows a meadow with the [Desk Buddy](notifications.md#desk-buddy), Jasper's version,
 each start-up step and a progress bar, until the window has painted. A look with its own [branding](looks.md#branding)
@@ -76,10 +77,9 @@ Under the default look the window has:
 
 - a **header** with a search field in the middle, which shows where the current pane is (`user@~/path` locally,
   `host:path` over SSH) and opens the [command palette](command-palette.md) when you click it, and a toolbar: New
-  tab, New terminal window, Split, Maximize pane, the plugins' buttons (such as Remote's Sessions menu), Find,
-  Settings and the window's ⋮ menu. On
-  macOS the header shares the title bar with the window controls and the menus are in the menu bar; on Linux and
-  Windows the menus sit in Jasper's own title bar;
+  tab, New terminal window, Split, Maximize pane, the plugins' buttons (the Editor's New Editor Window, Remote's
+  Sessions menu), Find, Settings and the window's ⋮ menu. On macOS the header shares the title bar with the window
+  controls and the menus are in the menu bar; on Linux and Windows the menus sit in Jasper's own title bar;
 - the **terminal**, with a row of tabs above it once the window has more than one tab;
 - **rails** on the left and right edges with a button for each tool window;
 - a **status bar** with the shell's name, a dot showing whether shell integration is active (● active, ○ not
@@ -102,9 +102,10 @@ Jasper keeps its settings and data in one folder, its home:
 Setting the `JASPER_HOME` environment variable moves it; a Jasper in another home runs beside the default home's and
 never stays in the background ([one Jasper per home](command-line.md#one-jasper-per-home)). The home holds
 `config.toml` (written the first time you save a change in Settings), `logs/`, `themes/` for imported themes, `plugins/`
-with each plugin's settings file and data, `plugins.toml` with each plugin's enabled state and your consent, and
-`ui-state.toml` with the tool window layout and `workspace.toml` with the windows, tabs and panes Jasper restores. The home is separate from the installed application, so removing or
-upgrading Jasper keeps your settings and data. [Configuration](configuration.md) lists every setting and file.
+with each plugin's settings file and data, `plugins.toml` with each plugin's enabled state and your consent,
+`ui-state.toml` with the tool window layout, and `workspace.toml` with the windows, tabs and panes Jasper restores. The
+home is separate from the installed application, so removing or upgrading Jasper keeps your settings and data.
+[Configuration](configuration.md) lists every setting and file.
 
 ### Running in the background
 
@@ -114,21 +115,22 @@ keeps Jasper running with no windows open, so a new window opens at once. It tak
 | | macOS | Windows | Linux |
 | --- | --- | --- | --- |
 | Default | On | On | Off |
-| Closing the last window | Jasper keeps running in its menu bar item: **New Terminal Window**, **Settings…**, **Quit Jasper Completely** | Jasper keeps running in its notification-area icon: **Open Jasper**, **Quit Jasper** | Jasper quits. With the setting on, it keeps running with no icon; launch Jasper again for a window |
+| Closing the main window (and with it every window) | Jasper keeps running in its menu bar item: **New Terminal Window**, **Settings…**, **Quit Jasper Completely** | Jasper keeps running in its notification-area icon: **Open Jasper**, **Quit Jasper** | Jasper quits. With the setting on, it keeps running with no icon; launch Jasper again for a window |
 | Quit | Cmd+Q closes every window and keeps Jasper in the menu bar; **Quit Jasper Completely** ends it | Quit (Ctrl+Alt+Shift+Q) ends Jasper | Quit (Ctrl+Alt+Shift+Q) ends Jasper |
 | At login | An installed Jasper starts in the background, with no Dock icon | An installed Jasper starts in the background | Not started |
 
-One Jasper runs per home: launching it again brings the running Jasper's window forward, or opens one when none is
-open, and opens the files and folders you named. On macOS Jasper's Dock icon shows only while one of its windows is open. Turning the setting off also removes
-the login item when you save.
+One Jasper runs per home, with the setting on or off: launching it again brings the running Jasper's main window
+forward, restoring its windows first when none is open, and opens the files and folders you named. On macOS a file or
+folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way, and the Dock icon shows
+only while one of Jasper's windows is open. Turning the setting off also removes the login item when you save.
 
 ## A first tour
 
 ### Tabs and splits
 
 - **New Tab** (Cmd+T on macOS, Ctrl+Shift+T on Linux and Windows) opens a tab; **New Terminal Window** (Cmd+N,
-  Ctrl+Shift+N) a child window. New tabs, windows and splits start in the current pane's folder once its shell has reported it, as shell
-  integration does.
+  Ctrl+Shift+N) a child window, which has only a title bar and its tabs. New tabs, windows and splits start in the
+  current pane's folder once its shell has reported it, as shell integration does.
 - **Split Right** (Cmd+D, Ctrl+Shift+D) and **Split Down** (Cmd+Shift+D, Ctrl+Alt+Shift+D) split the current pane;
   drag the divider to resize. **Focus Pane Left / Right / Up / Down** (Cmd+Option+Arrow, Ctrl+Alt+Shift+Arrow) moves
   between panes, and **Maximize Pane** (Cmd+Shift+Enter, Ctrl+Alt+Shift+Enter) shows only the current pane until you
@@ -136,10 +138,13 @@ the login item when you save.
   beside the pane instead, and **Move Pane to New Tab** (Cmd+Option+T, Ctrl+Alt+Shift+T) gives the pane a tab of its
   own.
 - **Close Pane** (Cmd+W, Ctrl+Shift+W) closes the current pane, and its tab with the last pane; **Close Tab**
-  (Cmd+Option+W, Ctrl+Alt+Shift+W) closes the whole tab. **Rename Tab** (Cmd+I, Ctrl+Shift+I) names a tab; an empty
-  name returns to the automatic title.
-- Drag a tab to reorder it, and middle-click it to close it. Right-click a pane for Copy, Paste, Find, the split
-  commands and the plugins' commands for that pane.
+  (Cmd+Option+W, Ctrl+Alt+Shift+W) closes the whole tab, and **Close Window** (Cmd+Shift+W on macOS, no default
+  shortcut on Linux and Windows) the window. A child window closes with its last tab; the main window stays open with
+  an empty workspace. **Rename Tab** (Cmd+I, Ctrl+Shift+I) names a tab; an empty name returns to the automatic title.
+- Drag a tab to reorder it, onto another window to move it there, or out of every window into a child window of its
+  own; middle-click it to close it. Hold Cmd+Option (Ctrl+Alt on Linux and Windows) and drag a pane to move it beside
+  another pane or into a tab of its own. Right-click a pane for Copy, Paste, Find, the split and move commands and the
+  plugins' commands for that pane.
 
 On Linux and Windows, Copy and Paste are Ctrl+Shift+C and Ctrl+Shift+V, so Ctrl+C still reaches the program in the
 terminal. **Find** (Cmd+F, Ctrl+Shift+F) searches the pane's text as you type; see
@@ -177,13 +182,14 @@ page. See [configuration](configuration.md) and [keyboard shortcuts](keyboard-sh
 
 ### Tool windows
 
-Tool windows are panels beside and below the terminal: Sessions, SFTP, Tunnels and File Servers on the left, and
-Notifications on the right; Remote's file transfers show at the foot of the SFTP tool window. Click a rail button to show
-or hide one; View › Tool Windows lists them too, and some have shortcuts, such as **Toggle SSH hosts** (Cmd+Option+1,
-Alt+1) and **Toggle SFTP** (Cmd+Option+2, Alt+2). Drag a rail button or a tool window's header to another edge, or
-right-click the button and choose **Move to**. Each side, and the bottom, has two slots, and each slot shows one tool
-window at a time; Jasper remembers the layout. Under the Enterprise look the rails are labelled stripes, each label
-starting with its tool window's icon, and the tool windows are in the Window menu. See [the workspace](workspace.md).
+Tool windows are panels beside and below the terminal in the main window: Sessions, SFTP, Tunnels and File Servers on
+the left, and Notifications on the right; Remote's file transfers show at the foot of the SFTP tool window. Click a rail
+button to show or hide one; View › Tool Windows lists them too, and some have shortcuts, such as **Toggle SSH hosts**
+(Cmd+Option+1, Alt+1) and **Toggle SFTP** (Cmd+Option+2, Alt+2). Drag a rail button or a tool window's header to
+another edge, or right-click the button and choose **Move to**. Each side, and the bottom, has two slots, and each slot
+shows one tool window at a time; Jasper remembers the layout. Under the Enterprise look the rails are labelled stripes,
+each label starting with its tool window's icon, and the tool windows are in the Window menu. See
+[the workspace](workspace.md#tool-windows-and-the-dock).
 
 ### Connect to a host
 
@@ -208,10 +214,10 @@ SSH pane, **Open SFTP here** (Cmd+Shift+O, Ctrl+Alt+Shift+O) browses the host's 
 The Credential Vault keeps logins, SSH keys and secure notes in one encrypted file in Jasper's home.
 
 1. Choose File › **Open Vault...** (Cmd+Shift+\\ on macOS, Ctrl+Alt+Shift+\\ on Linux and Windows). The first time,
-   **Create Vault** asks for a master password of at least 8 characters. **Bind to this device** (marked Recommended) stores
-   a device secret with the system's keychain (in a file in Jasper's home where there is none), so the vault opens
-   only on this computer. Your master password cannot be recovered if you forget it.
-2. In the Credential Vault window, the **Add entry** (+) menu (**New** under the Enterprise look) adds a **Login**,
+   **Create Vault** asks for a master password of at least 8 characters. **Bind to this device** (marked Recommended)
+   stores a device secret with the system's keychain (in a file in Jasper's home where there is none), so the vault
+   opens only on this computer. Your master password cannot be recovered if you forget it.
+2. In the Credential Vault manager, the **Add entry** (+) menu (**New** under the Enterprise look) adds a **Login**,
    an **SSH Key** or a **Secure Note**, or runs **Generate SSH Key...**.
 3. **Search Vault Logins** (Cmd+\\, Ctrl+Shift+\\) finds a login in the command palette: Enter copies its password,
    Cmd+Enter (Ctrl+Enter) its username, and Jasper clears the copy from the clipboard after 30 seconds.

@@ -42,7 +42,7 @@ that window is focused. Waiting cards show in the order they arrived.
 
 ## The Notifications panel
 
-The Notifications [tool window](workspace.md) starts in the upper half of the window's right side. Under the
+The Notifications [tool window](workspace.md) starts in the upper half of the main window's right side. Under the
 [Enterprise look](enterprise.md) it is titled **Event Log** and starts on the left of the bottom strip. Its button,
 or **Notifications: Show History** in the command palette, opens and closes it; under the Enterprise look either one
 opening it makes it the [active tool window](enterprise.md#windows-and-menus), with the keyboard, and Show History
@@ -126,9 +126,9 @@ Plugins. A plugin that failed while starting is reported once, by its incident's
 When something fails unexpectedly, in Jasper or in a plugin, Jasper records it as an incident and tells you with an
 error notification: "Unexpected error in Jasper", or, for a plugin, "<name> failed to start", "<name> failed to stop"
 or "<name> failed in <operation>". A plugin's offers **Disable Plugin**, and both offer **Show more…**, which opens the
-Errors tab at that incident, in the main window. **Notifications: Show Errors** in the command palette opens the tab too. A shell that
-could not start is recorded as well: each failure is announced as "Could not start the terminal", with its folder and
-cause, and offers **Show more…**.
+Errors tab at that incident, in the main window. **Notifications: Show Errors** in the command palette opens the tab
+too. A shell that could not start is recorded as well: each failure is announced as "Could not start the terminal",
+with its folder and cause, and offers **Show more…**.
 
 The **Errors** tab lists this session's incidents, most recently seen first: each row shows the summary, the
 source (Jasper or the plugin's name), "×N" once it happened more than once, and the time. When the same failure
@@ -256,7 +256,7 @@ screen.
 
 ## For developers
 
-Jasper's own code posts through the application's notification center; see
+Jasper's own code posts through the application's notification centre; see
 [posting a notification](app-maintenance.md#posting-a-notification) and
 [recording an incident](app-maintenance.md#recording-an-incident). Plugins post through the SDK's
 [`Notifications`](sdk-reference.html#dev.jasper.sdk.notifications.Notifications), which needs no capability: a group is

@@ -210,8 +210,9 @@ Example view-test input on EDT: `view.handleMouse(new MouseEvent(view,
 MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON1_DOWN_MASK, 1, 1, 1, false,
 MouseEvent.BUTTON1));`. Keep press-time modifiers through release, Shift bypass,
 a macOS Cmd-click staying local under mouse reporting, right-click behaviour,
-out-of-bounds checks, fractional wheel accumulation, alternate-screen arrow keys and
-the macOS Shift-wheel rule.
+out-of-bounds checks, fractional wheel accumulation, alternate-screen arrow keys,
+the macOS Shift-wheel rule, and ignoring an event an earlier listener consumed (the
+application's pane drag relies on it).
 Do not let a plugin borrow a controller's in-flight gesture state.
 
 ## Change process metadata

@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 import java.util.Objects;
 
 /**
- * One choice of Jasper's Split lists (tabs and panes spec 2.10 and 8): what a new pane can hold, with the actions that
+ * One choice of Jasper's Split lists: what a new pane can hold, with the actions that
  * open it in a new pane to the right of and below the focused pane. {@link Windows#splitChoices()} lists them; a list
  * a plugin builds shows each choice's {@link #rightLabel()} and {@link #downLabel()}, as Jasper's do.
  *
@@ -27,7 +27,7 @@ public record SplitChoice(String label, String rightAction, String downAction, b
 
     /**
      * The entry that opens it to the right, as every Split list words it: the label and "Right", then an ellipsis while
-     * its action asks something first, as "Open File Right…" (pane flexibility spec 3).
+     * its action asks something first, as "Open File Right…".
      *
      * @return the entry's text
      */

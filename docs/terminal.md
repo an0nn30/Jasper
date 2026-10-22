@@ -2,8 +2,8 @@
 
 A terminal pane runs a shell on this machine in a pseudo-terminal (ConPTY on Windows), a program a plugin or the
 [default editor](editor.md#default-editor) starts instead of the shell, or a session a plugin provides, such as an SSH
-connection from [Remote](remote.md). Tabs hold one or more panes; splitting, focusing, maximizing and moving them is described in
-[the workspace guide](workspace.md). This guide covers working inside a pane.
+connection from [Remote](remote.md). Tabs hold one or more panes; splitting, focusing, maximising and moving them is
+described in [the workspace guide](workspace.md). This guide covers working inside a pane.
 
 Terminal settings are on **Settings › Terminal** and its **Font & Colors**, **Cursor** and **Shell** pages, and in the
 `[terminal]` table of `config.toml`; the [settings table](configuration.md#supported-settings) gives every key's
@@ -41,8 +41,8 @@ as Remote's **Open SFTP here** and File Server's **Share Path**.
 ## Shells and profiles
 
 **Shell profile** (`terminal.shell.profile`) on **Settings › Terminal › Shell** chooses the shell new tabs and windows
-start. A split starts the profile of the pane it splits. Splitting a pane that runs a plugin's session, such as an SSH
-pane, starts a local shell with the configured profile in your home folder; Remote's
+start. A split beside a running local shell starts that shell's profile. Splitting a pane that runs a plugin's
+session, such as an SSH pane, starts a local shell with the configured profile in your home folder; Remote's
 [**Split with Same Host**](remote.md#split-with-same-host) opens another session on the host.
 
 | Profile | Id | Offered on | Runs | Tab and status bar name |
@@ -252,7 +252,7 @@ Jasper pastes multi-line text without asking. Middle-click does not paste.
 
 Jasper's shortcuts are checked before a key reaches the program. Keys held with Cmd on macOS never reach the program.
 Jasper's Linux and Windows defaults use Ctrl+Shift, so plain Ctrl keys such as Ctrl+C reach the shell; the exceptions
-are Ctrl+Tab and Ctrl+Shift+Tab (next and previous tab) and Ctrl+1 to Ctrl+9 (select a tab). The bundled Remote plugin
+are Ctrl+PageDown and Ctrl+PageUp (next and previous tab) and Ctrl+1 to Ctrl+9 (select a tab). The bundled Remote plugin
 also takes Alt+1, Alt+2 and Alt+3 there (**Toggle SSH hosts**, **Toggle SFTP**, **Transfers**); they reach the program
 as Meta keys only after you rebind them in **Settings › Keymap**. A shortcut whose action is unavailable, such as Copy
 with nothing selected, is not passed to the program either.
@@ -279,6 +279,9 @@ scrollback rows above the live screen are not reported.
 Hold **Shift** to keep the mouse in Jasper: Shift-drag selects, Shift-double-click selects a word, Shift-right-click
 opens Jasper's context menu and, on Linux and Windows, the Shift-wheel does what the wheel does without mouse reports:
 it scrolls the pane, or sends Up and Down arrow keys on the alternate screen.
+
+A left press with Cmd+Option held (Ctrl+Alt on Linux and Windows) starts a
+[pane drag](workspace.md#panes-and-splits) instead: the program gets no report of it, and it starts no selection.
 
 ## Links and file paths
 
@@ -504,10 +507,10 @@ starts. A pane that is not WSL asked to start on a `\\wsl.localhost` share start
 
 ## Titles
 
-A tab is named after its focused pane, first match winning:
+A tab is named after its active pane, first match winning:
 
-1. the name you gave it with **Rename Tab** (Cmd+I on macOS, Ctrl+Shift+I on Linux and Windows); an empty name returns
-   to automatic naming;
+1. the name you gave the pane's terminal with **Rename Tab** (Cmd+I on macOS, Ctrl+Shift+I on Linux and Windows); an
+   empty name returns to automatic naming;
 2. the title a program set with OSC 0, 1 or 2; with shell integration it lasts until the next command starts or
    finishes;
 3. the running command, with shell integration;
@@ -534,14 +537,16 @@ shell exits** (`terminal.on_exit`):
 A pane that stays closes when you press a key that is neither a modifier nor one of Jasper's shortcuts. A change applies
 to the next exit in every pane, but never closes a pane that already exited. A pane running a program instead of the
 shell, such as a terminal editor the default editor opened, closes after exit code 0 and stays otherwise, whatever
-this setting says. Closing a tab's last pane closes the tab, and closing a window's last tab closes the window.
+this setting says. Closing a tab's last pane closes the tab; a child window closes with its last tab, and the main
+window shows its empty workspace.
 
 A session a plugin provides shows "Connecting…" with **Cancel** while it connects. When it ends or fails, a banner says
 "Disconnected (exit N)", "Disconnected: *reason*" or the plugin's message, with **Reconnect** (**Retry** when it never
 connected) and **Close**, unless the plugin asked for the pane to close. After "Disconnected (exit N)", pressing a key
 that is neither a modifier nor a shortcut in the pane closes it, as for a local shell; use **Reconnect** to connect
-again. When the other side stops accepting input, what you type is dropped and "Input dropped: the remote side is not
-accepting input" shows for four seconds.
+again. A session Jasper restored with its tab offers **Reconnect** from its first attempt, and **Cancel** on that
+attempt keeps the pane. When the other side stops accepting input, what you type is dropped and "Input dropped: the
+remote side is not accepting input" shows for four seconds.
 
 ## Font size
 

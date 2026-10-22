@@ -100,7 +100,7 @@ id = "dev.example.harbour"
 name = "Harbour"
 version = "1.0.0"
 entry = "dev.example.harbour.HarbourPlugin"
-sdk = ">=0.18.3, <0.19"
+sdk = ">=0.21.0, <0.22"
 capabilities = ["presentation.provide"]
 presentation = "presentation/harbour.kit.toml"
 themes = ["themes/harbour.json"]
@@ -111,10 +111,6 @@ or `..`, without a leading or trailing `/`. The kit file's paths resolve against
 and splash art live in or under that folder. The entry class's `start` may do nothing, as Enterprise's does: other
 plugins learn the look through the SDK ([adapting a plugin to a look](#adapting-a-plugin-to-a-look)). Enterprise also
 sets `enabled_by_default = false`, which keeps a bundled plugin off until the user turns it on.
-
-`sdk = ">=0.18.3, <0.19"` admits the Jasper versions that read every key and value on this page, `icons = "@jasper"`
-included. A Jasper that accepts the plugin by a wider range but does not know a key or value the kit file uses refuses
-the whole kit file.
 
 To try a look while you write it, start Jasper with `--plugin-dir` pointing at the plugin
 ([running a plugin in Jasper](plugin-authoring.md#running-a-plugin-in-jasper)): that copy wins the election and needs
@@ -182,8 +178,8 @@ The base gives every key its starting value (the columns below) and also decides
 | Key | Values | `default` base | `classic` base | What it changes |
 |---|---|---|---|---|
 | `title_bar` | `unified`, `native`, `classic` | `unified` | `native` | `unified`: on macOS the title row holds the toolbar; on Linux and Windows Jasper draws the title bar, or the system draws it with `window.native_decorations`. `native`: the system title bar on every platform, on macOS following the theme's darkness; Settings hides `window.native_decorations`. `classic`: IntelliJ Classic's title bar on macOS and Windows, and `native`'s on Linux ([the classic title bar](#the-classic-title-bar)). Under `native` and `classic` the toolbar is a classic row beneath the title (22-pixel icon buttons named by their tooltips under `window.toolbar = "icons"`, each button's icon and then its label under `"icons_and_labels"`), and Settings draws no title row of its own. |
-| `menu_bar` | `system`, `window` | `system` | `window` | `system`: the standard menus, in the screen menu bar on macOS. `window`: the classic menus of each workspace window: File, Edit, View, then Session and Transfer, the plugins' menus and Tools, each when filled, then Window and Help. Window holds the Tab items and the tool window toggles, which leave View. Under `native` they are a row in the main window on every platform, the macOS screen menu bar is off and child and auxiliary windows have none; under `classic` they are where [the classic title bar](#the-classic-title-bar) puts them. Needs `title_bar = "native"` or `"classic"`. |
-| `window_title` | 1 to 120 characters | `"{context}"` | `"{context}"` | The window's title, from the [tokens](#window-title-tokens) below. |
+| `menu_bar` | `system`, `window` | `system` | `window` | `system`: the standard menus, in the screen menu bar on macOS. `window`: the main window's classic menus: File, Edit, View, then Session and Transfer, the plugins' menus and Tools, each when filled, then Window and Help. Window holds the Tab items and the tool window toggles, which leave View. Under `native` they are a row in the main window on every platform, the macOS screen menu bar is off and child and auxiliary windows have none; under `classic` they are where [the classic title bar](#the-classic-title-bar) puts them. Needs `title_bar = "native"` or `"classic"`. |
+| `window_title` | 1 to 120 characters | `"{context}"` | `"{context}"` | The main window's title, from the [tokens](#window-title-tokens) below; a child window is titled after its active tab. |
 | `tool_windows` | `rails`, `stripes` | `rails` | `stripes` | `rails`: icon stripes as wide as `window.rail_width`. `stripes`: labelled stripes on the sides and a strip along the bottom, each label starting with its tool window's icon, tool windows framed flush under header strips, and a tool window becoming the active one, with the keyboard, when you click in it, open it from its stripe or use its toggle (a menu item or its shortcut); Settings hides `window.rail_width`, and the Notifications panel is called **Event Log** and starts in Bottom Left instead of Right Top ([tool windows](workspace.md#tool-windows-and-the-dock)). |
 | `editor_tabs` | `equal`, `classic` | `equal` | `classic` | Equal-width tabs, shown once a window has two tabs, or classic tabs, always shown and as wide as their labels, each with a × (a terminal tab also with a status dot), and a + after the last. |
 | `status_bar` | `segments`, `cells` | `segments` | `cells` | Slash-separated segments, or ruled cells. |
@@ -199,8 +195,8 @@ The base gives every key its starting value (the columns below) and also decides
 
 | Platform | Title bar | Menus (`menu_bar = "window"`) |
 |---|---|---|
-| macOS | A 28-point band in the toolbar's colour, seamless with the toolbar row below it, where macOS draws the traffic lights and the window's title, light or dark with the theme. A double-click in it zooms, minimises or does nothing, as System Settings › Desktop & Dock says; full screen removes it. | The screen menu bar, with **About Jasper** and **Settings…** in the application menu. A child window shows the main window's menus there. Other windows, such as Settings and About, keep the system title bar and show a short File menu in the screen menu bar. |
-| Windows | Jasper's 28-pixel title bar in the toolbar's colour, holding the menus and then the window's title, left-aligned and dimmed while the window is inactive, over a 1-pixel rule. As the window narrows, a long title shortens to 60 pixels, then the menus fold into "…" and then ☰. With `window.native_decorations = true` the system title bar instead, after a restart. | In the title bar, or a row in the window under the system title bar. Other windows and dialogs have Jasper's title bar without menus. |
+| macOS | A 28-point band in the toolbar's colour, seamless with the toolbar row below it, where macOS draws the traffic lights and the window's title, light or dark with the theme. A double-click in it zooms, minimises or does nothing, as System Settings › Desktop & Dock says; full screen removes it. | The screen menu bar, with **About Jasper** and **Settings…** in the application menu. A child window shows the same menus there, acting on that window. Other windows, such as Settings and About, keep the system title bar and show a short File menu in the screen menu bar. |
+| Windows | Jasper's 28-pixel title bar in the toolbar's colour, holding the menus and then the window's title, left-aligned and dimmed while the window is inactive, over a 1-pixel rule. As the window narrows, a long title shortens to 60 pixels, then the menus fold into "…" and then ☰. With `window.native_decorations = true` the system title bar instead, after a restart. | In the main window's title bar, or a row in it under the system title bar. A child window's title bar holds its title and the window's ⋮; other windows and dialogs have Jasper's title bar without menus. |
 | Linux | The system title bar, as `native`. | A row in the main window; child and auxiliary windows have none. |
 
 Classic in-window dialogs and overlays start below the title bar. Compact ([view modes](workspace.md#view-modes)) keeps
@@ -367,7 +363,7 @@ All three keys are required when the table is present.
 | `splash_art` | an `.svg` path | The art at the top of the splash screen. |
 
 A start that opens a window (not `--background`, `--no-window` or `--safe-mode`) shows a 720 × 440 splash screen until
-the first workspace window has painted, or until start-up stops. It names each step as start-up reaches it ("Starting
+the first Jasper window has painted, or until start-up stops. It names each step as start-up reaches it ("Starting
 Java runtime…", "Reading configuration…", "Loading plugin: *name*" for each plugin, "Restoring workspace…", then
 "Starting *product* Workstation…", *product* being `[branding] product` or else Jasper), and a progress bar along its
 bottom edge fills with each step. A splash that cannot be drawn is skipped and logged.

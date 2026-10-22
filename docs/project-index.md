@@ -20,8 +20,7 @@ Change or assign shortcuts in [Settings › Keymap](keyboard-shortcuts.md#settin
 
 ## Indexing a project
 
-When a terminal's shell reports its folder and that folder is inside a project, Project Index posts a card in the pane's
-window:
+When a terminal's shell reports its folder and that folder is inside a project, Project Index posts a card:
 
 > **Index project?**
 >

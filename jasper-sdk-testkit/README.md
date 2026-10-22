@@ -84,7 +84,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `invoke(actionId, windowId, paneIdOrNull)` | Runs an action as a window would; false when it is disabled or unknown |
 | `toolbar()` | The plugin toolbar section as `button:<id>`, `menu:<title>:<id>,<id>` and `view` |
 | `toolbarViews(windowId)`, `closeToolbarViews(windowId)` | Builds a window's toolbar views, as the window does when it opens; closes them, as closing the window does |
-| `menu(target)` | One menu's contributed entries (`FILE`, `EDIT`, `VIEW`, `PANE`, `TAB`, `TOOLS`, `SESSION`, `TRANSFER`, `context` or `top:<menuId>`) as `item:<id>`, `---` and `submenu:<title>` lines, children indented, sections separated by `===` |
+| `menu(target)` | One menu's contributed entries (`FILE`, `EDIT`, `VIEW`, `TAB`, `TOOLS`, `SESSION`, `TRANSFER`, `context` or `top:<menuId>`) as `item:<id>`, `---` and `submenu:<title>` lines, children indented, sections separated by `===` |
 | `status()`, `progress()` | Visible status items as `id\|side\|text\|tooltip\|actionId`; visible progress states by id |
 | `rail()` | Rail buttons' action ids |
 | `panels()` | Registered panels as `id\|title\|ANCHOR`, with `+split` for a panel that starts in the second half and `\|<action id>` for one that names its own toggle |
@@ -102,7 +102,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | Method | Returns or does |
 | --- | --- |
 | `addTerminalWindow()`, `addTerminalTab(windowId, title)`, `addTerminalPane(tabId, info)`, `addContentTab(windowId, title)` | Scripts the workspace (the first window added while no main window is open is the main window; a terminal tab has one pane); each announces itself on the terminal topics, delivered by `flush()` |
-| `moveTab(tabId, windowId)`, `windowTabs(windowId)`, `holdPane(paneId)` | Moves a tab to another window as the user would; a window's tabs, each its items pane by pane; holds a local pane `NOT_STARTED` until its tab is shown, as Jasper holds a restored one |
+| `moveTab(tabId, windowId)`, `closeTab(tabId)`, `windowTabs(windowId)`, `holdPane(paneId)` | Moves a tab the test added to another window, or closes it, as the user would (the last tab of a child window takes the window); a window's tabs, each its items pane by pane; holds a local pane `NOT_STARTED` until its tab is shown, as Jasper holds a restored one |
 | `activateTerminalWindow(id)`, `focusTerminalPane(id)`, `closeTerminalPane(id)` | The user turns to a window, focuses a pane or closes one (the last pane takes its tab, the last tab a child window) |
 | `setPaneInfo(id, info)`, `setSelection(id, text)`, `setForegroundJob(id, name)` | Changes what a pane reports, without an event |
 | `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` | Publish terminal events for a pane |
@@ -192,6 +192,10 @@ Jasper's is `<home>/plugins/<id>/data`.
   not in Jasper.
 - `requestQuit()` counts a quit guard whose decision is still pending as a refusal, because the fake does not pump
   events.
+- `restoreTab` puts the restored tab in a new tab at the end of the window's strip; Jasper places it where it was
+  saved, in its tab and pane.
+- `toolbarViews` builds a window's toolbar views for any open window, a child window too; Jasper builds them only in
+  the main window, the only window with a toolbar.
 - A declared subcommand with no handler fails with a message naming the plugin's id; Jasper names the plugin.
 
 ## The contract suites

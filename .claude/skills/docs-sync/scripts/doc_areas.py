@@ -17,6 +17,9 @@ SDK_GUIDES = ["jasper-sdk/README.md", "jasper-sdk-testkit/README.md", "docs/plug
 APP = "jasper-app/src/main/java/dev/jasper/app/"
 RULES = [  # (area, path prefixes, guides)
     ("SDK", ["jasper-sdk/", "jasper-sdk-testkit/"], SDK_GUIDES),
+    ("external plugin example", ["docs/examples/"], ["docs/examples/external-plugin/README.md", "tools/sdk-reference/guide/02-quick-start.html",
+                                                    "docs/plugin-authoring.md (building outside the repository)"]),
+    ("settings template", ["config.example.toml"], ["docs/configuration.md", "README.md (if it quotes the template)"]),
     ("exported plugin APIs", ["plugins/vault/src/main/java/dev/jasper/vault/api/", "plugins/editor/src/main/java/dev/jasper/editor/api/",
                               "plugins/remote/src/main/java/dev/jasper/remote/api/", "plugins/snippets/src/main/java/dev/jasper/snippets/api/"],
      ["docs/plugin-apis.md", "docs/sdk-reference.html (regenerate)"]),

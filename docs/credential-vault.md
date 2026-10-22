@@ -48,9 +48,9 @@ when the vault is created; changing the master password keeps it.
 
 ## Unlocking and locking
 
-**Unlock Vault** asks for the master password over the window that needs the vault, or inside the manager when
-that is open. Every plugin and command that needs the vault while it is locked waits on the same prompt. Enter in the
-field unlocks. A failed attempt says why in the form:
+**Unlock Vault** asks for the master password over the window that needs the vault, or, while the manager is open,
+inside the manager, which comes to the front without the window behind it. Every plugin and command that needs the
+vault while it is locked waits on the same prompt. Enter in the field unlocks. A failed attempt says why in the form:
 
 | Message | Cause |
 |---|---|
@@ -85,10 +85,11 @@ data folder instead, readable by your account only. The manager's footer names t
 
 ## The manager
 
-The manager is one modeless dialog over the main window, **Credential Vault**; opening it again brings it to the
-front, and it closes with the main window. Its title row has a lock
-button (tooltip "Lock vault") and the add menu (tooltip "Add entry"): **Login**, **SSH Key**, **Secure Note** and
-**Generate SSH Key...**.
+The manager is one modeless dialog, **Credential Vault**, over the main window, whichever window you open it from: the
+main window comes forward first, restored if it was minimised. Opening it again brings it to the front, and it closes
+with the main window. You can resize it, and Jasper remembers its size and position. Its first row has a lock button
+(tooltip "Lock vault") and the add menu (tooltip "Add entry"): **Login**, **SSH Key**, **Secure Note** and **Generate
+SSH Key...**.
 
 Below are three columns:
 

@@ -8,8 +8,8 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 
 - [Getting started](getting-started.md): installing on each platform, the first launch, a first tour, safe mode and
   uninstalling.
-- [Workspace](workspace.md): windows, tabs, panes, tool windows and the dock, menus, the toolbar, the status bar, view
-  modes and the file chooser.
+- [Workspace](workspace.md): windows, tabs, panes, saving and restoring them, tool windows and the dock, menus, the
+  toolbar, the status bar, view modes and the file chooser.
 - [Terminal](terminal.md): terminal panes, shell profiles (WSL and [Cygwin Bash](terminal.md#cygwin-bash) among them),
   selection, links, search and shell integration.
 - [Command palette](command-palette.md): commands, scopes, recents and the Run window.
@@ -17,7 +17,7 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
   notifications and Desk Buddy.
 - [Keyboard shortcuts](keyboard-shortcuts.md): every default shortcut on macOS, Linux and Windows, and the Keymap.
 - [Configuration](configuration.md): the Settings dialog, every setting in `config.toml`, Jasper's home and its files.
-- [Command line](command-line.md): Jasper's startup options and the `jasper` command.
+- [Command line](command-line.md): Jasper's startup options, one Jasper per home, and the `jasper` command.
 - [Diagnostics](diagnostics.md): log files, their bounds and privacy, memory, start-up timing, and what Jasper does
   when it cannot start.
 
@@ -28,8 +28,8 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 - [Remote](remote.md): SSH hosts, WSL distributions, SFTP and transfers, editing remote files, tunnels, host-key
   trust, the Sessions tool window and the API Remote exports to other plugins.
 - [Credential Vault](credential-vault.md): logins, SSH keys and secure notes, grants and key generation.
-- [Editor](editor.md): editing local and remote files in workspace tabs, previewing Markdown and the `jasper editor`
-  command. Its Vim mode has a list of [supported keys](editor-vim-reference.md) and of
+- [Editor](editor.md): editing local and remote files in workspace panes, several views of one file, previewing
+  Markdown and the `jasper editor` command. Its Vim mode has a list of [supported keys](editor-vim-reference.md) and of
   [differences from Vim](vim-divergences.md).
 - [File Server](file-server.md): sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP and TFTP.
 - [Project Index](project-index.md): indexing projects and finding their files from the command palette.
@@ -49,7 +49,7 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 - [SDK reference](sdk-reference.html): every SDK package, type and member, and the bundled plugins' exported APIs.
 - [Writing a plugin](plugin-authoring.md): the manifest, capabilities, lifecycle, contributions, settings, packaging
   and testing.
-- [Plugin UI](plugin-ui.md): building panels, forms and windows with the theme engine.
+- [Plugin UI](plugin-ui.md): building panels, dialogs, forms and content tabs with the theme engine.
 - [Plugin APIs](plugin-apis.md): the APIs that the Vault, Editor, Remote and Snippets plugins export to other
   plugins.
 - [SDK architecture](sdk-architecture.md): how Jasper discovers, loads, threads and stops plugins.

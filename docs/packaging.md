@@ -179,9 +179,9 @@ without the cache and then without the user's options ([start-up recovery](diagn
 - **Native libraries** (macOS, Windows): each is byte-identical to its jar entry and (macOS) validly signed, and a
   headless probe with the image's runtime, options and class path loads them from `native/` and extracts nothing.
 - **macOS**: the three bridges (architecture, signature, exported JNI symbols); `Info.plist` identifier
-  `dev.jasper.app`, version and Local Network text; the icon file and catalog; the launcher's app-specific UUID;
-  `codesign --verify --deep --strict`; a trained cache accepted by `java -XX:AOTMode=on`; the SDK the launcher was
-  linked against.
+  `dev.jasper.app`, version, Local Network text and [document types](#macos-open-with); the icon file and catalog;
+  the launcher's app-specific UUID; `codesign --verify --deep --strict`; a trained cache accepted by
+  `java -XX:AOTMode=on`; the SDK the launcher was linked against.
 - **Windows**: the PE machine type of `Jasper.exe`, `jasper-watch.exe`, `java.exe` and `jvm.dll`, and every frame of
   `Jasper.ico` embedded in the launcher.
 - **Linux**: the ELF machine type of the launcher, `jasper-watch` and `java`, and `lib/Jasper.png`.
@@ -296,6 +296,16 @@ reliable permission tracking, which the ad-hoc signature is not
 [TN3178](https://developer.apple.com/documentation/technotes/tn3178-checking-for-and-resolving-build-uuid-problems)).
 Command-line tools started from Apple's Terminal are exempt from the permission, so a working
 `./gradlew :jasper-app:run` there does not show that the packaged app has it.
+
+### macOS Open With
+
+`packageApp` declares `CFBundleDocumentTypes` in `Info.plist`: text and source code (`public.text`,
+`public.source-code`) as an editor and folders (`public.folder`) as a viewer, each at `LSHandlerRank` Alternate, so
+Jasper appears in Finder's Open With and takes drops on its Dock icon without becoming any type's default application.
+macOS hands the files and folders to Jasper as an open-file event, to the running Jasper when there is one: each file
+opens in the [default editor](editor.md#default-editor), or is revealed in the file manager when no editor plugin runs or
+the default editor is **System default app**, and each folder as a terminal tab, in the main window
+([one Jasper per home](command-line.md#one-jasper-per-home)). `verifyPackage` checks the key.
 
 ## Windows
 
@@ -498,7 +508,7 @@ Windows job fails while [`validation.json`](#bundled-cygwin) lacks native and in
 architecture. The publish job refuses to continue if the tag moved during the build, requires exactly the nine packages,
 the two Cygwin source archives (`amd64` and `aarch64`) and the five SDK jars (`jasper-sdk-<v>.jar`,
 `jasper-sdk-<v>-sources.jar`, `jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and
-`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.18.3), and writes `SHA256SUMS`. It
+`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.21.0), and writes `SHA256SUMS`. It
 creates a draft prerelease titled `Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds
 exactly those files, and publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which
 a rerun finishes; a published release for the tag is never overwritten.
@@ -528,12 +538,6 @@ the [example external plugin](examples/external-plugin) against the SDK jars tha
 A failed job uploads its test results and reports, with the renders under `jasper-app/build/enterprise-settings/` and
 `jasper-app/build/chrome-renders/`, as the artifact `test-diagnostics-<runner>`, kept for seven days. A newer push to a
 pull request cancels its running check.
-
-## macOS Open With
-
-`packageApp` declares `CFBundleDocumentTypes` for text, source code and folders at `LSHandlerRank` Alternate, so Jasper
-appears in Finder's Open With and takes drops on its Dock icon without becoming any type's default application.
-`verifyPackage` checks the key.
 
 ## Native acceptance checklist
 
@@ -635,8 +639,8 @@ cannot mask a packaging problem.
   `Resident Jasper keeps a soft working-set floor of … MB` from start-up. Many thousands of page faults with a much
   smaller starting working set mean Windows trimmed the resident process despite the floor.
 - [ ] The `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`; after signing out and in,
-  Jasper is resident. Start Jasper by hand during sign-in too: the `--background` launch then finds it resident and
-  exits at once (`Started with --background while a Jasper owns this home; exiting`).
+  Jasper is resident. Start Jasper by hand during sign-in too: the `--background` launch then finds it running and
+  exits at once, leaving one Jasper process; it writes nothing to the log.
 - [ ] **Quit Jasper** in the notification-area icon exits completely; the icon appears only once start-up has settled
   (the first output painted, a finished `--background` warm-up, or 2 seconds after the first paint); setting
   `system.run_in_background = false` removes the Run value.

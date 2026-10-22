@@ -10,8 +10,8 @@ take precedence for the editor role and for a subcommand name two loading plugin
 <h3>What a plugin can do</h3>
 <ul class="cards">
 <li><b>Commands and chrome</b><span>Actions that appear in the command palette and Settings › Keymap with default shortcuts, placed in menus, the toolbar, the status bar and the tool window stripe.</span></li>
-<li><b>Tool windows and windows</b><span>Docked tool windows, windows of its own, dialogs, in-window overlays, popovers and document tabs in the workspace, all built from declarative views that Jasper draws.</span></li>
-<li><b>Terminals</b><span>Find windows, tabs and panes, read what a pane runs, type into it, open local tabs, splits and programs, add environment variables to new shells, and follow 16 terminal events.</span></li>
+<li><b>Tool windows, tabs and dialogs</b><span>Docked tool windows, content tabs that split, move between windows and come back when Jasper restores its windows, items in the Split lists, dialogs, in-window overlays and popovers, all built from declarative views that Jasper draws.</span></li>
+<li><b>Terminals</b><span>Find windows, tabs and panes, read what a pane runs, type into it, open local tabs, splits and programs, add environment variables to new shells, and follow 17 terminal events.</span></li>
 <li><b>Sessions</b><span>Provide a pane's session over its own connection, as Remote does for SSH: Jasper owns the pane, its banner and Reconnect.</span></li>
 <li><b>Command palette</b><span>Scopes of searchable rows with up to three verbs, an optional form step, recents, and a chip the user reaches by prefix or shortcut.</span></li>
 <li><b>Notifications and activity</b><span>Notification groups the user tunes in Settings, long-running activities and connection states shown on Desk Buddy.</span></li>
@@ -36,8 +36,8 @@ unless {@code JASPER_HOME} or the {@code jasper.home} Java property moves it; se
 requires export; Jasper's own classes and libraries are not visible. Everything a plugin registers through its context
 is attributed to it and removed when it stops. Nothing loads or unloads while Jasper runs: installing, updating, enabling,
 disabling and removing a plugin take effect at the next launch.</p>
-<p>The SDK depends only on the JDK. A few signatures use AWT and Swing types: colours ({@code java.awt.Color}), a window's
-preferred size ({@code java.awt.Dimension}), a component's workspace opacity ({@code java.awt.Component}), custom content ({@code javax.swing.JComponent}) and content-tab shortcuts
+<p>The SDK depends only on the JDK. A few signatures use AWT and Swing types: colours ({@code java.awt.Color}), a
+component's workspace opacity ({@code java.awt.Component}), custom content ({@code javax.swing.JComponent}) and content-tab shortcuts
 ({@code javax.swing.KeyStroke}). Plugins run on Java 25.</p>
 
 <h3>The bundled plugins</h3>

@@ -257,8 +257,8 @@ producer, and its entry points are safe from any thread:
   `PluginRuntime.reportFailuresTo`. Give each contained call a short operation ("panel <id>", "action <id>"): it is
   the incident's header and the notification's title.
 - `launchFailure(window, details, failure)` is for a shell that could not start, from `WindowContent.onLaunchFailure`.
-  Every occurrence is announced in its own window with its details and Show more…, while the incident itself still
-  counts up.
+  Every occurrence is announced on its own, as a card in the main window with its details and Show more…, while the
+  incident itself still counts up.
 
 Expected failures the user can act on, such as a file that cannot be read or a host that cannot be reached, are not
 incidents: post a notification with the details instead.
@@ -277,7 +277,7 @@ plain "Could not start the terminal" notification. Incidents add no messages or 
 Plugins post through `PluginContext.notifications()`
 ([`Notifications`](sdk-reference.html#dev.jasper.sdk.notifications.Notifications)), which `plugins.HostedNotifications`
 implements over the application's `NotificationCenter`. The runtime gets a `PluginRuntime.NotificationHost`: the
-center; `caused`, for a plugin's notification with a cause, which `JasperApplication` hands to
+centre; `caused`, for a plugin's notification with a cause, which `JasperApplication` hands to
 `IncidentNotices.pluginNotice`; and `problem`, for a plugin problem of the runtime's own, such as a settings file that
 cannot be opened. `PluginHost` posts activity outcomes, and `application.PluginProblemNotices` posts
 `PluginRuntime.problems()` after `PluginRuntime.start`. Change the SDK side in `PluginContractTest` first, so the
@@ -312,15 +312,14 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ### Single instance
 
-One Jasper process owns each home (workspace-tabs spec section 5). `bootstrap.SingleInstance` takes
-`residency.InstanceLock` before AWT and decides with `LaunchAction`; the owner's `bootstrap.Instance` binds both sockets
-at once and holds requests in `EarlyRequests` until `compose` hands it the application. Change the handoff's wire format
-in `residency.LaunchRequest` (with its protocol number), the owner's answer in `HandoffSocket.answering`, when the owner
-takes a request in `bootstrap.Instance`, and what a request opens in `JasperApplication.open`. On POSIX systems closing
-any descriptor of a file drops the process's locks on it, so once the owner holds `daemon/instance.lock` nothing in its
-process may open that file, even to close it at once. The process-level tests start child JVMs through
-`testsupport.ChildJvm` with only the test classes and jasper-app's classes, so those classes must not reach the toolkit
-or the other modules.
+One Jasper process owns each home. `bootstrap.SingleInstance` takes `residency.InstanceLock` before AWT and decides with
+`LaunchAction`; the owner's `bootstrap.Instance` binds both sockets at once and holds requests in `EarlyRequests` until
+`compose` hands it the application. Change the handoff's wire format in `residency.LaunchRequest` (with its protocol
+number), the owner's answer in `HandoffSocket.answering`, when the owner takes a request in `bootstrap.Instance`, and
+what a request opens in `JasperApplication.open` (`OpenPlan`). On POSIX systems closing any descriptor of a file drops
+the process's locks on it, so once the owner holds `daemon/instance.lock` nothing in its process may open that file,
+even to close it at once. The process-level tests start child JVMs through `testsupport.ChildJvm` with only the test
+classes and jasper-app's classes, so those classes must not reach the toolkit or the other modules.
 
 ```sh
 ./gradlew :jasper-app:test --tests "*InstanceLockTest" --tests "*SingleInstance*" --tests "*EarlyRequestsTest" --tests "*LaunchRequestTest" --tests "*HandoffSocketTest"
@@ -379,7 +378,7 @@ never reads the raw settings, so any failure leaves an opaque window.
 
 ### System notifications
 
-`application.SystemNotices` listens to the center. A `Change.SystemRequested` goes to `platform.SystemNotifier` when
+`application.SystemNotices` listens to the centre. A `Change.SystemRequested` goes to `platform.SystemNotifier` when
 `notifications.system` is on and Jasper is neither quitting nor stopped, an incident's notification with its title
 only. A read, expired or removed entry, and Clear All, withdraw what the operating system shows. A click raises the
 notification's window, then runs its default action, opens the Errors tab for an incident, or shows the
@@ -462,23 +461,22 @@ the menu bar and focus to be answered). GUI behaviour is on the
 
 ### Background warm-up
 
-The `--background` warm-up rehearses a window (`JasperApplication.warmUp`, `application.Rehearsal`) as well as
-building the fonts. The window is composed with the configured grid, theme and contributions around a canned terminal
-session fed from memory, so it starts no shell, PTY or child process; it is painted once into an image and discarded,
-never shown. It stays invisible to everything else: it opens no `WindowTrace` and marks no `FIRST_PAINT` or
-`OUTPUT_PAINTED` (those would settle residency for a window nobody sees), only `WARMED_UP`, which the `done` callback
-passed to `warmUp` marks whether the rehearsal succeeded, failed or threw; it is not registered with the terminal
-registry and is not a content host (`connectContributions(model, state, hostsContent)` with `false`), so plugin content
-never opens into it; and its error, info and launch-failure callbacks are logged, never shown, posted as notifications
-or recorded as incidents (`Rehearsal.silence`). It uses its own in-memory `UiState`, never restores the saved window
-layout and is discarded rather than closed (`WindowFrame.discard`; a window that failed to open is discarded by
-`WindowManager`), so its default layout never becomes the last window closed's, which the next window restores; it
-bypasses `WindowManager`, so it never reads or writes `workspace.toml`. A process that
-has warmed up labels its first plain window `menu` rather than `cold`. Once `done` has run, on every path (a played
-rehearsal, a failed one, an `Error`, and the headless early return), `warmUp` starts one `System.gc()` on a daemon
-thread from a later EDT event, so the rehearsal's garbage does not stay in the resident heap;
-`JasperApplication.collector` is the test seam. A headless JVM cannot build a `WindowFrame`, so
-some of the rehearsal's failure paths are covered by reading only.
+The `--background` warm-up rehearses a window (`JasperApplication.warmUp`, `application.Rehearsal`) as well as building
+the fonts. The window is composed with the configured grid, theme and contributions around a canned terminal session fed
+from memory, so it starts no shell, PTY or child process; it is painted once into an image and discarded, never shown.
+It stays invisible to everything else: it opens no `WindowTrace` and marks no `FIRST_PAINT` or `OUTPUT_PAINTED` (those
+would settle residency for a window nobody sees), only `WARMED_UP`, which the `done` callback passed to `warmUp` marks
+whether the rehearsal succeeded, failed or threw; it is not registered with the terminal registry and is not a content
+host (`connectContributions(model, state, hostsContent)` with `false`), so plugin content never opens into it; and its
+error, info and launch-failure callbacks are logged, never shown, posted as notifications or recorded as incidents
+(`Rehearsal.silence`). It uses its own in-memory `UiState`, never restores the saved dock layout and is discarded rather
+than closed (`WindowFrame.discard`; a window that failed to open is discarded by `WindowManager`), so its default dock
+layout never replaces the main window's in `ui-state.toml`; it bypasses `WindowManager`, so it never reads or writes
+`workspace.toml`. A process that has warmed up labels its first plain window `menu` rather than `cold`. Once `done` has
+run, on every path (a played rehearsal, a failed one, an `Error`, and the headless early return), `warmUp` starts one
+`System.gc()` on a daemon thread from a later EDT event, so the rehearsal's garbage does not stay in the resident heap;
+`JasperApplication.collector` is the test seam. A headless JVM cannot build a `WindowFrame`, so some of the rehearsal's
+failure paths are covered by reading only.
 
 ## Session lifecycle change
 
@@ -621,12 +619,12 @@ publishes a prerelease that is not marked latest, and it never overwrites a publ
 ## Adding or bumping a dependency
 
 Every external jar Jasper or a bundled plugin ships needs its exact `group:artifact:version` in a component of
-`jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`, with its license text (and its NOTICE, when
+`jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`, with its licence text (and its NOTICE, when
 the project publishes one) beside it; `verifyThirdPartyNotices` (in `check`) names any jar without one and any entry
 that no longer ships. A font file a bundled plugin ships is listed in its component's `files` as
-`<plugin id>/<path in its jar>`, and the check names any that is not. Read the new version's license before updating
+`<plugin id>/<path in its jar>`, and the check names any that is not. Read the new version's licence before updating
 the entry, and look inside the jar for bundled native binaries (DLLs, executables, shared libraries): their own
-licenses need components too. When `stagePackage` logs that it unsealed a jar, record the change in that component's
+licences need components too. When `stagePackage` logs that it unsealed a jar, record the change in that component's
 notice, as `jbr-api.NOTICE.txt` does. The Licenses window reads the same file. A component's `license` is an SPDX id
 that `about.ThirdPartyNotices` maps to the name the window shows; a new licence needs its entry there.
 
@@ -707,6 +705,16 @@ failure and lifetime tests.
 ([app icon assets](../packaging/icons/README.md)), and `ApplicationIcon` loads it.
 
 ## Workspace chrome
+
+Chrome that shows a plugin's, a program's or the user's text (menus and their items, context menus included, the
+toolbar's overflow and dropdowns, rail and tool window header buttons, tab lists, the Find bar's recent searches,
+status bar items) shows it as plain text ([design rules](app-architecture.md#design-rules)). Build such a component
+with `workspace.PlainText` (`menu`, `item`, `checkBox`, `button`, `toggle`): it creates the component empty, sets
+`html.disable`, then the text or `Action`, and its buttons' tooltips are plain too. A component built another way sets
+the property before its first text and, for its tooltip, returns `PlainText.plain(super.createToolTip())` from
+`createToolTip`. A new
+frame or dialog calls `platform.PlainTitlePane.install` on its root pane before it shows, as `WindowFrame` and
+`NativeShells` do (`PlainTextTest`, `PlainTitlePaneTest`).
 
 ### Header and title bar
 
@@ -851,15 +859,26 @@ light and dark selected fills and readable text, while the kit's control tests c
 
 ### Tabs
 
-A window's tabs are shown in its one strip, the parent-tab bar (`ParentTabBar` over the look's `TabStrip`); a group
-(`GroupView`), a pane, shows its one tab and no strip. The strip shows from two parent tabs under the equal tabs and
-always under the classic tabs (`WorkspaceChrome.showsTabStrip`, applied by `ParentTabBar.refresh`), and shows and hides
-at once, without motion. An entry is its parent tab's (`ParentTabBar.id`): it keeps its place while the parent tab shows
-another of its groups, and a parent tab moved in or out, or dragged along the strip, takes its new place at once. While
-a parent tab holds two or more groups, `WorkspaceView.dimPanes` dims every group but the active one by
-`terminal.dim_inactive_panes` (`WindowContent.paneDim`): a terminal through its view, which `TerminalPane.setActive`
-dims as before (every terminal but its window's active one), any other tab under the group's overlay
-(`GroupView.dim`).
+This section uses the code's words: a window's tabs are parent tabs (`layout.ParentTab`), a pane is a group
+(`layout.Group`) and the item a pane holds is a tab (`contributions.Tab`).
+
+A change to how panes split, move, close or maximise starts in `layout.Layout` and its tests (`LayoutOperationsTest`,
+`LayoutTest`, `LayoutGeometryTest`, and `ParentTabsTest` for a window's parent tabs): every operation returns a new
+layout, and `WorkspaceView` only renders the layout it holds. What `workspace.toml` keeps changes in
+`persistence.WorkspaceFile`, whose reader drops a bad entry alone (`WorkspaceFileTest`, `WorkspaceFileReadTest`), and in
+`WindowManager.snapshot` and `WindowContent.restore` (`WorkspaceRestoreTest`, `RestoredPaneTest`,
+`PluginTabRestoreTest`, `WorkspaceStoreTest`). The file says `version = 1`; a file of another version is set aside as
+`workspace.toml.bad`. After a format change, write the start-up benchmark's seed again (see
+[the AOT cache](#packaged-runtime-bundled-natives-and-the-aot-cache)).
+
+A window's parent tabs are shown in its one strip (`ParentTabBar` over the look's `TabStrip`); a group (`GroupView`)
+shows its one tab and no strip. The strip shows from two parent tabs under the equal tabs and always under the classic
+tabs (`WorkspaceChrome.showsTabStrip`, applied by `ParentTabBar.refresh`), and shows and hides at once, without motion.
+An entry is its parent tab's (`ParentTabBar.id`): it keeps its place while the parent tab shows another of its groups,
+and a parent tab moved in or out, or dragged along the strip, takes its new place at once. While a parent tab holds two
+or more groups, `WorkspaceView.dimPanes` dims every group but the active one by `terminal.dim_inactive_panes`
+(`WindowContent.paneDim`): a terminal through its view, which `TerminalPane.setActive` dims (every terminal but its
+window's active one), any other tab under the group's overlay (`GroupView.dim`).
 
 The default look's `WindowTabs` are equal-width cells with centred titles over the retained Swing selection model. It
 takes its surfaces from the workspace palette while keeping glass alpha, and
@@ -876,7 +895,7 @@ cursor and the landing on the target window's `DockDropOverlay`. A parent tab's 
 `WorkspaceDropResolver.place`: change the rule in the resolver and its tests first. A drop along its own strip is
 `WindowContent.reorderParentTab`; one into another window goes through `WindowManager.moveParentTab` (a window whose
 strip hides takes it over the band at its top, the main window's empty workspace anywhere over it), and a tear-out
-through `WindowManager.moveTabToNewWindow`, a full window. Beside a pane of a window's shown tab other than its own
+through `WindowManager.moveTabToNewWindow`, a new child window. Beside a pane of a window's shown tab other than its own
 (`TabDrag.Target.Into`) a parent tab merges into that tab, as one nested split (`Layout.insertBeside`): in its window
 through `WindowContent.mergeTab`, into another through `WindowManager.moveTabInto` and the tab registry. Its entry
 resting on another tab's entry for `TabDrag.SPRING_DELAY` shows that tab (spring-loading, the `TabDrag.spring` timer,
@@ -919,7 +938,7 @@ writes `build/render-preview/status-breadcrumbs-{dark,light}.png` and `breadcrum
 
 ### Dialog title rows and overlays
 
-Auxiliary title rows follow `MacTitleBar.Style` and the kit's title metrics: a window (`WINDOW`: the Vault manager,
+Auxiliary title rows follow `MacTitleBar.Style` and the kit's title metrics: a window (`WINDOW`: About, Licenses,
 the file chooser) has a 45-logical row above a hairline with the title and controls on its middle; a dialog
 (`DIALOG`) has a 30-logical band in the dialog surface with no rule, its title and controls centred 21 down (the
 native title region reaches over the content's top padding); a prompt dialog (`PROMPT`) keeps a 20-logical band with

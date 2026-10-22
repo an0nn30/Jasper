@@ -146,7 +146,7 @@ public interface PluginContext {
     Rail rail();
 
     /**
-     * Application-built windows and dialogs.
+     * Dialogs, overlays, popovers, content tabs, split items, restorers and file choosers.
      *
      * @return the windows service
      */

@@ -10,10 +10,11 @@ import java.util.concurrent.CompletableFuture;
 public interface EditorDocument {
     /**
      * The document's stable identity. Opening a document whose key is already open selects its tab (of several, the one
-     * focused last), and every tab that shows it shares one read, one text and one save. Recent Files records the key,
-     * and {@link Editor#reopener} resolves it by its prefix. Start it with a prefix of the plugin's
-     * own, the one it passes to {@link Editor#reopener} (for example {@code "remote:"}), never {@code "local:"}, which
-     * the Editor uses for local files.
+     * focused last), and Open File Right…, Open File Down… and Open in Editor Pane… show it in another view beside the
+     * focused pane; every tab that shows it shares one read, one text and one save. Recent Files records the key, and
+     * {@link Editor#reopener} resolves it by its prefix. Start it with a prefix of the plugin's own, the one it passes
+     * to {@link Editor#reopener} (for example {@code "remote:"}), never {@code "local:"}, which the Editor uses for
+     * local files.
      *
      * @return stable identity: two documents with equal keys are the same file
      */
@@ -68,10 +69,11 @@ public interface EditorDocument {
     CompletableFuture<Content> read(long limitBytes);
 
     /**
-     * Reads the whole file as {@link #read} does, for a restore, which asks the user nothing. The Editor reads a document
-     * this way when Jasper has restored its tab and the tab is first active or Load is pressed; Retry then reads it with
-     * {@link #read}. A document whose read can ask the user anything (a sign-in, a prompt) must override this so that it
-     * fails, saying why, instead of asking. The default reads as {@link #read} does.
+     * Reads the whole file as {@link #read} does, for a restore, which asks the user nothing. When Jasper has restored
+     * the tab of a document with a {@link #host()}, the Editor reads it this way once the tab is first active or Load
+     * is pressed; Retry then reads it with {@link #read}. A restored document without a host is read with {@link #read}
+     * at once. A document whose read can ask the user anything (a sign-in, a prompt) must override this so that it
+     * fails, saying why, instead of asking. The default reads as {@link #read} does. Since Editor 0.13.0.
      *
      * @param limitBytes the largest size the editor accepts
      * @return the content and the revision it was read at
@@ -79,7 +81,7 @@ public interface EditorDocument {
     default CompletableFuture<Content> readQuietly(long limitBytes) { return read(limitBytes); }
 
     /**
-     * The file's current revision, which the Editor asks for before each Save (not Save As). When it differs from the
+     * The file's current revision, which the Editor asks for before each Save (not Save As…). When it differs from the
      * revision last read or written, the user chooses whether to overwrite or reload; when the file no longer exists,
      * whether to save anyway.
      *

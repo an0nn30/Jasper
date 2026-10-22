@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 import java.util.Objects;
 
 /**
- * One tab Move Pane to Tab offers an item (pane flexibility spec 4): another tab of the item's window, numbered as
+ * One tab Move Pane to Tab offers an item: another tab of the item's window, numbered as
  * Select Tab numbers the window's strip, from 1, and titled after its active pane's item, as the strip titles it, when
  * the plugin may read that title. {@link ContentTab#tabChoices()} lists them and says when, and
  * {@link ContentTab#moveToTab(int)} takes one's number.

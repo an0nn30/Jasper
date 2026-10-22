@@ -7,10 +7,12 @@ and tool windows), the terminal (with the bundled Cygwin environment's Cygwin Ba
 notifications, Settings, themes and looks; most features, the Editor and its Markdown preview among them, are bundled
 plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
 
-- **Branches.** This is `claude/workspace-tabs` (the workspace tabs and the single instance: plans 1 to 5, 7a to 8c, 6a,
-  6b, 9a and 9b, and the side branches `claude/html-disable-sweep`, `claude/priceless-curie-c36f2d` and
-  `claude/hopeful-newton-94a051`), which merged `origin/main` at `8c8776e7e` on 2026-10-21 and at `132dcac3e` on
-  2026-10-22 (the merge entries below); it is not merged into `main` and not pushed. `origin/main` at `132dcac3e` is
+- **Branches.** `main` and `origin/main` are at `06746d3c2` (pushed 2026-10-22): `claude/workspace-tabs` (the
+  workspace tabs and the single instance: plans 1 to 5, 7a to 8c, 6a, 6b, 9a and 9b, and the side branches
+  `claude/html-disable-sweep`, `claude/priceless-curie-c36f2d` and `claude/hopeful-newton-94a051`), which merged
+  `origin/main` at `8c8776e7e` on 2026-10-21 and at `132dcac3e` on 2026-10-22, then `claude/staged-remote-sessions-flake`
+  (the merge entries below); the series' entries, which end "not merged" or "not pushed", were written before the push.
+  `origin/main` at `132dcac3e` is
   `8c8776e7e`, the Editor font size shortcuts (`f77c41c94`) and the documentation commit that brings the guides up to
   them; `origin/main` at `8c8776e7e` is `427321de4` and the two documentation commits that bring the guides up to it.
   `origin/main` at `427321de4` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status Bar Keymap
@@ -30,12 +32,12 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   (the side stripes as the rebased `e8ecfdcf2` to `faeec76f3`, which plan 15a's E15 leaves to confirm). The V1
   documentation overhaul (`claude/v1-docs`, with `origin/main` at `c6bb59fdd` merged in) is merged into `main`; its entry below, which
   ends "Not merged into `main`", was written before the merge. Since then `claude/v1-docs` has brought the guides up to
-  `427321de4`, and `132dcac3e` up to the Editor font size shortcuts. Unmerged into `main`: this branch and
+  `427321de4`, then to `132dcac3e` (the Editor font size shortcuts) and then to `06746d3c2`. Unmerged into `main`:
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.21.0` (`JasperSdk.VERSION`, not shipped), with main's 0.18.2 and 0.18.3 additions; every bundled plugin
-  declares `sdk = ">=0.21.0, <0.22"`.
+- **SDK** `0.21.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.21.0, <0.22"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.
@@ -43,25 +45,22 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** This branch with the side branches and `origin/main` at `132dcac3e` merged (2026-10-22):
-  12,823 tests, 0 failures, 0 errors, 29 skipped; after plan 9b's final fix wave and its residual round (2026-10-22)
-  12,802. After the fix wave alone it had 12,796, after plan 9b's documentation commit
-  (2026-10-22) 12,777, and after plan 9a's final fix wave and its residual round (2026-10-21) 12,706. `./gradlew check`
-  on `claude/editor-font-zoom` (`427321de4` with the Editor font size shortcuts, 2026-10-21): 11,893 tests, 0 failures,
-  0 errors, 29 skipped; on local `main` with the Editor's typography and Markdown preview and the bundled Cygwin merged
-  (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in Editor performance
-  tests). Both ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
-  `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19): macOS, Ubuntu and
-  every Linux packaging and install check passed, and so did the single-worker Windows check. No check is recorded for
-  the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode (`eb424eeec`, `4743469e5`),
-  the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the Javadoc rename (`427321de4`).
+- **Last recorded checks.** `./gradlew check --continue` on `claude/staged-remote-sessions-flake` and on
+  `claude/workspace-tabs` after the third sync (both 2026-10-22): 12,823 tests, 0 failures, 0 errors, 29 skipped (25
+  platform skips and four opt-in Editor performance tests); no check is recorded for their merge, `06746d3c2`, which
+  conflicted in this file only. Earlier on the branch: 12,802 after plan 9b's final fix wave and its residual round
+  (2026-10-22) and 12,706 after plan 9a's (2026-10-21). `claude/editor-font-zoom` (`427321de4` with the Editor font size
+  shortcuts, 2026-10-21) had 11,893 tests, 0 failures, 0 errors, 29 skipped. These ran with Python 3.13
+  (`-Pjasper.python`), because `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14.
+  Hosted CI on PR #1 (2026-10-19): macOS, Ubuntu and every Linux packaging and install check passed, and so did the
+  single-worker Windows check; no later hosted CI run is recorded.
 
 Bundled plugins, all enabled by default except Enterprise:
 
 | Plugin | Id | Version | Exports | Provides |
 | --- | --- | --- | --- | --- |
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
-| Editor | `dev.jasper.editor` | 0.15.0 | `dev.jasper.editor.api` | Local and remote text files in tabs, with Markdown preview; `jasper editor` |
+| Editor | `dev.jasper.editor` | 0.15.0 | `dev.jasper.editor.api` | Local and remote text files in panes, several views of one file, Markdown preview; `jasper editor` |
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
 | File Server | `dev.jasper.fileserver` | 0.6.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
@@ -94,10 +93,17 @@ Open items, as the entries below record them:
 - **Website.** The Shell Prompt and Meadow website changes are not deployed: the Pages workflow runs only by hand and
   has not been run (2026-10-20).
 - **Rulings awaited.** Plan 12's Rulings 17 (the focused header's guard) and its question on the Run window's row
-  count, and plan 13's comparison of the iconed stripes with their icon slices cut out.
-- **Enterprise residuals.** The differences from the mocks that the series entry and plans 13 to 15b list; the
-  splash's fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's port to
-  SDK 0.18; the default look's macOS menu bar, which still folds against the window's width (plan 14).
+  count, plan 13's comparison of the iconed stripes with their icon slices cut out, and plan 9b's Ruling 14: one find
+  bar per Editor window, in its selected view, where IntelliJ and VS Code give each view its own.
+- **Deferred.** From plan 2's entry: `workspace.toml`'s writer has no depth cap while its reader drops a tab whose
+  splits nest deeper than 64; and a split to the left or up, then closing the new pane or dragging it back (plan 5),
+  does not give the sizes back exactly, so the pane that was split halves on each round trip.
+- **Test temp folders.** About 235,000 folders that tests leave in `java.io.tmpdir` on the dev Mac (`plugin-fixture*`,
+  `jasper-contract*`) slow sqlite-jdbc's native load; cleaning them up is left for a change of its own (2026-10-22).
+- **Enterprise residuals.** The differences from the mocks that the series entry and plans 13 to 15b list; the splash's
+  fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's rebuild against SDK
+  0.21.0, from its `jasper-sdk-0.18.3` branch (plan 6b's entry); the default look's macOS menu bar, which still folds
+  against the window's width (plan 14).
 
 ## Handoff log
 

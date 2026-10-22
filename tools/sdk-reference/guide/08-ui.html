@@ -97,7 +97,7 @@ the next tree.</p>
 <tr><td>Controls</td><td>{@link Nodes.Button} (PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), {@link Nodes.MenuButton}, {@link Nodes.Field} (TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER), {@link Nodes.Secret}, {@link Nodes.Choice} (DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS, TABS), {@link Nodes.PickerMenu}, {@link Nodes.Toggle}, {@link Nodes.Breadcrumbs}</td></tr>
 <tr><td>Collections</td><td>{@link Nodes.ItemList} with {@link ListItem} rows (SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS), {@link Nodes.Table} with {@link Column}s and {@link TableRow}s, {@link Nodes.Tree} with {@link TreeItem}s</td></tr>
 <tr><td>Layout</td><td>{@link Nodes.Stack} (a {@link Nodes.LayoutRole} such as VERTICAL, INLINE or ACTIONS), {@link Nodes.Card}, {@link Nodes.Section}, {@link Nodes.FormRow}, {@link Nodes.SettingRow}, {@link Nodes.Split}, {@link Nodes.Empty}</td></tr>
-<tr><td>Compositions</td><td>{@link Nodes.Panel} with its {@link Nodes.Header}, for tool windows; {@link Nodes.Form} (PROMPT, PROMPT_COMPACT, SHEET, FULL, SETTINGS, WINDOW), for dialogs, windows and pages</td></tr>
+<tr><td>Compositions</td><td>{@link Nodes.Panel} with its {@link Nodes.Header}, for tool windows; {@link Nodes.Form} (PROMPT, PROMPT_COMPACT, SHEET, FULL, SETTINGS, WINDOW), for dialogs and pages</td></tr>
 <tr><td>Custom</td><td>{@link Nodes.Custom}, a slot for a registered component</td></tr>
 </tbody>
 </table>
@@ -167,12 +167,12 @@ ACTIONS stack, first, last or beside another separator;</li>
 {@code window}, {@code window.add} and {@code zoom}.
 They follow the theme and the look. {@code run}, IntelliJ's classic Run triangle, and {@code application}, its
 run-configuration icon, are authored artwork: controls draw them in their own colours, and panels, prompts and tiles
-draw a monochrome glyph of the same name. These two names need SDK 0.18.1. {@code editor.source},
+draw a monochrome glyph of the same name. {@code editor.source},
 {@code editor.split}, {@code editor.preview} and {@code editor.scroll-sync} are a document's view controls (source only,
 source and preview, preview only, synchronised scrolling) in IntelliJ's New UI art, and their {@code .classic} names are
 IntelliJ's classic art, for use while {@link dev.jasper.sdk.ui.Presentation#icons()} is
 {@link dev.jasper.sdk.ui.Presentation.Icons#CLASSIC}. All eight are authored light and dark art that Jasper draws in
-its own colours wherever the name appears; they need SDK 0.18.3. Under the Enterprise look a tool
+its own colours wherever the name appears. Under the Enterprise look a tool
 window's stripe label starts with its icon, and IntelliJ's classic art draws {@code network}, {@code folder},
 {@code tunnel}, {@code download}, {@code server} and {@code bell} there, and {@code add}, {@code split}, {@code zoom},
 {@code settings}, {@code window.add} and {@code search} in the toolbar, toolbar views, the status bar and tool-window
@@ -222,7 +222,7 @@ classic layouts when {@link dev.jasper.sdk.ui.Presentation#classic()} is true, a
 the bottom strip under labelled stripes:</p>
 <pre><code class="language-java">boolean classic = context.appearance().presentation().classic();
 Anchor side = context.appearance().presentation().toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;</code></pre>
-<p>{@link Appearance#presentation()} needs SDK 0.18.2. In a test,
+<p>In a test,
 {@link dev.jasper.sdk.testing.FakePluginHost#setPresentation(Presentation)} with
 {@link dev.jasper.sdk.testing.FakePresentations#CLASSIC} runs the plugin under the Enterprise look's values.</p>
 
@@ -235,7 +235,7 @@ Terminal › Font &amp; Colors saves them. The value is the same for every windo
 not change it, and it is safe from any thread. Register {@link Appearance#onTerminalTypographyChanged(Consumer)} on the
 UI thread: the handler runs there after each saved change, when the getter already returns the new value. An equal value
 notifies nobody and registering delivers no initial value, so read the getter first; the registration closes with the
-plugin. Both need SDK 0.18.3. In a test,
+plugin. In a test,
 {@link dev.jasper.sdk.testing.FakePluginHost#setTerminalTypography(TerminalTypography)} publishes a value on the next
 {@code flush()}.</p>
 </section>

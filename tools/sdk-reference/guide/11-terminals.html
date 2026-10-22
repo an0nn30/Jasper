@@ -34,7 +34,7 @@ shows, and an item Jasper closed with its windows comes back under the same id, 
 <tr><td>{@code columns}, {@code rows}</td><td>The grid size; 0 before the session starts.</td></tr>
 <tr><td>{@code shellIntegration}</td><td>Whether the shell reports its prompts and commands, which the command events need.</td></tr>
 <tr><td>{@code kind}, {@code providerPluginId}</td><td>{@link SessionKind#LOCAL} or {@link SessionKind#PLUGIN}, and the providing plugin.</td></tr>
-<tr><td>{@code state}, {@code exitStatus}</td><td>{@link SessionState#CONNECTING}, {@code RUNNING} or {@code EXITED}, and the exit status once it exited with a known one.</td></tr>
+<tr><td>{@code state}, {@code exitStatus}</td><td>{@link SessionState#NOT_STARTED} (a restored terminal whose tab has not shown yet), {@link SessionState#CONNECTING}, {@code RUNNING} or {@code EXITED}, and the exit status once it exited with a known one.</td></tr>
 <tr><td>{@code shell}</td><td>The shell or program's label, such as {@code zsh}, or a provided session's title.</td></tr>
 </tbody>
 </table>
@@ -47,11 +47,12 @@ worker thread. {@link TabHandle#title()} is the tab's title as its header shows 
 with {@code "\r"} to run it, or leave it at the prompt for the user. {@link PaneHandle#sendBytes(byte[])} writes raw bytes,
 and {@link PaneHandle#paste(String)} pastes the way the user's paste does, bracketed when the program asked for that. The
 three are safe from any thread, and calls from one thread keep their order. Input to a pane whose session is not running
-(still connecting, or exited) is dropped.</p>
+(not started yet, still connecting, or exited) is dropped.</p>
 
 <h3>Opening tabs, splits and programs</h3>
-<p>{@link Terminals#openTab(WindowHandle,OpenRequest)} opens and selects a tab; {@link Terminals#split(PaneHandle,Direction,OpenRequest)}
-splits a pane {@link Direction#RIGHT} or {@link Direction#DOWN}. Both return the new pane, or empty when the window or
+<p>{@link Terminals#openTab(WindowHandle,OpenRequest)} opens a terminal in a new tab at the end of the window's strip and
+shows it; {@link Terminals#split(PaneHandle,Direction,OpenRequest)} opens one in a new pane beside the target pane, in
+its tab, to the {@link Direction#RIGHT} or {@link Direction#DOWN}. Both return the new pane, or empty when the window or
 pane is gone (or, for a split, its session has ended) or the request names a profile Jasper does not list. A local request
 needs {@code terminal.open}:</p>
 <table>
@@ -158,10 +159,11 @@ restorer opens it again; Jasper connects it when its tab is first shown.</p>
 <li><b>One outcome per attempt.</b> Exactly one of {@link PendingSession#attach(TerminalConnection)},
 {@link PendingSession#fail(String)} and cancellation takes effect; later calls are ignored. Every method is safe from any
 thread, also after the plugin stopped. {@code fail} shows the message with <b>Retry</b> (or <b>Reconnect</b> after an
-earlier session); a connector that throws fails the attempt with its message.</li>
+earlier session and in a pane Jasper restored with its tab); a connector that throws fails the attempt with its message.</li>
 <li><b>Cancellation.</b> The user's Cancel, the pane closing, the plugin stopping or Jasper quitting cancels the attempt.
 {@link PendingSession#onCancelled(Runnable)} handlers run once, on Jasper's cleanup thread, to abort a blocking connect.
-Cancelling before any session was shown closes the pane, unless Jasper restored it with its tab.</li>
+Cancelling before any session was shown closes the pane, except in a pane Jasper restored with its tab, which shows
+"Connection cancelled" with <b>Reconnect</b>.</li>
 <li><b>Ownership.</b> {@code attach} hands the connection over whatever happens: when the attempt was already cancelled
 or ended, Jasper closes it at once without reading it. Jasper calls {@code close} exactly once, on its cleanup thread;
 release everything the session holds there.</li>

@@ -46,13 +46,13 @@ way. `ScopeSpec.withIcon` is checked like any other name, but neither palette dr
 
 `run` and `application` are authored host artwork: `run` is IntelliJ's classic Run triangle and `application` its
 run-configuration icon. Controls draw them in their own colours under every look; panels, prompts and tiles draw a
-monochrome glyph of the same name. The two names need SDK 0.18.1.
+monochrome glyph of the same name.
 
 `editor.source`, `editor.split`, `editor.preview` and `editor.scroll-sync` are a document's view controls (source only,
 source and preview, preview only, synchronised scrolling) in IntelliJ's New UI art, and each `.classic` name is
 IntelliJ's classic art for the same control. Use the `.classic` names while `appearance().presentation().icons()` is
 `Presentation.Icons.CLASSIC`, as the Editor's Markdown document toolbar does. All eight are authored light and dark art:
-Jasper draws the one that suits the theme, in its own colours, wherever the name appears. They need SDK 0.18.3.
+Jasper draws the one that suits the theme, in its own colours, wherever the name appears.
 
 ## The Enterprise look's classic art
 
@@ -63,7 +63,7 @@ its authored art.
 
 IntelliJ's classic icons also draw `add`, `split`, `zoom`, `settings`, `window.add` and `search` in the toolbar (action
 buttons and toolbar views), the status bar and tool-window headers (`PanelHeader` actions and a panel's own header
-controls). In a tool window's or window's body these names keep their ordinary art.
+controls). In a tool window's body, a dialog or a content tab these names keep their ordinary art.
 
 ## Registering artwork
 

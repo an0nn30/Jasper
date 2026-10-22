@@ -17,11 +17,11 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   Editor tab's menu does the same.
 - **New Editor Tab** (File menu and command palette), or **New File** (Cmd+N, or Ctrl+N on Linux and Windows) in an
   Editor tab, opens an empty file named "Untitled", "Untitled 2" and so on in a new tab. **Split Right with Editor**
-  (**New Editor Pane** in the File menu) and **Split Down with Editor** put one in a new pane beside the focused pane,
-  from the command palette or as **Editor Right** and **Editor Down** in the Split submenus of the Tab menu and of a
-  terminal's or an editor's right-click menu. **New Editor Window** (File menu, command palette and the toolbar's New
-  Editor Window button) opens one in a new child window. None of these has a default shortcut. A new file's first save
-  asks where to save it.
+  (command palette and File menu) and **Split Down with Editor** (command palette) put one in a new pane beside the
+  focused pane; the Split submenus of the Tab menu and of a terminal's or an editor's right-click menu list them as
+  **Editor Right** and **Editor Down**. **New Editor Window** (File menu, command palette and the toolbar's New
+  Editor Window button) opens one in a new child window. New Editor Tab, Split Right with Editor, Split Down with
+  Editor and New Editor Window have no default shortcut. A new file's first save asks where to save it.
 - **Open File Right…** and **Open File Down…**, in the Split submenus (the command palette calls them **Split Right
   with Open File…** and **Split Down with Open File…**), and **Open in Editor Pane…** in the File menu, which does what
   Open File Right does, show the file chooser for one file and open it in a new pane beside the focused pane; the new
@@ -44,11 +44,15 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   that does, opens as an empty tab that its first save creates. With `--wait` (`-w`) the command returns once the last
   view of each file it opened has closed, so `git config --global core.editor "jasper editor --wait"` edits commit
   messages here; Ctrl+C stops waiting and leaves the tabs open. With no file it does what **Show Editor** does.
+- The files a launch names (`Jasper notes.txt`, or `jasper notes.txt` with the
+  [jasper command](command-line.md#the-jasper-command)), and on macOS the files you open with Jasper in Finder (Open
+  With) or drop on its Dock icon, go to the [default editor](#default-editor); this Editor opens them in the main
+  window ([One Jasper per home](command-line.md#one-jasper-per-home)).
 
 A file opens in a new tab of the window it was opened from, otherwise of the main window. Opening a file that is already
 open selects its tab, of several [views](#views-of-one-file) the one you were in last; `jasper editor` and a Cmd-click
 also move the caret to the line. While a file loads, its tab shows "Loading *name*…" ("Loading *name* from *host*…" for
-a remote file) with **Cancel**, which closes the tab. A file that cannot be opened shows **Could Not Open File** with
+a remote file) with **Cancel**, which closes its pane. A file that cannot be opened shows **Could Not Open File** with
 the reason; see [Large, binary and unreadable files](#large-binary-and-unreadable-files).
 
 ## Tabs
@@ -57,14 +61,15 @@ Each file is the item of a pane, or of several as [views](#views-of-one-file): a
 others in a tab ([Plugin tabs](workspace.md#plugin-tabs)). A tab shows its active pane's file:
 
 - the file's name, with ● before it while the file has unsaved changes (updated just after you stop typing);
-- after the name, the parent folder's name when another open tab has the same name, and a remote file's host, joined
+- after the name, the parent folder's name when another open file has the same name, and a remote file's host, joined
   by ` · `;
 - a file icon, or a server icon for a remote file. Its tooltip is the file's full location.
 
 Right-click the tab for **Move Tab to New Window**, **Move Tab Into** and **Close Tab**, then every
-[command](#commands-and-shortcuts) with its shortcut, **Copy**, **Paste**, **Select All**, **Cut**, **Delete**,
-**Undo**, **Redo**, **Increase Font Size**, **Decrease Font Size** and **Reset Font Size**; a child window's ⋮ menu
-also has **Move to Main Window**. Moving a tab keeps its text, undo history, unsaved changes and Markdown view.
+[command](#commands-and-shortcuts) but Close Pane, with its shortcut, **Copy**, **Paste**, **Select All**, **Cut**,
+**Delete**, **Undo**, **Redo**, **Increase Font Size**, **Decrease Font Size** and **Reset Font Size**; a child
+window's ⋮ menu also has **Move to Main Window**. Moving a tab keeps its text, undo history, unsaved changes and
+Markdown view.
 Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the **Folding** submenu (Toggle Current
 Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by **Save**, **Find…**, **Go to Line…**,
 **Toggle Comment**, **Revert to Saved**, **Split File Right** and **Split File Down**, then **Split** (Terminal Right,
@@ -73,22 +78,25 @@ opens the choice in a new pane beside the editor, **Move Pane to New Tab**, whic
 own while its tab holds another pane, and **Move Pane to Tab**, which moves it into another tab of its window. This menu
 names a tab whose active pane shows an Editor file and lists any other tab as "Tab 3"; the Tab menu names them all.
 
-While an Editor tab is selected its own shortcuts take precedence over the window's: on macOS Cmd+N makes a new file
-instead of a new terminal window. The Edit menu's **Copy**, **Paste**, **Find**, **Find Next** and **Find Previous**
-act on the Editor tab; the File menu's **Close Pane** closes the file's pane, and **Close Tab** its whole tab.
-**Next Tab**, **Previous Tab** and **Select Tab 1**–**9** count the window's tabs, whatever their panes hold.
+While an Editor file's pane is the active pane of the tab that shows, its own shortcuts take precedence over the
+window's: on macOS Cmd+N makes a new file instead of a new terminal window. The Edit menu's **Copy**, **Paste**,
+**Find**, **Find Next** and **Find Previous** act on that pane; the File menu's **Close Pane** closes it, and
+**Close Tab** its whole tab. **Next Tab**, **Previous Tab** and **Select Tab 1**–**9** count the window's tabs, whatever
+their panes hold.
 
 **Increase Font Size** and **Decrease Font Size** (View › Font Size; Cmd+= and Cmd+-, Ctrl+Shift+= and Ctrl+Shift+- on
-Linux and Windows) change the selected Editor tab and its Markdown preview by one point, from 6 to 72 points, without
-saving anything. **Reset Font Size** (Cmd+0; Ctrl+Shift+0) returns the tab to the saved [font size](#fonts), the
-terminal's while **Follow terminal font** is on. Saving a new font size applies it to every tab, as does turning
-**Follow terminal font** on or off when that changes the size; other font changes keep each tab's own size.
+Linux and Windows) change the active Editor pane and its Markdown preview by one point, from 6 to 72 points, without
+saving anything; another [view](#views-of-one-file) of the same file keeps its size. **Reset Font Size** (Cmd+0;
+Ctrl+Shift+0) returns the pane to the saved [font size](#fonts), the terminal's while **Follow terminal font** is on.
+Saving a new font size applies it to every Editor pane, as does turning **Follow terminal font** on or off when that
+changes the size; other font changes keep each pane's own size.
 
 When Jasper restores its windows, each file comes back in its tab and pane: a local file is read at once, and one
-deleted since comes back as a failed read with **Retry**; a remote one, through Remote, waits until its tab is first
-active or you press **Load**, and then reads only if signing in asks nothing (an open connection, or the SSH agent);
-otherwise it says so, and **Retry** signs in. An untitled file that was never saved does not come back, nor does a
-document whose key is too long to save. A restored file is not added to [Recent files](#recent-files).
+deleted since comes back as a failed read with **Retry**; a remote one, through Remote, shows "*name* on *host* loads
+when you select it" with **Close** and **Load** until its tab is first active or you press **Load**, and then reads
+only if signing in asks nothing (an open connection, or the SSH agent); otherwise it says so, and **Retry** signs in.
+An untitled file that was never saved does not come back, nor does a document whose key is too long to save. A
+restored file is not added to [Recent files](#recent-files).
 
 ## Views of one file
 
@@ -124,8 +132,8 @@ all of them.
 
 ## Status bar
 
-While an Editor tab is selected, the window's [status bar](workspace.md#the-status-bar) shows the file's location and
-these items:
+While an Editor file's pane is active, the window's [status bar](workspace.md#the-status-bar) shows the file's location
+and these items:
 
 | Item | Shows | Click |
 |---|---|---|
@@ -134,7 +142,7 @@ these items:
 | Encoding: `UTF-8`, `UTF-8 BOM`, `UTF-16LE BOM`, `UTF-16BE BOM`, `ISO-8859-1` | How the file is stored | |
 | `LF`, `CRLF` or `CR` | The line endings saves write; `Mixed → LF` (or `CRLF`, `CR`) until a save makes mixed endings one kind | |
 | `Spaces: 4` or `Tab: 4` | Whether the Tab key inserts spaces or a tab, and `tab_size` | |
-| `Wrap: On` or `Wrap: Off` | Soft wrap in this tab | Toggles it |
+| `Wrap: On` or `Wrap: Off` | Soft wrap of this file, in every view of it | Toggles it |
 | `Vim: On` or `Vim: Off` | [Vim mode](#vim-mode) | Toggles it, in every tab |
 
 Before them, "Saving…" shows while a save runs, and for 3 seconds "Reloaded: changed on disk" after an
@@ -143,8 +151,9 @@ Before them, "Saving…" shows while a save runs, and for 3 seconds "Reloaded: c
 
 ## Commands and shortcuts
 
-The Editor's commands are in the tab's right-click menu and take their shortcuts while an Editor tab is selected. In
-Vim mode, `:action id` and `<Action>(id)` run them by the id in the last column.
+The Editor's commands, all but Close Pane, are in the tab's right-click menu, and they take their shortcuts while an
+Editor file's pane is active ([Tabs](#tabs)). In Vim mode, `:action id` and `<Action>(id)` run them by the id in the
+last column.
 
 | Command | macOS | Linux and Windows | Id |
 |---|---|---|---|
@@ -189,8 +198,8 @@ The plugin's actions are in the command palette and can be given other shortcuts
 |---|---|---|---|---|
 | Open in Editor… | `dev.jasper.editor.open` | Cmd+O | Ctrl+Shift+O | File menu |
 | New Editor Tab | `dev.jasper.editor.new_editor_tab` | | | File menu |
-| Split Right with Editor | `dev.jasper.editor.split_right_editor` | | | File menu (as New Editor Pane), the Split submenus |
-| Split Down with Editor | `dev.jasper.editor.split_down_editor` | | | The Split submenus |
+| Split Right with Editor | `dev.jasper.editor.split_right_editor` | | | File menu, the Split submenus (as Editor Right) |
+| Split Down with Editor | `dev.jasper.editor.split_down_editor` | | | The Split submenus (as Editor Down) |
 | Split Right with Open File… | `dev.jasper.editor.split_right_open-file` | | | The Split submenus (as Open File Right…) |
 | Split Down with Open File… | `dev.jasper.editor.split_down_open-file` | | | The Split submenus (as Open File Down…) |
 | Open in Editor Pane… | `dev.jasper.editor.open_in_pane` | | | File menu |
@@ -485,7 +494,7 @@ computer; the chooser asks before replacing a file. A file that is open in anoth
 in another tab." Afterwards the tab edits the new file, and its language is detected again unless you chose one.
 **Save** on an untitled tab is Save As; a tab opened for a file that does not exist yet saves straight to its path.
 
-**Save All** saves every Editor tab with unsaved changes, in every window, one after another, so each dialog comes on
+**Save All** saves every open file with unsaved changes, in every window, one after another, so each dialog comes on
 its own.
 
 Closing the last [view](#views-of-one-file) of a file with unsaved changes asks "Save changes to *name*?" with **Save**
@@ -547,8 +556,9 @@ a recent file".
 **Default editor** on the Editor's settings page (Settings › Tools › Editor) chooses the editor for the files Jasper
 opens itself: `config.toml` (**Open in Editor** in Settings › Appearance & Behavior › System Settings › Configuration
 file, **Open config.toml** on the Settings banner and the configuration notification), a plugin's settings file, the
-custom VM options file, **File › Open File…**, Cmd-clicked paths in terminal panes and other plugins' requests. It also
-sets the `EDITOR` of Jasper's shells, which `git commit`, `crontab -e` and `kubectl edit` use.
+custom VM options file, **File › Open File…**, Cmd-clicked paths in terminal panes, the files a launch or Finder hands
+to Jasper ([Opening files](#opening-files)) and other plugins' requests. It also sets the `EDITOR` of Jasper's shells,
+which `git commit`, `crontab -e` and `kubectl edit` use.
 
 - **Jasper Editor**, the default: files open in a tab here. `EDITOR` is the path of this Jasper's own `jasper` command
   (the one inside the installed app) followed by `editor --wait`, so it works whether or not the command is installed
@@ -558,7 +568,8 @@ sets the `EDITOR` of Jasper's shells, which `git commit`, `crontab -e` and `kube
   otherwise. They run with Jasper's own `PATH`, so when Jasper starts from the Dock their `:!` commands may need full
   paths. App editors start on their own; one that exits with an error posts "Could not open a file in your default
   editor", naming its program. `EDITOR` is the editor's path with the options below.
-- **System default app**: files open with your system's app for them, and Jasper sets no `EDITOR`.
+- **System default app**: files open with your system's app for them, and Jasper sets no `EDITOR`. A file a launch or
+  Finder hands to Jasper is shown in the file manager instead.
 - **Custom command**: `custom_command` with the file's quoted path added, in a terminal tab, or on its own when
   `custom_in_terminal` is off. `/bin/sh` runs it with Jasper's `PATH` plus `/opt/homebrew/bin`, `/usr/local/bin` and
   `~/.local/bin`; on Windows, `cmd` runs it. `EDITOR` is the command as written. Until you enter one, files open with
@@ -617,7 +628,7 @@ A bad value is reported and its default used ([Plugin settings](plugins.md#plugi
 | `font_ligatures` | `false` | | Font ligatures | Every tab, at once |
 | `font_line_height` | `1.0` | 0.5–3: a multiple of the fonts' own line height | Line height | Every tab, at once |
 | `tab_size` | `4` | 1–16 columns | Tab size | Every tab, at once; Vim's 'tabstop' and 'shiftwidth' |
-| `soft_wrap` | `false` | | Soft wrap | Tabs opened afterwards; **Toggle Soft Wrap** changes one tab |
+| `soft_wrap` | `false` | | Soft wrap | Files opened afterwards; **Toggle Soft Wrap** changes one file |
 | `vim` | `false` | | Vim mode | Every tab, at once; the Vim status item and **Toggle Vim Mode** set it |
 | `markdown_view_mode` | `"source"` | `source`, `split` (Source and preview), `preview` | Default view | Tabs that show Markdown for the first time; choosing a view in a tab sets it ([Markdown preview](#markdown-preview)) |
 | `max_file_mib` | `10` | 1–256 MiB | Largest file (MiB) | The next read |
@@ -891,7 +902,8 @@ Project Index do) finds the `Editor` service with `services().find(Editor.class)
 storage and login, for a Markdown preview's relative links and images; a provider checks the path with
 `RelativePaths.requireValid`, and one that keeps the default, which returns empty, has links that say "This document
 cannot resolve relative links" ([relative paths](plugin-apis.md#relative-paths)). A plugin with a file source calls
-`locationDocuments(sourceId, resolver)` so that Open in Editor… and Save As… offer the source's places and open what
+`locationDocuments(sourceId, resolver)` so that Open in Editor…, Open in Editor Pane…, Open File Right…, Open File Down… and Save As… offer the source's places and open what
 the user picks through the `LocationResolver`; `reopener(prefix, resolve)` lets Recent files reopen its
-documents, and `opener(handler)` lets it answer Open in Editor… itself. [Plugin APIs](plugin-apis.md) describes the
-package.
+documents and Jasper restore their tabs (a restored document with a host is first read with
+`EditorDocument.readQuietly`, which asks the user nothing), and `opener(handler)` lets it answer Open in Editor…
+itself. [Plugin APIs](plugin-apis.md) describes the package.

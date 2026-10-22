@@ -12,7 +12,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
-/** Application-built windows and dialogs with consistent chrome. */
+/**
+ * Dialogs, overlays and popovers with Jasper's chrome, content tabs and their restorers, split items, close and quit
+ * guards, and Jasper's file chooser.
+ */
 public interface Windows {
     /** Create a nonblocking popup attached to a host-issued live capability.
      * @param anchor attachment authority from this host
@@ -50,7 +53,7 @@ public interface Windows {
     ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content, TabPlacement placement);
 
     /**
-     * Registers how this plugin rebuilds its tabs saved with restore state of {@code kind} (workspace tabs spec 13 and 14).
+     * Registers how this plugin rebuilds its tabs saved with restore state of {@code kind}.
      * Register it in {@code start()}: Jasper restores its windows once every plugin has started, and again whenever the
      * main window opens after it closed. A tab is saved only while its plugin has a restorer for its kind; a saved tab
      * whose plugin is missing or disabled, or has no restorer for its kind any more, comes back as a placeholder that
@@ -66,7 +69,7 @@ public interface Windows {
     Subscription restorer(String kind, TabRestorer restorer);
 
     /**
-     * Registers a split item (tabs and panes spec 8 and 11). Jasper lists it in every Split list (the Tab menu's and the
+     * Registers a split item. Jasper lists it in every Split list (the Tab menu's and the
      * right-click menus' Split submenus) after the terminal, the bundled plugins' items first and each in the order they
      * registered, and registers its {@link SplitItemSpec#rightAction()} and {@link SplitItemSpec#downAction()}, which can
      * be bound under {@code [keybindings]} and placed in the plugin's menus and toolbar as its own actions. Running one
@@ -86,7 +89,7 @@ public interface Windows {
     Subscription splitItem(SplitItemSpec spec, BiConsumer<WindowHandle, TabPlacement> opener);
 
     /**
-     * What every Split list offers, in its order (tabs and panes spec 2.10 and 8): {@link SplitChoice#TERMINAL}, then each
+     * What every Split list offers, in its order: {@link SplitChoice#TERMINAL}, then each
      * registered split item, the bundled plugins' first and each in the order they registered. A plugin that builds its
      * own menu, as the Editor builds its right-click menu, lists these and runs one beside an item with
      * {@link ContentTab#split(SplitChoice, dev.jasper.sdk.terminal.Direction)}.

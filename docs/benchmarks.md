@@ -125,13 +125,14 @@ pane ownership and one controlled fixture per pane. Cold-ready and warm-idle sna
 emits one staged payload per pane concurrently and then stays idle; output-settle is a separate phase. The interactive
 phase also fills the output, then runs asynchronous literal searches for `jasper`, alternates 16 and 17 pt fonts and
 1100 and 1050 px window widths, and returns to 16 pt and 1100 px. A cycle creates a tab and a split beside it, closes
-both, opens a sibling window and closes it; the baseline window stays open. Closed sessions are released before the retention
-samples. The final settle and a post-cleanup sample are separate.
+both, opens a sibling window and closes it; the baseline window stays open. Closed sessions are released before the
+retention samples. The final settle and a post-cleanup sample are separate.
 
 The initial window targets 1100×850 logical pixels; native minimum sizes can change it. Splits alternate right and
-down on the active pane, each opening a terminal in a new pane. Each run records the actual window size and, per pane, the rows, columns, view pixels, font
-size and visibility. Do not compare layouts from different monitor scaling, window managers, fonts or display sizes
-without reviewing that metadata. The child first requests 120×36, which is not its measured grid.
+down on the active pane, each opening a terminal in a new pane. Each run records the actual window size and, per pane,
+the rows, columns, view pixels, font size and visibility. Do not compare layouts from different monitor scaling,
+window managers, fonts or display sizes without reviewing that metadata. The child first requests 120×36, which is not
+its measured grid.
 
 A default memory run usually takes a few minutes, within a hard budget of 900 seconds and 120 seconds per
 configuration; the throughput run has one configuration and the 120-second deadline. A timeout is an explicit failed
@@ -249,6 +250,7 @@ whole report `incomplete` and the exit status 1. The JSON at the output path hol
 milliseconds from the click, plus the count, median, minimum and maximum per milestone; a `.json.md` companion lists the
 same summary as a table.
 
-Cold launches include residency's start-up work (the handoff endpoint is bound before the first window) and restore
-the saved windows, both of which the [start-up baseline](benchmarks/2026-10-02-startup-baseline.md) predates, so its
-numbers are not strictly comparable with later cold runs. The AOT training launch is not resident.
+Cold launches include claiming the home (the instance lock, the handoff endpoint and the command socket, all before
+the first window) and restoring the saved windows, which the
+[start-up baseline](benchmarks/2026-10-02-startup-baseline.md) predates, so its numbers are not strictly comparable
+with later cold runs. The AOT training launch is not resident.

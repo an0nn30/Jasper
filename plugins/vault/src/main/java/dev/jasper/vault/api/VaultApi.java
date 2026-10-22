@@ -53,8 +53,8 @@ public interface VaultApi {
 
     /**
      * Prompts for the master password over {@code owner} when the vault is locked. Every requester shares one unlock
-     * prompt: a request made while the prompt is open joins it where it is, and while the Credential Vault window is
-     * open the prompt opens in that window. Without a vault it posts a notification saying to create one and answers
+     * prompt: a request made while the prompt is open joins it where it is, and while the Credential Vault manager is
+     * open the prompt opens in it. Without a vault it posts a notification saying to create one and answers
      * {@code false}.
      *
      * @param owner the window the prompt opens over

@@ -34,7 +34,8 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     void setCommands(List<ContentCommand> commands);
     /**
-     * Replaces the items the window's status bar shows while this tab is active. Ignored once the tab is closed.
+     * Replaces the items the main window's status bar shows while this tab is active there; a child window has no
+     * status bar. Ignored once the tab is closed.
      *
      * @param items immutable snapshot of status items
      */
@@ -72,7 +73,7 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     void moveToMainWindow();
     /**
-     * Move Pane to New Tab (tabs and panes spec 9): the pane showing this item leaves its tab for a new tab right after it,
+     * Move Pane to New Tab: the pane showing this item leaves its tab for a new tab right after it,
      * which shows; nothing closes or leaves the window. Its tab's only pane, an item with a modal prompt open and an
      * item being closed stay where they are ({@link #mayMoveToNewTab()}).
      *
@@ -87,7 +88,7 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     boolean mayMoveToNewTab();
     /**
-     * Move Pane to Tab's choices (pane flexibility spec 4): the window's other tabs, in strip order, for a menu the
+     * Move Pane to Tab's choices: the window's other tabs, in strip order, for a menu the
      * plugin builds, which shows disabled while there is none. A choice carries its tab's title, the title of the tab's
      * shown item, only when the plugin holds {@code terminal.observe}, which reads any tab's title, or when that item is
      * this plugin's own content; otherwise its title is empty and its label reads {@code Tab 2}. Its number is the
@@ -99,7 +100,7 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     List<TabChoice> tabChoices();
     /**
-     * Move Pane to Tab (pane flexibility spec 4): the pane showing this item moves to the right of the active pane of the
+     * Move Pane to Tab: the pane showing this item moves to the right of the active pane of the
      * tab numbered {@code number} in its window's strip, which then shows, this item focused; no item closes or leaves the
      * window; its old tab closes if this was its last pane, and a maximized pane of the tab it joins stops being
      * maximized. The number of its own tab, a number no tab has, and an item {@link #tabChoices()} offers none for move
@@ -110,7 +111,7 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     void moveToTab(int number);
     /**
-     * Split with a choice beside this item (tabs and panes spec 8): selects it, then opens {@code choice} in a new pane on
+     * Split with a choice beside this item: selects it, then opens {@code choice} in a new pane on
      * {@code direction}'s side of its pane, as the Split lists' entries do: a terminal for {@link SplitChoice#TERMINAL},
      * else the split item's view, through its action. A closed tab, or one being closed, opens nothing. Whoever calls it,
      * it runs with the owning plugin's authority over the tab, its {@code terminal.open} for Terminal Right and Down

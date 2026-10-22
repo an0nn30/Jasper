@@ -5,7 +5,7 @@ import dev.jasper.sdk.terminal.WindowHandle;
 import java.util.Objects;
 
 /**
- * One saved tab a {@link TabRestorer} opens again (workspace tabs spec 13).
+ * One saved tab a {@link TabRestorer} opens again.
  *
  * @param window the Jasper window being restored: the owner of a content tab, or the window of a session's tab
  * @param title the tab's title when it was saved

@@ -96,7 +96,7 @@ public final class FakePluginHost implements AutoCloseable {
     final FakeNotifications notifications = new FakeNotifications(this);
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
-    /** Why restorers declined, in order (workspace tabs spec 13). */
+    /** Why restorers declined, in order. */
     private final List<String> declines = new CopyOnWriteArrayList<>();
     final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<String, List<String>> settingsReports = new java.util.concurrent.ConcurrentHashMap<>();
@@ -696,7 +696,9 @@ public final class FakePluginHost implements AutoCloseable {
      * UI thread: the toolbar views a Jasper window shows, in toolbar order. The window builds each registered
      * {@code ToolbarItem.View} once, the first time this is asked for it, as a window builds its views when it opens; a
      * view whose factory threw or whose tree the toolbar does not admit is left out and recorded in {@link #failures()}.
-     * A window that is not open, or whose views {@link #closeToolbarViews closed}, shows none and asks no factory.
+     * A window that is not open, or whose views {@link #closeToolbarViews closed}, shows none and asks no factory. Jasper
+     * builds toolbar views only in the main window, the only window with a toolbar; the fake builds them for any open
+     * window, a child window too.
      *
      * @param windowId a Jasper window
      * @return the live views
@@ -710,8 +712,8 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * UI thread: closes a window's toolbar views, as the window does when it closes; a fake window does when its last
-     * tab closes or moves to another window.
+     * UI thread: closes a window's toolbar views, as the window does when it closes; a fake child window does when its
+     * last tab closes or moves to another window; the main window stays open.
      *
      * @param windowId a Jasper window
      * @since 0.18.0
@@ -1134,7 +1136,7 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Invokes a panel's factory as the main window showing it would, or shows the panel built there: panels live in the
-     * main window (workspace tabs spec 14). A factory failure is recorded.
+     * main window. A factory failure is recorded.
      *
      * @param panelId the panel to build
      * @return the component, or null when no main window is open, there is no such panel or its factory failed
@@ -1328,7 +1330,7 @@ public final class FakePluginHost implements AutoCloseable {
     public UUID addTerminalWindow() { return workspace.addWindow().id; }
 
     /**
-     * Adds and selects a terminal tab, in a new tab of its own at the end of the window's strip (tabs and panes spec 4);
+     * Adds and selects a terminal tab, in a new tab of its own at the end of the window's strip;
      * {@link #addTerminalPane} gives it its one pane.
      *
      * @param windowId an open window
@@ -1386,7 +1388,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * A window's tabs as its strip shows them (tabs and panes spec 4), each tab's items pane by pane: the ids
+     * A window's tabs as its strip shows them, each tab's items pane by pane: the ids
      * {@code TabHandle.id()} reports.
      *
      * @param windowId a window
@@ -1439,7 +1441,7 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public void setPaneInfo(UUID paneId, dev.jasper.sdk.terminal.PaneInfo info) { workspace.pane(paneId).ifPresent(pane -> pane.info = Objects.requireNonNull(info, "info")); }
     /**
-     * Holds a local pane as Jasper holds a restored terminal tab it has not shown yet (workspace tabs spec 13): it reports
+     * Holds a local pane as Jasper holds a restored terminal tab it has not shown yet: it reports
      * {@code SessionState.NOT_STARTED} with no grid (0 columns, 0 rows, no shell integration) and drops what plugins send
      * it, and it starts on its tab's next selection or focus ({@link #focusTerminalPane}, or its {@code TabHandle.select()}),
      * after the selection is reported, with the snapshot it had when it was held. Only a local pane can be held; a pane
@@ -1889,8 +1891,8 @@ public final class FakePluginHost implements AutoCloseable {
     public dev.jasper.sdk.ui.ContentPresentation contentPresentation(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).presentation; }
     /**
      * The Jasper window a content tab is in: the window it opened in, or the one a move took it to. An owner
-     * that was a content tab resolves to that tab's window, and no owner or a closed window to the first open window
-     * that no tab was moved out to, or a new one when there is none.
+     * that was a content tab resolves to that tab's window, and no owner or a closed window to the main window, or to a
+     * new main window when none is open.
      *
      * @param tab handle from this host
      * @return originating owner */
@@ -1932,7 +1934,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * The restore state a tab gives (workspace tabs spec 13): a plugin's content tab's, or the one a plugin's provided
+     * The restore state a tab gives: a plugin's content tab's, or the one a plugin's provided
      * session carries. Call it on the UI thread.
      *
      * @param tabId a tab of the scripted workspace
@@ -1946,7 +1948,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * The restore state a plugin's content tab gives (workspace tabs spec 13). Call it on the UI thread.
+     * The restore state a plugin's content tab gives. Call it on the UI thread.
      *
      * @param tab a content tab from this host
      * @return its restore state; empty when the tab does not come back
@@ -1955,7 +1957,7 @@ public final class FakePluginHost implements AutoCloseable {
     public java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent) tab).restore; }
 
     /**
-     * Restores one saved tab as Jasper does when it restores its windows (workspace tabs spec 13): the plugin's restorer for
+     * Restores one saved tab as Jasper does when it restores its windows: the plugin's restorer for
      * {@code state}'s kind runs, and the first content tab it opens, whatever window or placement it named, or the first
      * provided session it opens in window {@code windowId}, is the saved tab, in that window, where it stays while the
      * restorer runs: a move asked of it does nothing. A content tab is placed there, not shown: it is

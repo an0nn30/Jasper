@@ -153,10 +153,10 @@ The Sample plugin registers its demo actions only when its demo settings are on:
 (`dev.jasper.sample.demo`, Cmd+Option+J; Ctrl+Alt+Shift+J) and **Sample Greetings…**
 (`dev.jasper.sample.greetings.open`, Cmd+Option+Y; Ctrl+Alt+Shift+Y).
 
-While an Editor tab is selected, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save. They
-are listed in the Editor tab's right-click menu and in [Editor](editor.md#commands-and-shortcuts), and are not part of
-the keymap. The window's Increase, Decrease and Reset Font Size change the selected Editor tab's own font size
-([Editor](editor.md#tabs)), and its Close Pane, Cmd+W (Ctrl+Shift+W), closes the Editor file's pane.
+While an Editor file's pane is active, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save.
+They are listed in the Editor tab's right-click menu and in [Editor](editor.md#commands-and-shortcuts), and are not part
+of the keymap. The window's Increase, Decrease and Reset Font Size change that pane's own font size
+([Editor](editor.md#tabs)), and its Close Pane, Cmd+W (Ctrl+Shift+W), closes the pane.
 
 ## Fixed keys
 
@@ -188,7 +188,8 @@ read-only rows.
 | File chooser | Cmd+L (Ctrl+L) | Type a location |
 | File chooser | Cmd+Shift+. (Ctrl+Shift+.) | Show or hide hidden items |
 | Settings | Enter, Escape | OK, Cancel |
-| Dragging a tool window | Escape | Cancels the drag |
+| A pane | Cmd+Option with a left-button drag (Ctrl+Alt on Linux and Windows) | Moves the pane ([Panes and splits](workspace.md#panes-and-splits)) |
+| Dragging a tab, a pane or a tool window | Escape | Cancels the drag |
 | Menus in the window (Linux and Windows) | F10 | Opens the first menu (in a terminal pane F10 goes to the program) |
 
 ## How shortcuts apply
@@ -200,8 +201,8 @@ read-only rows.
 - When the action is unavailable (Copy with nothing selected, for example), the key reaches the focused control, except
   in a terminal pane: there Jasper takes the key and does nothing, so Ctrl+Shift+C never reaches the shell as Ctrl+C.
 - Copy and Paste in a text field use the field's own copy and paste.
-- On Linux and Windows, Ctrl+PageUp and Ctrl+PageDown switch tabs even while a text field, a list or a table has the
-  focus.
+- The keys of Next Tab and Previous Tab switch tabs even while a text field, a list or a table has the focus, which
+  would otherwise take Ctrl+PageUp and Ctrl+PageDown for itself.
 - While the command palette card is open it takes the keyboard; Jasper's other shortcuts wait until it closes, except
   Copy and Paste in its query field, the palette's own shortcut (back to All from a scope chip, otherwise closing the
   card) and the plugin scopes' shortcuts, which switch the open palette to that scope, or close the card when that

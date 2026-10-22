@@ -4,8 +4,8 @@ Jasper has one UI kit (`jasper-ui`). The application and every bundled plugin bu
 plugin's dialogs, tool windows and settings look exactly like Jasper's own, in whichever look and theme are active.
 Plugins never see the kit's Swing classes: they describe their UI with immutable SDK values,
 [`Nodes`](sdk-reference.html#dev.jasper.sdk.ui.Nodes), and Jasper turns them into kit controls. This guide shows how to
-use that vocabulary; [Writing a Jasper plugin](plugin-authoring.md) covers where views go (tool windows, windows,
-dialogs, popovers, content tabs, the toolbar, Settings), lifetimes and threading.
+use that vocabulary; [Writing a Jasper plugin](plugin-authoring.md) covers where views go (tool windows, content
+tabs, dialogs, popovers, the toolbar, Settings), lifetimes and threading.
 
 ## What the host owns, and what you own
 
@@ -14,6 +14,8 @@ dialogs, popovers, content tabs, the toolbar, Settings), lifetimes and threading
 | Which surface (form kind, panel, split), its sections, rows and controls, their order and stable ids | Every size, inset, gap, radius, font and icon geometry |
 | Text, values, options, enabled, visible, busy and error states, the one primary action | Colours, from the active theme's semantic roles |
 | What an event means for your domain, and the next spec | Focus, keys (Enter, Escape, Tab, arrows), where validation shows, popups, scrolling, accessible names |
+
+Text you supply, tooltips included, is shown as written: a string starting with `<html>` is not rendered as HTML.
 
 The SDK has no way to paint ordinary controls, choose their colours or fonts, or size them. Only specialised content
 (an editor canvas, a chart, a terminal-like view) is the plugin's own component, registered as
@@ -29,7 +31,7 @@ The SDK has no way to paint ordinary controls, choose their colours or fonts, or
 3. Change your state and call `view.update(nextSpec)`. Jasper reconciles by node id: typed text, caret, selection,
    focus and scroll survive, and theme changes, including the user's interface font, re-render without your
    involvement.
-4. Close the view, or let the window, tool window or dialog that holds it close it. Events after that are dropped.
+4. Close the view, or let the tool window, content tab or dialog that holds it close it. Events after that are dropped.
 
 Keep ids stable for the life of a control; changing a node's id or kind replaces the control.
 
@@ -74,12 +76,12 @@ Pick the composition from what the surface is, not from how it should look:
 | Dialog with grouped fields (add host, new server, new tunnel) | `Form` with `FormKind.FULL`; each group is a `Section` holding a `Card` |
 | Sheet attached to a Jasper window or one of your content tabs | `Form` with `FormKind.SHEET`, shown with `DialogSpec.Presentation.ATTACHED_SHEET` |
 | Modal prompt inside a window, over its dimmed content | Any `Form`, often `PROMPT` or `PROMPT_COMPACT`, shown with `DialogSpec.Presentation.OVERLAY` |
-| Window body with a pinned footer | `Form` with `FormKind.WINDOW` (exactly one section, no hero) |
+| Window-sized dialog with a pinned footer, such as the Credential Vault manager | `Form` with `FormKind.WINDOW` (exactly one section, no hero), shown in a modeless dialog, which opens at a window's size, can be resized and remembers its bounds |
 | Tool window | `Panel` with a `Header`, optional search or navigation, a body and an optional footer |
 | Sidebar, list and detail (a manager) | `Split` with `SplitKind.THREE_COLUMN`, or `SIDEBAR_DETAIL` without the sidebar |
 | Document in a content tab | `Split` with `SplitKind.DOCUMENT` around a `Custom` |
 | Settings page of your own | `Stack` with `LayoutRole.SETTINGS_PAGE` |
-| Controls in the main toolbar | An INLINE `Stack` from a `ToolbarItem.view` factory: LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER choices, `MenuButton`s, `Separator`s, at most one PRIMARY `Button` and icon-only GHOST `Button`s, which draw a 16-pixel glyph and need SDK 0.18.1; see [the toolbar](plugin-authoring.md#the-toolbar) |
+| Controls in the main toolbar | An INLINE `Stack` from a `ToolbarItem.view` factory: LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER choices, `MenuButton`s, `Separator`s, at most one PRIMARY `Button` and icon-only GHOST `Button`s, which draw a 16-pixel glyph; see [the toolbar](plugin-authoring.md#the-toolbar) |
 | Nothing to show yet, or a disconnected state | `Empty` with an icon, title, description and actions |
 
 Inside cards:
@@ -212,7 +214,8 @@ static ViewSpec serversPanel(List<String> names, Set<String> running, String que
 ```
 
 Register it with `context.panels().register(new PanelSpec(...), host -> context.kit().create(...))` and keep your model
-outside the view: Jasper builds it once, in the main window. Two-line rows in a tool window are compact: the name leads
+outside the view: Jasper builds it in the main window the first time it shows, and again after the main window closed
+and opened anew. Two-line rows in a tool window are compact: the name leads
 the title line and keeps its width before whatever follows it; a `Chip` and a `MONO_SMALL` endpoint form the second
 line; one compact `Toggle` trails. A row switch is its own control: toggling it never activates the row, and its state
 follows what your domain confirms (set `pending` while a start or stop is in flight). A note above an `Empty` body, such
@@ -545,7 +548,7 @@ event dispatch thread, so run the test in `SwingUtilities.invokeAndWait`. A plug
   `setComposing(id, true)` plays an input method.
 - [`FakeKit`](sdk-reference.html#dev.jasper.sdk.testing.FakeKit)'s `views()`, `icons()` and `failures()` list its views,
   registered icons and contained handler failures. `FakePluginHost` mounts views where Jasper would: `panelView`,
-  `windowView`, `toolbarViews`, `settingsPanelView` and `popoverViews` return them.
+  `windowView`, `contentView`, `toolbarViews`, `settingsPanelView` and `popoverViews` return them.
 - The fake kit gives registered custom content a plain 13-point `SansSerif` as its font; `contentFont(font)` replaces
   it and sets the content already registered, as a change of the user's interface font would.
 - Assert on descriptors (which rows exist, which action is primary, which state is enabled), not on pixels; Jasper's own

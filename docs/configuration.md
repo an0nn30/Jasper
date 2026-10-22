@@ -27,8 +27,8 @@ the installed app's files; `./gradlew :jasper-app:run -Pjasper.home=<dir>` uses 
 `--config <path>` reads another configuration file; a relative path resolves from the working directory. Only the file
 moves: plugins, logs, layout and every other file stay in Jasper's home. `--config` applies only when Jasper starts (a
 later launch hands its request to the running Jasper, which ignores it), and a Jasper started with it is never resident
-and never changes the login item, so the `system.run_in_background` in its file is never acted on. [Command line](command-line.md) describes every startup
-option and the `jasper` command.
+and never changes the login item, so the `system.run_in_background` in its file is never acted on.
+[Command line](command-line.md) describes every startup option and the `jasper` command.
 
 ### Files in Jasper's home
 
@@ -40,10 +40,11 @@ option and the `jasper` command.
 | `plugins/<id>/` | A plugin's `<id>.toml` settings file, its `data/` folder and, for a plugin you installed, its `jars/` ([Plugins](plugins.md)). |
 | `plugins.toml`, `plugins.lock` | Which plugins are enabled and the capabilities you consented to; the lock held while that file changes. |
 | `themes/` | Imported themes, one `<id>.json` each ([Themes](themes.md)). |
-| `ui-state.toml`, `command-history.toml`, `buddy.toml` | [Application state](#application-state-files). |
+| `ui-state.toml`, `workspace.toml`, `command-history.toml`, `buddy.toml` | [Application state](#application-state-files). |
+| `workspace.toml.bad` | Saved windows Jasper could not restore ([workspace.toml](#workspacetoml)). |
 | `logs/` | Jasper's log files ([Diagnostics](diagnostics.md)). |
 | `shell-integration/` | The [shell integration](#shell-integration) scripts, extracted at every start. |
-| `daemon/` | Owner-only. The instance lock (`instance.lock`), which the Jasper that owns the home holds whether or not it is resident; its two sockets and their tokens, the handoff socket a second launch hands its request to before it exits and the `jasper` command's socket (`commands`); and the plugin commands `jasper --help` lists. On macOS a Dock click reaches the running Jasper and never creates a process ([one Jasper per home](command-line.md#one-jasper-per-home)). |
+| `daemon/` | Owner-only on macOS and Linux. The instance lock (`instance.lock`, with the owner's process id in `instance.pid`) that the Jasper owning the home holds while it runs, resident or not ([one Jasper per home](command-line.md#one-jasper-per-home)); the handoff socket a second launch hands its request to (`socket`, with `token`); the `jasper` command's socket (`commands`, with `commands.token` and `commands.token.pid`); and `subcommands`, the plugin commands `jasper --help` lists. |
 | `jasper-aot.failed` | On macOS, the record that the start-up cache failed, so Jasper starts without it ([Diagnostics](diagnostics.md#start-up-cache-packaged-macos-app)). |
 | `presentation-attempt.toml`, `presentation-attempt.lock` | Whether the last start with a plugin's look finished, and the lock held while that file changes ([Looks](looks.md#the-attempt-record)). |
 | `notification-icon.png` | Jasper's icon for `notify-send` on Linux. |
@@ -284,7 +285,9 @@ under every look.
 
 `window.columns` and `window.lines` are the terminal grid a new window opens with, measured in the saved terminal font
 and limited to the display's usable area. Jasper restores its windows where they were
-([`workspace.toml`](#workspacetoml)); the grid sizes a window it does not restore. A window keeps its size when they change; new tabs and splits in it take the space the layout gives them.
+([`workspace.toml`](#workspacetoml)); the grid sizes any other new window, except one a tab dragged out of every window
+opens, which is as large as the workspace it left. A window keeps its size when they change; new tabs and splits in it
+take the space the layout gives them.
 
 `window.native_decorations` and `window.view_mode` are read when Jasper starts. Under the default look, Jasper puts its
 header, the title search field and the toolbar, in the window's title bar: on macOS beside the window buttons, on
@@ -347,8 +350,8 @@ Jasper's home. [Notifications](notifications.md) describes what he shows.
 With `system.run_in_background` on (the default on macOS and Windows), Jasper keeps running when its last window
 closes, so the next window opens without a cold start; plugins keep running, but no shell does. On macOS, Quit (Cmd+Q)
 closes every window and leaves Jasper in the menu bar, whose item offers **New Terminal Window**, **Settings…** and
-**Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and **Quit Jasper**. Linux has no such icon,
-so the default there is off. [The workspace](workspace.md) describes quitting and reopening.
+**Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and **Quit Jasper**. Linux has
+no such icon, so the default there is off. [The workspace](workspace.md) describes quitting and reopening.
 
 Residency also starts Jasper in the background at login:
 
@@ -420,8 +423,8 @@ appearance. Only the terminal text area changes; tabs, panels and the editor kee
 ### Shell, environment and history
 
 `terminal.shell.profile` chooses the shell new tabs start; a split beside a running terminal starts that terminal's
-profile, and any other split the configured one. Shell
-History keeps its settings in its own file, `plugins/dev.jasper.history/dev.jasper.history.toml` ([Plugins](#plugins)).
+profile, and any other split the configured one. Shell History keeps its settings in its own file,
+`plugins/dev.jasper.history/dev.jasper.history.toml` ([Plugins](#plugins)).
 
 | Profile | Starts |
 |---|---|
@@ -583,11 +586,12 @@ Settings › Plugins installs, enables, disables and removes plugins; [Plugins](
 ## Application state files
 
 Jasper writes these files in its home itself; they are not configuration and are not meant to be edited. Each is
-written atomically; one that cannot be read is ignored (and logged), and its defaults apply.
+written atomically; one that cannot be read is ignored (and logged), and its defaults apply, except `workspace.toml`,
+which is kept aside ([below](#workspacetoml)).
 
 | File | Holds |
 |---|---|
-| `ui-state.toml` | Window layout ([below](#ui-statetoml)) |
+| `ui-state.toml` | The tool window layout and where dialogs were ([below](#ui-statetoml)) |
 | `workspace.toml` | Jasper's windows, tabs and panes ([below](#workspacetoml)) |
 | `command-history.toml` | The command palette's recent commands and how often you used each result ([Command palette](command-palette.md)) |
 | `buddy.toml` | The desk buddy's position: `version = 1`, `x`, `y` |
@@ -606,24 +610,31 @@ next one's, a resident Jasper's included. The windows themselves are in [`worksp
 | `[dock]` `left_ratio`, `right_ratio`, `bottom_ratio` | How each area divides between its two slots |
 | `[panels."<id>"]` `slot`, `order`, `visible` | A tool window's slot (`LEFT_TOP`, `LEFT_BOTTOM`, `BOTTOM_LEFT`, `RIGHT_TOP`, `RIGHT_BOTTOM` or `BOTTOM_RIGHT`), its place on the stripe, and whether it showed |
 | `[look."<plugin id>".dock]`, `[look."<plugin id>".panels."<id>"]` | The same for a plugin's look, such as Enterprise, which keeps a layout of its own |
-| `[windows."<id>"]` `x`, `y`, `width`, `height` | Where Settings (`app.settings`), the file chooser (`file-chooser`), About (`jasper.about`) and Licenses (`jasper.licenses`) were |
+| `[windows."<id>"]` `x`, `y`, `width`, `height` | Where Settings (`app.settings`), the file chooser (`file-chooser`), About (`jasper.about`), Licenses (`jasper.licenses`) and a plugin's window-sized dialog, under its plugin id and title, such as the Credential Vault manager (`dev.jasper.vault\|Credential Vault`), were |
 | `[palette]` `center_x`, `top` | Where the palette card was dragged, as fractions of the window |
 | `[palette.run_window]` `left`, `bottom` | Where the Run window was dragged, as fractions of the window |
 | `[chooser]` `recent`, `pinned`, `preview`, `show_hidden` | The file chooser's recent and pinned folders and its two toggles |
 
 ### workspace.toml
 
-`workspace.toml` keeps Jasper's windows: the main window and each full window, with its size, position and maximized
-state, its tabs in order with the one it shows, and each tab's split panes, the active one and what each pane holds.
-Jasper saves it within a second of each change, when a window closes, on Quit and when it goes to the background, and
-restores it at start and whenever the main window opens again. A window keeps its normal bounds while maximized or
-minimized and never comes back minimized; one that no longer fits an available display is fitted to a usable display.
-A terminal comes back with its name and profile and a new shell in its last local directory, or where a new shell
-starts when that directory was on another host or is gone; only the terminals of the tab each window shows start at
-once, the others when their tab first shows. A plugin's view comes back in its tab and pane when its plugin can restore
-it (the Editor's files, Remote's SSH tabs), and otherwise as a placeholder that says why (the plugin is not installed,
-turned off, marked for removal, off in safe mode, waiting for your review or could not start, or it could not restore
-that view), with Close and, while its plugin runs, Retry. Scrollback and running programs do not come back. A file
-Jasper cannot read is kept as `workspace.toml.bad`, and Jasper starts with one terminal tab and says so. Quit Jasper
+At most 256 KiB. `workspace.toml` keeps Jasper's windows: the main window and each child window (`role = "full"` in the
+file), with its size, position and maximised state, its tabs in order with the one it shows, and each tab's split panes,
+the active one and what each pane holds. Jasper saves it within a second of each change, at once when a window closes,
+and before closing every window together (closing the main window, Quit, going to the background). It restores the
+windows whenever the main window opens, at start or after it closed, from what it saved last, else from the file. A
+window keeps its normal bounds while maximised or minimised and never comes back minimised; one that no longer fits an
+available display is fitted to a usable display. A terminal comes back with the name you gave it and its profile and a
+new shell in its last local directory, or where a new shell starts when that directory was on another host or is gone;
+only the terminals of the tab each window shows start at once, the others when their tab first shows. A plugin's view
+that its plugin saves for restoring (the Editor's files, Remote's SSH tabs) comes back in its tab and pane; when its
+plugin does not run or cannot restore it, a placeholder says why (the plugin is not installed, turned off, marked for
+removal, off in safe mode, waiting for your review or could not start, or it could not restore that view), with Close
+and, while its plugin runs, Retry. Scrollback, running programs, plugin views their plugin does not save, such as an
+untitled Editor tab, and Jasper's own tabs, such as the Errors tab, do not come back. When the windows would pass the
+size limit, Jasper leaves out plugins' views and then terminals, the largest first, and logs each one.
+
+When saved windows do not all come back (the file cannot be read, has another `version` or keeps no main window, an
+entry in it is bad, or a window cannot be restored), Jasper keeps them as `workspace.toml.bad`, opens what it could
+(one terminal tab when the file itself is unusable) and posts "Jasper could not restore your windows". Quit Jasper
 before changing the file: once Jasper has opened a window it restores from what it last saved, not from the file, and
 a later save may replace the change.

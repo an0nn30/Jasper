@@ -7,7 +7,7 @@ code, and must return promptly. Slow work goes to the plugin's background execut
 thread before they touch the SDK.</p>
 
 <h3>The UI thread rule</h3>
-<p>Registering anything (actions, menus, toolbar and status items, tool windows, windows, palette scopes, file sources,
+<p>Registering anything (actions, menus, toolbar and status items, tool windows, content tabs, split items, restorers, palette scopes, file sources,
 subcommands, event subscriptions, services), creating and updating views, and every query or command on
 {@link Terminals} and its handles must happen on the UI thread. A call from another thread throws
 {@code IllegalStateException}: "<i>what</i> must be called on the UI thread: <i>plugin id</i>", or "Kit requires EDT" from the
@@ -74,7 +74,7 @@ asking, with {@link ContentTab#close()} or when the plugin stops. A plugin rarel
 closes whatever it left open, newest first. Close a subscription when the contribution should go away while the plugin
 keeps running, such as a menu entry for a host the user deleted, or rebuild a menu section with
 {@link PluginMenu#clear()} and {@link PluginMenu#add(String)}.</p>
-<p>Some handles end on their own: a {@link PanelHost} when its window closes ({@link PanelHost#onClosed(Runnable)}), a
+<p>Some handles end on their own: a {@link PanelHost} when the main window closes ({@link PanelHost#onClosed(Runnable)}), a
 {@link ContentTab} when the user closes it ({@link ContentTab#onClosed(Runnable)}), a {@link UiAnchor} when its control
 is hidden, disabled, made busy, removed or closed ({@link UiAnchor#onClosed(Runnable)}), and a dialog when the user or
 its window closes it ({@link WindowSurface#onClosed(Runnable)}). Pane, tab and window handles keep only an id: a closed target

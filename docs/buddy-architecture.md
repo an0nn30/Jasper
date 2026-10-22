@@ -153,7 +153,7 @@ Two producers post notices. [CommandNotifier](../jasper-app/src/main/java/dev/ja
 runs past `notifications.long_command_seconds`, or starts or continues out of sight, gets
 a `RUNNING` task with detail "Running · <elapsed>" (none while the setting is 0), and
 Jasper sets Buddy working while any of them runs. A long command's outcome reaches the
-operating system through the notification center's delivery and
+operating system through the notification centre's delivery and
 `application.SystemNotices`, not through CommandNotifier.
 [ActivityNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/ActivityNotifier.java)
 (source: the plugin id) turns plugin activities into `RUNNING` tasks, whose detail

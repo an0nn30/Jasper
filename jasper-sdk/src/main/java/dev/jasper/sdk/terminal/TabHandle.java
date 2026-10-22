@@ -4,7 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * One item of a Jasper window, the one a pane shows, which the SDK calls a tab (tabs and panes spec 3): a terminal tab,
+ * One item of a Jasper window, the one a pane shows, which the SDK calls a tab: a terminal tab,
  * whose {@link #terminal()} is its one pane, or a content tab, such as an editor, a tool view or a plugin's view. A
  * window holds tabs in its tab strip, each holding panes, and {@link WindowHandle#tabs()} lists their items. Handles keep
  * an id and no Swing object; two handles for the same tab are equal.

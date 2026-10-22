@@ -24,7 +24,8 @@ beside them. `<u>` is 0: only the Jasper that owns the home writes its logs. `<g
 to generation 0 across launches and, once it reaches about 1 MiB, renames it to 1 (and 1 to 2) and starts a new 0.
 Three generations are kept, so one Jasper's log never exceeds about 3 MiB. A launch that ends early writes no log: one
 that handed its request to the Jasper that owns the home, a `--background` or `--no-window` launch that found that
-Jasper running, and one that printed `--help` or rejected its arguments.
+Jasper running, one that printed `--help` or rejected its arguments, and one that could neither hand off nor start,
+which prints why to standard error ([one Jasper per home](command-line.md#one-jasper-per-home)).
 
 Only records from Jasper's own loggers are written: names under `dev.jasper`, which include the terminal library,
 Buddy and each plugin's logger, `dev.jasper.plugins.<plugin id>` (what a plugin's `PluginContext.log()` returns).
@@ -93,9 +94,12 @@ that piece of work took. Phases overlap (`application` includes `plugins`), so d
 - `look=` names the look: `default`, or the id of the plugin that provides it.
 
 Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …, output painted … after the
-request`. `<trigger>` is `cold`, `menu`, `reopen` or `handoff`. A window opened after the last one had closed adds
-`; no window for … before`, and on Windows also `… page faults until shown, working set … to … MB`. With
-`-Djasper.startupTrace=<file>` the same data is also written as JSON; the start-up benchmark uses it.
+request`. `<trigger>` is `cold` (a launch's first window), `menu`, `reopen` (a Dock click, Spotlight or `open -a` on
+macOS), `handoff` (a second launch or a `jasper` call), `open-file` (a macOS open-file event), `notification` (a click
+on a system notification), `plugin` (a plugin's view opening with no window open) or `restore` (a child window coming
+back with the main window). A window opened after the last one had closed adds `; no window for … before`, and on
+Windows also `… page faults until shown, working set … to … MB`. With `-Djasper.startupTrace=<file>` the same data is
+also written as JSON; the start-up benchmark uses it.
 
 ## Start-up recovery
 

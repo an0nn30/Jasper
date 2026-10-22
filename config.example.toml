@@ -23,7 +23,7 @@ status_bar = true
 status_bar_height = 24
 # Live across open windows.
 memory_indicator = false
-# Initial grid for a new window when no window size is saved yet (see ui-state.toml). Columns: 5-500; lines: 2-200.
+# Initial grid for a window Jasper does not restore from workspace.toml. Columns: 5-500; lines: 2-200.
 columns = 100
 lines = 35
 # Restart required. Windows and Linux only: true uses the operating system's title bar, with the menus and
@@ -35,7 +35,7 @@ native_decorations = false
 view_mode = "normal"
 
 [buddy]
-# Live. Show the pixel-art Jasper floating above your windows while a Jasper window is open.
+# Live. Show the pixel-art Jasper floating above your windows while the main window is open.
 # Show/Hide Jasper in the command palette and right-click > Hide Jasper toggle him for the session.
 enabled = false
 
@@ -94,7 +94,8 @@ copy_on_select = false
 bell = "visual"
 # Shell process exit: "keep_open" retains the stopped terminal and output (the default).
 # Use "close_on_success" for code 0 only, or "close" for any exit.
-# Only the exited pane closes; its tab/window closes when empty. Live for future exits;
+# Only the exited pane closes; a tab closes with its last pane, and a window with its last tab, except the main
+# window, which shows its empty workspace. Live for future exits;
 # reloading never closes previously retained output. A program returning to the shell is not a shell exit.
 on_exit = "keep_open"
 # New panes only. "auto" loads Jasper's shell integration script into zsh and bash after your startup files, into
@@ -109,8 +110,8 @@ scheme = "match"
 # New panes only. The shell new tabs start: "powershell", "pwsh" (PowerShell 7), "cmd" or "cygwin" (Jasper's
 # Cygwin Bash) on Windows, "wsl:<name>" for a WSL distribution, "login" on macOS and Linux, or "custom" (program and
 # args below).
-# Empty means "custom" when program or args are set, otherwise the platform default. A split starts the
-# shell of the pane it splits; a profile that is not installed starts the default with a warning.
+# Empty means "custom" when program or args are set, otherwise the platform default. A split beside a running
+# terminal starts that terminal's profile; a profile that is not installed starts the default with a warning.
 profile = ""
 # For the "custom" profile. An empty program selects the platform's default shell (the login shell on macOS and Linux).
 # Configured args append to that default command. An explicit program receives only these args,

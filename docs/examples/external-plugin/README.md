@@ -16,8 +16,8 @@ Copy this folder to start a plugin of your own.
 ## Building it
 
 1. Download `jasper-sdk-<version>.jar` and `jasper-sdk-testkit-<version>.jar` from a Jasper release whose SDK version
-   the manifest's `sdk` range admits (`>=0.18.0, <0.19`), and put them in `libs/`. `-PjasperSdkDir=<folder>` reads
-   them from another folder, and `-PjasperSdkVersion=<version>` picks other jars than the default, `0.18.3`. A missing
+   the manifest's `sdk` range admits (`>=0.21.0, <0.22`), and put them in `libs/`. `-PjasperSdkDir=<folder>` reads
+   them from another folder, and `-PjasperSdkVersion=<version>` picks other jars than the default, `0.21.0`. A missing
    jar stops the build with a message naming it.
 2. Run the build with Gradle and a Java 25 JDK of any vendor installed. The folder has no Gradle wrapper; `gradle
    wrapper` adds one.
@@ -38,7 +38,9 @@ builds the example from them; CI runs this on Linux:
 ## Running it in Jasper
 
 - `jasper --plugin-dir build/plugin/dev.example.hello` starts a Jasper that loads the folder without asking for
-  consent. See [launching Jasper with options](../../command-line.md#launching-jasper-with-options).
+  consent. The option applies only to a Jasper that starts: quit a Jasper running in the same Jasper home first, or set
+  `JASPER_HOME` to another folder ([one Jasper per home](../../command-line.md#one-jasper-per-home)). See
+  [launching Jasper with options](../../command-line.md#launching-jasper-with-options).
 - To install it, open File › Manage Plugins…, choose Install from Zip… from the Plugin options menu (the three-dot
   button) on the Plugins page, pick the zip, review the plugin and choose Install. It loads after Jasper restarts; see
   [installing a plugin](../../plugins.md#installing-a-plugin).

@@ -1,7 +1,7 @@
 # The Enterprise look
 
 Enterprise is a bundled plugin (`dev.jasper.enterprise`), off by default, that provides Jasper's presentation: the
-window chrome and the way controls are drawn. With it on, each workspace window has IntelliJ Classic's title bar on
+window chrome and the way controls are drawn. With it on, the main window has IntelliJ Classic's title bar on
 macOS and Windows (the system's on Linux), the classic menus, a classic toolbar row, labelled tool window stripes and a
 Run window in place of the command palette card, and controls are drawn the classic way, in the Enterprise theme or
 any other. Remote, File Server and Credential Vault switch to classic layouts of their own.
@@ -48,7 +48,7 @@ Enterprise as skipped: "did not finish starting with this look last time".
 
 ### Windows and menus
 
-- **Title bars.** Workspace windows have IntelliJ Classic's title bar
+- **Title bars.** The main window and child windows have IntelliJ Classic's title bar
   ([the classic title bar](looks.md#the-classic-title-bar)):
   - On macOS, a 28-point band in the toolbar's colour, seamless with the toolbar row, holds the traffic lights and the
     window's title, light or dark with the theme shown. A double-click in it does what System Settings › Desktop &
@@ -58,27 +58,30 @@ Enterprise as skipped: "did not finish starting with this look last time".
     the system title bar instead, with the menus as a row in the window.
   - On Linux, the system title bar.
 
-  Other windows, such as Settings, About and the Credential Vault manager, keep the system title bar on macOS and
-  Linux and Jasper's on Windows. Settings hides `window.native_decorations` on macOS and Linux. Compact keeps the
-  system title bar, without the band.
-- **Window title.** `Workstation — {session} — {directory}`: `{session}` is the session's name for a session a plugin
-  provides, such as a Remote host, the host of a pane in a remote directory, or "Local: *shell*"; `{directory}` is the
-  remote path, or the local folder with `~` for your home folder. A part with nothing to show drops with its separator.
+  A child window's band or title bar holds only its title and, at its end, the window's ⋮ menu (on Linux a row under
+  the system title bar holds the ⋮). Other windows, such as Settings, About and the Credential Vault manager, keep the
+  system title bar on macOS and Linux and Jasper's on Windows. Settings hides `window.native_decorations` on macOS and
+  Linux. Compact keeps the system title bar, without the band.
+- **Window title.** The main window's is `Workstation — {session} — {directory}`: `{session}` is the session's name
+  for a session a plugin provides, such as a Remote host, the host of a pane in a remote directory, or "Local:
+  *shell*"; `{directory}` is the remote path, or the local folder with `~` for your home folder. A part with nothing to
+  show drops with its separator. A child window is titled after its active tab.
 - **Menus** are in the screen menu bar on macOS, with **About Jasper** and **Settings…** in the application menu; in
-  the title bar on Windows; and a row in the window on Linux, with **About Jasper** at the end of Help on both. The
-  order is File, Edit, View, Session and Transfer (when a plugin fills them), the plugins' own menus, Tools (when a
-  plugin fills it), Window and Help. **Window** holds what the standard look's Tab menu holds, then the tool window
-  toggles, which the standard look keeps under View. A child window shows the main window's menus in the screen menu bar
-  on macOS and has none on Linux and Windows; auxiliary windows, such as About, show a short File menu in the screen menu
-  bar on macOS and have none on Linux and Windows, where Close Window's shortcut still closes them.
+  the main window's title bar on Windows; and a row in the main window on Linux, with **About Jasper** at the end of
+  Help on both. The order is File, Edit, View, Session and Transfer (when a plugin fills them), the plugins' own menus,
+  Tools (when a plugin fills it), Window and Help. **Window** holds what the standard look's Tab menu holds, then the
+  tool window toggles, which the standard look keeps under View. A child window shows the same menus in the screen
+  menu bar on macOS, acting on that window, and has none on Linux and Windows; auxiliary windows, such as About, show a
+  short File menu in the screen menu bar on macOS and have none on Linux and Windows, where Ctrl+W still closes them.
 - **Toolbar row** under the title bar: **New Session**, **Split** (Split Right, Split Down), **Maximize**, the plugins'
   toolbar items (such as Remote's session combo and Run button), then at the trailing edge **Search Everywhere**, an
-  icon-only magnifier whose tooltip names the palette's shortcut and which opens the Run window, and **Settings…**. By
-  default each button is a 22 px icon named by its tooltip, the built-in ones IntelliJ's classic icons, and Split marks
-  its menu with a small ▼ in its corner. **Toolbar: Icons and Labels** (`window.toolbar = "icons_and_labels"`) shows
-  each button's icon, then its label, Split ending in ▼; Search Everywhere stays an icon. **Toolbar: Hidden** removes
-  the row, Search Everywhere and the plugins' items with it; the palette's shortcut and **▶ Run…** still open the Run
-  window. Its height, `window.toolbar_height`, defaults to 28 px, IntelliJ's.
+  icon-only magnifier whose tooltip names the palette's shortcut and which opens the Run window, **Settings…** and the
+  window's ⋮ menu ([windows](workspace.md#windows)). By default each button is a 22 px icon named by its tooltip, the
+  built-in ones IntelliJ's classic icons, and Split marks its menu with a small ▼ in its corner. **Toolbar: Icons and
+  Labels** (`window.toolbar = "icons_and_labels"`) shows each button's icon, then its label, Split ending in ▼; Search
+  Everywhere and the ⋮ stay icons. **Toolbar: Hidden** removes the row, Search Everywhere, the ⋮ and the plugins' items
+  with it; the palette's shortcut and **▶ Run…** still open the Run window. Its height, `window.toolbar_height`,
+  defaults to 28 px, IntelliJ's.
 - **Tabs** are classic: always shown, as wide as their labels, each with a × (a terminal tab also with a status dot), a
   **+** after the last, the active one underlined.
 - **Tool windows** ([tool windows and the dock](workspace.md#tool-windows-and-the-dock)) sit on labelled stripes: left
@@ -87,7 +90,7 @@ Enterprise as skipped: "did not finish starting with this look last time".
   SFTP, Tunnels, Transfers, File Servers and the Event Log, and a monochrome glyph for any other. When a window's
   toggle shortcut is a digit key held with Cmd, Option or Ctrl (Ctrl or Alt on Linux and Windows), its label then
   starts with the digit, such as "3: Transfers". A click toggles the window and a right-click opens its menu. Frames
-  are flush, under header strips 24 px high, whose buttons draw IntelliJ's classic icons for add, split, zoom,
+  are flush, under header strips 24 px high, whose buttons draw IntelliJ's classic icons for add, split, maximize,
   settings, new window and search, as the toolbar does. Settings hides `window.rail_width`, which does not apply.
 - **The active tool window.** A click anywhere in a tool window, opening it from its stripe, or its toggle in the
   Window menu or its shortcut (such as Cmd+Option+2, Alt+2 on Linux and Windows, for SFTP) makes it the active one:
@@ -147,7 +150,7 @@ Plex Mono too ([defaults](#defaults)). Terminal text keeps `[terminal.font]`.
 
 The look has no branding of its own: windows, the Dock or taskbar keep Jasper's Shell Prompt icon, and a start that
 opens a window (not `--background`, `--no-window` or `--safe-mode`) shows Jasper's Meadow splash until the first
-workspace window has painted ([branding](looks.md#branding)). Its turtle is animated unless `config.toml` sets
+Jasper window has painted ([branding](looks.md#branding)). Its turtle is animated unless `config.toml` sets
 `ui.animations.enabled = false`, which Settings hides under this look.
 
 ### Defaults

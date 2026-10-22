@@ -15,7 +15,7 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <tr><td>Rail buttons</td><td>{@link Rail#add(String)}</td><td></td><td>The left tool window stripe, after the tool window buttons</td></tr>
 <tr><td>Tool windows</td><td>{@link Panels#register(PanelSpec,PanelFactory)}, {@link Panels#toggle(String,WindowHandle)}</td><td></td><td>A stripe button and a tool window in one of six dock slots of the main window; View › Tool Windows</td></tr>
 <tr><td>Dialogs</td><td>{@link Windows#dialog(DialogSpec)}, {@link Windows#overlay(OverlaySpec)}, {@link Windows#popover(UiAnchor)}</td><td></td><td>Dialogs and sheets, in-window overlays, popovers below a control</td></tr>
-<tr><td>Content tabs</td><td>{@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)}</td><td></td><td>A document in a pane of a workspace tab, beside terminals, a new pane or a new child window</td></tr>
+<tr><td>Content tabs</td><td>{@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)}</td><td></td><td>A document in a new tab, a new pane beside the focused one or a new child window, beside terminals</td></tr>
 <tr><td>Split items</td><td>{@link Windows#splitItem(SplitItemSpec,BiConsumer)}</td><td></td><td>Every Split list, after the terminal, with two bindable actions</td></tr>
 <tr><td>Restorers</td><td>{@link Windows#restorer(String,TabRestorer)}</td><td></td><td>The plugin's saved tabs coming back when Jasper restores its windows</td></tr>
 <tr><td>File choosers</td><td>{@link Windows#choose(FileChoice)}, {@link Windows#chooseFiles(WindowOwner,String,Optional)}, {@link Windows#chooseDirectory(WindowOwner,String,Optional)}, {@link Windows#chooseSaveFile(WindowOwner,String,Optional)}</td><td></td><td>Jasper's file chooser, over a Jasper window or one of the plugin's content tabs</td></tr>
@@ -31,7 +31,7 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <tr><td>Settings</td><td>{@link PluginSettings#declare(SettingSpec)}, {@link PluginSettings#page(SettingsPanel)}</td><td></td><td>The plugin's page in Settings › Tools; see <a href="#settings">Settings</a></td></tr>
 <tr><td>Icons</td><td>{@link UiKit#registerIcon(IconAsset)}</td><td></td><td>Anywhere the plugin names an icon</td></tr>
 <tr><td>Services and topics</td><td>{@link Services#publish(Class,Object)}, {@link Events#publish(Topic,Object)}</td><td></td><td>Other plugins; see <a href="#services">Services</a></td></tr>
-<tr><td>Quit and close guards</td><td>{@link Windows#onQuitting(Supplier)}, {@link Windows#onTabsClosing(BiFunction)}, {@link WindowSurface#onClosing(BooleanSupplier)}</td><td></td><td>Asked before Jasper quits or a window or tab closes</td></tr>
+<tr><td>Quit and close guards</td><td>{@link Windows#onQuitting(Supplier)}, {@link Windows#onTabsClosing(BiFunction)}, {@link WindowSurface#onClosing(BooleanSupplier)}</td><td></td><td>Asked before Jasper quits, a tab closes or a dialog closes</td></tr>
 <tr><td>A look and themes</td><td>{@code presentation} and {@code themes} in the manifest</td><td>{@code presentation.provide} for a look</td><td>The chrome and controls, and themes in Settings › Appearance &amp; Behavior › Appearance; see <a href="looks.md">looks</a> and <a href="creating-themes.md">creating themes</a></td></tr>
 </tbody>
 </table>
@@ -88,7 +88,7 @@ rebuild it at any time with {@link PluginMenu#clear()}.</p>
 that opens a menu of actions, and {@link ToolbarItem#view(ToolbarViewFactory)} a small group of the plugin's own
 controls in the main window's toolbar (a child window has none). A toolbar view's root is an INLINE {@link Nodes.Stack} of LABEL texts, DROPDOWN,
 SEARCHABLE or PICKER choices, at most one PRIMARY button, icon-only GHOST buttons (a blank label with an icon and a
-tooltip, which need SDK 0.18.1 or later), menu buttons and separators; any other tree is refused, and the window shows
+tooltip), menu buttons and separators; any other tree is refused, and the window shows
 no view.
 When the toolbar is too narrow, buttons move into its "More actions" menu and a view hides.</p>
 
@@ -106,7 +106,8 @@ two actions.</p>
 <h3>Tool windows and the rail</h3>
 <p>A registered panel gets a stripe button in the main window, the only window with tool windows: its icon, or under
 the Enterprise look's labelled stripes a label that starts with the icon and reads its title. Its {@link PanelFactory}
-builds its view once, on the UI thread, the first time the panel shows; a toggle from a child window shows it in the main
+builds its view on the UI thread the first time the panel shows in the main window, and again after the main window
+closed and opened anew; a toggle from a child window shows it in the main
 window and brings that window to the front. The
 {@link PanelSpec}'s anchor and {@link PanelSpec#withSplit()} pick the default slot (Left Top, Left Bottom, Bottom Left,
 Right Top, Right Bottom or Bottom Right); the user can move it with the header's Options menu, and Jasper remembers where.
@@ -127,7 +128,9 @@ A view of the plugin's own that is not a tool window is a content tab.</p>
 <ul>
 <li>{@link Windows#dialog(DialogSpec)}: a dialog over a Jasper window, a content tab or an anchor, closed with its window,
 presented {@link DialogSpec.Presentation#CENTERED}, as an {@link DialogSpec.Presentation#ATTACHED_SHEET} or as an
-in-window {@link DialogSpec.Presentation#OVERLAY}; the look may place it another way. {@code show} returns after a modal dialog closes.</li>
+in-window {@link DialogSpec.Presentation#OVERLAY}; the look may place it another way. {@code show} returns after a modal dialog closes.
+A modeless dialog whose content is a {@link Nodes.FormKind#WINDOW} form, as the Credential Vault manager's is, opens at
+a window's size, can be resized and remembers its bounds.</li>
 <li>{@link Windows#overlay(OverlaySpec)}: progress content centred inside a Jasper window, one per window. Escape and
 outside clicks do not dismiss it, so give it a Cancel action.</li>
 <li>{@link Windows#popover(UiAnchor)}: a popup below (or above) a button or picker, from {@link UiView#anchor(String)};

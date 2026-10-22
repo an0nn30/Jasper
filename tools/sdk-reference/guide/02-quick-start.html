@@ -151,7 +151,10 @@ class HelloPluginTest {
 }</code></pre></li>
 <li><b>Build and run it in Jasper.</b> The commands use a Gradle wrapper in the project ({@code gradle wrapper} makes
 one; Jasper's CI builds this example with Gradle 9.7.0). {@code stagePlugin} writes the plugin folder, the plugin jar
-beside the libraries it bundles; {@code --plugin-dir} starts a separate Jasper that loads it without a capability review:
+beside the libraries it bundles; {@code --plugin-dir} starts Jasper with it, without a capability review. The option
+applies only to a Jasper that starts: quit a Jasper already running in the same Jasper home first, because a second
+launch hands off to it and the option is ignored (<a href="command-line.md#one-jasper-per-home">one Jasper per
+home</a>), or set {@code JASPER_HOME} to another folder to run it beside your everyday Jasper:
 <pre><code class="language-shell">./gradlew check stagePlugin
 jasper --plugin-dir build/plugin/dev.example.hello</code></pre>
 The {@code jasper} command must be on your {@code PATH} (Settings › Appearance &amp; Behavior › System Settings ›

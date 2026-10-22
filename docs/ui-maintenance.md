@@ -14,11 +14,12 @@ Use Java 25 on the JetBrains Runtime and the repository wrapper. Every command h
 
 `:jasper-ui:check` runs the module's tests, Javadoc with doclint (every group except missing comments; an error fails
 the build), the root-project gate `verifyUiArchitecture` ([packages](ui-architecture.md#packages)) and
-`checkThemeTool`, the theme converter's Python tests (`tools/themes`), which need Python 3.11 or later as `python3` or
-`python`, or the interpreter `-Pjasper.python=<path>` names. The test task depends on the module jar, passes
-`jasper.uiJar` and `jasper.repoRoot` to the tests, and takes every `docs/**/*.md` and `jasper-ui/README.md` as inputs,
-so a documentation edit reruns the documentation tests. `-Dflatlaf.uiScale=<n>` is forwarded to every test JVM, to
-run the same logical geometry at another scale. `verifyUiDistribution` is not part of `check`.
+`checkThemeTool`, the theme converter's Python tests (`tools/themes`), which need Python 3.11 to 3.13 (3.14 fails
+`test_deeply_nested_input_is_a_message`) as `python3` or `python`, or the interpreter `-Pjasper.python=<path>` names.
+The test task depends on the module jar, passes `jasper.uiJar` and `jasper.repoRoot` to the tests, and takes every
+`docs/**/*.md` and `jasper-ui/README.md` as inputs, so a documentation edit reruns the documentation tests.
+`-Dflatlaf.uiScale=<n>` is forwarded to every test JVM, to run the same logical geometry at another scale.
+`verifyUiDistribution` is not part of `check`.
 
 ## The gallery
 
@@ -132,8 +133,11 @@ jasper-app's `AppDocumentationTest` checks the same files' links and `#anchors`.
 Update the UI and SDK `Nodes`, `KitValues`, the testkit's contract coverage and the renderer together. `Nodes.Node`
 is sealed, so the control registry's dispatch fails to compile until it handles a new kind. Add a mounted fixture and
 a behaviour or rendered regression. Named artwork expresses explicit intent; it never infers feature meaning from ids
-or text. Then run `./gradlew sdkReference` to regenerate [the SDK reference](sdk-reference.html), which
-`verifySdkReference` checks, and describe the node in [plugin UI](plugin-ui.md).
+or text. A control that shows the node's text sets `html.disable` before its first text or Action, and on the tooltip
+it creates ([plain text](ui-architecture.md#views)); `ButtonsTest`, `PanelSurfacesTest` and `SettingsControlsTest`
+check that a text starting with `<html>` builds no `BasicHTML` view. Then run `./gradlew sdkReference` to regenerate
+[the SDK reference](sdk-reference.html), which `verifySdkReference` checks, and describe the node in
+[plugin UI](plugin-ui.md).
 
 ### A metric role
 

@@ -109,7 +109,7 @@ starts"); every address the server answers on, each with **Copy**; **Start**, **
 **Stop** or **Stopping…**; **Edit…** (**Save as a Server…** on a temporary server); and the
 [activity log](#activity-and-transfers).
 
-While a File Servers tool window is visible, the addresses are recomputed every 10 seconds and each time it is shown, so
+While the File Servers tool window is visible, the addresses are recomputed every 10 seconds and each time it is shown, so
 a server reachable from all networks picks up a network you joined.
 
 The status bar shows "⇅ 1 server" or "⇅ *n* servers" while servers run; its tooltip lists each running server with its

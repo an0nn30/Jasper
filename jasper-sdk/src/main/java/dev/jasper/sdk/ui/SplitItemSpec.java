@@ -5,12 +5,12 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * A plugin's split item (tabs and panes spec 8 and 11): what a new pane can hold besides a terminal. Jasper lists it in
+ * A plugin's split item: what a new pane can hold besides a terminal. Jasper lists it in
  * every Split list and registers two actions for it, which can be bound like any action and have no default shortcut:
  * {@link #rightAction()}, titled "Split Right with" and the label, and {@link #downAction()}, titled "Split Down with"
  * and the label. The Split lists show it as the label followed by "Right" and "Down". An item whose actions ask
  * something before they open the pane, as a file chooser does ({@link #asking()}), ends those entries and its actions'
- * titles with an ellipsis, as menus mark a command that asks for more first (pane flexibility spec 3).
+ * titles with an ellipsis, as menus mark a command that asks for more first.
  *
  * @param id namespaced id that starts with the plugin's id and a dot, its last part naming the item, for example
  *           {@code dev.example.notes.notes}; at most 116 characters, so that its actions' ids are action ids

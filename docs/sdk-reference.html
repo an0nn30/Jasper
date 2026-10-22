@@ -745,8 +745,8 @@ take precedence for the editor role and for a subcommand name two loading plugin
 <h3>What a plugin can do</h3>
 <ul class="cards">
 <li><b>Commands and chrome</b><span>Actions that appear in the command palette and Settings › Keymap with default shortcuts, placed in menus, the toolbar, the status bar and the tool window stripe.</span></li>
-<li><b>Tool windows and windows</b><span>Docked tool windows, windows of its own, dialogs, in-window overlays, popovers and document tabs in the workspace, all built from declarative views that Jasper draws.</span></li>
-<li><b>Terminals</b><span>Find windows, tabs and panes, read what a pane runs, type into it, open local tabs, splits and programs, add environment variables to new shells, and follow 16 terminal events.</span></li>
+<li><b>Tool windows, tabs and dialogs</b><span>Docked tool windows, content tabs that split, move between windows and come back when Jasper restores its windows, items in the Split lists, dialogs, in-window overlays and popovers, all built from declarative views that Jasper draws.</span></li>
+<li><b>Terminals</b><span>Find windows, tabs and panes, read what a pane runs, type into it, open local tabs, splits and programs, add environment variables to new shells, and follow 17 terminal events.</span></li>
 <li><b>Sessions</b><span>Provide a pane's session over its own connection, as Remote does for SSH: Jasper owns the pane, its banner and Reconnect.</span></li>
 <li><b>Command palette</b><span>Scopes of searchable rows with up to three verbs, an optional form step, recents, and a chip the user reaches by prefix or shortcut.</span></li>
 <li><b>Notifications and activity</b><span>Notification groups the user tunes in Settings, long-running activities and connection states shown on Desk Buddy.</span></li>
@@ -771,8 +771,8 @@ unless <code>JASPER_HOME</code> or the <code>jasper.home</code> Java property mo
 requires export; Jasper's own classes and libraries are not visible. Everything a plugin registers through its context
 is attributed to it and removed when it stops. Nothing loads or unloads while Jasper runs: installing, updating, enabling,
 disabling and removing a plugin take effect at the next launch.</p>
-<p>The SDK depends only on the JDK. A few signatures use AWT and Swing types: colours (<code>java.awt.Color</code>), a window's
-preferred size (<code>java.awt.Dimension</code>), a component's workspace opacity (<code>java.awt.Component</code>), custom content (<code>javax.swing.JComponent</code>) and content-tab shortcuts
+<p>The SDK depends only on the JDK. A few signatures use AWT and Swing types: colours (<code>java.awt.Color</code>), a
+component's workspace opacity (<code>java.awt.Component</code>), custom content (<code>javax.swing.JComponent</code>) and content-tab shortcuts
 (<code>javax.swing.KeyStroke</code>). Plugins run on Java 25.</p>
 
 <h3>The bundled plugins</h3>
@@ -803,8 +803,8 @@ in <a href="plugins.md">plugins</a>.</p>
 adds <code>dev.jasper.sdk.testing</code>, and the bundled plugins' exported packages complete the API reference below.</p>
 <div class="table-wrap"><table class="packages"><thead><tr><th>Package</th><th>What it holds</th></tr></thead><tbody>
 <tr><td><a href="#package-dev.jasper.sdk"><code>dev.jasper.sdk</code></a></td><td>Leaf values shared by every SDK package: the SDK version, plugin identity, the capability names and the exception a
-gated call throws without one, the theme variant, the owner a dialog is parented to and the subscription returned
-by every registration.</td></tr>
+gated call throws without one, the theme variant, the owner a dialog is parented to, the restore state a plugin's tab
+comes back with when Jasper restores its windows, and the subscription returned by every registration.</td></tr>
 <tr><td><a href="#package-dev.jasper.sdk.plugin"><code>dev.jasper.sdk.plugin</code></a></td><td>The entry point a plugin implements and the context the runtime hands it.</td></tr>
 <tr><td><a href="#package-dev.jasper.sdk.activity"><code>dev.jasper.sdk.activity</code></a></td><td>Long-running work a plugin volunteers to show: begin an activity, report progress, end it once; or announce a
 connection, report its state as it changes and close it.</td></tr>
@@ -993,7 +993,10 @@ java { toolchain { languageVersion = <span class="t">JavaLanguageVersion</span>.
 }</code></pre></li>
 <li><b>Build and run it in Jasper.</b> The commands use a Gradle wrapper in the project (<code>gradle wrapper</code> makes
 one; Jasper's CI builds this example with Gradle 9.7.0). <code>stagePlugin</code> writes the plugin folder, the plugin jar
-beside the libraries it bundles; <code>--plugin-dir</code> starts a separate Jasper that loads it without a capability review:
+beside the libraries it bundles; <code>--plugin-dir</code> starts Jasper with it, without a capability review. The option
+applies only to a Jasper that starts: quit a Jasper already running in the same Jasper home first, because a second
+launch hands off to it and the option is ignored (<a href="command-line.md#one-jasper-per-home">one Jasper per
+home</a>), or set <code>JASPER_HOME</code> to another folder to run it beside your everyday Jasper:
 <pre class="code" data-language="shell"><code><span class="k">./gradlew</span> check stagePlugin
 <span class="k">jasper</span> --plugin-dir build/plugin/dev.example.hello</code></pre>
 The <code>jasper</code> command must be on your <code>PATH</code> (Settings › Appearance &amp; Behavior › System Settings ›
@@ -1052,7 +1055,7 @@ and when a user installs the plugin's zip. The file may be at most 64 KiB.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Key</th><th>Type</th><th>Required</th><th>Rules</th></tr></thead>
 <tbody>
-<tr><td><code>id</code></td><td>string</td><td>yes</td><td>Matches <code>[a-z][a-z0-9_.-]{0,127}</code>; <code>jasper</code> and ids starting <code>jasper.</code> are reserved. It namespaces what the plugin adds: action, menu, panel, window, status item, palette scope, notification group and file source ids start with <code>&lt;id&gt;.</code>, as do the topics it publishes, and icon names start with <code>&lt;id&gt;:</code>. Icon names allow no <code>_</code>, so a plugin that registers icons keeps its id to letters, digits, dots and dashes.</td></tr>
+<tr><td><code>id</code></td><td>string</td><td>yes</td><td>Matches <code>[a-z][a-z0-9_.-]{0,127}</code>; <code>jasper</code> and ids starting <code>jasper.</code> are reserved. It namespaces what the plugin adds: action, menu, panel, split item, status item, palette scope, notification group and file source ids start with <code>&lt;id&gt;.</code>, as do the topics it publishes, and icon names start with <code>&lt;id&gt;:</code>. Icon names allow no <code>_</code>, so a plugin that registers icons keeps its id to letters, digits, dots and dashes.</td></tr>
 <tr><td><code>name</code></td><td>string</td><td>yes</td><td>Shown everywhere Jasper names the plugin. It must show something: not only spaces, zero-width or bidi characters.</td></tr>
 <tr><td><code>version</code></td><td>string</td><td>yes</td><td>One to three numeric components, such as <code>1</code>, <code>1.2</code> or <code>1.2.0</code>, without leading zeros, pre-release or build suffixes. Missing components are 0, and <a href="#dev.jasper.sdk.PluginInfo.version()"><code>PluginInfo.version()</code></a> reads the normalised form, <code>1.2.0</code>.</td></tr>
 <tr><td><code>entry</code></td><td>string</td><td>yes</td><td>The fully qualified name of the entry class, in a package. It must be public, have a public no-argument constructor and implement <a href="#dev.jasper.sdk.plugin.Plugin"><code>Plugin</code></a>.</td></tr>
@@ -1187,7 +1190,7 @@ it requires: Jasper prepares them before it calls <code>start</code>, and <a hre
 <h3>When start fails</h3>
 <p>When <code>start</code> throws, or the entry class cannot be created, Jasper rolls the plugin back completely: everything
 the context handed out goes, not only its registrations. Its actions, menus, toolbar and status items, tool windows,
-windows and dialogs, palette scopes, file sources, subcommand handlers and event subscriptions are removed; open
+content tabs, split items, restorers and dialogs, palette scopes, file sources, subcommand handlers and event subscriptions are removed; open
 activities end as failed with "Plugin failed to start" and connections close; its notifications expire; staged services
 are discarded, so no other plugin ever sees them; its background tasks are interrupted; and the context closes. The
 plugin is reported as failed with "<i>Name</i> failed to start" (with <b>Disable Plugin</b> and <b>Show more…</b>, which
@@ -1216,7 +1219,7 @@ deadline. See <a href="#threading">Threading</a> for the shutdown order.</p>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.activities()"><code>PluginContext.activities()</code></a></td><td>Activities and connections shown on Desk Buddy.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.notifications()"><code>PluginContext.notifications()</code></a></td><td>Its notification groups.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.actions()"><code>PluginContext.actions()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.menus()"><code>PluginContext.menus()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.toolbar()"><code>PluginContext.toolbar()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.statusBar()"><code>PluginContext.statusBar()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.rail()"><code>PluginContext.rail()</code></a></td><td>Commands and where they appear; see <a href="#contributions">Contributions</a>.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.panels()"><code>PluginContext.panels()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.windows()"><code>PluginContext.windows()</code></a></td><td>Tool windows, windows, dialogs, overlays, popovers, content tabs and file choosers.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.panels()"><code>PluginContext.panels()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.windows()"><code>PluginContext.windows()</code></a></td><td>Tool windows, dialogs, overlays, popovers, content tabs, split items, restorers and file choosers.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.kit()"><code>PluginContext.kit()</code></a>, <a href="#dev.jasper.sdk.plugin.PluginContext.appearance()"><code>PluginContext.appearance()</code></a></td><td>Its <a href="#ui">view kit</a>, the current theme's colours, the look Jasper runs with and the saved terminal font.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.terminals()"><code>PluginContext.terminals()</code></a></td><td>Windows, tabs and panes; see <a href="#terminals">Terminals</a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.plugin.PluginContext.palette()"><code>PluginContext.palette()</code></a></td><td>Command palette scopes; see <a href="#palette">Palette</a>.</td></tr>
@@ -1265,7 +1268,7 @@ code, and must return promptly. Slow work goes to the plugin's background execut
 thread before they touch the SDK.</p>
 
 <h3>The UI thread rule</h3>
-<p>Registering anything (actions, menus, toolbar and status items, tool windows, windows, palette scopes, file sources,
+<p>Registering anything (actions, menus, toolbar and status items, tool windows, content tabs, split items, restorers, palette scopes, file sources,
 subcommands, event subscriptions, services), creating and updating views, and every query or command on
 <a href="#dev.jasper.sdk.terminal.Terminals"><code>Terminals</code></a> and its handles must happen on the UI thread. A call from another thread throws
 <code>IllegalStateException</code>: "<i>what</i> must be called on the UI thread: <i>plugin id</i>", or "Kit requires EDT" from the
@@ -1332,7 +1335,7 @@ asking, with <a href="#dev.jasper.sdk.ui.ContentTab.close()"><code>ContentTab.cl
 closes whatever it left open, newest first. Close a subscription when the contribution should go away while the plugin
 keeps running, such as a menu entry for a host the user deleted, or rebuild a menu section with
 <a href="#dev.jasper.sdk.ui.PluginMenu.clear()"><code>PluginMenu.clear()</code></a> and <a href="#dev.jasper.sdk.ui.PluginMenu.add(String)"><code>PluginMenu.add(String)</code></a>.</p>
-<p>Some handles end on their own: a <a href="#dev.jasper.sdk.ui.PanelHost"><code>PanelHost</code></a> when its window closes (<a href="#dev.jasper.sdk.ui.PanelHost.onClosed(Runnable)"><code>PanelHost.onClosed(Runnable)</code></a>), a
+<p>Some handles end on their own: a <a href="#dev.jasper.sdk.ui.PanelHost"><code>PanelHost</code></a> when the main window closes (<a href="#dev.jasper.sdk.ui.PanelHost.onClosed(Runnable)"><code>PanelHost.onClosed(Runnable)</code></a>), a
 <a href="#dev.jasper.sdk.ui.ContentTab"><code>ContentTab</code></a> when the user closes it (<a href="#dev.jasper.sdk.ui.ContentTab.onClosed(Runnable)"><code>ContentTab.onClosed(Runnable)</code></a>), a <a href="#dev.jasper.sdk.ui.UiAnchor"><code>UiAnchor</code></a> when its control
 is hidden, disabled, made busy, removed or closed (<a href="#dev.jasper.sdk.ui.UiAnchor.onClosed(Runnable)"><code>UiAnchor.onClosed(Runnable)</code></a>), and a dialog when the user or
 its window closes it (<a href="#dev.jasper.sdk.ui.WindowSurface.onClosed(Runnable)"><code>WindowSurface.onClosed(Runnable)</code></a>). Pane, tab and window handles keep only an id: a closed target
@@ -1377,8 +1380,8 @@ not the quit guards, and the plugins keep running until Jasper really quits.</p>
 <section class="guide" id="capabilities">
 <h2>Capabilities</h2>
 <p>A capability names something a plugin does that the user cannot see in the window, such as reading what a terminal
-runs or typing into it, or a role only one plugin at a time can take. Adding actions, menu items, tool windows, windows,
-status items, notifications, settings and services needs none. A plugin declares its capabilities in
+runs or typing into it, or a role only one plugin at a time can take. Adding actions, menu items, tool windows, content tabs,
+dialogs, status items, notifications, settings and services needs none. A plugin declares its capabilities in
 <code>plugin.toml</code>:</p>
 <pre class="code" data-language="toml"><code><span class="p">capabilities </span>= [<span class="s">&quot;terminal.observe&quot;</span>, <span class="s">&quot;terminal.inject&quot;</span>, <span class="s">&quot;palette.contribute&quot;</span>]</code></pre>
 <p>The names are the constants of <a href="#dev.jasper.sdk.Capabilities"><code>Capabilities</code></a>; <a href="#dev.jasper.sdk.Capabilities.ALL"><code>Capabilities.ALL</code></a> lists them. An unknown name makes the
@@ -1423,7 +1426,7 @@ fewer keeps the consent. Bundled plugins and the <code>--plugin-dir</code> plugi
 <tr><td><code>terminal.observe</code></td><td>See your terminals: titles, folders, the commands you run and how they end</td><td><a href="#dev.jasper.sdk.terminal.PaneHandle.info()"><code>PaneHandle.info()</code></a>, <a href="#dev.jasper.sdk.terminal.PaneHandle.foregroundJob()"><code>PaneHandle.foregroundJob()</code></a>, <a href="#dev.jasper.sdk.terminal.TabHandle.title()"><code>TabHandle.title()</code></a>, other tabs' titles in <a href="#dev.jasper.sdk.ui.ContentTab.tabChoices()"><code>ContentTab.tabChoices()</code></a> (without it a choice reads "Tab N"), and subscribing to any <a href="#dev.jasper.sdk.terminal.TerminalEvents"><code>TerminalEvents</code></a> topic (every id starting <code>jasper.terminal.</code>)</td><td>The first terminal subscription, and the first <code>tabChoices()</code> answer with other tabs' titles</td></tr>
 <tr><td><code>terminal.selection</code></td><td>Read the text you select in a terminal</td><td><a href="#dev.jasper.sdk.terminal.PaneHandle.selection()"><code>PaneHandle.selection()</code></a></td><td>Each read, with the number of characters</td></tr>
 <tr><td><code>terminal.inject</code></td><td>Type into your terminals</td><td><a href="#dev.jasper.sdk.terminal.PaneHandle.sendText(String)"><code>PaneHandle.sendText(String)</code></a>, <a href="#dev.jasper.sdk.terminal.PaneHandle.sendBytes(byte[])"><code>PaneHandle.sendBytes(byte[])</code></a>, <a href="#dev.jasper.sdk.terminal.PaneHandle.paste(String)"><code>PaneHandle.paste(String)</code></a>, also on a palette query's target pane</td><td>Each call, with the number of bytes</td></tr>
-<tr><td><code>terminal.open</code></td><td>Open terminal tabs, splits and windows, and run programs in them</td><td><a href="#dev.jasper.sdk.terminal.Terminals.openTab(WindowHandle,OpenRequest)"><code>Terminals.openTab(WindowHandle, OpenRequest)</code></a> and <a href="#dev.jasper.sdk.terminal.Terminals.split(PaneHandle,Direction,OpenRequest)"><code>Terminals.split(PaneHandle, Direction, OpenRequest)</code></a> with a local request (a shell, a shell profile or a program), <a href="#dev.jasper.sdk.terminal.Terminals.profiles()"><code>Terminals.profiles()</code></a>, <a href="#dev.jasper.sdk.terminal.Terminals.onProfilesChanged(Runnable)"><code>Terminals.onProfilesChanged(Runnable)</code></a></td><td>Each open, with the program's file name when it runs one</td></tr>
+<tr><td><code>terminal.open</code></td><td>Open terminal tabs, splits and windows, and run programs in them</td><td><a href="#dev.jasper.sdk.terminal.Terminals.openTab(WindowHandle,OpenRequest)"><code>Terminals.openTab(WindowHandle, OpenRequest)</code></a> and <a href="#dev.jasper.sdk.terminal.Terminals.split(PaneHandle,Direction,OpenRequest)"><code>Terminals.split(PaneHandle, Direction, OpenRequest)</code></a> with a local request (a shell, a shell profile or a program), <a href="#dev.jasper.sdk.ui.ContentTab.split(SplitChoice,Direction)"><code>ContentTab.split(SplitChoice, Direction)</code></a> with <a href="#dev.jasper.sdk.ui.SplitChoice.TERMINAL"><code>SplitChoice.TERMINAL</code></a>, <a href="#dev.jasper.sdk.terminal.Terminals.profiles()"><code>Terminals.profiles()</code></a>, <a href="#dev.jasper.sdk.terminal.Terminals.onProfilesChanged(Runnable)"><code>Terminals.onProfilesChanged(Runnable)</code></a></td><td>Each open, with the program's file name when it runs one</td></tr>
 <tr><td><code>session.provide</code></td><td>Run its own terminal sessions, such as remote connections</td><td><code>openTab</code> and <code>split</code> with <a href="#dev.jasper.sdk.terminal.OpenRequest.session(SessionSpec)"><code>OpenRequest.session(SessionSpec)</code></a></td><td>Each open</td></tr>
 <tr><td><code>palette.contribute</code></td><td>Add scopes to the command palette and open it</td><td><a href="#dev.jasper.sdk.palette.Palette.register(PaletteScope)"><code>Palette.register(PaletteScope)</code></a> and <a href="#dev.jasper.sdk.palette.Palette.open(WindowHandle,String,Optional,Optional)"><code>Palette.open(WindowHandle, String, Optional, Optional)</code></a></td><td>The first use</td></tr>
 <tr><td><code>files.source</code></td><td>Add places, such as saved hosts, to the file chooser</td><td><a href="#dev.jasper.sdk.files.FileSources.register(FileSource)"><code>FileSources.register(FileSource)</code></a></td><td>The first registration</td></tr>
@@ -1472,7 +1475,7 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <tr><td>Rail buttons</td><td><a href="#dev.jasper.sdk.ui.Rail.add(String)"><code>Rail.add(String)</code></a></td><td></td><td>The left tool window stripe, after the tool window buttons</td></tr>
 <tr><td>Tool windows</td><td><a href="#dev.jasper.sdk.ui.Panels.register(PanelSpec,PanelFactory)"><code>Panels.register(PanelSpec, PanelFactory)</code></a>, <a href="#dev.jasper.sdk.ui.Panels.toggle(String,WindowHandle)"><code>Panels.toggle(String, WindowHandle)</code></a></td><td></td><td>A stripe button and a tool window in one of six dock slots of the main window; View › Tool Windows</td></tr>
 <tr><td>Dialogs</td><td><a href="#dev.jasper.sdk.ui.Windows.dialog(DialogSpec)"><code>Windows.dialog(DialogSpec)</code></a>, <a href="#dev.jasper.sdk.ui.Windows.overlay(OverlaySpec)"><code>Windows.overlay(OverlaySpec)</code></a>, <a href="#dev.jasper.sdk.ui.Windows.popover(UiAnchor)"><code>Windows.popover(UiAnchor)</code></a></td><td></td><td>Dialogs and sheets, in-window overlays, popovers below a control</td></tr>
-<tr><td>Content tabs</td><td><a href="#dev.jasper.sdk.ui.Windows.openTab(ContentSpec,WindowOwner,UiView,TabPlacement)"><code>Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)</code></a></td><td></td><td>A document in a pane of a workspace tab, beside terminals, a new pane or a new child window</td></tr>
+<tr><td>Content tabs</td><td><a href="#dev.jasper.sdk.ui.Windows.openTab(ContentSpec,WindowOwner,UiView,TabPlacement)"><code>Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)</code></a></td><td></td><td>A document in a new tab, a new pane beside the focused one or a new child window, beside terminals</td></tr>
 <tr><td>Split items</td><td><a href="#dev.jasper.sdk.ui.Windows.splitItem(SplitItemSpec,BiConsumer)"><code>Windows.splitItem(SplitItemSpec, BiConsumer)</code></a></td><td></td><td>Every Split list, after the terminal, with two bindable actions</td></tr>
 <tr><td>Restorers</td><td><a href="#dev.jasper.sdk.ui.Windows.restorer(String,TabRestorer)"><code>Windows.restorer(String, TabRestorer)</code></a></td><td></td><td>The plugin's saved tabs coming back when Jasper restores its windows</td></tr>
 <tr><td>File choosers</td><td><a href="#dev.jasper.sdk.ui.Windows.choose(FileChoice)"><code>Windows.choose(FileChoice)</code></a>, <a href="#dev.jasper.sdk.ui.Windows.chooseFiles(WindowOwner,String,Optional)"><code>Windows.chooseFiles(WindowOwner, String, Optional)</code></a>, <a href="#dev.jasper.sdk.ui.Windows.chooseDirectory(WindowOwner,String,Optional)"><code>Windows.chooseDirectory(WindowOwner, String, Optional)</code></a>, <a href="#dev.jasper.sdk.ui.Windows.chooseSaveFile(WindowOwner,String,Optional)"><code>Windows.chooseSaveFile(WindowOwner, String, Optional)</code></a></td><td></td><td>Jasper's file chooser, over a Jasper window or one of the plugin's content tabs</td></tr>
@@ -1488,7 +1491,7 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <tr><td>Settings</td><td><a href="#dev.jasper.sdk.settings.PluginSettings.declare(SettingSpec)"><code>PluginSettings.declare(SettingSpec)</code></a>, <a href="#dev.jasper.sdk.settings.PluginSettings.page(SettingsPanel)"><code>PluginSettings.page(SettingsPanel)</code></a></td><td></td><td>The plugin's page in Settings › Tools; see <a href="#settings">Settings</a></td></tr>
 <tr><td>Icons</td><td><a href="#dev.jasper.sdk.ui.UiKit.registerIcon(IconAsset)"><code>UiKit.registerIcon(IconAsset)</code></a></td><td></td><td>Anywhere the plugin names an icon</td></tr>
 <tr><td>Services and topics</td><td><a href="#dev.jasper.sdk.services.Services.publish(Class,Object)"><code>Services.publish(Class, Object)</code></a>, <a href="#dev.jasper.sdk.events.Events.publish(Topic,Object)"><code>Events.publish(Topic, Object)</code></a></td><td></td><td>Other plugins; see <a href="#services">Services</a></td></tr>
-<tr><td>Quit and close guards</td><td><a href="#dev.jasper.sdk.ui.Windows.onQuitting(Supplier)"><code>Windows.onQuitting(Supplier)</code></a>, <a href="#dev.jasper.sdk.ui.Windows.onTabsClosing(BiFunction)"><code>Windows.onTabsClosing(BiFunction)</code></a>, <a href="#dev.jasper.sdk.ui.WindowSurface.onClosing(BooleanSupplier)"><code>WindowSurface.onClosing(BooleanSupplier)</code></a></td><td></td><td>Asked before Jasper quits or a window or tab closes</td></tr>
+<tr><td>Quit and close guards</td><td><a href="#dev.jasper.sdk.ui.Windows.onQuitting(Supplier)"><code>Windows.onQuitting(Supplier)</code></a>, <a href="#dev.jasper.sdk.ui.Windows.onTabsClosing(BiFunction)"><code>Windows.onTabsClosing(BiFunction)</code></a>, <a href="#dev.jasper.sdk.ui.WindowSurface.onClosing(BooleanSupplier)"><code>WindowSurface.onClosing(BooleanSupplier)</code></a></td><td></td><td>Asked before Jasper quits, a tab closes or a dialog closes</td></tr>
 <tr><td>A look and themes</td><td><code>presentation</code> and <code>themes</code> in the manifest</td><td><code>presentation.provide</code> for a look</td><td>The chrome and controls, and themes in Settings › Appearance &amp; Behavior › Appearance; see <a href="looks.md">looks</a> and <a href="creating-themes.md">creating themes</a></td></tr>
 </tbody>
 </table></div>
@@ -1545,7 +1548,7 @@ rebuild it at any time with <a href="#dev.jasper.sdk.ui.PluginMenu.clear()"><cod
 that opens a menu of actions, and <a href="#dev.jasper.sdk.ui.ToolbarItem.view(ToolbarViewFactory)"><code>ToolbarItem.view(ToolbarViewFactory)</code></a> a small group of the plugin's own
 controls in the main window's toolbar (a child window has none). A toolbar view's root is an INLINE <a href="#dev.jasper.sdk.ui.Nodes.Stack"><code>Nodes.Stack</code></a> of LABEL texts, DROPDOWN,
 SEARCHABLE or PICKER choices, at most one PRIMARY button, icon-only GHOST buttons (a blank label with an icon and a
-tooltip, which need SDK 0.18.1 or later), menu buttons and separators; any other tree is refused, and the window shows
+tooltip), menu buttons and separators; any other tree is refused, and the window shows
 no view.
 When the toolbar is too narrow, buttons move into its "More actions" menu and a view hides.</p>
 
@@ -1563,7 +1566,8 @@ two actions.</p>
 <h3>Tool windows and the rail</h3>
 <p>A registered panel gets a stripe button in the main window, the only window with tool windows: its icon, or under
 the Enterprise look's labelled stripes a label that starts with the icon and reads its title. Its <a href="#dev.jasper.sdk.ui.PanelFactory"><code>PanelFactory</code></a>
-builds its view once, on the UI thread, the first time the panel shows; a toggle from a child window shows it in the main
+builds its view on the UI thread the first time the panel shows in the main window, and again after the main window
+closed and opened anew; a toggle from a child window shows it in the main
 window and brings that window to the front. The
 <a href="#dev.jasper.sdk.ui.PanelSpec"><code>PanelSpec</code></a>'s anchor and <a href="#dev.jasper.sdk.ui.PanelSpec.withSplit()"><code>PanelSpec.withSplit()</code></a> pick the default slot (Left Top, Left Bottom, Bottom Left,
 Right Top, Right Bottom or Bottom Right); the user can move it with the header's Options menu, and Jasper remembers where.
@@ -1584,7 +1588,9 @@ A view of the plugin's own that is not a tool window is a content tab.</p>
 <ul>
 <li><a href="#dev.jasper.sdk.ui.Windows.dialog(DialogSpec)"><code>Windows.dialog(DialogSpec)</code></a>: a dialog over a Jasper window, a content tab or an anchor, closed with its window,
 presented <a href="#dev.jasper.sdk.ui.DialogSpec.Presentation.CENTERED"><code>DialogSpec.Presentation.CENTERED</code></a>, as an <a href="#dev.jasper.sdk.ui.DialogSpec.Presentation.ATTACHED_SHEET"><code>DialogSpec.Presentation.ATTACHED_SHEET</code></a> or as an
-in-window <a href="#dev.jasper.sdk.ui.DialogSpec.Presentation.OVERLAY"><code>DialogSpec.Presentation.OVERLAY</code></a>; the look may place it another way. <code>show</code> returns after a modal dialog closes.</li>
+in-window <a href="#dev.jasper.sdk.ui.DialogSpec.Presentation.OVERLAY"><code>DialogSpec.Presentation.OVERLAY</code></a>; the look may place it another way. <code>show</code> returns after a modal dialog closes.
+A modeless dialog whose content is a <a href="#dev.jasper.sdk.ui.Nodes.FormKind.WINDOW"><code>Nodes.FormKind.WINDOW</code></a> form, as the Credential Vault manager's is, opens at
+a window's size, can be resized and remembers its bounds.</li>
 <li><a href="#dev.jasper.sdk.ui.Windows.overlay(OverlaySpec)"><code>Windows.overlay(OverlaySpec)</code></a>: progress content centred inside a Jasper window, one per window. Escape and
 outside clicks do not dismiss it, so give it a Cancel action.</li>
 <li><a href="#dev.jasper.sdk.ui.Windows.popover(UiAnchor)"><code>Windows.popover(UiAnchor)</code></a>: a popup below (or above) a button or picker, from <a href="#dev.jasper.sdk.ui.UiView.anchor(String)"><code>UiView.anchor(String)</code></a>;
@@ -1811,7 +1817,7 @@ the next tree.</p>
 <tr><td>Controls</td><td><a href="#dev.jasper.sdk.ui.Nodes.Button"><code>Nodes.Button</code></a> (PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), <a href="#dev.jasper.sdk.ui.Nodes.MenuButton"><code>Nodes.MenuButton</code></a>, <a href="#dev.jasper.sdk.ui.Nodes.Field"><code>Nodes.Field</code></a> (TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER), <a href="#dev.jasper.sdk.ui.Nodes.Secret"><code>Nodes.Secret</code></a>, <a href="#dev.jasper.sdk.ui.Nodes.Choice"><code>Nodes.Choice</code></a> (DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS, TABS), <a href="#dev.jasper.sdk.ui.Nodes.PickerMenu"><code>Nodes.PickerMenu</code></a>, <a href="#dev.jasper.sdk.ui.Nodes.Toggle"><code>Nodes.Toggle</code></a>, <a href="#dev.jasper.sdk.ui.Nodes.Breadcrumbs"><code>Nodes.Breadcrumbs</code></a></td></tr>
 <tr><td>Collections</td><td><a href="#dev.jasper.sdk.ui.Nodes.ItemList"><code>Nodes.ItemList</code></a> with <a href="#dev.jasper.sdk.ui.ListItem"><code>ListItem</code></a> rows (SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS), <a href="#dev.jasper.sdk.ui.Nodes.Table"><code>Nodes.Table</code></a> with <a href="#dev.jasper.sdk.ui.Column"><code>Column</code></a>s and <a href="#dev.jasper.sdk.ui.TableRow"><code>TableRow</code></a>s, <a href="#dev.jasper.sdk.ui.Nodes.Tree"><code>Nodes.Tree</code></a> with <a href="#dev.jasper.sdk.ui.TreeItem"><code>TreeItem</code></a>s</td></tr>
 <tr><td>Layout</td><td><a href="#dev.jasper.sdk.ui.Nodes.Stack"><code>Nodes.Stack</code></a> (a <a href="#dev.jasper.sdk.ui.Nodes.LayoutRole"><code>Nodes.LayoutRole</code></a> such as VERTICAL, INLINE or ACTIONS), <a href="#dev.jasper.sdk.ui.Nodes.Card"><code>Nodes.Card</code></a>, <a href="#dev.jasper.sdk.ui.Nodes.Section"><code>Nodes.Section</code></a>, <a href="#dev.jasper.sdk.ui.Nodes.FormRow"><code>Nodes.FormRow</code></a>, <a href="#dev.jasper.sdk.ui.Nodes.SettingRow"><code>Nodes.SettingRow</code></a>, <a href="#dev.jasper.sdk.ui.Nodes.Split"><code>Nodes.Split</code></a>, <a href="#dev.jasper.sdk.ui.Nodes.Empty"><code>Nodes.Empty</code></a></td></tr>
-<tr><td>Compositions</td><td><a href="#dev.jasper.sdk.ui.Nodes.Panel"><code>Nodes.Panel</code></a> with its <a href="#dev.jasper.sdk.ui.Nodes.Header"><code>Nodes.Header</code></a>, for tool windows; <a href="#dev.jasper.sdk.ui.Nodes.Form"><code>Nodes.Form</code></a> (PROMPT, PROMPT_COMPACT, SHEET, FULL, SETTINGS, WINDOW), for dialogs, windows and pages</td></tr>
+<tr><td>Compositions</td><td><a href="#dev.jasper.sdk.ui.Nodes.Panel"><code>Nodes.Panel</code></a> with its <a href="#dev.jasper.sdk.ui.Nodes.Header"><code>Nodes.Header</code></a>, for tool windows; <a href="#dev.jasper.sdk.ui.Nodes.Form"><code>Nodes.Form</code></a> (PROMPT, PROMPT_COMPACT, SHEET, FULL, SETTINGS, WINDOW), for dialogs and pages</td></tr>
 <tr><td>Custom</td><td><a href="#dev.jasper.sdk.ui.Nodes.Custom"><code>Nodes.Custom</code></a>, a slot for a registered component</td></tr>
 </tbody>
 </table></div>
@@ -1881,12 +1887,12 @@ ACTIONS stack, first, last or beside another separator;</li>
 <code>window</code>, <code>window.add</code> and <code>zoom</code>.
 They follow the theme and the look. <code>run</code>, IntelliJ's classic Run triangle, and <code>application</code>, its
 run-configuration icon, are authored artwork: controls draw them in their own colours, and panels, prompts and tiles
-draw a monochrome glyph of the same name. These two names need SDK 0.18.1. <code>editor.source</code>,
+draw a monochrome glyph of the same name. <code>editor.source</code>,
 <code>editor.split</code>, <code>editor.preview</code> and <code>editor.scroll-sync</code> are a document's view controls (source only,
 source and preview, preview only, synchronised scrolling) in IntelliJ's New UI art, and their <code>.classic</code> names are
 IntelliJ's classic art, for use while <a href="#dev.jasper.sdk.ui.Presentation.icons()"><code>Presentation.icons()</code></a> is
 <a href="#dev.jasper.sdk.ui.Presentation.Icons.CLASSIC"><code>Presentation.Icons.CLASSIC</code></a>. All eight are authored light and dark art that Jasper draws in
-its own colours wherever the name appears; they need SDK 0.18.3. Under the Enterprise look a tool
+its own colours wherever the name appears. Under the Enterprise look a tool
 window's stripe label starts with its icon, and IntelliJ's classic art draws <code>network</code>, <code>folder</code>,
 <code>tunnel</code>, <code>download</code>, <code>server</code> and <code>bell</code> there, and <code>add</code>, <code>split</code>, <code>zoom</code>,
 <code>settings</code>, <code>window.add</code> and <code>search</code> in the toolbar, toolbar views, the status bar and tool-window
@@ -1936,7 +1942,7 @@ classic layouts when <a href="#dev.jasper.sdk.ui.Presentation.classic()"><code>P
 the bottom strip under labelled stripes:</p>
 <pre class="code" data-language="java"><code><span class="k">boolean</span> classic = context.appearance().presentation().classic();
 <span class="t">Anchor</span> side = context.appearance().presentation().toolWindows() == <span class="t">Presentation</span>.<span class="t">ToolWindows</span>.<span class="t">STRIPES</span> ? <span class="t">Anchor</span>.<span class="t">BOTTOM</span> : <span class="t">Anchor</span>.<span class="t">LEFT</span>;</code></pre>
-<p><a href="#dev.jasper.sdk.ui.Appearance.presentation()"><code>Appearance.presentation()</code></a> needs SDK 0.18.2. In a test,
+<p>In a test,
 <a href="#dev.jasper.sdk.testing.FakePluginHost.setPresentation(Presentation)"><code>FakePluginHost.setPresentation(Presentation)</code></a> with
 <a href="#dev.jasper.sdk.testing.FakePresentations.CLASSIC"><code>FakePresentations.CLASSIC</code></a> runs the plugin under the Enterprise look's values.</p>
 
@@ -1949,7 +1955,7 @@ Terminal › Font &amp; Colors saves them. The value is the same for every windo
 not change it, and it is safe from any thread. Register <a href="#dev.jasper.sdk.ui.Appearance.onTerminalTypographyChanged(Consumer)"><code>Appearance.onTerminalTypographyChanged(Consumer)</code></a> on the
 UI thread: the handler runs there after each saved change, when the getter already returns the new value. An equal value
 notifies nobody and registering delivers no initial value, so read the getter first; the registration closes with the
-plugin. Both need SDK 0.18.3. In a test,
+plugin. In a test,
 <a href="#dev.jasper.sdk.testing.FakePluginHost.setTerminalTypography(TerminalTypography)"><code>FakePluginHost.setTerminalTypography(TerminalTypography)</code></a> publishes a value on the next
 <code>flush()</code>.</p>
 </section>
@@ -2070,7 +2076,7 @@ settings; <a href="#dev.jasper.sdk.settings.SettingsPanel.dispose()"><code>Setti
 <p><a href="#dev.jasper.sdk.settings.SettingsPanel.pendingChanged()"><code>SettingsPanel.pendingChanged()</code></a> runs after a standard row handles the user's edit, choice, list action,
 Browse… or Reset, once <a href="#dev.jasper.sdk.settings.SettingsPanelHost.pending(Setting)"><code>SettingsPanelHost.pending(Setting)</code></a> returns the result and the row shows its validation
 (an invalid edit leaves the pending value as it was). Rebuild there whatever the page shows from pending values, as the
-Editor's page does. The plugin's own <code>stage</code> calls do not trigger it. It needs SDK 0.18.3.</p>
+Editor's page does. The plugin's own <code>stage</code> calls do not trigger it.</p>
 </section>
 
 <section class="guide" id="services">
@@ -2217,7 +2223,7 @@ shows, and an item Jasper closed with its windows comes back under the same id, 
 <tr><td><code>columns</code>, <code>rows</code></td><td>The grid size; 0 before the session starts.</td></tr>
 <tr><td><code>shellIntegration</code></td><td>Whether the shell reports its prompts and commands, which the command events need.</td></tr>
 <tr><td><code>kind</code>, <code>providerPluginId</code></td><td><a href="#dev.jasper.sdk.terminal.SessionKind.LOCAL"><code>SessionKind.LOCAL</code></a> or <a href="#dev.jasper.sdk.terminal.SessionKind.PLUGIN"><code>SessionKind.PLUGIN</code></a>, and the providing plugin.</td></tr>
-<tr><td><code>state</code>, <code>exitStatus</code></td><td><a href="#dev.jasper.sdk.terminal.SessionState.CONNECTING"><code>SessionState.CONNECTING</code></a>, <code>RUNNING</code> or <code>EXITED</code>, and the exit status once it exited with a known one.</td></tr>
+<tr><td><code>state</code>, <code>exitStatus</code></td><td><a href="#dev.jasper.sdk.terminal.SessionState.NOT_STARTED"><code>SessionState.NOT_STARTED</code></a> (a restored terminal whose tab has not shown yet), <a href="#dev.jasper.sdk.terminal.SessionState.CONNECTING"><code>SessionState.CONNECTING</code></a>, <code>RUNNING</code> or <code>EXITED</code>, and the exit status once it exited with a known one.</td></tr>
 <tr><td><code>shell</code></td><td>The shell or program's label, such as <code>zsh</code>, or a provided session's title.</td></tr>
 </tbody>
 </table></div>
@@ -2230,11 +2236,12 @@ worker thread. <a href="#dev.jasper.sdk.terminal.TabHandle.title()"><code>TabHan
 with <code>&quot;\r&quot;</code> to run it, or leave it at the prompt for the user. <a href="#dev.jasper.sdk.terminal.PaneHandle.sendBytes(byte[])"><code>PaneHandle.sendBytes(byte[])</code></a> writes raw bytes,
 and <a href="#dev.jasper.sdk.terminal.PaneHandle.paste(String)"><code>PaneHandle.paste(String)</code></a> pastes the way the user's paste does, bracketed when the program asked for that. The
 three are safe from any thread, and calls from one thread keep their order. Input to a pane whose session is not running
-(still connecting, or exited) is dropped.</p>
+(not started yet, still connecting, or exited) is dropped.</p>
 
 <h3>Opening tabs, splits and programs</h3>
-<p><a href="#dev.jasper.sdk.terminal.Terminals.openTab(WindowHandle,OpenRequest)"><code>Terminals.openTab(WindowHandle, OpenRequest)</code></a> opens and selects a tab; <a href="#dev.jasper.sdk.terminal.Terminals.split(PaneHandle,Direction,OpenRequest)"><code>Terminals.split(PaneHandle, Direction, OpenRequest)</code></a>
-splits a pane <a href="#dev.jasper.sdk.terminal.Direction.RIGHT"><code>Direction.RIGHT</code></a> or <a href="#dev.jasper.sdk.terminal.Direction.DOWN"><code>Direction.DOWN</code></a>. Both return the new pane, or empty when the window or
+<p><a href="#dev.jasper.sdk.terminal.Terminals.openTab(WindowHandle,OpenRequest)"><code>Terminals.openTab(WindowHandle, OpenRequest)</code></a> opens a terminal in a new tab at the end of the window's strip and
+shows it; <a href="#dev.jasper.sdk.terminal.Terminals.split(PaneHandle,Direction,OpenRequest)"><code>Terminals.split(PaneHandle, Direction, OpenRequest)</code></a> opens one in a new pane beside the target pane, in
+its tab, to the <a href="#dev.jasper.sdk.terminal.Direction.RIGHT"><code>Direction.RIGHT</code></a> or <a href="#dev.jasper.sdk.terminal.Direction.DOWN"><code>Direction.DOWN</code></a>. Both return the new pane, or empty when the window or
 pane is gone (or, for a split, its session has ended) or the request names a profile Jasper does not list. A local request
 needs <code>terminal.open</code>:</p>
 <div class="table-wrap"><table>
@@ -2341,10 +2348,11 @@ restorer opens it again; Jasper connects it when its tab is first shown.</p>
 <li><b>One outcome per attempt.</b> Exactly one of <a href="#dev.jasper.sdk.terminal.PendingSession.attach(TerminalConnection)"><code>PendingSession.attach(TerminalConnection)</code></a>,
 <a href="#dev.jasper.sdk.terminal.PendingSession.fail(String)"><code>PendingSession.fail(String)</code></a> and cancellation takes effect; later calls are ignored. Every method is safe from any
 thread, also after the plugin stopped. <code>fail</code> shows the message with <b>Retry</b> (or <b>Reconnect</b> after an
-earlier session); a connector that throws fails the attempt with its message.</li>
+earlier session and in a pane Jasper restored with its tab); a connector that throws fails the attempt with its message.</li>
 <li><b>Cancellation.</b> The user's Cancel, the pane closing, the plugin stopping or Jasper quitting cancels the attempt.
 <a href="#dev.jasper.sdk.terminal.PendingSession.onCancelled(Runnable)"><code>PendingSession.onCancelled(Runnable)</code></a> handlers run once, on Jasper's cleanup thread, to abort a blocking connect.
-Cancelling before any session was shown closes the pane, unless Jasper restored it with its tab.</li>
+Cancelling before any session was shown closes the pane, except in a pane Jasper restored with its tab, which shows
+"Connection cancelled" with <b>Reconnect</b>.</li>
 <li><b>Ownership.</b> <code>attach</code> hands the connection over whatever happens: when the attempt was already cancelled
 or ended, Jasper closes it at once without reading it. Jasper calls <code>close</code> exactly once, on its cleanup thread;
 release everything the session holds there.</li>
@@ -2628,7 +2636,7 @@ handlers, factories and background tasks) as a line; assert it is empty.</p>
 <tr><td>Actions and chrome</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.invoke(String,UUID,UUID)"><code>FakePluginHost.invoke(String, UUID, UUID)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.actions()"><code>FakePluginHost.actions()</code></a> (<code>id|title|enabled</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.actionSpec(String)"><code>FakePluginHost.actionSpec(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.toolbar()"><code>FakePluginHost.toolbar()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.menu(String)"><code>FakePluginHost.menu(String)</code></a> (<code>FILE</code> … <code>TRANSFER</code>, <code>context</code>, <code>top:&lt;menu id&gt;</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.status()"><code>FakePluginHost.status()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.progress()"><code>FakePluginHost.progress()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.rail()"><code>FakePluginHost.rail()</code></a></td></tr>
 <tr><td>Tool windows and dialogs</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.openPanel(String)"><code>FakePluginHost.openPanel(String)</code></a> (in the main window), <a href="#dev.jasper.sdk.testing.FakePluginHost.closePanel(String)"><code>FakePluginHost.closePanel(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.requestClose(String)"><code>FakePluginHost.requestClose(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.requestQuit()"><code>FakePluginHost.requestQuit()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeToolbarViews(UUID)"><code>FakePluginHost.closeToolbarViews(UUID)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.panels()"><code>FakePluginHost.panels()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.panelView(String)"><code>FakePluginHost.panelView(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.panelHeader(String)"><code>FakePluginHost.panelHeader(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windows()"><code>FakePluginHost.windows()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windowView(String,String)"><code>FakePluginHost.windowView(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.dialogPresentation(String,String)"><code>FakePluginHost.dialogPresentation(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.popoverViews(String)"><code>FakePluginHost.popoverViews(String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentTabs()"><code>FakePluginHost.contentTabs()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentPresentation(ContentTab)"><code>FakePluginHost.contentPresentation(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentStatus(ContentTab)"><code>FakePluginHost.contentStatus(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentCommands(ContentTab)"><code>FakePluginHost.contentCommands(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentOwner(ContentTab)"><code>FakePluginHost.contentOwner(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentComponent(ContentTab)"><code>FakePluginHost.contentComponent(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentTab(String,String)"><code>FakePluginHost.contentTab(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.contentView(String,String)"><code>FakePluginHost.contentView(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windowContent(String,String)"><code>FakePluginHost.windowContent(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.dialogSwatch(String,String)"><code>FakePluginHost.dialogSwatch(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.toolbarViews(UUID)"><code>FakePluginHost.toolbarViews(UUID)</code></a></td></tr>
 <tr><td>Views</td><td><a href="#dev.jasper.sdk.testing.FakeKitView.emit(UiEvent)"><code>FakeKitView.emit(UiEvent)</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.type(String,String)"><code>FakeKitView.type(String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.setSecret(String,char[])"><code>FakeKitView.setSecret(String, char[])</code></a>, <a href="#dev.jasper.sdk.testing.FakeKit.contentFont(Font)"><code>FakeKit.contentFont(Font)</code></a> for the interface font custom content receives</td><td><a href="#dev.jasper.sdk.ui.UiView.spec()"><code>UiView.spec()</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.focused()"><code>FakeKitView.focused()</code></a>, <a href="#dev.jasper.sdk.testing.FakeKitView.revealed()"><code>FakeKitView.revealed()</code></a></td></tr>
-<tr><td>Terminals</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalWindow()"><code>FakePluginHost.addTerminalWindow()</code></a> (the first one added while no main window is open is the main window), <a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalTab(UUID,String)"><code>FakePluginHost.addTerminalTab(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalPane(UUID,PaneInfo)"><code>FakePluginHost.addTerminalPane(UUID, PaneInfo)</code></a> (a terminal tab's one pane), <a href="#dev.jasper.sdk.testing.FakePluginHost.addContentTab(UUID,String)"><code>FakePluginHost.addContentTab(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.moveTab(UUID,UUID)"><code>FakePluginHost.moveTab(UUID, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.holdPane(UUID)"><code>FakePluginHost.holdPane(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.activateTerminalWindow(UUID)"><code>FakePluginHost.activateTerminalWindow(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.focusTerminalPane(UUID)"><code>FakePluginHost.focusTerminalPane(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeTerminalPane(UUID)"><code>FakePluginHost.closeTerminalPane(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setPaneInfo(UUID,PaneInfo)"><code>FakePluginHost.setPaneInfo(UUID, PaneInfo)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setSelection(UUID,String)"><code>FakePluginHost.setSelection(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setForegroundJob(UUID,String)"><code>FakePluginHost.setForegroundJob(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setShellProfiles(List)"><code>FakePluginHost.setShellProfiles(List)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.sent(UUID)"><code>FakePluginHost.sent(UUID)</code></a> (<code>write:&lt;text&gt;</code>, <code>paste:&lt;text&gt;</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.openRequests()"><code>FakePluginHost.openRequests()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.terminalPanes()"><code>FakePluginHost.terminalPanes()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windowTabs(UUID)"><code>FakePluginHost.windowTabs(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.shellEnvironment(Map)"><code>FakePluginHost.shellEnvironment(Map)</code></a></td></tr>
+<tr><td>Terminals</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalWindow()"><code>FakePluginHost.addTerminalWindow()</code></a> (the first one added while no main window is open is the main window), <a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalTab(UUID,String)"><code>FakePluginHost.addTerminalTab(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalPane(UUID,PaneInfo)"><code>FakePluginHost.addTerminalPane(UUID, PaneInfo)</code></a> (a terminal tab's one pane), <a href="#dev.jasper.sdk.testing.FakePluginHost.addContentTab(UUID,String)"><code>FakePluginHost.addContentTab(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.moveTab(UUID,UUID)"><code>FakePluginHost.moveTab(UUID, UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeTab(UUID)"><code>FakePluginHost.closeTab(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.holdPane(UUID)"><code>FakePluginHost.holdPane(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.activateTerminalWindow(UUID)"><code>FakePluginHost.activateTerminalWindow(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.focusTerminalPane(UUID)"><code>FakePluginHost.focusTerminalPane(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.closeTerminalPane(UUID)"><code>FakePluginHost.closeTerminalPane(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setPaneInfo(UUID,PaneInfo)"><code>FakePluginHost.setPaneInfo(UUID, PaneInfo)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setSelection(UUID,String)"><code>FakePluginHost.setSelection(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setForegroundJob(UUID,String)"><code>FakePluginHost.setForegroundJob(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.setShellProfiles(List)"><code>FakePluginHost.setShellProfiles(List)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.sent(UUID)"><code>FakePluginHost.sent(UUID)</code></a> (<code>write:&lt;text&gt;</code>, <code>paste:&lt;text&gt;</code>), <a href="#dev.jasper.sdk.testing.FakePluginHost.openRequests()"><code>FakePluginHost.openRequests()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.terminalPanes()"><code>FakePluginHost.terminalPanes()</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.windowTabs(UUID)"><code>FakePluginHost.windowTabs(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.shellEnvironment(Map)"><code>FakePluginHost.shellEnvironment(Map)</code></a></td></tr>
 <tr><td>Terminal events</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.commandStarted(UUID,String)"><code>FakePluginHost.commandStarted(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.commandFinished(UUID,String,OptionalInt,Duration)"><code>FakePluginHost.commandFinished(UUID, String, OptionalInt, Duration)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.titleChanged(UUID,String)"><code>FakePluginHost.titleChanged(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.cwdChanged(UUID,Path)"><code>FakePluginHost.cwdChanged(UUID, Path)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.remoteCwdChanged(UUID,String,String)"><code>FakePluginHost.remoteCwdChanged(UUID, String, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.sessionExited(UUID,OptionalInt)"><code>FakePluginHost.sessionExited(UUID, OptionalInt)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.bell(UUID)"><code>FakePluginHost.bell(UUID)</code></a>, then <a href="#dev.jasper.sdk.testing.FakePluginHost.flush()"><code>FakePluginHost.flush()</code></a></td><td></td></tr>
 <tr><td>Restoring</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.restoreTab(String,UUID,String,RestoreState)"><code>FakePluginHost.restoreTab(String, UUID, String, RestoreState)</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.restoreState(ContentTab)"><code>FakePluginHost.restoreState(ContentTab)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.restoreState(UUID)"><code>FakePluginHost.restoreState(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.declinedRestores()"><code>FakePluginHost.declinedRestores()</code></a></td></tr>
 <tr><td>Provided sessions</td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.cancelSession(UUID)"><code>FakePluginHost.cancelSession(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.reconnectSession(UUID)"><code>FakePluginHost.reconnectSession(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.typeIntoSession(UUID,String)"><code>FakePluginHost.typeIntoSession(UUID, String)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.pumpSessions()"><code>FakePluginHost.pumpSessions()</code></a></td><td><a href="#dev.jasper.sdk.testing.FakePluginHost.sessionState(UUID)"><code>FakePluginHost.sessionState(UUID)</code></a>, <a href="#dev.jasper.sdk.testing.FakePluginHost.sessionOutput(UUID)"><code>FakePluginHost.sessionOutput(UUID)</code></a></td></tr>
@@ -2667,6 +2675,10 @@ is listed by <a href="#dev.jasper.sdk.testing.FakePluginHost.lookDefaultProblems
 <li><a href="#dev.jasper.sdk.ui.Platform.openInEditor(Path)"><code>Platform.openInEditor(Path)</code></a> runs on the calling thread; <a href="#dev.jasper.sdk.files.FileSource.connect(String,WindowOwner)"><code>FileSource.connect(String, WindowOwner)</code></a> always
 receives a window; provided panes report 80 × 24; cancellation handlers run at once.</li>
 <li>An unavailable subcommand's message names the plugin's id rather than its name.</li>
+<li><a href="#dev.jasper.sdk.testing.FakePluginHost.restoreTab(String,UUID,String,RestoreState)"><code>FakePluginHost.restoreTab(String, UUID, String, RestoreState)</code></a> puts the restored tab in a new tab at the end of
+the window's strip; Jasper places it where it was saved, in its tab and pane.</li>
+<li><a href="#dev.jasper.sdk.testing.FakePluginHost.toolbarViews(UUID)"><code>FakePluginHost.toolbarViews(UUID)</code></a> builds toolbar views for any open window, a child window too; Jasper builds
+them only in the main window.</li>
 <li>The fake has no active tool window: <a href="#dev.jasper.sdk.ui.Panels.toggle(String,WindowHandle)"><code>Panels.toggle(String, WindowHandle)</code></a> and <a href="#dev.jasper.sdk.ui.PanelHost.show()"><code>PanelHost.show()</code></a> from a
 panel's own toggle action only toggle or show it, also under <a href="#dev.jasper.sdk.testing.FakePresentations.CLASSIC"><code>FakePresentations.CLASSIC</code></a>, where Jasper activates
 a showing panel that is not the active tool window instead of hiding it.</li>
@@ -2759,22 +2771,16 @@ member.</p>
 <p>Every manifest says which SDK versions the plugin runs on, as a range. Build against SDK 0.21.0 and declare:</p>
 <pre class="code" data-language="toml"><code><span class="p">sdk </span>= <span class="s">&quot;&gt;=0.21.0, &lt;0.22&quot;</span></code></pre>
 <p>That admits 0.21.0 and every later 0.21 version, and nothing from 0.22 on. A plugin that uses something only a later
-0.21 version has starts its range there. Every bundled plugin declares <code>sdk = &quot;&gt;=0.21.0, &lt;0.22&quot;</code>. 0.19.0, 0.20.0
-and 0.21.0 are breaking boundaries: 0.19.0 makes a window's tabs terminal and content tabs alike
-(<a href="#dev.jasper.sdk.terminal.TabHandle.kind()"><code>TabHandle.kind()</code></a> and <a href="#dev.jasper.sdk.terminal.TabHandle.terminal()"><code>TabHandle.terminal()</code></a> in place of a tab's pane list), 0.20.0 gives Jasper one main
-window and child windows in place of plugin windows (<a href="#dev.jasper.sdk.terminal.WindowHandle.isMain()"><code>WindowHandle.isMain()</code></a>, <a href="#dev.jasper.sdk.ui.TabPlacement"><code>TabPlacement</code></a>,
-<a href="#dev.jasper.sdk.ui.ContentTab.moveToNewWindow()"><code>ContentTab.moveToNewWindow()</code></a>), and 0.21.0 makes tabs hold panes, adds split items
-(<a href="#dev.jasper.sdk.ui.Windows.splitItem(SplitItemSpec,BiConsumer)"><code>Windows.splitItem(SplitItemSpec, BiConsumer)</code></a>) and saves the workspace (<a href="#dev.jasper.sdk.RestoreState"><code>RestoreState</code></a>,
-<a href="#dev.jasper.sdk.ui.Windows.restorer(String,TabRestorer)"><code>Windows.restorer(String, TabRestorer)</code></a>, <a href="#dev.jasper.sdk.terminal.SessionState.NOT_STARTED"><code>SessionState.NOT_STARTED</code></a>).</p>
+0.21 version has starts its range there. Every bundled plugin declares <code>sdk = &quot;&gt;=0.21.0, &lt;0.22&quot;</code>.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Form</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><code>&gt;=0.18.0</code>, <code>&gt;0.18.0</code>, <code>&lt;=0.18.2</code>, <code>&lt;0.19</code>, <code>=0.18.0</code></td><td>A comparator and a version of one to three numbers; missing numbers are 0, so <code>&lt;0.19</code> means <code>&lt;0.19.0</code>.</td></tr>
-<tr><td><code>&gt;=0.18.0, &lt;0.19</code></td><td>Comparators separated by commas; every one must hold.</td></tr>
+<tr><td><code>&gt;=0.21.0</code>, <code>&gt;0.21.0</code>, <code>&lt;=0.21.2</code>, <code>&lt;0.22</code>, <code>=0.21.0</code></td><td>A comparator and a version of one to three numbers; missing numbers are 0, so <code>&lt;0.22</code> means <code>&lt;0.22.0</code>.</td></tr>
+<tr><td><code>&gt;=0.21.0, &lt;0.22</code></td><td>Comparators separated by commas; every one must hold.</td></tr>
 <tr><td><code>&quot;&quot;</code></td><td>An empty range admits every SDK version.</td></tr>
 </tbody>
 </table></div>
-<p>A bare version such as <code>&quot;0.18.0&quot;</code> is not a range and makes the manifest invalid, and so does a version with a
+<p>A bare version such as <code>&quot;0.21.0&quot;</code> is not a range and makes the manifest invalid, and so does a version with a
 pre-release or build suffix. The <code>version</code> of a <code>requires</code> entry uses the same syntax.</p>
 
 <h3>How Jasper checks</h3>
@@ -2801,15 +2807,16 @@ type or member and the SDK version to rebuild it for. A call to a method this SD
 <section class="package" id="package-dev.jasper.sdk">
 <h3 class="package-title"><span class="kind kind-package">package</span> <code>dev.jasper.sdk</code></h3>
 <div class="doc"><p>Leaf values shared by every SDK package: the SDK version, plugin identity, the capability names and the exception a
-gated call throws without one, the theme variant, the owner a dialog is parented to and the subscription returned
-by every registration. This package depends on no other SDK package.</p></div>
+gated call throws without one, the theme variant, the owner a dialog is parented to, the restore state a plugin's tab
+comes back with when Jasper restores its windows, and the subscription returned by every registration. This package
+depends on no other SDK package.</p></div>
 <div class="table-wrap"><table class="summary"><thead><tr><th>Type</th><th>Kind</th><th>Summary</th></tr></thead><tbody>
 <tr><td><a href="#dev.jasper.sdk.Capabilities"><code>Capabilities</code></a></td><td><span class="kind kind-class">class</span></td><td>The capability names a plugin declares in <code>plugin.toml</code> and the user consents to.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.JasperSdk"><code>JasperSdk</code></a></td><td><span class="kind kind-class">class</span></td><td>The SDK version a plugin's <code>sdk</code> range is checked against: Jasper does not load a plugin whose range in
 <code>plugin.toml</code> excludes <a href="#dev.jasper.sdk.JasperSdk.VERSION"><code>VERSION</code></a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.MissingCapabilityException"><code>MissingCapabilityException</code></a></td><td><span class="kind kind-class">class</span></td><td>A gated call by a plugin that did not declare the capability, or whose user did not consent to it.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.PluginInfo"><code>PluginInfo</code></a></td><td><span class="kind kind-record">record</span></td><td>A plugin's verified identity, as read from its descriptor by the runtime.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.RestoreState"><code>RestoreState</code></a></td><td><span class="kind kind-record">record</span></td><td>How a plugin's tab comes back when Jasper restores its windows (workspace tabs spec 13 and 14): the kind of restorer the
+<tr><td><a href="#dev.jasper.sdk.RestoreState"><code>RestoreState</code></a></td><td><span class="kind kind-record">record</span></td><td>How a plugin's tab comes back when Jasper restores its windows: the kind of restorer the
 plugin registered with <code>Windows.restorer</code> and a small map of strings the restorer rebuilds the tab from, such as a
 file's path.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.Subscription"><code>Subscription</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Ends one registration.</td></tr>
@@ -2957,7 +2964,7 @@ provides it, and it needs no call: the host reads the presentation from the plug
 <article class="type" id="dev.jasper.sdk.RestoreState">
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.RestoreState">RestoreState</a></h4><span class="since">since 0.21.0</span><span class="pkg">dev.jasper.sdk</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>RestoreState</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> kind, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Map.html" title="java.util.Map">Map</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt; values)</code></pre>
-<div class="doc"><p>How a plugin's tab comes back when Jasper restores its windows (workspace tabs spec 13 and 14): the kind of restorer the
+<div class="doc"><p>How a plugin's tab comes back when Jasper restores its windows: the kind of restorer the
 plugin registered with <code>Windows.restorer</code> and a small map of strings the restorer rebuilds the tab from, such as a
 file's path. Jasper writes it into <code>workspace.toml</code> with the tab, so it holds no secret. A content tab gives it in
 its <code>ContentSpec</code> or later with <code>ContentTab.setRestore</code>; a provided session gives it in its
@@ -3155,7 +3162,7 @@ presentation and the saved terminal typography.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.plugin.PluginContext.windows()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.plugin.PluginContext.windows()" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.Windows">Windows</a> <b>windows</b>()</code></pre>
-<div class="doc"><p>Application-built windows and dialogs.</p></div>
+<div class="doc"><p>Dialogs, overlays, popovers, content tabs, split items, restorers and file choosers.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the windows service</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.plugin.PluginContext.terminals()">
@@ -5337,7 +5344,7 @@ pane's session is not a local process.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.terminal.SessionSpec"><code>SessionSpec</code></a></td><td><span class="kind kind-record">record</span></td><td>A session your plugin provides.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.terminal.SessionState"><code>SessionState</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Where a pane's session is in its life.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.terminal.ShellProfileInfo"><code>ShellProfileInfo</code></a></td><td><span class="kind kind-record">record</span></td><td>A shell Jasper detected and can start in a local pane, as <a href="#dev.jasper.sdk.terminal.Terminals.profiles()"><code>Terminals.profiles()</code></a> lists it.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.terminal.TabHandle"><code>TabHandle</code></a></td><td><span class="kind kind-interface">interface</span></td><td>One item of a Jasper window, the one a pane shows, which the SDK calls a tab (tabs and panes spec 3): a terminal tab,
+<tr><td><a href="#dev.jasper.sdk.terminal.TabHandle"><code>TabHandle</code></a></td><td><span class="kind kind-interface">interface</span></td><td>One item of a Jasper window, the one a pane shows, which the SDK calls a tab: a terminal tab,
 whose <a href="#dev.jasper.sdk.terminal.TabHandle.terminal()"><code>terminal()</code></a> is its one pane, or a content tab, such as an editor, a tool view or a plugin's view.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.terminal.TerminalConnection"><code>TerminalConnection</code></a></td><td><span class="kind kind-record">record</span></td><td>A connected session, handed to <a href="#dev.jasper.sdk.terminal.PendingSession.attach(TerminalConnection)"><code>PendingSession.attach</code></a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.terminal.TerminalEvents"><code>TerminalEvents</code></a></td><td><span class="kind kind-class">class</span></td><td>What happens in Jasper's windows, their tabs and terminal tabs' panes.</td></tr>
@@ -5788,7 +5795,7 @@ and text sent to it is dropped.</dd>
 <article class="type" id="dev.jasper.sdk.terminal.TabHandle">
 <header class="type-head"><span class="kind kind-interface">interface</span><h4><a class="self" href="#dev.jasper.sdk.terminal.TabHandle">TabHandle</a></h4><span class="pkg">dev.jasper.sdk.terminal</span></header>
 <pre class="sig"><code><span class="kw">interface</span> <b>TabHandle</b></code></pre>
-<div class="doc"><p>One item of a Jasper window, the one a pane shows, which the SDK calls a tab (tabs and panes spec 3): a terminal tab,
+<div class="doc"><p>One item of a Jasper window, the one a pane shows, which the SDK calls a tab: a terminal tab,
 whose <a href="#dev.jasper.sdk.terminal.TabHandle.terminal()"><code>terminal()</code></a> is its one pane, or a content tab, such as an editor, a tool view or a plugin's view. A
 window holds tabs in its tab strip, each holding panes, and <a href="#dev.jasper.sdk.terminal.WindowHandle.tabs()"><code>WindowHandle.tabs()</code></a> lists their items. Handles keep
 an id and no Swing object; two handles for the same tab are equal.
@@ -6295,7 +6302,7 @@ empty once the window is closed.</p></div>
 <p class="badges"><span class="since">since 0.20.0</span></p>
 <div class="doc"><p>Whether this is the main window, the one with Jasper's toolbar, tool windows and status bar, which stays open
 when its last tab closes; any other window is a child window, a title bar over its tabs, which closes with its
-last tab (workspace tabs spec 6).</p></div>
+last tab.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>true for the main window while it is open</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.terminal.WindowHandle.toFront()">
@@ -6350,13 +6357,13 @@ a host list can be rebuilt with <a href="#dev.jasper.sdk.ui.PluginMenu.clear()">
 <tr><td><a href="#dev.jasper.sdk.ui.PluginPopover"><code>PluginPopover</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Nonblocking, owner-attached popup.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Presentation"><code>Presentation</code></a></td><td><span class="kind kind-record">record</span></td><td>Facts about the look Jasper runs with, read through <a href="#dev.jasper.sdk.ui.Appearance.presentation()"><code>Appearance.presentation()</code></a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Rail"><code>Rail</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Plain action buttons on the left stripe, after the panels' buttons: for example a button that opens a plugin's tab.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.RestoreRequest"><code>RestoreRequest</code></a></td><td><span class="kind kind-record">record</span></td><td>One saved tab a <a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a> opens again (workspace tabs spec 13).</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.RestoreRequest"><code>RestoreRequest</code></a></td><td><span class="kind kind-record">record</span></td><td>One saved tab a <a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a> opens again.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.SemanticColor"><code>SemanticColor</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Stable canonical theme roles.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ShortcutContext"><code>ShortcutContext</code></a></td><td><span class="kind kind-record">record</span></td><td>Where an action's shortcut applies.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Side"><code>Side</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Which end of the status bar an item sits at.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.SplitChoice"><code>SplitChoice</code></a></td><td><span class="kind kind-record">record</span></td><td>One choice of Jasper's Split lists (tabs and panes spec 2.10 and 8): what a new pane can hold, with the actions that
+<tr><td><a href="#dev.jasper.sdk.ui.SplitChoice"><code>SplitChoice</code></a></td><td><span class="kind kind-record">record</span></td><td>One choice of Jasper's Split lists: what a new pane can hold, with the actions that
 open it in a new pane to the right of and below the focused pane.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.SplitItemSpec"><code>SplitItemSpec</code></a></td><td><span class="kind kind-record">record</span></td><td>A plugin's split item (tabs and panes spec 8 and 11): what a new pane can hold besides a terminal.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.SplitItemSpec"><code>SplitItemSpec</code></a></td><td><span class="kind kind-record">record</span></td><td>A plugin's split item: what a new pane can hold besides a terminal.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.StandardMenu"><code>StandardMenu</code></a></td><td><span class="kind kind-enum">enum</span></td><td>The application's built-in menus; a plugin's entries form a section at the end of one.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.StatusBar"><code>StatusBar</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Status bar contributions.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.StatusItem"><code>StatusItem</code></a></td><td><span class="kind kind-interface">interface</span></td><td>A status bar item the application renders in the main window, the only window with a status bar.</td></tr>
@@ -6366,12 +6373,11 @@ open it in a new pane to the right of and below the focused pane.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.SyntaxPalette"><code>SyntaxPalette</code></a></td><td><span class="kind kind-record">record</span></td><td>Immutable styles for every semantic syntax role.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.SyntaxRole"><code>SyntaxRole</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Semantic syntax roles, classified by the editor plugin.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.SyntaxStyle"><code>SyntaxStyle</code></a></td><td><span class="kind kind-record">record</span></td><td>The appearance of one syntax role.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.TabChoice"><code>TabChoice</code></a></td><td><span class="kind kind-record">record</span></td><td>One tab Move Pane to Tab offers an item (pane flexibility spec 4): another tab of the item's window, numbered as
+<tr><td><a href="#dev.jasper.sdk.ui.TabChoice"><code>TabChoice</code></a></td><td><span class="kind kind-record">record</span></td><td>One tab Move Pane to Tab offers an item: another tab of the item's window, numbered as
 Select Tab numbers the window's strip, from 1, and titled after its active pane's item, as the strip titles it, when
 the plugin may read that title.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.TabPlacement"><code>TabPlacement</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Where <a href="#dev.jasper.sdk.ui.Windows.openTab(ContentSpec,WindowOwner,UiView,TabPlacement)"><code>Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)</code></a> puts a new content tab
-(tabs and panes spec 11).</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a></td><td><span class="kind kind-interface">functional interface</span></td><td>Rebuilds a plugin's saved tabs when Jasper restores its windows (workspace tabs spec 13 and 14): at start, and whenever
+<tr><td><a href="#dev.jasper.sdk.ui.TabPlacement"><code>TabPlacement</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Where <a href="#dev.jasper.sdk.ui.Windows.openTab(ContentSpec,WindowOwner,UiView,TabPlacement)"><code>Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)</code></a> puts a new content tab.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a></td><td><span class="kind kind-interface">functional interface</span></td><td>Rebuilds a plugin's saved tabs when Jasper restores its windows: at start, and whenever
 the main window opens again after it closed.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TableRow"><code>TableRow</code></a></td><td><span class="kind kind-record">record</span></td><td>Immutable table row descriptor: one row of a <a href="#dev.jasper.sdk.ui.Nodes.Table"><code>Nodes.Table</code></a>.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TerminalTypography"><code>TerminalTypography</code></a></td><td><span class="kind kind-record">record</span></td><td>Saved terminal typography, shared by every window and independent of a pane's temporary zoom.</td></tr>
@@ -6385,7 +6391,8 @@ the main window opens again after it closed.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.UiView"><code>UiView</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Opaque owned view.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.ViewSpec"><code>ViewSpec</code></a></td><td><span class="kind kind-record">record</span></td><td>A validated immutable view tree.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.WindowSurface"><code>WindowSurface</code></a></td><td><span class="kind kind-interface">interface</span></td><td>A plugin's dialog or overlay.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.Windows"><code>Windows</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Application-built windows and dialogs with consistent chrome.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.Windows"><code>Windows</code></a></td><td><span class="kind kind-interface">interface</span></td><td>Dialogs, overlays and popovers with Jasper's chrome, content tabs and their restorers, split items, close and quit
+guards, and Jasper's file chooser.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.WorkspacePalette"><code>WorkspacePalette</code></a></td><td><span class="kind kind-record">record</span></td><td>Semantic colors for workspace controls.</td></tr>
 </tbody></table></div>
 <article class="type" id="dev.jasper.sdk.ui.ActionContext">
@@ -6481,8 +6488,7 @@ plain Ctrl in an editor or a panel.</p></div>
 <div class="member" id="dev.jasper.sdk.ui.ActionSpec.withContext(ShortcutContext)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ActionSpec.withContext(ShortcutContext)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.ActionSpec">ActionSpec</a> <b>withContext</b>(<a class="tl" href="#dev.jasper.sdk.ui.ShortcutContext">ShortcutContext</a> value)</code></pre>
 <p class="badges"><span class="since">since 0.11.0</span></p>
-<div class="doc"><p>A copy whose shortcut applies only in a context. Panel and window contexts must name the plugin's own panel or
-window.</p></div>
+<div class="doc"><p>A copy whose shortcut applies only in a context. A panel context must name one of the plugin's own panels.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>value</code> where the shortcut applies</dd><dt>Returns</dt><dd>the copy</dd></dl>
 </div>
 </article>
@@ -6760,7 +6766,8 @@ own clipboard behaviour. Ignored once the tab is closed.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.setStatus(List)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ContentTab.setStatus(List)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>setStatus</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.ContentStatus">ContentStatus</a>&gt; items)</code></pre>
-<div class="doc"><p>Replaces the items the window's status bar shows while this tab is active. Ignored once the tab is closed.</p></div>
+<div class="doc"><p>Replaces the items the main window's status bar shows while this tab is active there; a child window has no
+status bar. Ignored once the tab is closed.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>items</code> immutable snapshot of status items</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.setFocusTarget(Runnable)">
@@ -6796,7 +6803,7 @@ open and a tab being closed stay where they are.</p></div>
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.moveToNewTab()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ContentTab.moveToNewTab()" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>moveToNewTab</b>()</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>Move Pane to New Tab (tabs and panes spec 9): the pane showing this item leaves its tab for a new tab right after it,
+<div class="doc"><p>Move Pane to New Tab: the pane showing this item leaves its tab for a new tab right after it,
 which shows; nothing closes or leaves the window. Its tab's only pane, an item with a modal prompt open and an
 item being closed stay where they are (<a href="#dev.jasper.sdk.ui.ContentTab.mayMoveToNewTab()"><code>mayMoveToNewTab()</code></a>).</p></div>
 </div>
@@ -6809,7 +6816,7 @@ item being closed stay where they are (<a href="#dev.jasper.sdk.ui.ContentTab.ma
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.tabChoices()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ContentTab.tabChoices()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.TabChoice">TabChoice</a>&gt; <b>tabChoices</b>()</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>Move Pane to Tab's choices (pane flexibility spec 4): the window's other tabs, in strip order, for a menu the
+<div class="doc"><p>Move Pane to Tab's choices: the window's other tabs, in strip order, for a menu the
 plugin builds, which shows disabled while there is none. A choice carries its tab's title, the title of the tab's
 shown item, only when the plugin holds <code>terminal.observe</code>, which reads any tab's title, or when that item is
 this plugin's own content; otherwise its title is empty and its label reads <code>Tab 2</code>. Its number is the
@@ -6820,7 +6827,7 @@ tab's place in the strip either way.</p></div>
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.moveToTab(int)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ContentTab.moveToTab(int)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>moveToTab</b>(<span class="kw">int</span> number)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>Move Pane to Tab (pane flexibility spec 4): the pane showing this item moves to the right of the active pane of the
+<div class="doc"><p>Move Pane to Tab: the pane showing this item moves to the right of the active pane of the
 tab numbered <code>number</code> in its window's strip, which then shows, this item focused; no item closes or leaves the
 window; its old tab closes if this was its last pane, and a maximized pane of the tab it joins stops being
 maximized. The number of its own tab, a number no tab has, and an item <a href="#dev.jasper.sdk.ui.ContentTab.tabChoices()"><code>tabChoices()</code></a> offers none for move
@@ -6832,7 +6839,7 @@ nothing.</p></div>
         <a class="tl" href="#dev.jasper.sdk.ui.SplitChoice">SplitChoice</a> choice,
         <a class="tl" href="#dev.jasper.sdk.terminal.Direction">Direction</a> direction)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>Split with a choice beside this item (tabs and panes spec 8): selects it, then opens <code>choice</code> in a new pane on
+<div class="doc"><p>Split with a choice beside this item: selects it, then opens <code>choice</code> in a new pane on
 <code>direction</code>'s side of its pane, as the Split lists' entries do: a terminal for <a href="#dev.jasper.sdk.ui.SplitChoice.TERMINAL"><code>SplitChoice.TERMINAL</code></a>,
 else the split item's view, through its action. A closed tab, or one being closed, opens nothing. Whoever calls it,
 it runs with the owning plugin's authority over the tab, its <code>terminal.open</code> for Terminal Right and Down
@@ -9362,7 +9369,7 @@ decorations; the user's decoration and view-mode settings are not reported.</p><
 <article class="type" id="dev.jasper.sdk.ui.RestoreRequest">
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.ui.RestoreRequest">RestoreRequest</a></h4><span class="since">since 0.21.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>RestoreRequest</b>(<a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a> window, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> title, <a class="tl" href="#dev.jasper.sdk.RestoreState">RestoreState</a> state)</code></pre>
-<div class="doc"><p>One saved tab a <a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a> opens again (workspace tabs spec 13).</p></div>
+<div class="doc"><p>One saved tab a <a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a> opens again.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.RestoreRequest.window()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a></code></td><td class="cn"><code><b>window</b></code></td><td>the Jasper window being restored: the owner of a content tab, or the window of a session's tab</td></tr>
@@ -9538,7 +9545,7 @@ key does nothing, so the shell never receives it as a control character.</p></di
 <article class="type" id="dev.jasper.sdk.ui.SplitChoice">
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.ui.SplitChoice">SplitChoice</a></h4><span class="since">since 0.21.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>SplitChoice</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> label, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> rightAction, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> downAction, <span class="kw">boolean</span> asks)</code></pre>
-<div class="doc"><p>One choice of Jasper's Split lists (tabs and panes spec 2.10 and 8): what a new pane can hold, with the actions that
+<div class="doc"><p>One choice of Jasper's Split lists: what a new pane can hold, with the actions that
 open it in a new pane to the right of and below the focused pane. <a href="#dev.jasper.sdk.ui.Windows.splitChoices()"><code>Windows.splitChoices()</code></a> lists them; a list
 a plugin builds shows each choice's <a href="#dev.jasper.sdk.ui.SplitChoice.rightLabel()"><code>rightLabel()</code></a> and <a href="#dev.jasper.sdk.ui.SplitChoice.downLabel()"><code>downLabel()</code></a>, as Jasper's do.</p></div>
 <h5>Components</h5>
@@ -9568,7 +9575,7 @@ a plugin builds shows each choice's <a href="#dev.jasper.sdk.ui.SplitChoice.righ
 <div class="member" id="dev.jasper.sdk.ui.SplitChoice.rightLabel()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.SplitChoice.rightLabel()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> <b>rightLabel</b>()</code></pre>
 <div class="doc"><p>The entry that opens it to the right, as every Split list words it: the label and "Right", then an ellipsis while
-its action asks something first, as "Open File Right…" (pane flexibility spec 3).</p></div>
+its action asks something first, as "Open File Right…".</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the entry's text</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.SplitChoice.downLabel()">
@@ -9581,12 +9588,12 @@ action asks something first.</p></div>
 <article class="type" id="dev.jasper.sdk.ui.SplitItemSpec">
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.ui.SplitItemSpec">SplitItemSpec</a></h4><span class="since">since 0.21.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>SplitItemSpec</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> id, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> label, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt; icon, <span class="kw">boolean</span> asks)</code></pre>
-<div class="doc"><p>A plugin's split item (tabs and panes spec 8 and 11): what a new pane can hold besides a terminal. Jasper lists it in
+<div class="doc"><p>A plugin's split item: what a new pane can hold besides a terminal. Jasper lists it in
 every Split list and registers two actions for it, which can be bound like any action and have no default shortcut:
 <a href="#dev.jasper.sdk.ui.SplitItemSpec.rightAction()"><code>rightAction()</code></a>, titled "Split Right with" and the label, and <a href="#dev.jasper.sdk.ui.SplitItemSpec.downAction()"><code>downAction()</code></a>, titled "Split Down with"
 and the label. The Split lists show it as the label followed by "Right" and "Down". An item whose actions ask
 something before they open the pane, as a file chooser does (<a href="#dev.jasper.sdk.ui.SplitItemSpec.asking()"><code>asking()</code></a>), ends those entries and its actions'
-titles with an ellipsis, as menus mark a command that asks for more first (pane flexibility spec 3).</p></div>
+titles with an ellipsis, as menus mark a command that asks for more first.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.SplitItemSpec.id()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>id</b></code></td><td>namespaced id that starts with the plugin's id and a dot, its last part naming the item, for example
@@ -9646,8 +9653,8 @@ titles with an ellipsis, as menus mark a command that asks for more first (pane 
 <dt id="dev.jasper.sdk.ui.StandardMenu.FILE"><code>FILE</code></dt><dd>The File menu.</dd>
 <dt id="dev.jasper.sdk.ui.StandardMenu.EDIT"><code>EDIT</code></dt><dd>The Edit menu.</dd>
 <dt id="dev.jasper.sdk.ui.StandardMenu.VIEW"><code>VIEW</code></dt><dd>The View menu.</dd>
-<dt id="dev.jasper.sdk.ui.StandardMenu.TAB"><code>TAB</code></dt><dd>The Tab menu: the Split submenu, Move Pane to New Tab, Move Pane to Tab, focusing panes, moving between prompts,
-and the tab commands.</dd>
+<dt id="dev.jasper.sdk.ui.StandardMenu.TAB"><code>TAB</code></dt><dd>The Tab menu: the Split submenu, Move Pane to New Tab, Move Pane to Tab, Move Tab Into, focusing panes, moving
+between prompts, Rename Tab and the tab commands.</dd>
 <dt id="dev.jasper.sdk.ui.StandardMenu.TOOLS"><code>TOOLS</code> <span class="since">since 0.16.1</span></dt><dd>The Tools menu, for utility commands. Jasper has none of its own, so it shows only while a plugin has entries in
 it, after Tab, Session and Transfer and before plugins' own menus, or after plugins' menus in a classic menu
 bar.</dd>
@@ -9840,7 +9847,7 @@ do nothing after close. Closing is idempotent and safe from any thread.</p></div
 <article class="type" id="dev.jasper.sdk.ui.TabChoice">
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.ui.TabChoice">TabChoice</a></h4><span class="since">since 0.21.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>TabChoice</b>(<span class="kw">int</span> number, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> title)</code></pre>
-<div class="doc"><p>One tab Move Pane to Tab offers an item (pane flexibility spec 4): another tab of the item's window, numbered as
+<div class="doc"><p>One tab Move Pane to Tab offers an item: another tab of the item's window, numbered as
 Select Tab numbers the window's strip, from 1, and titled after its active pane's item, as the strip titles it, when
 the plugin may read that title. <a href="#dev.jasper.sdk.ui.ContentTab.tabChoices()"><code>ContentTab.tabChoices()</code></a> lists them and says when, and
 <a href="#dev.jasper.sdk.ui.ContentTab.moveToTab(int)"><code>ContentTab.moveToTab(int)</code></a> takes one's number.</p></div>
@@ -9869,8 +9876,8 @@ the plugin may read that title. <a href="#dev.jasper.sdk.ui.ContentTab.tabChoice
 <article class="type" id="dev.jasper.sdk.ui.TabPlacement">
 <header class="type-head"><span class="kind kind-enum">enum</span><h4><a class="self" href="#dev.jasper.sdk.ui.TabPlacement">TabPlacement</a></h4><span class="since">since 0.20.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">enum</span> <b>TabPlacement</b></code></pre>
-<div class="doc"><p>Where <a href="#dev.jasper.sdk.ui.Windows.openTab(ContentSpec,WindowOwner,UiView,TabPlacement)"><code>Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)</code></a> puts a new content tab
-(tabs and panes spec 11). A content tab is an item, the one a pane shows: a window holds tabs, and each tab holds
+<div class="doc"><p>Where <a href="#dev.jasper.sdk.ui.Windows.openTab(ContentSpec,WindowOwner,UiView,TabPlacement)"><code>Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)</code></a> puts a new content tab.
+A content tab is an item, the one a pane shows: a window holds tabs, and each tab holds
 panes. A tab already open for the same key is selected where it is, whatever the placement.</p></div>
 <h5>Constants</h5>
 <dl class="constants">
@@ -9886,7 +9893,7 @@ shown, the main window's empty workspace taking it in its place.</dd>
 <header class="type-head"><span class="kind kind-interface">functional interface</span><h4><a class="self" href="#dev.jasper.sdk.ui.TabRestorer">TabRestorer</a></h4><span class="since">since 0.21.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="an">@<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/FunctionalInterface.html" title="java.lang.FunctionalInterface">FunctionalInterface</a></span>
 <span class="kw">interface</span> <b>TabRestorer</b></code></pre>
-<div class="doc"><p>Rebuilds a plugin's saved tabs when Jasper restores its windows (workspace tabs spec 13 and 14): at start, and whenever
+<div class="doc"><p>Rebuilds a plugin's saved tabs when Jasper restores its windows: at start, and whenever
 the main window opens again after it closed. Registered with <a href="#dev.jasper.sdk.ui.Windows.restorer(String,TabRestorer)"><code>Windows.restorer</code></a> for one restorer kind; called on
 the UI thread for a saved tab of that kind:</p><ul>
   <li>once for each saved tab while its window is restored, before that window shows;</li>
@@ -10065,7 +10072,7 @@ Read it through <a href="#dev.jasper.sdk.ui.Appearance.terminalTypography()"><co
 <div class="member" id="dev.jasper.sdk.ui.ToolbarItem.view(ToolbarViewFactory)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ToolbarItem.view(ToolbarViewFactory)" aria-label="Link to this member">#</a><code><span class="kw">static</span> <a class="tl" href="#dev.jasper.sdk.ui.ToolbarItem">ToolbarItem</a> <b>view</b>(<a class="tl" href="#dev.jasper.sdk.ui.ToolbarViewFactory">ToolbarViewFactory</a> factory)</code></pre>
 <p class="badges"><span class="since">since 0.18.0</span></p>
-<div class="doc"><p>A group of the plugin's own controls, one per window.</p></div>
+<div class="doc"><p>A group of the plugin's own controls in the main window's toolbar.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>factory</code> builds one window's view</dd><dt>Returns</dt><dd>the item</dd></dl>
 </div>
 <h5>Nested types</h5>
@@ -10532,7 +10539,8 @@ it open; a guard that throws is treated as allowing the close.</p></div>
 <article class="type" id="dev.jasper.sdk.ui.Windows">
 <header class="type-head"><span class="kind kind-interface">interface</span><h4><a class="self" href="#dev.jasper.sdk.ui.Windows">Windows</a></h4><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">interface</span> <b>Windows</b></code></pre>
-<div class="doc"><p>Application-built windows and dialogs with consistent chrome.</p></div>
+<div class="doc"><p>Dialogs, overlays and popovers with Jasper's chrome, content tabs and their restorers, split items, close and quit
+guards, and Jasper's file chooser.</p></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.sdk.ui.Windows.popover(UiAnchor)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.Windows.popover(UiAnchor)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.PluginPopover">PluginPopover</a> <b>popover</b>(<a class="tl" href="#dev.jasper.sdk.ui.UiAnchor">UiAnchor</a> anchor)</code></pre>
@@ -10566,7 +10574,7 @@ retains it, final closure disposes it.</p></div>
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> kind,
         <a class="tl" href="#dev.jasper.sdk.ui.TabRestorer">TabRestorer</a> restorer)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>Registers how this plugin rebuilds its tabs saved with restore state of <code>kind</code> (workspace tabs spec 13 and 14).
+<div class="doc"><p>Registers how this plugin rebuilds its tabs saved with restore state of <code>kind</code>.
 Register it in <code>start()</code>: Jasper restores its windows once every plugin has started, and again whenever the
 main window opens after it closed. A tab is saved only while its plugin has a restorer for its kind; a saved tab
 whose plugin is missing or disabled, or has no restorer for its kind any more, comes back as a placeholder that
@@ -10578,7 +10586,7 @@ says why.</p></div>
         <a class="tl" href="#dev.jasper.sdk.ui.SplitItemSpec">SplitItemSpec</a> spec,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/BiConsumer.html" title="java.util.function.BiConsumer">BiConsumer</a>&lt;<a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a>, <a class="tl" href="#dev.jasper.sdk.ui.TabPlacement">TabPlacement</a>&gt; opener)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>Registers a split item (tabs and panes spec 8 and 11). Jasper lists it in every Split list (the Tab menu's and the
+<div class="doc"><p>Registers a split item. Jasper lists it in every Split list (the Tab menu's and the
 right-click menus' Split submenus) after the terminal, the bundled plugins' items first and each in the order they
 registered, and registers its <a href="#dev.jasper.sdk.ui.SplitItemSpec.rightAction()"><code>SplitItemSpec.rightAction()</code></a> and <a href="#dev.jasper.sdk.ui.SplitItemSpec.downAction()"><code>SplitItemSpec.downAction()</code></a>, which can
 be bound under <code>[keybindings]</code> and placed in the plugin's menus and toolbar as its own actions. Running one
@@ -10592,7 +10600,7 @@ a user's Split request, possibly offered from another plugin's menu, so it shoul
 <div class="member" id="dev.jasper.sdk.ui.Windows.splitChoices()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.Windows.splitChoices()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.SplitChoice">SplitChoice</a>&gt; <b>splitChoices</b>()</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>What every Split list offers, in its order (tabs and panes spec 2.10 and 8): <a href="#dev.jasper.sdk.ui.SplitChoice.TERMINAL"><code>SplitChoice.TERMINAL</code></a>, then each
+<div class="doc"><p>What every Split list offers, in its order: <a href="#dev.jasper.sdk.ui.SplitChoice.TERMINAL"><code>SplitChoice.TERMINAL</code></a>, then each
 registered split item, the bundled plugins' first and each in the order they registered. A plugin that builds its
 own menu, as the Editor builds its right-click menu, lists these and runs one beside an item with
 <a href="#dev.jasper.sdk.ui.ContentTab.split(SplitChoice,Direction)"><code>ContentTab.split(SplitChoice, Direction)</code></a>.</p></div>
@@ -11263,14 +11271,16 @@ directory when this host made it (<a href="#dev.jasper.sdk.testing.FakePluginHos
 <div class="doc"><p>UI thread: the toolbar views a Jasper window shows, in toolbar order. The window builds each registered
 <code>ToolbarItem.View</code> once, the first time this is asked for it, as a window builds its views when it opens; a
 view whose factory threw or whose tree the toolbar does not admit is left out and recorded in <a href="#dev.jasper.sdk.testing.FakePluginHost.failures()"><code>failures()</code></a>.
-A window that is not open, or whose views <a href="#dev.jasper.sdk.testing.FakePluginHost.closeToolbarViews(UUID)">closed</a>, shows none and asks no factory.</p></div>
+A window that is not open, or whose views <a href="#dev.jasper.sdk.testing.FakePluginHost.closeToolbarViews(UUID)">closed</a>, shows none and asks no factory. Jasper
+builds toolbar views only in the main window, the only window with a toolbar; the fake builds them for any open
+window, a child window too.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>windowId</code> a Jasper window</dd><dt>Returns</dt><dd>the live views</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.closeToolbarViews(UUID)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.closeToolbarViews(UUID)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>closeToolbarViews</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> windowId)</code></pre>
 <p class="badges"><span class="since">since 0.18.0</span></p>
-<div class="doc"><p>UI thread: closes a window's toolbar views, as the window does when it closes; a fake window does when its last
-tab closes or moves to another window.</p></div>
+<div class="doc"><p>UI thread: closes a window's toolbar views, as the window does when it closes; a fake child window does when its
+last tab closes or moves to another window; the main window stays open.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>windowId</code> a Jasper window</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.menu(String)">
@@ -11342,7 +11352,7 @@ become inert and its close handlers run. Nothing happens when the panel is not o
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.openPanel(String)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.openPanel(String)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JComponent.html" title="javax.swing.JComponent">JComponent</a> <b>openPanel</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> panelId)</code></pre>
 <div class="doc"><p>Invokes a panel's factory as the main window showing it would, or shows the panel built there: panels live in the
-main window (workspace tabs spec 14). A factory failure is recorded.</p></div>
+main window. A factory failure is recorded.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>panelId</code> the panel to build</dd><dt>Returns</dt><dd>the component, or null when no main window is open, there is no such panel or its factory failed</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.panelView(String)">
@@ -11439,7 +11449,7 @@ application's, delivered by <a href="#dev.jasper.sdk.testing.FakePluginHost.flus
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalTab(UUID,String)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> <b>addTerminalTab</b>(
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> windowId,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> title)</code></pre>
-<div class="doc"><p>Adds and selects a terminal tab, in a new tab of its own at the end of the window's strip (tabs and panes spec 4);
+<div class="doc"><p>Adds and selects a terminal tab, in a new tab of its own at the end of the window's strip;
 <a href="#dev.jasper.sdk.testing.FakePluginHost.addTerminalPane(UUID,PaneInfo)"><code>addTerminalPane</code></a> gives it its one pane.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>windowId</code> an open window</dd><dd><code>title</code> the tab's title</dd><dt>Returns</dt><dd>the new tab's id</dd></dl>
 </div>
@@ -11478,7 +11488,7 @@ window's strip.</p></div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.windowTabs(UUID)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.windowTabs(UUID)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a>&gt;&gt; <b>windowTabs</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> windowId)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>A window's tabs as its strip shows them (tabs and panes spec 4), each tab's items pane by pane: the ids
+<div class="doc"><p>A window's tabs as its strip shows them, each tab's items pane by pane: the ids
 <code>TabHandle.id()</code> reports.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>windowId</code> a window</dd><dt>Returns</dt><dd>the tabs in strip order, each a list of item ids; empty for a window that is not open</dd></dl>
 </div>
@@ -11511,7 +11521,7 @@ or <code>requestClose</code>.</p></div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.holdPane(UUID)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.holdPane(UUID)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>holdPane</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> paneId)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>Holds a local pane as Jasper holds a restored terminal tab it has not shown yet (workspace tabs spec 13): it reports
+<div class="doc"><p>Holds a local pane as Jasper holds a restored terminal tab it has not shown yet: it reports
 <code>SessionState.NOT_STARTED</code> with no grid (0 columns, 0 rows, no shell integration) and drops what plugins send
 it, and it starts on its tab's next selection or focus (<a href="#dev.jasper.sdk.testing.FakePluginHost.focusTerminalPane(UUID)"><code>focusTerminalPane</code></a>, or its <code>TabHandle.select()</code>),
 after the selection is reported, with the snapshot it had when it was held. Only a local pane can be held; a pane
@@ -11790,8 +11800,8 @@ then one titled after its <code>ContentSpec</code>.</p></div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.contentOwner(ContentTab)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.contentOwner(ContentTab)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.WindowOwner">WindowOwner</a> <b>contentOwner</b>(<a class="tl" href="#dev.jasper.sdk.ui.ContentTab">ContentTab</a> tab)</code></pre>
 <div class="doc"><p>The Jasper window a content tab is in: the window it opened in, or the one a move took it to. An owner
-that was a content tab resolves to that tab's window, and no owner or a closed window to the first open window
-that no tab was moved out to, or a new one when there is none.</p></div>
+that was a content tab resolves to that tab's window, and no owner or a closed window to the main window, or to a
+new main window when none is open.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>tab</code> handle from this host</dd><dt>Returns</dt><dd>originating owner</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.contentStatus(ContentTab)">
@@ -11820,14 +11830,14 @@ tests as <a href="#dev.jasper.sdk.testing.FakePluginHost.windowView(String,Strin
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.restoreState(UUID)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.restoreState(UUID)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.RestoreState">RestoreState</a>&gt; <b>restoreState</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> tabId)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>The restore state a tab gives (workspace tabs spec 13): a plugin's content tab's, or the one a plugin's provided
+<div class="doc"><p>The restore state a tab gives: a plugin's content tab's, or the one a plugin's provided
 session carries. Call it on the UI thread.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>tabId</code> a tab of the scripted workspace</dd><dt>Returns</dt><dd>its restore state; empty when the tab does not come back</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.restoreState(ContentTab)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.restoreState(ContentTab)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.RestoreState">RestoreState</a>&gt; <b>restoreState</b>(<a class="tl" href="#dev.jasper.sdk.ui.ContentTab">ContentTab</a> tab)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>The restore state a plugin's content tab gives (workspace tabs spec 13). Call it on the UI thread.</p></div>
+<div class="doc"><p>The restore state a plugin's content tab gives. Call it on the UI thread.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>tab</code> a content tab from this host</dd><dt>Returns</dt><dd>its restore state; empty when the tab does not come back</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.restoreTab(String,UUID,String,RestoreState)">
@@ -11837,7 +11847,7 @@ session carries. Call it on the UI thread.</p></div>
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> title,
         <a class="tl" href="#dev.jasper.sdk.RestoreState">RestoreState</a> state)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>Restores one saved tab as Jasper does when it restores its windows (workspace tabs spec 13): the plugin's restorer for
+<div class="doc"><p>Restores one saved tab as Jasper does when it restores its windows: the plugin's restorer for
 <code>state</code>'s kind runs, and the first content tab it opens, whatever window or placement it named, or the first
 provided session it opens in window <code>windowId</code>, is the saved tab, in that window, where it stays while the
 restorer runs: a move asked of it does nothing. A content tab is placed there, not shown: it is
@@ -11998,11 +12008,12 @@ same key (of several, the one focused last), and brings that tab's window to the
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.Editor.reopener(String,Function)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <a class="tl" href="#dev.jasper.sdk.Subscription">Subscription</a> <b>reopener</b>(
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> keyPrefix,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Function.html" title="java.util.function.Function">Function</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Function.html" title="java.util.function.Function">Function</a>&lt;<a class="tl" href="#dev.jasper.sdk.WindowOwner">WindowOwner</a>, <a class="tl" href="#dev.jasper.editor.api.EditorDocument">EditorDocument</a>&gt;&gt;&gt; resolve)</code></pre>
-<div class="doc"><p>Makes recent files under a key prefix reopenable. The resolver runs on the UI thread and must do no I/O. It
-returns empty when the key cannot be reopened now, for example because its host was deleted, and otherwise a
-factory that builds the document for the window reopening it (null when there is none). A later registration
-of the same prefix replaces the earlier one; the longest matching prefix wins. A resolver that throws or answers
-null cannot reopen the key.</p></div>
+<div class="doc"><p>Makes recent files under a key prefix reopenable. The resolver also brings the Editor's tabs of such documents
+back when Jasper restores its windows, which at start may be before the plugin's own data has loaded. The
+resolver runs on the UI thread and must do no I/O. It returns empty when the key cannot be reopened now, for
+example because its host was deleted, and otherwise a factory that builds the document for the window reopening
+it (null when there is none). A later registration of the same prefix replaces the earlier one; the longest
+matching prefix wins. A resolver that throws or answers null cannot reopen the key.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>keyPrefix</code> the start of the keys this plugin's documents use, for example <code>&quot;remote:&quot;</code>; not blank and
     not starting with <code>&quot;local:&quot;</code>, which the Editor keeps for local files (<a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html"><code>IllegalArgumentException</code></a>
     otherwise)</dd><dd><code>resolve</code> resolves a recorded key</dd><dt>Returns</dt><dd>removes the reopener</dd></dl>
@@ -12018,9 +12029,9 @@ request. A handler that throws counts as false.</p></div>
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.Editor.locationDocuments(String,LocationResolver)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <a class="tl" href="#dev.jasper.sdk.Subscription">Subscription</a> <b>locationDocuments</b>(
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> sourceId,
         <a class="tl" href="#dev.jasper.editor.api.LocationResolver">LocationResolver</a> resolver)</code></pre>
-<div class="doc"><p>Lets Open in Editor… and Save As offer a file source's places and open or save what the user picks there. The
-chooser offers the source's roots only while a resolver is registered; a later registration for the same source
-replaces the earlier one.</p></div>
+<div class="doc"><p>Lets Open in Editor…, Open in Editor Pane…, Open File Right…, Open File Down… and Save As… offer a file source's
+places and open or save what the user picks there. The chooser offers the source's roots only while a resolver is
+registered; a later registration for the same source replaces the earlier one.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>sourceId</code> the id of a file source the plugin registered; not blank (<a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html"><code>IllegalArgumentException</code></a>
     otherwise)</dd><dd><code>resolver</code> builds documents for the source's files</dd><dt>Returns</dt><dd>removes the resolver</dd></dl>
 </div>
@@ -12034,10 +12045,11 @@ UI thread; none may block. Futures may complete on any thread.</p></div>
 <div class="member" id="dev.jasper.editor.api.EditorDocument.key()">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.EditorDocument.key()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> <b>key</b>()</code></pre>
 <div class="doc"><p>The document's stable identity. Opening a document whose key is already open selects its tab (of several, the one
-focused last), and every tab that shows it shares one read, one text and one save. Recent Files records the key,
-and <a href="#dev.jasper.editor.api.Editor.reopener(String,Function)"><code>Editor.reopener</code></a> resolves it by its prefix. Start it with a prefix of the plugin's
-own, the one it passes to <a href="#dev.jasper.editor.api.Editor.reopener(String,Function)"><code>Editor.reopener</code></a> (for example <code>&quot;remote:&quot;</code>), never <code>&quot;local:&quot;</code>, which
-the Editor uses for local files.</p></div>
+focused last), and Open File Right…, Open File Down… and Open in Editor Pane… show it in another view beside the
+focused pane; every tab that shows it shares one read, one text and one save. Recent Files records the key, and
+<a href="#dev.jasper.editor.api.Editor.reopener(String,Function)"><code>Editor.reopener</code></a> resolves it by its prefix. Start it with a prefix of the plugin's own, the one it passes
+to <a href="#dev.jasper.editor.api.Editor.reopener(String,Function)"><code>Editor.reopener</code></a> (for example <code>&quot;remote:&quot;</code>), never <code>&quot;local:&quot;</code>, which the Editor uses for
+local files.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>stable identity: two documents with equal keys are the same file</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.EditorDocument.name()">
@@ -12074,15 +12086,16 @@ larger than <code>limitBytes</code>. Cancelling the future aborts the transfer. 
 </div>
 <div class="member" id="dev.jasper.editor.api.EditorDocument.readQuietly(long)">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.EditorDocument.readQuietly(long)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html" title="java.util.concurrent.CompletableFuture">CompletableFuture</a>&lt;<a class="tl" href="#dev.jasper.editor.api.Content">Content</a>&gt; <b>readQuietly</b>(<span class="kw">long</span> limitBytes)</code></pre>
-<div class="doc"><p>Reads the whole file as <a href="#dev.jasper.editor.api.EditorDocument.read(long)"><code>read</code></a> does, for a restore, which asks the user nothing. The Editor reads a document
-this way when Jasper has restored its tab and the tab is first active or Load is pressed; Retry then reads it with
-<a href="#dev.jasper.editor.api.EditorDocument.read(long)"><code>read</code></a>. A document whose read can ask the user anything (a sign-in, a prompt) must override this so that it
-fails, saying why, instead of asking. The default reads as <a href="#dev.jasper.editor.api.EditorDocument.read(long)"><code>read</code></a> does.</p></div>
+<div class="doc"><p>Reads the whole file as <a href="#dev.jasper.editor.api.EditorDocument.read(long)"><code>read</code></a> does, for a restore, which asks the user nothing. When Jasper has restored
+the tab of a document with a <a href="#dev.jasper.editor.api.EditorDocument.host()"><code>host()</code></a>, the Editor reads it this way once the tab is first active or Load
+is pressed; Retry then reads it with <a href="#dev.jasper.editor.api.EditorDocument.read(long)"><code>read</code></a>. A restored document without a host is read with <a href="#dev.jasper.editor.api.EditorDocument.read(long)"><code>read</code></a>
+at once. A document whose read can ask the user anything (a sign-in, a prompt) must override this so that it
+fails, saying why, instead of asking. The default reads as <a href="#dev.jasper.editor.api.EditorDocument.read(long)"><code>read</code></a> does. Since Editor 0.13.0.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>limitBytes</code> the largest size the editor accepts</dd><dt>Returns</dt><dd>the content and the revision it was read at</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.EditorDocument.revision()">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.EditorDocument.revision()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html" title="java.util.concurrent.CompletableFuture">CompletableFuture</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.editor.api.Revision">Revision</a>&gt;&gt; <b>revision</b>()</code></pre>
-<div class="doc"><p>The file's current revision, which the Editor asks for before each Save (not Save As). When it differs from the
+<div class="doc"><p>The file's current revision, which the Editor asks for before each Save (not Save As…). When it differs from the
 revision last read or written, the user chooses whether to overwrite or reload; when the file no longer exists,
 whether to save anyway.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the file's current revision, or empty when it no longer exists</dd></dl>
@@ -12125,7 +12138,7 @@ throws counts as not knowing.</p></div>
 <div class="doc"><p>What Open in Editor… was invoked on.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
-<tr id="dev.jasper.editor.api.OpenRequest.window()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a></code></td><td class="cn"><code><b>window</b></code></td><td>the workspace window</td></tr>
+<tr id="dev.jasper.editor.api.OpenRequest.window()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a></code></td><td class="cn"><code><b>window</b></code></td><td>the Jasper window</td></tr>
 <tr id="dev.jasper.editor.api.OpenRequest.pane()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.terminal.PaneHandle">PaneHandle</a>&gt;</code></td><td class="cn"><code><b>pane</b></code></td><td>the focused terminal pane; empty while another kind of tab is selected. The handle is the Editor's and
     is gated by the Editor's capabilities: use its <code>id()</code> to find the pane through your own terminals</td></tr>
 <tr id="dev.jasper.editor.api.OpenRequest.documentKey()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;</code></td><td class="cn"><code><b>documentKey</b></code></td><td>the key of the Editor tab that is active, when one is and no terminal pane is focused</td></tr>
@@ -12754,8 +12767,8 @@ interface default fails with <a class="ext" href="https://docs.oracle.com/en/jav
 <div class="member" id="dev.jasper.vault.api.VaultApi.ensureUnlocked(WindowHandle)">
 <pre class="sig"><a class="self" href="#dev.jasper.vault.api.VaultApi.ensureUnlocked(WindowHandle)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html" title="java.util.concurrent.CompletableFuture">CompletableFuture</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Boolean.html" title="java.lang.Boolean">Boolean</a>&gt; <b>ensureUnlocked</b>(<a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a> owner)</code></pre>
 <div class="doc"><p>Prompts for the master password over <code>owner</code> when the vault is locked. Every requester shares one unlock
-prompt: a request made while the prompt is open joins it where it is, and while the Credential Vault window is
-open the prompt opens in that window. Without a vault it posts a notification saying to create one and answers
+prompt: a request made while the prompt is open joins it where it is, and while the Credential Vault manager is
+open the prompt opens in it. Without a vault it posts a notification saying to create one and answers
 <code>false</code>.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>owner</code> the window the prompt opens over</dd><dt>Returns</dt><dd><code>true</code> once unlocked; <code>false</code> when the user cancels or there is no vault</dd></dl>
 </div>

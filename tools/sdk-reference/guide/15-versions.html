@@ -11,22 +11,16 @@ member.</p>
 <p>Every manifest says which SDK versions the plugin runs on, as a range. Build against SDK {@sdk.version} and declare:</p>
 <pre><code class="language-toml">sdk = "&gt;=0.21.0, &lt;0.22"</code></pre>
 <p>That admits 0.21.0 and every later 0.21 version, and nothing from 0.22 on. A plugin that uses something only a later
-0.21 version has starts its range there. Every bundled plugin declares {@code sdk = ">=0.21.0, <0.22"}. 0.19.0, 0.20.0
-and 0.21.0 are breaking boundaries: 0.19.0 makes a window's tabs terminal and content tabs alike
-({@link TabHandle#kind()} and {@link TabHandle#terminal()} in place of a tab's pane list), 0.20.0 gives Jasper one main
-window and child windows in place of plugin windows ({@link WindowHandle#isMain()}, {@link TabPlacement},
-{@link ContentTab#moveToNewWindow()}), and 0.21.0 makes tabs hold panes, adds split items
-({@link Windows#splitItem(SplitItemSpec,BiConsumer)}) and saves the workspace ({@link RestoreState},
-{@link Windows#restorer(String,TabRestorer)}, {@link SessionState#NOT_STARTED}).</p>
+0.21 version has starts its range there. Every bundled plugin declares {@code sdk = ">=0.21.0, <0.22"}.</p>
 <table>
 <thead><tr><th>Form</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td>{@code >=0.18.0}, {@code >0.18.0}, {@code <=0.18.2}, {@code <0.19}, {@code =0.18.0}</td><td>A comparator and a version of one to three numbers; missing numbers are 0, so {@code <0.19} means {@code <0.19.0}.</td></tr>
-<tr><td>{@code >=0.18.0, <0.19}</td><td>Comparators separated by commas; every one must hold.</td></tr>
+<tr><td>{@code >=0.21.0}, {@code >0.21.0}, {@code <=0.21.2}, {@code <0.22}, {@code =0.21.0}</td><td>A comparator and a version of one to three numbers; missing numbers are 0, so {@code <0.22} means {@code <0.22.0}.</td></tr>
+<tr><td>{@code >=0.21.0, <0.22}</td><td>Comparators separated by commas; every one must hold.</td></tr>
 <tr><td>{@code ""}</td><td>An empty range admits every SDK version.</td></tr>
 </tbody>
 </table>
-<p>A bare version such as {@code "0.18.0"} is not a range and makes the manifest invalid, and so does a version with a
+<p>A bare version such as {@code "0.21.0"} is not a range and makes the manifest invalid, and so does a version with a
 pre-release or build suffix. The {@code version} of a {@code requires} entry uses the same syntax.</p>
 
 <h3>How Jasper checks</h3>

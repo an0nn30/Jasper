@@ -44,11 +44,12 @@ public interface Editor {
     default void open(EditorDocument document, WindowOwner owner) { open(document); }
 
     /**
-     * Makes recent files under a key prefix reopenable. The resolver runs on the UI thread and must do no I/O. It
-     * returns empty when the key cannot be reopened now, for example because its host was deleted, and otherwise a
-     * factory that builds the document for the window reopening it (null when there is none). A later registration
-     * of the same prefix replaces the earlier one; the longest matching prefix wins. A resolver that throws or answers
-     * null cannot reopen the key.
+     * Makes recent files under a key prefix reopenable. The resolver also brings the Editor's tabs of such documents
+     * back when Jasper restores its windows, which at start may be before the plugin's own data has loaded. The
+     * resolver runs on the UI thread and must do no I/O. It returns empty when the key cannot be reopened now, for
+     * example because its host was deleted, and otherwise a factory that builds the document for the window reopening
+     * it (null when there is none). A later registration of the same prefix replaces the earlier one; the longest
+     * matching prefix wins. A resolver that throws or answers null cannot reopen the key.
      *
      * @param keyPrefix the start of the keys this plugin's documents use, for example {@code "remote:"}; not blank and
      *     not starting with {@code "local:"}, which the Editor keeps for local files ({@link IllegalArgumentException}
@@ -73,9 +74,9 @@ public interface Editor {
     }
 
     /**
-     * Lets Open in Editor… and Save As offer a file source's places and open or save what the user picks there. The
-     * chooser offers the source's roots only while a resolver is registered; a later registration for the same source
-     * replaces the earlier one.
+     * Lets Open in Editor…, Open in Editor Pane…, Open File Right…, Open File Down… and Save As… offer a file source's
+     * places and open or save what the user picks there. The chooser offers the source's roots only while a resolver is
+     * registered; a later registration for the same source replaces the earlier one.
      *
      * @param sourceId the id of a file source the plugin registered; not blank ({@link IllegalArgumentException}
      *     otherwise)

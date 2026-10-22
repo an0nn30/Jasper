@@ -56,9 +56,9 @@ Building the distribution (`installDist`, `packageApp`) is headless; on macOS, A
 
 ## Find the owner before editing
 
-- [Architecture](../docs/app-architecture.md): the module and package graph, start-up and its rollback, residency,
-  quit and shutdown, threading, saved versus live configuration, every package's owner, looks and window chrome,
-  themes.
+- [Architecture](../docs/app-architecture.md): the module and package graph, start-up and its rollback, residency and
+  the single instance, the windows and the saved workspace, quit and shutdown, threading, saved versus live
+  configuration, every package's owner, looks and window chrome, themes.
 - [Maintenance recipes](../docs/app-maintenance.md): commands and shortcuts, palette scopes, settings, notifications,
   platform hooks, session launches, packaging, releases, dependencies, themes and the workspace chrome, and the tests
   that read the documentation.
@@ -77,6 +77,9 @@ Starting points by change:
 | --- | --- |
 | A built-in command or shortcut | `commands/ActionId`, `workspace/WorkspaceActions`, `workspace/WindowCommands`, `workspace/WindowChrome` |
 | An application command outside the workspace | `JasperApplication.startPlugins` (`contributions.addAction`) |
+| Windows, tabs and panes | `workspace/WindowManager`, `workspace/WindowContent`, `workspace/WorkspaceView`, `layout/Layout`, `contributions/TabRegistry` |
+| What `workspace.toml` keeps | `persistence/WorkspaceFile`, `workspace/WorkspaceStore`, `WindowManager.snapshot` |
+| A second launch, `jasper <path>...` or a macOS open-file event | `bootstrap/SingleInstance`, `residency/LaunchRequest`, `JasperApplication.open`, `application/OpenPlan` |
 | A core setting | `config/CoreSettings`, `config/ConfigSnapshot`, `settingsui/CorePages`, `workspace/WorkspaceConfiguration` |
 | A notification or incident | `notifications/NotificationCenter`, `application/NotificationsFeature`, `application/IncidentNotices` |
 | Buddy notices | `notifications/CommandNotifier`, `workspace/WorkspaceActivity`, `notifications/ActivityNotifier` |

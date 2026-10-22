@@ -67,22 +67,25 @@ folder in the user's `Path` (Windows).
 `CommandListener` binds the home's `daemon/commands` once the launch owns the home's instance lock, before AWT, and the
 owner holds the calls that arrive until the application is composed, so the first call finds its handler; only the
 owner binds, so whatever is at the path was left by a process that has gone and is replaced. On POSIX it makes
-`daemon/` owner-only (`rwx------`) and writes a random `<socket>.token` and the owner's process id before the socket
-appears. The accept loop is a non-daemon thread, so a
-`--no-window` Jasper stays up for its first call; each connection is served on its own virtual thread and its reply
-frames on a writer thread of their own. A request must arrive within 5 seconds and stay under 1 MiB; a line that is
+`daemon/` owner-only (`rwx------`) and writes a random `<socket>.token` and the owner's process id
+(`<socket>.token.pid`) before the socket appears. The accept loop is a non-daemon thread, so a `--no-window` Jasper
+stays up for its first call; each connection is served on its own virtual thread and its reply frames on a writer
+thread of their own. A request must arrive within 5 seconds and stay under 1 MiB; a line that is
 not a request is dropped without a reply, the token is compared in constant time, and the exit code is held to 0 to
 255 (anything else is 1).
 
-`JasperApplication.commands()` answers a call with no arguments by opening or raising a window (exit code 0) and hands
-anything else to the plugins' `PluginCommands`, which runs the owning plugin's `CommandLine` handler on the UI thread.
+The arguments reach Jasper as given, with the caller's working directory, and `JasperApplication.commands()` decides
+what the call is. With no arguments it raises the main window, restoring the windows first when none is open, as a
+second launch's handoff does (exit code 0). A first argument a plugin declares as a subcommand goes to the plugins'
+`PluginCommands`, which runs the owning plugin's `CommandLine` handler on the UI thread, after restoring the windows
+when the subcommand will run and no main window is open. Otherwise, when every argument names an existing file or
+folder, each file opens in the editor a plugin provides, or is revealed when none runs, and each folder as a terminal
+tab, in the main window (exit code 0); when the first does but others do not, the call fails with "jasper: no such
+file or folder:" and the missing ones (exit code 1). Anything else goes to `PluginCommands`, which reports an unknown
+or unavailable name.
 `SubcommandList` writes `daemon/subcommands` atomically at plugin start, with the subcommands of the plugins that
 started. The plugin side is under
 [command-line subcommands](../../docs/plugin-authoring.md#command-line-subcommands).
-
-Other arguments go to Jasper as given, with the caller's working directory, and Jasper decides: a subcommand a plugin
-declares runs; otherwise, when every argument names an existing file or folder, each file opens in the editor, or is
-revealed when no editor plugin runs, and each folder as a terminal tab. No arguments bring Jasper forward.
 
 ## Sources and tests
 

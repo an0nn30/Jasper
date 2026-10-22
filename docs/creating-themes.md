@@ -298,10 +298,10 @@ on `surface.panel`, `surface.sidebar` and `surface.card`.
 
 ### Title bar roles
 
-Two optional roles give the window's header row (the title, the command field and the toolbar buttons) colours of
-its own, such as a dark title bar on a light theme. Slate Cobalt leaves both out; Ubuntu Yaru sets both. Under the
-Enterprise look the terminal window's header row and, on macOS and Windows, IntelliJ Classic's title bar above it
-take `surface.app` instead.
+Two optional roles give the main window's header row (the title, the command field and the toolbar buttons) colours
+of its own, such as a dark title bar on a light theme. Slate Cobalt leaves both out; Ubuntu Yaru sets both. Under the
+Enterprise look the main window's header row and, on macOS and Windows, IntelliJ Classic's title bar above it take
+`surface.app` instead.
 
 | Role | Paints | Left out, it is |
 |---|---|---|
@@ -755,7 +755,7 @@ id = "dev.example.harbour"
 name = "Harbour Theme"
 version = "1.0.0"
 entry = "dev.example.harbour.HarbourPlugin"
-sdk = ">=0.18.0, <0.19"
+sdk = ">=0.21.0, <0.22"
 description = "The Harbour theme."
 themes = ["themes/harbour.json"]
 ```

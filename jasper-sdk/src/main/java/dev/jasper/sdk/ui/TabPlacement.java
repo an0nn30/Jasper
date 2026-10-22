@@ -1,8 +1,8 @@
 package dev.jasper.sdk.ui;
 
 /**
- * Where {@link Windows#openTab(ContentSpec, dev.jasper.sdk.WindowOwner, UiView, TabPlacement)} puts a new content tab
- * (tabs and panes spec 11). A content tab is an item, the one a pane shows: a window holds tabs, and each tab holds
+ * Where {@link Windows#openTab(ContentSpec, dev.jasper.sdk.WindowOwner, UiView, TabPlacement)} puts a new content tab.
+ * A content tab is an item, the one a pane shows: a window holds tabs, and each tab holds
  * panes. A tab already open for the same key is selected where it is, whatever the placement.
  *
  * @since 0.20.0

@@ -52,8 +52,8 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   number fails with `E830`. Vim's message after an undo ("1 line less; before #2") is not shown.
 - **`:sort` compares code points.** `:sort l` does not use the system's collation.
 - **Marks and registers in other files' views.** `:marks` shows an uppercase mark in another file's view with that
-  file's location (its full path, or a remote file's host and path), and `:registers` shows `"%` as the file's location,
-  where Vim shows file names.
+  file's location (its full path, or a remote file's login, host and path), and `:registers` shows `"%` as the file's
+  location, where Vim shows file names.
 - **`:` is not a motion.** After an operator (`d:`) it fails; Vim runs the command and deletes to where it went.
 - **Options.** `:set` knows only the [options Jasper has](editor.md#vim-options); an option Vim has and Jasper lacks
   fails with `E518: Unknown option`, and `:set` and `:set all` list only Jasper's. 'hlsearch' starts on (Vim's default
@@ -62,11 +62,12 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **A final line break.** A text without one edits as Vim edits such a file, and is saved as it is, where Vim (with
   'fixendofline', on by default) adds one when it writes. An edit that leaves the last line empty adds the final break,
   which that empty line needs to be a line.
-- **Files are the buffers.** Each open file is a buffer, its [views](editor.md#views-of-one-file) are its windows, and
-  each tab is a tab page. `:e file` opens the file in a tab, or selects its view, where Vim edits it in the window;
-  `:w file` saves the tab as the file, which it then edits, where Vim writes a copy; `:q` closes the pane, and closing
-  the last one leaves Jasper running. A file never has to be written before another is shown, so `:e`, `:b` and `:bn`
-  never need `!` ('hidden' as it were), and `:ls` shows every file as loaded and shown (`a`), named by its location.
+- **Files are the buffers.** Each open file is a buffer and its [views](editor.md#views-of-one-file) are its windows;
+  `gt`, `gT`, `:tabn` and `:tabp` move between the files as `:bn` does, where Vim moves between tab pages. `:e file`
+  opens the file in a tab, or selects its view, where Vim edits it in the window; `:w file` saves the tab as the file,
+  which it then edits, where Vim writes a copy; `:q` closes the pane, and closing the last one leaves Jasper running. A
+  file never has to be written before another is shown, so `:e`, `:b` and `:bn` never need `!` ('hidden' as it were),
+  and `:ls` shows every file as loaded and shown (`a`), named by its location.
   `:w` on an untitled tab asks where to save it, as the Editor's Save does, where Vim fails with `E32`. `:e newfile`
   opens an empty tab its first save creates.
 - **Relative file names** start from the current file's folder (the home folder for an untitled tab), as Jasper has no

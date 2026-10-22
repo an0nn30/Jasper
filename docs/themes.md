@@ -94,8 +94,8 @@ look, the selected tab is the theme's terminal surface, so with `match` the text
 while with High Contrast the text area is black and the tab keeps the theme's colour. Inactive tabs take the theme's
 tab strip colour, darkened when it is too close to the terminal surface to tell the selected tab apart (lightened when
 the terminal surface is near black). Under the Enterprise look the selected tab takes the theme's card colour instead.
-On macOS, workspace opacity and blur (`ui.workspace.opacity`, `ui.workspace.blur`) apply to the terminal area. The
-Editor always follows the shown theme's own Editor colours.
+On macOS, workspace opacity and blur (`ui.workspace.opacity`, `ui.workspace.blur`) apply to the terminal area of every
+window. The Editor always follows the shown theme's own Editor colours.
 
 ## Installed themes
 
