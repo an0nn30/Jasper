@@ -27,7 +27,8 @@
   nothing.
 - `plugins/editor/src/test/resources/markdown/everyday.md` holds a deliberately broken link; the link checker skips
   test resources.
-- `StagedTransferLifecycleTest` and `FileServerPluginTest.addsStartsServesAndStopsAServer` time out under heavy load.
+- `StagedTransferLifecycleTest`, `FileServerPluginTest.addsStartsServesAndStopsAServer` and `RemoteShortcutConfigTest`
+  ("Plugin workers did not finish resource cleanup after stop") time out under heavy load.
   Re-run the class alone before treating a failure as real.
 - `checkThemeTool` needs Python 3.11 to 3.13 (`-Pjasper.python=<interpreter>`); 3.14 fails one of its tests.
 - The auto-mode permission classifier blocks pushing to `main` without an approval in the conversation; ask.
