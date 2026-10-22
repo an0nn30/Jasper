@@ -8,10 +8,13 @@ notifications, Settings, themes and looks; most features, the Editor and its Mar
 plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
 
 - **Branches.** This is `claude/workspace-tabs` (the workspace tabs and the single instance: plans 1 to 5, 7a to 8c, 6a,
-  6b, 9a and 9b), which merged `origin/main` at `8c8776e7e` on 2026-10-21 (the merge entry below); it is not merged into
-  `main` and not pushed. `origin/main` at `8c8776e7e` is `427321de4` and the two documentation commits that bring the
-  guides up to it. `origin/main` at `427321de4` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status
-  Bar Keymap actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise mode),
+  6b, 9a and 9b, and the side branches `claude/html-disable-sweep`, `claude/priceless-curie-c36f2d` and
+  `claude/hopeful-newton-94a051`), which merged `origin/main` at `8c8776e7e` on 2026-10-21 and at `132dcac3e` on
+  2026-10-22 (the merge entries below); it is not merged into `main` and not pushed. `origin/main` at `132dcac3e` is
+  `8c8776e7e`, the Editor font size shortcuts (`f77c41c94`) and the documentation commit that brings the guides up to
+  them; `origin/main` at `8c8776e7e` is `427321de4` and the two documentation commits that bring the guides up to it.
+  `origin/main` at `427321de4` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status Bar Keymap
+  actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise mode),
   the Editor's own typography and Markdown preview (SDK 0.18.3, Editor 0.11.0, Remote 0.15.1), the bundled Cygwin on
   Windows, Jasper Meadow as the default theme of both appearances in both looks, with a new Dark variant (`73c2b8f61`),
   and the website without its demo fixtures and preview pages (`375615bbf`); the Cygwin entry below, which says "merged
@@ -27,8 +30,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   (the side stripes as the rebased `e8ecfdcf2` to `faeec76f3`, which plan 15a's E15 leaves to confirm). The V1
   documentation overhaul (`claude/v1-docs`, with `origin/main` at `c6bb59fdd` merged in) is merged into `main`; its entry below, which
   ends "Not merged into `main`", was written before the merge. Since then `claude/v1-docs` has brought the guides up to
-  `427321de4`. Unmerged into `main`: this branch and `claude/test-isolation-leaks` (the Swing test-isolation guard, 3
-  commits).
+  `427321de4`, and `132dcac3e` up to the Editor font size shortcuts. Unmerged into `main`: this branch and
+  `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
 - **SDK** `0.21.0` (`JasperSdk.VERSION`, not shipped), with main's 0.18.2 and 0.18.3 additions; every bundled plugin
@@ -40,8 +43,9 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** This branch after plan 9b's final fix wave and its residual round (2026-10-22): 12,802
-  tests, 0 failures, 0 errors, 29 skipped. After the fix wave alone it had 12,796, after plan 9b's documentation commit
+- **Last recorded checks.** This branch with the side branches and `origin/main` at `132dcac3e` merged (2026-10-22):
+  12,823 tests, 0 failures, 0 errors, 29 skipped; after plan 9b's final fix wave and its residual round (2026-10-22)
+  12,802. After the fix wave alone it had 12,796, after plan 9b's documentation commit
   (2026-10-22) 12,777, and after plan 9a's final fix wave and its residual round (2026-10-21) 12,706. `./gradlew check`
   on `claude/editor-font-zoom` (`427321de4` with the Editor font size shortcuts, 2026-10-21): 11,893 tests, 0 failures,
   0 errors, 29 skipped; on local `main` with the Editor's typography and Markdown preview and the bundled Cygwin merged
@@ -74,9 +78,9 @@ Open items, as the entries below record them:
   Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
   Meadow splash, the Rail and Status Bar shortcuts (2026-10-20) and the Editor font size shortcuts (2026-10-21) await
   theirs. The workspace tabs series awaits the checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only
-  tab, plans 7a to 8c, 6a, 6b, 9a and 9b; plan 2 had none), and so do its two merge entries ("local main merged in",
-  2026-10-19, and the second sync, 2026-10-21). One AOT training run should confirm the seeded `workspace.toml`
-  (2026-10-21).
+  tab, plans 7a to 8c, 6a, 6b, 9a and 9b; plan 2 had none), and so do its merge entries ("local main merged in",
+  2026-10-19, the second sync, 2026-10-21, and the side branches with the third sync, 2026-10-22). One AOT training run
+  should confirm the seeded `workspace.toml` (2026-10-21).
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
@@ -98,6 +102,39 @@ Open items, as the entries below record them:
 ## Handoff log
 
 Newest first. Each entry describes its change as it stood when the entry was written.
+
+**Workspace tabs: the side branches and origin/main merged in (the third sync) — 2026-10-22**
+(`claude/workspace-tabs`, `be2fe2670..6bc961c6f`, then this entry). Four `git merge --no-ff`, in this order; both
+sides' intent kept in every conflict:
+1. `claude/html-disable-sweep` (`0f52f9ef9`, cut at `ff322c478`, before plans 9a and 9b), merge `6f6bf04be`: this file
+   (the sweep's entry below plan 9a's) and `docs/design/theme-engine/migration.csv` (9a's and 9b's rows, then the
+   sweep's). `c8a0d95ca` then applies the sweep's rule to the menus 9a and 9b added: Move Tab Into's entries and the tab
+   menu's item commands (the Editor's Split File Right and Down among them) come from `PlainText.item`; the right-click
+   menu's Split list and Move Pane to Tab take `PlainText::item`, so their items have `html.disable` before their
+   Action; the Editor's `DocumentArea.menuItem` sets it before a command's title, so the text menu's Split File items
+   are plain text (`EditorViewsTest.theRightClickMenusSplitFileItemsArePlainText`). The Tab menu's Move Pane to Tab
+   and Move Tab Into entries and `DocumentArea.submenu` and `plainItem` already set it first and keep it.
+2. `origin/main` at `132dcac3e`, merge `fa15bd9eb`: `claude/priceless-curie-c36f2d` was cut from `main` there, not from
+   this branch, so main's Editor font size shortcuts (`f77c41c94`) and their documentation commit came in first, on
+   their own. Nine files conflicted. `HostedContentTest` keeps both sides' tests, main's font size test opening its
+   tabs with `tabs().open` and reading `currentTerminal()`. The Editor, workspace, keyboard shortcuts, maintenance and
+   plugin guides, the SDK guide page and the SDK reference keep this branch's wording with main's `font-bigger`,
+   `font-smaller` and `font-reset`; the Editor guide's tab menu lists the three font size commands, and each view of a
+   file has its own font size (`EditorViewsTest.increaseFontSizeInOneViewLeavesTheFilesOtherViews`, `6bc961c6f`). This
+   file keeps the branch's header with main's check and GUI check, and main's entry between the second sync's and plan
+   6b's.
+3. `claude/priceless-curie-c36f2d` (`7e59bdc42`), merge `6240ec810`: this file only.
+4. `claude/hopeful-newton-94a051` (`2be1e468d`, cut at `2b168a6af`), merge `6f66a3603`: this file only (the GUI checks
+   item and its entry). Plans 9a and 9b left `dev.jasper.app.persistence` as it was, and `StartupBenchTest` passes on
+   the seed unchanged.
+
+The entries dated 2026-10-21 are in commit-time order. `./gradlew check --continue` (Python 3.13): after merge 1 and
+`c8a0d95ca` 12,812 tests, after merges 2 and 3 12,819, each with 0 failures, 0 errors and 29 skipped; after merge 4,
+while another worktree's tests held the Mac at load averages of 90 to 170, 9 `jasper-app` failures, 8 of them "Plugin
+workers did not finish resource cleanup after stop" and one `SingleInstanceTest` timing assertion, none in code the
+merge touched; once the load fell, **12,823 tests, 0 failures, 0 errors, 29 skipped**. GUI checks for the user: the
+merged entries' own, and Increase Font Size in one view of a file leaving its other views as they were. Not merged
+into `main`, not pushed.
 
 **Workspace tabs, plan 9b: two views of one file — 2026-10-22** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `ab55ecde6..e6c33c193`, the documentation commit `c098fcbc5`, then the final
