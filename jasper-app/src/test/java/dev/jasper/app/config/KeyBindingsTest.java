@@ -25,6 +25,9 @@ class KeyBindingsTest {
             ActionId.MOVE_PANE_TO_TAB_1, ActionId.MOVE_PANE_TO_TAB_2, ActionId.MOVE_PANE_TO_TAB_3, ActionId.MOVE_PANE_TO_TAB_4,
             ActionId.MOVE_PANE_TO_TAB_5, ActionId.MOVE_PANE_TO_TAB_6, ActionId.MOVE_PANE_TO_TAB_7, ActionId.MOVE_PANE_TO_TAB_8,
             ActionId.MOVE_PANE_TO_TAB_9,
+            ActionId.MOVE_TAB_INTO_TAB_1, ActionId.MOVE_TAB_INTO_TAB_2, ActionId.MOVE_TAB_INTO_TAB_3, ActionId.MOVE_TAB_INTO_TAB_4,
+            ActionId.MOVE_TAB_INTO_TAB_5, ActionId.MOVE_TAB_INTO_TAB_6, ActionId.MOVE_TAB_INTO_TAB_7, ActionId.MOVE_TAB_INTO_TAB_8,
+            ActionId.MOVE_TAB_INTO_TAB_9,
             ActionId.TOGGLE_ZEN_MODE, ActionId.TOGGLE_RAIL, ActionId.TOGGLE_STATUS_BAR,
             ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT,
             ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
@@ -157,6 +160,23 @@ class KeyBindingsTest {
             .isThrownBy(() -> KeyBindings.withOverrides(false, Map.of("split_down", "cmd+shift+d")))
             .withMessageContaining("split_right")
             .withMessageContaining("split_down");
+    }
+
+    /**
+     * Pane flexibility spec 5 (workspace plan 9a Rulings 22): Move Tab Into Tab 1 to 9 have no default, take a key of
+     * their own, and a key another action holds collides as any action's does.
+     */
+    @Test
+    void moveTabIntoTabNTakesAKeyOfItsOwnAndCollidesAsAnyAction() {
+        for (boolean mac : new boolean[]{true, false}) {
+            String key = mac ? "ctrl+cmd+j" : "ctrl+alt+shift+j";
+            assertThat(KeyBindings.withOverrides(mac, Map.of("move_tab_into_tab_2", key)).strokeFor(ActionId.MOVE_TAB_INTO_TAB_2))
+                .isEqualTo(KeyBindings.parse(key, mac));
+            String taken = mac ? "cmd+2" : "ctrl+2";
+            assertThatIllegalArgumentException()
+                .isThrownBy(() -> KeyBindings.withOverrides(mac, Map.of("move_tab_into_tab_2", taken)))
+                .withMessageContaining("move_tab_into_tab_2").withMessageContaining("select_tab_2");
+        }
     }
 
     @Test

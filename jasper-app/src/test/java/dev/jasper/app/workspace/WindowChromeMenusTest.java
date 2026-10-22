@@ -111,6 +111,8 @@ class WindowChromeMenusTest {
                 .containsSubsequence("submenu:Split", "Move Pane to New Tab", "submenu:Move Pane to Tab", "Next Prompt", "---", "Next Tab",
                     "Previous Tab", "---",
                     "split", "---", "Toggle Hosts");
+            assertThat(window).as("Move Pane to Tab and Move Tab Into right after Move Pane to New Tab")
+                .containsSequence("Move Pane to New Tab", "submenu:Move Pane to Tab", "submenu:Move Tab Into");
             assertThat(window.getLast()).as("the tool-window toggles close the menu").isEqualTo("Toggle Hosts");
             var split = (JMenu) menu(owner, "Window").getMenuComponent(0);
             assertThat(items(split)).containsExactly("Terminal Right", "Terminal Down", "Sketch Right", "Sketch Down");
@@ -120,6 +122,28 @@ class WindowChromeMenusTest {
             var standard = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             standard.connectContributions(model);
             assertThat(items(menu(standard, "View"))).as("the default look keeps them in View").contains("submenu:Tool Windows");
+        });
+    }
+
+    /**
+     * Pane flexibility spec 4 and 5 (workspace plan 9a Rulings 22): the classic Window menu, which holds the Tab menu's
+     * items, fills its Move Pane to Tab and Move Tab Into submenus as it opens, each with the window's other tab.
+     */
+    @Test void theClassicWindowMenuFillsItsMoveSubmenusAsItOpens() throws Exception {
+        edt(() -> {
+            var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), classic());
+            owner.connectContributions(model(false));
+            owner.newTab(DesktopTestSupport.HOME);
+            JMenu window = menu(owner, "Window");
+            for (var listener : window.getMenuListeners()) listener.menuSelected(new javax.swing.event.MenuEvent(window));
+            for (String title : List.of("Move Pane to Tab", "Move Tab Into")) {
+                JMenu moves = null;
+                for (Component child : window.getMenuComponents())
+                    if (child instanceof JMenu sub && title.equals(sub.getText())) moves = sub;
+                assertThat(moves).as(title).isNotNull();
+                assertThat(moves.isEnabled()).as("%s offers the other tab", title).isTrue();
+                assertThat(items(moves)).as(title).singleElement().satisfies(text -> assertThat(text).startsWith("1 "));
+            }
         });
     }
 

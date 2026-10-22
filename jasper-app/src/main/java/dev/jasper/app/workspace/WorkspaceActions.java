@@ -1,12 +1,14 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.contributions.OtherTab;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.terminal.view.TerminalAction;
 import dev.jasper.terminal.view.TerminalView;
 import java.awt.event.ActionEvent;
 import java.util.EnumMap;
+import java.util.List;
 import javax.swing.*;
 
 /** Window-local action table and dispatch; all lookups resolve the current pane on the EDT. */
@@ -64,6 +66,9 @@ final class WorkspaceActions {
             case MOVE_PANE_TO_TAB_1, MOVE_PANE_TO_TAB_2, MOVE_PANE_TO_TAB_3, MOVE_PANE_TO_TAB_4, MOVE_PANE_TO_TAB_5,
                  MOVE_PANE_TO_TAB_6, MOVE_PANE_TO_TAB_7, MOVE_PANE_TO_TAB_8, MOVE_PANE_TO_TAB_9 ->
                 owner.moveToTab(owner.selectedTab(), id.ordinal() - ActionId.MOVE_PANE_TO_TAB_1.ordinal());
+            case MOVE_TAB_INTO_TAB_1, MOVE_TAB_INTO_TAB_2, MOVE_TAB_INTO_TAB_3, MOVE_TAB_INTO_TAB_4, MOVE_TAB_INTO_TAB_5,
+                 MOVE_TAB_INTO_TAB_6, MOVE_TAB_INTO_TAB_7, MOVE_TAB_INTO_TAB_8, MOVE_TAB_INTO_TAB_9 ->
+                owner.moveTabIntoTab(owner.activeParentTab(), id.ordinal() - ActionId.MOVE_TAB_INTO_TAB_1.ordinal());
             case OPEN_FILE -> owner.openFile();
             case QUIT -> owner.requestQuit();
             case CLOSE_PANE -> owner.closeTab(owner.selectedTab());
@@ -100,6 +105,11 @@ final class WorkspaceActions {
         owner.update();
     }
 
+    /** Whether {@code targets} offer the tab at {@code index} of the strip, 0 for the first. */
+    private static boolean offers(List<OtherTab> targets, int index) {
+        return targets.stream().anyMatch(other -> other.number() == index + 1);
+    }
+
     private static String contentCommand(ActionId id) {
         return switch (id) {
             case FIND -> "find"; case FIND_NEXT -> "find-next"; case FIND_PREVIOUS -> "find-previous";
@@ -116,6 +126,9 @@ final class WorkspaceActions {
             var content = owner.selectedContent();
             boolean ready = present && pane.view() != null;
             boolean running = present && pane.running();
+            // The tabs Move Pane to Tab and Move Tab Into offer, once a pass (pane flexibility spec 4 and 5).
+            var paneTargets = owner.paneTargets(owner.selectedTab());
+            var tabTargets = owner.tabTargets(owner.activeParentTab());
             for (ActionId id : ActionId.values()) {
                 String contentKey = contentCommand(id);
                 // A plugin's item closes through its own close request (workspace plan 8a Rulings 15).
@@ -137,7 +150,12 @@ final class WorkspaceActions {
                     // flexibility spec 4).
                     case MOVE_PANE_TO_TAB_1, MOVE_PANE_TO_TAB_2, MOVE_PANE_TO_TAB_3, MOVE_PANE_TO_TAB_4, MOVE_PANE_TO_TAB_5,
                          MOVE_PANE_TO_TAB_6, MOVE_PANE_TO_TAB_7, MOVE_PANE_TO_TAB_8, MOVE_PANE_TO_TAB_9 ->
-                        owner.mayMoveToTab(owner.selectedTab(), id.ordinal() - ActionId.MOVE_PANE_TO_TAB_1.ordinal());
+                        offers(paneTargets, id.ordinal() - ActionId.MOVE_PANE_TO_TAB_1.ordinal());
+                    // So for the shown tab, and a tab holding an item that may not move (pane flexibility spec 5;
+                    // workspace plan 9a Rulings 22).
+                    case MOVE_TAB_INTO_TAB_1, MOVE_TAB_INTO_TAB_2, MOVE_TAB_INTO_TAB_3, MOVE_TAB_INTO_TAB_4, MOVE_TAB_INTO_TAB_5,
+                         MOVE_TAB_INTO_TAB_6, MOVE_TAB_INTO_TAB_7, MOVE_TAB_INTO_TAB_8, MOVE_TAB_INTO_TAB_9 ->
+                        offers(tabTargets, id.ordinal() - ActionId.MOVE_TAB_INTO_TAB_1.ordinal());
                     case TOGGLE_ZEN_MODE -> owner.isMain();
                     // A child window has no status bar or rail of its own (workspace tabs spec 6.3).
                     case TOGGLE_RAIL, TOGGLE_STATUS_BAR -> owner.isMain() && !owner.zenMode();

@@ -1695,6 +1695,31 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
+     * Whether Move Tab Into would move the tab {@code id} into the tab at {@code index} of this window's strip: one of
+     * {@link #tabTargets}, so another tab than {@code id}.
+     *
+     * @param id a tab of this window, or null
+     * @param index a place in the strip, 0 for the first
+     * @return whether it would move
+     */
+    boolean mayMoveTabIntoTab(ParentTabId id, int index) {
+        return tabTargets(id).stream().anyMatch(other -> other.number() == index + 1);
+    }
+
+    /**
+     * Move Tab Into Tab 1 to 9, and the Tab menu's Move Tab Into (pane flexibility spec 5; workspace plan 9a Rulings
+     * 22): every pane of the tab {@code id} goes to the right of the active pane of the tab at {@code index} of the
+     * strip, as {@link #moveTabInto(ParentTabId, ParentTabId)} moves them. Nothing when {@link #mayMoveTabIntoTab} says
+     * no.
+     *
+     * @param id a tab of this window, or null
+     * @param index a place in the strip, 0 for the first
+     */
+    void moveTabIntoTab(ParentTabId id, int index) {
+        if (mayMoveTabIntoTab(id, index)) moveTabInto(id, parentTabs.views().get(index).id());
+    }
+
+    /**
      * Move Tab Into's submenu for the tab {@code parent} (pane flexibility spec 5; workspace plan 9a Rulings 9): an entry
      * for each other tab of the window, its number and title as plain text, that moves every pane of {@code parent} into
      * that tab; disabled while there is none.

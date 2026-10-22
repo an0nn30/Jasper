@@ -13,6 +13,7 @@ import dev.jasper.app.commands.Command;
 import dev.jasper.app.contributions.MenuEntry;
 import dev.jasper.app.contributions.MenuSection;
 import dev.jasper.app.contributions.MenuTarget;
+import dev.jasper.app.contributions.OtherTab;
 import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -473,19 +474,24 @@ final class WindowChrome {
 
     /**
      * Tab (workspace plan 8b Rulings 10): the Split submenu {@code split}, Move Pane to New Tab, Move Pane to Tab (pane
-     * flexibility spec 4), focusing panes and moving between prompts, a rule, Rename Tab, a rule, the tab commands.
+     * flexibility spec 4), Move Tab Into (spec 5; workspace plan 9a Rulings 22), focusing panes and moving between
+     * prompts, a rule, Rename Tab, a rule, the tab commands.
      */
     private JMenu tabMenu(JMenu split) {
         JMenu menu = menu("Tab");
         menu.add(split);
         for (ActionId id : GROUP_ITEMS) {
             menu.add(new MenuBarItems.Item(owner.action(id)));
-            // Move Pane to Tab follows Move Pane to New Tab (pane flexibility spec 4); the menu fills it as it opens, since
-            // the window's tabs are not there yet while its chrome is built.
+            // Move Pane to Tab follows Move Pane to New Tab (pane flexibility spec 4), and Move Tab Into follows it
+            // (spec 5); the menu fills them as it opens, since the window's tabs are not there yet while its chrome is
+            // built.
             if (id == ActionId.MOVE_PANE_TO_NEW_TAB) {
                 JMenu moves = menu("Move Pane to Tab");
                 moves.setName(PANE_MOVES);
                 menu.add(moves);
+                JMenu into = menu("Move Tab Into");
+                into.setName(TAB_MOVES);
+                menu.add(into);
             }
         }
         menu.addSeparator();
@@ -535,6 +541,8 @@ final class WindowChrome {
 
     /** The name of a Move Pane to Tab submenu, which the menu holding it fills as it opens ({@link #observe}). */
     static final String PANE_MOVES = "movePaneToTab";
+    /** The name of the Tab menu's Move Tab Into submenu, which the menu holding it fills as it opens. */
+    static final String TAB_MOVES = "moveTabInto";
 
     /**
      * Fills {@code moves}, a Move Pane to Tab submenu (pane flexibility spec 4; workspace plan 9a Rulings 5 and 6), for
@@ -547,13 +555,35 @@ final class WindowChrome {
      * @return the submenu
      */
     private JMenu paneMoves(JMenu moves, java.util.function.Function<Action, JMenuItem> item) {
+        return fillMoves(moves, owner.paneTargets(owner.selectedTab()), ActionId.MOVE_PANE_TO_TAB_1,
+            index -> owner.moveToTab(owner.selectedTab(), index), item);
+    }
+
+    /**
+     * Fills {@code moves}, the Tab menu's Move Tab Into submenu (pane flexibility spec 5; workspace plan 9a Rulings
+     * 22), for the window's shown tab, as {@link #paneMoves} fills Move Pane to Tab: an entry for each other tab, its
+     * number and title as plain text, that moves every pane of the shown tab there; the first nine run Move Tab Into
+     * Tab 1 to 9 and show their keys. Disabled while there is none: one tab, or a tab holding an item that may not
+     * move.
+     */
+    private JMenu tabMoves(JMenu moves) {
+        return fillMoves(moves, owner.tabTargets(owner.activeParentTab()), ActionId.MOVE_TAB_INTO_TAB_1,
+            index -> owner.moveTabIntoTab(owner.activeParentTab(), index), MenuBarItems.Item::new);
+    }
+
+    /**
+     * Fills {@code moves} with an entry for each of {@code targets}, its number and title as plain text: the first nine
+     * run the action numbered as it from {@code first} and show its keys, a later one runs {@code beyond} with its
+     * place in the strip. Disabled while there is no target.
+     */
+    private JMenu fillMoves(JMenu moves, List<OtherTab> targets, ActionId first, java.util.function.IntConsumer beyond,
+                            java.util.function.Function<Action, JMenuItem> item) {
         moves.removeAll();
-        var targets = owner.paneTargets(owner.selectedTab());
         for (var target : targets) {
             int index = target.number() - 1;
-            Action run = index < 9 ? owner.action(ActionId.values()[ActionId.MOVE_PANE_TO_TAB_1.ordinal() + index])
+            Action run = index < 9 ? owner.action(ActionId.values()[first.ordinal() + index])
                 : new AbstractAction() {
-                    @Override public void actionPerformed(ActionEvent event) { owner.moveToTab(owner.selectedTab(), index); }
+                    @Override public void actionPerformed(ActionEvent event) { beyond.accept(index); }
                 };
             JMenuItem built = item.apply(run);
             built.setHideActionText(true);
@@ -567,10 +597,13 @@ final class WindowChrome {
         return moves;
     }
 
-    /** Fills each Move Pane to Tab submenu {@code menu} holds, as {@code menu} opens. */
+    /** Fills each Move Pane to Tab and Move Tab Into submenu {@code menu} holds, as {@code menu} opens. */
     private void refreshPaneMoves(JMenu menu) {
-        for (Component child : menu.getMenuComponents())
-            if (child instanceof JMenu moves && PANE_MOVES.equals(moves.getName())) paneMoves(moves, MenuBarItems.Item::new);
+        for (Component child : menu.getMenuComponents()) {
+            if (!(child instanceof JMenu moves)) continue;
+            if (PANE_MOVES.equals(moves.getName())) paneMoves(moves, MenuBarItems.Item::new);
+            else if (TAB_MOVES.equals(moves.getName())) tabMoves(moves);
+        }
     }
 
     /** One item per tool window whose toggle action this window has, in registration order. */

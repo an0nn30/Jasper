@@ -58,6 +58,15 @@ class KeymapDefaultsTest {
         new Row("move_pane_to_tab_7", KeyContext.GLOBAL, "none", "none"),
         new Row("move_pane_to_tab_8", KeyContext.GLOBAL, "none", "none"),
         new Row("move_pane_to_tab_9", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_1", KeyContext.GLOBAL, "none", "none"),                     // pane flexibility spec 5
+        new Row("move_tab_into_tab_2", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_3", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_4", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_5", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_6", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_7", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_8", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_9", KeyContext.GLOBAL, "none", "none"),
         new Row("toggle_zen_mode", KeyContext.GLOBAL, "none", "none"),                       // Zen follow-up
         new Row("toggle_rail", KeyContext.GLOBAL, "none", "none"),                           // 57
         new Row("toggle_status_bar", KeyContext.GLOBAL, "none", "none"),                     // 59

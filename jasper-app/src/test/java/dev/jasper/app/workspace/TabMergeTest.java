@@ -7,7 +7,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.appearance.ThemeTestSupport;
+import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.AnimationSettings;
+import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.OtherTab;
 import dev.jasper.app.contributions.Tab;
@@ -31,12 +33,14 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import javax.swing.JComponent;
 import javax.swing.JLayeredPane;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import javax.swing.event.MenuEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -596,6 +600,140 @@ class TabMergeTest {
                 assertThat(((JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
                     .as("%s renders no HTML", ((JMenuItem) child).getText()).isNull();
             }
+        });
+    }
+
+    /** The menu bar's Tab menu, opened as a click opens it, which fills its Move Tab Into submenu. */
+    private JMenu tabMenu() {
+        var bar = owner.menuBar();
+        for (int i = 0; i < bar.getMenuCount(); i++) {
+            JMenu menu = bar.getMenu(i);
+            if (menu == null || !"Tab".equals(menu.getText())) continue;
+            for (var listener : menu.getMenuListeners()) listener.menuSelected(new MenuEvent(menu));
+            return menu;
+        }
+        throw new AssertionError("no Tab menu");
+    }
+
+    /** The Tab menu's Move Tab Into submenu, filled for the window's shown tab. */
+    private JMenu tabMenuInto() {
+        for (Component child : tabMenu().getMenuComponents())
+            if (child instanceof JMenu moves && "Move Tab Into".equals(moves.getText())) return moves;
+        throw new AssertionError("no Move Tab Into in the Tab menu");
+    }
+
+    /** Where the entry reading {@code text} sits among {@code menu}'s children. */
+    private static int place(JMenu menu, String text) {
+        Component[] children = menu.getMenuComponents();
+        for (int i = 0; i < children.length; i++) if (children[i] instanceof JMenuItem item && text.equals(item.getText())) return i;
+        throw new AssertionError("no " + text + " in " + texts(menu));
+    }
+
+    /**
+     * Pane flexibility spec 5 and workspace plan 9a Rulings 22: the Tab menu's Move Tab Into, right after Move Pane to
+     * Tab, lists the window's other tabs for its shown tab, numbered as Select Tab numbers them, as plain text; an
+     * entry moves every pane of the shown tab to the right of that tab's active pane, as a tab's own menu moves them.
+     */
+    @Test void theTabMenusMoveTabIntoFollowsMovePaneToTabAndMovesTheShownTab() throws Exception {
+        edt(() -> {
+            Tab bold = view("<html><b>B", TabRegistry.Placement.NEW_TAB);
+            owner.selectTab(b);
+            JMenu tab = tabMenu();
+            assertThat(place(tab, "Move Tab Into")).as("right after Move Pane to Tab").isEqualTo(place(tab, "Move Pane to Tab") + 1);
+            JMenu moves = tabMenuInto();
+            assertThat(texts(moves)).as("the shown tab's others").containsExactly("2 d", "3 e", "4 <html><b>B");
+            assertThat(moves.isEnabled()).isTrue();
+            for (Component child : moves.getMenuComponents()) {
+                assertThat(((JMenuItem) child).getClientProperty("html.disable"))
+                    .as("%s disables HTML", ((JMenuItem) child).getText()).isEqualTo(Boolean.TRUE);
+                assertThat(((JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
+                    .as("%s renders no HTML", ((JMenuItem) child).getText()).isNull();
+            }
+            assertThat(entry(moves, "2 d").getAccelerator()).as("Move Tab Into Tab 2, unbound by default").isNull();
+            facts.clear();
+            entry(moves, "2 d").doClick();
+            assertThat(ids()).as("its entry goes").containsExactly(second, third, owner.parentTabOf(bold).orElseThrow());
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+            assertThat(PaneDragTest.shape(owner)).as("to the right of d, as one nested split").isEqualTo("V[c, H[d, a, b]]");
+            assertThat(owner.selectedTab()).as("the moved tab's active pane has the focus").isSameAs(b);
+            assertThat(announced()).as("its item stays selected for the registry").isEmpty();
+        });
+    }
+
+    /**
+     * Pane flexibility spec 5 and workspace plan 9a Rulings 22: Move Tab Into Tab 1 to 9 are keymap actions with no
+     * default, in the palette, that move the shown tab into the tab numbered so; the shown tab's own number, a number
+     * no tab has, and a tab holding an item that may not move do nothing.
+     */
+    @Test void moveTabIntoTabNIsAnUnboundActionThatMovesTheShownTab() throws Exception {
+        edt(() -> {
+            for (ActionId id : ActionId.values()) if (id.id().startsWith("move_tab_into_tab_")) {
+                assertThat(owner.bindings().strokeFor(id)).as("%s has no default key", id).isEmpty();
+                assertThat(owner.commands().find(id.id())).as("%s is in the palette", id).isPresent();
+            }
+            owner.updateActions();
+            assertThat(owner.action(ActionId.MOVE_TAB_INTO_TAB_1).isEnabled()).as("the shown tab's own").isFalse();
+            assertThat(owner.action(ActionId.MOVE_TAB_INTO_TAB_3).isEnabled()).isTrue();
+            assertThat(owner.action(ActionId.MOVE_TAB_INTO_TAB_4).isEnabled()).as("no fourth tab").isFalse();
+            owner.invoke(ActionId.MOVE_TAB_INTO_TAB_1);
+            owner.invoke(ActionId.MOVE_TAB_INTO_TAB_4);
+            owner.moveTabIntoTab(first, 0);
+            owner.moveTabIntoTab(first, 7);
+            assertThat(ids()).as("nothing moved").containsExactly(first, second, third);
+            var held = a.pin();
+            try {
+                owner.updateActions();
+                assertThat(owner.action(ActionId.MOVE_TAB_INTO_TAB_3).isEnabled()).as("a dialog open in a pane").isFalse();
+                assertThat(tabMenuInto().isEnabled()).isFalse();
+                owner.invoke(ActionId.MOVE_TAB_INTO_TAB_3);
+                assertThat(ids()).containsExactly(first, second, third);
+            } finally {
+                held.close();
+            }
+            facts.clear();
+            owner.invoke(ActionId.MOVE_TAB_INTO_TAB_3);
+            assertThat(ids()).containsExactly(second, third);
+            assertThat(owner.activeParentTab()).isEqualTo(third);
+            assertThat(PaneDragTest.shape(owner)).as("to the right of e").isEqualTo("H[e, a, b]");
+            assertThat(owner.selectedTab()).isSameAs(b);
+            assertThat(announced()).as("its item stays selected for the registry").isEmpty();
+            owner.updateActions();
+            assertThat(owner.action(ActionId.MOVE_TAB_INTO_TAB_1).isEnabled()).as("the other tab, now the first").isTrue();
+            assertThat(owner.action(ActionId.MOVE_TAB_INTO_TAB_2).isEnabled()).as("the shown tab, now the second").isFalse();
+        });
+    }
+
+    /** Pane flexibility spec 5: in a window of one tab, the Tab menu's Move Tab Into offers none and is disabled. */
+    @Test void theTabMenusMoveTabIntoInAWindowOfOneTabIsDisabled() throws Exception {
+        edt(() -> {
+            owner.moveTabInto(second, first);
+            owner.moveTabInto(third, first);
+            assertThat(ids()).containsExactly(first);
+            assertThat(tabMenuInto().isEnabled()).isFalse();
+            assertThat(texts(tabMenuInto())).isEmpty();
+            owner.updateActions();
+            for (ActionId id : ActionId.values()) if (id.id().startsWith("move_tab_into_tab_"))
+                assertThat(owner.action(id).isEnabled()).as("%s", id).isFalse();
+        });
+    }
+
+    /** Pane flexibility spec 5: a key bound to Move Tab Into Tab 2 shows on its entry; past nine, all tabs show. */
+    @Test void aKeyBoundToMoveTabIntoTabShowsOnItsEntryAndPastNineEveryTabIsListed() throws Exception {
+        boolean macOs = System.getProperty("os.name").startsWith("Mac");
+        edt(() -> {
+            owner.setBindings(KeyBindings.withOverrides(macOs, Map.of("move_tab_into_tab_2", "alt+shift+j")));
+            var keys = KeyBindings.parse("alt+shift+j", macOs).orElseThrow();
+            assertThat(owner.bindings().strokeFor(ActionId.MOVE_TAB_INTO_TAB_2)).contains(keys);
+            assertThat(entry(tabMenuInto(), "2 d").getAccelerator()).isEqualTo(keys);
+            for (String title : List.of("f", "g", "h", "i", "j", "k", "l")) view(title, TabRegistry.Placement.NEW_TAB);
+            owner.selectTab(b);
+            JMenu moves = tabMenuInto();
+            assertThat(texts(moves)).hasSize(9).startsWith("2 d").endsWith("10 l");
+            assertThat(entry(moves, "10 l").getAccelerator()).as("no action of its own").isNull();
+            entry(moves, "10 l").doClick();
+            assertThat(ids()).doesNotContain(first);
+            assertThat(PaneDragTest.shape(owner)).isEqualTo("H[l, a, b]");
+            assertThat(owner.selectedTab()).isSameAs(b);
         });
     }
 
