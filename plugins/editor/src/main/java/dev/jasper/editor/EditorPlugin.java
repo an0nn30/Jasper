@@ -181,8 +181,9 @@ public final class EditorPlugin implements Plugin {
             int prefix = key.indexOf(':');
             if (document.isEmpty()) return Optional.of(reopeners.handles(key) ? "its file can no longer be opened"
                 : prefix < 1 ? "no running plugin opens this document" : "no running plugin opens " + key.substring(0, prefix + 1) + " documents");
-            return window().openRestored(document.get().apply(request.window()), request.window())
-                ? Optional.empty() : Optional.of("the file is open in another tab");
+            // Pane flexibility spec 6: a file already open comes back as another view of it.
+            window().openRestored(document.get().apply(request.window()), request.window());
+            return Optional.empty();
         });
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);

@@ -230,11 +230,14 @@ class EditorWindowTest {
     /** Workspace plan 6b's review: a document that comes back is not an open, so Recent Files does not record it. */
     @Test void aRestoredDocumentIsNotRecordedAsOpened() throws Exception {
         Path file = file("restored.txt", "text\n");
-        assertThat(window.openRestored(new LocalDocument(file, context.background()), null)).isTrue();
+        window.openRestored(new LocalDocument(file, context.background()), null);
         drain();
         assertThat(window.sessions()).singleElement().extracting(DocumentSession::state).isEqualTo(DocumentSession.State.READY);
         assertThat(recorded).isEmpty();
-        assertThat(window.openRestored(new LocalDocument(file, context.background()), null)).as("open already").isFalse();
+        window.openRestored(new LocalDocument(file, context.background()), null);
+        assertThat(window.sessions()).as("open already: it comes back as another view of the file").hasSize(1);
+        assertThat(host.contentTabs()).hasSize(2);
+        assertThat(recorded).isEmpty();
         window.openLocal(file);
         assertThat(recorded).as("opening it as usual is recorded").containsExactly(LocalDocument.key(file));
     }
@@ -252,7 +255,7 @@ class EditorWindowTest {
         window.openLocal(file("used.txt", "used\n"), used);
         drain();
         host.contentTabs().getLast().close();
-        assertThat(window.openRestored(new LocalDocument(file("restored.txt", "restored\n"), context.background()), restored)).isTrue();
+        window.openRestored(new LocalDocument(file("restored.txt", "restored\n"), context.background()), restored);
         drain();
         assertThat(host.contentOwner(host.contentTabs().getLast())).as("restored where it was saved").isEqualTo(restored);
         host.contentTabs().getLast().close();

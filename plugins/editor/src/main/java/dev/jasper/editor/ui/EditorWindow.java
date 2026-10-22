@@ -234,24 +234,28 @@ public final class EditorWindow {
      * Opens a document Jasper restores with its windows (workspace tabs spec 13): its tab is placed where it was saved, not
      * selected. A document on another host waits until its tab is first active, or Load is pressed, and then reads without
      * asking anything ({@code EditorDocument.readQuietly}); Retry then reads it as usual, which may sign in. Recent Files
-     * does not record it: coming back is not an open (workspace plan 6b's review).
+     * does not record it: coming back is not an open (workspace plan 6b's review). A document already open comes back as
+     * another view of it (pane flexibility spec 6), which reads nothing: a file's views share one read, which waits for
+     * the first of them to be active when the file is on another host.
      *
      * @param document the saved document
      * @param owner the window being restored
-     * @return false when the document is open already, and no tab opened
      */
-    public boolean openRestored(EditorDocument document, WindowOwner owner) {
-        if (model.find(document.key()).isPresent()) return false;
+    public void openRestored(EditorDocument document, WindowOwner owner) {
+        Optional<DocumentSession> open = model.find(document.key());
         var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
-        var created = new DocumentSession(document, sessionEnvironment(ref));
+        DocumentSession created = open.isPresent() ? null : new DocumentSession(document, sessionEnvironment(ref));
         // The tab opens in the window being restored, which the user did not choose: the Editor's prompts and its own
         // open command keep the window they used before (workspace plan 6b's final review, M4).
         WindowOwner chosen = origin;
         origin = owner;
-        try { add(created, ref); }
+        try {
+            if (created == null) addView(open.get(), dev.jasper.sdk.ui.TabPlacement.NEW_TAB, views(open.get()).getFirst());
+            else add(created, ref);
+        }
         finally { origin = chosen; }
+        if (created == null) return;
         if (document.host().isPresent()) created.defer(); else created.load();
-        return true;
     }
 
     /** @param document opened in a new tab, or its open tab selected, of several the one focused last; the window comes to the front */

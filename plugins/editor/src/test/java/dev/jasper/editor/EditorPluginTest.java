@@ -408,7 +408,7 @@ class EditorPluginTest {
 
     /**
      * Workspace tabs spec 13: a restored document on another host waits until its tab is first active, then reads asking
-     * nothing; a document already open restores no second tab.
+     * nothing; a document already open comes back as another view of it, which reads nothing (pane flexibility spec 6).
      */
     @Test void aRestoredRemoteDocumentReadsQuietlyOnlyOnceItsTabIsActive() throws Exception {
         try (var host = host()) {
@@ -454,8 +454,70 @@ class EditorPluginTest {
             tab.select();
             drain(host);
             assertThat(quiet.get() + loud.get()).as("selected again, not read again").isEqualTo(1);
-            assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", state)).as("already open").isEmpty();
-            assertThat(host.declinedRestores()).singleElement().asString().contains("the file is open in another tab");
+            assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", state)).as("already open: another view of it").isPresent();
+            drain(host);
+            assertThat(host.declinedRestores()).isEmpty();
+            assertThat(host.contentTabs()).as("two views of notes.md, and other.md").hasSize(3);
+            assertThat(quiet.get() + loud.get()).as("the new view shares the file's one read").isEqualTo(1);
+        }
+    }
+
+    /**
+     * Pane flexibility spec 6: every view of a file comes back, each saved with the file's key; a remote file's views
+     * wait, and the first of them shown reads the file once, quietly, for all of them; a local file's views share one
+     * read too.
+     */
+    @Test void everyViewOfAFileComesBackAndItsFileIsReadOnceForAllOfThem() throws Exception {
+        var plugin = plugin();
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID main = host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            var reads = new java.util.concurrent.atomic.AtomicInteger();
+            dev.jasper.editor.api.EditorDocument remote = new dev.jasper.editor.api.EditorDocument() {
+                @Override public String key() { return "test:/srv/two.md"; }
+                @Override public String name() { return "two.md"; }
+                @Override public String location() { return "box:/srv/two.md"; }
+                @Override public Optional<String> host() { return Optional.of("box"); }
+                @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> read(long limitBytes) {
+                    reads.incrementAndGet();
+                    byte[] text = "# two\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    return java.util.concurrent.CompletableFuture.completedFuture(new dev.jasper.editor.api.Content(text, new dev.jasper.editor.api.Revision(1, text.length)));
+                }
+                @Override public java.util.concurrent.CompletableFuture<Optional<dev.jasper.editor.api.Revision>> revision() {
+                    return java.util.concurrent.CompletableFuture.completedFuture(Optional.empty());
+                }
+                @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Revision> write(byte[] content) {
+                    return java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("read only"));
+                }
+            };
+            consumer.get().services().require(Editor.class).reopener("test:", key -> Optional.of(owner -> remote));
+            var state = dev.jasper.sdk.RestoreState.of("document", "key", remote.key());
+            assertThat(host.restoreTab("dev.jasper.editor", main, "two.md", state)).isPresent();
+            assertThat(host.restoreTab("dev.jasper.editor", main, "two.md", state)).as("another view of it").isPresent();
+            drain(host);
+            assertThat(reads).as("both views wait").hasValue(0);
+            var views = List.copyOf(host.contentTabs());
+            assertThat(views).hasSize(2).allSatisfy(tab -> assertThat(host.restoreState(tab)).contains(state));
+            views.getLast().select();
+            drain(host);
+            assertThat(reads).as("one read for both views").hasValue(1);
+            views.getFirst().select();
+            drain(host);
+            assertThat(reads).hasValue(1);
+            Path notes = Files.writeString(home.resolve("notes.md"), "# notes\n");
+            var local = dev.jasper.sdk.RestoreState.of("document", "key", "local:" + notes.toAbsolutePath().normalize());
+            assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", local)).isPresent();
+            assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", local)).isPresent();
+            drain(host);
+            var windowField = EditorPlugin.class.getDeclaredField("window");
+            windowField.setAccessible(true);
+            var window = (EditorWindow) windowField.get(plugin);
+            assertThat(window.sessions()).as("two files, four views").hasSize(2);
+            assertThat(host.contentTabs()).hasSize(4);
+            assertThat(host.declinedRestores()).isEmpty();
+            assertThat(host.failures()).isEmpty();
         }
     }
 
