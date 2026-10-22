@@ -437,6 +437,20 @@ GUI checks for the user:
 
 Not merged, not pushed.
 
+**Staged transfer test waits for its enqueue — 2026-10-21** (`claude/priceless-curie-c36f2d`, worktree
+`.claude/worktrees/priceless-curie-c36f2d`, from `main` at `132dcac3e`; not merged or pushed):
+`StagedTransferLifecycleTest` timed out now and then under a full `check` at `enqueued.get(5, SECONDS)`. The enqueue
+runs once the Remote coordinator's control loop has opened its SQLite queue, and each case's new plugin class loader
+makes its first connection extract and load sqlite-jdbc's native library, after listing all of `java.io.tmpdir`. That
+took 1.5–2 s on the idle dev Mac and 9–24 s under CPU load. Timestamps showed the command queued throughout and run
+within 7 ms of the queue opening: no ordering race in the host's drain or the transfer queue. The test now waits with
+`join()`, and the suite's 5-minute default timeout catches a hang; test-only change. Before it, 12 CPU burners failed
+3 of 3 runs; after it, 50 runs in a row passed under 10 burners (every case 5.1–22.2 s). Most of the idle cost is the
+listing: the dev Mac's user temp dir holds about 223,000 entries, mostly `plugin-fixture*` and `jasper-contract*`
+folders that `PluginJars.build` and `AppContractTest` leave behind on every run. Full headless `check` passed on macOS:
+11,893 tests, zero failures/errors, 29 skips; its first run's one failure, `EditorCommandsTest`'s 10-second wait for
+`/bin/sh` while the machine was loaded, passed on the rerun.
+
 **External text stays plain text — 2026-10-21** (`claude/html-disable-sweep`, from `claude/workspace-tabs` at
 `ff322c478`; not merged, not pushed). Swing builds a text's HTML view when a component's UI is installed (at
 construction) and when its text, font or foreground changes, and reads `html.disable` only then; a tooltip does not
