@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.WeakHashMap;
 import java.util.function.Supplier;
 import javax.swing.AbstractButton;
 import javax.swing.JLayeredPane;
@@ -58,20 +59,22 @@ import javax.swing.text.JTextComponent;
  * label beside the cursor and the target window's layered pane shows where it would land ({@link DockDropOverlay});
  * nothing moves until the release.
  * <p>The target: of the windows under the cursor that can take a drop (on macOS none in full screen on the display of
- * the drag's own window but that window), the most recently active. For a tab, over its strip, the place before the
- * first of the strip's other entries whose middle is not left of the cursor, where the entries take their new places at
- * once on the release; a window whose strip hides (the standard look's one tab) takes it at its end over the band its
- * strip takes when it shows, and the main window's empty workspace, which has no panes, anywhere over it, in its place.
- * Over a pane of a window's shown tab other than the dragged tab's own, beside that pane on the side whose edge the
- * cursor is nearest, every pane of the tab as one nested split (pane flexibility spec 5). Spring-loading shows the tabs
- * whose panes take it: the entry resting on another tab's entry of a strip, any window's, for {@link #SPRING_DELAY} ms,
- * within {@link #SPRING_SLOP} px of where it came to rest, shows that tab at once, as a pane drag's hover does, so in the
- * drag's own window, which shows the dragged tab, its other tabs' panes take it too. Anywhere else in that window (its
- * dock, chrome or title bar), and over any other window of Jasper's (Settings, About, a dialog), nothing; outside every
- * window, a new full window the size of the tab's workspace, with the entry where the cursor holds it and kept on the
- * display under the cursor, except for a window's only tab (a full window's already is its own; workspace plan 8a
- * Rulings 6). A tab holding an item that is pinned (a modal owner holds it in its window), or one being closed, takes
- * targets along its own strip only.
+ * the drag's own window but that window), the most recently active; but where one of Jasper's other windows (Settings,
+ * About, Licenses, a plugin's dialog) that came to the front after it is under the cursor, none, for a tab and a pane
+ * alike, as native drag and drop goes by the order windows stack in (workspace plan 9a Rulings 21). For a tab, over its
+ * strip, the place before the first of the strip's other entries whose middle is not left of the cursor, where the
+ * entries take their new places at once on the release; a window whose strip hides (the standard look's one tab) takes
+ * it at its end over the band its strip takes when it shows, and the main window's empty workspace, which has no panes,
+ * anywhere over it, in its place. Over a pane of a window's shown tab other than the dragged tab's own, beside that
+ * pane on the side whose edge the cursor is nearest, every pane of the tab as one nested split (pane flexibility spec
+ * 5). Spring-loading shows the tabs whose panes take it: the entry resting on another tab's entry of a strip, any
+ * window's, for {@link #SPRING_DELAY} ms, within {@link #SPRING_SLOP} px of where it came to rest, shows that tab at
+ * once, as a pane drag's hover does, so in the drag's own window, which shows the dragged tab, its other tabs' panes
+ * take it too. Anywhere else in that window (its dock, chrome or title bar), and over any other window of Jasper's
+ * (Settings, About, a dialog), nothing; outside every window, a new full window the size of the tab's workspace, with
+ * the entry where the cursor holds it and kept on the display under the cursor, except for a window's only tab (a full
+ * window's already is its own; workspace plan 8a Rulings 6). A tab holding an item that is pinned (a modal owner holds
+ * it in its window), or one being closed, takes targets along its own strip only.
  * <p>A pane's targets (tabs and panes spec 7): a pane of the window's shown tab other than its own, beside which it goes
  * on the side whose edge the cursor is nearest; the middle half of a tab's entry in the window's strip, which shows that
  * tab at once, with no drop of its own, so that one of its panes can take the pane; the tab that showed there before
@@ -139,6 +142,21 @@ final class TabDrag {
         record Into(WindowContent window, GroupId group, Side side) implements Target { }
     }
 
+    /**
+     * One of Jasper's showing windows that the drag does not reach (Settings, About, Licenses, a plugin's dialog, a
+     * popup) and its frame on screen.
+     *
+     * @param window the window, as {@link #activated} hears of it coming to the front, or a test's stand-in for it
+     * @param frame its frame on screen
+     */
+    record Auxiliary(Object window, Rectangle frame) {
+        /** Requires both. */
+        Auxiliary {
+            Objects.requireNonNull(window, "window");
+            Objects.requireNonNull(frame, "frame");
+        }
+    }
+
     /** How far right of and below the cursor the label's corner sits, so no window is ever under the pointer's tip. */
     static final int LABEL_OFFSET = 8;
 
@@ -156,11 +174,18 @@ final class TabDrag {
     private final DockDropOverlay overlay = new DockDropOverlay();
     private final TabDragLabel label = new TabDragLabel();
     /**
-     * Test seam: the frames on screen of Jasper's other showing windows (Settings, About, Licenses, a dialog, a popup),
-     * where a release drops nothing; none of the windows the drag reaches, nor the label's. Production reads
-     * {@link Window#getWindows()}, which a headless JVM leaves empty.
+     * Test seam: Jasper's other showing windows (Settings, About, Licenses, a dialog, a popup) with their frames on
+     * screen; none of the windows the drag reaches, nor the label's. Production reads {@link Window#getWindows()},
+     * which a headless JVM leaves empty.
      */
-    Supplier<List<Rectangle>> otherWindows = this::auxiliaryFrames;
+    Supplier<List<Auxiliary>> otherWindows = this::auxiliaryFrames;
+    /**
+     * When each of Jasper's windows last came to the front ({@link #activated}), by a count that only grows: a window
+     * the drag reaches by its content, another by its native window. Weak, so a closed window goes with its last
+     * reference.
+     */
+    private final Map<Object, Long> fronts = new WeakHashMap<>();
+    private long front;
     private final KeyEventDispatcher escape = this::dispatchKeyEvent;
     /** After Esc ended a drag: the rest of that keystroke ({@link #escapeRest}). */
     private final KeyEventDispatcher escapeRest = this::escapeRest;
@@ -244,6 +269,15 @@ final class TabDrag {
 
     /** Test seam: where the entry came to rest while a wait runs, else null. */
     Point springRest() { return springAt == null ? null : new Point(springAt); }
+
+    /**
+     * {@code window} came to the front (workspace plan 9a Rulings 21): of Jasper's windows under the cursor the one
+     * that came to the front last takes or refuses a drop. The window manager tells it of each window the drag reaches,
+     * by its content, and of each other window of Jasper's, by its native window.
+     *
+     * @param window a window the drag reaches, or one of Jasper's other windows
+     */
+    void activated(Object window) { fronts.put(Objects.requireNonNull(window, "window"), ++front); }
 
     /**
      * A left press on {@code tab}'s entry in {@code bar}, the entry of the tab whose active pane holds it: a drag of that
@@ -550,28 +584,49 @@ final class TabDrag {
         GraphicsDevice home = device(from);
         OptionalInt under = WorkspaceDropResolver.windowAt(at,
             open.stream().map(window -> onScreen(window, window == from, home)).toList());
+        WindowContent window = under.isPresent() ? open.get(under.getAsInt()) : null;
+        // The window of Jasper's on top under the cursor takes or refuses the drop (workspace plan 9a Rulings 21): one
+        // the drag does not reach, above the one under the cursor or outside every one of them, takes nothing, and no
+        // tab springs under it.
+        if (covered(window, at)) {
+            stopSpring();
+            showLanding();
+            return;
+        }
         if (pane) {
             // A pane takes targets in a window alone: it never becomes a window (tabs and panes spec 7).
-            if (under.isPresent()) target = onPanes(open.get(under.getAsInt()), at);
+            if (window != null) target = onPanes(window, at);
             showLanding();
             return;
         }
         // What the registry keeps in its window stays there: a tab holding an item that is pinned or being closed. No
         // other window takes it, and it tears nothing out.
         boolean stays = !movable();
-        if (under.isPresent()) {
-            WindowContent window = open.get(under.getAsInt());
+        if (window != null) {
             // A tab drops on a strip (tabs and panes spec 6), else beside a pane of a shown tab but its own (pane
             // flexibility spec 5), unless it moves along its own strip only.
             if (!stays || window == from) target = onBar(window, at);
             if (target.isEmpty() && !stays) target = intoPanes(window, at);
-        } else if (WorkspaceDropResolver.windowAt(at, otherWindows.get()).isEmpty() && !stays && tearsOut()) {
+        } else if (!stays && tearsOut()) {
             // Outside every window of Jasper's: a full window.
             target = Optional.of(new Target.TearOut(tearOutBounds(at), new Point(at)));
         }
         // Spring-loading: the entry resting on another tab's entry shows that tab (pane flexibility spec 5).
-        spring(stays || under.isEmpty() ? null : open.get(under.getAsInt()), at);
+        spring(stays ? null : window, at);
         showLanding();
+    }
+
+    /**
+     * Whether one of Jasper's windows the drag does not reach ({@link #otherWindows}) is on top at {@code at}: one
+     * under the cursor that came to the front after {@code window}, the window the drag reaches under it, as native
+     * drag and drop goes by the order windows stack in (workspace plan 9a Rulings 21); for {@code window} null, any
+     * under the cursor.
+     */
+    private boolean covered(WindowContent window, Point at) {
+        long below = window == null ? -1 : fronts.getOrDefault(window, 0L);
+        for (Auxiliary other : otherWindows.get())
+            if (other.frame().contains(at) && fronts.getOrDefault(other.window(), 0L) > below) return true;
+        return false;
     }
 
     /**
@@ -940,13 +995,14 @@ final class TabDrag {
         return new Rectangle(at.x - grab.x, at.y - grab.y, size.width, size.height);
     }
 
-    /** The frames on screen of Jasper's showing windows the drag does not reach, but the label's: see {@link #otherWindows}. */
-    private List<Rectangle> auxiliaryFrames() {
+    /** Jasper's showing windows the drag does not reach, but the label's: see {@link #otherWindows}. */
+    private List<Auxiliary> auxiliaryFrames() {
         var reached = new HashSet<Component>();
         for (WindowContent window : windows.get()) reached.add(outermost(window));
-        var frames = new ArrayList<Rectangle>();
+        var frames = new ArrayList<Auxiliary>();
         for (Window window : Window.getWindows())
-            if (window.isShowing() && !reached.contains(window) && !label.owns(window)) frames.add(window.getBounds());
+            if (window.isShowing() && !reached.contains(window) && !label.owns(window))
+                frames.add(new Auxiliary(window, window.getBounds()));
         return frames;
     }
 

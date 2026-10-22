@@ -12,8 +12,12 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.layout.TabRestore;
 import dev.jasper.app.persistence.WorkspaceFile;
+import java.awt.AWTEvent;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.event.AWTEventListener;
+import java.awt.event.WindowEvent;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -137,6 +141,15 @@ public final class WindowManager {
      * carries what leaves a window to this manager, which each window knows (parent tabs spec 5).
      */
     private final TabDrag tabDrag = new TabDrag(() -> windowsByActivation().stream().map(JasperWindow::content).toList());
+    /**
+     * Tells the tab drag of each of Jasper's other windows (Settings, About, a plugin's dialog) coming to the front, so
+     * that the one on top under the cursor takes or refuses a drop (workspace plan 9a Rulings 21): installed when a
+     * window of this manager first comes to the front, gone when its last window closes.
+     */
+    private final AWTEventListener fronts = event -> {
+        if (event.getID() == WindowEvent.WINDOW_ACTIVATED) tabDrag.activated(((WindowEvent) event).getWindow());
+    };
+    private boolean watchingFronts;
     private MainWindow main;
     private JasperWindow lastActive;
     private int openings;
@@ -1026,6 +1039,11 @@ public final class WindowManager {
         lastActive = window;
         activations.remove(window);
         activations.addFirst(window);
+        tabDrag.activated(window.content());
+        if (!watchingFronts) {
+            Toolkit.getDefaultToolkit().addAWTEventListener(fronts, AWTEvent.WINDOW_EVENT_MASK);
+            watchingFronts = true;
+        }
         hooks.activated().accept(window);
     }
 
@@ -1042,6 +1060,10 @@ public final class WindowManager {
         else children.remove(window);
         activations.remove(window);
         if (lastActive == window) lastActive = null;
+        if (watchingFronts && isEmpty()) {
+            Toolkit.getDefaultToolkit().removeAWTEventListener(fronts);
+            watchingFronts = false;
+        }
         try {
             // A window closing is saved at once: a child window the user closed is gone with its tabs (spec 13).
             if (store != null) store.save();

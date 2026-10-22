@@ -24,10 +24,12 @@ import dev.jasper.app.layout.Split;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.IdleTerminalSession;
+import java.awt.AWTEvent;
 import java.awt.Component;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
@@ -729,7 +731,8 @@ class TabDragWindowsTest {
         launch();
         edt(() -> {
             // A headless JVM has no windows: the drag is told where a Settings frame stands on the pretend screen.
-            manager.tabDrag().otherWindows = () -> List.of(new Rectangle(2400, 700, 600, 500));
+            manager.tabDrag().otherWindows = () -> List.of(new TabDrag.Auxiliary(new Object(),
+                new Rectangle(2400, 700, 600, 500)));
             Tab tab = entryOf(main.content(), id[0]);
             Point overSettings = new Point(2600, 900);
             Component source = start(main.content(), tab, overSettings);
@@ -739,6 +742,138 @@ class TabDragWindowsTest {
             assertThat(manager.children()).containsExactly(child);
             assertThat(placed).isEmpty();
             assertThat(tab.window()).isEqualTo(main.id());
+        });
+    }
+
+    /** How many listeners take every window event, as the window manager's watch of Jasper's other windows does. */
+    private static int windowListeners() {
+        return Toolkit.getDefaultToolkit().getAWTEventListeners(AWTEvent.WINDOW_EVENT_MASK).length;
+    }
+
+    /** A stand-in Settings frame over the whole child window and a little past it, on the pretend screen. */
+    private Rectangle settingsOverChild() {
+        Rectangle covered = onScreen(frameOf(child), new Rectangle(frameOf(child).getSize()));
+        covered.grow(40, 40);
+        return covered;
+    }
+
+    /**
+     * Workspace plan 9a Rulings 21: of Jasper's windows under the cursor the one that came to the front last takes or
+     * refuses a drop, as native drag and drop does on macOS and Windows and in VS Code. A Settings frame that came to
+     * the front after the child window it covers gives a tab drag no target over the child's strip or pane: no strip
+     * drop, no merge and no spring-loading, and the landing hides; a release there moves nothing.
+     */
+    @Test void aWindowOfJaspersThatCameToTheFrontAfterTheWindowItCoversTakesNoTabDrop() throws Exception {
+        ParentTabId[] ids = new ParentTabId[3];
+        edt(() -> {
+            ids[0] = secondTab(main);
+            ids[1] = child.content().activeParentTab();
+            ids[2] = secondTab(child);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            Object settings = new Object();
+            manager.tabDrag().otherWindows = () -> List.of(new TabDrag.Auxiliary(settings, settingsOverChild()));
+            child.events().activated().accept(true);
+            manager.tabDrag().activated(settings);
+            main.events().activated().accept(true);
+            Tab moving = entryOf(from, ids[0]);
+            GroupId pane = activeGroup(child);
+            List<ParentTabId> before = tabIds(to);
+            Point onOwnStrip = onEntry(from, entryOf(from, tabIds(from).getFirst()), 0.25);
+            Component source = start(from, moving, onOwnStrip);
+            assertThat(manager.tabDrag().overlay().getParent()).as("the landing shows on the drag's own strip")
+                .isSameAs(SwingUtilities.getRootPane(from).getLayeredPane());
+            Point overPane = inside(pane(to, pane), 0.9, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, overPane);
+            assertThat(manager.tabDrag().target()).as("Settings above the child's pane").isEmpty();
+            assertThat(manager.tabDrag().overlay().getParent()).as("the landing hides").isNull();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, inside(band(to), 0.5, 0.5));
+            assertThat(manager.tabDrag().target()).as("Settings above the child's strip").isEmpty();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onEntry(to, entryOf(to, ids[1]), 0.5));
+            assertThat(manager.tabDrag().spring.isRunning()).as("nor does a hidden tab's entry spring").isFalse();
+            facts.clear();
+            mouse(source, MouseEvent.MOUSE_RELEASED, overPane);
+            assertThat(tabIds(to)).as("nothing merged").isEqualTo(before);
+            assertThat(to.workspace().tabs()).hasSize(1);
+            assertThat(moving.window()).isEqualTo(main.id());
+            assertThat(moves()).isEmpty();
+            assertThat(placed).as("nor torn out").isEmpty();
+        });
+    }
+
+    /** Workspace plan 9a Rulings 21: the same Settings frame, come to the front before the child window, lies below. */
+    @Test void aWindowOfJaspersThatCameToTheFrontBeforeTheWindowUnderItLeavesItTheDrop() throws Exception {
+        ParentTabId[] ids = new ParentTabId[1];
+        edt(() -> ids[0] = secondTab(main));
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            Object settings = new Object();
+            manager.tabDrag().otherWindows = () -> List.of(new TabDrag.Auxiliary(settings, settingsOverChild()));
+            manager.tabDrag().activated(settings);
+            child.events().activated().accept(true);
+            main.events().activated().accept(true);
+            Tab moving = entryOf(from, ids[0]), there = to.selectedTab();
+            GroupId pane = activeGroup(child);
+            Point overPane = inside(pane(to, pane), 0.9, 0.5);
+            Component source = start(from, moving, overPane);
+            assertThat(manager.tabDrag().target()).as("the child window is on top")
+                .contains(new TabDrag.Target.Into(to, pane, Side.RIGHT));
+            mouse(source, MouseEvent.MOUSE_RELEASED, overPane);
+            assertThat(to.workspace().tabs()).as("the drop reaches the pane").containsExactly(there, moving);
+            assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(moving.id().value(), main.id(), child.id()));
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 21 for a pane drag (tabs and panes spec 7): Settings above the child window's pane
+     * gives it no target there; once the child window comes to the front after Settings, its pane takes the drop.
+     */
+    @Test void aPaneDragOverAWindowOfJaspersAboveAnotherWindowsPaneDropsNothingThere() throws Exception {
+        edt(() -> {
+            main.content().split(Side.RIGHT);
+            relayout(frameOf(main));
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            Object settings = new Object();
+            manager.tabDrag().otherWindows = () -> List.of(new TabDrag.Auxiliary(settings, settingsOverChild()));
+            child.events().activated().accept(true);
+            manager.tabDrag().activated(settings);
+            main.events().activated().accept(true);
+            Tab moving = from.workspace().tabs().get(1), there = to.selectedTab();
+            GroupId target = there.group().orElseThrow();
+            Point left = inside(pane(to, target), 0.1, 0.5);
+            Component source = startPane(from, moving, left);
+            assertThat(manager.tabDrag().movingPane()).isTrue();
+            assertThat(manager.tabDrag().target()).as("Settings above the child's pane").isEmpty();
+            assertThat(manager.tabDrag().overlay().getParent()).isNull();
+            child.events().activated().accept(true);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, left, PANE);
+            assertThat(manager.tabDrag().target()).as("the child window came to the front since")
+                .contains(new TabDrag.Target.Beside(to, target, Side.LEFT));
+            mouse(source, MouseEvent.MOUSE_RELEASED, left, PANE);
+            assertThat(to.workspace().tabs()).containsExactly(moving, there);
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 21: the window manager hears Jasper's other windows come to the front from when one of
+     * its windows first does until its last window closes, so no listener outlives its windows.
+     */
+    @Test void theManagerWatchesJaspersOtherWindowsWhileItsWindowsAreOpen() throws Exception {
+        edt(() -> {
+            int before = windowListeners();
+            main.events().activated().accept(true);
+            child.events().activated().accept(true);
+            assertThat(windowListeners()).as("one listener for every window").isEqualTo(before + 1);
+            child.requestClose();
+            assertThat(windowListeners()).as("while the main window is open").isEqualTo(before + 1);
+            manager.closeAll();
+            assertThat(windowListeners()).as("gone with the last window").isEqualTo(before);
         });
     }
 
