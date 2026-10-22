@@ -26,6 +26,8 @@ final class TextViews {
 
     /**
      * {@code view} has closed: the other views keep the document and its history, and its text area lets go of them.
+     * The last view keeps its document and history, and its text is kept as {@code detached}, which the session may
+     * still read.
      *
      * @param view one of the views
      */

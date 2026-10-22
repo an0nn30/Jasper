@@ -1,6 +1,7 @@
 package dev.jasper.editor.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN;
 
 import dev.jasper.editor.local.LocalDocument;
@@ -81,8 +82,15 @@ class TextViewsTest {
         two.area().setCaretPosition(two.area().getLineStartOffset(4));
         two.area().replaceSelection("x");
         Files.writeString(file, "a\nb\n");
+        var changes = new ArrayList<String>();
+        one.area().getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent event) { changes.add("insert"); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent event) { changes.add("remove"); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent event) { }
+        });
         two.session().revert();
         drain();
+        assertThat(changes).as("the text replaced once for both views").containsExactly("remove", "insert");
         assertThat(asked).extracting(Question::title).as("asked once, about the document").containsExactly("Revert to Saved");
         assertThat(one.area().getText()).isEqualTo("a\nb\n");
         assertThat(one.area().getCaretLineNumber()).isEqualTo(1);
@@ -126,6 +134,43 @@ class TextViewsTest {
         drain();
         assertThat(two.session().state()).isEqualTo(DocumentSession.State.READY);
         assertThat(two.area().getText()).isEqualTo("slow\n");
+    }
+
+    /** Once a loading file's other view has closed, Cancel in the view left stops the read, as one view's Cancel does. */
+    @Test void cancelInTheLastViewOfALoadingFileStopsTheRead() throws Exception {
+        Path file = Files.writeString(folder.resolve("stop.txt"), "stop\n");
+        var closing = new ArrayList<EditorTab>();
+        var one = new EditorTab(new FakeKit("dev.jasper.editor"), new DocumentSession(new LocalDocument(file, background::add), environment),
+            closing::add, false);
+        views.add(one);
+        one.session().load();
+        second(one).dispose();
+        dev.jasper.editor.testsupport.Kits.click(one.view(), EditorTab.DISMISS);
+        assertThat(closing).containsExactly(one);
+        drain();
+        assertThat(one.session().state()).as("the read stopped").isNotEqualTo(DocumentSession.State.READY);
+        assertThat(one.area().getText()).isEmpty();
+    }
+
+    /** A view is made from an open view of its file: one that has closed is refused, loudly. */
+    @Test void aViewIsNotMadeFromAClosedView() throws Exception {
+        var one = first(Files.writeString(folder.resolve("closed.txt"), "x\n"));
+        var two = second(one);
+        one.dispose();
+        assertThatThrownBy(() -> new EditorTab(new FakeKit("dev.jasper.editor"), two.session(), closed -> { }, false, one))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /** Vim turning on in one view leaves the other view's undo as it was: its neighbouring typing is still one step. */
+    @Test void vimTurningOnInOneViewLeavesTheOthersUndoGrouping() throws Exception {
+        var one = first(Files.writeString(folder.resolve("group.txt"), "x\n"));
+        var two = second(one);
+        one.vim(Optional.of(new Vim(VimHost.detached())));
+        two.area().setCaretPosition(1);
+        two.area().replaceSelection("a");
+        two.area().replaceSelection("b");
+        two.area().undoLastAction();
+        assertThat(one.area().getText()).as("one step, as RSyntaxTextArea groups typing").isEqualTo("x\n");
     }
 
     /** A closed view leaves nothing behind on its file's session, which outlives it while other views show the file. */

@@ -135,9 +135,11 @@ public final class EditorTab {
      * and undo history (pane flexibility spec 6).
      *
      * @param sharing an open view of the same session, or null for its first
+     * @throws IllegalArgumentException if {@code sharing} is a view of another session, or has closed
      */
     EditorTab(UiKit kit, DocumentSession session, Consumer<EditorTab> close, boolean debounce, EditorTab sharing) {
-        if (sharing != null && sharing.session != session) throw new IllegalArgumentException("A view shares its own document's text");
+        if (sharing != null && (sharing.session != session || sharing.closed))
+            throw new IllegalArgumentException("A view shares the text of an open view of its own document");
         this.session = session;
         this.close = close;
         this.debounce = debounce;

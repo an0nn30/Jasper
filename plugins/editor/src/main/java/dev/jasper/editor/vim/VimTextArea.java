@@ -71,11 +71,15 @@ public class VimTextArea extends RSyntaxTextArea {
     /**
      * Shows {@code other}'s document from now on, as another view of it (pane flexibility spec 6): the same text and
      * language, and the one undo history, so an undo in either undoes the document's last edit. Call it before anything
-     * else listens to this area's document.
+     * else listens to this area's document, and before Vim turns on in it.
      *
      * @param other a text area showing the document
+     * @throws IllegalStateException if Vim is on in this area, which reads the document it shows, or this area already
+     *     shows a document that another area shares
      */
     public void share(VimTextArea other) {
+        if (vim != null) throw new IllegalStateException("Vim is on in the text area: it shares a document before Vim turns on");
+        if (undo.shared()) throw new IllegalStateException("The text area already shows a document another text area shares");
         VimUndoManager history = other.undo;
         history.join(this);
         other.followFocus();
