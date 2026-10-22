@@ -25,7 +25,7 @@ class MarkdownNavigationTest {
             context.kit().registerIcon(StatusLine.VIM_ICON); // as EditorPlugin.start does
             var settings=new EditorSettings("Monospaced",13,List.of(),false,1,false,4,false,8,false);
             var env=new EditorEnvironment(context,SwingUtilities::invokeLater,owner -> q -> q.dismissed(),owner -> (m,f) -> false,() -> settings,b -> java.util.concurrent.CompletableFuture.completedFuture(null),false);
-            window=new EditorWindow(env,() -> {},d -> recents.add(d.key()));navigation=new MarkdownNavigation(window,context.platform()::browse);
+            window=new EditorWindow(env,() -> {},d -> recents.add(d.key()));navigation=new MarkdownNavigation(window,context.platform()::openInBrowser);
         });
     }
     /** As {@code EditorPlugin.stop}: the window closes its tabs before the host takes the Vim widget's icon away. */
@@ -89,6 +89,21 @@ class MarkdownNavigationTest {
             assertThat(host.browsed()).hasSize(2);
             tab.area().append("changed");
             pane.activateSelectedLink();assertThat(host.browsed()).hasSize(2);
+        });
+    }
+    /** Browser plan 3: a preview's web link goes to the browser a plugin provides, as a click, and the system browser hears nothing. */
+    @Test void aPreviewLinkGoesToTheProvidedBrowserFirst() throws Exception {
+        var tab=open("preview.md","[web](https://example.com/a)\n");
+        List<String> seen=new ArrayList<>();
+        edt(() -> {tab.surface().setFont(new java.awt.Font("Dialog",0,13));tab.markdownMode(MarkdownMode.PREVIEW,false);});drain();
+        edt(() -> {
+            host.start(new PluginInfo("dev.example.browser","Browser","1.0.0",Set.of("browser.provide")),Set.of(),Set.of(),
+                c -> c.platform().browser((address,origin,owner) -> {seen.add(address+"|"+origin+"|"+owner.isPresent());return true;}));
+            var pane=tab.surface().preview();
+            dev.jasper.editor.testsupport.PreviewFixture.layout(tab.surface().previewScroll,300,100);
+            pane.editor().setCaretPosition(0);pane.nextLink(true);pane.activateSelectedLink();
+            assertThat(seen).containsExactly("https://example.com/a|CLICK|false");
+            assertThat(host.browsed()).isEmpty();
         });
     }
     @Test void delayedTargetWaitsForLoadAndClosingItDropsNavigation() throws Exception {
