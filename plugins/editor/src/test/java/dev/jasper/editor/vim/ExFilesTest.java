@@ -36,6 +36,8 @@ class ExFilesTest {
         boolean untitled = true;
         boolean saves = true;
         int current = 1;
+        /** How many panes show the editor's own buffer. */
+        int windows = 1;
 
         VimHost.Documents documents() {
             return new VimHost.Documents(this::buffers,
@@ -50,7 +52,9 @@ class ExFilesTest {
                     return done;
                 },
                 (number, discard) -> calls.add("close " + number + (discard ? " discard" : "")),
+                (editor, discard) -> calls.add("quit" + (discard ? " discard" : "")),
                 number -> calls.add("select " + number),
+                editor -> calls.add("show"),
                 number -> calls.add("reload " + number),
                 (editor, target) -> calls.add("open " + target.map(p -> folder.relativize(p).toString()).orElse("new")),
                 path -> {
@@ -66,9 +70,9 @@ class ExFilesTest {
 
         private List<Buffer> buffers(VimEditor editor) {
             List<Buffer> all = new ArrayList<>();
-            all.add(new Buffer(1, name, file, current == 1, false, editor.documentModified(), untitled, editor.cursorLine()));
+            all.add(new Buffer(1, name, file, current == 1, false, editor.documentModified(), untitled, editor.cursorLine(), windows));
             for (Buffer other : others) all.add(new Buffer(other.number(), other.name(), other.file(), current == other.number(),
-                other.alternate(), other.modified(), other.untitled(), other.line()));
+                other.alternate(), other.modified(), other.untitled(), other.line(), other.windows()));
             return all;
         }
     }
@@ -99,8 +103,8 @@ class ExFilesTest {
     }
 
     private void others() {
-        tabs.others.add(new Buffer(2, folder.resolve("two.txt").toString(), Optional.of(folder.resolve("two.txt")), false, true, false, false, 4));
-        tabs.others.add(new Buffer(3, "Untitled 1", Optional.empty(), false, false, true, true, 1));
+        tabs.others.add(new Buffer(2, folder.resolve("two.txt").toString(), Optional.of(folder.resolve("two.txt")), false, true, false, false, 4, 1));
+        tabs.others.add(new Buffer(3, "Untitled 1", Optional.empty(), false, false, true, true, 1, 1));
     }
 
     @Test void writeSavesAndSaysWhatItWrote() throws Exception {
@@ -146,7 +150,7 @@ class ExFilesTest {
         });
     }
 
-    @Test void quitClosesTheTabUnlessItHasChanges() throws Exception {
+    @Test void quitClosesThePaneUnlessItIsTheLastOfAChangedFile() throws Exception {
         named("one.txt");
         others();
         onEdt(() -> {
@@ -156,10 +160,15 @@ class ExFilesTest {
             assertThat(editor.message()).isEqualTo("E37: No write since last change (add ! to override)");
             assertThat(tabs.calls).isEmpty();
             type(editor, ":q!<CR>");
-            assertThat(tabs.calls).containsExactly("close 1 discard");
+            assertThat(tabs.calls).containsExactly("quit discard");
+            tabs.windows = 2;
+            tabs.calls.clear();
+            type(editor, ":q<CR>");
+            assertThat(tabs.calls).as("another pane shows the file, which keeps its changes there").containsExactly("quit");
+            tabs.windows = 1;
             modified = false;
             type(editor, ":q<CR>");
-            assertThat(tabs.calls).last().isEqualTo("close 1");
+            assertThat(tabs.calls).last().isEqualTo("quit");
             type(editor, ":qa<CR>");
             assertThat(editor.message()).as("tab 3 has changes").isEqualTo("E162: No write since last change for buffer \"Untitled 1\"");
             tabs.calls.clear();
@@ -167,7 +176,7 @@ class ExFilesTest {
             assertThat(tabs.calls).containsExactly("close 1 discard", "close 2 discard", "close 3 discard");
             tabs.calls.clear();
             type(editor, "ZQ");
-            assertThat(tabs.calls).containsExactly("close 1 discard");
+            assertThat(tabs.calls).containsExactly("quit discard");
         });
     }
 
@@ -176,14 +185,14 @@ class ExFilesTest {
         onEdt(() -> {
             var editor = editor(new VimTextArea(), "a\n");
             type(editor, ":wq<CR>");
-            assertThat(tabs.calls).containsExactly("save 1", "close 1");
+            assertThat(tabs.calls).containsExactly("save 1", "quit");
             tabs.calls.clear();
             type(editor, ":x<CR>");
-            assertThat(tabs.calls).as("no changes: no save").containsExactly("close 1");
+            assertThat(tabs.calls).as("no changes: no save").containsExactly("quit");
             tabs.calls.clear();
             modified = true;
             type(editor, "ZZ");
-            assertThat(tabs.calls).containsExactly("save 1", "close 1");
+            assertThat(tabs.calls).containsExactly("save 1", "quit");
             tabs.calls.clear();
             tabs.saves = false;
             type(editor, ":wq<CR>");
@@ -201,7 +210,7 @@ class ExFilesTest {
             assertThat(tabs.calls).containsExactly("save 1", "save 3", "close 1", "close 2", "close 3");
             tabs.calls.clear();
             type(editor, ":exi<CR>");
-            assertThat(tabs.calls).containsExactly("save 1", "close 1");
+            assertThat(tabs.calls).containsExactly("save 1", "quit");
         });
     }
 

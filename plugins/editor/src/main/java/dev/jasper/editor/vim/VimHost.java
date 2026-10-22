@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
@@ -68,7 +69,8 @@ public record VimHost(Function<Character, Optional<String>> readClipboard, BiCon
     }
 
     /**
-     * An Editor tab as a Vim buffer (spec 6.2).
+     * An open file as a Vim buffer (spec 6.2): one however many views show it, as Vim shows one buffer in many windows
+     * (pane flexibility spec 6).
      *
      * @param number its buffer number, which stays while the tab is open
      * @param name what {@code :ls} and the messages call it: the file's location, or the untitled tab's name
@@ -78,10 +80,11 @@ public record VimHost(Function<Character, Optional<String>> readClipboard, BiCon
      * @param alternate whether it is the tab that was selected before ({@code #})
      * @param modified whether it has unsaved changes
      * @param untitled whether it has never been saved
-     * @param line its cursor line, 1-based
+     * @param line its cursor line, 1-based: the current view's, or the view focused last
+     * @param windows how many views show it (Vim's b_nwindows)
      */
     public record Buffer(int number, String name, Optional<Path> file, boolean current, boolean alternate, boolean modified,
-                         boolean untitled, int line) { }
+                         boolean untitled, int line, int windows) { }
 
     /**
      * The Editor's tabs as Vim's buffers. Buffers are named by their numbers; the functions run on the UI thread, and
@@ -90,8 +93,11 @@ public record VimHost(Function<Character, Optional<String>> readClipboard, BiCon
      * @param buffers the open tabs in their order, the one {@code editor} belongs to marked current
      * @param save saves a buffer as the Editor's Save does (Save As for an untitled tab); completes with whether it saved
      * @param saveAs saves a buffer to a file, which it then edits; completes with whether it saved
-     * @param close closes a buffer's tab; {@code true} discards its changes without asking
-     * @param select selects a buffer's tab
+     * @param close closes every view of a buffer, as {@code :qa} does; {@code true} discards its changes without asking
+     * @param quit closes the view {@code editor} is in, as Vim's {@code :q} closes its window; {@code true} discards the
+     *     changes of a buffer it was the last view of without asking
+     * @param select selects a buffer's view, the one focused last
+     * @param show selects the view {@code editor} is in
      * @param reload reads a buffer's file again, discarding its changes
      * @param open opens a file in a tab (or selects its tab) next to {@code editor}'s, or with no file a new untitled
      *     tab; a file that does not exist yet gets an empty tab its first save creates
@@ -99,13 +105,14 @@ public record VimHost(Function<Character, Optional<String>> readClipboard, BiCon
      */
     public record Documents(Function<VimEditor, List<Buffer>> buffers, IntFunction<CompletableFuture<Boolean>> save,
                             BiFunction<Integer, Path, CompletableFuture<Boolean>> saveAs, BiConsumer<Integer, Boolean> close,
-                            IntConsumer select, IntConsumer reload, BiConsumer<VimEditor, Optional<Path>> open,
-                            Function<Path, Optional<String>> read) {
+                            BiConsumer<VimEditor, Boolean> quit, IntConsumer select, Consumer<VimEditor> show,
+                            IntConsumer reload, BiConsumer<VimEditor, Optional<Path>> open, Function<Path, Optional<String>> read) {
         /** No tabs: an editor alone, which is buffer 1 and cannot be saved, closed or left. */
         public static final Documents NONE = new Documents(
             editor -> List.of(new Buffer(1, editor.documentName(), Optional.empty(), true, false, editor.documentModified(), true,
-                editor.cursorLine())),
+                editor.cursorLine(), 1)),
             number -> CompletableFuture.completedFuture(false), (number, file) -> CompletableFuture.completedFuture(false),
-            (number, discard) -> { }, number -> { }, number -> { }, (editor, file) -> { }, file -> Optional.empty());
+            (number, discard) -> { }, (editor, discard) -> { }, number -> { }, editor -> { }, number -> { }, (editor, file) -> { },
+            file -> Optional.empty());
     }
 }

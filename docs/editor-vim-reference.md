@@ -237,7 +237,7 @@ After an operator, and in Visual mode, where they extend the area.
 | `zM` | close every fold |
 | `:` | a command line; with a count, for that many lines (`:.,.+N`) |
 | `ZZ` | save the tab if it has changes and close it (`:x`) |
-| `ZQ` | close the pane, discarding its changes (`:q!`) |
+| `ZQ` | close the pane, as `:q!` does |
 | `gt` | the next tab, or tab {count} |
 | `gT` | {count} tabs back |
 | `&` | repeat the last `:s` on the line, without its flags |
@@ -442,7 +442,7 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:wa[ll]` | save every tab with changes |
 | `:xa[ll]` | save every tab with changes, then close them all |
 | `:wqa[ll]` | as `:xa` |
-| `:q[uit]` | close the pane; `!` discards its changes |
+| `:q[uit]` | close the pane; a file with changes loses its last pane only with `!`, which discards them |
 | `:qa[ll]` | close every tab; `!` discards their changes |
 | `:quita[ll]` | as `:qa` |
 | `:e[dit]` | open {file} in a tab, or read the tab's file again (`!` discards changes) |

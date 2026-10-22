@@ -139,7 +139,7 @@ final class Numbers {
                 }
             }
             int maxlen = 0;
-            if (visual && !linewise) maxlen = c.editor.marks().visualCurswant == Visual.MAX ? linelen - col : length;
+            if (visual && !linewise) maxlen = c.editor.marks().visualCurswant() == Visual.MAX ? linelen - col : length;
             Parsed parsed = str2nr(ptr, col, hex, oct, bin, maxlen);
             char pre = parsed.pre;
             length = parsed.length;

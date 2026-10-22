@@ -822,17 +822,19 @@ public final class EditorWindow {
         return session.untitled() ? saveAsSession(session) : session.save();
     }
 
-    /** The tabs as Vim's buffers (Vim spec 6.2): numbered, and saved, closed, selected and opened the Editor's way. */
+    /**
+     * The open files as Vim's buffers (Vim spec 6.2), their views as its windows (pane flexibility spec 6): numbered, and
+     * saved, closed, selected and opened the Editor's way.
+     */
     private VimHost.Documents documents() {
         return new VimHost.Documents(this::buffers,
             number -> tabNumbered(number).map(tab -> saveSession(tab.session())).orElse(CompletableFuture.completedFuture(false)),
             (number, file) -> tabNumbered(number).map(tab -> tab.session().saveAs(new LocalDocument(file, context.background())))
                 .orElse(CompletableFuture.completedFuture(false)),
-            (number, discard) -> tabNumbered(number).ifPresent(tab -> {
-                if (discard) discarding.add(tab);
-                closeTab(tab);
-            }),
+            (number, discard) -> tabNumbered(number).ifPresent(tab -> { for (EditorTab view : views(tab.session())) close(view, discard); }),
+            (editor, discard) -> tabOf(editor).ifPresent(tab -> close(tab, discard)),
             number -> tabNumbered(number).ifPresent(tab -> select(tab.session())),
+            editor -> tabOf(editor).ifPresent(tab -> { activate(tab); hosted.get(tab).select(); }),
             number -> tabNumbered(number).ifPresent(tab -> tab.session().reload()),
             (editor, file) -> {
                 WindowOwner owner = tabOf(editor).map(hosted::get).map(WindowOwner.class::cast).orElseGet(this::owner);
@@ -841,6 +843,12 @@ public final class EditorWindow {
                 else newFile(file.get(), owner);
             },
             EditorWindow::readText);
+    }
+
+    /** Closes a view for Vim; {@code discard} lets its file's changes go without asking when it is the file's last view. */
+    private void close(EditorTab tab, boolean discard) {
+        if (discard) discarding.add(tab);
+        closeTab(tab);
     }
 
     /**
@@ -855,7 +863,8 @@ public final class EditorWindow {
             Optional<Path> file = localFile(session).or(() -> Optional.ofNullable(newFiles.get(session)));
             EditorTab view = session == here ? current : views(session).getFirst();
             return new VimHost.Buffer(numbers.get(session), session.location(), file, session == here, session == previous && session != here,
-                session.dirty(), session.untitled() && !newFiles.containsKey(session), view.area().getCaretLineNumber() + 1);
+                session.dirty(), session.untitled() && !newFiles.containsKey(session), view.area().getCaretLineNumber() + 1,
+                views(session).size());
         }).toList();
     }
 

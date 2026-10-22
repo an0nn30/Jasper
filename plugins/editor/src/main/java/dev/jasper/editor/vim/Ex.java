@@ -111,7 +111,7 @@ final class Ex {
         def("wall", BANG | TRLBAR, Addr.NONE, "save every tab with changes", ExFiles::writeAll);
         def("xall", BANG | TRLBAR, Addr.NONE, "save every tab with changes, then close them all", ExFiles::exitAll);
         def("wqall", BANG | TRLBAR, Addr.NONE, "as `:xa`", ExFiles::exitAll);
-        def("quit", BANG | TRLBAR, Addr.NONE, "close the pane; `!` discards its changes", ExFiles::quit);
+        def("quit", BANG | TRLBAR, Addr.NONE, "close the pane; a file with changes loses its last pane only with `!`, which discards them", ExFiles::quit);
         def("qall", BANG | TRLBAR, Addr.NONE, "close every tab; `!` discards their changes", ExFiles::quitAll);
         def("quitall", BANG | TRLBAR, Addr.NONE, "as `:qa`", ExFiles::quitAll);
         def("edit", BANG | EXTRA | TRLBAR, Addr.NONE, "open {file} in a tab, or read the tab's file again (`!` discards changes)", ExFiles::edit);
@@ -182,7 +182,7 @@ final class Ex {
         commands.action(":", "a command line; with a count, for that many lines (`:.,.+N`)", false, c -> c.editor.ex().open(c));
         commands.visual(":", "a command line for the Visual lines (`:'<,'>`)", false, false, c -> c.editor.ex().open(c));
         commands.action("ZZ", "save the tab if it has changes and close it (`:x`)", false, c -> c.editor.ex().execute("x"));
-        commands.action("ZQ", "close the pane, discarding its changes (`:q!`)", false, c -> c.editor.ex().execute("q!"));
+        commands.action("ZQ", "close the pane, as `:q!` does", false, c -> c.editor.ex().execute("q!"));
         commands.action("gt", "the next tab, or tab {count}", false, ExFiles::gt);
         commands.action("gT", "{count} tabs back", false, ExFiles::gT);
         commands.action("&", "repeat the last `:s` on the line, without its flags", false, c -> {

@@ -272,6 +272,42 @@ class EditorViewsTest {
         return ((List<?>) field.get(session)).size();
     }
 
+    private static void vimKeys(EditorTab tab, String keys) throws Exception {
+        var vim = tab.vimEditor().orElseThrow();
+        dev.jasper.editor.testsupport.Kits.edt(() -> { for (var key : dev.jasper.editor.vim.KeyInput.parse(keys)) vim.feed(key); });
+    }
+
+    /**
+     * Vim sees one buffer per file, however many views show it, as Vim shows one buffer in many windows: :ls lists it
+     * once, an uppercase mark goes back to the view it was set in, :q in a view of a changed file that another view shows
+     * closes its pane, and the file's last view needs !.
+     */
+    @Test void vimSeesOneBufferPerFileAndQuitClosesOnlyItsPane() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 13, List.of(), false, 1.0, false, 4, false, 1, true));
+        EditorTab first = opened(file("one.txt", "one\n"));
+        EditorTab second = split(TabPlacement.SPLIT_RIGHT);
+        EditorTab other = opened(file("two.txt", "two\n"));
+        vimKeys(second, ":ls<CR>");
+        assertThat(second.vimEditor().orElseThrow().output()).extracting(dev.jasper.editor.vim.VimEditor.OutputLine::text)
+            .as("one buffer per file, the current one the view's").satisfiesExactly(
+                line -> assertThat(line).startsWith("  1 %a"), line -> assertThat(line).startsWith("  2 "));
+        vimKeys(second, "<CR>");
+        vimKeys(first, "mA");
+        vimKeys(other, "'A");
+        assertThat(window.selected()).as("the view the mark was set in, though another view of its file was focused later")
+            .containsSame(first);
+        ContentTab firstPane = handle(0), secondPane = handle(1);
+        first.area().append("edit\n");
+        vimKeys(second, ":q<CR>");
+        assertThat(secondPane.isClosed()).as("its pane closes; the other view keeps the changes").isTrue();
+        assertThat(asked).isEmpty();
+        assertThat(window.sessions()).hasSize(2);
+        assertThat(first.session().dirty()).isTrue();
+        vimKeys(first, ":q<CR>");
+        assertThat(first.vimEditor().orElseThrow().message()).isEqualTo("E37: No write since last change (add ! to override)");
+        assertThat(firstPane.isClosed()).isFalse();
+    }
+
     /** A remote file's second view reads nothing, so it opens though the file's connection has gone since the first read. */
     @Test void aRemoteFilesSecondViewReadsNothingThoughItsConnectionIsGone() {
         var remote = new StubDocument("stub:/srv/notes.txt", "notes.txt", "box:/srv/notes.txt", "box");

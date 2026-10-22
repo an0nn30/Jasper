@@ -92,8 +92,8 @@ final class Visual {
         Marks marks = editor.marks();
         marks.set(START, editor.visualAnchor());
         marks.set(END, editor.cursor());
-        marks.visualMode = mode;
-        marks.visualCurswant = editor.curswant();
+        marks.visualMode(mode);
+        marks.visualCurswant(editor.curswant());
     }
 
     /** v_swap_corners. */
@@ -125,9 +125,9 @@ final class Visual {
         VimEditor editor = c.editor;
         Marks marks = editor.marks();
         Pos start = marks.get(START), end = marks.get(END);
-        if (start == null || end == null || marks.visualMode == null) throw Context.fail();
-        Mode mode = marks.visualMode;
-        int curswant = marks.visualCurswant;
+        if (start == null || end == null || marks.visualMode() == null) throw Context.fail();
+        Mode mode = marks.visualMode();
+        int curswant = marks.visualCurswant();
         if (editor.mode().visual()) remember(editor, editor.mode());
         editor.visualAnchor(clamp(c.buffer, start));
         editor.mode(mode);

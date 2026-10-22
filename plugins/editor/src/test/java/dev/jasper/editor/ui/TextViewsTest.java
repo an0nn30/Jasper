@@ -218,6 +218,35 @@ class TextViewsTest {
         assertThat(one.area().getText()).as("with Vim on, an edit outside a Vim change is a step of its own").isEqualTo("bcd\n");
     }
 
+    private static void type(EditorTab view, String keys) {
+        for (KeyInput key : KeyInput.parse(keys)) view.vimEditor().orElseThrow().feed(key);
+    }
+
+    /**
+     * Vim's buffer marks belong to the file, as Vim keeps them per buffer: a mark set in one view is the other's too, and
+     * {@code '.} and the change list follow an edit made in either view; the jumplist stays each view's own.
+     */
+    @Test void lowercaseMarksAndTheLastChangeBelongToTheFile() throws Exception {
+        var one = first(Files.writeString(folder.resolve("marks.txt"), "one\ntwo\nthree\nfour\n"));
+        var two = second(one);
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        two.vim(Optional.of(vim));
+        type(one, "jma");
+        type(two, "gg'a");
+        assertThat(two.area().getCaretLineNumber()).as("the other view's mark a").isEqualTo(1);
+        type(one, "jjx");
+        type(two, "gg'.");
+        assertThat(two.area().getCaretLineNumber()).as("the last change, made in the other view").isEqualTo(3);
+        type(two, "g;");
+        assertThat(two.area().getCaretLineNumber()).as("the change list").isEqualTo(3);
+        type(one, "gg");
+        type(one, "dd");
+        type(two, "gg'a");
+        assertThat(two.area().getCaretLineNumber()).as("the mark moved with the other view's deletion").isZero();
+        assertThat(two.vimEditor().orElseThrow().message()).isEmpty();
+    }
+
     /** Each view has its own Markdown mode: the preview in one and the source in the other, each switched on its own. */
     @Test void aMarkdownPreviewInOneViewAndTheSourceInTheOther() {
         var one = first(DocumentSession.untitled("Untitled", environment));
