@@ -302,6 +302,9 @@ final class VimUndoManager extends RUndoManager {
         view = next;
     }
 
+    /** @return whether {@code area} is the view that edits now */
+    boolean editsNow(RTextArea area) { return view.area == area; }
+
     /** @param on whether Vim mode groups the edits of the view that edits now */
     void vim(boolean on) {
         view.vim = on;

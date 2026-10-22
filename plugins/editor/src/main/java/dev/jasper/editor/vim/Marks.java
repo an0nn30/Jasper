@@ -21,7 +21,8 @@ import javax.swing.text.Document;
  * <p>As in Vim, the named marks, the Visual area and the change list belong to the buffer: every editor of one
  * document, in each of its views, shares them (pane flexibility spec 6), in one store the document holds, which follows
  * every edit to the document, whichever view made it. The jumplist, the previous-context mark and the place in the
- * change list are each editor's own, as they are a Vim window's.
+ * change list are each editor's own, as they are a Vim window's; the editor of the view that edits now is Vim's
+ * current window.
  *
  * <p>The table keeps the positions of the text's line breaks so that a removal, which a document event reports only
  * after the text is gone, can still be read as lines and columns.
@@ -67,8 +68,9 @@ final class Marks {
 
         /**
          * changed_common: the {@code '.} mark moves to the change, and the change list gains an entry for the first change
-         * of an undo step unless it is on the same line as the last entry and within 79 columns of it. Every editor's
-         * place in the list goes to its end.
+         * of an undo step unless it is on the same line as the last entry and within 79 columns of it. The editor of the
+         * view that edits now goes to the list's end; another stays at its place, or at the end when it was there, and
+         * when a full list drops its oldest entry, each place after the first moves back one with its entry.
          */
         void changed(int line, int col) {
             Pos at = new Pos(line, col);
@@ -82,10 +84,14 @@ final class Marks {
             }
             if (add) {
                 newChange = false;
-                if (changes.size() == LIST_SIZE) changes.removeFirst();
+                if (changes.size() == LIST_SIZE) {
+                    changes.removeFirst();
+                    for (Marks editor : editors) if (editor.changeIndex > 0) editor.changeIndex--;
+                }
+                for (Marks editor : editors) if (editor.changeIndex == changes.size()) editor.changeIndex++;
                 changes.add(at.copy());
             } else changes.set(changes.size() - 1, at.copy());
-            for (Marks editor : editors) editor.changeIndex = changes.size();
+            for (Marks editor : editors) if (editor.area.editsNow()) editor.changeIndex = changes.size();
         }
 
         void inserted(int offset, int length) {
@@ -230,6 +236,9 @@ final class Marks {
     }
 
     private final Buffer buffer;
+    /** The editor whose marks these are, and its text area. */
+    private final VimEditor owner;
+    private final VimTextArea area;
     private final List<Pos> jumps = new ArrayList<>();
     /** The jumplist index: jumps.size() when not moving through the list (Vim's w_jumplistidx). */
     int jumpIndex;
@@ -241,11 +250,16 @@ final class Marks {
     static final int LIST_SIZE = 100;
 
     /**
-     * An editor's marks; the buffer's are the ones the document's other editors already have, else new.
+     * An editor's marks; the buffer's are the ones the document's other editors already have, else new. Its place in the
+     * change list is after the last change, as a Vim window's is when it starts.
      *
-     * @param document the document the editor shows
+     * @param owner the editor
+     * @param area its text area, whose document it shows
      */
-    Marks(Document document) {
+    Marks(VimEditor owner, VimTextArea area) {
+        this.owner = owner;
+        this.area = area;
+        Document document = area.getDocument();
         Buffer shared = document.getProperty(BUFFER) instanceof Buffer held ? held : null;
         if (shared == null) {
             shared = new Buffer(document);
@@ -254,6 +268,31 @@ final class Marks {
         buffer = shared;
         buffer.editors.add(this);
         pcmark = new Pos(0, 0);
+        changeIndex = buffer.changes.size();
+    }
+
+    /** @return another editor of the document, the first of them to open; null when there is none */
+    VimEditor sibling() {
+        for (Marks other : buffer.editors) if (other != this) return other.owner;
+        return null;
+    }
+
+    /** @return whether {@code other} is an editor's of the same document: one Vim buffer */
+    boolean sameBuffer(Marks other) { return buffer == other.buffer; }
+
+    /**
+     * win_init: the editor of a view split from {@code source}'s starts with its jumplist, its previous contexts and its
+     * place in the change list.
+     *
+     * @param source the marks of an editor of the same document
+     */
+    void splitFrom(Marks source) {
+        jumps.clear();
+        for (Pos pos : source.jumps) jumps.add(pos.copy());
+        jumpIndex = source.jumpIndex;
+        pcmark = source.pcmark == null ? null : source.pcmark.copy();
+        prevPcmark = source.prevPcmark == null ? null : source.prevPcmark.copy();
+        changeIndex = source.changeIndex;
     }
 
     /** The editor goes; the buffer's marks go with the document's last editor. */
@@ -457,4 +496,7 @@ final class Marks {
     void track(Pos pos) { buffer.extra.add(pos); }
 
     void untrack(Pos pos) { buffer.extra.removeIf(p -> p == pos); }
+
+    /** @return the positions owned elsewhere that move with the text, for tests */
+    List<Pos> tracked() { return List.copyOf(buffer.extra); }
 }

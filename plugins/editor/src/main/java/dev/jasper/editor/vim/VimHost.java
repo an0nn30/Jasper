@@ -72,12 +72,12 @@ public record VimHost(Function<Character, Optional<String>> readClipboard, BiCon
      * An open file as a Vim buffer (spec 6.2): one however many views show it, as Vim shows one buffer in many windows
      * (pane flexibility spec 6).
      *
-     * @param number its buffer number, which stays while the tab is open
+     * @param number its buffer number, which stays while the file is open
      * @param name what {@code :ls} and the messages call it: the file's location, or the untitled tab's name
      * @param file its local file, when it has one (an untitled tab opened with {@code :e newfile} has the file it
      *     will be saved to)
-     * @param current whether it is the tab the command runs in
-     * @param alternate whether it is the tab that was selected before ({@code #})
+     * @param current whether it is the buffer the command runs in, in any of its views
+     * @param alternate whether it is the buffer that was selected before ({@code #})
      * @param modified whether it has unsaved changes
      * @param untitled whether it has never been saved
      * @param line its cursor line, 1-based: the current view's, or the view focused last

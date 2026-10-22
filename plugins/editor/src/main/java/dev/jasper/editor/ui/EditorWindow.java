@@ -838,7 +838,7 @@ public final class EditorWindow {
             (number, discard) -> tabNumbered(number).ifPresent(tab -> { for (EditorTab view : views(tab.session())) close(view, discard); }),
             (editor, discard) -> tabOf(editor).ifPresent(tab -> close(tab, discard)),
             number -> tabNumbered(number).ifPresent(tab -> select(tab.session())),
-            editor -> tabOf(editor).ifPresent(tab -> { activate(tab); hosted.get(tab).select(); }),
+            editor -> tabOf(editor).ifPresent(this::show),
             number -> tabNumbered(number).ifPresent(tab -> tab.session().reload()),
             (editor, file) -> {
                 WindowOwner owner = tabOf(editor).map(hosted::get).map(WindowOwner.class::cast).orElseGet(this::owner);
@@ -1002,6 +1002,8 @@ public final class EditorWindow {
             if (!disposed) context.notifications().group().error("Could not save the Markdown default view", failed);
         }));
         tab.modeChanged(() -> activate(tab));
+        // Vim's file marks are the file's (Rulings 12): a closing view's go to the file's view active last.
+        tab.marksHeir(() -> views(session).stream().filter(view -> view != tab).findFirst().flatMap(EditorTab::vimEditor));
         tab.noticeChanged(this::refreshStatus);
         tab.surface().previewCallbacks(id -> {
             // Resolve IDs only against the currently installed, generation-validated controller result.
@@ -1060,6 +1062,8 @@ public final class EditorWindow {
             handle.select();
             origin = handle.window();
             EditorTab view = addView(tab.session(), placement, tab);
+            // Vim's win_init: the new window starts with its source's jumplist, '' mark, change-list place and window options.
+            tab.vimEditor().ifPresent(source -> view.vimEditor().ifPresent(split -> split.splitFrom(source)));
             // Rulings 19: the new view starts where its source is, as VS Code's Split Editor and IntelliJ's Split Vertically do.
             var caret = tab.area().getCaret();
             view.area().getCaret().setDot(caret.getMark());
@@ -1170,9 +1174,10 @@ public final class EditorWindow {
     }
 
     /** Selects the file's most recently active view (pane flexibility spec 6). */
-    private void select(DocumentSession session) {
-        views(session).stream().findFirst().ifPresent(tab -> { activate(tab); hosted.get(tab).select(); });
-    }
+    private void select(DocumentSession session) { views(session).stream().findFirst().ifPresent(this::show); }
+
+    /** Selects a view: it becomes the active one and its pane shows. */
+    private void show(EditorTab tab) { activate(tab); hosted.get(tab).select(); }
     private void activate(EditorTab tab) {
         if (!hosted.containsKey(tab)) return;
         if (selectedTab != tab && selectedTab != null) {

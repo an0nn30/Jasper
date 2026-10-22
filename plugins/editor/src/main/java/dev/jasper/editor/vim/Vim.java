@@ -48,8 +48,11 @@ public final class Vim {
     /** The uppercase marks: each remembers its editor (Vim's namedfm). */
     private final java.util.Map<Character, GlobalMark> globalMarks = new java.util.HashMap<>();
 
-    /** An uppercase mark: its editor and where it is. */
-    record GlobalMark(VimEditor editor, Pos pos) { }
+    /** An uppercase mark: the editor of the view it was set in, and where it is. */
+    record GlobalMark(VimEditor editor, Pos pos) {
+        /** @return whether the mark is in {@code other}'s file, in any of its views: Vim's current buffer */
+        boolean inFileOf(VimEditor other) { return editor.marks().sameBuffer(other.marks()); }
+    }
 
     /** @param host what the engine needs from the Editor */
     public Vim(VimHost host) {
@@ -145,10 +148,14 @@ public final class Vim {
         globalMarks.put(name, new GlobalMark(editor, tracked));
     }
 
-    /** @return an uppercase mark's position when it is in {@code editor}, or null */
+    /**
+     * getmark_buf_fnum: a file mark in the current buffer is a mark there, whichever of the file's views it was set in.
+     *
+     * @return an uppercase mark's position when it is in {@code editor}'s file, or null
+     */
     Pos globalMark(char name, VimEditor editor) {
         GlobalMark mark = globalMarks.get(name);
-        return mark == null || mark.editor() != editor ? null : mark.pos().copy();
+        return mark == null || !mark.inFileOf(editor) ? null : mark.pos().copy();
     }
 
     /** {@code :delmarks}: an uppercase mark goes. */
@@ -160,8 +167,25 @@ public final class Vim {
     /** @return the uppercase and digit marks, by name, for {@code :marks} */
     java.util.SortedMap<Character, GlobalMark> globalMarks() { return new java.util.TreeMap<>(globalMarks); }
 
-    /** An editor closed: its uppercase marks go. */
-    void forget(VimEditor editor) { globalMarks.values().removeIf(mark -> mark.editor() == editor); }
+    /**
+     * An editor closed: its uppercase marks go to another editor of its file, as Vim's file marks are the file's (pane
+     * flexibility spec 6), and go, untracked, with the file's last editor.
+     */
+    void forget(VimEditor editor) {
+        VimEditor heir = editor.marks().sibling();
+        if (heir != null) moveGlobalMarks(editor, heir);
+        globalMarks.values().removeIf(mark -> {
+            if (mark.editor() != editor) return false;
+            editor.marks().untrack(mark.pos());
+            return true;
+        });
+    }
+
+    /** {@code from}'s uppercase marks become {@code to}'s, an editor of the same file, where they stay tracked. */
+    void moveGlobalMarks(VimEditor from, VimEditor to) {
+        if (!from.marks().sameBuffer(to.marks())) return;
+        globalMarks.replaceAll((name, mark) -> mark.editor() == from ? new GlobalMark(to, mark.pos()) : mark);
+    }
 
     /** @return the last search pattern, direction and offset, and the search history */
     Search search() { return search; }

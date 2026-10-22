@@ -308,6 +308,85 @@ class EditorViewsTest {
         assertThat(firstPane.isClosed()).isFalse();
     }
 
+    private void vimOn() { settings.set(new EditorSettings("Monospaced", 13, List.of(), false, 1.0, false, 4, false, 1, true)); }
+
+    /**
+     * An uppercase mark is its file's, as Vim's file marks are: when the view it was set in closes, it goes to the file's
+     * view active last, to which {@code 'A} from another file then goes, on the mark's line.
+     */
+    @Test void aClosedViewsUppercaseMarkGoesToItsFilesViewActiveLast() throws Exception {
+        vimOn();
+        EditorTab first = opened(file("one.txt", "1\n2\n3\n4\n"));
+        EditorTab second = split(TabPlacement.SPLIT_RIGHT);
+        EditorTab third = split(TabPlacement.SPLIT_DOWN);
+        EditorTab other = opened(file("two.txt", "two\n"));
+        vimKeys(second, "3GmA");
+        ContentTab secondPane = handle(1);
+        // The third view is the file's view active last, and the other file is active.
+        handle(2).select();
+        handle(3).select();
+        window.closeTab(second);
+        assertThat(secondPane.isClosed()).isTrue();
+        vimKeys(other, "'A");
+        assertThat(window.selected()).as("the view active last, not the one opened first").containsSame(third);
+        assertThat(third.area().getCaretLineNumber()).isEqualTo(2);
+        assertThat(first.area().getCaretLineNumber()).isZero();
+    }
+
+    /** {@code :q!} in a view another view of its file shows closes that view alone, and the other keeps the file's changes. */
+    @Test void quitBangInAViewThatIsNotTheFilesLastKeepsItsChangesInTheOther() throws Exception {
+        vimOn();
+        EditorTab first = opened(file("bang.txt", "one\n"));
+        EditorTab second = split(TabPlacement.SPLIT_RIGHT);
+        ContentTab firstPane = handle(0), secondPane = handle(1);
+        vimKeys(second, "ccchanged<Esc>:q!<CR>");
+        assertThat(secondPane.isClosed()).isTrue();
+        assertThat(firstPane.isClosed()).isFalse();
+        assertThat(asked).isEmpty();
+        assertThat(first.area().getText()).isEqualTo("changed\n");
+        assertThat(first.session().dirty()).isTrue();
+    }
+
+    /** {@code :qa} closes every view of a file without changes, and {@code :qa!} every view of one with changes, asking nothing. */
+    @Test void quitAllClosesEveryViewOfAFile() throws Exception {
+        vimOn();
+        EditorTab first = opened(file("all.txt", "one\n"));
+        split(TabPlacement.SPLIT_RIGHT);
+        vimKeys(first, ":qa<CR>");
+        assertThat(host.contentTabs()).isEmpty();
+        assertThat(window.sessions()).isEmpty();
+        EditorTab changed = opened(file("changed.txt", "two\n"));
+        EditorTab view = split(TabPlacement.SPLIT_RIGHT);
+        changed.area().append("edit\n");
+        vimKeys(view, ":qa!<CR>");
+        assertThat(host.contentTabs()).isEmpty();
+        assertThat(window.sessions()).isEmpty();
+        assertThat(asked).isEmpty();
+    }
+
+    /**
+     * A split view starts with its source's jumplist, {@code ''} mark and place in the change list, and its window-local
+     * options, as Vim's win_init gives a new window its source window's, though the file's first view has others.
+     */
+    @Test void aSplitViewStartsWithItsSourcesJumplistAndPlaces() throws Exception {
+        vimOn();
+        opened(file("jumps.txt", "a\nb\nc\nd\ne\nf\n"));
+        EditorTab source = split(TabPlacement.SPLIT_RIGHT);
+        vimKeys(source, "xjjxjjx3G5Gg;g;6G:setlocal rnu<CR>:jumps<CR>");
+        List<String> jumps = source.vimEditor().orElseThrow().output().stream().map(dev.jasper.editor.vim.VimEditor.OutputLine::text).toList();
+        vimKeys(source, "<CR>");
+        EditorTab split = split(TabPlacement.SPLIT_DOWN);
+        vimKeys(split, ":jumps<CR>");
+        assertThat(split.vimEditor().orElseThrow().output()).extracting(dev.jasper.editor.vim.VimEditor.OutputLine::text)
+            .as("the jumplist").hasSizeGreaterThan(2).isEqualTo(jumps);
+        vimKeys(split, "<CR>:setlocal rnu?<CR>");
+        assertThat(split.vimEditor().orElseThrow().message()).as("a window-local option").isEqualTo("  relativenumber");
+        vimKeys(split, "''");
+        assertThat(split.area().getCaretLineNumber()).as("the '' mark").isEqualTo(2);
+        vimKeys(split, "g;");
+        assertThat(split.area().getCaretLineNumber()).as("the place in the change list").isZero();
+    }
+
     /** A remote file's second view reads nothing, so it opens though the file's connection has gone since the first read. */
     @Test void aRemoteFilesSecondViewReadsNothingThoughItsConnectionIsGone() {
         var remote = new StubDocument("stub:/srv/notes.txt", "notes.txt", "box:/srv/notes.txt", "box");

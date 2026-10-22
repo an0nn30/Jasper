@@ -59,6 +59,9 @@ public class VimTextArea extends RSyntaxTextArea {
     /** This area edits the document now: the history's steps go by its caret and its Vim engine. */
     private void edits() { if (undo != null) undo.view(this); }
 
+    /** @return whether this area is the one of its document's views that edits it now */
+    boolean editsNow() { return undo != null && undo.editsNow(this); }
+
     /** From now on the area edits the document whenever it gains the focus, as one of several views of it. */
     private void followFocus() {
         if (followsFocus) return;

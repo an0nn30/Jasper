@@ -448,4 +448,29 @@ class VimEditorTest {
             assertThat(editor.bells()).as("a lone modifier never rings").isEqualTo(bells + 2);
         });
     }
+
+    /**
+     * Vim's file marks are the file's (pane flexibility spec 6): when the editor of the view a mark was set in closes, the
+     * mark goes to another editor of the file, still moving with the text, and it goes, untracked, with the file's last.
+     */
+    @Test void anUppercaseMarkStaysWithItsFileUntilItsLastEditorCloses() throws Exception {
+        onEdt(() -> {
+            var shown = new VimTextArea();
+            shown.setText("1\n2\n3\n4\n");
+            var other = new VimTextArea();
+            other.share(shown);
+            var first = new VimEditor(vim, shown, EditorDefaults.VIM);
+            var second = new VimEditor(vim, other, EditorDefaults.VIM);
+            type(second, "3GmA");
+            second.close();
+            assertThat(vim.globalMarks().get('A')).as("the mark is the file's other editor's").isNotNull()
+                .extracting(Vim.GlobalMark::editor).isSameAs(first);
+            type(first, "ggO0<Esc>'A");
+            assertThat(first.cursor().line).as("it still moves with the text").isEqualTo(3);
+            Marks marks = first.marks();
+            first.close();
+            assertThat(vim.globalMarks()).doesNotContainKey('A');
+            assertThat(marks.tracked()).as("the file's last editor untracks it").isEmpty();
+        });
+    }
 }

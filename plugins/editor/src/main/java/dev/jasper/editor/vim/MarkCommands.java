@@ -78,7 +78,7 @@ final class MarkCommands {
         if (name < 0) throw Context.fail();
         if (name >= 'A' && name <= 'Z' || name >= '0' && name <= '9') {
             Vim.GlobalMark mark = c.vim.globalMarks().get((char) name);
-            if (mark != null && mark.editor() != c.editor) {
+            if (mark != null && !mark.inFileOf(c.editor)) {
                 elsewhere(c, mark, linewise);
                 throw VimFailure.quiet();
             }
@@ -98,14 +98,12 @@ final class MarkCommands {
     }
 
     /**
-     * An uppercase mark in another tab (spec 3.6): the view it was set in is selected and its cursor goes to the mark. An
-     * operator or Visual mode cannot reach into another tab, so there the command fails.
+     * An uppercase mark in another file (spec 3.6): the view it was set in is selected and its cursor goes to the mark. An
+     * operator or Visual mode cannot reach into another file, so there the command fails.
      */
     private static void elsewhere(Context c, Vim.GlobalMark mark, boolean linewise) {
         if (c.operator != null || c.inVisual()) throw Context.fail();
         VimEditor other = mark.editor();
-        var buffers = c.vim.host().documents().buffers().apply(other);
-        var buffer = buffers.stream().filter(VimHost.Buffer::current).findFirst().orElseThrow(() -> new VimFailure("E20: Mark not set"));
         Pos pos = check(other.buffer(), mark.pos());
         String line = other.buffer().line(pos.line);
         int col = linewise ? Text.firstNonBlank(line) : Math.min(pos.col, line.length());

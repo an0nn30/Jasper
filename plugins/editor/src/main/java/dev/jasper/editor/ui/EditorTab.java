@@ -57,6 +57,8 @@ public final class EditorTab {
 
     private Runnable focusArea = () -> area().requestFocusInWindow();
     private VimEditor vim;
+    /** The editor of the file's other view that this view's uppercase Vim marks go to when it closes, if any. */
+    private java.util.function.Supplier<Optional<VimEditor>> marksHeir = Optional::empty;
     private final VimBar vimBar = new VimBar(this::render, this::reveal);
     private int tabSize = 4;
     private FindBar find;
@@ -171,7 +173,10 @@ public final class EditorTab {
         edits.stop();
         if (markdown != null) markdown.close();
         area().getDocument().removeDocumentListener(editListener);
-        if (vim != null) { vimBar.detach(); vim.close(); vim = null; }
+        if (vim != null) {
+            marksHeir.get().ifPresent(vim::leaveMarksTo);
+            vimBar.detach(); vim.close(); vim = null;
+        }
         document.close();
         find = null;
         session.removeListener(refreshing);
@@ -216,6 +221,12 @@ public final class EditorTab {
         render();
     }
     public Optional<VimEditor> vimEditor() { return Optional.ofNullable(vim); }
+
+    /**
+     * @param heir the editor of the file's other view that this view's uppercase Vim marks go to when it closes, as Vim's
+     *     file marks are the file's (pane flexibility spec 6); empty gives them to another editor of the file
+     */
+    void marksHeir(java.util.function.Supplier<Optional<VimEditor>> heir) { marksHeir = heir; }
 
     /** Applies explicit document values; hosted tabs use their appearance subscription and settings instead. */
     public void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax) {

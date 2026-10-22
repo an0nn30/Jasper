@@ -109,8 +109,11 @@ public final class VimEditor {
         this.vim = vim;
         this.area = area;
         this.buffer = new Buffer(area.getDocument());
-        this.marks = new Marks(area.getDocument());
-        this.options = vim.options().local();
+        this.marks = new Marks(this, area);
+        // Another view's editor of the document joins its Vim buffer (pane flexibility spec 6): its buffer-local options
+        // are the buffer's, and its window-local ones start as that editor's window's.
+        VimEditor sibling = marks.sibling();
+        this.options = sibling == null ? vim.options().local() : sibling.options.window();
         this.machine = new Machine(this);
         this.insert = new InsertMode(this);
         this.highlights = new Highlights(area);
@@ -124,8 +127,13 @@ public final class VimEditor {
         area.getDocument().addDocumentListener(highlightListener);
         area.addFocusListener(leaveListener);
         originalCaret = area.getCaret() instanceof ConfigurableCaret caret ? caret.getStyle() : CaretStyle.VERTICAL_LINE_STYLE;
+        if (sibling != null) {
+            // The buffer has its options already, which the Editor's defaults and the language set when it opened.
+            this.defaults = sibling.defaults;
+            languagePairs = sibling.languagePairs;
+        }
         editorDefaults(defaults);
-        languageChanged();
+        if (sibling == null) languageChanged();
         area.addPropertyChangeListener(org.fife.ui.rsyntaxtextarea.RSyntaxTextArea.SYNTAX_STYLE_PROPERTY, languageListener);
         options.onChanged(this::syncArea);
         syncArea();
@@ -161,8 +169,30 @@ public final class VimEditor {
         viewport.close();
         lineNumbers.close();
         highlights.clear();
+        options.close();
         vim.forget(this);
         buffer.close();
+    }
+
+    /**
+     * This editor's view closes while {@code heir}'s shows the same file: its uppercase marks become {@code heir}'s, as
+     * Vim's file marks are the file's (pane flexibility spec 6). Without it, {@link #close} gives them to another editor
+     * of the file.
+     *
+     * @param heir the editor of another view of the same file
+     */
+    public void leaveMarksTo(VimEditor heir) { vim.moveGlobalMarks(this, heir); }
+
+    /**
+     * This editor's view was split from {@code source}'s (Vim's win_init): it starts with its jumplist, its {@code ''}
+     * mark, its place in the change list and its window-local options.
+     *
+     * @param source the editor of the view of the same file this one was split from
+     */
+    public void splitFrom(VimEditor source) {
+        if (!marks.sameBuffer(source.marks)) return;
+        marks.splitFrom(source.marks);
+        options.windowFrom(source.options);
     }
 
     /**

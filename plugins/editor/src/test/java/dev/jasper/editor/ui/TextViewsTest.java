@@ -238,13 +238,112 @@ class TextViewsTest {
         type(one, "jjx");
         type(two, "gg'.");
         assertThat(two.area().getCaretLineNumber()).as("the last change, made in the other view").isEqualTo(3);
-        type(two, "g;");
-        assertThat(two.area().getCaretLineNumber()).as("the change list").isEqualTo(3);
+        type(two, "ggg;");
+        assertThat(two.area().getCaretLineNumber()).as("the change list, from another line").isEqualTo(3);
         type(one, "gg");
         type(one, "dd");
         type(two, "gg'a");
         assertThat(two.area().getCaretLineNumber()).as("the mark moved with the other view's deletion").isZero();
         assertThat(two.vimEditor().orElseThrow().message()).isEmpty();
+        type(one, ":jumps<CR>");
+        type(two, ":jumps<CR>");
+        assertThat(one.vimEditor().orElseThrow().output()).as("one jump, its gg, between the heading and the end").hasSize(3);
+        assertThat(two.vimEditor().orElseThrow().output()).as("the other view's jumps are its own").hasSizeGreaterThan(3);
+    }
+
+    /** Two views of a file with Vim on, the mark A set in the second on line 3. */
+    private List<EditorTab> markedViews(String name) throws Exception {
+        var one = first(Files.writeString(folder.resolve(name), "1\n2\n3\n4\n5\n6\n7\n8\n"));
+        var two = second(one);
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        two.vim(Optional.of(vim));
+        type(two, "3GmA");
+        return List.of(one, two);
+    }
+
+    /** An uppercase mark set in another view of the file is a mark in this file, as Vim's getmark_buf_fnum reads one: an operator reaches it. */
+    @Test void anOperatorReachesAnUppercaseMarkSetInAnotherViewOfTheFile() throws Exception {
+        var views = markedViews("operator.txt");
+        type(views.getFirst(), "6Gd'A");
+        assertThat(views.getFirst().area().getText()).isEqualTo("1\n2\n7\n8\n");
+    }
+
+    @Test void visualModeReachesAnUppercaseMarkSetInAnotherViewOfTheFile() throws Exception {
+        var views = markedViews("visual.txt");
+        type(views.getFirst(), "6GV'Ad");
+        assertThat(views.getFirst().area().getText()).isEqualTo("1\n2\n7\n8\n");
+    }
+
+    /** {@code 'A} to a mark of the same file moves this view's cursor, as in Vim's current window; the view it was set in stays. */
+    @Test void anUppercaseMarkOfTheSameFileMovesOnlyThisViewsCursor() throws Exception {
+        var views = markedViews("jump.txt");
+        type(views.get(1), "8G");
+        type(views.getFirst(), "gg'A");
+        assertThat(views.getFirst().area().getCaretLineNumber()).as("this view goes to the mark").isEqualTo(2);
+        assertThat(views.get(1).area().getCaretLineNumber()).as("the view it was set in stays put").isEqualTo(7);
+    }
+
+    /** A view whose Vim starts after changes starts at the end of the file's change list, after the last change. */
+    @Test void aNewViewStartsAtTheEndOfTheChangeList() throws Exception {
+        var one = first(Files.writeString(folder.resolve("start.txt"), "a\nb\nc\nd\ne\n"));
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        type(one, "xjjxjjx");
+        var two = second(one);
+        two.vim(Optional.of(vim));
+        type(two, "ggg;");
+        assertThat(two.area().getCaretLineNumber()).as("the last change").isEqualTo(4);
+        assertThat(two.vimEditor().orElseThrow().message()).isEmpty();
+    }
+
+    /**
+     * Each view keeps its own place in the file's change list, as each Vim window does (changed_common): an edit moves the
+     * view that made it to the end, and another view stays where it was, or at the end when it was there.
+     */
+    @Test void eachViewKeepsItsPlaceInTheChangeList() throws Exception {
+        var one = first(Files.writeString(folder.resolve("places.txt"), "a\nb\nc\nd\ne\nf\n"));
+        var two = second(one);
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        two.vim(Optional.of(vim));
+        type(one, "xjjxjjx");
+        type(two, "g;");
+        assertThat(two.area().getCaretLineNumber()).as("at the end through the other view's changes").isEqualTo(4);
+        type(two, "g;");
+        assertThat(two.area().getCaretLineNumber()).isEqualTo(2);
+        type(one, "Gx");
+        type(two, "g;");
+        assertThat(two.area().getCaretLineNumber()).as("the other view's change leaves this view's place").isZero();
+    }
+
+    /** A full change list drops its oldest entry, and another view's place stays on its entry (changed_common). */
+    @Test void aFullChangeListKeepsAnotherViewOnItsEntry() throws Exception {
+        var one = first(Files.writeString(folder.resolve("full.txt"), "ab\n".repeat(102)));
+        var two = second(one);
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        two.vim(Optional.of(vim));
+        type(one, "xj".repeat(100));
+        type(two, "98g;");
+        assertThat(two.area().getCaretLineNumber()).as("the third of the list's 100 entries").isEqualTo(2);
+        type(one, "x");
+        type(two, "g;");
+        assertThat(two.area().getCaretLineNumber()).as("the entry before it, now the list's first").isEqualTo(1);
+    }
+
+    /** Vim's buffer-local options are the file's: one view's {@code :setlocal} reaches the other, and window-local ones stay. */
+    @Test void bufferLocalOptionsBelongToTheFile() throws Exception {
+        var one = first(Files.writeString(folder.resolve("options.txt"), "x\n"));
+        var two = second(one);
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        two.vim(Optional.of(vim));
+        type(two, ":setlocal sw=2 et nonumber<CR>");
+        type(one, ">>");
+        assertThat(one.area().getText()).as("'shiftwidth' and 'expandtab' set in the other view").isEqualTo("  x\n");
+        type(one, ":setlocal number?<CR>");
+        assertThat(one.vimEditor().orElseThrow().message()).as("'number' is each view's own").isEqualTo("  number");
     }
 
     /** A view in Preview comes back to its source on the text it showed, though another view added lines above it. */
