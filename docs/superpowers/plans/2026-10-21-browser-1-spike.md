@@ -14,6 +14,24 @@
 
 **Spec:** [`docs/superpowers/specs/2026-10-21-jasper-browser-plugin-design.md`](../specs/2026-10-21-jasper-browser-plugin-design.md). Sections 12 and 13 define this spike.
 
+**Execution status (2026-10-22): in progress, run subagent-driven.** These deviations from the plan's text were ruled
+during execution:
+- **Task 1, Step 3:** the return `cd` uses the absolute worktree path, because `../../..` was one level short.
+  `JCEF_JDK` is set inline on every command, because agent shells do not keep exported variables. The jcef check
+  passes at a count of 1 or more, because `java -version` names jcef on two lines. The archive was 379 MB, not about
+  250 MB.
+- **Scripts (from Task 3):** `spike.sh` and `spike.ps1` drop `--add-modules ALL-SYSTEM`. JBR's `jcef` module resolves
+  by default, and the flag printed an incubator-module warning on every run.
+- **Task 2, review fixes:**
+  - `ProcessStats.noSandboxFlag` trusts only visible command lines, and says "unknown" when some helpers' command lines
+    are hidden;
+  - `rssKb` closes the child's stdin and waits before reading;
+  - `deleteTree` also ignores `UncheckedIOException`;
+  - the self-check gains `process_record_writes_keys`, `no_sandbox_flag_cases` and `platform_delete_tree`, and a
+    stronger `report_appends_each_put`.
+
+  It has 13 checks after Task 2, and 21 after Task 3.
+
 ## The plan series
 
 | Plan | Deliverable | Waits on |
@@ -1256,7 +1274,7 @@ ls "${TMPDIR:-/tmp}" | grep -c "jasper-spike-"
 ```
 
 Expected:
-- nineteen `PASS` lines (`pages_https_is_untrusted` among them, because the JBR SDK has `keytool`), then `SELF-CHECK PASSED`;
+- twenty-one `PASS` lines (`pages_https_is_untrusted` among them, because the JBR SDK has `keytool`), then `SELF-CHECK PASSED`;
 - then `0`.
 
 - [ ] **Step 6: Commit**
@@ -1805,7 +1823,7 @@ tools/spikes/browser/spike.sh --self-check
 
 Expected:
 - the sources compile;
-- nineteen `PASS` lines and `SELF-CHECK PASSED`. The self-check never touches `CefSession`.
+- twenty-one `PASS` lines and `SELF-CHECK PASSED`. The self-check never touches `CefSession`.
 
 If an adapter method fails to compile, read its signature in the JCEF runtime and match it exactly, then record the difference in this plan's banner. Read it with `"$JCEF_JDK/bin/javap" -p --module jcef org.cef.handler.<Adapter>`.
 
@@ -2405,7 +2423,7 @@ with
 tools/spikes/browser/spike.sh --self-check
 ```
 
-Expected: nineteen `PASS` lines, then `SELF-CHECK PASSED`. Do not run the spike without `--self-check`: that opens the window, which is the user's job (Global Constraints).
+Expected: twenty-one `PASS` lines, then `SELF-CHECK PASSED`. Do not run the spike without `--self-check`: that opens the window, which is the user's job (Global Constraints).
 
 - [ ] **Step 5: Commit**
 
