@@ -878,11 +878,14 @@ through `WindowManager.moveTabToNewWindow`, a full window. Beside a pane of a wi
 through `WindowContent.mergeTab`, into another through `WindowManager.moveTabInto` and the tab registry. Its entry
 resting on another tab's entry for `TabDrag.SPRING_DELAY` shows that tab (spring-loading, the `TabDrag.spring` timer,
 which tests fire themselves: `TabDragTestSupport.elapse`). A window's only parent tab has no tear-out target, and a
-parent tab holding a pinned tab or one being closed takes targets along its own strip only. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in
-full screen on the display of the drag's own window, other than that window, takes no drop (`TabDrag.dropFrame`). Esc,
-a plain move or a press anywhere (a lost release), the source window losing the focus, and the tab its entry shows
-closing, leaving its parent tab or giving way to another of its groups end a drag. `TabDragTest` and
-`TabDragWindowsTest` drive it headlessly over stand-in frames on a pretend screen (`TabDragTestSupport`).
+parent tab holding a pinned tab or one being closed takes targets along its own strip only. Of Jasper's windows under
+the cursor the one that came to the front last takes or refuses the drop (`TabDrag.activated`: the `WindowManager` tells
+it of its own windows and, through a `WINDOW_ACTIVATED` listener while they are open, of the others), so another window
+of Jasper's (`TabDrag.otherWindows`) on top there gives a tab or a pane no target, and on macOS a window in full screen
+on the display of the drag's own window, other than that window, takes no drop (`TabDrag.dropFrame`). Esc, a plain move
+or a press anywhere (a lost release), the source window losing the focus, and the tab its entry shows closing, leaving
+its parent tab or giving way to another of its groups end a drag. `TabDragTest` and `TabDragWindowsTest` drive it
+headlessly over stand-in frames on a pretend screen (`TabDragTestSupport`).
 
 A pane drags with the same `TabDrag`: a window's `paneClicks` hands it a left press with `TabDrag.movesPane`'s modifier
 (Cmd+Option, Ctrl+Alt elsewhere) on an item of its shown tab, consumed, and the drag's gesture listener consumes that

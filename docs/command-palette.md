@@ -167,8 +167,9 @@ plugin action, the View › Show/Hide choices ("Toolbar: Icons and Labels", "Too
 "Split Right · Vertical" and "Split Down · Horizontal". A row's tag is the command's shortcut.
 
 Split Right opens a terminal in a new pane to the right of the focused pane and Split Down one below; Split Right with
-Editor, Split Down with Editor and each plugin's split items do the same with their views, and Move Pane to New Tab
-gives the focused pane a tab of its own.
+Editor, Split Down with Editor and each plugin's split items do the same with their views (Split Right with Open File…
+and Split Down with Open File… ask for the file first), and Move Pane to New Tab gives the focused pane a tab of its
+own.
 
 - A search ranks an exact title first, then titles that start with the query, titles whose words start with each query
   word, titles that contain it, keyword matches, and fuzzy matches with fewer gaps first. Ties go to recently used

@@ -39,6 +39,7 @@ The tables follow the sections of Settings › Keymap. The ID is the name to use
 | Focus Pane Down | `focus_pane_down` | Cmd+Option+Down | Ctrl+Alt+Shift+Down |
 | Move Pane to New Tab | `move_pane_to_new_tab` | Cmd+Option+T | Ctrl+Alt+Shift+T |
 | Move Pane to Tab 1 … Move Pane to Tab 9 | `move_pane_to_tab_1` … `move_pane_to_tab_9` | none | none |
+| Move Tab Into Tab 1 … Move Tab Into Tab 9 | `move_tab_into_tab_1` … `move_tab_into_tab_9` | none | none |
 
 ### Search
 

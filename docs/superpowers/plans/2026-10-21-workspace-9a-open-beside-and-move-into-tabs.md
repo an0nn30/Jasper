@@ -1,16 +1,24 @@
 # Workspace tabs 9a: open beside, and moving panes and tabs into tabs Implementation Plan
 
-**Status: executed on 2026-10-21** (`b748fa26a..d9f6ad43e`); see `docs/STATUS.md`. Written against
-`claude/workspace-tabs` at `ff322c478` ("Spec: pane flexibility approved by the user; the tabs and panes spec points at
-it"), in parallel with plan 9b (`2026-10-21-workspace-9b-two-views-of-a-file.md`), which executes after this one and
-re-anchors on it. Deviations from the plan's text: (1) Ruling 20, added after the automated security review of Task 4
-(a controller ruling): `ContentTab.tabChoices()` carries a tab's title only for a plugin that holds `terminal.observe`,
-or when the tab shows the plugin's own content, else "Tab N" (Task 4's fix round); (2) Task 4: `PaneItems`'s class
-Javadoc re-wrapped, wording only; (3) Task 5's fix round: `WindowTabs.refresh` re-slots the strip's entries at once when
-a merge or a move changes their order (plan 8c's last-pane move was affected too), `WorkspaceView.join` checks what
-arrived, `Layout.insertBeside` checks its arguments first; (4) Task 5: the shown tab merging into a hidden one announces
-nothing, as plan 8c's rule has it; (5) Task 7: two tests beyond the plan, from Task 6's review; (6) Task 8: two sentences
-the new menu entry made stale are corrected in plugin authoring and the Editor guide, and Ruling 20 is in plugin authoring, the SDK README, the SDK reference's guide page and the Editor guide.
+**Status: executed on 2026-10-21** (`b748fa26a..54ab42da3`, then the final review's fix wave's documentation commit);
+see `docs/STATUS.md`. Written against `claude/workspace-tabs` at `ff322c478` ("Spec: pane flexibility approved by the
+user; the tabs and panes spec points at it"), in parallel with plan 9b
+(`2026-10-21-workspace-9b-two-views-of-a-file.md`), which executes after this one and re-anchors on it. Deviations from
+the plan's text: (1) Ruling 20, added after the automated security review of Task 4 (a controller ruling):
+`ContentTab.tabChoices()` carries a tab's title only for a plugin that holds `terminal.observe`, or when the tab shows
+the plugin's own content, else "Tab N" (Task 4's fix round); (2) Task 4: `PaneItems`'s class Javadoc re-wrapped, wording
+only; (3) Task 5's fix round: `WindowTabs.refresh` re-slots the strip's entries at once when a merge or a move changes
+their order (plan 8c's last-pane move was affected too), `WorkspaceView.join` checks what arrived, `Layout.insertBeside`
+checks its arguments first; (4) Task 5: the shown tab merging into a hidden one announces nothing, as plan 8c's rule has
+it; (5) Task 7: two tests beyond the plan, from Task 6's review, and its fix round (`1a0f587b0`): the `springRest()`
+seam, tests that pin the slop and an entry boundary within it, and one hit-test for spring-loading and a pane drag's
+hover; (6) Task 8: two sentences the new menu entry made stale are corrected in plugin authoring and the Editor guide,
+and Ruling 20 is in plugin authoring, the SDK README, the SDK reference's guide page and the Editor guide; (7) the final
+review's fix wave: Rulings 21 to 23 (of Jasper's windows the one on top under the cursor takes or refuses a drag's drop;
+Move Tab Into in the Tab menu and Move Tab Into Tab 1 to 9, unbound, so Ruling 9's Move Tab Into has keymap actions
+after all; a classic strip's "+" springs no tab), `EditorWindow.openBeside` refusing another placement before its
+chooser shows, `WindowManager.moveTabInto` refusing the main window's empty workspace, and the tests the task reviews
+left for it.
 Tasks 1 to 8 ran their scripts with no anchor re-found.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

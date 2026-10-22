@@ -35,9 +35,8 @@ pane by a screen less one line on every platform; they are not rebindable and ne
 Right-clicking a pane (Shift-right-clicking while a program asks for [mouse reports](#mouse-reporting)) focuses it and
 opens its context menu: **Copy**, **Paste**, **Find**, **Clear Terminal**, **Split** (a terminal, an editor, a file you
 choose or a plugin's view, right or down), **Move Pane to New Tab**, **Move Pane to Tab**, **Maximize Pane** and **Close
-Pane**, then **Move Tab to New Window**
-(and **Move to Main Window** in a child window) and the items plugins add, such as Remote's **Open SFTP here** and File Server's **Share
-Path**.
+Pane**, then **Move Tab to New Window** (and **Move to Main Window** in a child window) and the items plugins add, such
+as Remote's **Open SFTP here** and File Server's **Share Path**.
 
 ## Shells and profiles
 

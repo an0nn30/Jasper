@@ -24,9 +24,9 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   asks where to save it.
 - **Open File Right…** and **Open File Down…**, in the Split submenus (the command palette calls them **Split Right
   with Open File…** and **Split Down with Open File…**), and **Open in Editor Pane…** in the File menu, which does what
-  Open File Right does, show the file chooser for one file and open it in a new pane beside the focused pane, which it
-  then has. A file that is open already shows its open pane instead; cancelling opens nothing. None of these has a
-  default shortcut.
+  Open File Right does, show the file chooser for one file and open it in a new pane beside the focused pane; the new
+  pane takes the focus. A file that is open already shows its open pane instead; cancelling opens nothing. None of these
+  has a default shortcut.
 - **Recent Files…** (command palette) reopens a file the Editor opened before; see [Recent files](#recent-files).
 - **Show Editor** (command palette) selects the Editor tab you were last in, or opens an untitled tab when there is
   none.
