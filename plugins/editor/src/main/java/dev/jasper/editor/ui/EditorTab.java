@@ -19,13 +19,21 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
 import org.fife.ui.rtextarea.RTextScrollPane;
 
-/** One document's descriptor controller. Only {@link DocumentArea} owns specialized Swing document content. */
+/**
+ * One view of a document: its descriptor controller. Only {@link DocumentArea} owns specialized Swing document content.
+ * A document can have several views (pane flexibility spec 6), which show one text with one undo history; each has its
+ * own caret, selection, scroll position, find bar, Vim state and Markdown mode.
+ */
 public final class EditorTab {
     static final String DOCUMENT = "document", CONTENT = "document.content", STATE = "document.state", BANNER = "document.banner";
     static final String RETRY = "document.retry", DISMISS = "document.dismiss", FIRST = "document.banner.first", SECOND = "document.banner.second";
     static final String FAILED_TITLE = "Could Not Open File";
     private final DocumentSession session;
-    private final DocumentArea document = new DocumentArea();
+    private final DocumentArea document;
+    /** The document's views, this one among them, through which its session reads and replaces the text. */
+    private final TextViews views;
+    /** The view's listener on its session, which goes when the view closes: the session may outlive it. */
+    private final Runnable refreshing = this::refresh;
     private final UiView view;
     private final Consumer<EditorTab> close;
     private final Timer edits;
@@ -117,18 +125,31 @@ public final class EditorTab {
     }
     void active(boolean value) { if (markdown != null) markdown.active(value); }
 
-    /** Creates an owned kit view; closing the hosted view ends document refreshes as well. */
+    /** Creates an owned kit view, the session's first; closing the hosted view ends document refreshes as well. */
     public EditorTab(UiKit kit, DocumentSession session, Consumer<EditorTab> close, boolean debounce) {
+        this(kit, session, close, debounce, null);
+    }
+
+    /**
+     * Creates an owned kit view of {@code session}; with {@code sharing}, another view of it, which shows the same text
+     * and undo history (pane flexibility spec 6).
+     *
+     * @param sharing an open view of the same session, or null for its first
+     */
+    EditorTab(UiKit kit, DocumentSession session, Consumer<EditorTab> close, boolean debounce, EditorTab sharing) {
+        if (sharing != null && sharing.session != session) throw new IllegalArgumentException("A view shares its own document's text");
         this.session = session;
         this.close = close;
         this.debounce = debounce;
+        document = new DocumentArea(sharing == null ? null : sharing.document);
+        views = sharing == null ? new TextViews(session) : sharing.views;
+        views.add(this);
         edits = new Timer(300, event -> { if (!closed) session.textEdited(); });
         edits.setRepeats(false);
         area().getDocument().addDocumentListener(editListener);
-        session.attach(area()::getText, this::replaceText);
         view = kit.create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.EDITOR, document, this::shutdown));
-        session.addListener(this::refresh);
+        session.addListener(refreshing);
         refresh();
     }
 
@@ -151,6 +172,9 @@ public final class EditorTab {
         if (vim != null) { vimBar.detach(); vim.close(); vim = null; }
         document.close();
         find = null;
+        session.removeListener(refreshing);
+        // Last: the listeners above leave the document this view shared, which its other views keep.
+        views.remove(this);
     }
 
     void appearance(Appearance appearance) { icons = appearance.presentation().icons(); document.appearance(appearance); render(); }
@@ -211,12 +235,28 @@ public final class EditorTab {
         if (markdown != null) markdown.sourceChanged();
         if (debounce) edits.restart(); else session.textEdited();
     }
-    private void replaceText(String text, boolean keepPosition) {
-        if (closed) return;
-        int line = keepPosition ? area().getCaretLineNumber() : 0;
+    /**
+     * A load or reload replaces the text every view of the document shows ({@link TextViews}): no edit is counted
+     * meanwhile.
+     *
+     * @param keepPosition whether the caret keeps its line
+     * @return the line the caret goes back to, 0-based
+     */
+    int beginReplace(boolean keepPosition) {
         replacing = true;
-        try { area().setText(text); } finally { replacing = false; }
-        area().discardAllEdits();
+        return keepPosition ? area().getCaretLineNumber() : 0;
+    }
+
+    /** The replaced text is in: edits count again. */
+    void endReplace() { replacing = false; }
+
+    /**
+     * After a replace, the caret goes to the start of {@code line}, or of the last line when the text is shorter, and
+     * Vim and the preview read the text again.
+     *
+     * @param line the line {@link #beginReplace} gave
+     */
+    void replaced(int line) {
         try { area().setCaretPosition(area().getLineStartOffset(Math.min(line, area().getLineCount() - 1))); }
         catch (BadLocationException impossible) { area().setCaretPosition(0); }
         if (vim != null) vim.textReplaced();
@@ -250,7 +290,8 @@ public final class EditorTab {
             case "markdown.images.retry" -> { if (markdown != null) markdown.retryImages(); }
             case "markdown.scroll-sync" -> { if (showingText() && markdownEligible()) { linkedScrolling = !linkedScrolling; document.scrollLink.linked(linkedScrolling); render(); } }
             case RETRY -> { if (session.deferred() || session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
-            case DISMISS -> { session.cancelLoad(); close.accept(this); }
+            // A read the file's other views wait for goes on (pane flexibility spec 6); the last view's Cancel stops it.
+            case DISMISS -> { if (views.size() == 1) session.cancelLoad(); close.accept(this); }
             case FIRST -> { if (session.banner() == DocumentSession.Banner.DELETED) close.accept(this); else if (session.banner() == DocumentSession.Banner.CHANGED) session.reloadFromBanner(); }
             case SECOND -> { if (session.banner() == DocumentSession.Banner.DELETED) session.keepDeleted(); else if (session.banner() == DocumentSession.Banner.CHANGED) session.keepMine(); }
             default -> { }

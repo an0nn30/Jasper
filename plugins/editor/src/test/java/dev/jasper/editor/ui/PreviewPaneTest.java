@@ -305,7 +305,7 @@ class PreviewPaneTest {
     }
     @Test void modesKeepSourceDocumentUndoCaretAndSplitRatio() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var area=new DocumentArea();area.setSize(900,500);area.doLayout();area.area.setText("first");area.area.append(" second");area.area.setCaretPosition(4);
+            var area=new DocumentArea(null);area.setSize(900,500);area.doLayout();area.area.setText("first");area.area.append(" second");area.area.setCaretPosition(4);
             var doc=area.area.getDocument();area.mode(MarkdownMode.SPLIT);area.doLayout();
             var split=(JSplitPane)area.getComponent(0);split.setDividerLocation(300);double ratio=area.dividerRatio();
             area.mode(MarkdownMode.PREVIEW);area.setSize(1200,500);area.mode(MarkdownMode.SPLIT);area.doLayout();

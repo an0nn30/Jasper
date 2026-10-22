@@ -92,7 +92,14 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private double opacity = 1;
     private Color background = Color.BLACK, gutter = Color.BLACK;
 
-    DocumentArea() {
+    /**
+     * The text column of a view; with {@code shares}, of another view of the same document, whose text area this one's
+     * shares before anything listens to it (pane flexibility spec 6).
+     *
+     * @param shares a view's text column, or null for the document's first
+     */
+    DocumentArea(DocumentArea shares) {
+        if (shares != null) area.share(shares.area);
         setLayout(new BorderLayout());
         preview=new PreviewPane(id -> activateLink.accept(id), this::previewGeometry);
         previewScroll=new JScrollPane(preview.editor());previewScroll.setBorder(BorderFactory.createEmptyBorder());

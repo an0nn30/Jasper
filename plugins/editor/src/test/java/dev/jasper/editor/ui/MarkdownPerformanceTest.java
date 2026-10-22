@@ -46,7 +46,7 @@ class MarkdownPerformanceTest {
                 System.out.printf("PERF %s prepare %.3f ms source=%d html=%d anchors=%d%n",name,(System.nanoTime()-start)/1e6,source.length(),prepared.result().html().length(),prepared.result().blocks().size());
                 int index=copy;
                 edt(() -> measure(name+" source setup "+index,() -> {
-                    var area=new DocumentArea();areas.add(area);area.setFont(new Font("Serif",0,16));
+                    var area=new DocumentArea(null);areas.add(area);area.setFont(new Font("Serif",0,16));
                     area.area.typography(PreviewPaneTest.TYPE);area.area.setText(source);area.area.setCaretPosition(0);area.area.setLineWrap(true);area.mode(MarkdownMode.SPLIT);
                     area.preview().install(prepared,PreviewPaneTest.TYPE,PreviewPaneTest.palette(false),EditorThemeTest.syntax(1),area.getFont(),1);
                 }));

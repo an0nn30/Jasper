@@ -26,7 +26,7 @@ class ScrollLinkTest {
         Fixture(String text, java.util.function.Consumer<DocumentArea> setup) throws Exception {
             prepared=PreviewPaneTest.prepare(text);
             edt(() -> {
-                area=new DocumentArea();area.setFont(new Font("Serif",0,16));
+                area=new DocumentArea(null);area.setFont(new Font("Serif",0,16));
                 area.area.typography(PreviewPaneTest.TYPE);area.area.setText(text);area.area.setCaretPosition(0);area.area.setLineWrap(true);
                 setup.accept(area);area.mode(MarkdownMode.SPLIT);
                 area.preview().install(prepared,PreviewPaneTest.TYPE,PreviewPaneTest.palette(false),EditorThemeTest.syntax(1),area.getFont(),1);

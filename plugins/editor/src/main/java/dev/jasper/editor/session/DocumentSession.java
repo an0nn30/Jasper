@@ -104,6 +104,9 @@ public final class DocumentSession {
     /** @param listener runs after any change a view shows */
     public void addListener(Runnable listener) { listeners.add(Objects.requireNonNull(listener)); }
 
+    /** @param listener one {@link #addListener} added, which runs no more */
+    public void removeListener(Runnable listener) { listeners.remove(listener); }
+
     /**
      * Waits to read the document: Jasper restored its tab, and it reads when its tab is first active or Load is pressed,
      * that first read asking nothing (workspace tabs spec 13).
