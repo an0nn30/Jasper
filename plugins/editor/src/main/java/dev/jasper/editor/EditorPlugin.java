@@ -47,7 +47,8 @@ import javax.swing.SwingUtilities;
 public final class EditorPlugin implements Plugin {
     static final String OPEN = "dev.jasper.editor.open", NEW_TAB = "dev.jasper.editor.new_editor_tab", SHOW = "dev.jasper.editor.show",
         NEW_WINDOW = "dev.jasper.editor.new_window", REVERT = "dev.jasper.editor.revert",
-        RELOAD_VIMRC = "dev.jasper.editor.reload_vimrc", OPEN_IN_PANE = "dev.jasper.editor.open_in_pane";
+        RELOAD_VIMRC = "dev.jasper.editor.reload_vimrc", OPEN_IN_PANE = "dev.jasper.editor.open_in_pane",
+        SPLIT_FILE_RIGHT = "dev.jasper.editor.split_file_right", SPLIT_FILE_DOWN = "dev.jasper.editor.split_file_down";
     /**
      * The Editor's split item (tabs and panes spec 8 and 10): Split Right with Editor, which is New Editor Pane, and Split
      * Down with Editor (workspace plan 8b Rulings 13).
@@ -141,6 +142,13 @@ public final class EditorPlugin implements Plugin {
             invoked -> window().revert(invoked.window()));
         context.actions().register(ActionSpec.of(RELOAD_VIMRC, "Reload vimrc").withKeywords(List.of("editor", "vim", "vimrc", "reload")),
             invoked -> window().reloadVimrc(invoked.window()));
+        // Pane flexibility spec 6: the window's file in another view, in a new pane beside its own; no default key.
+        context.actions().register(ActionSpec.of(SPLIT_FILE_RIGHT, "Split File Right")
+                .withKeywords(List.of("editor", "split", "file", "right", "view", "pane")),
+            invoked -> window().splitFile(invoked.window(), dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT));
+        context.actions().register(ActionSpec.of(SPLIT_FILE_DOWN, "Split File Down")
+                .withKeywords(List.of("editor", "split", "file", "down", "view", "pane")),
+            invoked -> window().splitFile(invoked.window(), dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN));
         // Workspace tabs spec 6.5: an untitled document in a child window of its own; no default key. Its icon is the toolbar button's.
         context.actions().register(ActionSpec.of(NEW_WINDOW, "New Editor Window").withIcon("file")
                 .withKeywords(List.of("editor", "new", "window", "untitled")),

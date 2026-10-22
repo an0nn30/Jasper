@@ -11920,7 +11920,7 @@ client; until then it is empty.</p></div>
 <p class="group-lead">Packages that bundled plugins export to other plugins. Declare the exporting plugin under <code>requires</code> in <code>plugin.toml</code> (usually with <code>optional = true</code>), compile against its jar, and look its services up with <code>Services.find</code> or <code>Services.require</code>.</p>
 <section class="package" id="package-dev.jasper.editor.api">
 <h3 class="package-title"><span class="kind kind-package">package</span> <code>dev.jasper.editor.api</code></h3>
-<p class="export">Exported by <b>Editor</b> <code>dev.jasper.editor</code> 0.14.0. Declare it in <code>plugin.toml</code>: <code>requires = [{ id = "dev.jasper.editor", version = "&gt;=0.14.0", optional = true }]</code>.</p>
+<p class="export">Exported by <b>Editor</b> <code>dev.jasper.editor</code> 0.15.0. Declare it in <code>plugin.toml</code>: <code>requires = [{ id = "dev.jasper.editor", version = "&gt;=0.15.0", optional = true }]</code>.</p>
 <div class="doc"><p>The Editor's exported API: open a local file, or a document another plugin reads and writes; make recent documents
 reopenable; answer Open in Editor… and offer a file source's places in Open in Editor… and Save As. May depend on:
 the JDK and the SDK.</p></div>
@@ -11961,14 +11961,14 @@ only.</p></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.editor.api.Editor.open(Path)">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.Editor.open(Path)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>open</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html" title="java.nio.file.Path">Path</a> file)</code></pre>
-<div class="doc"><p>Opens a local file in a new tab of the main window, or selects the tab already showing it, and brings that tab's
-window to the front.</p></div>
+<div class="doc"><p>Opens a local file in a new tab of the main window, or selects the tab already showing it (of several, the one
+focused last), and brings that tab's window to the front.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>file</code> a local file</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.Editor.open(EditorDocument)">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.Editor.open(EditorDocument)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>open</b>(<a class="tl" href="#dev.jasper.editor.api.EditorDocument">EditorDocument</a> document)</code></pre>
 <div class="doc"><p>Opens a document another plugin provides in a new tab of the main window, or selects the tab whose document has the
-same key, and brings that tab's window to the front.</p></div>
+same key (of several, the one focused last), and brings that tab's window to the front.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>document</code> the document</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.Editor.open(Path,WindowOwner)">
@@ -11976,7 +11976,8 @@ same key, and brings that tab's window to the front.</p></div>
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html" title="java.nio.file.Path">Path</a> file,
         <a class="tl" href="#dev.jasper.sdk.WindowOwner">WindowOwner</a> owner)</code></pre>
 <div class="doc"><p>Opens a local file in a new tab of the window the request came from, or of the main window when <code>owner</code> is
- null; a file already open is selected in its tab, wherever that is. The interface default ignores <code>owner</code>.</p></div>
+ null; a file already open is selected in its tab, wherever that is (of several, the one focused last). The
+ interface default ignores <code>owner</code>.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>file</code> local file</dd><dd><code>owner</code> the Jasper window or content tab the request came from, or null</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.Editor.open(EditorDocument,WindowOwner)">
@@ -11984,8 +11985,8 @@ same key, and brings that tab's window to the front.</p></div>
         <a class="tl" href="#dev.jasper.editor.api.EditorDocument">EditorDocument</a> document,
         <a class="tl" href="#dev.jasper.sdk.WindowOwner">WindowOwner</a> owner)</code></pre>
 <div class="doc"><p>Opens a document in a new tab of the window the request came from, or of the main window when <code>owner</code> is
- null; a document whose key is already open is selected in its tab, wherever that is. The interface default ignores
- <code>owner</code>.</p></div>
+ null; a document whose key is already open is selected in its tab, wherever that is (of several, the one focused
+ last). The interface default ignores <code>owner</code>.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>document</code> document to open</dd><dd><code>owner</code> the Jasper window or content tab the request came from, or null</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.Editor.reopener(String,Function)">
@@ -12027,8 +12028,9 @@ UI thread; none may block. Futures may complete on any thread.</p></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.editor.api.EditorDocument.key()">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.EditorDocument.key()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> <b>key</b>()</code></pre>
-<div class="doc"><p>The document's stable identity. Opening a document whose key is already open selects that tab; Recent Files
-records the key, and <a href="#dev.jasper.editor.api.Editor.reopener(String,Function)"><code>Editor.reopener</code></a> resolves it by its prefix. Start it with a prefix of the plugin's
+<div class="doc"><p>The document's stable identity. Opening a document whose key is already open selects its tab (of several, the one
+focused last), and every tab that shows it shares one read, one text and one save. Recent Files records the key,
+and <a href="#dev.jasper.editor.api.Editor.reopener(String,Function)"><code>Editor.reopener</code></a> resolves it by its prefix. Start it with a prefix of the plugin's
 own, the one it passes to <a href="#dev.jasper.editor.api.Editor.reopener(String,Function)"><code>Editor.reopener</code></a> (for example <code>&quot;remote:&quot;</code>), never <code>&quot;local:&quot;</code>, which
 the Editor uses for local files.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>stable identity: two documents with equal keys are the same file</dd></dl>

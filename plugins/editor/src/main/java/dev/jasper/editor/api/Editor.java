@@ -13,8 +13,8 @@ import java.util.function.Predicate;
  */
 public interface Editor {
     /**
-     * Opens a local file in a new tab of the main window, or selects the tab already showing it, and brings that tab's
-     * window to the front.
+     * Opens a local file in a new tab of the main window, or selects the tab already showing it (of several, the one
+     * focused last), and brings that tab's window to the front.
      *
      * @param file a local file
      */
@@ -22,21 +22,22 @@ public interface Editor {
 
     /**
      * Opens a document another plugin provides in a new tab of the main window, or selects the tab whose document has the
-     * same key, and brings that tab's window to the front.
+     * same key (of several, the one focused last), and brings that tab's window to the front.
      *
      * @param document the document
      */
     void open(EditorDocument document);
     /** Opens a local file in a new tab of the window the request came from, or of the main window when {@code owner} is
-     * null; a file already open is selected in its tab, wherever that is. The interface default ignores {@code owner}.
+     * null; a file already open is selected in its tab, wherever that is (of several, the one focused last). The
+     * interface default ignores {@code owner}.
      * @param file local file
      * @param owner the Jasper window or content tab the request came from, or null
      */
     default void open(Path file, WindowOwner owner) { open(file); }
 
     /** Opens a document in a new tab of the window the request came from, or of the main window when {@code owner} is
-     * null; a document whose key is already open is selected in its tab, wherever that is. The interface default ignores
-     * {@code owner}.
+     * null; a document whose key is already open is selected in its tab, wherever that is (of several, the one focused
+     * last). The interface default ignores {@code owner}.
      * @param document document to open
      * @param owner the Jasper window or content tab the request came from, or null
      */

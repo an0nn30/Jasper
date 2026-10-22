@@ -85,11 +85,13 @@ class TabShortcutCollisionTest {
     /**
      * Tabs and panes spec 10 and 16 (workspace plan 8b Rulings 12 and 20): the Editor's New Editor Tab, its split item's
      * two actions, Revert to Saved and Reload vimrc are registered, have no default on either platform, and can be bound.
+     * So are pane flexibility spec 6's Split File Right and Split File Down.
      */
     @Test void theEditorsNewActionsHaveNoDefaultAndCanBeBound() throws Exception {
         var extensions = started();
         var ids = List.of("dev.jasper.editor.new_editor_tab", "dev.jasper.editor.split_right_editor",
-            "dev.jasper.editor.split_down_editor", "dev.jasper.editor.revert", "dev.jasper.editor.reload_vimrc");
+            "dev.jasper.editor.split_down_editor", "dev.jasper.editor.revert", "dev.jasper.editor.reload_vimrc",
+            "dev.jasper.editor.split_file_right", "dev.jasper.editor.split_file_down");
         onEdt(() -> {
             assertThat(contributions.splitItems()).extracting(SplitItem::label).as("the Editor's split item").contains("Editor");
             assertThat(extensions).extracting(KeyBindings.Extension::id).containsAll(ids);

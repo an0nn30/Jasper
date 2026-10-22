@@ -459,6 +459,38 @@ class EditorPluginTest {
         }
     }
 
+    /**
+     * Pane flexibility spec 6: Split File Right and Split File Down, with no default key, show the window's file in
+     * another view, in a new pane beside its own; the Tab menu's item commands list them too.
+     */
+    @Test void splitFileRightAndDownShowTheWindowsFileInAnotherViewBesideIt() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow();
+            assertThat(host.actions()).contains("dev.jasper.editor.split_file_right|Split File Right|true",
+                "dev.jasper.editor.split_file_down|Split File Down|true");
+            for (String id : List.of("dev.jasper.editor.split_file_right", "dev.jasper.editor.split_file_down"))
+                assertThat(host.actionSpec(id)).as(id).hasValueSatisfying(spec -> {
+                    assertThat(spec.defaultBinding()).as("no default key").isEmpty();
+                    assertThat(spec.keywords()).contains("split", "file");
+                });
+            assertThat(host.invoke("dev.jasper.editor.split_file_right", main, null)).isTrue();
+            assertThat(host.contentTabs()).as("no file, nothing to split").isEmpty();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            consumer.get().services().require(Editor.class).open(Files.writeString(home.resolve("view.txt"), "x\n"));
+            drain(host);
+            assertThat(host.invoke("dev.jasper.editor.split_file_right", main, null)).isTrue();
+            assertThat(host.invoke("dev.jasper.editor.split_file_down", main, null)).isTrue();
+            assertThat(host.windowTabs(main)).as("one tab of three views of the file").singleElement()
+                .satisfies(panes -> assertThat(panes).hasSize(3));
+            assertThat(host.contentTabs()).hasSize(3)
+                .allSatisfy(tab -> assertThat(host.contentPresentation(tab).title()).isEqualTo("view.txt"));
+            assertThat(host.contentCommands(host.contentTabs().getFirst())).extracting(dev.jasper.sdk.ui.ContentCommand::title)
+                .as("the Tab menu's item commands").contains("Split File Right", "Split File Down");
+        }
+    }
+
     /** Workspace tabs spec 6.5: New Editor Window, with no default key, opens an untitled document in a new child window. */
     @Test void newEditorWindowOpensAnUntitledDocumentInANewChildWindow() throws Exception {
         try (var host = host()) {

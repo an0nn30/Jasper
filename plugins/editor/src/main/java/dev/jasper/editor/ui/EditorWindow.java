@@ -50,8 +50,10 @@ import org.fife.ui.rsyntaxtextarea.RSyntaxTextAreaEditorKit;
 public final class EditorWindow {
     /** The restorer kind of a document tab, and the key its restore state names the document by (workspace tabs spec 13). */
     public static final String RESTORE_KIND = "document", RESTORE_KEY = "key";
-    // Revert to Saved too: the tab strip's menu, its other place, hides with one tab (workspace plan 8b Rulings 20).
-    private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment", "revert");
+    // Revert to Saved too: the tab strip's menu, its other place, hides with one tab (workspace plan 8b Rulings 20). Split
+    // File Right and Down too (pane flexibility spec 6).
+    private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment", "revert", "split-file-right",
+        "split-file-down");
 
     private final EditorEnvironment environment;
     private final dev.jasper.editor.markdown.resources.ImageLoader imageLoader;
@@ -63,6 +65,14 @@ public final class EditorWindow {
     private final Locations locations;
     private final EditorModel model = new EditorModel();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
+    /** Every view, the most recently active first (pane flexibility spec 6): a file's first here is the one an open selects. */
+    private final List<EditorTab> recent = new ArrayList<>();
+    /** Each file's question owner: the tab of its most recently active view, over which its prompts show. */
+    private final java.util.Map<DocumentSession, java.util.concurrent.atomic.AtomicReference<WindowOwner>> questionOwners = new java.util.HashMap<>();
+    /** What {@link #closed} handed out for a file, completed when its last view closes. */
+    private final java.util.Map<DocumentSession, List<CompletableFuture<Void>>> lastViewClosed = new java.util.HashMap<>();
+    /** Each view's listener on its file's session, which goes with the view: the session outlives it while others show it. */
+    private final java.util.Map<EditorTab, Runnable> sessionListeners = new java.util.HashMap<>();
     private final java.util.Map<EditorTab, Boolean> markdownCommandsReady = new java.util.HashMap<>();
     private EditorTab selectedTab;
     private WindowOwner origin;
@@ -82,11 +92,11 @@ public final class EditorWindow {
     private boolean showingEmpty = true;
     private boolean guarding;
     private final Vim vim;
-    /** Each tab's Vim buffer number (Vim spec 6.2), kept while it is open. */
+    /** Each file's Vim buffer number (Vim spec 6.2), kept while it is open, however many views show it. */
     private final java.util.Map<DocumentSession, Integer> numbers = new java.util.HashMap<>();
     private int nextNumber = 1;
-    /** The tab selected before the current one: Vim's alternate buffer. */
-    private EditorTab previous;
+    /** The file selected before the current one, another than it: Vim's alternate buffer. */
+    private DocumentSession previous;
     /** Untitled tabs {@code :e} opened for files that do not exist yet: their first save creates the file. */
     private final java.util.Map<DocumentSession, Path> newFiles = new java.util.HashMap<>();
     /** Tabs {@code :q!} closes: their changes go without asking. */
@@ -184,6 +194,8 @@ public final class EditorWindow {
             new Command("markdown.split", "Markdown: Source and Preview", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.SPLIT)),
             new Command("markdown.preview", "Markdown: Preview", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW)),
             new Command("revert", "Revert to Saved", Optional.empty(), false, this::revert),
+            new Command("split-file-right", "Split File Right", Optional.empty(), false, () -> splitFile(dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT)),
+            new Command("split-file-down", "Split File Down", Optional.empty(), false, () -> splitFile(dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN)),
             new Command("language", "Language…", Optional.empty(), false, this::chooseLanguage),
             new Command("wrap", "Toggle Soft Wrap", Optional.empty(), false, this::toggleWrap),
             new Command("toggle-vim", "Toggle Vim Mode", Optional.empty(), false, this::toggleVim),
@@ -193,15 +205,26 @@ public final class EditorWindow {
         ticker = new Timer(2000, event -> watcher.tick());
         noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> {tab.navigationNotice("");tab.session().clearNotice();}));
         noticeTimer.setRepeats(false);
-        closeRegistration = context.windows().onTabsClosing((handles, batch) -> {
-            var closing = hosted.entrySet().stream().filter(e -> handles.contains(e.getValue())).map(java.util.Map.Entry::getKey).toList();
-            if (closing.isEmpty()) return CompletableFuture.completedFuture(true);
-            if (!batch && closing.size() == 1) return approveTab(closing.getFirst());
-            promptOwner = handles.getFirst();
-            try { return CompletableFuture.completedFuture(mayClose(closing)); }
-            finally { promptOwner = null; }
-        });
+        closeRegistration = context.windows().onTabsClosing(this::tabsClosing);
         if (environment.timers()) ticker.start();
+    }
+
+    /**
+     * The closing guard Jasper asks before content tabs close: one tab's own close ({@code batch} false), or a window's,
+     * a quit's or a restart's batch. A view of a file another view still shows closes without a question (pane
+     * flexibility spec 6).
+     *
+     * @param handles the closing tabs, the Editor's among them
+     * @param batch whether a window, a quit or a restart closes them
+     * @return whether they may close
+     */
+    CompletableFuture<Boolean> tabsClosing(List<ContentTab> handles, boolean batch) {
+        var closing = hosted.entrySet().stream().filter(e -> handles.contains(e.getValue())).map(java.util.Map.Entry::getKey).toList();
+        if (closing.isEmpty()) return CompletableFuture.completedFuture(true);
+        if (!batch && closing.size() == 1) return approveTab(closing.getFirst());
+        promptOwner = handles.getFirst();
+        try { return CompletableFuture.completedFuture(mayClose(closing)); }
+        finally { promptOwner = null; }
     }
 
     /**
@@ -228,10 +251,13 @@ public final class EditorWindow {
         return true;
     }
 
-    /** @param document opened in a new tab, or its open tab selected; the window comes to the front */
+    /** @param document opened in a new tab, or its open tab selected, of several the one focused last; the window comes to the front */
     public void open(EditorDocument document) { open(document, null); }
 
-    /** Opens a file in the window the request came from; null chooses the main window. */
+    /**
+     * Opens a file in the window the request came from; null chooses the main window. A file already open has its view
+     * selected, of several the one focused last (pane flexibility spec 6).
+     */
     public void open(EditorDocument document, WindowOwner owner) {
         origin = owner;
         Optional<DocumentSession> existing = model.find(document.key());
@@ -266,7 +292,7 @@ public final class EditorWindow {
     /**
      * Opens {@code document} in a new pane at {@code placement} beside the focused pane of {@code owner}'s window, which
      * the new pane then has, as Split Right with Editor opens an untitled one (pane flexibility spec 3). A document that is
-     * open already shows its open pane, as {@link #open} shows it (workspace plan 9a Rulings 4).
+     * open already shows there in another view of it (pane flexibility spec 6), reported again as {@link #open} reports it.
      *
      * @param document the document
      * @param owner the window
@@ -278,8 +304,8 @@ public final class EditorWindow {
         origin = owner;
         Optional<DocumentSession> existing = model.find(document.key());
         if (existing.isPresent()) {
-            // Until plan 9b's second view: the file's open pane shows, as Open in Editor… shows it.
-            selectOpen(existing.get());
+            // Pane flexibility spec 6: another view of the file, beside the focused pane.
+            openView(existing.get(), owner, placement);
             return;
         }
         openSession(document, placement);
@@ -310,8 +336,7 @@ public final class EditorWindow {
 
     EditorTab openLinked(EditorTab originTab, EditorDocument document) {
         open(document, hosted.get(originTab));
-        var session = model.find(document.key()).orElseThrow();
-        return hosted.keySet().stream().filter(tab -> tab.session() == session).findFirst().orElseThrow();
+        return views(model.find(document.key()).orElseThrow()).getFirst();
     }
 
     /** Reports a new tab's document the first time it becomes ready: a failed read reports nothing, a successful retry does. */
@@ -326,7 +351,7 @@ public final class EditorWindow {
             question -> owner.get() instanceof ContentTab tab && tab.isClosed() ? question.dismissed() : environment.askers().apply(owner.get()).apply(question), () -> environment.settings().get().maxFileBytes());
     }
     private WindowOwner owner() { return promptOwner != null ? promptOwner : selectedTab == null ? origin : hosted.get(selectedTab); }
-    private WindowOwner owner(DocumentSession session) { return hosted.entrySet().stream().filter(e -> e.getKey().session() == session).map(e -> (WindowOwner)e.getValue()).findFirst().orElseGet(this::owner); }
+    private WindowOwner owner(DocumentSession session) { return views(session).stream().findFirst().map(hosted::get).map(WindowOwner.class::cast).orElseGet(this::owner); }
     /**
      * The owner another plugin's code is handed: the window, never the Editor's tab, whose handle carries the Editor's
      * authority over the tab, its {@code terminal.open} for Terminal Right and Down included (workspace plan 8b's final
@@ -403,19 +428,20 @@ public final class EditorWindow {
         return true;
     }
 
-    /** Completes once the session's tab has closed: when the user closes it, its window closes or the Editor stops. */
+    /**
+     * Completes once the session's last view has closed: when the user closes it, its window closes or the Editor stops
+     * (pane flexibility spec 6).
+     */
     public CompletableFuture<Void> closed(DocumentSession session) {
         var done = new CompletableFuture<Void>();
-        var handle = hosted.entrySet().stream().filter(entry -> entry.getKey().session() == session)
-            .map(Map.Entry::getValue).findFirst();
-        if (handle.isEmpty() || handle.get().isClosed()) done.complete(null);
-        else handle.get().onClosed(() -> done.complete(null));
+        if (views(session).isEmpty()) done.complete(null);
+        else lastViewClosed.computeIfAbsent(session, waiting -> new ArrayList<>()).add(done);
         return done;
     }
 
     private void moveCaret(DocumentSession session, int line, int column) {
         if (line <= 0) return;
-        hosted.keySet().stream().filter(tab -> tab.session() == session).findFirst().ifPresent(tab -> {
+        views(session).stream().findFirst().ifPresent(tab -> {
             var area = tab.area();
             int index = Math.min(line, area.getLineCount()) - 1;
             try {
@@ -644,6 +670,8 @@ public final class EditorWindow {
         if (!hosted.containsKey(tab)) return CompletableFuture.completedFuture(true);
         if (discarding.remove(tab)) return CompletableFuture.completedFuture(true);
         DocumentSession session = tab.session();
+        // Pane flexibility spec 6: the file's other views keep its changes, so only its last view asks.
+        if (views(session).size() > 1) return CompletableFuture.completedFuture(true);
         var pending = session.pendingSave();
         if (pending.isPresent()) return pending.get().thenCompose(saved -> saved ? approveTab(tab) : CompletableFuture.completedFuture(false));
         if (!session.dirty()) return CompletableFuture.completedFuture(true);
@@ -728,7 +756,8 @@ public final class EditorWindow {
      * then asks about unsaved tabs, and saves them all when asked to. Re-checks after each wait, since edits made
      * during it can leave a tab saving again or dirty again, rather than trusting a single pass to still hold.
      * Refuses while it is already asking or waiting: a quit or close that arrives during its prompt or wait
-     * would otherwise wait on saves that cannot finish until the outer prompt returns.
+     * would otherwise wait on saves that cannot finish until the outer prompt returns. It asks about a file only when
+     * every view of it closes (pane flexibility spec 6), and then once.
      */
     boolean mayClose() { return mayClose(editorTabs()); }
     private boolean mayClose(List<EditorTab> closing) {
@@ -739,7 +768,7 @@ public final class EditorWindow {
         guarding = true;
         try {
             while (true) {
-                List<DocumentSession> running = closing.stream().map(EditorTab::session).filter(model.sessions()::contains).filter(DocumentSession::saving).toList();
+                List<DocumentSession> running = lastViews(closing).stream().filter(DocumentSession::saving).toList();
                 if (!running.isEmpty()) {
                     // Waits only on the saves already in flight; it starts none of its own, so a tab whose save
                     // finishes and is then edited again is not silently written without asking.
@@ -747,7 +776,7 @@ public final class EditorWindow {
                     if (!await.apply(saving(running.size()), allSucceeded(inFlight))) return false;
                     continue;
                 }
-                List<DocumentSession> dirty = closing.stream().map(EditorTab::session).filter(model.sessions()::contains).filter(DocumentSession::dirty).toList();
+                List<DocumentSession> dirty = lastViews(closing).stream().filter(DocumentSession::dirty).toList();
                 if (dirty.isEmpty()) return true;
                 String answer = ask.apply(new Question("Unsaved changes", unsaved(dirty), List.of("Save All", "Discard", "Cancel")));
                 if ("Discard".equals(answer)) return true;
@@ -764,6 +793,12 @@ public final class EditorWindow {
         } finally {
             guarding = false;
         }
+    }
+
+    /** The open files every view of which is among {@code closing}, each once: only they lose their changes. */
+    private List<DocumentSession> lastViews(List<EditorTab> closing) {
+        return closing.stream().map(EditorTab::session).distinct().filter(model.sessions()::contains)
+            .filter(session -> closing.containsAll(views(session))).toList();
     }
 
     private void shutDown() {
@@ -805,18 +840,26 @@ public final class EditorWindow {
             EditorWindow::readText);
     }
 
+    /**
+     * The open files as Vim's buffers, one each however many views show it, as Vim shows one buffer in many windows
+     * (pane flexibility spec 6): the current one is {@code editor}'s, and its line is the caret's in {@code editor}'s view,
+     * another's in its most recently active view.
+     */
     private List<VimHost.Buffer> buffers(dev.jasper.editor.vim.VimEditor editor) {
         var current = tabOf(editor).orElse(null);
-        return editorTabs().stream().map(tab -> {
-            DocumentSession session = tab.session();
+        DocumentSession here = current == null ? null : current.session();
+        return model.sessions().stream().filter(session -> !views(session).isEmpty()).map(session -> {
             Optional<Path> file = localFile(session).or(() -> Optional.ofNullable(newFiles.get(session)));
-            return new VimHost.Buffer(numbers.get(session), session.location(), file, tab == current, tab == previous && tab != current,
-                session.dirty(), session.untitled() && !newFiles.containsKey(session), tab.area().getCaretLineNumber() + 1);
+            EditorTab view = session == here ? current : views(session).getFirst();
+            return new VimHost.Buffer(numbers.get(session), session.location(), file, session == here, session == previous && session != here,
+                session.dirty(), session.untitled() && !newFiles.containsKey(session), view.area().getCaretLineNumber() + 1);
         }).toList();
     }
 
+    /** @return the most recently active view of the file with buffer {@code number} */
     private Optional<EditorTab> tabNumbered(int number) {
-        return editorTabs().stream().filter(tab -> numbers.get(tab.session()) == number).findFirst();
+        return model.sessions().stream().filter(session -> numbers.get(session) == number).findFirst()
+            .flatMap(session -> views(session).stream().findFirst());
     }
 
     private Optional<EditorTab> tabOf(dev.jasper.editor.vim.VimEditor editor) {
@@ -918,11 +961,26 @@ public final class EditorWindow {
         add(session, ownerRef, dev.jasper.sdk.ui.TabPlacement.NEW_TAB);
     }
 
+    /** A newly open file and its first view, where {@code placement} puts it; {@code ownerRef} is its question owner. */
     private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef,
                      dev.jasper.sdk.ui.TabPlacement placement) {
+        session.setWrap(environment.settings().get().softWrap());
+        model.add(session);
+        numbers.put(session, nextNumber++);
+        questionOwners.put(session, ownerRef);
+        addView(session, placement, null);
+    }
+
+    /**
+     * A view of an open file where {@code placement} puts it: its first, or with {@code sharing} another, which shows the
+     * same text and undo history (pane flexibility spec 6).
+     *
+     * @param sharing an open view of the file, or null for its first
+     * @return the new view
+     */
+    private EditorTab addView(DocumentSession session, dev.jasper.sdk.ui.TabPlacement placement, EditorTab sharing) {
         EditorSettings settings = environment.settings().get();
-        session.setWrap(settings.softWrap());
-        var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
+        var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers(), sharing);
         tab.previews(context.background(), environment.ui(), imageLoader);
         tab.markdownPreferences(environment.markdownPreferences(), failed -> environment.ui().execute(() -> {
             if (!disposed) context.notifications().group().error("Could not save the Markdown default view", failed);
@@ -946,17 +1004,17 @@ public final class EditorWindow {
         tab.addToPopup(tabCommands.stream().filter(command -> POPUP.contains(command.id())).toList());
         tab.area().setTransferHandler(new FileDrop(tab.area().getTransferHandler(), this::openLocalFiles));
         tab.area().addCaretListener(event -> { if (selected().orElse(null) == tab) refreshStatus(); });
-        session.addListener(() -> {
+        Runnable refreshing = () -> {
             if (!hosted.containsKey(tab)) return;
             refreshCommands(tab);
             refreshHeaders();
             if (selected().orElse(null) == tab) refreshStatus();
-        });
-        model.add(session);
-        numbers.put(session, nextNumber++);
+        };
+        session.addListener(refreshing);
+        sessionListeners.put(tab, refreshing);
         var spec = new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name());
         var handle = context.windows().openTab(restoreState(session).map(spec::withRestore).orElse(spec), origin, tab.view(), placement);
-        hosted.put(tab, handle); ownerRef.set(handle);
+        hosted.put(tab, handle); recent.addFirst(tab); questionOwners.get(session).set(handle);
         handle.setFocusTarget(tab::focusContent);
         // A restored document on another host reads when its tab is first active (workspace tabs spec 13).
         handle.onActive(active -> { if (active) { activate(tab); if (session.deferred()) session.load(); } });
@@ -969,6 +1027,61 @@ public final class EditorWindow {
         activate(tab);
         readVimrcOnce();
         refresh();
+        return tab;
+    }
+
+    /**
+     * Split File Right and Split File Down (pane flexibility spec 6): the selected file in another view, in a new pane
+     * beside its own, which it selects first, so the new pane opens there though another pane had the focus. The new view
+     * starts at its source's caret, selection and scroll position.
+     *
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     */
+    public void splitFile(dev.jasper.sdk.ui.TabPlacement placement) {
+        selected().ifPresent(tab -> {
+            ContentTab handle = hosted.get(tab);
+            if (handle == null || handle.isClosed()) return;
+            handle.select();
+            origin = handle.window();
+            EditorTab view = addView(tab.session(), placement, tab);
+            // Rulings 19: the new view starts where its source is, as VS Code's Split Editor and IntelliJ's Split Vertically do.
+            var caret = tab.area().getCaret();
+            view.area().getCaret().setDot(caret.getMark());
+            view.area().getCaret().moveDot(caret.getDot());
+            java.awt.Point shown = tab.scroll().getViewport().getViewPosition();
+            javax.swing.SwingUtilities.invokeLater(() -> { if (!view.closed()) view.scroll().getViewport().setViewPosition(shown); });
+        });
+    }
+
+    /**
+     * Split File Right or Down as an action run in {@code window} does it, from the palette or a key: as
+     * {@link #splitFile(dev.jasper.sdk.ui.TabPlacement)}, for the file {@link #revert(WindowHandle)} would revert; nothing
+     * while the window shows no file.
+     *
+     * @param window the window the action ran in
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     */
+    public void splitFile(WindowHandle window, dev.jasper.sdk.ui.TabPlacement placement) {
+        fileIn(window).ifPresent(tab -> { activate(tab); splitFile(placement); });
+    }
+
+    /**
+     * Open File Right or Down of a file that is already open (pane flexibility spec 6): another view of it, in a new pane
+     * beside the focused pane of {@code owner}'s window, as Open in Editor… of an open file reports it again.
+     *
+     * @param session the open file
+     * @param owner the window or tab it was asked in
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     */
+    private void openView(DocumentSession session, WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
+        origin = owner;
+        addView(session, placement, views(session).stream().findFirst().orElse(null));
+        if (session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
+    }
+
+    /** A file's open views, the most recently active first (pane flexibility spec 6). */
+    private List<EditorTab> views(DocumentSession session) {
+        return recent.stream().filter(tab -> tab.session() == session).toList();
     }
 
     private void refreshCommands(EditorTab tab) {
@@ -1014,25 +1127,44 @@ public final class EditorWindow {
     private void remove(EditorTab tab) {
         if (hosted.remove(tab) == null) return;
         markdownCommandsReady.remove(tab);
-        tab.dispose(); tab.session().cancelLoad(); model.remove(tab.session());
-        numbers.remove(tab.session());
-        newFiles.remove(tab.session());
-        unrestorable.remove(tab.session());
+        recent.remove(tab);
         discarding.remove(tab);
-        if (previous == tab) previous = null;
+        DocumentSession session = tab.session();
+        Runnable refreshing = sessionListeners.remove(tab);
+        if (refreshing != null) session.removeListener(refreshing);
+        tab.dispose();
+        if (views(session).isEmpty()) forget(session);
+        else questionOwners.get(session).set(hosted.get(views(session).getFirst()));
         if (selectedTab == tab) selectedTab = hosted.keySet().stream().findFirst().orElse(null);
         if (selectedTab != null) activate(selectedTab);
         refresh();
     }
+
+    /** A file's last view has closed (pane flexibility spec 6): the file is no longer open. */
+    private void forget(DocumentSession session) {
+        session.cancelLoad(); model.remove(session);
+        numbers.remove(session);
+        newFiles.remove(session);
+        unrestorable.remove(session);
+        questionOwners.remove(session);
+        if (previous == session) previous = null;
+        var waiting = lastViewClosed.remove(session);
+        if (waiting != null) waiting.forEach(done -> done.complete(null));
+    }
+
+    /** Selects the file's most recently active view (pane flexibility spec 6). */
     private void select(DocumentSession session) {
-        for (var entry : hosted.entrySet()) if (entry.getKey().session() == session) { activate(entry.getKey()); entry.getValue().select(); return; }
+        views(session).stream().findFirst().ifPresent(tab -> { activate(tab); hosted.get(tab).select(); });
     }
     private void activate(EditorTab tab) {
         if (!hosted.containsKey(tab)) return;
         if (selectedTab != tab && selectedTab != null) {
             selectedTab.find(null);
-            previous = selectedTab;
+            if (selectedTab.session() != tab.session()) previous = selectedTab.session();
         }
+        recent.remove(tab);
+        recent.addFirst(tab);
+        questionOwners.get(tab.session()).set(hosted.get(tab));
         selectedTab = tab; tab.find(findBar); refreshStatus();
     }
     private void refreshFind() { if (!disposed && selectedTab != null) selectedTab.render(); }

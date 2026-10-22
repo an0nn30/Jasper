@@ -1264,10 +1264,10 @@ class EditorWindowTest {
     }
 
     /**
-     * Pane flexibility spec 3 and workspace plan 9a Rulings 4: Open File Right of a file that is open already shows its
-     * open pane, as Open in Editor… does, records it again and opens nothing.
+     * Pane flexibility spec 3 and 6: Open File Right of a file that is open already shows it in another view, in a new
+     * pane beside the focused pane, and records it again, as Open in Editor… of an open file does.
      */
-    @Test void openBesideOfAFileThatIsOpenShowsItsOpenPane() throws Exception {
+    @Test void openBesideOfAFileThatIsOpenShowsAnotherViewBesideTheFocusedPane() throws Exception {
         UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
         UUID pane = host.addTerminalPane(shell, dev.jasper.sdk.terminal.PaneInfo.unknown());
         WindowHandle handle = context.terminals().window(main).orElseThrow();
@@ -1279,9 +1279,12 @@ class EditorWindowTest {
         host.queueFileChoice(List.of(new FileLocation.Local(a)));
         window.openBeside(handle, dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
         drain();
-        assertThat(host.contentTabs()).as("no second pane").hasSize(1);
-        assertThat(host.windowTabs(main)).containsExactly(List.of(shell), List.of(editor));
-        assertThat(handle.activeTab().map(dev.jasper.sdk.terminal.TabHandle::id)).as("its open pane shows").contains(editor);
+        assertThat(host.contentTabs()).as("another view of the file").hasSize(2);
+        assertThat(window.sessions()).as("one file").hasSize(1);
+        assertThat(host.windowTabs(main)).hasSize(2);
+        assertThat(host.windowTabs(main).getFirst()).as("beside the focused shell, in its tab").hasSize(2).startsWith(shell);
+        assertThat(host.windowTabs(main).get(1)).containsExactly(editor);
+        assertThat(window.selected().orElseThrow().session()).isSameAs(window.sessions().getFirst());
         assertThat(recorded).containsExactly(LocalDocument.key(a), LocalDocument.key(a));
     }
 

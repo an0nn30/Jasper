@@ -9,8 +9,9 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface EditorDocument {
     /**
-     * The document's stable identity. Opening a document whose key is already open selects that tab; Recent Files
-     * records the key, and {@link Editor#reopener} resolves it by its prefix. Start it with a prefix of the plugin's
+     * The document's stable identity. Opening a document whose key is already open selects its tab (of several, the one
+     * focused last), and every tab that shows it shares one read, one text and one save. Recent Files records the key,
+     * and {@link Editor#reopener} resolves it by its prefix. Start it with a prefix of the plugin's
      * own, the one it passes to {@link Editor#reopener} (for example {@code "remote:"}), never {@code "local:"}, which
      * the Editor uses for local files.
      *
