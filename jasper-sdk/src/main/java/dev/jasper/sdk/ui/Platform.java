@@ -36,8 +36,8 @@ public interface Platform {
      * window, then the system browser, as {@link #browse} opens it. Returns at once; a failure is posted in the
      * plugin's notification group, never thrown.
      *
-     * @param uri an absolute {@code http} or {@code https} address
-     * @throws IllegalArgumentException when the address is not an absolute http or https one
+     * @param uri an absolute {@code http} or {@code https} address with a host
+     * @throws IllegalArgumentException when the address is not an absolute http or https address with a host
      * @since 0.21.0
      */
     void openInBrowser(URI uri);

@@ -196,8 +196,15 @@ public final class JasperApplication {
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
     /** Test seam: how a window's native frame is made. Production builds a {@link WindowFrame}. Before the manager, which reads it. */
     Function<JasperWindow, WindowShell> frames = this::frameOnScreen;
-    /** Test seam: how a web address opens in the system browser (browser plan 3). Production uses a virtual thread. EDT. */
-    Consumer<java.net.URI> systemBrowser = JasperApplication::openInSystemBrowser;
+    /** The system browser's opens still running, which shutdown waits for within its grace. Any thread. */
+    private final Set<CompletableFuture<?>> browserOpens = ConcurrentHashMap.newKeySet();
+    /**
+     * Test seam: how a web address opens in the system browser (browser plan 3). Production uses a virtual thread, which
+     * shutdown waits for. EDT.
+     */
+    Consumer<java.net.URI> systemBrowser = this::openInSystemBrowser;
+    /** Test seam: the desktop's browser, which {@code openInSystemBrowser} calls off the EDT. Production is {@link dev.jasper.app.platform.Browser#open}. */
+    Consumer<java.net.URI> desktop = dev.jasper.app.platform.Browser::open;
     /**
      * Test seam: whether the main window's detached tool windows get native windows ({@link DetachedFrame}): only where
      * windows can be made, as nothing native is made headless.
@@ -848,16 +855,24 @@ public final class JasperApplication {
         }
     }
 
-    /** The system browser's open, on a virtual thread; a failure is logged without the address, which may be program output. */
-    private static void openInSystemBrowser(java.net.URI address) {
-        Thread.ofVirtual().name("jasper-open-link").start(() -> {
+    /**
+     * The system browser's open, on a virtual thread that shutdown waits for, so a Jasper the {@code jasper} command
+     * started without a window does not quit before the desktop took the address; a failure is logged without the
+     * address, which may be program output.
+     */
+    private void openInSystemBrowser(java.net.URI address) {
+        Consumer<java.net.URI> opener = desktop;
+        CompletableFuture<Void> open = CompletableFuture.runAsync(() -> {
             try {
-                dev.jasper.app.platform.Browser.open(address);
+                opener.accept(address);
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "Could not open a web address in the system browser ("
                     + failure.getClass().getSimpleName() + ")");
             }
-        });
+        }, work -> Thread.ofVirtual().name("jasper-open-link").start(work));
+        // Added before its removal is registered: an open that finished already is removed at once.
+        browserOpens.add(open);
+        open.whenComplete((ignored, failure) -> browserOpens.remove(open));
     }
 
     /** What running plugins add to a new local shell, given Jasper's own environment; nothing before they start. EDT. */
@@ -2447,6 +2462,8 @@ public final class JasperApplication {
         pending.add(history.closedFuture());
         // The last save (closing every window saved them) reaches the disk before the process ends.
         if (workspaceStore != null) pending.add(workspaceStore.written());
+        // An address the jasper command handed the system browser reaches it before a Jasper with no window ends.
+        pending.addAll(List.copyOf(browserOpens));
         shutdown.await(pending);
     }
 

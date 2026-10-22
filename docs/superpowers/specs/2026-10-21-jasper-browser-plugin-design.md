@@ -316,8 +316,8 @@ the host's routing. Zoom uses the same actions Editor tabs answer.
 
 ## 9. Start-up and memory (the anti-goals)
 
-- **Plugin start does registration only.** That means the link handler, the split item, actions, the toolbar item, the
-  restorer, the settings page and the subcommand. No JCEF class is loaded and no Chromium process starts.
+- **Plugin start does registration only.** That means the web browser role, the split item, actions, the toolbar item,
+  the restorer, the settings page and the subcommand. No JCEF class is loaded and no Chromium process starts.
 - **Chromium starts on first use.** First use is the first browser item or Chromium preview shown, and Chromium starts
   only after the window is up.
 - **A restored browser tab** holds only its URL. Its page loads the first time it is shown.
@@ -411,12 +411,12 @@ Proposed plans, in order:
   - Markdown-to-HTML output, with its sanitising and content security policy.
 - **The Chromium layer stays thin and concrete.** It has no engine interface with a test fake, per AGENTS.md's
   two-implementations rule. The user checks it by hand on each platform.
-- **The SDK link-handler contribution** is covered by the testkit and the contract cases on both runtimes.
+- **The web browser role** is covered by the testkit and the contract cases on both runtimes.
 - **The start-up and memory criteria** of section 9 are measured with the existing benchmarks, run with the user's OK.
 
 ## 15. Left to the builder
 
-- Exact SDK names for the link-handler contribution and the browser API.
+- Exact names for the browser API.
 - Where bookmarks and history are stored, and in what format.
 - The cache cap and the idle delay before Chromium shuts down.
 - Whether code highlighting reuses the Editor's highlighter or a bundled script themed with the Editor's colours.

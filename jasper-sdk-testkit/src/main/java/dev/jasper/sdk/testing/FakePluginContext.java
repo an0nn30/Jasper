@@ -136,6 +136,8 @@ public final class FakePluginContext implements PluginContext {
                 @Override public void openInBrowser(java.net.URI uri) {
                     requireOpen();
                     java.net.URI address = webAddress(uri);
+                    if (address.getRawAuthority() == null || address.getRawAuthority().isEmpty())
+                        throw new IllegalArgumentException("Only an http or https address with a host opens in a browser: " + uri);
                     // As the application: the browser a plugin provides first, as a click in the active window; here on the caller's thread.
                     if (!host.openLink(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, host.activeWindowId())) host.browsed.add(address);
                 }

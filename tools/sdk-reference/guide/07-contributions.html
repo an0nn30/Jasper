@@ -269,6 +269,7 @@ described in <a href="#terminals">Terminals</a>.</p>
 <h3>Desktop integration</h3>
 <p>{@link Platform#copy(String)} puts text on the clipboard; {@link Platform#copySecret(String)} also clears it 30 seconds
 later if it is still there. {@link Platform#browse(URI)} opens an http or https address in the browser, and
-{@link Platform#openInEditor(Path)} opens a file in the user's editor. Their failures are posted in the plugin's default
-notification group, never thrown.</p>
+{@link Platform#openInEditor(Path)} opens a file in the user's editor. {@link Platform#openInBrowser(URI)} opens a link the
+user asked for, offering it to the web browser role first, while {@link Platform#browse(URI)} always uses the system
+browser. Their failures are posted in the plugin's default notification group, never thrown.</p>
 </section>

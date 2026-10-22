@@ -223,6 +223,8 @@ final class HostedContext implements PluginContext {
                 @Override public void openInBrowser(URI uri) {
                     requireOpen();
                     URI address = webAddress(uri);
+                    if (address.getRawAuthority() == null || address.getRawAuthority().isEmpty())
+                        throw new IllegalArgumentException("Only an http or https address with a host opens in a browser: " + uri);
                     host.environment.ui().accept(() -> {
                         Optional<java.util.UUID> window = host.environment.terminals().activeWindow().map(dev.jasper.app.terminals.WindowEntry::id);
                         if (host.webBrowsers.open(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, window)) return;

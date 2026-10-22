@@ -4100,6 +4100,7 @@ public abstract class PluginContractTest {
             user.get().platform().browse(direct);
             assertThatIllegalArgumentException().isThrownBy(() -> user.get().platform().openInBrowser(java.net.URI.create("mailto:someone@example.com")));
             assertThatIllegalArgumentException().isThrownBy(() -> user.get().platform().openInBrowser(java.net.URI.create("/relative")));
+            assertThatIllegalArgumentException().as("no host").isThrownBy(() -> user.get().platform().openInBrowser(java.net.URI.create("http:/x")));
             assertThatThrownBy(() -> user.get().platform().openInBrowser(null)).isInstanceOf(NullPointerException.class);
         });
         h.flush();

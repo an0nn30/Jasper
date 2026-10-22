@@ -1172,7 +1172,8 @@ it ran in; and `jasper open-url <address>`, the command programs use ([command l
   [`LinkOrigin`](sdk-reference.html#dev.jasper.sdk.ui.LinkOrigin)`.CLICK` when the user asked for the address and
   `PROGRAM` when a program did, through `jasper open-url`; a program's sign-in page usually works only in the system
   browser. `false`, or a handler that throws, hands the address to the system browser.
-- A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown.
+- A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown, so treat the
+  address as untrusted input and show it before acting on it.
 - `ftp` and `mailto` links, and `Platform.browse`, always go to the system browser.
 - One plugin at a time: a bundled plugin's registration replaces one that is not bundled; otherwise a later
   registration throws `IllegalStateException` ("The browser is already provided by *id*"). The role ends with the

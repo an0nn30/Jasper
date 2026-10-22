@@ -309,7 +309,7 @@ public interface ContractHarness extends AutoCloseable {
         boolean clickNotification(String title);
         List<java.nio.file.Path> openedInEditor();
         /**
-         * Every web address that reached the system browser, in request order: each {@code Platform.browse}, and each
+         * Every web address that reached the system browser: each {@code Platform.browse}, and each
          * {@code Platform.openInBrowser} that no provided browser opened.
          */
         List<java.net.URI> browsed();

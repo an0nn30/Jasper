@@ -563,7 +563,7 @@ class JasperApplicationPluginsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
 
-    /** A web browser that appends {@code <address>|<origin>|<window or ->} to {@code data/opened} and declines {@code /declined}. */
+    /** A web browser that appends {@code <address>|<origin>|<window id or ->} to {@code data/opened} and declines {@code /declined}. */
     private static final String WEB_BROWSER = """
         package fix.web;
         import dev.jasper.sdk.plugin.Plugin;
@@ -575,7 +575,8 @@ class JasperApplicationPluginsTest {
                 context.platform().browser((address, origin, window) -> {
                     try {
                         Files.writeString(context.dataDirectory().resolve("opened"),
-                            address + "|" + origin + "|" + (window.isPresent() ? "window" : "-") + "\\n",
+                            address + "|" + origin + "|"
+                                + window.map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-") + "\\n",
                             StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                     } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
                     return !address.getPath().equals("/declined");
@@ -635,6 +636,7 @@ class JasperApplicationPluginsTest {
         java.net.URI declined = java.net.URI.create("https://example.com/declined");
         var terminated = new CountDownLatch(1);
         JasperApplication[] application = new JasperApplication[1];
+        java.util.UUID[] active = new java.util.UUID[1];
         edt(() -> {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
             application[0].systemBrowser = address -> system.add(address.toString());
@@ -654,13 +656,14 @@ class JasperApplicationPluginsTest {
             application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
                 () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
             application[0].openFirstWindow(List.of()).orElseThrow();
-            application[0].terminals().windowActivated(application[0].terminals().windows().getFirst().id());
+            active[0] = application[0].terminals().windows().getFirst().id();
+            application[0].terminals().windowActivated(active[0]);
             application[0].browse(help);
             application[0].browse(declined);
         });
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
             .as("as clicks: with no window active, then from the active one")
-            .containsExactly(help + "|CLICK|-", help + "|CLICK|window", declined + "|CLICK|window");
+            .containsExactly(help + "|CLICK|-", help + "|CLICK|" + active[0], declined + "|CLICK|" + active[0]);
         assertThat(system).as("only the address the browser declined").containsExactly(declined.toString());
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
@@ -677,6 +680,7 @@ class JasperApplicationPluginsTest {
         var terminated = new CountDownLatch(1);
         JasperApplication[] application = new JasperApplication[1];
         java.util.UUID[] pane = new java.util.UUID[1];
+        java.util.UUID[] calling = new java.util.UUID[1];
         edt(() -> {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
             application[0].systemBrowser = address -> system.add(address.toString());
@@ -685,6 +689,7 @@ class JasperApplicationPluginsTest {
             application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
                 () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
             application[0].openFirstWindow(List.of()).orElseThrow();
+            calling[0] = application[0].terminals().windows().getFirst().id();
             pane[0] = application[0].terminals().windows().getFirst().selectedTab().get()
                 .flatMap(tab -> tab.terminal().get()).orElseThrow().id();
         });
@@ -696,11 +701,71 @@ class JasperApplicationPluginsTest {
             home, Optional.empty(), text -> { }, text -> { }));
         assertThat(program.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened"))).containsExactly(
-            "https://example.com/c|CLICK|window", "https://example.com/d|CLICK|window", "https://example.com/sign-in|PROGRAM|-");
+            "https://example.com/c|CLICK|" + calling[0], "https://example.com/d|CLICK|" + calling[0], "https://example.com/sign-in|PROGRAM|-");
         assertThat(system).as("the browser took each one").isEmpty();
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /**
+     * Browser plan 3's final review, I2: {@code composeContent} wires each window's terminal link opener to
+     * {@code openLink} with that window, so a clicked web link reaches the provided browser as a click from it.
+     */
+    @Test void aWindowsTerminalLinkOpenerSendsClicksToTheBrowserWithThatWindow() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        var system = new CopyOnWriteArrayList<String>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        dev.jasper.app.workspace.MainWindow[] main = new dev.jasper.app.workspace.MainWindow[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].startPlugins(null, dev, false, dirs);
+            // A stand-in frame opens the main window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
+            application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
+                () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            main[0] = application[0].openFirstWindow(List.of()).orElseThrow();
+        });
+        edt(() -> main[0].content().onOpenLink.accept("https://example.com/e"));
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
+            .containsExactly("https://example.com/e|CLICK|" + main[0].id());
+        assertThat(system).as("the browser took it").isEmpty();
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /**
+     * Browser plan 3's final review, I1: a Jasper that the {@code jasper} command started without a window, and that is
+     * not resident, quits once the system browser has taken the command's address, not while it is still opening.
+     */
+    @Test void aSystemBrowserOpenStartedByACommandFinishesBeforeShutdownCompletes() throws Exception {
+        var desktop = new CopyOnWriteArrayList<String>();
+        var release = new CountDownLatch(1);
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        try {
+            edt(() -> {
+                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+                application[0].desktop = address -> {
+                    desktop.add(address.toString());
+                    try { release.await(); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+                };
+            });
+            // Before the plugins start, the command's address goes to the default systemBrowser.
+            var opened = application[0].commands().dispatch(new dev.jasper.app.commandline.Invocation(List.of("https://example.com/s"),
+                home, Optional.empty(), text -> { }, text -> { }));
+            assertThat(opened.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+            edt(application[0]::quitNow);
+            assertThat(terminated.await(500, TimeUnit.MILLISECONDS)).as("still opening, within the shutdown's grace").isFalse();
+            release.countDown();
+            assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(desktop).as("the address reached the desktop's browser").containsExactly("https://example.com/s");
+        } finally { release.countDown(); }
     }
 
     private static void awaitCalls(List<String> calls, int count) throws InterruptedException {

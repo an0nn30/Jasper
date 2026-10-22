@@ -16,6 +16,7 @@ recorded these deviations from the plan's text:
   `tools/sdk-reference/guide/03-manifest.html` name `open-url` among the reserved subcommands. Editor 0.16.0 and Remote
   0.17.0 replace their older versions in `docs/plugin-apis.md` and the `docs/STATUS.md` plugin table.
 - **Task 8:** the check ran 12,846 tests, one more than this plan's sum of 12,845; all 22 tests the plan adds ran.
+- **Final review:** its fixes add two tests; the check ran 12,848.
 
 **Goal:** Jasper routes web addresses through one plugin-provided web browser role, as it routes files through the
 editor role: a terminal's clicked `http` and `https` links, plugins' `Platform.openInBrowser`, `jasper <url>…` and
