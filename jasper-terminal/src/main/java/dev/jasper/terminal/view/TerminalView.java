@@ -295,6 +295,19 @@ public final class TerminalView extends JComponent {
         fileLinkHandler = handler;
     }
 
+    /**
+     * Receives each URL a Cmd-click (macOS) or Ctrl-click (Linux and Windows) opens: an {@code http}, {@code https}
+     * or {@code ftp} URL written in the output, following soft wraps, or an OSC 8 link whose target is {@code http},
+     * {@code https}, {@code ftp} or {@code mailto}, as the program wrote it. The text is unauthenticated program output:
+     * an OSC 8 link's target can differ from the text shown, and it may not parse as a URI. Without an opener, the
+     * default, the desktop's browser opens it. Called on the Event Dispatch Thread, so the opener must not block.
+     *
+     * @param opener the receiver, or {@code null} for the desktop's browser
+     */
+    public void setLinkOpener(Consumer<String> opener) {
+        this.linkOpener = opener == null ? DesktopServices::openBrowser : opener;
+    }
+
     /** Current appearance and behavior, owned by the Event Dispatch Thread. */
     public TerminalOptions options() { return options; }
 
@@ -601,10 +614,6 @@ public final class TerminalView extends JComponent {
             @Override public void alternateBufferChanged(boolean alternate) { reconcileRowsLater(generation); }
             @Override public void bell() { bells.signal(generation); }
         };
-    }
-
-    void setLinkOpener(Consumer<String> opener) {
-        this.linkOpener = opener;
     }
 
     long topRow() {

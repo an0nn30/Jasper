@@ -235,6 +235,24 @@ class TerminalViewInteractionTest {
         assertThat(opened.get()).isEqualTo("https://m.dev");
     }
 
+    /** Browser plan 3: the link opener is public, and null puts the desktop's browser back. */
+    @Test
+    void aNullLinkOpenerRestoresTheDesktopDefault() throws Exception {
+        assertThat(TerminalView.class.getMethod("setLinkOpener", java.util.function.Consumer.class)).as("app-facing").isNotNull();
+        List<String> opened = new ArrayList<>();
+        view.setLinkOpener(opened::add);
+        show("go https://m.dev x", 0, "go https://m.dev x");
+
+        view.handleMouse(press(8, 0, 1, LINK));
+        view.handleMouse(release(8, 0));
+        view.setLinkOpener(null);
+        view.handleMouse(press(8, 0, 1, LINK));
+        view.handleMouse(release(8, 0));
+
+        assertThat(opened).as("the second click went to the desktop's browser, which a headless test cannot open")
+            .containsExactly("https://m.dev");
+    }
+
     @Test
     void commandClickOpensALinkEvenWhenTheProgramWantsTheMouse() throws Exception {
         assumeTrue(MAC);
