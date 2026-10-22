@@ -223,7 +223,7 @@ window (actions, menus, tool windows, windows, notifications, settings) need non
 
 | Capability | Lets the plugin | The review sheet says |
 | --- | --- | --- |
-| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()`, and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end |
+| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()` (which does not throw without it: its other tabs read "Tab N"), and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end |
 | `terminal.selection` | read `PaneHandle.selection()` | Read the text you select in a terminal |
 | `terminal.inject` | call `PaneHandle.sendText`, `sendBytes` and `paste` | Type into your terminals |
 | `terminal.open` | open tabs and splits with a local request (the shell, a profile or a program), and read `Terminals.profiles()` and `onProfilesChanged` | Open terminal tabs, splits and windows, and run programs in them |

@@ -829,6 +829,41 @@ class TabDragWindowsTest {
     }
 
     /**
+     * Workspace plan 9a Rulings 21, as the final review's residual round rules it: macOS keeps a window above the
+     * window that owns it, so a plugin's modeless dialog owned by the child window is above the child window even when
+     * the child window came to the front after it, and a tab drag over it has no target; an ownerless frame that came
+     * to the front before the child window still leaves the drop to the child window's pane.
+     */
+    @Test void aWindowOwnedByTheWindowUnderTheCursorIsAboveItWhicheverCameToTheFrontLast() throws Exception {
+        ParentTabId[] ids = new ParentTabId[1];
+        edt(() -> ids[0] = secondTab(main));
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            Object dialog = new Object(), settings = new Object();
+            var owned = new TabDrag.Auxiliary(dialog, settingsOverChild(), List.of(frameOf(child)));
+            var ownerless = new TabDrag.Auxiliary(settings, settingsOverChild());
+            manager.tabDrag().otherWindows = () -> List.of(owned);
+            manager.tabDrag().activated(dialog);
+            manager.tabDrag().activated(settings);
+            child.events().activated().accept(true);
+            main.events().activated().accept(true);
+            Tab moving = entryOf(from, ids[0]), there = to.selectedTab();
+            GroupId pane = activeGroup(child);
+            Point overPane = inside(pane(to, pane), 0.9, 0.5);
+            Component source = start(from, moving, overPane);
+            assertThat(manager.tabDrag().target()).as("the dialog its owner came in front of after it").isEmpty();
+            assertThat(manager.tabDrag().overlay().getParent()).as("the landing hides").isNull();
+            manager.tabDrag().otherWindows = () -> List.of(ownerless);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, overPane);
+            assertThat(manager.tabDrag().target()).as("an ownerless frame below the child window")
+                .contains(new TabDrag.Target.Into(to, pane, Side.RIGHT));
+            mouse(source, MouseEvent.MOUSE_RELEASED, overPane);
+            assertThat(to.workspace().tabs()).as("the drop reaches the pane").containsExactly(there, moving);
+        });
+    }
+
+    /**
      * Workspace plan 9a Rulings 21 for a pane drag (tabs and panes spec 7): Settings above the child window's pane
      * gives it no target there; once the child window comes to the front after Settings, its pane takes the drop.
      */

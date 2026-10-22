@@ -40,15 +40,14 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** This branch after plan 9a's final fix wave (2026-10-21): 12,705 tests, 0 failures, 0
-  errors, 29 skipped. `./gradlew check` on local `main` with the Editor's typography and Markdown preview and the
-  bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in
-  Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
-  `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
-  macOS, Ubuntu and every Linux packaging and install check passed, and so did the single-worker Windows check. No
-  check is recorded for the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode
-  (`eb424eeec`, `4743469e5`), the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the
-  Javadoc rename (`427321de4`).
+- **Last recorded checks.** This branch after plan 9a's final fix wave and its residual round (2026-10-21): 12,706
+  tests, 0 failures, 0 errors, 29 skipped. `./gradlew check` on local `main` with the Editor's typography and Markdown
+  preview and the bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips
+  and four opt-in Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
+  `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19): macOS, Ubuntu and
+  every Linux packaging and install check passed, and so did the single-worker Windows check. No check is recorded for
+  the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode (`eb424eeec`, `4743469e5`),
+  the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the Javadoc rename (`427321de4`).
 
 Bundled plugins, all enabled by default except Enterprise:
 
@@ -96,8 +95,9 @@ Open items, as the entries below record them:
 Newest first. Each entry describes its change as it stood when the entry was written.
 
 **Workspace tabs, plan 9a: open beside, and moving panes and tabs into tabs — 2026-10-21** (`claude/workspace-tabs`,
-worktree `.claude/worktrees/workspace-tabs`, `b748fa26a..54ab42da3`, then this documentation commit of the final
-review's fix wave; [plan](superpowers/plans/2026-10-21-workspace-9a-open-beside-and-move-into-tabs.md),
+worktree `.claude/worktrees/workspace-tabs`, `b748fa26a..f7d5464b9`, the final review's fix wave ending in its
+documentation commit, then this residual round;
+[plan](superpowers/plans/2026-10-21-workspace-9a-open-beside-and-move-into-tabs.md),
 [spec](superpowers/specs/2026-10-21-jasper-pane-flexibility-design.md), sections 3 to 5 and 8). **Open beside:** the
 Editor (0.14.0) registers a second split item, Open File (`EditorPlugin.OPEN_FILE`), so every Split list gains Open File
 Right… and Open File Down…, and its File menu gains Open in Editor Pane… (`dev.jasper.editor.open_in_pane`) beside New
@@ -177,34 +177,36 @@ round (`1a0f587b0`): the `springRest()` seam, tests that pin the slop and an ent
 (`entryUnder`) for spring-loading and a pane drag's hover. (6) Task 8: two sentences the new menu entry made stale are
 corrected (plugin authoring's content-tab commands and the Editor guide's tab right-click menu list Move Tab Into), and
 Ruling 20 is in plugin authoring, the SDK README, the guide page and the Editor guide. (7) The final review's fix wave
-(`b4152416c..54ab42da3` and this commit): Rulings 21 to 23 (I1, M1 and M2); `EditorWindow.openBeside` refuses another
-placement before its chooser shows and `WindowManager.moveTabInto` refuses the main window's empty workspace, which has
-no pane to go beside; `WorkspaceActions.update` builds the Move lists once a pass; tests for the items left for it
-(below); the capability tables and audit lists of plugin authoring, the guide page and the plugins guide name
-`ContentTab.tabChoices()`, which degrades to "Tab N" without `terminal.observe` instead of refusing. Accepted with no
-change, as the reviews ruled: Task 1's Minors 3 and 4 (one `UiValuesTest` assertion tests only the action id's
-validation; the ellipsis wording sits in four places because the architecture forces it); Task 3's Minor 4 (style: fully
-qualified names, `PANE_MOVES`' place); Task 4's Minors 6 and 7 (a stale entry moves by number, inherent to the number
-API and shared by the host's menus; the title cap is copied across the module boundary) and that an own tab's
-placeholder text is blanked too (conservative); Task 5's Minor 2 (a redundant, defensive `reslot ||` where
-`WindowTabs.refresh` runs without motion); Task 6's Minors 5, 7 and 8 (the move reads the pre-move target view,
-contrived; duplication; a report's warning breakdown). Left for the final review and done in its fix wave (deviation 7):
-Task 1's Minor 1 (a `SplitListsTest` helper's Javadoc); Task 2's Minors 1 to 3 (the resolver-failure path of
-`withDocument` untested; focus asserted through the Editor's `selected()`, not the handle's `activeTab()`; `openBeside`
-shows the chooser before it validates the placement) and an app test for a split item opening into the main window's
-empty workspace; Task 3's Minors 2 and 3 (the Enterprise pin uses `containsSubsequence` and nothing opens the classic
-Window menu to see it filled; `update()` rebuilds the `OtherTab` list nine times, which a range check would avoid); Task
-4's two test pins (`TabChoice(2, "").label()` in `UiValuesTest`; an own item hidden behind a foreign shown pane); Task
-5's Minors 1 and 3 and a whole-tab merge with terminal items for `ActivePaneChanged` (pin the join guard's messages; a
-`WindowTabMotionTest` case for a non-neighbour merge with motion on); Task 6's Minors 1 to 4 (the main drag test cannot
-catch a missing final select or weights; the maximize test checks only a count; the selection after `WINDOW_CLOSED` is
-unasserted; `moveTabInto` throws for an empty workspace's pane instead of refusing) and its Minor 6 as a question, which
-Ruling 21 answers; Task 7's own notes (the slop assertion cannot tell resting from restarting, since only timing shows
-it; `entryUnder` repeats `onPanes`' loop over the entries' x-ranges), which its fix round resolved. `./gradlew check
---continue` after the fix wave: **12,705 tests, 0 failures, 0 errors, 29 skipped, BUILD SUCCESSFUL** (app 4,394, Editor
-5,152, UI 943, terminal 460, testkit 244, Buddy 154, SDK 105, the other plugins 1,253) (excludes the external example,
-which `check` does not run); the example external plugin's `check pluginZip`, built against the SDK jars `check` wrote,
-passes.
+(`b4152416c..f7d5464b9`): Rulings 21 to 23 (I1, M1 and M2); `EditorWindow.openBeside` refuses another placement before
+its chooser shows and `WindowManager.moveTabInto` refuses the main window's empty workspace, which has no pane to go
+beside; `WorkspaceActions.update` builds the Move lists once a pass; tests for the items left for it (below); the
+capability tables and audit lists of plugin authoring, the guide page and the plugins guide name
+`ContentTab.tabChoices()`, which degrades to "Tab N" without `terminal.observe` instead of refusing; and a residual
+round on top of `f7d5464b9`, ruled by the controller from the wave's concern: a window owned by the window under the
+cursor, as a plugin's modeless dialog is, counts as above it whatever the activation order, since macOS keeps an owned
+window above its owner (`TabDrag.Auxiliary.owners`). Accepted with no change, as the reviews ruled: Task 1's Minors 3
+and 4 (one `UiValuesTest` assertion tests only the action id's validation; the ellipsis wording sits in four places
+because the architecture forces it); Task 3's Minor 4 (style: fully qualified names, `PANE_MOVES`' place); Task 4's
+Minors 6 and 7 (a stale entry moves by number, inherent to the number API and shared by the host's menus; the title cap
+is copied across the module boundary) and that an own tab's placeholder text is blanked too (conservative); Task 5's
+Minor 2 (a redundant, defensive `reslot ||` where `WindowTabs.refresh` runs without motion); Task 6's Minors 5, 7 and 8
+(the move reads the pre-move target view, contrived; duplication; a report's warning breakdown). Left for the final
+review and done in its fix wave (deviation 7): Task 1's Minor 1 (a `SplitListsTest` helper's Javadoc); Task 2's Minors 1
+to 3 (the resolver-failure path of `withDocument` untested; focus asserted through the Editor's `selected()`, not the
+handle's `activeTab()`; `openBeside` shows the chooser before it validates the placement) and an app test for a split
+item opening into the main window's empty workspace; Task 3's Minors 2 and 3 (the Enterprise pin uses
+`containsSubsequence` and nothing opens the classic Window menu to see it filled; `update()` rebuilds the `OtherTab`
+list nine times, which a range check would avoid); Task 4's two test pins (`TabChoice(2, "").label()` in `UiValuesTest`;
+an own item hidden behind a foreign shown pane); Task 5's Minors 1 and 3 and a whole-tab merge with terminal items for
+`ActivePaneChanged` (pin the join guard's messages; a `WindowTabMotionTest` case for a non-neighbour merge with motion
+on); Task 6's Minors 1 to 4 (the main drag test cannot catch a missing final select or weights; the maximize test checks
+only a count; the selection after `WINDOW_CLOSED` is unasserted; `moveTabInto` throws for an empty workspace's pane
+instead of refusing) and its Minor 6 as a question, which Ruling 21 answers; Task 7's own notes (the slop assertion
+cannot tell resting from restarting, since only timing shows it; `entryUnder` repeats `onPanes`' loop over the entries'
+x-ranges), which its fix round resolved. `./gradlew check --continue` after the residual round: **12,706 tests, 0
+failures, 0 errors, 29 skipped, BUILD SUCCESSFUL** (app 4,395, Editor 5,152, UI 943, terminal 460, testkit 244, Buddy
+154, SDK 105, the other plugins 1,253) (excludes the external example, which `check` does not run); the example external
+plugin's `check pluginZip`, built against the SDK jars `check` wrote, passes.
 GUI checks for the user:
 - Tab › Split and a terminal's and an editor's right-click Split submenus list Open File Right… and Open File Down…;
   each opens the file chooser for one file, and the file opens in a new pane to the right of or below the focused pane,
@@ -229,9 +231,10 @@ GUI checks for the user:
 - dragging a tab's entry over a pane of another window shows the landing on the nearest side; releasing moves all its
   panes there, the windows' shells still running; a child window's only tab dragged away (Enterprise, where its strip
   shows) closes that window;
-- during a tab drag or a pane drag, a Settings or About window that came to the front after the window it floats over
-  is on top: over it the drag has no target, the landing hides, nothing springs and a release there moves nothing;
-  bring that window to the front first and its panes take the drop again;
+- during a tab drag or a pane drag, a Settings or About window that came to the front after the window it floats over is
+  on top: over it the drag has no target, the landing hides, nothing springs and a release there moves nothing; bring
+  that window to the front first and its panes take the drop again; a plugin's modeless dialog stays on top of the
+  window that owns it even after that window comes to the front, and takes no drop either;
 - holding the dragged entry still over another tab's entry for half a second shows that tab at once, with no motion,
   in the drag's own window and in another; a drop beside one of its panes merges the tab there; Esc, or a release over
   a title bar, brings back the tab that showed before; moving on keeps the reorder marker as before;
