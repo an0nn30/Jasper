@@ -1617,7 +1617,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         for (int i = 0; i < views.size(); i++) {
             WorkspaceView view = views.get(i);
             if (!view.id().equals(own) && view.selected() != null)
-                others.add(new OtherTab(view.id(), i + 1, WindowTabs.capped(tabTitle(view.selected()))));
+                others.add(new OtherTab(view.id(), i + 1, WindowTabs.capped(tabTitle(view.selected())), view.selected().id()));
         }
         return others;
     }

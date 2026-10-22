@@ -239,6 +239,27 @@ class MovePaneToTabTest {
         });
     }
 
+    /**
+     * Pane flexibility spec 4, through the registry and the window's own host as {@code ContentTab.tabChoices} and
+     * {@code moveToTab} ask: the choices are the window's, each naming the item its tab shows; its own tab's number and one no
+     * tab has move nothing, and another tab's number moves the pane there, selected.
+     */
+    @Test void aPluginsItemMovesIntoAnotherTabThroughTheRegistry() throws Exception {
+        edt(() -> {
+            assertThat(model.tabs().tabChoices(b)).as("the window's own choices").isEqualTo(owner.paneTargets(b));
+            assertThat(model.tabs().tabChoices(b)).extracting(OtherTab::label).containsExactly("2 c", "3 d");
+            assertThat(model.tabs().tabChoices(b)).extracting(OtherTab::shown).as("the items the tabs show")
+                .containsExactly(c.id(), d.id());
+            model.tabs().moveToTab(b, 1);
+            model.tabs().moveToTab(b, 7);
+            assertThat(PaneDragTest.shape(owner)).as("its own tab's number, and one no tab has, move nothing").isEqualTo("H[a, b]");
+            model.tabs().moveToTab(b, 2);
+            assertThat(PaneDragTest.shape(owner)).isEqualTo("H[c, b]");
+            assertThat(owner.selectedTab()).isSameAs(b);
+            assertThat(b.closed()).isFalse();
+        });
+    }
+
     /** Pane flexibility spec 4 and Review Focus 6: a tab's title is plain text in both submenus, never HTML. */
     @Test void aTabsTitleIsPlainTextInBothSubmenus() throws Exception {
         edt(() -> {

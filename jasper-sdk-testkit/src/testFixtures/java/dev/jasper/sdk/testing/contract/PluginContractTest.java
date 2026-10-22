@@ -257,6 +257,11 @@ public abstract class PluginContractTest {
         };
     }
 
+    /** A content tab in {@code window}, owned by {@code context}'s plugin, which shows. */
+    private static dev.jasper.sdk.ui.ContentTab openContent(PluginContext context, UUID window, String key, String title) {
+        return context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec(key, title), context.terminals().window(window).orElseThrow(), kitView(context));
+    }
+
     private static dev.jasper.sdk.ui.UiView kitView(PluginContext context) {
         return context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",dev.jasper.sdk.ui.ControlState.READY,"Content",dev.jasper.sdk.ui.Nodes.TextRole.BODY)), e -> {});
     }
@@ -2229,6 +2234,144 @@ public abstract class PluginContractTest {
             var owner = alpha.get().terminals().window(main).orElseThrow();
             var notes = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), owner, kitView(alpha.get()));
             assertThat(notes.tabChoices()).containsExactly(new dev.jasper.sdk.ui.TabChoice(1, "x".repeat(199) + "…"));
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 8: a title cut at the limit never splits an emoji's surrogate pair: with the pair's first
+     * half where the ellipsis would follow, the title ends before the pair.
+     */
+    @Test void aTabChoicesTitleIsNotCutThroughAnEmoji() {
+        String title = "x".repeat(198) + new String(Character.toChars(0x1F600)) + "y".repeat(40);
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, title);
+        h.addTerminalPane(shell, title, Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var notes = openContent(alpha.get(), main, "notes", "Notes");
+            assertThat(notes.tabChoices()).containsExactly(new dev.jasper.sdk.ui.TabChoice(1, "x".repeat(198) + "…"));
+        });
+    }
+
+    /**
+     * Pane flexibility spec 4: a choice carries its tab's title, the title of the tab's shown item, only to a plugin that
+     * holds {@code terminal.observe}, as {@code TabHandle.title()} requires, or when that item is the plugin's own content,
+     * which it names itself; any other choice has an empty title and reads {@code Tab 2}. Its number is the tab's place in
+     * the strip either way, and moves the pane there.
+     */
+    @Test void aTabChoiceCarriesItsTabsTitleOnlyToAPluginThatMayReadIt() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        var gamma = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.beta"), Set.of(), Set.of(), beta::set);
+        h.start(info("test.gamma", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), gamma::set);
+        var ids = new AtomicReference<List<UUID>>();
+        h.ui(() -> {
+            var other = openContent(beta.get(), main, "other", "Other");
+            UUID others = beta.get().terminals().window(main).orElseThrow().activeTab().orElseThrow().id();
+            var memo = openContent(alpha.get(), main, "memo", "Memo");
+            UUID memos = alpha.get().terminals().window(main).orElseThrow().activeTab().orElseThrow().id();
+            var notes = openContent(alpha.get(), main, "notes", "Notes");
+            UUID note = alpha.get().terminals().window(main).orElseThrow().activeTab().orElseThrow().id();
+            var seen = openContent(gamma.get(), main, "seen", "Seen");
+            UUID seens = gamma.get().terminals().window(main).orElseThrow().activeTab().orElseThrow().id();
+            ids.set(List.of(others, memos, note, seens));
+            assertThat(notes.tabChoices()).as("without terminal.observe: the name of its own content, and no other")
+                .containsExactly(new dev.jasper.sdk.ui.TabChoice(1, ""), new dev.jasper.sdk.ui.TabChoice(2, ""),
+                    new dev.jasper.sdk.ui.TabChoice(3, "Memo"), new dev.jasper.sdk.ui.TabChoice(5, ""));
+            assertThat(notes.tabChoices()).extracting(dev.jasper.sdk.ui.TabChoice::label)
+                .containsExactly("Tab 1", "Tab 2", "3 Memo", "Tab 5");
+            assertThat(other.tabChoices()).as("another plugin's content names nothing to a plugin that may not read it")
+                .containsExactly(new dev.jasper.sdk.ui.TabChoice(1, ""), new dev.jasper.sdk.ui.TabChoice(3, ""),
+                    new dev.jasper.sdk.ui.TabChoice(4, ""), new dev.jasper.sdk.ui.TabChoice(5, ""));
+            assertThat(seen.tabChoices()).as("with terminal.observe: every tab's title")
+                .containsExactly(new dev.jasper.sdk.ui.TabChoice(1, "zsh"), new dev.jasper.sdk.ui.TabChoice(2, "Other"),
+                    new dev.jasper.sdk.ui.TabChoice(3, "Memo"), new dev.jasper.sdk.ui.TabChoice(4, "Notes"));
+            assertThat(memo.tabChoices()).extracting(dev.jasper.sdk.ui.TabChoice::number).containsExactly(1, 2, 4, 5);
+            notes.moveToTab(1);
+        });
+        UUID others = ids.get().get(0), memos = ids.get().get(1), note = ids.get().get(2), seens = ids.get().get(3);
+        assertThat(h.windowTabs(main)).as("a tab with no title shown moves a pane there as any other")
+            .containsExactly(List.of(shell, note), List.of(others), List.of(memos), List.of(seens));
+    }
+
+    /**
+     * Pane flexibility spec 4: the pane moves to the right of the target tab's shown pane, not to the end of its panes.
+     */
+    @Test void aContentTabMovesRightOfTheShownPaneOfATabOfTwoPanes() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), alpha::set);
+        var ids = new AtomicReference<List<UUID>>();
+        h.ui(() -> {
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            var draft = openContent(alpha.get(), main, "draft", "Draft");
+            UUID drafted = owner.activeTab().orElseThrow().id();
+            draft.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, Direction.RIGHT);
+            UUID terminal = owner.activeTab().orElseThrow().id();
+            draft.select();
+            var notes = openContent(alpha.get(), main, "notes", "Notes");
+            UUID note = owner.activeTab().orElseThrow().id();
+            ids.set(List.of(drafted, terminal, note));
+            assertThat(notes.tabChoices()).as("a tab is titled after its shown pane's item")
+                .containsExactly(new dev.jasper.sdk.ui.TabChoice(1, "zsh"), new dev.jasper.sdk.ui.TabChoice(2, "Draft"));
+            notes.moveToTab(2);
+        });
+        UUID drafted = ids.get().get(0), terminal = ids.get().get(1), note = ids.get().get(2);
+        assertThat(h.windowTabs(main)).as("right after the shown pane, not after the last").containsExactly(
+            List.of(shell), List.of(drafted, note, terminal));
+    }
+
+    /**
+     * Pane flexibility spec 4: an item waiting on a close decision is offered no tab and moves into none, and is offered
+     * them again once it is kept.
+     */
+    @Test void aContentTabWaitingOnACloseDecisionIsOfferedNoTabAndMovesIntoNone() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        var note = new AtomicReference<UUID>();
+        h.ui(() -> {
+            var notes = openContent(alpha.get(), main, "notes", "Notes");
+            note.set(alpha.get().terminals().window(main).orElseThrow().activeTab().orElseThrow().id());
+            var answer = new CompletableFuture<Boolean>();
+            alpha.get().windows().onTabsClosing((tabs, batch) -> answer);
+            var closing = notes.requestClose();
+            assertThat(notes.tabChoices()).as("waiting on its close decision").isEmpty();
+            notes.moveToTab(1);
+            answer.complete(false);
+            assertThat(closing.join()).isFalse();
+            assertThat(notes.tabChoices()).as("kept").containsExactly(new dev.jasper.sdk.ui.TabChoice(1, "zsh"));
+        });
+        assertThat(h.windowTabs(main)).as("nothing moved while it waited").containsExactly(List.of(shell), List.of(note.get()));
+    }
+
+    /**
+     * Pane flexibility spec 4: a number that moves nothing selects nothing: an item that is not shown stays inactive, and
+     * the move that does go selects it.
+     */
+    @Test void aRefusedMoveToTabLeavesAnUnselectedItemInactive() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var notes = openContent(alpha.get(), main, "notes", "Notes");
+            var draft = openContent(alpha.get(), main, "draft", "Draft");
+            assertThat(notes.isActive()).as("another tab was shown after it").isFalse();
+            assertThat(draft.isActive()).isTrue();
+            notes.moveToTab(2);
+            notes.moveToTab(9);
+            notes.moveToTab(0);
+            assertThat(notes.isActive()).as("its own tab's number, one no tab has and none select nothing").isFalse();
+            assertThat(draft.isActive()).isTrue();
+            notes.moveToTab(3);
+            assertThat(notes.isActive()).as("a move that goes selects the item").isTrue();
         });
     }
 

@@ -1,6 +1,7 @@
 package dev.jasper.app.contributions;
 
 import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.TabId;
 import java.util.Objects;
 
 /**
@@ -10,12 +11,15 @@ import java.util.Objects;
  * @param id the tab's id
  * @param number its place in the window's strip, from 1, as Select Tab numbers it
  * @param title its title, its active pane's item's, as the strip's tab list shows it
+ * @param shown the item its active pane shows, which tells whether a plugin may read the title (pane flexibility spec
+ *     4, for {@code ContentTab.tabChoices()})
  */
-public record OtherTab(ParentTabId id, int number, String title) {
+public record OtherTab(ParentTabId id, int number, String title, TabId shown) {
     /** Requires every value, the number from 1. */
     public OtherTab {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(title, "title");
+        Objects.requireNonNull(shown, "shown");
         if (number < 1) throw new IllegalArgumentException("A tab's number starts at 1: " + number);
     }
 

@@ -510,8 +510,8 @@ public final class TabRegistry {
 
     /**
      * The tabs Move Pane to Tab offers {@code tab} (pane flexibility spec 4; {@code ContentTab.tabChoices()}): the other
-     * tabs of its window, numbered from 1 in strip order; none for a tab that may not move ({@link #movable}) or that no
-     * window holds.
+     * tabs of its window, numbered from 1 in strip order, with their real titles, which {@code HostedUi} gives a plugin only
+     * as far as it may read them; none for a tab that may not move ({@link #movable}) or that no window holds.
      *
      * @param tab the tab
      * @return the tabs

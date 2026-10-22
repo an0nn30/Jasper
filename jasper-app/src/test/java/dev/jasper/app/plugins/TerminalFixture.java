@@ -372,9 +372,12 @@ final class TerminalFixture {
         if (tab == null) return List.of();
         List<Group> strip = strip(tab.window);
         var choices = new ArrayList<dev.jasper.app.contributions.OtherTab>();
-        for (int i = 0; i < strip.size(); i++)
-            if (strip.get(i) != tab.group)
-                choices.add(new dev.jasper.app.contributions.OtherTab(strip.get(i).id, i + 1, capped(strip.get(i).recent.getFirst().title.get())));
+        for (int i = 0; i < strip.size(); i++) {
+            if (strip.get(i) == tab.group) continue;
+            Tab shown = strip.get(i).recent.getFirst();
+            choices.add(new dev.jasper.app.contributions.OtherTab(strip.get(i).id, i + 1, capped(shown.title.get()),
+                new dev.jasper.app.layout.TabId(shown.id)));
+        }
         return choices;
     }
 
@@ -389,14 +392,14 @@ final class TerminalFixture {
     /**
      * Move Pane to Tab: the item {@code tabId} leaves its tab for a new pane right after the shown item of the tab numbered
      * {@code number}, where it is selected; its old tab goes with its last pane. Its own tab's number and one no tab has
-     * move nothing.
+     * move nothing. Answers whether it moved.
      */
-    void moveToTab(UUID tabId, int number) {
+    boolean moveToTab(UUID tabId, int number) {
         Tab tab = tabs.get(tabId);
-        if (tab == null) return;
+        if (tab == null) return false;
         Window window = tab.window;
         List<Group> strip = strip(window);
-        if (number < 1 || number > strip.size() || strip.get(number - 1) == tab.group) return;
+        if (number < 1 || number > strip.size() || strip.get(number - 1) == tab.group) return false;
         Group to = strip.get(number - 1), from = tab.group;
         Tab beside = to.recent.getFirst();
         window.tabs.remove(tab);
@@ -406,6 +409,7 @@ final class TerminalFixture {
         to.recent.add(tab);
         window.tabs.add(window.tabs.indexOf(beside) + 1, tab);
         select(tab);
+        return true;
     }
 
     /** A window's tabs in strip order. */

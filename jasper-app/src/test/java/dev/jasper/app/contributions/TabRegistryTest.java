@@ -41,7 +41,7 @@ class TabRegistryTest {
         };
         registry.addHost(new WorkspaceHost(main, tab -> {}, tab -> {}, tab -> {}, () -> {}, tab -> Optional.empty(),
             (tab, group, side) -> {}, split::test, tab -> shares[0], tab -> heard.add("new tab " + tab.title()),
-            tab -> List.of(new OtherTab(dev.jasper.app.layout.ParentTabId.random(), 2, "zsh")),
+            tab -> List.of(new OtherTab(dev.jasper.app.layout.ParentTabId.random(), 2, "zsh", dev.jasper.app.layout.TabId.random())),
             (tab, number) -> heard.add("tab " + number + " " + tab.title())));
         Tab notes = registry.open("dev.example.editor", "notes", "Notes", main, new JPanel());
         assertThat(registry.splitTerminal(notes, Side.DOWN)).as("its window took it").isTrue();
@@ -67,6 +67,32 @@ class TabRegistryTest {
         registry.moveToTab(notes, 2);
         assertThat(heard).as("a pinned or closed tab reaches nothing")
             .containsExactly("terminal DOWN of Notes", "terminal RIGHT of Notes", "new tab Notes", "tab 2 Notes");
+    }
+
+    /**
+     * Pane flexibility spec 4: the item a restorer opened is held in the window being restored while its restore runs, so
+     * it is offered no tab and moves into none (as it does not move to a new tab); once the restore returns, it is and does.
+     */
+    @Test void aRestorersItemGetsNoTabChoicesAndMovesNowhereWhileItsRestoreRuns() {
+        var heard = new ArrayList<String>();
+        registry.addHost(new WorkspaceHost(main, mounted::add, mounted::remove, tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(detached, mounted::add, mounted::remove, tab -> {}, () -> {}, tab -> Optional.empty(),
+            (tab, group, side) -> {}, (tab, side) -> false, tab -> true, tab -> {},
+            tab -> List.of(new OtherTab(dev.jasper.app.layout.ParentTabId.random(), 2, "zsh", TabId.random())),
+            (tab, number) -> heard.add("tab " + number + " " + tab.title())));
+        registry.windows(windows(main, detached));
+        var state = new dev.jasper.app.layout.TabRestore("note", Map.of());
+        registry.restorer("plugin.notes", "note", restoring -> {
+            Tab held = registry.open("plugin.notes", "note:todo", restoring.title(), null, new JPanel());
+            assertThat(registry.tabChoices(held)).as("held while its restore runs").isEmpty();
+            registry.moveToTab(held, 2);
+            return Optional.empty();
+        });
+        Tab restored = registry.restore(TabId.random(), "plugin.notes", new TabRegistry.Restoring(detached, "Todo", state)).tab().orElseThrow();
+        assertThat(heard).as("a held item reaches no window").isEmpty();
+        assertThat(registry.tabChoices(restored)).extracting(OtherTab::label).as("once it is placed").containsExactly("2 zsh");
+        registry.moveToTab(restored, 2);
+        assertThat(heard).containsExactly("tab 2 Todo");
     }
 
     /**

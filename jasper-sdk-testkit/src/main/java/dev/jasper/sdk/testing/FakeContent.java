@@ -64,13 +64,27 @@ final class FakeContent implements ContentTab {
     /** Tabs and panes spec 9: its tab's only pane, a pinned item and one waiting on a close decision stay. */
     public boolean mayMoveToNewTab(){return movable()&&tab.group.recent.size()>1;}
     public void moveToNewTab(){if(!mayMoveToNewTab())return;ui.host.workspace.moveToNewTab(tab);select();}
-    /** Pane flexibility spec 4: its window's other tabs, numbered from 1 in strip order; none for an item that may not move. */
+    /**
+     * Pane flexibility spec 4: its window's other tabs, numbered from 1 in strip order; none for an item that may not move.
+     * A choice carries its tab's title only for a plugin that holds terminal.observe or whose own content the tab shows,
+     * as the application's do; any other gets it empty.
+     */
     public List<TabChoice> tabChoices(){
         if(!movable())return List.of();
         var strip=ui.host.workspace.strip(tab.window);
+        boolean observes=ui.context.plugin().capabilities().contains(dev.jasper.sdk.Capabilities.TERMINAL_OBSERVE);
         var choices=new ArrayList<TabChoice>();
-        for(int i=0;i<strip.size();i++)if(strip.get(i)!=tab.group)choices.add(new TabChoice(i+1,capped(strip.get(i).recent.getFirst().title)));
+        for(int i=0;i<strip.size();i++){
+            if(strip.get(i)==tab.group)continue;
+            var shown=strip.get(i).recent.getFirst();
+            choices.add(new TabChoice(i+1,observes||ownContent(shown)?capped(shown.title):""));
+        }
         return List.copyOf(choices);
+    }
+    /** Whether {@code shown} is an open content tab of this plugin. */
+    private boolean ownContent(FakeWorkspace.Tab shown){
+        for(var content:ui.contents)if(content.tab==shown&&!content.closed)return true;
+        return false;
     }
     /** Past 200 characters a title's start and an ellipsis within that limit, as Jasper's menus cut a tab's title. */
     private static String capped(String title){

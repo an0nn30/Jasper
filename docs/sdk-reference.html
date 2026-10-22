@@ -6359,7 +6359,8 @@ open it in a new pane to the right of and below the focused pane.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.SyntaxRole"><code>SyntaxRole</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Semantic syntax roles, classified by the editor plugin.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.SyntaxStyle"><code>SyntaxStyle</code></a></td><td><span class="kind kind-record">record</span></td><td>The appearance of one syntax role.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TabChoice"><code>TabChoice</code></a></td><td><span class="kind kind-record">record</span></td><td>One tab Move Pane to Tab offers an item (pane flexibility spec 4): another tab of the item's window, numbered as
-Select Tab numbers the window's strip, from 1, and titled after its active pane's item, as the strip titles it.</td></tr>
+Select Tab numbers the window's strip, from 1, and titled after its active pane's item, as the strip titles it, when
+the plugin may read that title.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TabPlacement"><code>TabPlacement</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Where <a href="#dev.jasper.sdk.ui.Windows.openTab(ContentSpec,WindowOwner,UiView,TabPlacement)"><code>Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)</code></a> puts a new content tab
 (tabs and panes spec 11).</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a></td><td><span class="kind kind-interface">functional interface</span></td><td>Rebuilds a plugin's saved tabs when Jasper restores its windows (workspace tabs spec 13 and 14): at start, and whenever
@@ -6785,30 +6786,34 @@ open and a tab being closed stay where they are.</p></div>
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ContentTab.moveToNewTab()" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>moveToNewTab</b>()</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
 <div class="doc"><p>Move Pane to New Tab (tabs and panes spec 9): the pane showing this item leaves its tab for a new tab right after it,
-which shows; nothing closes or leaves the window. Its tab's only pane, a tab with a modal prompt open and a tab
-being closed stay where they are (<a href="#dev.jasper.sdk.ui.ContentTab.mayMoveToNewTab()"><code>mayMoveToNewTab()</code></a>).</p></div>
+which shows; nothing closes or leaves the window. Its tab's only pane, an item with a modal prompt open and an
+item being closed stay where they are (<a href="#dev.jasper.sdk.ui.ContentTab.mayMoveToNewTab()"><code>mayMoveToNewTab()</code></a>).</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.mayMoveToNewTab()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ContentTab.mayMoveToNewTab()" aria-label="Link to this member">#</a><code><span class="kw">boolean</span> <b>mayMoveToNewTab</b>()</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
 <div class="doc"><p>Whether <a href="#dev.jasper.sdk.ui.ContentTab.moveToNewTab()"><code>moveToNewTab()</code></a> would move this item, for a menu entry that shows disabled otherwise.</p></div>
-<dl class="tags"><dt>Returns</dt><dd>false for its tab's only pane, a tab with a modal prompt open, a tab being closed and a closed one</dd></dl>
+<dl class="tags"><dt>Returns</dt><dd>false for its tab's only pane, an item with a modal prompt open, an item being closed and a closed one</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.tabChoices()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ContentTab.tabChoices()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.TabChoice">TabChoice</a>&gt; <b>tabChoices</b>()</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
-<div class="doc"><p>Move Pane to Tab's choices (pane flexibility spec 4): the other tabs of this item's window, in strip order, for a
-menu the plugin builds, which shows disabled while there is none.</p></div>
-<dl class="tags"><dt>Returns</dt><dd>the choices; none while the window has one tab, and none for a tab with a modal prompt open, a tab being
-    closed or a closed one</dd></dl>
+<div class="doc"><p>Move Pane to Tab's choices (pane flexibility spec 4): the window's other tabs, in strip order, for a menu the
+plugin builds, which shows disabled while there is none. A choice carries its tab's title, the title of the tab's
+shown item, only when the plugin holds <code>terminal.observe</code>, which reads any tab's title, or when that item is
+this plugin's own content; otherwise its title is empty and its label reads <code>Tab 2</code>. Its number is the
+tab's place in the strip either way.</p></div>
+<dl class="tags"><dt>Returns</dt><dd>the choices; none while the window has one tab, and none for an item with a modal prompt open, an item
+    being closed or a closed one</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.moveToTab(int)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ContentTab.moveToTab(int)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>moveToTab</b>(<span class="kw">int</span> number)</code></pre>
 <p class="badges"><span class="since">since 0.21.0</span></p>
 <div class="doc"><p>Move Pane to Tab (pane flexibility spec 4): the pane showing this item moves to the right of the active pane of the
 tab numbered <code>number</code> in its window's strip, which then shows, this item focused; no item closes or leaves the
-window; its old tab closes with its last pane, and a maximized pane of the tab it joins stops being maximized. The
-number of its own tab, a number no tab has, and an item <a href="#dev.jasper.sdk.ui.ContentTab.tabChoices()"><code>tabChoices()</code></a> offers none for move nothing.</p></div>
+window; its old tab closes if this was its last pane, and a maximized pane of the tab it joins stops being
+maximized. The number of its own tab, a number no tab has, and an item <a href="#dev.jasper.sdk.ui.ContentTab.tabChoices()"><code>tabChoices()</code></a> offers none for move
+nothing.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>number</code> a tab's place in its window's strip, from 1, as <a href="#dev.jasper.sdk.ui.TabChoice.number()"><code>TabChoice.number()</code></a> gives it</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ContentTab.split(SplitChoice,Direction)">
@@ -9630,7 +9635,8 @@ titles with an ellipsis, as menus mark a command that asks for more first (pane 
 <dt id="dev.jasper.sdk.ui.StandardMenu.FILE"><code>FILE</code></dt><dd>The File menu.</dd>
 <dt id="dev.jasper.sdk.ui.StandardMenu.EDIT"><code>EDIT</code></dt><dd>The Edit menu.</dd>
 <dt id="dev.jasper.sdk.ui.StandardMenu.VIEW"><code>VIEW</code></dt><dd>The View menu.</dd>
-<dt id="dev.jasper.sdk.ui.StandardMenu.TAB"><code>TAB</code></dt><dd>The Tab menu: the Split submenu, Move Pane to New Tab, focusing panes, moving between prompts, and the tab commands.</dd>
+<dt id="dev.jasper.sdk.ui.StandardMenu.TAB"><code>TAB</code></dt><dd>The Tab menu: the Split submenu, Move Pane to New Tab, Move Pane to Tab, focusing panes, moving between prompts,
+and the tab commands.</dd>
 <dt id="dev.jasper.sdk.ui.StandardMenu.TOOLS"><code>TOOLS</code> <span class="since">since 0.16.1</span></dt><dd>The Tools menu, for utility commands. Jasper has none of its own, so it shows only while a plugin has entries in
 it, after Tab, Session and Transfer and before plugins' own menus, or after plugins' menus in a classic menu
 bar.</dd>
@@ -9824,27 +9830,28 @@ do nothing after close. Closing is idempotent and safe from any thread.</p></div
 <header class="type-head"><span class="kind kind-record">record</span><h4><a class="self" href="#dev.jasper.sdk.ui.TabChoice">TabChoice</a></h4><span class="since">since 0.21.0</span><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">record</span> <b>TabChoice</b>(<span class="kw">int</span> number, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> title)</code></pre>
 <div class="doc"><p>One tab Move Pane to Tab offers an item (pane flexibility spec 4): another tab of the item's window, numbered as
-Select Tab numbers the window's strip, from 1, and titled after its active pane's item, as the strip titles it.
-<a href="#dev.jasper.sdk.ui.ContentTab.tabChoices()"><code>ContentTab.tabChoices()</code></a> lists them, and <a href="#dev.jasper.sdk.ui.ContentTab.moveToTab(int)"><code>ContentTab.moveToTab(int)</code></a> takes one's number.</p></div>
+Select Tab numbers the window's strip, from 1, and titled after its active pane's item, as the strip titles it, when
+the plugin may read that title. <a href="#dev.jasper.sdk.ui.ContentTab.tabChoices()"><code>ContentTab.tabChoices()</code></a> lists them and says when, and
+<a href="#dev.jasper.sdk.ui.ContentTab.moveToTab(int)"><code>ContentTab.moveToTab(int)</code></a> takes one's number.</p></div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.TabChoice.number()"><td class="ct"><code><span class="kw">int</span></code></td><td class="cn"><code><b>number</b></code></td><td>the tab's place in its window's strip, from 1</td></tr>
 <tr id="dev.jasper.sdk.ui.TabChoice.title()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>title</b></code></td><td>the tab's title, past 200 characters its start and an ellipsis within that limit, as Jasper's menus
-    show it</td></tr>
+    show it; empty when the plugin may not read it (see <a href="#dev.jasper.sdk.ui.ContentTab.tabChoices()"><code>ContentTab.tabChoices()</code></a>)</td></tr>
 </tbody></table></div>
 <h5>Constructors</h5>
 <div class="member" id="dev.jasper.sdk.ui.TabChoice.TabChoice(int,String)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.TabChoice.TabChoice(int,String)" aria-label="Link to this member">#</a><code><b>TabChoice</b>(
         <span class="kw">int</span> number,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> title)</code></pre>
-<div class="doc"><p>Requires the title and a number from 1.</p></div>
+<div class="doc"><p>Requires the title, which may be empty, and a number from 1.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>number</code></dd><dd><code>title</code></dd></dl>
 </div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.sdk.ui.TabChoice.label()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.TabChoice.label()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> <b>label</b>()</code></pre>
 <div class="doc"><p>What a menu shows for it, as Jasper's own Move Pane to Tab words its entries: the number, a space and the title, as
-<code>2 notes.txt</code>.</p></div>
+<code>2 notes.txt</code>; <code>Tab 2</code> when the title is empty.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the entry's text</dd></dl>
 </div>
 </article>

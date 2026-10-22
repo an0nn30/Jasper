@@ -70,6 +70,8 @@ final class HostedContext implements PluginContext {
     final HostedNotifications notifications;
     final HostedCommandLine commandLine;
     private boolean observing;
+    /** Whether the plugin's first answer with other tabs' titles has been audited. */
+    private boolean titlesRead;
     Plugin plugin;
 
     HostedContext(PluginHost host, HostedPlugin hosted, DeclaredSettings declared) {
@@ -93,6 +95,11 @@ final class HostedContext implements PluginContext {
         ui.kit(kit);
         ui.bundled = () -> host.fileEditors.bundled(id);
         ui.terminalOpen = what -> { gate.require(Capabilities.TERMINAL_OPEN); return () -> gate.audit(Capabilities.TERMINAL_OPEN, what); };
+        ui.tabTitles = () -> {
+            if (!gate.has(Capabilities.TERMINAL_OBSERVE)) return false;
+            if (!titlesRead) { titlesRead = true; gate.audit(Capabilities.TERMINAL_OBSERVE, "read tab titles"); }
+            return true;
+        };
         this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals, hosted.iconHue());
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,

@@ -71,8 +71,8 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
     void moveToMainWindow();
     /**
      * Move Pane to New Tab (tabs and panes spec 9): the pane showing this item leaves its tab for a new tab right after it,
-     * which shows; nothing closes or leaves the window. Its tab's only pane, a tab with a modal prompt open and a tab
-     * being closed stay where they are ({@link #mayMoveToNewTab()}).
+     * which shows; nothing closes or leaves the window. Its tab's only pane, an item with a modal prompt open and an
+     * item being closed stay where they are ({@link #mayMoveToNewTab()}).
      *
      * @since 0.21.0
      */
@@ -80,24 +80,28 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
     /**
      * Whether {@link #moveToNewTab()} would move this item, for a menu entry that shows disabled otherwise.
      *
-     * @return false for its tab's only pane, a tab with a modal prompt open, a tab being closed and a closed one
+     * @return false for its tab's only pane, an item with a modal prompt open, an item being closed and a closed one
      * @since 0.21.0
      */
     boolean mayMoveToNewTab();
     /**
-     * Move Pane to Tab's choices (pane flexibility spec 4): the other tabs of this item's window, in strip order, for a
-     * menu the plugin builds, which shows disabled while there is none.
+     * Move Pane to Tab's choices (pane flexibility spec 4): the window's other tabs, in strip order, for a menu the
+     * plugin builds, which shows disabled while there is none. A choice carries its tab's title, the title of the tab's
+     * shown item, only when the plugin holds {@code terminal.observe}, which reads any tab's title, or when that item is
+     * this plugin's own content; otherwise its title is empty and its label reads {@code Tab 2}. Its number is the
+     * tab's place in the strip either way.
      *
-     * @return the choices; none while the window has one tab, and none for a tab with a modal prompt open, a tab being
-     *     closed or a closed one
+     * @return the choices; none while the window has one tab, and none for an item with a modal prompt open, an item
+     *     being closed or a closed one
      * @since 0.21.0
      */
     List<TabChoice> tabChoices();
     /**
      * Move Pane to Tab (pane flexibility spec 4): the pane showing this item moves to the right of the active pane of the
      * tab numbered {@code number} in its window's strip, which then shows, this item focused; no item closes or leaves the
-     * window; its old tab closes with its last pane, and a maximized pane of the tab it joins stops being maximized. The
-     * number of its own tab, a number no tab has, and an item {@link #tabChoices()} offers none for move nothing.
+     * window; its old tab closes if this was its last pane, and a maximized pane of the tab it joins stops being
+     * maximized. The number of its own tab, a number no tab has, and an item {@link #tabChoices()} offers none for move
+     * nothing.
      *
      * @param number a tab's place in its window's strip, from 1, as {@link TabChoice#number()} gives it
      * @since 0.21.0

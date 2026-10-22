@@ -165,8 +165,8 @@ class AppContractTest extends PluginContractTest {
                 },
                 tab -> terminalFixture.tabChoices(tab.id().value()),
                 (tab, number) -> {
-                    terminalFixture.moveToTab(tab.id().value(), number);
-                    for (var other : tabs.inWindow(id)) other.active(other == tab);
+                    if (terminalFixture.moveToTab(tab.id().value(), number))
+                        for (var other : tabs.inWindow(id)) other.active(other == tab);
                 }));
             terminalFixture.onWindowClosed(id, () -> {
                 registration.close();
@@ -657,6 +657,47 @@ class AppContractTest extends PluginContractTest {
             org.assertj.core.api.Assertions.assertThat(lines).as("one line, for the terminal that opened")
                 .containsExactly("Plugin test.alpha used terminal.open: opened a terminal beside content tab " + note.get());
             org.assertj.core.api.Assertions.assertThat(harness.openRequests()).containsExactly("beside|" + note.get() + "|RIGHT");
+        } finally {
+            harness.close();
+        }
+    }
+
+    /**
+     * Pane flexibility spec 4, the application alone: a plugin that holds {@code terminal.observe} reads other tabs' titles
+     * through its content tab's choices, and its first such answer is audited once, as its subscription is; a plugin that
+     * does not read none, and writes none.
+     */
+    @org.junit.jupiter.api.Test void aPluginsFirstTitledTabChoicesAreAuditedOnce() {
+        ContractHarness harness = newHarness();
+        try {
+            UUID main = harness.addTerminalWindow(), shell = harness.addTerminalTab(main, "zsh");
+            harness.addTerminalPane(shell, "zsh", Path.of("/"));
+            var alpha = new AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+            var beta = new AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+            harness.start(new PluginInfo("test.alpha", "test.alpha", "1.0.0", Set.of(dev.jasper.sdk.Capabilities.TERMINAL_OBSERVE)),
+                Set.of(), Set.of(), alpha::set);
+            harness.start(new PluginInfo("test.beta", "test.beta", "1.0.0", Set.of()), Set.of(), Set.of(), beta::set);
+            var notes = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            var sketch = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            harness.ui(() -> {
+                for (var context : List.of(alpha.get(), beta.get())) {
+                    var owner = context.terminals().window(main).orElseThrow();
+                    var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",
+                        dev.jasper.sdk.ui.ControlState.READY, "Content", dev.jasper.sdk.ui.Nodes.TextRole.BODY)), event -> { });
+                    boolean first = context == alpha.get();
+                    (first ? notes : sketch).set(context.windows().openTab(
+                        new dev.jasper.sdk.ui.ContentSpec(first ? "notes" : "sketch", first ? "Notes" : "Sketch"), owner, view));
+                }
+            });
+            List<String> lines = HostedTerminalsTest.audited(() -> harness.ui(() -> {
+                org.assertj.core.api.Assertions.assertThat(sketch.get().tabChoices()).extracting(dev.jasper.sdk.ui.TabChoice::title)
+                    .as("without the capability").containsOnly("");
+                org.assertj.core.api.Assertions.assertThat(notes.get().tabChoices()).extracting(dev.jasper.sdk.ui.TabChoice::title)
+                    .as("with it").contains("zsh");
+                notes.get().tabChoices();
+            }));
+            org.assertj.core.api.Assertions.assertThat(lines).as("one line, for the plugin that read titles")
+                .containsExactly("Plugin test.alpha used terminal.observe: read tab titles");
         } finally {
             harness.close();
         }

@@ -99,6 +99,13 @@ final class HostedUi {
      */
     java.util.function.Function<String, Runnable> terminalOpen = what -> { throw new IllegalStateException("terminal.open gate not set: " + what); };
     /**
+     * Whether this plugin may read the title of a tab whose shown item is not its own content: it holds
+     * {@code terminal.observe}, as {@code TabHandle.title()} requires (pane flexibility spec 4, for the choices of
+     * {@code ContentTab.tabChoices()}). Asking it for an answer that carries titles audits the plugin's first such
+     * answer. Its context sets it; unset, no plugin may.
+     */
+    java.util.function.BooleanSupplier tabTitles = () -> false;
+    /**
      * The id of this plugin's action whose handler is running on the UI thread, or null: a toggle or show its panel's
      * own toggle action makes as it runs activates the panel (plan 15b Rulings 1).
      */
@@ -599,9 +606,17 @@ final class HostedUi {
         public void moveToMainWindow() { requireUi("move content"); entry.moveToMainWindow(); }
         public void moveToNewTab() { requireUi("move content"); model.tabs().moveToNewTab(entry); }
         public boolean mayMoveToNewTab() { requireUi("move content"); return model.tabs().mayMoveToNewTab(entry); }
+        /** Each tab's title goes to a plugin that observes terminals or whose own content the tab shows, and no other. */
         public List<dev.jasper.sdk.ui.TabChoice> tabChoices() {
             requireUi("move content");
-            return model.tabs().tabChoices(entry).stream().map(other -> new dev.jasper.sdk.ui.TabChoice(other.number(), other.title())).toList();
+            var others = model.tabs().tabChoices(entry);
+            boolean observes = !others.isEmpty() && tabTitles.getAsBoolean();
+            return others.stream().map(other -> new dev.jasper.sdk.ui.TabChoice(other.number(),
+                observes || ownContent(other.shown()) ? other.title() : "")).toList();
+        }
+        private boolean ownContent(dev.jasper.app.layout.TabId shown) {
+            return model.tabs().tab(shown).filter(tab -> tab.kind() == dev.jasper.app.contributions.Tab.Kind.HOSTED
+                && tab.plugin().equals(pluginId)).isPresent();
         }
         public void moveToTab(int number) { requireUi("move content"); model.tabs().moveToTab(entry, number); }
         public void split(dev.jasper.sdk.ui.SplitChoice choice, dev.jasper.sdk.terminal.Direction direction) {
