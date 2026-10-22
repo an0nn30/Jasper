@@ -84,6 +84,8 @@ class TabDragWindowsTest {
 
     @AfterEach void cleanup() throws Exception {
         edt(() -> {
+            assertThat(manager.tabDrag().active() || !manager.tabDrag().spring.isRunning())
+                .as("a stopped drag leaves no wait running").isTrue();
             manager.tabDrag().cancel();
             manager.closeAll();
         });
@@ -1120,6 +1122,35 @@ class TabDragWindowsTest {
             assertThat(to.activeParentTab()).as("the tab it joined").isEqualTo(ids[0]);
             assertThat(to.workspace().tabs()).hasSize(2).startsWith(hidden);
             assertThat(tabIds(from)).as("its entry went").hasSize(1).doesNotContain(ids[2]);
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 15: the wait's listener running late, after the window whose entry the dragged one rested
+     * on closed, shows nothing there, and the drag runs on.
+     */
+    @Test void aWaitRunningOutLateAfterItsWindowClosedShowsNothing() throws Exception {
+        ParentTabId[] ids = new ParentTabId[3];
+        edt(() -> {
+            ids[0] = child.content().activeParentTab();
+            ids[1] = secondTab(child);
+            ids[2] = secondTab(main);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            TabDrag drag = manager.tabDrag();
+            Component source = start(from, entryOf(from, ids[2]), onEntry(to, entryOf(to, ids[0]), 0.5));
+            assertThat(drag.spring.isRunning()).isTrue();
+            child.requestClose();
+            assertThat(child.closed()).isTrue();
+            runOutLate(drag);
+            assertThat(to.activeParentTab()).as("nothing shows in the closed window").isEqualTo(ids[1]);
+            assertThat(drag.active()).as("the drag runs on").isTrue();
+            assertThat(from.activeParentTab()).isEqualTo(ids[2]);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onTitleBar(frameOf(main)));
+            mouse(source, MouseEvent.MOUSE_RELEASED, onTitleBar(frameOf(main)));
+            assertThat(tabIds(from)).as("nothing moved").hasSize(2);
         });
     }
 

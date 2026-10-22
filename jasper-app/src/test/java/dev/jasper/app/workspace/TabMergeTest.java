@@ -5,6 +5,7 @@ import static dev.jasper.app.workspace.TabDragTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.contributions.Contributions;
@@ -96,6 +97,8 @@ class TabMergeTest {
     @AfterEach void cleanup() throws Exception {
         edt(() -> {
             try {
+                assertThat(owner.tabDrag().active() || !owner.tabDrag().spring.isRunning())
+                    .as("a stopped drag leaves no wait running").isTrue();
                 owner.tabDrag().cancel();
                 assertThat(keys.dispatchers).as("no Esc dispatcher is left behind").isEmpty();
                 assertThat(motionListeners()).as("no lost-release listener is left behind").isEqualTo(listeners);
@@ -323,6 +326,87 @@ class TabMergeTest {
             assertThat(ids()).as("reordered").containsExactly(second, first, third);
             assertThat(owner.activeParentTab()).as("the dragged tab shows again").isEqualTo(first);
             assertThat(owner.selectedTab()).isSameAs(b);
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 15: the entry rests while the cursor stays within {@link TabDrag#SPRING_SLOP} of where it
+     * came to rest, that far included, measured from there and not from the last move; one pixel past it the wait starts
+     * again where the cursor is, and far along the same entry the place it rests follows the cursor.
+     */
+    @Test void theEntryRestsWithinTheSlopOfWhereItCameToRest() throws Exception {
+        edt(() -> {
+            assertThat(TabDrag.SPRING_SLOP).isEqualTo(4);
+            int slop = UIScale.scale(TabDrag.SPRING_SLOP);
+            TabDrag drag = owner.tabDrag();
+            Point rest = onEntry(owner, d, 0.4);
+            Component source = start(owner, b, rest);
+            assertThat(drag.springRest()).as("where it came to rest").isEqualTo(rest);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(rest.x + slop, rest.y));
+            assertThat(drag.springRest()).as("the slop away, included").isEqualTo(rest);
+            Point past = new Point(rest.x + slop + 1, rest.y);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, past);
+            assertThat(drag.springRest()).as("a pixel past the slop from where it rested, though a pixel from the last move")
+                .isEqualTo(past);
+            Point far = onEntry(owner, d, 0.8);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, far);
+            assertThat(drag.springRest()).as("far along the same entry").isEqualTo(far);
+            elapse(drag);
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 15: onto another entry the wait starts again, however close the cursor stays: from a pixel
+     * left of the boundary between two entries to a pixel right of it, within the slop, the entry it rests on last shows.
+     */
+    @Test void crossingIntoTheNextEntryWithinTheSlopWaitsForThatEntry() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            List<Rectangle> entries = owner.tabBar().tabBounds();
+            List<Tab> listed = owner.parentTabs().bar().tabs();
+            Rectangle left = entries.get(listed.indexOf(d)), right = entries.get(listed.indexOf(e));
+            Component strip = owner.tabBar().component();
+            Point inD = onScreen(strip, new Rectangle(left.x + left.width - 1, left.y + left.height / 2, 0, 0)).getLocation();
+            Point inE = onScreen(strip, new Rectangle(right.x, right.y + right.height / 2, 0, 0)).getLocation();
+            assertThat(inD.distance(inE)).as("within the slop").isLessThanOrEqualTo(UIScale.scale(TabDrag.SPRING_SLOP));
+            Component source = start(owner, b, inD);
+            assertThat(drag.springRest()).isEqualTo(inD);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, inE);
+            assertThat(drag.springRest()).as("the wait starts again over e's entry").isEqualTo(inE);
+            elapse(drag);
+            assertThat(owner.activeParentTab()).as("e's tab").isEqualTo(third);
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 15: the wait's listener running late shows nothing once the drag has ended, or once the
+     * tab it waited on has closed, and leaves the drag no tab to bring back when it ends.
+     */
+    @Test void aWaitRunningOutLateShowsNothing() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Point rest = onEntry(owner, d, 0.6);
+            Component source = start(owner, b, rest);
+            assertThat(esc()).isTrue();
+            mouse(source, MouseEvent.MOUSE_RELEASED, rest);
+            runOutLate(drag);
+            assertThat(owner.activeParentTab()).as("after the drag ended").isEqualTo(first);
+            assertThat(drag.active()).isFalse();
+            source = start(owner, b, onEntry(owner, e, 0.6));
+            assertThat(drag.spring.isRunning()).isTrue();
+            e.close();
+            assertThat(ids()).as("its tab went with its only item").containsExactly(first, second);
+            assertThat(drag.active()).as("the drag runs on").isTrue();
+            int[] focused = {0};
+            b.focusTarget(() -> focused[0]++);
+            runOutLate(drag);
+            assertThat(owner.activeParentTab()).as("after the tab closed").isEqualTo(first);
+            assertThat(owner.selectedTab()).isSameAs(b);
+            assertThat(esc()).isTrue();
+            assertThat(focused[0]).as("no tab to bring back, nothing focused again").isZero();
+            mouse(source, MouseEvent.MOUSE_RELEASED, rest);
+            assertThat(ids()).containsExactly(first, second);
         });
     }
 

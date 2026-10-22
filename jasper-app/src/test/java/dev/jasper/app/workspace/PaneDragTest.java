@@ -651,6 +651,28 @@ class PaneDragTest {
     }
 
     /**
+     * Workspace plan 9a Rulings 15: a pane drag waits for no spring-loading: over another tab's entry its outer quarter
+     * is a new-tab place and its middle half shows that tab at once, and no wait runs over either.
+     */
+    @Test void aPaneDragOverAnotherTabsEntryWaitsForNothing() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Point place = onEntry(owner, d, 0.9);
+            Component source = startPane(owner, c, place);
+            assertThat(drag.target()).as("a new-tab place").contains(new TabDrag.Target.NewTab(owner, 2));
+            assertThat(drag.spring.isRunning()).as("over its outer quarter").isFalse();
+            assertThat(owner.activeParentTab()).isEqualTo(first);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onEntry(owner, d, 0.5), PANE);
+            assertThat(owner.activeParentTab()).as("its middle half shows its tab at once").isEqualTo(second);
+            assertThat(drag.spring.isRunning()).as("over its middle half").isFalse();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onTitleBar(frame), PANE);
+            mouse(source, MouseEvent.MOUSE_RELEASED, onTitleBar(frame), PANE);
+            assertThat(owner.activeParentTab()).isEqualTo(first);
+            assertThat(shape(owner)).isEqualTo("H[a, V[b, c]]");
+        });
+    }
+
+    /**
      * Tabs and panes spec 13 and Review Focus 3: a drag that showed another tab and ends elsewhere shows the tab that
      * showed before again, its item focused: after Esc, and after a release over nothing.
      */

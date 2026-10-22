@@ -68,11 +68,10 @@ import javax.swing.text.JTextComponent;
  * within {@link #SPRING_SLOP} px of where it came to rest, shows that tab at once, as a pane drag's hover does, so in the
  * drag's own window, which shows the dragged tab, its other tabs' panes take it too. Anywhere else in that window (its
  * dock, chrome or title bar), and over any other window of Jasper's (Settings, About, a dialog), nothing; outside every
- * window,
- * a new full window the size of the tab's workspace, with the entry
- * where the cursor holds it and kept on the display under the cursor, except for a window's only tab (a full window's
- * already is its own; workspace plan 8a Rulings 6). A tab holding an item that is pinned (a modal owner holds it in its
- * window), or one being closed, takes targets along its own strip only.
+ * window, a new full window the size of the tab's workspace, with the entry where the cursor holds it and kept on the
+ * display under the cursor, except for a window's only tab (a full window's already is its own; workspace plan 8a
+ * Rulings 6). A tab holding an item that is pinned (a modal owner holds it in its window), or one being closed, takes
+ * targets along its own strip only.
  * <p>A pane's targets (tabs and panes spec 7): a pane of the window's shown tab other than its own, beside which it goes
  * on the side whose edge the cursor is nearest; the middle half of a tab's entry in the window's strip, which shows that
  * tab at once, with no drop of its own, so that one of its panes can take the pane; the tab that showed there before
@@ -197,8 +196,9 @@ final class TabDrag {
     private MouseEvent gesturePress;
     private final AWTEventListener gestureEvents = this::gestureEvent;
     /**
-     * The windows a pane drag showed another tab of, each with the tab that showed there before, which shows again as the
-     * drag ends unless its drop lands in that window (tabs and panes spec 13).
+     * The windows a pane drag's hover or a tab drag's spring-loading showed another tab of, each with the tab that showed
+     * there before, which shows again as the drag ends unless its drop lands in that window (tabs and panes spec 13; pane
+     * flexibility spec 5).
      */
     private final Map<WindowContent, ParentTabId> hovered = new LinkedHashMap<>();
     /** The text view whose text drag sits out the gesture, while it does (workspace plan 8c Rulings 16). */
@@ -241,6 +241,9 @@ final class TabDrag {
     DockDropOverlay overlay() { return overlay; }
 
     TabDragLabel label() { return label; }
+
+    /** Test seam: where the entry came to rest while a wait runs, else null. */
+    Point springRest() { return springAt == null ? null : new Point(springAt); }
 
     /**
      * A left press on {@code tab}'s entry in {@code bar}, the entry of the tab whose active pane holds it: a drag of that
@@ -333,8 +336,9 @@ final class TabDrag {
 
     /**
      * The left button's release on the pressed component: a running drag drops where its target says. The label and the
-     * landing go whatever happens. The window the drop is for keeps the tab a pane drag showed there while the drop
-     * shows the item there; after a drop that does nothing or fails, the tab that showed before shows again.
+     * landing go whatever happens. The window the drop is for keeps the tab a pane drag's hover or a tab drag's
+     * spring-loading showed there while the drop shows the item there; after a drop that does nothing or fails, the tab
+     * that showed before shows again.
      */
     void released(MouseEvent event) {
         if (tab == null || event.getComponent() != source || event.getButton() != MouseEvent.BUTTON1) return;
@@ -372,10 +376,11 @@ final class TabDrag {
     }
 
     /**
-     * After a drop for {@code window}, whose tab {@code before} showed there before a pane drag showed another (tabs
-     * and panes spec 13): unless the drop landed {@code moving} in the window's shown tab, {@code before} shows again,
-     * its active item focused in {@code home}, the drag's own window, as {@link #restore} shows it. Nothing for a
-     * window the drag showed no other tab of, or one that closed.
+     * After a drop for {@code window}, whose tab {@code before} showed there before a pane drag's hover or a tab drag's
+     * spring-loading showed another (tabs and panes spec 13; pane flexibility spec 5): unless the drop landed
+     * {@code moving} in the window's shown tab, {@code before} shows again, its active item focused in {@code home}, the
+     * drag's own window, as {@link #restore} shows it. Nothing for a window the drag showed no other tab of, or one that
+     * closed.
      */
     private static void unhover(WindowContent window, ParentTabId before, WindowContent home, Tab moving) {
         if (window == null || before == null || window.closed()) return;
@@ -589,7 +594,10 @@ final class TabDrag {
         spring.restart();
     }
 
-    /** The tab whose entry in {@code window}'s shown strip is under {@code at}, on screen; null off the entries. */
+    /**
+     * The tab whose entry in {@code window}'s shown strip is under {@code at}, on screen; null off the entries. The hit-test
+     * of spring-loading and of a pane drag's hover ({@link #onPanes}) alike.
+     */
     private static ParentTabId entryUnder(WindowContent window, Point at) {
         Component strip = window.tabBar().component();
         if (!strip.isVisible()) return null;
@@ -598,6 +606,7 @@ final class TabDrag {
         if (!new Rectangle(strip.getSize()).contains(inStrip)) return null;
         List<Rectangle> entries = window.tabBar().tabBounds();
         List<Tab> listed = window.parentTabs().bar().tabs();
+        // The point is on the strip, so an entry's x range alone counts: the row below the entries is theirs.
         for (int i = 0; i < Math.min(entries.size(), listed.size()); i++) {
             Rectangle entry = entries.get(i);
             if (inStrip.x >= entry.x && inStrip.x < entry.x + entry.width) return window.parentTabs().bar().id(listed.get(i));
@@ -682,14 +691,8 @@ final class TabDrag {
             OptionalInt place = window.tabBar().newTabPlace(inStrip);
             if (place.isPresent())
                 return window != from || from.mayMoveToNewTab(tab) ? Optional.of(new Target.NewTab(window, place.getAsInt())) : Optional.empty();
-            List<Rectangle> entries = window.tabBar().tabBounds();
-            List<Tab> listed = parents.bar().tabs();
-            // The point is on the strip, so an entry's x range alone counts: the row below the entries is theirs.
-            for (int i = 0; i < Math.min(entries.size(), listed.size()); i++) {
-                Rectangle entry = entries.get(i);
-                if (inStrip.x >= entry.x && inStrip.x < entry.x + entry.width)
-                    hover(window, parents.bar().id(listed.get(i)));
-            }
+            // An entry's middle half: its tab shows at once, as spring-loading's hit-test finds it.
+            hover(window, entryUnder(window, at));
             return Optional.empty();
         }
         return WorkspaceDropResolver.resolve(local, paneAreas(parents, tab)).map(drop -> new Target.Beside(window, drop.group(), drop.side()));
@@ -724,8 +727,9 @@ final class TabDrag {
     }
 
     /**
-     * Shows {@code window}'s tab {@code id} for a pane drag (tabs and panes spec 7 and 13; workspace plan 8c Rulings 4),
-     * remembering the tab that showed there before the drag first showed another. In the drag's own window its active
+     * Shows {@code window}'s tab {@code id} for a pane drag's hover (tabs and panes spec 7 and 13; workspace plan 8c
+     * Rulings 4) or a tab drag's spring-loading ({@link #sprung}; pane flexibility spec 5), remembering the tab that
+     * showed there before the drag first showed another. Nothing for {@code id} null. In the drag's own window its active
      * item takes the focus, as Select Tab gives it; another window's focus stays where it is, as a focus request there
      * would raise that window and take the focus from the drag's own, which ends the drag. Its panes take their places at
      * once, for the next target.
@@ -739,9 +743,10 @@ final class TabDrag {
     }
 
     /**
-     * Each window a pane drag showed another tab of shows the tab that showed before (tabs and panes spec 13; workspace
-     * plan 8c Rulings 5), except {@code kept}, the window its drop is for, which shows what the drop shows; in
-     * {@code home}, the drag's own window, that tab's active item takes the focus again. A tab gone meanwhile stays gone.
+     * Each window a pane drag's hover or a tab drag's spring-loading showed another tab of shows the tab that showed
+     * before (tabs and panes spec 13; workspace plan 8c Rulings 5; pane flexibility spec 5), except {@code kept}, the
+     * window its drop is for, which shows what the drop shows; in {@code home}, the drag's own window, that tab's active
+     * item takes the focus again. A tab gone meanwhile stays gone.
      */
     private void restore(WindowContent home, WindowContent kept) {
         var before = new LinkedHashMap<>(hovered);
@@ -835,8 +840,9 @@ final class TabDrag {
     private void finish() { finish(null); }
 
     /**
-     * As {@link #finish()}; the windows a pane drag showed another tab of show the tab that showed before, except
-     * {@code kept}, the window the drop is for (tabs and panes spec 13).
+     * As {@link #finish()}; the spring-loading wait stops, and the windows a pane drag's hover or a tab drag's
+     * spring-loading showed another tab of show the tab that showed before, except {@code kept}, the window the drop is
+     * for (tabs and panes spec 13; pane flexibility spec 5).
      */
     private void finish(WindowContent kept) {
         boolean wasDragging = dragging;
@@ -864,7 +870,8 @@ final class TabDrag {
             shown.close();
             shown = null;
         }
-        // The tabs a pane drag showed give way once nothing of the drag listens any more.
+        // The tabs a pane drag's hover or a tab drag's spring-loading showed give way once nothing of the drag listens
+        // any more.
         restore(home, kept);
         if (!wasDragging) return;
         if (keys != null) {

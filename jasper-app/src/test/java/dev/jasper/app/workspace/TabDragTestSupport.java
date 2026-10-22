@@ -12,6 +12,7 @@ import java.awt.Component;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -220,6 +221,11 @@ final class TabDragTestSupport {
         if (!drag.spring.isRunning()) throw new AssertionError("the spring-loading wait does not run");
         drag.spring.stop();
         for (var listener : drag.spring.getActionListeners())
-            listener.actionPerformed(new java.awt.event.ActionEvent(drag.spring, java.awt.event.ActionEvent.ACTION_PERFORMED, null));
+            listener.actionPerformed(new ActionEvent(drag.spring, ActionEvent.ACTION_PERFORMED, null));
+    }
+
+    /** The spring-loading wait's listener run directly, whatever the wait's state: what a late run of it meets. */
+    static void runOutLate(TabDrag drag) {
+        drag.spring.getActionListeners()[0].actionPerformed(new ActionEvent(drag.spring, ActionEvent.ACTION_PERFORMED, null));
     }
 }
