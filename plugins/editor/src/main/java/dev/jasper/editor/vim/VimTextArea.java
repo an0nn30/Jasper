@@ -18,7 +18,9 @@ import org.fife.ui.rtextarea.RUndoManager;
 /**
  * Every Editor tab's text area (spec 1.1). With Vim off it is an ordinary RSyntaxTextArea. With Vim on, key events
  * reach the attached {@link VimEditor} before Swing's key bindings: a key Vim takes is consumed here, so neither the
- * text area's bindings nor the Editor's window shortcuts see it (the handler rule, spec 2.2).
+ * text area's bindings nor the Editor's window shortcuts see it (the handler rule, spec 2.2). Several text areas can
+ * show one document ({@link #share}): they share its undo history, and the one the user types in, clicks or focuses is
+ * the one that edits it.
  */
 public class VimTextArea extends RSyntaxTextArea {
     private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
@@ -30,16 +32,90 @@ public class VimTextArea extends RSyntaxTextArea {
     private boolean swallowTyped;
     private char highSurrogate;
 
+    /** Whether the area tells its history when it gains the focus: once another area shares its document. */
+    private boolean followsFocus;
+
     /** An empty text area. */
     public VimTextArea() { }
 
+    /**
+     * The area keeps one history: the superclass constructor asks for it, and {@code discardAllEdits} asks again after
+     * emptying it, which keeps the history a shared document's views have in common (pane flexibility spec 6).
+     */
     @Override protected RUndoManager createUndoManager() {
-        undo = new VimUndoManager(this);
-        undo.vim(vim != null);
+        if (undo == null) {
+            undo = new VimUndoManager(this);
+            undo.vim(vim != null);
+        }
         return undo;
     }
 
-    VimUndoManager vimUndo() { return undo; }
+    /** @return the document's undo history, with this area as the one that edits now, since its Vim engine asks */
+    VimUndoManager vimUndo() {
+        edits();
+        return undo;
+    }
+
+    /** This area edits the document now: the history's steps go by its caret and its Vim engine. */
+    private void edits() { if (undo != null) undo.view(this); }
+
+    /** From now on the area edits the document whenever it gains the focus, as one of several views of it. */
+    private void followFocus() {
+        if (followsFocus) return;
+        followsFocus = true;
+        addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusGained(java.awt.event.FocusEvent event) { edits(); }
+        });
+    }
+
+    /**
+     * Shows {@code other}'s document from now on, as another view of it (pane flexibility spec 6): the same text and
+     * language, and the one undo history, so an undo in either undoes the document's last edit. Call it before anything
+     * else listens to this area's document.
+     *
+     * @param other a text area showing the document
+     */
+    public void share(VimTextArea other) {
+        VimUndoManager history = other.undo;
+        history.join(this);
+        other.followFocus();
+        followFocus();
+        // setDocument's discardAllEdits empties this area's own history, then createUndoManager hands it the shared one.
+        undo = history;
+        setDocument(other.getDocument());
+    }
+
+    /**
+     * Stops showing a shared document: this area gets an empty document and a history of its own, and the other views
+     * keep the text and its history, which this area's swap leaves as it was. Nothing happens while no other area shows
+     * the document.
+     */
+    public void unshare() {
+        VimUndoManager history = undo;
+        if (!history.shared()) return;
+        undo = null;
+        history.leave(this, () -> setDocument(createDefaultModel()));
+    }
+
+    @Override public void replaceSelection(String text) {
+        edits();
+        super.replaceSelection(text);
+    }
+
+    @Override public void beginAtomicEdit() {
+        edits();
+        super.beginAtomicEdit();
+    }
+
+    @Override public void undoLastAction() {
+        edits();
+        super.undoLastAction();
+    }
+
+    @Override public void redoLastAction() {
+        edits();
+        super.redoLastAction();
+    }
 
     /**
      * Marks an action name as one of the Editor's own commands: outside Insert and Replace mode, a key Vim declines
@@ -54,6 +130,7 @@ public class VimTextArea extends RSyntaxTextArea {
 
     void attach(VimEditor editor) {
         vim = editor;
+        edits();
         undo.vim(editor != null);
         revalidate();
     }
@@ -121,6 +198,7 @@ public class VimTextArea extends RSyntaxTextArea {
     }
 
     @Override protected void processKeyEvent(KeyEvent event) {
+        edits();
         VimEditor editor = vim;
         Verdict verdict = editor == null ? Verdict.PASS : handled(editor, event);
         switch (verdict) {
@@ -212,6 +290,7 @@ public class VimTextArea extends RSyntaxTextArea {
     }
 
     @Override protected void processInputMethodEvent(InputMethodEvent event) {
+        edits();
         VimEditor editor = vim;
         if (editor != null && !editor.editing() && event.getID() == InputMethodEvent.INPUT_METHOD_TEXT_CHANGED) {
             // Input methods are off outside Insert mode, but macOS press-and-hold accents and the emoji picker still
