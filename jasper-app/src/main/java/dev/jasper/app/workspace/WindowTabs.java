@@ -77,13 +77,17 @@ final class WindowTabs extends JPanel implements TabStrip {
         // Only an open or a close moves: a tab that arrives or leaves by a move does not.
         boolean opened = updated.stream().anyMatch(tab -> !entries.containsKey(tab) && !tab.moving());
         boolean closing = order.stream().anyMatch(tab -> !updated.contains(tab) && tab.closed());
-        if (changed) {
+        // The entries that stay take their tabs' order at once, as a reorder does: a merge, or a tab's last pane moving
+        // into a tab that is not its neighbour, leaves the tab it joined showing an item another entry showed, so that
+        // entry stays where it was drawn while the tab's own goes (pane flexibility spec 5).
+        boolean reslot = !drawn(updated).equals(updated.stream().filter(entries::containsKey).toList());
+        if (changed || reslot) {
             for (Tab tab : List.copyOf(order)) if (!updated.contains(tab)) {
                 Entry entry = entries.remove(tab);
                 entry.slot.entry = null; // The shrinking gap retains no closed session, plugin or controls.
                 viewport.remove(entry);
             }
-            if (!added && !removed) { settle(); slots.clear(); }
+            if (reslot) { settle(); slots.clear(); }
             order.clear(); order.addAll(updated);
             for (int i = 0; i < order.size(); i++) {
                 Tab tab = order.get(i);
@@ -92,12 +96,12 @@ final class WindowTabs extends JPanel implements TabStrip {
                     int at = i == 0 ? 0 : slots.indexOf(entries.get(order.get(i - 1)).slot) + 1;
                     while (at < slots.size() && slots.get(at).entry == null) at++;
                     slots.add(at, entry.slot);
-                } else if (!added && !removed) slots.add(entries.get(tab).slot);
+                } else if (reslot) slots.add(entries.get(tab).slot);
             }
             Curve curve = added ? Curve.OPEN : Curve.CLOSE;
             int millis = added ? animations.tabOpenMillis() : animations.tabCloseMillis();
             // A strip that does not show takes its tabs at once, so it shows and hides settled.
-            if (order.size() <= 1 || !opened && !closing || !shown() || !animations.enabled() || !source.animates()
+            if (reslot || order.size() <= 1 || !opened && !closing || !shown() || !animations.enabled() || !source.animates()
                 || layoutWidth <= 0) millis = 0;
             for (Slot slot : slots) slot.width.target(slot.entry == null ? 0 : 1.0 / order.size(), now, millis, curve);
             sample(now);
@@ -106,6 +110,13 @@ final class WindowTabs extends JPanel implements TabStrip {
         setBackground(source.owner().theme().surface());
         for (Tab tab : order) entries.get(tab).refresh();
         doLayout(); syncTimer(); revalidate(); repaint();
+    }
+
+    /** The tabs of {@code tabs} that have entries, in the order the strip draws them. */
+    private List<Tab> drawn(List<Tab> tabs) {
+        var drawn = new ArrayList<Tab>();
+        for (Slot slot : slots) if (slot.entry != null && tabs.contains(slot.entry.tab)) drawn.add(slot.entry.tab);
+        return drawn;
     }
 
     /**

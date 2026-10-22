@@ -161,11 +161,16 @@ final class WorkspaceView extends JPanel {
     /**
      * Takes {@code arrived}, every item of another tab, beside {@code group} as {@code arranged}, that tab's layout, gives
      * them (pane flexibility spec 5): one nested split on {@code side} of the pane ({@link Layout#insertBeside}), the moved
-     * tab's active pane active and a maximize ended. Their components leave the workspace that showed them.
+     * tab's active pane active and a maximize ended. Their components leave the workspace that showed them. An
+     * {@code arranged} that places other items than {@code arrived}, as a saved tab's restore refuses one, changes
+     * nothing and throws {@link IllegalArgumentException}.
      */
     void join(List<Tab> arrived, Layout arranged, GroupId group, Side side) {
+        var placed = new HashMap<TabId, Tab>();
+        for (Tab tab : arrived) placed.put(tab.id(), tab);
+        if (!placed.keySet().equals(Set.copyOf(arranged.tabs()))) throw new IllegalArgumentException("The layout places other items");
         Layout next = layout.insertBeside(arranged, group, side);
-        for (Tab tab : arrived) tabs.put(tab.id(), tab);
+        tabs.putAll(placed);
         apply(next);
     }
 

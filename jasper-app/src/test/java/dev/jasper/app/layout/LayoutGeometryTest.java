@@ -122,6 +122,8 @@ class LayoutGeometryTest {
         Layout empty = Layout.empty();
         assertThatIllegalArgumentException().as("the empty workspace").isThrownBy(() -> empty.insertBeside(moved, empty.activeGroup(), Side.RIGHT));
         assertThatNullPointerException().isThrownBy(() -> target.insertBeside(moved, groupId(2), null));
+        assertThatNullPointerException().as("a null pane, before the empty layout's message")
+            .isThrownBy(() -> target.insertBeside(Layout.empty(), null, Side.RIGHT));
     }
 
     @Test void resizeAddressesASplitByItsPathAndNormalizes() {

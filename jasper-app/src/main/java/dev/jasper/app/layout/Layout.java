@@ -322,6 +322,7 @@ public final class Layout {
      */
     public Layout insertBeside(Layout other, GroupId group, Side side) {
         Objects.requireNonNull(other, "other");
+        Objects.requireNonNull(group, "group");
         Objects.requireNonNull(side, "side");
         if (other.isEmpty()) throw new IllegalArgumentException("An empty layout has no panes to put beside " + group);
         if (requireGroup(group).tabs().isEmpty()) throw new IllegalArgumentException("The empty workspace's group cannot be split");

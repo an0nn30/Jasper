@@ -267,9 +267,12 @@ class MovePaneToTabTest {
             owner.selectTab(b);
             for (JMenu moves : List.of(tabMenuMoves(), contextMoves())) {
                 assertThat(texts(moves)).containsExactly("2 c", "3 d", "4 <html><b>B");
-                for (Component child : moves.getMenuComponents())
+                for (Component child : moves.getMenuComponents()) {
+                    assertThat(((JMenuItem) child).getClientProperty("html.disable"))
+                        .as("%s disables HTML", ((JMenuItem) child).getText()).isEqualTo(Boolean.TRUE);
                     assertThat(((JMenuItem) child).getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey))
                         .as("%s renders no HTML", ((JMenuItem) child).getText()).isNull();
+                }
             }
         });
     }
