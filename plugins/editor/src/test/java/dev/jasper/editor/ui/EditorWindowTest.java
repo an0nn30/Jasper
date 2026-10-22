@@ -1248,6 +1248,8 @@ class EditorWindowTest {
         assertThat(host.windowTabs(main)).as("a pane beside the shell, in its tab").hasSize(1);
         assertThat(host.windowTabs(main).getFirst()).hasSize(2).startsWith(shell);
         assertThat(window.selected().orElseThrow().session().name()).isEqualTo("a.txt");
+        assertThat(handle.activeTab().map(dev.jasper.sdk.terminal.TabHandle::id)).as("the new pane has the focus")
+            .contains(host.windowTabs(main).getFirst().get(1));
         assertThat(recorded).containsExactly(LocalDocument.key(a));
         host.queueFileChoice(List.of(new FileLocation.Local(b)));
         window.openBeside(handle, dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN);
@@ -1255,6 +1257,8 @@ class EditorWindowTest {
         assertThat(host.windowTabs(main)).hasSize(1);
         assertThat(host.windowTabs(main).getFirst()).as("beside the focused file, in the same tab").hasSize(3).startsWith(shell);
         assertThat(window.selected().orElseThrow().session().name()).isEqualTo("b.txt");
+        assertThat(handle.activeTab().map(dev.jasper.sdk.terminal.TabHandle::id)).as("the newer pane has the focus")
+            .contains(host.windowTabs(main).getFirst().get(2));
         assertThat(host.fileChoices().getLast().initial()).as("from an Editor file, in its folder")
             .contains(new FileLocation.Local(home));
     }
@@ -1321,6 +1325,25 @@ class EditorWindowTest {
         assertThat(host.windowTabs(main).getFirst()).hasSize(2).startsWith(shell);
     }
 
+    /** A file source's resolver that fails, through Open File Right: a notification says so, and no pane opens. */
+    @Test void openBesideOfASourcesFileWhoseResolverFailsOpensNothingAndSaysSo() throws Exception {
+        locations.register("test.hosts", new LocationResolver() {
+            @Override public EditorDocument document(FileLocation.Sourced location, WindowOwner owner) {
+                throw new IllegalStateException("no route to box");
+            }
+            @Override public Optional<FileLocation.Sourced> location(String key) { return Optional.empty(); }
+        });
+        UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
+        host.queueFileChoice(List.of(new FileLocation.Sourced("test.hosts", "box", "/srv/app.conf")));
+        window.openBeside(context.terminals().window(main).orElseThrow(), dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+        drain();
+        assertThat(host.notifications().lines())
+            .containsExactly("dev.jasper.editor|ERROR|Could not open a file|/srv/app.conf: no route to box|IllegalStateException");
+        assertThat(host.contentTabs()).as("no pane").isEmpty();
+        assertThat(host.windowTabs(main)).containsExactly(List.of(shell));
+        assertThat(recorded).isEmpty();
+    }
+
     /** {@code openDocumentBeside} opens beside a pane, right or down, and nowhere else. */
     @Test void openDocumentBesideTakesOnlyTheSplitPlacements() throws Exception {
         UUID main = host.addTerminalWindow();
@@ -1330,6 +1353,18 @@ class EditorWindowTest {
         for (var placement : List.of(dev.jasper.sdk.ui.TabPlacement.NEW_TAB, dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW))
             org.assertj.core.api.Assertions.assertThatIllegalArgumentException().as(placement.name())
                 .isThrownBy(() -> window.openDocumentBeside(document, handle, placement));
+        assertThat(host.contentTabs()).isEmpty();
+    }
+
+    /** Workspace plan 9a's Task 2 review: {@code openBeside} refuses another placement before its chooser shows. */
+    @Test void openBesideRefusesAnotherPlacementBeforeItsChooserShows() {
+        UUID main = host.addTerminalWindow();
+        host.addTerminalTab(main, "zsh");
+        WindowHandle handle = context.terminals().window(main).orElseThrow();
+        for (var placement : List.of(dev.jasper.sdk.ui.TabPlacement.NEW_TAB, dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW))
+            org.assertj.core.api.Assertions.assertThatIllegalArgumentException().as(placement.name())
+                .isThrownBy(() -> window.openBeside(handle, placement));
+        assertThat(host.fileChoices()).as("no chooser").isEmpty();
         assertThat(host.contentTabs()).isEmpty();
     }
 

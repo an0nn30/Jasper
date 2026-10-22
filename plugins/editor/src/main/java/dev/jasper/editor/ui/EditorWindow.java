@@ -250,8 +250,10 @@ public final class EditorWindow {
      *
      * @param owner the window the command ran in
      * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     * @throws IllegalArgumentException for another placement, before the chooser shows
      */
     public void openBeside(WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
+        requireBeside(placement);
         java.util.UUID shown = owner instanceof WindowHandle window ? window.id() : null;
         Optional<FileLocation> near = hosted.entrySet().stream()
             .filter(entry -> entry.getValue().isActive() && entry.getValue().window().id().equals(shown))
@@ -272,8 +274,7 @@ public final class EditorWindow {
      * @throws IllegalArgumentException for another placement
      */
     public void openDocumentBeside(EditorDocument document, WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
-        if (placement != dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT && placement != dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN)
-            throw new IllegalArgumentException("A file opens in a pane to the right or below, not " + placement);
+        requireBeside(placement);
         origin = owner;
         Optional<DocumentSession> existing = model.find(document.key());
         if (existing.isPresent()) {
@@ -282,6 +283,12 @@ public final class EditorWindow {
             return;
         }
         openSession(document, placement);
+    }
+
+    /** A file opens in a pane to the right or below: {@code placement} is {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}. */
+    private static void requireBeside(dev.jasper.sdk.ui.TabPlacement placement) {
+        if (placement != dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT && placement != dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN)
+            throw new IllegalArgumentException("A file opens in a pane to the right or below, not " + placement);
     }
 
     /**
