@@ -563,6 +563,110 @@ class JasperApplicationPluginsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
 
+    /** A web browser that appends {@code <address>|<origin>|<window or ->} to {@code data/opened} and declines {@code /declined}. */
+    private static final String WEB_BROWSER = """
+        package fix.web;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import java.nio.file.Files;
+        import java.nio.file.StandardOpenOption;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
+                context.platform().browser((address, origin, window) -> {
+                    try {
+                        Files.writeString(context.dataDirectory().resolve("opened"),
+                            address + "|" + origin + "|" + (window.isPresent() ? "window" : "-") + "\\n",
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    return !address.getPath().equals("/declined");
+                });
+            }
+        }
+        """;
+
+    /**
+     * Browser plan 3, Review Focus 1 to 3: a clicked web link goes to the browser a plugin provides, as a click; one it
+     * declines, any other link the terminal opens and every link before the plugins start go to the system browser, and a
+     * link that is no URI opens nothing.
+     */
+    @Test void aClickedWebLinkGoesToTheProvidedBrowserAndAnyOtherLinkToTheSystemBrowser() throws Exception {
+        var system = new CopyOnWriteArrayList<String>();
+        java.util.UUID window = java.util.UUID.randomUUID();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].openLink("https://example.com/early", window);
+        });
+        assertThat(system).as("before the plugins start").containsExactly("https://example.com/early");
+
+        system.clear();
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        edt(() -> {
+            application[0].startPlugins(null, dev, false, dirs);
+            application[0].openLink("https://example.com/a", window);
+            application[0].openLink("HTTPS://Example.com/declined", window);
+            application[0].openLink("mailto:someone@example.com", window);
+            application[0].openLink("ftp://files.example.com/x", window);
+            application[0].openLink("https://example.com/a b", window);
+        });
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
+            .as("as clicks; a window that is not open is no window")
+            .containsExactly("https://example.com/a|CLICK|-", "HTTPS://Example.com/declined|CLICK|-");
+        assertThat(system).as("the declined address, mailto and ftp; nothing for a link that is no URI")
+            .containsExactly("HTTPS://Example.com/declined", "mailto:someone@example.com", "ftp://files.example.com/x");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /**
+     * Browser plan 3, the user's ruling ("route Help and About through it too"): Jasper's own web links, which Settings'
+     * Help button, the Licenses window and the plugin manager open through {@code browse}, go to the browser a plugin
+     * provides as clicks from the active window, else to the system browser.
+     */
+    @Test void jaspersOwnWebLinksGoToTheProvidedBrowserAndOtherwiseTheSystemBrowser() throws Exception {
+        var system = new CopyOnWriteArrayList<String>();
+        java.net.URI help = java.net.URI.create(dev.jasper.app.settingsui.SettingsDialog.HELP_URL + "keybindings");
+        java.net.URI declined = java.net.URI.create("https://example.com/declined");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].browse(help);
+        });
+        assertThat(system).as("before the plugins start").containsExactly(help.toString());
+
+        system.clear();
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        edt(() -> {
+            application[0].startPlugins(null, dev, false, dirs);
+            application[0].browse(help);
+            // A stand-in frame opens the main window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
+            application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
+                () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            application[0].openFirstWindow(List.of()).orElseThrow();
+            application[0].terminals().windowActivated(application[0].terminals().windows().getFirst().id());
+            application[0].browse(help);
+            application[0].browse(declined);
+        });
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
+            .as("as clicks: with no window active, then from the active one")
+            .containsExactly(help + "|CLICK|-", help + "|CLICK|window", declined + "|CLICK|window");
+        assertThat(system).as("only the address the browser declined").containsExactly(declined.toString());
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
     private static void awaitCalls(List<String> calls, int count) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline && calls.size() < count) Thread.sleep(10);

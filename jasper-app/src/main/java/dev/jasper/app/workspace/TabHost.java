@@ -12,9 +12,9 @@ import java.util.UUID;
 import javax.swing.KeyStroke;
 
 /**
- * One window's side of the terminal tabs it shows (workspace tabs spec 9.3): the shortcut, context-menu and file-link
- * handlers a pane's view gets, the window its activity and terminal-registry facts report from, the window's theme and
- * opacity, and focus. A tab moving to another window is detached from this host and attached to the next window's; its
+ * One window's side of the terminal tabs it shows (workspace tabs spec 9.3): the shortcut, context-menu, file-link and
+ * link handlers a pane's view gets, the window its activity and terminal-registry facts report from, the window's
+ * theme and opacity, and focus. A tab moving to another window is detached from this host and attached to the next window's; its
  * session is never touched (spec 2.3). A "go to" callback selects its tab through the registry when it runs, so it
  * follows the tab to whichever window holds it then. EDT only.
  */
@@ -149,7 +149,7 @@ final class TabHost {
         pane.setShellExitBehavior(configured.terminal().onExit());
     }
 
-    /** The view's shortcut, context-menu and file-link handlers, and its launch focus, go to this window. */
+    /** The view's shortcut, context-menu, file-link and link handlers, and its launch focus, go to this window. */
     private void bind(Tab tab, TerminalPane pane) {
         pane.allowLaunchFocus = () -> owner.commandPalette() == null || !owner.commandPalette().blocksActions();
         pane.view().setShortcutHandler(event -> owner.dispatchShortcut(KeyStroke.getKeyStrokeForEvent(event), pane.view()));
@@ -158,6 +158,7 @@ final class TabHost {
             owner.chrome().contextMenu().show(pane.view(), event.getX(), event.getY());
         });
         pane.view().setFileLinkHandler(link -> openFileLink(pane, link));
+        pane.view().setLinkOpener(link -> owner.onOpenLink.accept(link));
     }
 
     private static void unwire(TerminalPane pane) {
@@ -176,6 +177,7 @@ final class TabHost {
         pane.allowLaunchFocus = () -> true;
         if (pane.view() != null) {
             pane.view().setShortcutHandler(null); pane.view().setContextMenuHandler(null); pane.view().setFileLinkHandler(null);
+            pane.view().setLinkOpener(null);
         }
     }
 

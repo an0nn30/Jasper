@@ -291,12 +291,16 @@ final class HostedContext implements PluginContext {
             }
         }
 
-        /** Opens an address in the system browser on this plugin's worker; a failure is posted in its group, never thrown. */
+        /**
+         * Opens an address in the system browser on this plugin's worker; a failure is posted in its group, never thrown.
+         * The log names the failure's class only: the address may be program output, and the exception's message may repeat it.
+         */
         private void systemBrowser(URI address) {
             background().execute(() -> {
                 try { host.environment.browser().accept(address); }
                 catch (RuntimeException failure) {
-                    log().log(System.Logger.Level.WARNING, "Could not open " + address + " in a browser", failure);
+                    log().log(System.Logger.Level.WARNING,
+                        "Could not open a web address in the system browser: " + failure.getClass().getName());
                     notifications.group().error("Could not open a web address", address.toString(), failure);
                 }
             });

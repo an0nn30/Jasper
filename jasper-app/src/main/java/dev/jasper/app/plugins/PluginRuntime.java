@@ -690,6 +690,31 @@ public final class PluginRuntime {
         else current.fileEditors.openFromWorker(file, line, window, desktop);
     }
 
+    /**
+     * Opens a web address the user asked for (a link clicked in a terminal, {@code jasper <address>}): the web browser
+     * a plugin provides ({@code Platform.browser}), asked on this thread as a click from {@code window}, then
+     * {@code desktop} when no plugin provides one, or it declines or throws. Before the plugins start, {@code desktop}
+     * alone. UI thread: the browser must not block, so nothing waits for it.
+     *
+     * @param address an absolute http or https address
+     * @param window the Jasper window the address came from, or empty
+     * @param desktop the system browser's opener; it must not block
+     * @throws IllegalStateException off the UI thread
+     */
+    public void openLink(java.net.URI address, Optional<UUID> window, Consumer<java.net.URI> desktop) {
+        openAddress(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, window, desktop);
+    }
+
+    private void openAddress(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> window,
+                             Consumer<java.net.URI> desktop) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Web addresses are opened on the UI thread");
+        Objects.requireNonNull(address, "address");
+        Objects.requireNonNull(window, "window");
+        Objects.requireNonNull(desktop, "desktop");
+        PluginHost current = host;
+        if (current == null || !current.webBrowsers.open(address, origin, window)) desktop.accept(address);
+    }
+
     private Optional<Path> commandClient = Optional.empty();
 
     /**

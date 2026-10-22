@@ -194,6 +194,8 @@ public final class JasperApplication {
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
     /** Test seam: how a window's native frame is made. Production builds a {@link WindowFrame}. Before the manager, which reads it. */
     Function<JasperWindow, WindowShell> frames = this::frameOnScreen;
+    /** Test seam: how a web address opens in the system browser (browser plan 3). Production uses a virtual thread. EDT. */
+    Consumer<java.net.URI> systemBrowser = JasperApplication::openInSystemBrowser;
     /**
      * Test seam: whether the main window's detached tool windows get native windows ({@link DetachedFrame}): only where
      * windows can be made, as nothing native is made headless.
@@ -597,6 +599,7 @@ public final class JasperApplication {
             content.onInfo = (title, details) -> notificationViews.info(title, details, windowId);
             content.onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
             content.onOpenFile = (file, line) -> openFileAt(file, line, windowId);
+            content.onOpenLink = link -> openLink(link, windowId);
             // File › Open File… (spec 13): the plugins' file chooser over this window; nothing before plugins start.
             content.fileChooser = folder -> auxiliary == null ? Optional.empty() : auxiliary.openFile(windowId, folder);
             if (main) notificationViews.attach(content);
@@ -765,6 +768,65 @@ public final class JasperApplication {
                 else runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), fallback);
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, failed, failure);
+            }
+        });
+    }
+
+    /**
+     * Opens a link a Cmd-click (Ctrl-click elsewhere) in window {@code window} handed over, as the terminal read it
+     * (browser plan 3): a web address ({@code webAddress}) through the web browser a plugin provides, as a click from that
+     * window, else the system browser; any other link the terminal opens, an {@code ftp} URL or an OSC 8 {@code mailto}
+     * link, in the system browser, as before. A link that is not a URI opens nothing, and the log does not repeat it: it
+     * is program output. EDT.
+     */
+    void openLink(String link, UUID window) {
+        Optional<java.net.URI> address = webAddress(link);
+        if (address.isPresent()) {
+            openWebAddress(address.get(), Optional.of(window));
+            return;
+        }
+        try {
+            systemBrowser.accept(new java.net.URI(link));
+        } catch (java.net.URISyntaxException notALink) {
+            LOG.log(System.Logger.Level.INFO, "A clicked link is not a URI, so nothing opens");
+        }
+    }
+
+    /**
+     * Opens a web address the user asked for: the web browser a plugin provides, as a click from {@code window}, else the
+     * system browser; before the plugins start, the system browser. EDT.
+     */
+    private void openWebAddress(java.net.URI address, Optional<UUID> window) {
+        PluginRuntime runtime = plugins;
+        if (runtime == null) systemBrowser.accept(address);
+        else runtime.openLink(address, window, systemBrowser);
+    }
+
+    /**
+     * {@code text} as a web address (browser plan 3): an absolute URI whose scheme is {@code http} or {@code https}, in
+     * any case, with an authority, such as {@code https://example.com/a}. Anything else is empty: another scheme, an
+     * opaque URI such as {@code https:example.com}, one without an authority such as {@code http:/notes}, a Windows path,
+     * and text that does not parse. Any thread.
+     */
+    static Optional<java.net.URI> webAddress(String text) {
+        try {
+            var address = new java.net.URI(text);
+            String scheme = address.getScheme();
+            boolean web = scheme != null && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"));
+            return web && !address.isOpaque() && address.getRawAuthority() != null ? Optional.of(address) : Optional.empty();
+        } catch (java.net.URISyntaxException notAnAddress) {
+            return Optional.empty();
+        }
+    }
+
+    /** The system browser's open, on a virtual thread; a failure is logged without the address, which may be program output. */
+    private static void openInSystemBrowser(java.net.URI address) {
+        Thread.ofVirtual().name("jasper-open-link").start(() -> {
+            try {
+                dev.jasper.app.platform.Browser.open(address);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "Could not open a web address in the system browser ("
+                    + failure.getClass().getSimpleName() + ")");
             }
         });
     }
@@ -1550,12 +1612,16 @@ public final class JasperApplication {
                 });
         }
 
-        private void browse(java.net.URI uri) {
-            if (!supports(Desktop.Action.BROWSE)) return;
-            CompletableFuture.runAsync(() -> {
-                try { Desktop.getDesktop().browse(uri); }
-                catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
-            });
+        /**
+         * Opens one of Jasper's own web links (browser plan 3, the user's ruling): Settings' Help button, the Licenses
+         * window's homepages and the plugin manager's homepages. Their windows are not Jasper windows, so an http or https
+         * address goes to the web browser a plugin provides as a click from the active Jasper window, else to the system
+         * browser; any other address goes to the system browser. EDT.
+         */
+        void browse(java.net.URI uri) {
+            Optional<UUID> window = terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id);
+            if (webAddress(uri.toString()).isPresent()) openWebAddress(uri, window);
+            else systemBrowser.accept(uri);
         }
 
     /**

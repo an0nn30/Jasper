@@ -41,7 +41,10 @@ import static dev.jasper.app.workspace.DesktopTestSupport.until;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
-/** A Cmd-click (Ctrl-click elsewhere) on a file in a pane, through the real view, to the window's {@code onOpenFile}. */
+/**
+ * A Cmd-click (Ctrl-click elsewhere) on a file or a URL in a pane, through the real view, to the window's
+ * {@code onOpenFile} or {@code onOpenLink}.
+ */
 class FileLinkClickTest {
     private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
     private static final int LINK = MAC ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
@@ -49,6 +52,7 @@ class FileLinkClickTest {
     @TempDir Path directory;
     private final PipedOutputStream remote = new PipedOutputStream();
     private final List<String> opened = Collections.synchronizedList(new ArrayList<>());
+    private final List<String> links = Collections.synchronizedList(new ArrayList<>());
     private final List<WindowContent> windows = new ArrayList<>();
     private int writes;
 
@@ -186,9 +190,44 @@ class FileLinkClickTest {
         assertThat(opened).containsExactly(directory.resolve("notes.txt") + ":0");
     }
 
+    /**
+     * Browser plan 3, Review Focus 1, the window's half: a URL under the pointer, plain text or OSC 8, goes to the window's
+     * {@code onOpenLink} as the terminal read it, and a path still goes to {@code onOpenFile}.
+     */
+    @Test void aClickedUrlGoesToTheWindowsLinkOpenerAsWritten() throws Exception {
+        TerminalPane pane = localPane(attached());
+        write(pane, "see https://example.com/a?b=1 now\r\nftp://files.example.com/x\r\n"
+            + "\033]8;;mailto:someone@example.com\007mail me\033]8;;\007\r\nsrc/Foo.java:3\r\n");
+
+        click(pane, 6, 0);
+        click(pane, 3, 1);
+        click(pane, 2, 2);
+        click(pane, 2, 3);
+
+        assertThat(links).containsExactly("https://example.com/a?b=1", "ftp://files.example.com/x", "mailto:someone@example.com");
+        assertThat(opened).containsExactly(directory.resolve("src").resolve("Foo.java") + ":3");
+    }
+
+    /** Browser plan 3: unlike a file path, a URL in a provided session's pane goes to the window too. */
+    @Test @DisabledOnOs(OS.WINDOWS) void aUrlInAProvidedSessionGoesToTheWindowToo() throws Exception {
+        List<SessionAttempt> attempts = Collections.synchronizedList(new ArrayList<>());
+        TerminalPane[] pane = new TerminalPane[1];
+        edt(() -> pane[0] = window(launcher(new ArrayDeque<>()))
+            .openTab(directory, new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run)).pane());
+        until(() -> !attempts.isEmpty());
+        attempts.getFirst().attach(connection());
+        until(() -> pane[0].view() != null);
+        write(pane[0], "see https://example.com/remote\r\n");
+
+        click(pane[0], 6, 0);
+
+        assertThat(links).containsExactly("https://example.com/remote");
+    }
+
     private WindowContent window(ShellLauncher launcher) {
         WindowContent owner = new WindowContent(launcher, directory, path -> { }, () -> { }, () -> { });
         owner.onOpenFile = (file, line) -> opened.add(file + ":" + line);
+        owner.onOpenLink = links::add;
         windows.add(owner);
         return owner;
     }

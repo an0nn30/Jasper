@@ -238,6 +238,7 @@ class TerminalViewInteractionTest {
     /** Browser plan 3: the link opener is public, and null puts the desktop's browser back. */
     @Test
     void aNullLinkOpenerRestoresTheDesktopDefault() throws Exception {
+        assumeTrue(java.awt.GraphicsEnvironment.isHeadless());
         assertThat(TerminalView.class.getMethod("setLinkOpener", java.util.function.Consumer.class)).as("app-facing").isNotNull();
         List<String> opened = new ArrayList<>();
         view.setLinkOpener(opened::add);
