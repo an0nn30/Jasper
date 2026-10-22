@@ -223,6 +223,30 @@ public final class EditorTab {
     public Optional<VimEditor> vimEditor() { return Optional.ofNullable(vim); }
 
     /**
+     * The view starts where {@code source}, another view of its file, is (Rulings 19): at its caret, selection and scroll
+     * position. With Vim on it starts as Vim's {@code :split} starts a window, once its pane has its size: the cursor on
+     * the source's, the source's first line on top, and the window scrolled as update_topline brings the cursor into
+     * sight.
+     *
+     * @param source an open view of the same file
+     */
+    void startAt(EditorTab source) {
+        if (closed) return;
+        var caret = source.area().getCaret();
+        var shown = source.scroll().getViewport().getViewPosition();
+        if (vim != null) {
+            int line;
+            try { line = source.area().getLineOfOffset(Math.max(0, source.area().viewToModel2D(new java.awt.Point(0, shown.y)))); }
+            catch (BadLocationException impossible) { line = 0; }
+            vim.startAt(caret.getDot(), line);
+            return;
+        }
+        area().getCaret().setDot(caret.getMark());
+        area().getCaret().moveDot(caret.getDot());
+        javax.swing.SwingUtilities.invokeLater(() -> { if (!closed) scroll().getViewport().setViewPosition(shown); });
+    }
+
+    /**
      * @param heir the editor of the file's other view that this view's uppercase Vim marks go to when it closes, as Vim's
      *     file marks are the file's (pane flexibility spec 6); empty gives them to another editor of the file
      */

@@ -254,6 +254,71 @@ class EditorViewsTest {
         assertThat(second.area().getSelectedText()).isEqualTo("two");
     }
 
+    /** Runs what is queued on the event thread, as the next turns of the event loop would, from a test running on it. */
+    private static void settle() {
+        for (int turn = 0; turn < 4; turn++) {
+            var loop = java.awt.Toolkit.getDefaultToolkit().getSystemEventQueue().createSecondaryLoop();
+            java.awt.EventQueue.invokeLater(loop::exit);
+            if (!loop.enter()) throw new AssertionError("The event loop did not run");
+        }
+    }
+
+    /** Lays a view out {@code lines} lines high, as its pane's first layout would. */
+    private static void laidOut(EditorTab view, int width, int lines) {
+        view.surface().setSize(width, lines * view.area().getLineHeight() + 4);
+        view.surface().doLayout();
+        view.scroll().doLayout();
+        view.scroll().getViewport().doLayout();
+    }
+
+    /** @return the first line the view shows, 0-based */
+    private static int topLine(EditorTab view) throws Exception {
+        var shown = view.scroll().getViewport().getViewPosition();
+        return view.area().getLineOfOffset(view.area().viewToModel2D(new java.awt.Point(0, shown.y)));
+    }
+
+    /** @return whether the view's caret line shows whole */
+    private static boolean caretShown(EditorTab view) throws Exception {
+        var rect = view.scroll().getViewport().getViewRect();
+        int y = view.area().yForLine(view.area().getCaretLineNumber());
+        return y >= rect.y && y + view.area().getLineHeight() <= rect.y + rect.height;
+    }
+
+    private Path numbered(String name, int count) throws Exception {
+        var text = new StringBuilder();
+        for (int i = 1; i <= count; i++) text.append("line ").append(i).append('\n');
+        return file(name, text.toString());
+    }
+
+    /**
+     * With Vim on, a split view starts as Vim's {@code :split} starts a window, once its pane has its size: its cursor on
+     * its source's line, its source's first line on top when the cursor shows there, and otherwise scrolled to bring the
+     * cursor into sight, as in a new pane half as high (Rulings 19).
+     */
+    @Test void aVimSplitViewStartsOnItsSourcesCursorLine() throws Exception {
+        vimOn();
+        EditorTab source = opened(numbered("split.txt", 600));
+        laidOut(source, 400, 40);
+        settle();
+        vimKeys(source, "200Gzt229G");
+        settle();
+        assertThat(topLine(source)).isEqualTo(199);
+        assertThat(source.area().getCaretLineNumber()).isEqualTo(228);
+        EditorTab right = split(TabPlacement.SPLIT_RIGHT);
+        laidOut(right, 200, 40);
+        settle();
+        assertThat(right.area().getCaretLineNumber()).as("Split File Right: the source's cursor line").isEqualTo(228);
+        assertThat(topLine(right)).as("and its first line").isEqualTo(199);
+        assertThat(caretShown(right)).isTrue();
+        handle(0).select();
+        EditorTab down = split(TabPlacement.SPLIT_DOWN);
+        laidOut(down, 400, 20);
+        settle();
+        assertThat(down.area().getCaretLineNumber()).as("Split File Down, half as high: the source's cursor line").isEqualTo(228);
+        assertThat(caretShown(down)).as("in sight").isTrue();
+        assertThat(source.area().getCaretLineNumber()).as("the source stays").isEqualTo(228);
+    }
+
     /** Closed views leave nothing on their file's session: five views opened and closed, and its listeners are as before. */
     @Test void closedViewsLeaveNoListenerOnTheirFile() throws Exception {
         EditorTab first = opened(file("leak.txt", "x\n"));

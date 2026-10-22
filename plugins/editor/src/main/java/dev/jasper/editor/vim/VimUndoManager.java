@@ -305,6 +305,12 @@ final class VimUndoManager extends RUndoManager {
     /** @return whether {@code area} is the view that edits now */
     boolean editsNow(RTextArea area) { return view.area == area; }
 
+    /** @return whether {@code area}'s view holds its place on the text for a put-back that has not run yet */
+    boolean holds(RTextArea area) {
+        for (View each : views) if (each.area == area) return each.held != null;
+        return false;
+    }
+
     /** @param on whether Vim mode groups the edits of the view that edits now */
     void vim(boolean on) {
         view.vim = on;
@@ -528,11 +534,8 @@ final class VimUndoManager extends RUndoManager {
         other.queuedIn = null;
         RTextArea area = other.area;
         if (area.getParent() != place.port()) return;
-        // The lines an edit added must be laid out before a line below the old end can be shown (a view in a hidden
-        // tab is not laid out by itself), or the scroll pane would pull the view back.
-        if (area.getHeight() < area.getPreferredSize().height) place.port().doLayout();
         Point position = place.now(area);
-        if (area instanceof VimTextArea text && text.vim().isPresent()) text.vim().get().keepPlace(position);
+        if (area instanceof VimTextArea text) text.keepPlace(position);
         else place.port().setViewPosition(position);
     }
 

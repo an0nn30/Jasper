@@ -1065,11 +1065,7 @@ public final class EditorWindow {
             // Vim's win_init: the new window starts with its source's jumplist, '' mark, change-list place and window options.
             tab.vimEditor().ifPresent(source -> view.vimEditor().ifPresent(split -> split.splitFrom(source)));
             // Rulings 19: the new view starts where its source is, as VS Code's Split Editor and IntelliJ's Split Vertically do.
-            var caret = tab.area().getCaret();
-            view.area().getCaret().setDot(caret.getMark());
-            view.area().getCaret().moveDot(caret.getDot());
-            java.awt.Point shown = tab.scroll().getViewport().getViewPosition();
-            javax.swing.SwingUtilities.invokeLater(() -> { if (!view.closed()) view.scroll().getViewport().setViewPosition(shown); });
+            view.startAt(tab);
         });
     }
 

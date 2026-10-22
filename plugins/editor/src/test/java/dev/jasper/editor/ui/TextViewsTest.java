@@ -441,6 +441,53 @@ class TextViewsTest {
         assertThat(port.getViewPosition().y).as("the source shows the text it showed").isEqualTo(one.area().yForLine(399) + 3);
     }
 
+    /** Two views of an untitled Markdown file of 600 lines, "line 1" to "line 600", the first laid out with its previews. */
+    private List<EditorTab> markdownViews() {
+        var one = first(DocumentSession.untitled("Untitled", environment));
+        var two = second(one);
+        for (EditorTab view : List.of(one, two)) view.previews(background::add, Runnable::run);
+        one.session().setStyle(SYNTAX_STYLE_MARKDOWN);
+        var text = new StringBuilder();
+        for (int i = 1; i <= 600; i++) text.append("line ").append(i).append('\n');
+        two.area().setText(text.toString());
+        laidOut(one);
+        return List.of(one, two);
+    }
+
+    /** @return the text of the line the view's source shows first */
+    private static String top(EditorTab view) throws Exception {
+        var area = view.area();
+        int line = area.getLineOfOffset(area.viewToModel2D(new java.awt.Point(0, view.scroll().getViewport().getViewPosition().y)));
+        return area.getText(area.getLineStartOffset(line), area.getLineEndOffset(line) - area.getLineStartOffset(line)).strip();
+    }
+
+    /** @return the text of the view's caret line */
+    private static String caretLine(EditorTab view) throws Exception {
+        var area = view.area();
+        int line = area.getCaretLineNumber();
+        return area.getText(area.getLineStartOffset(line), area.getLineEndOffset(line) - area.getLineStartOffset(line)).strip();
+    }
+
+    /**
+     * With Vim on, a view in Preview comes back to its source on the text it showed through Vim, as another view's edit
+     * puts a view back: Vim's window is that text, so {@code H} goes to its first line, and the cursor kept its own.
+     */
+    @Test void aVimViewsPreviewComesBackToItsSourceThroughVim() throws Exception {
+        var views = markdownViews();
+        var one = views.getFirst();
+        one.vim(Optional.of(new Vim(VimHost.detached())));
+        type(one, "300Gzt305G");
+        one.markdownMode(MarkdownMode.PREVIEW, false);
+        views.get(1).area().setCaretPosition(0);
+        views.get(1).area().replaceSelection("new\n".repeat(100));
+        one.markdownMode(MarkdownMode.SOURCE, false);
+        one.surface().doLayout();
+        assertThat(top(one)).as("the source shows the text it showed").isEqualTo("line 300");
+        assertThat(caretLine(one)).as("the cursor kept its text").isEqualTo("line 305");
+        type(one, "H");
+        assertThat(caretLine(one)).as("Vim's window is the text shown").isEqualTo("line 300");
+    }
+
     /** Each view has its own Markdown mode: the preview in one and the source in the other, each switched on its own. */
     @Test void aMarkdownPreviewInOneViewAndTheSourceInTheOther() {
         var one = first(DocumentSession.untitled("Untitled", environment));

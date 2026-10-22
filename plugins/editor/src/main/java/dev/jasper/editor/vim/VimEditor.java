@@ -54,6 +54,8 @@ public final class VimEditor {
     private final Highlights highlights;
     private final View view = new View(this);
     private final ViewportSync viewport;
+    /** A split view's start while its viewport has no size yet: the source's cursor offset and first line; or null. */
+    private int[] start;
     private final Folds folds;
     private final LineNumbers lineNumbers;
     /** The text area's word-wrapping, put back when Vim turns off (Vim wraps at any character). */
@@ -354,6 +356,40 @@ public final class VimEditor {
         }
         if (!busy) fire();
     }
+
+    /**
+     * This editor's view opens beside another view of its file and starts where that view is (Rulings 19), as Vim's
+     * {@code :split} starts a window on its source window's cursor: once the viewport has its size, the cursor goes to
+     * {@code offset}, the window shows {@code line} first, and update_topline then brings the cursor into sight, with
+     * 'scrolloff'. Until then the viewport's own moves leave the cursor where it is.
+     *
+     * @param offset the source view's cursor
+     * @param line the first line the source view shows, 0-based
+     */
+    public void startAt(int offset, int line) {
+        start = new int[] { offset, line };
+        viewport.resize();
+    }
+
+    /** The viewport has its size: a split view's start ({@link #startAt}) goes in now. */
+    void sized() {
+        if (start == null) return;
+        int offset = start[0], line = start[1];
+        start = null;
+        boolean was = busy;
+        busy = true;
+        try {
+            setCursor(buffer.pos(Math.min(offset, buffer.length())));
+            view.topline(line + 1);
+            view.updateTopline();
+            view.cursColumns();
+            viewport.show();
+        } finally { busy = was; }
+        if (!was) fire();
+    }
+
+    /** @return whether a split view's start or another view's edit waits to place this view's window */
+    boolean placePending() { return start != null || area.placeHeld(); }
 
     /** The viewport's size changed the view's: outside a command, the view scrolls to keep the cursor shown. */
     void viewResized() {

@@ -95,14 +95,14 @@ class VimUndoManagerTest {
         return new VimViews(shown, other, new VimEditor(new Vim(VimHost.detached()), shown, EditorDefaults.VIM));
     }
 
-    /** A viewport that counts the moves the undo history asks of it, not the scroll pane's echoes of them. */
+    /** A viewport that counts the moves a put-back asks of it, not the scroll pane's echoes of them. */
     private static final class CountingViewport extends JViewport {
         int moves;
 
         @Override public void setViewPosition(Point position) {
             boolean history = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
                 .walk(frames -> frames.skip(1).findFirst())
-                .map(caller -> caller.getDeclaringClass() == VimUndoManager.class).orElse(false);
+                .map(caller -> caller.getDeclaringClass() == VimTextArea.class && caller.getMethodName().equals("keepPlace")).orElse(false);
             if (history) moves++;
             super.setViewPosition(position);
         }
@@ -614,6 +614,32 @@ class VimUndoManagerTest {
             assertThat(v.get().cursorShown()).as("and in sight").isTrue();
             assertThat(editor.view().botline - 1).as("the window scrolls the least: the cursor on its last line")
                 .isEqualTo(editor.cursor().line + 1);
+        });
+    }
+
+    /**
+     * A layout of a Vim view's viewport after another view's edit above its window, before the view is put back, is not
+     * a user's scroll: lines removed above a window at the end of the text shrink the text area, the layout pulls the
+     * viewport back inside it, onto other text, and the cursor stays on its own.
+     */
+    @Test void aLayoutBeforeAVimViewIsPutBackLeavesItsCursorOnItsText() throws Exception {
+        var v = new AtomicReference<VimViews>();
+        onEdt(() -> {
+            v.set(vimViews());
+            type(v.get().editor(), "560Gzt570G");
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var other = v.get().other();
+            other.select(lineStart(other, 9), lineStart(other, 309));
+            other.replaceSelection("");
+            // As Swing lays the viewport out after the edit, before the caret's scroll.
+            v.get().port().doLayout();
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(top(v.get().shown())).as("the view shows the same text").isEqualTo("line 560");
+            assertThat(line(v.get().shown(), v.get().editor().cursor().line)).as("the cursor stays on its text").isEqualTo("line 570");
         });
     }
 

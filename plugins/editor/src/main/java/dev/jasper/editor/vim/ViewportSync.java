@@ -71,7 +71,8 @@ final class ViewportSync {
     /**
      * The view's size from the viewport: whole lines and whole characters of the Editor's font (the text area's own
      * left and right insets hold no text). When the size changes, the view scrolls to keep the cursor shown, and the
-     * text area's room below the last line follows the new height.
+     * text area's room below the last line follows the new height. Once the viewport has a size, a split view's start
+     * goes in ({@link VimEditor#startAt}).
      */
     void resize() { resize(false); }
 
@@ -87,9 +88,11 @@ final class ViewportSync {
         View view = editor.view();
         int rows = Math.max(1, visible.height / lineHeight), columns = Math.max(1, textWidth / charWidth);
         area.revalidate();
-        if (!force && rows == view.height() && columns == view.width()) return;
-        view.resize(rows, columns);
-        editor.viewResized();
+        if (force || rows != view.height() || columns != view.width()) {
+            view.resize(rows, columns);
+            editor.viewResized();
+        }
+        editor.sized();
     }
 
     /** After a command: the viewport shows the view's first line and column. */
@@ -115,9 +118,15 @@ final class ViewportSync {
         } catch (BadLocationException ignored) { }
     }
 
-    /** The user scrolled: the view's first line follows, and the cursor moves inside the window. */
+    /**
+     * The user scrolled: the view's first line follows, and the cursor moves inside the window. While another view's
+     * edit waits to put this view back on its text, or a split view waits to start where its source is, only a scroll
+     * the mouse makes (the wheel, the scroll bar) is the user's: the viewport's own moves meanwhile, its layout and the
+     * caret's scrolling, would pull the cursor onto other text, and the place that waits decides where the view goes.
+     */
     private void userScrolled() {
         if (moving || viewport == null) return;
+        if (editor.placePending() && !(java.awt.EventQueue.getCurrentEvent() instanceof java.awt.event.MouseEvent)) return;
         int top = topline(viewport.getViewPosition().y);
         if (top < 0 || top == editor.view().topline) return;
         editor.viewScrolled(top);

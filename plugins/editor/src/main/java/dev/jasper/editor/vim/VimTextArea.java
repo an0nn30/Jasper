@@ -62,6 +62,26 @@ public class VimTextArea extends RSyntaxTextArea {
     /** @return whether this area is the one of its document's views that edits it now */
     boolean editsNow() { return undo != null && undo.editsNow(this); }
 
+    /** @return whether another view's edit waits to put this area's viewport back on the text it showed */
+    boolean placeHeld() { return undo != null && undo.holds(this); }
+
+    /**
+     * Shows {@code position} in the area's viewport where the area is put back on the text it showed (pane flexibility
+     * spec 6), after another view's edit or when a Markdown preview gives way to the source: with Vim on, through Vim,
+     * whose cursor stays on its text and, when that leaves it outside the window, comes into sight as update_topline
+     * brings it; otherwise as it is. Nothing happens while the area is in no viewport.
+     *
+     * @param position the viewport position to show
+     */
+    public void keepPlace(java.awt.Point position) {
+        if (!(getParent() instanceof JViewport port)) return;
+        // The lines an edit added must be laid out before a line below the old end can be shown (a view in a hidden
+        // tab is not laid out by itself), or the scroll pane would pull the view back.
+        if (getHeight() < getPreferredSize().height) port.doLayout();
+        if (vim != null) vim.keepPlace(position);
+        else port.setViewPosition(position);
+    }
+
     /** From now on the area edits the document whenever it gains the focus, as one of several views of it. */
     private void followFocus() {
         if (followsFocus) return;

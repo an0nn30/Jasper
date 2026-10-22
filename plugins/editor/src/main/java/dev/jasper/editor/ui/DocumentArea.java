@@ -102,7 +102,8 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         try {super.doLayout();if(mode==MarkdownMode.SPLIT){split.setDividerLocation(dividerRatio);split.doLayout();}
             if (restoreSourcePosition && sourcePlace != null) {
                 scroll.doLayout(); scroll.getViewport().doLayout();
-                scroll.getViewport().setViewPosition(sourcePosition()); restoreSourcePosition = false;
+                // As another view's edit puts a view back: with Vim on, its cursor stays on its text and in sight.
+                area.keepPlace(sourcePosition()); restoreSourcePosition = false;
             }
         }
         finally{restoringDivider=false;}
