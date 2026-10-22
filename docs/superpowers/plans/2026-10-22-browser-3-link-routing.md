@@ -2,9 +2,20 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Execution status (2026-10-22): not started.** Execution follows AGENTS.md's subagent-driven workflow (a fresh
-implementer and a reviewer per task, fix rounds, a final whole-branch review). Record each deviation from this text here
-and in the `docs/STATUS.md` entry Task 7 writes.
+**Execution status (2026-10-22): executed** (`1d103ad3b..17b826302` commits); see `docs/STATUS.md`. The task reviews
+recorded these deviations from the plan's text:
+- **Task 2:** `LinkOrigin`'s `{@code Platform.openInBrowser}` became a `{@link}`, `Platform.browser`'s Javadoc finished
+  its OSC 8 sentence (a browser treats an address as untrusted), and one `LinkOrigin` Javadoc line was re-wrapped to
+  stay under 120 columns.
+- **Task 4:** `HostedContext.systemBrowser`'s failure log is a fixed message plus the exception's class name, because it
+  now also carries clicked addresses (this settles the plan's Ruling 5); the user-facing notification may keep the
+  address. `TerminalViewInteractionTest.aNullLinkOpenerRestoresTheDesktopDefault` assumes a headless JVM, as its
+  sibling does.
+- **Task 7:** `Platform.browser`'s Javadoc drops "from the terminal or the page" and tells a browser to treat an address
+  as untrusted input and show it before acting on it. `docs/plugin-authoring.md`, `docs/command-line.md` and
+  `tools/sdk-reference/guide/03-manifest.html` name `open-url` among the reserved subcommands. Editor 0.16.0 and Remote
+  0.17.0 replace their older versions in `docs/plugin-apis.md` and the `docs/STATUS.md` plugin table.
+- **Task 8:** the check ran 12,846 tests, one more than this plan's sum of 12,845; all 22 tests the plan adds ran.
 
 **Goal:** Jasper routes web addresses through one plugin-provided web browser role, as it routes files through the
 editor role: a terminal's clicked `http` and `https` links, plugins' `Platform.openInBrowser`, `jasper <url>…` and
