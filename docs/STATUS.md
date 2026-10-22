@@ -99,6 +99,24 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Staged Remote fixture waits for its transfer store — 2026-10-22** (`claude/staged-remote-sessions-flake`, worktree
+`.claude/worktrees/staged-remote-flake`, from `claude/workspace-tabs` at `6f66a3603`; not merged or pushed):
+`StagedRemoteSessionsTest.editingSavedVaultReferenceWithoutOptionalVaultDoesNotLinkItsApi` failed now and then under a
+full `check` with "Plugin workers did not finish resource cleanup after stop". A thread dump taken while the fixture's
+`close` waited showed the Remote worker inside `TransferCoordinator.controlLoop`, opening the transfer store: sqlite-jdbc
+was extracting and `System.load`ing a fresh copy of its native library for the plugin's own class loader. A stop cannot
+interrupt that load. The test stops the plugin about half a second after starting it, so `close` waited on the load:
+1.4–2.8 s per run at a load average near 50, and past the 10-second bound near 100 (reproduced on the second run). The
+same load made `StagedTransferLifecycleTest` flaky (its entry below). `StagedRemoteHost` now waits, before it returns,
+for the transfer queue to answer a snapshot, which it does only once its store is open, so `close` no longer races the
+load; a new `StagedRemoteHostTest` pins it (it failed before the change). Test-only change. After it, 50 runs in a row
+passed at load averages of 20–120 with every worker wait at close 0 ms; the staged Remote suites (`StagedRemoteHostTest`,
+`StagedRemoteSessionsTest`, `StagedRemoteSftpTest`, `StagedRemoteTunnelsTest`, `RemoteRenderEvidenceTest`) pass. The
+load is slow partly because sqlite-jdbc lists all of `java.io.tmpdir`, which on the dev Mac holds about 235,000 entries,
+mostly `plugin-fixture*` (127,000) and `jasper-contract*` (97,000) folders that tests leave behind; cleaning those up is
+left for a change of its own. `./gradlew check --continue`: **12,823 tests, 0 failures, 0
+errors, 29 skipped**.
+
 **Workspace tabs, plan 9b: two views of one file — 2026-10-22** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `ab55ecde6..e6c33c193`, the documentation commit `c098fcbc5`, then the final
 review's fix wave, `ba3d5c783` to its documentation commit;
