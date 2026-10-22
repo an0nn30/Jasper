@@ -488,6 +488,51 @@ class TextViewsTest {
         assertThat(caretLine(one)).as("Vim's window is the text shown").isEqualTo("line 300");
     }
 
+    private static String numbered(String word, int count) {
+        var text = new StringBuilder();
+        for (int i = 1; i <= count; i++) text.append(word).append(' ').append(i).append('\n');
+        return text.toString();
+    }
+
+    /** Puts the view in Preview while its source shows {@code line}, 0-based, first. */
+    private static void previewFrom(EditorTab view, int line) throws Exception {
+        view.scroll().getViewport().setViewPosition(new java.awt.Point(0, view.area().yForLine(line)));
+        view.markdownMode(MarkdownMode.PREVIEW, false);
+    }
+
+    /** Back from Preview to the source, laid out as its pane would lay it out. */
+    private static void source(EditorTab view) {
+        view.markdownMode(MarkdownMode.SOURCE, false);
+        view.surface().doLayout();
+    }
+
+    /**
+     * A view in Preview comes back to its source on its line's number once Revert to Saved has replaced the whole text,
+     * as its caret keeps its line, and once a reload has read the file changed on disk: there is no text left to follow.
+     */
+    @Test void aPreviewComesBackToItsLineAfterARevertOrAReload() throws Exception {
+        Path file = Files.writeString(folder.resolve("revert.md"), numbered("line", 600));
+        var one = first(file);
+        one.previews(background::add, Runnable::run);
+        one.session().setStyle(SYNTAX_STYLE_MARKDOWN);
+        laidOut(one);
+        previewFrom(one, 299);
+        one.area().setCaretPosition(one.area().getLineStartOffset(500));
+        one.area().replaceSelection("edit ");
+        one.session().revert();
+        drain();
+        assertThat(one.area().getText()).isEqualTo(numbered("line", 600));
+        source(one);
+        assertThat(top(one)).as("after Revert to Saved").isEqualTo("line 300");
+        previewFrom(one, 299);
+        Files.writeString(file, numbered("row", 700));
+        one.session().reload();
+        drain();
+        assertThat(one.area().getText()).startsWith("row 1\n");
+        source(one);
+        assertThat(top(one)).as("after a reload").isEqualTo("row 300");
+    }
+
     /** Each view has its own Markdown mode: the preview in one and the source in the other, each switched on its own. */
     @Test void aMarkdownPreviewInOneViewAndTheSourceInTheOther() {
         var one = first(DocumentSession.untitled("Untitled", environment));

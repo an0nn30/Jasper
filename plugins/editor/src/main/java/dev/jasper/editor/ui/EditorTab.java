@@ -274,13 +274,14 @@ public final class EditorTab {
     }
     /**
      * A load or reload replaces the text every view of the document shows ({@link TextViews}): no edit is counted
-     * meanwhile.
+     * meanwhile, and the place a Markdown preview keeps for its source keeps its line's number.
      *
      * @param keepPosition whether the caret keeps its line
      * @return the line the caret goes back to, 0-based
      */
     int beginReplace(boolean keepPosition) {
         replacing = true;
+        document.replacing();
         return keepPosition ? area().getCaretLineNumber() : 0;
     }
 
@@ -288,12 +289,13 @@ public final class EditorTab {
     void endReplace() { replacing = false; }
 
     /**
-     * After a replace, the caret goes to the start of {@code line}, or of the last line when the text is shorter, and
-     * Vim and the preview read the text again.
+     * After a replace, the caret goes to the start of {@code line}, or of the last line when the text is shorter, Vim
+     * and the preview read the text again, and the preview's place for the source follows the new text from its line.
      *
      * @param line the line {@link #beginReplace} gave
      */
     void replaced(int line) {
+        document.replaced();
         try { area().setCaretPosition(area().getLineStartOffset(Math.min(line, area().getLineCount() - 1))); }
         catch (BadLocationException impossible) { area().setCaretPosition(0); }
         if (vim != null) vim.textReplaced();

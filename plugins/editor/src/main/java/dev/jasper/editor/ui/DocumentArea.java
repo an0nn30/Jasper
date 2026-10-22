@@ -40,8 +40,12 @@ final class DocumentArea extends JComponent implements AutoCloseable {
      * Where the source showed the text when Preview took its place: the viewport's position, the start of the first
      * line it showed, as a position that moves with the text, and how far below that line's top the viewport began.
      * The source comes back on that text, though other views of the file edited it meanwhile (pane flexibility spec 6).
+     * While the whole text is replaced (a reload, Revert to Saved) there is no text to follow, and the place keeps its
+     * line's number instead, as each caret keeps its line.
+     *
+     * @param number the line's number while the whole text is replaced; -1 otherwise
      */
-    private record SourcePlace(java.awt.Point shown, javax.swing.text.Position line, int below) { }
+    private record SourcePlace(java.awt.Point shown, javax.swing.text.Position line, int number, int below) { }
     private SourcePlace sourcePlace;
     private boolean restoreSourcePosition;
     /** @return where the source shows the text now */
@@ -50,19 +54,39 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         try {
             int line = area.getLineOfOffset(Math.max(0, area.viewToModel2D(new java.awt.Point(0, shown.y))));
             int top = area.yForLine(line);
-            return new SourcePlace(shown, area.getDocument().createPosition(area.getLineStartOffset(line)), top < 0 ? 0 : shown.y - top);
+            return new SourcePlace(shown, area.getDocument().createPosition(area.getLineStartOffset(line)), -1, top < 0 ? 0 : shown.y - top);
         } catch (javax.swing.text.BadLocationException impossible) {
-            return new SourcePlace(shown, null, 0);
+            return new SourcePlace(shown, null, -1, 0);
         }
     }
     /** @return where the viewport shows the held place's line as it was shown; its old position when the line is folded away */
     private java.awt.Point sourcePosition() {
         if (sourcePlace.line() == null) return sourcePlace.shown();
         try {
-            int top = area.yForLine(area.getLineOfOffset(sourcePlace.line().getOffset()));
+            int line = sourcePlace.number() >= 0 ? Math.min(sourcePlace.number(), area.getLineCount() - 1)
+                : area.getLineOfOffset(sourcePlace.line().getOffset());
+            int top = area.yForLine(line);
             return top < 0 ? sourcePlace.shown() : new java.awt.Point(sourcePlace.shown().x, top + sourcePlace.below());
         } catch (javax.swing.text.BadLocationException impossible) {
             return sourcePlace.shown();
+        }
+    }
+    /** The whole text is about to be replaced (a reload, Revert to Saved): the source's place keeps its line's number. */
+    void replacing() {
+        var place = sourcePlace;
+        if (place == null || place.line() == null || place.number() >= 0) return;
+        int number = area.getDocument().getDefaultRootElement().getElementIndex(place.line().getOffset());
+        sourcePlace = new SourcePlace(place.shown(), place.line(), number, place.below());
+    }
+    /** The replaced text is in: the source's place follows the text again, from the start of its line. */
+    void replaced() {
+        var place = sourcePlace;
+        if (place == null || place.number() < 0) return;
+        try {
+            int start = area.getLineStartOffset(Math.min(place.number(), area.getLineCount() - 1));
+            sourcePlace = new SourcePlace(place.shown(), area.getDocument().createPosition(start), -1, place.below());
+        } catch (javax.swing.text.BadLocationException impossible) {
+            // The line is in the text.
         }
     }
     void focusSource(boolean value) { sourceFocused = value; }
