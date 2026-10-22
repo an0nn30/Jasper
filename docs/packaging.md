@@ -239,6 +239,9 @@ behind, the task names the `hdiutil detach -force` command to run.
 - `user.home` is `aot-training/home`, whose `config.toml` turns residency off (`system.run_in_background = false`)
   and replaces the login shell with a stand-in (`/bin/sh training-shell.sh`) that prints one `jasper-aot-training$ `
   prompt and discards its input;
+- the home's `workspace.toml` holds one main window, 960 by 600 points at 100, 100, with one terminal tab
+  (`startup-workspace.toml` in `jasper-app/src/main/resources/dev/jasper/app/benchmark/`), which the launch restores as
+  a normal start restores the saved windows, so the cache holds the restore path's classes too;
 - `JAVA_TOOL_OPTIONS` asks for the cache (`-XX:AOTCacheOutput`), the start-up trace (`-Djasper.startupTrace`) and no
   Dock icon or menu bar (`-Dapple.awt.UIElement=true`);
 - `JASPER_HOME`, `JDK_JAVA_OPTIONS`, `_JAVA_OPTIONS`, `CLASSPATH`, `JASPER_VM_OPTIONS_SKIP`, `JASPER_AOT_CACHE_SKIP`,
@@ -246,7 +249,7 @@ behind, the task names the `hdiutil detach -force` command to run.
   an empty file, so your own `jasper.vmoptions` never shapes the cache;
 - the bundled plugins start in their default state: Enterprise stays off, so its look is not part of the training.
 
-It needs your desktop session: a Jasper window appears for a few seconds where macOS places new windows, and anything
+It needs your desktop session: a Jasper window appears for a few seconds near the main display's top left, and anything
 typed into it goes to the stand-in. Once the trace reports start-up settled for this process as a cold start with the
 window shown, the shell's output painted and every plugin bound (at most 90 seconds), the task sends SIGTERM and the
 JVM assembles the cache as it exits (at most 300 seconds). The task then deletes the copy, so that the build machine

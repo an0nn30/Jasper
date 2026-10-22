@@ -206,6 +206,8 @@ printf '%s\\n' "$@" > "${cache%/*}/options.txt"
         assert trainingConfig.contains('run_in_background = false') && trainingConfig.contains('program = "/bin/sh"')
         assert trainingConfig.contains('args = ["' + new File(work, 'training-shell.sh').absolutePath + '"]')
         assert new File(work, 'training-shell.sh').canExecute()
+        assert new File(work, 'home/.config/jasper/workspace.toml').bytes == aotTrainingWorkspace.bytes
+        assert aotTrainingWorkspace.getText('UTF-8').contains('kind = "terminal"')
         assert aotTrainingConfig(new File('/w/say "hi"/s.sh')).contains('args = ["/w/say \\"hi\\"/s.sh"]')
         expectFailure('Jasper exited (3) before start-up settled') { runAotTraining(fake('exits', 'exit 3\n'), work, 20, 20) }
         expectFailure('start-up settled without OUTPUT_PAINTED, so the cache would miss') {
