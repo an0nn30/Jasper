@@ -45,12 +45,11 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   view of each file it opened has closed, so `git config --global core.editor "jasper editor --wait"` edits commit
   messages here; Ctrl+C stops waiting and leaves the tabs open. With no file it does what **Show Editor** does.
 
-A file opens in a new tab of the window it was opened from, otherwise of the main window. Opening a file that is already open
-selects its tab, of several [views](#views-of-one-file) the one you were in last; `jasper editor` and a Cmd-click also
-move the caret to the line. While a file loads, its tab shows "Loading *name*…" ("Loading *name* from *host*…" for a
-remote file) with **Cancel**, which closes the tab. A file that
-cannot be opened shows **Could Not Open File** with the reason; see
-[Large, binary and unreadable files](#large-binary-and-unreadable-files).
+A file opens in a new tab of the window it was opened from, otherwise of the main window. Opening a file that is already
+open selects its tab, of several [views](#views-of-one-file) the one you were in last; `jasper editor` and a Cmd-click
+also move the caret to the line. While a file loads, its tab shows "Loading *name*…" ("Loading *name* from *host*…" for
+a remote file) with **Cancel**, which closes the tab. A file that cannot be opened shows **Could Not Open File** with
+the reason; see [Large, binary and unreadable files](#large-binary-and-unreadable-files).
 
 ## Tabs
 
@@ -66,12 +65,12 @@ Right-click the tab for **Move Tab to New Window**, **Move Tab Into** and **Clos
 [command](#commands-and-shortcuts) with its shortcut, **Copy**, **Paste**, **Select All**, **Cut**, **Delete**,
 **Undo** and **Redo**; a child window's ⋮ menu also has **Move to Main Window**. Moving a tab keeps its text, undo
 history, unsaved changes and Markdown view.
-Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the
-**Folding** submenu (Toggle Current Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by
-**Save**, **Find…**, **Go to Line…**, **Toggle Comment**, **Revert to Saved**, **Split File Right** and **Split File
-Down**, then **Split** (Terminal Right, Terminal Down, Editor Right, Editor Down, Open File Right…, Open File Down…, then
-each plugin's split items), which opens the choice in a new pane beside the editor, **Move Pane to New Tab**, which gives the editor's pane a tab of its own
-while its tab holds another pane, and **Move Pane to Tab**, which moves it into another tab of its window. This menu
+Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the **Folding** submenu (Toggle Current
+Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by **Save**, **Find…**, **Go to Line…**,
+**Toggle Comment**, **Revert to Saved**, **Split File Right** and **Split File Down**, then **Split** (Terminal Right,
+Terminal Down, Editor Right, Editor Down, Open File Right…, Open File Down…, then each plugin's split items), which
+opens the choice in a new pane beside the editor, **Move Pane to New Tab**, which gives the editor's pane a tab of its
+own while its tab holds another pane, and **Move Pane to Tab**, which moves it into another tab of its window. This menu
 names a tab whose active pane shows an Editor file and lists any other tab as "Tab 3"; the Tab menu names them all.
 
 While an Editor tab is selected its own shortcuts take precedence over the window's: on macOS Cmd+N makes a new file
@@ -89,9 +88,11 @@ document whose key is too long to save. A restored file is not added to [Recent 
 
 **Split File Right** and **Split File Down** show the file in another view, in a new pane to the right of its own or
 below it: from the text's right-click menu, the tab's menu or the command palette, with no default shortcut (Settings ›
-Keymap can give them one). **Open File Right…** and **Open File Down…** of a file that is already open put another
-view of it beside the focused pane. A new view starts where its source view is, with its caret, selection and scroll
-position. In Vim mode `:action split-file-right` and `:action split-file-down` run them.
+Keymap can give them one). **Open File Right…** and **Open File Down…** of a file that is already open put another view
+of it beside the focused pane. A split view starts where its source view is, with its caret, selection and scroll
+position, and one that Open File Right… or Down… opens starts where the file's view you were in last is; with Vim on,
+its cursor is on that view's line, and its window scrolls to show the cursor when the new pane is shorter. In Vim mode
+`:action split-file-right` and `:action split-file-down` run them.
 
 A file's views show one text: an edit in one shows in the others at once, and Undo and Redo in any view undo and redo
 the last edit made in any of them, the undoing view's caret going to the change while the others stay where they were.
@@ -102,15 +103,16 @@ first line, or at the start of the text, keeps that line on top; an edit that ta
 after the deletion; and **Revert to Saved**, a reload and the undo of either leave each view on its line number. A view
 that comes back from the Markdown preview shows the text it showed.
 
-The ● marker, **Save**, **Save As…**, **Revert to Saved** and a reload act on the file from any view, and a reload
-keeps each view's caret on its line. Each view has its own caret, selection, scroll position, folds, Vim state and
-Markdown view; the find bar belongs to the selected view and closes when you select another; the language and soft wrap
-are the file's. Vim's marks `a` to `z`, `'.` and its change list are the file's too, as they are a Vim buffer's, and so
-are its buffer-local [options](#vim-options); its jumplist, `''` and place in the change list are each view's, a split
-view starting with its source's. Closing a view closes only that view, and the others keep the order you were last in
-them: Jasper asks about unsaved changes when the file's last view closes, and a window that closes with one view of a
-file another window still shows asks nothing. **Cancel** in one view of a file that is still loading closes that view,
-and the file goes on loading for the others. **Open in Editor…** of an open file selects the view you were in last, and
+The ● marker, **Save**, **Save As…**, **Revert to Saved** and a reload act on the file from any view, and a reload keeps
+each view's caret on its line. A remote file's sign-in prompt shows over the window the file was first opened in,
+whichever view asked. Each view has its own caret, selection, scroll position, folds, Vim state and Markdown view; the
+find bar belongs to the selected view and closes when you select another; the language and soft wrap are the file's.
+Vim's marks `a` to `z`, `'.` and its change list are the file's too, as they are a Vim buffer's, and so are its
+buffer-local [options](#vim-options); its jumplist, `''` and place in the change list are each view's, a split view
+starting with its source's. Closing a view closes only that view, and the others keep the order you were last in them:
+Jasper asks about unsaved changes when the file's last view closes, and a window that closes with one view of a file
+another window still shows asks nothing. **Cancel** in one view of a file that is still loading closes that view, and
+the file goes on loading for the others. **Open in Editor…** of an open file selects the view you were in last, and
 Recent files lists the file once. When Jasper restores its windows every view comes back, and the file is read once for
 all of them.
 
@@ -474,10 +476,11 @@ in another tab." Afterwards the tab edits the new file, and its language is dete
 **Save All** saves every Editor tab with unsaved changes, in every window, one after another, so each dialog comes on
 its own.
 
-Closing a tab with unsaved changes asks "Save changes to *name*?" with **Save** (Enter), **Don't Save** and **Cancel**. A
-tab whose save is running closes once the save succeeds. Closing a window that holds Editor tabs, quitting and
-restarting first wait for saves already running ("Saving 2 files…", with **Cancel**), then list the files with unsaved
-changes (up to ten, then "and *n* more") and ask **Save All** (Enter), **Discard** or **Cancel**.
+Closing the last [view](#views-of-one-file) of a file with unsaved changes asks "Save changes to *name*?" with **Save**
+(Enter), **Don't Save** and **Cancel**. A tab whose save is running closes once the save succeeds. Closing a window that
+holds Editor tabs, quitting and restarting first wait for saves already running ("Saving 2 files…", with **Cancel**),
+then list the files with unsaved changes (up to ten, then "and *n* more") and ask **Save All** (Enter), **Discard** or
+**Cancel**.
 
 **Revert to Saved** reads the file again. With unsaved changes it first asks "Discard your changes to *name*?" with
 **Discard Changes** and **Cancel** (Enter).

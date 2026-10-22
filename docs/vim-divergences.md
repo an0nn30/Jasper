@@ -51,8 +51,8 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **`:undo N` follows one line of history.** Undo is linear, so `:undo N` reaches only the changes on it; another
   number fails with `E830`. Vim's message after an undo ("1 line less; before #2") is not shown.
 - **`:sort` compares code points.** `:sort l` does not use the system's collation.
-- **Marks and registers in other tabs.** `:marks` shows an uppercase mark in another tab with the tab's name, and
-  `:registers` shows `"%` as the tab's name, where Vim shows file names.
+- **Marks and registers in other files' views.** `:marks` shows an uppercase mark in another file's view with the tab's
+  name, and `:registers` shows `"%` as the tab's name, where Vim shows file names.
 - **`:` is not a motion.** After an operator (`d:`) it fails; Vim runs the command and deletes to where it went.
 - **Options.** `:set` knows only the [options Jasper has](editor.md#vim-options); an option Vim has and Jasper lacks
   fails with `E518: Unknown option`, and `:set` and `:set all` list only Jasper's. 'hlsearch' starts on (Vim's default
@@ -102,9 +102,9 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   once (a mapping, `feedkeys()`) are inserted as one string, so there the mark stays at the insert's start.
 - **One typeahead per view.** Keys wait, and mappings and macros insert theirs, in the view's own typeahead; a mapping
   or macro that selects another file (`:bn`, `gt`) goes on in the view it started in. Vim's typeahead is global.
-- **Another view's window after an edit.** An insert at the start of the first line a window shows keeps that line on
-  top, and an edit that takes away that line shows the text after the deletion, where Vim shows the new line and the
-  line before the deletion.
+- **Another view's window after an edit.** Lines added just above the first line a window shows, including an insert at
+  its start, keep the old line on top, where Vim shows the new line (`O`, `:put!`, `o` on the line above, a split at
+  column 0); an edit that takes away that line shows the text after the deletion, where Vim shows the line before it.
 - **`q:`, `q/` and `q?` fail.** Jasper has no command-line window.
 - **Mapping arguments.** `<buffer>`, `<expr>` and `<script>` are refused with `Not supported in Jasper: <expr>`.
   `<silent>` is accepted and changes nothing, since Jasper never echoes the command line a mapping types. `<Leader>`

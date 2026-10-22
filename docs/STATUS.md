@@ -1,6 +1,6 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-21
+## Current state — 2026-10-22
 
 Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (windows, tabs, panes
 and tool windows), the terminal (with the bundled Cygwin environment's Cygwin Bash on Windows), the command palette,
@@ -40,14 +40,16 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** This branch after plan 9b (2026-10-22): 12,777 tests, 0 failures, 0 errors, 29 skipped.
-  After plan 9a's final fix wave and its residual round (2026-10-21) it had 12,706. `./gradlew check` on local `main`
-  with the Editor's typography and Markdown preview and the bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips
-  and four opt-in Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
-  `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19): macOS, Ubuntu and
-  every Linux packaging and install check passed, and so did the single-worker Windows check. No check is recorded for
-  the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode (`eb424eeec`, `4743469e5`),
-  the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the Javadoc rename (`427321de4`).
+- **Last recorded checks.** This branch after plan 9b's final fix wave (2026-10-22): 12,796 tests, 0 failures, 0
+  errors, 29 skipped. After plan 9b's documentation commit (2026-10-22) it had 12,777, and after plan 9a's final fix
+  wave and its residual round (2026-10-21) 12,706. `./gradlew check` on local `main` with the Editor's typography and
+  Markdown preview and the bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25
+  platform skips and four opt-in Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because
+  `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
+  macOS, Ubuntu and every Linux packaging and install check passed, and so did the single-worker Windows check. No check
+  is recorded for the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode
+  (`eb424eeec`, `4743469e5`), the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the
+  Javadoc rename (`427321de4`).
 
 Bundled plugins, all enabled by default except Enterprise:
 
@@ -95,7 +97,8 @@ Open items, as the entries below record them:
 Newest first. Each entry describes its change as it stood when the entry was written.
 
 **Workspace tabs, plan 9b: two views of one file — 2026-10-22** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `ab55ecde6..e6c33c193`, then this documentation commit;
+`.claude/worktrees/workspace-tabs`, `ab55ecde6..e6c33c193`, the documentation commit `c098fcbc5`, then the final
+review's fix wave, `ba3d5c783` to its documentation commit;
 [plan](superpowers/plans/2026-10-21-workspace-9b-two-views-of-a-file.md),
 [spec](superpowers/specs/2026-10-21-jasper-pane-flexibility-design.md), section 6). The Editor (0.15.0) shows one file
 in several views, each the item of a pane. **Split File Right** and **Split File Down** (the text's right-click menu,
@@ -154,7 +157,9 @@ new view starts at the change list's end and only the editing window's place in 
 view copies its source's jumplist, `''`, change-list place and window-local options (`win_init`); buffer-local options
 (`sw`, `et`, `ts`, `sts` and the others) are the file's and the window-local ones (`number`, `relativenumber`, `wrap`)
 the pane's, which **supersedes Ruling 13's clause that options stay global** for them; (14) one find bar, in the selected
-view, so no view's search leaks into another (the controller's reading of spec 6); (15) the Editor API's plugins see one
+view, so no view's search leaks into another (the controller's reading of spec 6, which gives each view its own find
+bar: the find bar belongs to the window's selected view, as with files today, and per-view find bars, as in IntelliJ and
+VS Code, would change every tab's behaviour and are left for the user to decide); (15) the Editor API's plugins see one
 document per key, and `Editor.open` of an open key selects its view focused last; (16) Editor 0.15.0; (17) no `:split` or
 `:vsplit`; (18) `jasper editor --wait` returns once the file's last view has closed; (19) a split view starts at its
 source's caret, selection and scroll position; (20) Cancel in one view of a loading file closes that view alone, the
@@ -168,7 +173,7 @@ event (`View.queuedIn`, cleared when the latest put-back runs); the Markdown Pre
 the first opened); `EditorWindow.step(int)` and the no-argument `mayClose()` are gone; `tabsClosing`'s Javadoc and `openView`'s
 `getFirst()`. (3) Task 3's fix round (`a6b4ff402`): Rulings 12 and 13 amended as above; `Vim.GlobalMark.inFileOf`; the
 `Marks` constructor starts a view at the change list's end and `Buffer.changed` moves only the editing window's place
-(`VimTextArea.editsNow()`); file marks pass on in `EditorTab.shutdown` (`marksHeir`, `Vim.leaveMarksTo`), not in
+(`VimTextArea.editsNow()`); file marks pass on in `EditorTab.shutdown` (`marksHeir`, `VimEditor.leaveMarksTo`), not in
 `EditorWindow.remove`, which runs after Vim closed; `VimEditor.splitFrom`, `Marks.splitFrom`, `Options.window()` and
 `windowFrom`; the Vim reference changed six rows (`ZQ` and `:q[uit]` in Task 3, `ZZ`, `:setl[ocal]`, `:wq` and `:x[it]`
 in the fix round), where the plan named two. (4) Task 4: `openRestored` passes `views(open).getFirst()` as the sharing
@@ -178,36 +183,51 @@ fixed in `e6c33c193`: with Vim on in two views, an edit in one and then the othe
 from the text area's current one, so a `setDocument` with stale geometry laid out the old lines against the new
 document; it reads the tokens from its own document now, as RSyntaxTextArea's `SyntaxView` does (seven cases, six of
 them RED with the exception). (6) Task 1b added one case beyond the plan (a second view's Vim groups), and the plan's
-Workspace counts are lower than what ran: the Editor's suite, 5,177 tests there, has 5,223, among them
-`VimUndoManagerTest` 27 (the plan's 8), `TextViewsTest` 24 (8), `EditorViewsTest` 18 (12) and `EditorWindowTest` 81 (79),
-the fix rounds' and the crash fix's cases included. (7) Task 5 (this documentation commit) also corrects
-`docs/vim-divergences.md`, where "Tabs are the buffers", "Uppercase marks across tabs" and "One typeahead per tab" were
-no longer true, and adds its "Another view's window after an edit" item; the options table of the Editor guide says
-"Per file" and "Per pane" where it said "Per tab". Accepted with no change, as the reviews ruled: Task 1b's Minor 4 (one
-dirty check per view per edit), Task 4's Minor 4 (`openRestored`'s sentinel shape), and the garbage-collection test of Task 1a,
-which assumes explicit GC (the build never disables it). Left for the final review (the reviews' parked items, one line
-each):
-- Task 4's test breadth: no two-window restore test, so a restored view's origin reset on the view path is unpinned;
-- Task 4's remote restore test cannot tell a quiet read from a loud one;
-- Task 4's restore tests do not check what the second view shows;
-- guard `ViewportSync.userScrolled` while a put-back is pending (a real layout pass could clamp a Vim cursor before the
-  caret scroll; unverified headless), and do the same for the Preview's restore in `doLayout`;
-- a reload while a view is in Preview brings its source back at the top: the Preview's place keeps its line number across
-  a whole-text replace;
-- the Preview's place at offset 0 follows the first-line rule;
-- the class Javadoc's nuance: Vim moves `w_topline` with its text for `O`, `:put!` and `:r`, and shows the new line only
-  for a split at column 0;
-- `Step.takesWhole` should classify only INSERT and REMOVE events (a CHANGE event is unreachable today);
-- tests for the cursor rule in the command-line branch and in Insert and Visual modes;
-- Task 3's M1: no test edits from a mid-list view (the change list's line 94 is unpinned);
-- Task 3's M2: a view that joins after a `:setlocal` is untested (the `defaults` and `languagePairs` sharing);
-- Task 3's M3: `:marks` of an uppercase mark in the same file is untested;
-- Task 3's M4: `EditorWindow`'s heir lookup runs `findFirst` before the `vimEditor` filter (a nit), and its Javadoc.
+Workspace counts are lower than what ran: the Editor's suite, 5,177 tests there, has 5,242, among them
+`VimUndoManagerTest` 36 (the plan's 8), `TextViewsTest` 30 (8), `EditorViewsTest` 21 (12) and `EditorWindowTest` 82 (79),
+the fix rounds', the crash fix's and the final fix wave's cases included. (7) Task 5 (the documentation commit
+`c098fcbc5`) also corrects `docs/vim-divergences.md`, where "Tabs are the buffers", "Uppercase marks across tabs" and
+"One typeahead per tab" were no longer true, and adds its "Another view's window after an edit" item; the options table
+of the Editor guide says "Per file" and "Per pane" where it said "Per tab". (8) The final review's fix wave
+(`ba3d5c783`, `d6e7ab0b6`, `ef0a315a1`, `d7a335e69`, then the documentation commit that updates this entry), with the
+controller's rulings: I1, several edits in one event (Replace All, Toggle Comment on several lines) took a view without
+Vim that was scrolled away from its caret to its caret, since its put-back ran before the later edits' caret scrolls:
+the put-back now goes through the event queue twice, after everything the event queued, still once per view per event;
+I2, Split File Right or Down with Vim on put the new view's cursor on another line, since the caret was copied and the
+viewport moved before the new pane's first layout and outside Vim: a Vim view now starts once its viewport has a size,
+as Vim's `:split` starts a window (the cursor on its source's, the source's first line on top, then `update_topline`;
+`EditorTab.startAt`, `VimEditor.startAt`), and while a put-back or a split's start waits, `ViewportSync.userScrolled`
+follows only a scroll the mouse makes (the parked guard), the Preview's restore going through Vim as a put-back does
+(`VimTextArea.keepPlace`); I3, a Markdown view in Preview lost its source's place on a reload or Revert to Saved (a
+one-view regression from `a1ff84d6f`): across a whole-text replace the place keeps its line number
+(`DocumentArea.replacing`, from `EditorTab.beginReplace`) and then follows the new text; M1, a wheel scroll, or a press
+on a scroll bar, of a view's pane while its put-back waits lets go of the place (`VimUndoManager.UserScroll`), which
+fixes the edge Task 5 noted (a queued wheel scroll overridden by a put-back); M2, a view that does not show once it has
+been displayable (a tab not shown, a source behind Preview) queues no put-back and lays out nothing while another view
+is typed in, and is put back once it shows, by the same rules (`EditorTextView.geometryBuilds()` counts the layouts for
+the test); M3, Open File Right… and Down… of an open file start the new view where the file's view active last is, as
+IntelliJ opens a file again at its last caret, through Vim's start with Vim on. Also in the wave: the Preview's place at
+the text's start follows the first-line rule; `Step.takesWhole` counts only inserts and removals; the marks heir is the
+file's view active last with Vim on, and its Javadoc cites Rulings 12; the class Javadoc and `docs/vim-divergences.md`
+widen the first-line departure from `mark_adjust` (lines added just above a window's first line: `O`, `:put!`, `o` on
+the line above, a split at column 0), the parked `w_topline` nuance being overturned; new cases pin the cursor rule
+while a command line is typed and in Insert mode, `g;` after an edit made from the middle of the change list, a view
+opened after a `:setlocal`, `:marks` for an uppercase mark of the same file, a two-window restore with the origin reset
+on the view path, a quiet read told from a loud one, and what a restored second view shows; the Editor guide says that
+closing asks only for a file's last view, how Open File Right… starts, and that a remote file's sign-in prompt shows
+over the window it was first opened in (a second view in another window shares the first view's sign-in owner, so a loud
+Retry asks there). Accepted with no change, as the reviews ruled: Task 1b's Minor 4 (one dirty check per view per edit),
+Task 4's Minor 4 (`openRestored`'s sentinel shape), the garbage-collection test of Task 1a, which assumes explicit GC
+(the build never disables it), and the other edge Task 5 noted: an edit no view's hook sees (a reload) holds no place
+for the view that edits now.
 
-`./gradlew check --continue`: **12,777 tests, 0 failures, 0 errors, 29 skipped, BUILD SUCCESSFUL** (app 4,395, Editor
-5,223, UI 943, terminal 460, testkit 244, Buddy 154, SDK 105, the other plugins 1,253) (excludes the external example,
-which `check` does not run); the example external plugin's `check pluginZip`, built against the SDK jars `check` wrote,
-passes.
+`./gradlew check --continue` after the fix wave: **12,796 tests, 0 failures, 0 errors, 29 skipped, BUILD SUCCESSFUL**
+(app 4,395, Editor 5,242, UI 943, terminal 460, testkit 244, Buddy 154, SDK 105, the other plugins 1,253) (excludes the
+external example, which `check` does not run); the example external plugin's `check pluginZip`, built against the SDK
+jars `check` wrote, passes. The run before it failed one app test, `StagedRemoteSessionsTest`'s
+`editingSavedVaultReferenceWithoutOptionalVaultDoesNotLinkItsApi` ("Plugin workers did not finish resource cleanup after
+stop"), which then passed three times on its own and in this run. The documentation commit `c098fcbc5` had 12,777 tests
+(Editor 5,223).
 GUI checks for the user:
 - Split File Right from a file's right-click menu: the file shows in a new pane to the right; typing in either pane shows
   in both at once, the ● marker on both; Cmd+Z (Ctrl+Z) in the other pane undoes it, that pane's caret going to the
@@ -229,14 +249,27 @@ GUI checks for the user:
   window, change the file, close that window: no question; then Quit: one question naming the file once; with unsaved
   edits in two views in two windows, Quit asks once;
 - Revert to Saved from one view while the other view's caret is near the end of a file the revert shortens;
-- Save As… from one view: both panes take the new name; quit and start: both views come back, each where it was;
+- Save As… from one view: both panes take the new name; quit and start: both views come back, each in its pane;
 - restart with two views of one file: both come back;
 - a remote file in two views (one in a child window): quit and start; both come back waiting, and showing either reads
   the file once, quietly;
 - Open File Right… of a file that is already open: another view beside the focused pane; Open in Editor… of it then
   selects the view you were in last;
 - Vim `:ls` in a view of a file with two views lists it once; `:q` there closes only that pane, and `:q` in its last
-  view of a changed file says `E37`.
+  view of a changed file says `E37`;
+- Vim on in both views of a file: type in one, then close the other: no error;
+- Vim on, two views of a changed file: `:wq` in one saves the file and closes that pane; `:qa` in the other closes it;
+- Vim on: `mA` in a view of one file, then `'A` in a view of another file selects the view it was set in, on its line;
+- Replace All, or Toggle Comment on several lines, in one view while the other view is scrolled away from its caret:
+  the other view stays where it was scrolled;
+- Split File Down and Split File Right with Vim on and the cursor in the lower half of the window: the new view's
+  cursor is on the same line, in sight;
+- a Markdown file in Preview that changes on disk, or Revert to Saved after an edit while in Preview: back to Source, it
+  shows the line it showed;
+- Open File Right… of an open file: the new view starts where the view you were in last is (with Vim on, on its
+  cursor line);
+- two views of a 1 MB file, one in a tab that is not shown: typing in the shown one stays as quick as with one view,
+  and selecting the other tab shows it on its text.
 
 Not merged, not pushed.
 
