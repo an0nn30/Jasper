@@ -650,15 +650,16 @@ final class TabDrag {
     }
 
     /**
-     * The tab whose entry in {@code window}'s shown strip is under {@code at}, on screen; null off the entries. The hit-test
-     * of spring-loading and of a pane drag's hover ({@link #onPanes}) alike.
+     * The tab whose entry in {@code window}'s shown strip is under {@code at}, on screen; null off the entries and on
+     * the strip's new-tab button, a crowded classic strip's "+" over the tabs it clips included (workspace plan 9a
+     * Rulings 23). The hit-test of spring-loading and of a pane drag's hover ({@link #onPanes}) alike.
      */
     private static ParentTabId entryUnder(WindowContent window, Point at) {
         Component strip = window.tabBar().component();
         if (!strip.isVisible()) return null;
         Point inStrip = new Point(at);
         SwingUtilities.convertPointFromScreen(inStrip, strip);
-        if (!new Rectangle(strip.getSize()).contains(inStrip)) return null;
+        if (!new Rectangle(strip.getSize()).contains(inStrip) || window.tabBar().onNewTabButton(inStrip)) return null;
         List<Rectangle> entries = window.tabBar().tabBounds();
         List<Tab> listed = window.parentTabs().bar().tabs();
         // The point is on the strip, so an entry's x range alone counts: the row below the entries is theirs.

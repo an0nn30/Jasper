@@ -116,6 +116,10 @@ final class ClassicTabs extends JPanel implements TabStrip {
         return OptionalInt.of(entries.size());
     }
 
+    @Override public boolean onNewTabButton(Point point) {
+        return point.x >= add.getX() && point.x < add.getX() + add.getWidth();
+    }
+
     List<Entry> entries() { return List.copyOf(entries); }
     JComponent add() { return add; }
 

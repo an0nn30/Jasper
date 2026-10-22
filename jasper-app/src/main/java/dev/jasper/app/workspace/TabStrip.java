@@ -36,6 +36,12 @@ sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs 
      * strip. The caller passes a point it found on the strip, of which the classic tabs read the x alone.
      */
     OptionalInt newTabPlace(Point point);
+    /**
+     * Whether {@code point}, in this strip's coordinates, is on its new-tab button, the classic tabs' "+", which is no
+     * tab's entry even where it stands over the tabs a crowded strip clips (workspace plan 9a Rulings 23); the equal
+     * tabs have none. The caller passes a point it found on the strip, of which the classic tabs read the x alone.
+     */
+    boolean onNewTabButton(Point point);
     /** Releases the tabs. */
     @Override void close();
 }

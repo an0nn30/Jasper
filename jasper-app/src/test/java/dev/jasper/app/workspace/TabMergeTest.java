@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.AnimationSettings;
@@ -23,6 +24,7 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
+import dev.jasper.app.testsupport.EnterpriseLook;
 import java.awt.Component;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
@@ -380,6 +382,40 @@ class TabMergeTest {
             assertThat(drag.springRest()).as("the wait starts again over e's entry").isEqualTo(inE);
             elapse(drag);
             assertThat(owner.activeParentTab()).as("e's tab").isEqualTo(third);
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 23: a crowded classic strip's "+" stands over the tabs it clips; the dragged entry
+     * resting on it springs nothing, as the "+" is no tab's entry, while an entry it leaves in sight springs as any
+     * does.
+     */
+    @Test void restingOnACrowdedClassicStripsPlusSpringsNothing() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            WindowContent classic = null;
+            try {
+                classic = content(idleLauncher(pending), themes, ClassicTabsTest.classic());
+                for (int i = 1; i < 31; i++) classic.newTab(HOME);
+                frame(classic, 100, 50, 700, 760);
+                var strip = (ClassicTabs) classic.tabBar();
+                assertThat(strip.entries().getLast().getX()).as("crowded: the last tabs clip").isGreaterThan(700);
+                List<Tab> tabs = classic.parentTabs().bar().tabs();
+                Point plus = middle(strip.add());
+                Point inStrip = SwingUtilities.convertPoint(strip.add(), strip.add().getWidth() / 2, 4, strip);
+                assertThat(strip.entries()).as("a clipped tab under the +")
+                    .anyMatch(entry -> entry.getBounds().contains(inStrip));
+                TabDrag drag = classic.tabDrag();
+                Component source = start(classic, tabs.getFirst(), onEntry(classic, tabs.get(1), 0.5));
+                assertThat(drag.spring.isRunning()).as("an entry the + leaves in sight springs").isTrue();
+                mouse(source, MouseEvent.MOUSE_DRAGGED, plus);
+                assertThat(drag.spring.isRunning()).as("the + is no tab's entry, whatever it covers").isFalse();
+            } finally {
+                if (classic != null) classic.tabDrag().cancel();
+                closeOwnersNow();
+                themes.close();
+                EnterpriseLook.restoreDefault();
+            }
         });
     }
 

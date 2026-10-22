@@ -154,6 +154,8 @@ final class WindowTabs extends JPanel implements TabStrip {
 
     @Override public OptionalInt newTabPlace(Point point) { return WorkspaceDropResolver.newTabPlace(point, tabBounds()); }
 
+    @Override public boolean onNewTabButton(Point point) { return false; }
+
     @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(source.owner().tabHeight())); }
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 
