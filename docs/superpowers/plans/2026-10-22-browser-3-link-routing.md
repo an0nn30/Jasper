@@ -34,6 +34,11 @@ sections 3, 6 and 13 item 3. **Brief:** the controller's design brief (`.superpo
 scratch in the design worktree) carries the decisions this plan follows; where it and the spec differ, the brief wins
 and the difference is listed under Deviations, which Task 7 writes back into the spec.
 
+**The user's decisions (2026-10-22), after reading the plan:** "route Help and About through it too" (Rulings 11,
+Deviations 6, Task 4). The review sheet's wording for `browser.provide`, "Open the web addresses Jasper opens, such as
+links you click in a terminal", stands: the user accepted it by not objecting. Whether a `jasper` URL call restores
+Jasper's windows stays with plan 4 (Rulings 6).
+
 ## Rulings the writer made
 
 Where the code made a brief decision impossible or left it open, the writer chose the smallest sensible thing:
@@ -67,9 +72,18 @@ Where the code made a brief decision impossible or left it open, the writer chos
    the brief named only `TabHost`'s unwire.
 10. **A provided (remote) session's URL clicks go through the route too.** File paths open nothing there
     (`TabHost.openFileLink`), but URLs always reached the desktop browser from any pane.
-11. **Jasper's own links keep the system browser**: the Help menu, About's licences, Settings' Help button and the
-    plugin manager's homepages (`JasperApplication.java:1518`, `LicensesView`, `SettingsDialog`, `PluginManagerPanel`).
-    They are Jasper's documentation, not links a person meets in a terminal or a plugin.
+11. **Jasper's own web links go through the role, as clicks** (the user: "route Help and About through it too").
+    Settings' Help button (`SettingsDialog.java:254`), the Licenses window's homepages (`LicensesView.java:117`, from
+    About's **Licenses…**) and the plugin manager's homepages (`PluginManagerPanel.java:175`) all open through
+    `JasperApplication`'s `browse(URI)` (`:1518`, wired at `:1270`, `:1404` and `:2064`), which Task 4 routes through
+    `openWebAddress`, the terminal clicks' path, and makes package-private for its test. None of these hooks knows the
+    window it came from (About, Licenses and Settings are auxiliary windows, not Jasper windows), so they go with the
+    active Jasper window, as Open in Editor for `config.toml` does (`PluginRuntime.open(Path, Consumer)`); with none
+    active, with no window. The Help menu itself holds no web link today (Keyboard Shortcuts, Change Memory Settings…,
+    Edit Custom VM Options… and About Jasper, `AboutWindows.helpEntries`), so routing the one helper covers every web
+    link Help and About open. The helper's `supports(Desktop.Action.BROWSE)` check goes: the system-browser fallback
+    logs an unsupported desktop instead of skipping it silently. The test calls `browse` directly; its three hook
+    wirings stay the same method references.
 12. **The SDK goes in two tasks.** Task 1 adds the values and the default `Platform.browser`; Task 2 adds the abstract
     `Platform.openInBrowser`, which `HostedContext` and `FakePluginContext`, the only two implementations, must provide
     in the same commit.
@@ -97,6 +111,9 @@ Task 7 writes each into the spec (sections 6 and 13).
    exit 2 (`PluginCommands.java:99-106`); before they start, `jasper: Jasper's plugins are not running`, exit 1.
 5. **Spec error, section 6:** the terminal's app-facing allowlist is type-level and already lists `TerminalView`
    (`jasper-terminal/README.md:44`), so making `setLinkOpener` public changes no allowlist.
+6. **Jasper's own web links are routed too** (the user's decision): spec 6's "Links the user clicks" names terminal
+   links and plugins' links; Settings' Help button and the Licenses window's and the plugin manager's homepages join
+   them, as clicks.
 
 ## Global Constraints
 
@@ -155,7 +172,9 @@ Task 7 writes each into the spec (sections 6 and 13).
 Also pinned: the role ending when its plugin stops (Task 2, `aBundledPluginsBrowserReplacesAnotherPluginsAndEndsWithItsPlugin`
 on both runtimes); a clicked link that is no URI (Task 4); a URL in a provided session's pane (Task 4); a quitting
 Jasper (Task 5, the extended `aRaiseOrAPathCallToAQuittingJasperFailsWithTheQuittingMessageAndOpensNothing`); a `null`
-link opener (Task 3); the Editor and Remote switches (Task 6).
+link opener (Task 3); Jasper's own Help and homepage links, before the plugins start, with no active window and from
+the active window (Task 4, `jaspersOwnWebLinksGoToTheProvidedBrowserAndOtherwiseTheSystemBrowser`); the Editor and
+Remote switches (Task 6).
 
 ## Verified facts
 
@@ -222,7 +241,7 @@ before quoting it; the anchors below are what the scripts match.
 | `jasper-terminal/.../view/TerminalView.java` | 3 | Public `setLinkOpener` |
 | `jasper-app/.../plugins/PluginRuntime.java` | 4, 5 | `openLink`, `openProgramLink` |
 | `jasper-app/.../workspace/WindowContent.java`, `TabHost.java`, `TerminalPane.java` | 4 | `onOpenLink`; wiring and unwiring |
-| `jasper-app/.../application/JasperApplication.java` | 4, 5 | `openLink`, `webAddress`, `systemBrowser`; the command's order |
+| `jasper-app/.../application/JasperApplication.java` | 4, 5 | `openLink`, `browse` (Jasper's own links), `webAddress`, `systemBrowser`; the command's order |
 | `plugins/editor/.../ui/EditorWindow.java`, `plugins/remote/.../ui/tunnels/TunnelsUi.java`, both `plugin.toml` | 6 | `openInBrowser`; versions |
 | Tests | each task | Listed in each task's Files |
 | Guides, `docs/STATUS.md`, the spec, `docs/sdk-reference.html` | 1, 2, 7 | Task 7, and the reference wherever Javadoc changes |
@@ -434,8 +453,8 @@ create("jasper-sdk/src/main/java/dev/jasper/sdk/ui/LinkOrigin.java", r'''package
  */
 public enum LinkOrigin {
     /**
-     * The user asked for it: a link Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, a plugin's
-     * {@code Platform.openInBrowser}, or {@code jasper <address>}.
+     * The user asked for it: a link Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, one of Jasper's
+     * own web links such as Settings' Help, a plugin's {@code Platform.openInBrowser}, or {@code jasper <address>}.
      */
     CLICK,
     /**
@@ -499,8 +518,9 @@ edit("jasper-sdk/src/main/java/dev/jasper/sdk/ui/Platform.java", [
     /**
      * Makes this plugin the web browser Jasper opens web addresses with: an {@code http} or {@code https} link
      * Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, with that window; every plugin's
-     * {@code openInBrowser}, with the active window; and the addresses given to the {@code jasper} command, with the
-     * window of the pane it ran in, go to {@code browser} first, on the UI thread, with who asked ({@link LinkOrigin}).
+     * {@code openInBrowser} and Jasper's own web links, such as Settings' Help, with the active window; and the
+     * addresses given to the {@code jasper} command, with the window of the pane it ran in, go to {@code browser} first,
+     * on the UI thread, with who asked ({@link LinkOrigin}).
      * A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown. Other
      * schemes, such as {@code mailto}, and {@link #browse} always go to the system browser. One at a time: a bundled
      * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
@@ -839,8 +859,8 @@ edit("jasper-sdk/src/main/java/dev/jasper/sdk/ui/Platform.java", [
      */
     void openInBrowser(URI uri);
 ''', 1),
-(r'''     * {@code openInBrowser}, with the active window;''',
- r'''     * {@link #openInBrowser}, with the active window;''', 1)])
+(r'''     * {@code openInBrowser} and Jasper's own web links''',
+ r'''     * {@link #openInBrowser} and Jasper's own web links''', 1)])
 edit("jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakePluginContext.java", [
 (r'''                @Override public void browse(java.net.URI uri) { requireOpen(); host.browsed.add(webAddress(uri)); }
 ''',
@@ -1304,14 +1324,16 @@ MSG
 Spec 6 ("Links the user clicks: http and https links in a terminal"), brief 3: `TabHost` wires each pane's link opener
 to `WindowContent.onOpenLink`; `JasperApplication.openLink` sends `http` and `https` links to the role as clicks with the
 pane's window through `PluginRuntime.openLink`, other links to the system browser, everything to the system browser
-before the plugins run.
+before the plugins run. Jasper's own web links (Settings' Help, the Licenses window's and the plugin manager's
+homepages, all through `JasperApplication.browse`) take the same path as clicks from the active window (Rulings 11).
 
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java` (before `:681`);
   `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java` (after `:257`, `:2641`);
   `jasper-app/src/main/java/dev/jasper/app/workspace/TabHost.java` (`:13-19`, `:145-153`, `:169-171`);
   `jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java` (`:625`);
-  `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (after `:192`, `:571`, before `:743`)
+  `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (after `:192`, `:571`, before `:743`,
+  `browse` `:1518-1524`)
 - Test: `jasper-app/src/test/java/dev/jasper/app/workspace/FileLinkClickTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/application/JasperApplicationPluginsTest.java` (before `awaitCalls`)
 
@@ -1326,7 +1348,8 @@ before the plugins run.
   - in `JasperApplication`: the package-private test seam `Consumer<java.net.URI> systemBrowser`,
     package-private `void openLink(String link, UUID window)` (EDT) and `static Optional<java.net.URI> webAddress(String text)`
     (any thread), private `void openWebAddress(java.net.URI address, Optional<UUID> window)` (EDT) and
-    `static void openInSystemBrowser(java.net.URI address)`;
+    `static void openInSystemBrowser(java.net.URI address)`; `void browse(java.net.URI uri)`, now package-private
+    (EDT): Jasper's own web links, as clicks from the active Jasper window, through `openWebAddress`;
   - the test fixture `JasperApplicationPluginsTest.WEB_BROWSER` (plugin `dev.example.web`, entry `fix.web.Main`): it
     appends `<address>|<origin>|<window or ->` to `data/opened` and declines the path `/declined`.
 
@@ -1451,6 +1474,49 @@ edit("jasper-app/src/test/java/dev/jasper/app/application/JasperApplicationPlugi
         ApplicationPluginCleanup.await(application[0]);
     }
 
+    /**
+     * Browser plan 3, the user's ruling ("route Help and About through it too"): Jasper's own web links, which Settings'
+     * Help button, the Licenses window and the plugin manager open through {@code browse}, go to the browser a plugin
+     * provides as clicks from the active window, else to the system browser.
+     */
+    @Test void jaspersOwnWebLinksGoToTheProvidedBrowserAndOtherwiseTheSystemBrowser() throws Exception {
+        var system = new CopyOnWriteArrayList<String>();
+        java.net.URI help = java.net.URI.create(dev.jasper.app.settingsui.SettingsDialog.HELP_URL + "keybindings");
+        java.net.URI declined = java.net.URI.create("https://example.com/declined");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].browse(help);
+        });
+        assertThat(system).as("before the plugins start").containsExactly(help.toString());
+
+        system.clear();
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        edt(() -> {
+            application[0].startPlugins(null, dev, false, dirs);
+            application[0].browse(help);
+            // A stand-in frame opens the main window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
+            application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
+                () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            application[0].openFirstWindow(List.of()).orElseThrow();
+            application[0].terminals().windowActivated(application[0].terminals().windows().getFirst().id());
+            application[0].browse(help);
+            application[0].browse(declined);
+        });
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
+            .as("as clicks: with no window active, then from the active one")
+            .containsExactly(help + "|CLICK|-", help + "|CLICK|window", declined + "|CLICK|window");
+        assertThat(system).as("only the address the browser declined").containsExactly(declined.toString());
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
     private static void awaitCalls(List<String> calls, int count) throws InterruptedException {''', 1)])
 PY
 ```
@@ -1458,7 +1524,8 @@ PY
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.FileLinkClickTest' --tests 'dev.jasper.app.application.JasperApplicationPluginsTest'`
-Expected: FAIL to compile `compileTestJava`: `cannot find symbol` `onOpenLink`, `systemBrowser` and `openLink(String,UUID)`.
+Expected: FAIL to compile `compileTestJava`: `cannot find symbol` `onOpenLink`, `systemBrowser` and `openLink(String,UUID)`,
+and `browse(URI) has private access in JasperApplication`.
 
 - [ ] **Step 3: Wire the views to the window and route their links**
 
@@ -1603,7 +1670,27 @@ edit("jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java
         });
     }
 
-    /** What running plugins add to a new local shell, given Jasper's own environment; nothing before they start. EDT. */''', 1)])
+    /** What running plugins add to a new local shell, given Jasper's own environment; nothing before they start. EDT. */''', 1),
+(r'''        private void browse(java.net.URI uri) {
+            if (!supports(Desktop.Action.BROWSE)) return;
+            CompletableFuture.runAsync(() -> {
+                try { Desktop.getDesktop().browse(uri); }
+                catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+            });
+        }
+''',
+ r'''        /**
+         * Opens one of Jasper's own web links (browser plan 3, the user's ruling): Settings' Help button, the Licenses
+         * window's homepages and the plugin manager's homepages. Their windows are not Jasper windows, so an http or https
+         * address goes to the web browser a plugin provides as a click from the active Jasper window, else to the system
+         * browser; any other address goes to the system browser. EDT.
+         */
+        void browse(java.net.URI uri) {
+            Optional<UUID> window = terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id);
+            if (webAddress(uri.toString()).isPresent()) openWebAddress(uri, window);
+            else systemBrowser.accept(uri);
+        }
+''', 1)])
 PY
 ```
 
@@ -1611,7 +1698,7 @@ PY
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.FileLinkClickTest' --tests 'dev.jasper.app.application.JasperApplicationPluginsTest' --tests 'dev.jasper.app.workspace.TabMoveTest' --tests 'dev.jasper.app.plugins.PluginRuntimeTest' verifyApplicationArchitecture verifyTerminalArchitecture :jasper-app:javadoc`
 Expected: `BUILD SUCCESSFUL`; `FileLinkClickTest` (with its two new cases; the provided-session one is skipped on
-Windows only) and `JasperApplicationPluginsTest` pass.
+Windows only) and `JasperApplicationPluginsTest` (with its two new cases) pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1632,7 +1719,9 @@ web browser a plugin provides as a click from the pane's window
 (PluginRuntime.openLink), then the system browser; an ftp URL or an OSC 8
 mailto link goes to the system browser as before, and so does every
 link before the plugins start. A link that is not a URI opens nothing,
-and the log never repeats a link's text.
+and the log never repeats a link's text. Jasper's own web links
+(Settings' Help, the Licenses window's and the plugin manager's
+homepages) take the same path, as clicks from the active window.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -2105,7 +2194,8 @@ edit("docs/plugin-authoring.md", [
 
 `context.platform().browser(webBrowser)` (`browser.provide`) makes the plugin the web browser Jasper opens web
 addresses with: an `http` or `https` link Cmd-clicked (Ctrl-clicked on Linux and Windows) in any terminal pane, with the
-clicked window; every plugin's `openInBrowser`, with the active window; `jasper <address>…`, with the window of the pane
+clicked window; every plugin's `openInBrowser` and Jasper's own web links (Settings' Help button, the Licenses
+window's and the plugin manager's homepages), with the active window; `jasper <address>…`, with the window of the pane
 it ran in; and `jasper open-url <address>`, the command programs use ([command line](command-line.md#the-jasper-command)).
 
 - [`WebBrowser`](sdk-reference.html#dev.jasper.sdk.ui.WebBrowser)`.open(address, origin, window)` runs on the UI thread,
@@ -2144,7 +2234,8 @@ A Cmd-click (Ctrl-click on Linux and Windows) on a URL in any terminal pane reac
 to the system browser. `JasperApplication.commands()` sends `jasper <address>…`, when every argument is one, as clicks
 in the calling pane's window, and `jasper open-url <address>` as a program's, before the path and subcommand handling.
 `Platform.openInBrowser` asks the role as a click in the active window, then opens the system browser on the plugin's
-worker as `Platform.browse` does.
+worker as `Platform.browse` does. `JasperApplication.browse`, which Settings' Help button, the Licenses window and the
+plugin manager use for Jasper's own links, sends them the clicks' way with the active window.
 ''', 1)])
 edit("jasper-sdk/README.md", [
 (r'''`Capabilities`, the twelve capability strings,''', r'''`Capabilities`, the thirteen capability strings,''', 1),
@@ -2180,7 +2271,7 @@ edit("tools/sdk-reference/guide/07-contributions.html", [
 (r'''<tr><td>The editor role</td><td>{@link Platform#editor(FileEditor)}</td><td>{@code editor.provide}</td><td>The files Jasper opens for editing, and Cmd-click (Ctrl-click on Linux and Windows) on paths in terminals</td></tr>
 ''',
  r'''<tr><td>The editor role</td><td>{@link Platform#editor(FileEditor)}</td><td>{@code editor.provide}</td><td>The files Jasper opens for editing, and Cmd-click (Ctrl-click on Linux and Windows) on paths in terminals</td></tr>
-<tr><td>The web browser role</td><td>{@link Platform#browser(WebBrowser)}</td><td>{@code browser.provide}</td><td>The http and https addresses Jasper opens: Cmd-click (Ctrl-click on Linux and Windows) on links in terminals, plugins' {@link Platform#openInBrowser(URI)}, and the {@code jasper} command's addresses</td></tr>
+<tr><td>The web browser role</td><td>{@link Platform#browser(WebBrowser)}</td><td>{@code browser.provide}</td><td>The http and https addresses Jasper opens: Cmd-click (Ctrl-click on Linux and Windows) on links in terminals, plugins' {@link Platform#openInBrowser(URI)}, Jasper's own Help and homepage links, and the {@code jasper} command's addresses</td></tr>
 ''', 1)])
 edit("tools/sdk-reference/guide/13-testing.html", [
 (r'''<li>{@link Platform#openInEditor(Path)} runs on the calling thread;''',
@@ -2247,6 +2338,11 @@ import sys; sys.path.insert(0, "build/plan-browser3")
 from edits import edit
 spec = "docs/superpowers/specs/2026-10-21-jasper-browser-plugin-design.md"
 edit(spec, [
+(r'''  - **Links the user clicks:** http and https links in a terminal, and links other plugins hand over.
+''',
+ r'''  - **Links the user clicks:** http and https links in a terminal, links other plugins hand over, and Jasper's own web
+    links: Settings' Help button and the Licenses window's and the plugin manager's homepages *(user)*.
+''', 1),
 (r'''    - `jasper <url>` fails with "no such file or folder".
   - **The design adds** a link-handler contribution. A plugin claims http(s) URLs, and the host consults it before
     falling back to the desktop browser. Terminal link clicks and `jasper` CLI URLs go through it.
@@ -2308,7 +2404,9 @@ testkit fakes the role (`FakePluginHost.openLink`, `browserPlugin`) and four con
 `TerminalView.setLinkOpener` is public (`null` restores the desktop's browser). The application sends a pane's clicked
 `http` and `https` links to the role as clicks from the pane's window (`TabHost`, `WindowContent.onOpenLink`,
 `JasperApplication.openLink`, `PluginRuntime.openLink`, `plugins.WebBrowsers`), and `ftp` and OSC 8 `mailto` links, an
-address the role declines and every link before the plugins start to the system browser. `jasper <address>…`, when
+address the role declines and every link before the plugins start to the system browser. Jasper's own web links
+(Settings' Help, the Licenses window's and the plugin manager's homepages, through `JasperApplication.browse`) go the
+same way as clicks from the active window, as the user asked ("route Help and About through it too"). `jasper <address>…`, when
 every argument is an absolute `http` or `https` address, goes to the role as clicks in the calling pane's window and
 `jasper open-url <address>` as a program's, both exiting 0; `open-url` without exactly one web address prints
 "jasper: open-url needs one web address (http or https)" and exits 2, and no plugin may declare it. The Editor's
@@ -2316,8 +2414,9 @@ Markdown links (Editor 0.16.0) and Remote's Open in Browser (Remote 0.17.0) use 
 provides the role yet, so every address still opens in the system browser. Moved to plan 4: `BROWSER` in local shells.
 The spec records the deviations (sections 6 and 13); the plan lists its rulings. `./gradlew check`: CHECK-RESULT. GUI
 checks for the user: a Cmd-click (Ctrl-click) on an `https` link and on an OSC 8 `mailto` link in a terminal,
-`jasper https://example.com` and `jasper open-url https://example.com` in a Jasper shell, a Markdown preview's web
-link, and a running tunnel's Open in Browser, each reaching the default browser or mail program as before.
+`jasper https://example.com` and `jasper open-url https://example.com` in a Jasper shell, Settings' Help (?) button, a
+homepage in About › Licenses… and in Settings › Plugins, a Markdown preview's web link, and a running tunnel's Open
+in Browser, each reaching the default browser or mail program as before.
 
 ''', 1)])
 PY
@@ -2364,8 +2463,8 @@ browserPlugin), the command line guide jasper <address> and jasper
 open-url, and the terminal guides the public link opener; the Editor,
 Remote and terminal guides say where links open. The spec takes plan 3's
 deviations: BROWSER moves to plan 4 and names jasper open-url, no URL
-scheme handler, and the corrected facts about jasper <url> and the
-terminal allowlist. STATUS records the plan; the SDK reference is
+scheme handler, Jasper's own web links routed too, and the corrected
+facts about jasper <url> and the terminal allowlist. STATUS records the plan; the SDK reference is
 regenerated.
 
 🤖 Generated with Claude Code at The Home Depot
@@ -2411,9 +2510,9 @@ print(f"{t:,} tests, {f} failures, {e} errors, {s} skipped")
 PY
 ```
 
-Expected: 0 failures and 0 errors. The count is the last recorded check's 12,823 plus the 21 tests this plan adds
-(3 in Task 1, 4 contract cases on each runtime in Task 2, 1 in Task 3, 3 in Task 4, 5 in Task 5, 1 in Task 6), so
-12,844 on macOS with 29 skipped, unless the branch's base has moved since.
+Expected: 0 failures and 0 errors. The count is the last recorded check's 12,823 plus the 22 tests this plan adds
+(3 in Task 1, 4 contract cases on each runtime in Task 2, 1 in Task 3, 4 in Task 4, 5 in Task 5, 1 in Task 6), so
+12,845 on macOS with 29 skipped, unless the branch's base has moved since.
 
 - [ ] **Step 3: Build the example external plugin from the SDK jars**
 
@@ -2457,7 +2556,7 @@ After the final whole-branch review, hand the user the GUI checks of the STATUS 
 
 1. **Spec and brief coverage.** Brief 1 (SDK, testkit, contract, capability recipe): Tasks 1-2. Brief 2 (terminal):
    Task 3, its guides Task 7. Brief 3 (app routing, `WebBrowsers`, `PluginRuntime` bridge, `HostedContext`): Tasks 2
-   and 4. Brief 4 (`jasper <url>`, `open-url`, reserved, `--help`, the order in `commands()`, `ApplicationCommandsTest`):
+   and 4; the user's "route Help and About through it too": Task 4 (`JasperApplication.browse`) and Task 7. Brief 4 (`jasper <url>`, `open-url`, reserved, `--help`, the order in `commands()`, `ApplicationCommandsTest`):
    Task 5, `docs/command-line.md` Task 7. Brief 5 (Editor, Remote, versions): Task 6. Brief 6 (deviations): the header
    and Task 7's spec edits. Spec 13 item 3 minus `BROWSER`: Tasks 1-6. Spec 14's "covered by the testkit and the
    contract cases on both runtimes": Task 2.
@@ -2466,7 +2565,7 @@ After the final whole-branch review, hand the user the GUI checks of the STATUS 
 3. **Names.** `BROWSER_PROVIDE`, `LinkOrigin.CLICK`/`PROGRAM`, `WebBrowser.open`, `Platform.browser`, `openInBrowser`,
    `WebBrowsers.register`/`open`, `PluginHost.webBrowsers`, `FakePluginHost.openLink`/`browserPlugin`/`provideBrowser`/`activeWindowId`,
    `ContractHarness.openLink`, `TerminalView.setLinkOpener`, `WindowContent.onOpenLink`, `PluginRuntime.openLink`/`openProgramLink`/`openAddress`,
-   `JasperApplication.systemBrowser`/`openLink`/`webAddress`/`webAddresses`/`openWebAddress`/`openProgramAddress`/`windowOfPane`/`OPEN_URL`
+   `JasperApplication.systemBrowser`/`openLink`/`browse`/`webAddress`/`webAddresses`/`openWebAddress`/`openProgramAddress`/`windowOfPane`/`OPEN_URL`
    and the fixture `WEB_BROWSER` are spelled the same in every task that uses them.
 4. **Review Focus.** Each of the five lines names its test, and each test is in the task that owns the code.
 5. **Proportion.** The plan carries complete code, as AGENTS.md requires: about 350 production lines in 20 files (the
