@@ -9,7 +9,7 @@ APIs, and exports its own, through the same mechanism. Every type below is in th
 | Package | Provider | Version | Service | Published with | Bundled consumers |
 | --- | --- | --- | --- | --- | --- |
 | [`dev.jasper.vault.api`](sdk-reference.html#package-dev.jasper.vault.api) | Credential Vault, `dev.jasper.vault` | 0.7.0 | [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi) | `publishPerConsumer`: each consumer gets its own instance | Remote, File Server |
-| [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.14.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
+| [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.15.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
 | [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.16.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
 | [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api) | Snippets, `dev.jasper.snippets` | 0.3.0 | [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) | `publish` | Shell History |
 
@@ -299,11 +299,13 @@ private void chooseCredential(WindowHandle window, UiView view, Optional<UUID> c
 ## Editor API
 
 Package [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api), from the Editor
-(`dev.jasper.editor`, 0.14.0). The user's side is in [Editor](editor.md).
+(`dev.jasper.editor`, 0.15.0). The user's side is in [Editor](editor.md).
 
 The Editor publishes one [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) for every consumer with `publish`.
 Call it on the UI thread only. Documents open as Editor tabs in a Jasper window; opening a document that is already
-open selects its tab, keeps it in the window it is in, and raises that window.
+open selects its tab (of several views of it, the one focused last), keeps it in the window it is in, and raises that
+window. A document shown in several views is one document to its plugin: the Editor reads it once, and saves and
+reloads it for all of them.
 
 | `Editor` member | Does |
 | --- | --- |

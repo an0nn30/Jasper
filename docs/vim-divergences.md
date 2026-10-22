@@ -61,12 +61,13 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **A final line break.** A text without one edits as Vim edits such a file, and is saved as it is, where Vim (with
   'fixendofline', on by default) adds one when it writes. An edit that leaves the last line empty adds the final break,
   which that empty line needs to be a line.
-- **Tabs are the buffers.** Each Editor tab is a buffer and a tab page. `:e file` opens the file in a tab, or selects
-  its tab, where Vim edits it in the window; `:w file` saves the tab as the file, which it then edits, where Vim
-  writes a copy; `:q` closes the tab, and closing the last one leaves Jasper running. A tab never has to be written
-  before another is shown, so `:e`, `:b` and `:bn` never need `!` ('hidden' as it were), and `:ls` shows every tab as
-  loaded and shown (`a`), named by its location. `:w` on an untitled tab asks where to save it, as the Editor's Save
-  does, where Vim fails with `E32`. `:e newfile` opens an empty tab its first save creates.
+- **Files are the buffers.** Each open file is a buffer, its [views](editor.md#views-of-one-file) are its windows, and
+  each tab is a tab page. `:e file` opens the file in a tab, or selects its view, where Vim edits it in the window;
+  `:w file` saves the tab as the file, which it then edits, where Vim writes a copy; `:q` closes the pane, and closing
+  the last one leaves Jasper running. A file never has to be written before another is shown, so `:e`, `:b` and `:bn`
+  never need `!` ('hidden' as it were), and `:ls` shows every file as loaded and shown (`a`), named by its location.
+  `:w` on an untitled tab asks where to save it, as the Editor's Save does, where Vim fails with `E32`. `:e newfile`
+  opens an empty tab its first save creates.
 - **Relative file names** start from the current file's folder (the home folder for an untitled tab), as Jasper has no
   current directory.
 - **Only whole files are written.** `:2,5w file`, `:w >> file`, `:w !cmd` and `:r !cmd` fail with E319.
@@ -81,8 +82,8 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   cursor line's number is right-aligned like the others; Vim puts it on the left. The text area draws an empty row
   after a file's final line break; it is not a line (Vim shows none), so it has no number and the cursor cannot reach
   it.
-- **Uppercase marks across tabs.** `'A` and `` `A `` select the tab the mark is in and go there; after an operator or
-  in Visual mode they fail, where Vim also cannot operate across files.
+- **Uppercase marks across files.** `'A` and `` `A `` of a mark in another file select the view it was set in and go
+  there; after an operator or in Visual mode they fail, where Vim also cannot operate across files.
 - **Folds are the Editor's code folds.** There are no manual folds (`zf`, `zd`, `zE`); `zo`, `zc` and the other fold
   commands act on the folds the Editor finds in the code. A closed fold shows its first line with the Editor's fold
   marker, where Vim shows a one-line summary such as `+--  4 lines: void f() {`.
@@ -99,8 +100,11 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   U+00FF as a word character.
 - **The `'.` mark and the change list follow each typed character**, as when typing in Vim. Keys fed to Vim all at
   once (a mapping, `feedkeys()`) are inserted as one string, so there the mark stays at the insert's start.
-- **One typeahead per tab.** Keys wait, and mappings and macros insert theirs, in the tab's own typeahead; a mapping or
-  macro that selects another tab (`:bn`, `gt`) goes on in the tab it started in. Vim's typeahead is global.
+- **One typeahead per view.** Keys wait, and mappings and macros insert theirs, in the view's own typeahead; a mapping
+  or macro that selects another file (`:bn`, `gt`) goes on in the view it started in. Vim's typeahead is global.
+- **Another view's window after an edit.** An insert at the start of the first line a window shows keeps that line on
+  top, and an edit that takes away that line shows the text after the deletion, where Vim shows the new line and the
+  line before the deletion.
 - **`q:`, `q/` and `q?` fail.** Jasper has no command-line window.
 - **Mapping arguments.** `<buffer>`, `<expr>` and `<script>` are refused with `Not supported in Jasper: <expr>`.
   `<silent>` is accepted and changes nothing, since Jasper never echoes the command line a mapping types. `<Leader>`

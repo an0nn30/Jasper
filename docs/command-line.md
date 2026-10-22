@@ -204,7 +204,7 @@ when you save it. With --wait, returns once every tab it opened has closed, as g
 
 | Argument | Meaning |
 |---|---|
-| `-w`, `--wait` | Return once every tab this call opened has closed, by you or with its window. Ctrl+C stops waiting and leaves the tabs open. Needs at least one FILE. |
+| `-w`, `--wait` | Return once the last view of each file this call opened has closed, by you or with its window. Ctrl+C stops waiting and leaves the tabs open. Needs at least one FILE. |
 | `-h`, `--help` | Print the usage and exit with status 0. |
 | `--` | Every later argument is a FILE, even one starting with `-`. |
 | `FILE[:LINE[:COLUMN]]` | A file to open, relative to the caller's working directory. An argument that names an existing file opens as written, even `a:1`; otherwise a trailing `:LINE` or `:LINE:COLUMN` of digits is split off, so `C:\notes.txt` is never split. LINE and COLUMN start at 1. |

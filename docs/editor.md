@@ -25,8 +25,8 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
 - **Open File Right…** and **Open File Down…**, in the Split submenus (the command palette calls them **Split Right
   with Open File…** and **Split Down with Open File…**), and **Open in Editor Pane…** in the File menu, which does what
   Open File Right does, show the file chooser for one file and open it in a new pane beside the focused pane; the new
-  pane takes the focus. A file that is open already shows its open pane instead; cancelling opens nothing. None of these
-  has a default shortcut.
+  pane takes the focus. A file that is open already shows in another [view](#views-of-one-file); cancelling opens
+  nothing. None of these has a default shortcut.
 - **Recent Files…** (command palette) reopens a file the Editor opened before; see [Recent files](#recent-files).
 - **Show Editor** (command palette) selects the Editor tab you were last in, or opens an untitled tab when there is
   none.
@@ -41,20 +41,21 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   recognises.
 - `jasper editor FILE[:LINE[:COLUMN]]...`, the [jasper command](command-line.md#jasper-editor), opens each file in the
   window of the Jasper pane it ran in, with the caret on LINE and COLUMN. A file that does not exist yet, in a folder
-  that does, opens as an empty tab that its first save creates. With `--wait` (`-w`) the command returns once every tab
-  it opened has closed, so `git config --global core.editor "jasper editor --wait"` edits commit messages here; Ctrl+C
-  stops waiting and leaves the tabs open. With no file it does what **Show Editor** does.
+  that does, opens as an empty tab that its first save creates. With `--wait` (`-w`) the command returns once the last
+  view of each file it opened has closed, so `git config --global core.editor "jasper editor --wait"` edits commit
+  messages here; Ctrl+C stops waiting and leaves the tabs open. With no file it does what **Show Editor** does.
 
 A file opens in a new tab of the window it was opened from, otherwise of the main window. Opening a file that is already open
-selects its tab; `jasper editor` and a Cmd-click also move the caret to the line. While a file loads, its tab shows
-"Loading *name*…" ("Loading *name* from *host*…" for a remote file) with **Cancel**, which closes the tab. A file that
+selects its tab, of several [views](#views-of-one-file) the one you were in last; `jasper editor` and a Cmd-click also
+move the caret to the line. While a file loads, its tab shows "Loading *name*…" ("Loading *name* from *host*…" for a
+remote file) with **Cancel**, which closes the tab. A file that
 cannot be opened shows **Could Not Open File** with the reason; see
 [Large, binary and unreadable files](#large-binary-and-unreadable-files).
 
 ## Tabs
 
-Each file is the item of one pane: a tab of its own, or a pane beside others in a tab
-([Plugin tabs](workspace.md#plugin-tabs)). A tab shows its active pane's file:
+Each file is the item of a pane, or of several as [views](#views-of-one-file): a tab of its own, or a pane beside
+others in a tab ([Plugin tabs](workspace.md#plugin-tabs)). A tab shows its active pane's file:
 
 - the file's name, with ● before it while the file has unsaved changes (updated just after you stop typing);
 - after the name, the parent folder's name when another open tab has the same name, and a remote file's host, joined
@@ -67,9 +68,9 @@ Right-click the tab for **Move Tab to New Window**, **Move Tab Into** and **Clos
 history, unsaved changes and Markdown view.
 Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the
 **Folding** submenu (Toggle Current Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by
-**Save**, **Find…**, **Go to Line…**, **Toggle Comment** and **Revert to Saved**, then **Split** (Terminal Right,
-Terminal Down, Editor Right, Editor Down, Open File Right…, Open File Down…, then each plugin's split items), which opens
-the choice in a new pane beside the editor, **Move Pane to New Tab**, which gives the editor's pane a tab of its own
+**Save**, **Find…**, **Go to Line…**, **Toggle Comment**, **Revert to Saved**, **Split File Right** and **Split File
+Down**, then **Split** (Terminal Right, Terminal Down, Editor Right, Editor Down, Open File Right…, Open File Down…, then
+each plugin's split items), which opens the choice in a new pane beside the editor, **Move Pane to New Tab**, which gives the editor's pane a tab of its own
 while its tab holds another pane, and **Move Pane to Tab**, which moves it into another tab of its window. This menu
 names a tab whose active pane shows an Editor file and lists any other tab as "Tab 3"; the Tab menu names them all.
 
@@ -83,6 +84,35 @@ deleted since comes back as a failed read with **Retry**; a remote one, through 
 active or you press **Load**, and then reads only if signing in asks nothing (an open connection, or the SSH agent);
 otherwise it says so, and **Retry** signs in. An untitled file that was never saved does not come back, nor does a
 document whose key is too long to save. A restored file is not added to [Recent files](#recent-files).
+
+## Views of one file
+
+**Split File Right** and **Split File Down** show the file in another view, in a new pane to the right of its own or
+below it: from the text's right-click menu, the tab's menu or the command palette, with no default shortcut (Settings ›
+Keymap can give them one). **Open File Right…** and **Open File Down…** of a file that is already open put another
+view of it beside the focused pane. A new view starts where its source view is, with its caret, selection and scroll
+position. In Vim mode `:action split-file-right` and `:action split-file-down` run them.
+
+A file's views show one text: an edit in one shows in the others at once, and Undo and Redo in any view undo and redo
+the last edit made in any of them, the undoing view's caret going to the change while the others stay where they were.
+An edit that adds or removes lines above another view leaves that view showing the same text, not the same pixels:
+without Vim its first line stays on top; with Vim its cursor stays on its text in every mode but the command line, and
+the window scrolls the least that shows it, keeping `scrolloff` lines around it. An insert at the start of a view's
+first line, or at the start of the text, keeps that line on top; an edit that takes away its first line shows the text
+after the deletion; and **Revert to Saved**, a reload and the undo of either leave each view on its line number. A view
+that comes back from the Markdown preview shows the text it showed.
+
+The ● marker, **Save**, **Save As…**, **Revert to Saved** and a reload act on the file from any view, and a reload
+keeps each view's caret on its line. Each view has its own caret, selection, scroll position, folds, Vim state and
+Markdown view; the find bar belongs to the selected view and closes when you select another; the language and soft wrap
+are the file's. Vim's marks `a` to `z`, `'.` and its change list are the file's too, as they are a Vim buffer's, and so
+are its buffer-local [options](#vim-options); its jumplist, `''` and place in the change list are each view's, a split
+view starting with its source's. Closing a view closes only that view, and the others keep the order you were last in
+them: Jasper asks about unsaved changes when the file's last view closes, and a window that closes with one view of a
+file another window still shows asks nothing. **Cancel** in one view of a file that is still loading closes that view,
+and the file goes on loading for the others. **Open in Editor…** of an open file selects the view you were in last, and
+Recent files lists the file once. When Jasper restores its windows every view comes back, and the file is read once for
+all of them.
 
 ## Status bar
 
@@ -126,6 +156,8 @@ Vim mode, `:action id` and `<Action>(id)` run them by the id in the last column.
 | Markdown: Source and Preview | | | `markdown.split` |
 | Markdown: Preview | | | `markdown.preview` |
 | Revert to Saved | | | `revert` |
+| Split File Right | | | `split-file-right` |
+| Split File Down | | | `split-file-down` |
 | Language… | | | `language` |
 | Toggle Soft Wrap | | | `wrap` |
 | Toggle Vim Mode | | | `toggle-vim` |
@@ -151,6 +183,8 @@ The plugin's actions are in the command palette and can be given other shortcuts
 | New Editor Window | `dev.jasper.editor.new_window` | | | File menu, toolbar |
 | Revert to Saved | `dev.jasper.editor.revert` | | | |
 | Reload vimrc | `dev.jasper.editor.reload_vimrc` | | | |
+| Split File Right | `dev.jasper.editor.split_file_right` | | | The text's right-click menu |
+| Split File Down | `dev.jasper.editor.split_file_down` | | | The text's right-click menu |
 | Recent Files… | `dev.jasper.editor.recent-files` | | | |
 | Show Editor | `dev.jasper.editor.show` | | | |
 
@@ -673,11 +707,14 @@ you turned it off).
 
 ### Tabs, files and the window
 
-- The tabs are Vim's buffers. `:w` saves through the Editor's Save (`:w file` saves as the file), `:q` closes the tab
-  (with unsaved changes it fails with `E37`; `:q!` closes it and discards them), `:wq`, `:x` and `ZZ` save and close,
-  `:e file` opens a file in a tab (a relative name starts from the current file's folder), `:r file` puts a file's
-  lines below the cursor, `:ls` lists the tabs with their buffer numbers, and `:b N`, `:bn`, `:tabn`, `gt` and `gT`
-  move between them. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
+- The open files are Vim's buffers, one each however many [views](#views-of-one-file) show it, and the views are its
+  windows. `:w` saves through the Editor's Save (`:w file` saves as the file), `:q` closes the pane (in a file's last
+  view, with unsaved changes, it fails with `E37`; `:q!` closes it and discards them), `:wq`, `:x` and `ZZ` save and
+  close the pane, `:qa` closes every view, `:e file` opens a file in a tab (a relative name starts from the current
+  file's folder), `:r file` puts a file's lines below the cursor, `:ls` lists the files with their buffer numbers, and
+  `:b N`, `:bn`, `:tabn`, `gt` and `gT` move between them, each to the file's view you were in last. An uppercase mark
+  (`mA`) set in another file takes you back to the view it was set in (`'A`); one set in another view of the same file
+  acts in the current view, as in Vim, and a mark whose view closes passes to the file's most recent other view.
 - `<C-g>` shows the file, its line count and the cursor's position; `ga` the character's code.
 - Scrolling (`<C-e>`, `<C-d>`, `<C-f>`, `zt`, `zz`), `H`, `M`, `L` and the screen-line motions (`gj`, `g0`, `g$`) work
   on a window as many lines high and characters wide as the text area shows, and the text scrolls past its last line as
@@ -717,61 +754,62 @@ vimrc"; a missing one is not reported.
 ### Vim options
 
 `:set`, `:setlocal` and `:setglobal` know these options; any other fails with `E518: Unknown option`. Names are not
-case-sensitive. "Per tab" options keep a value in each tab.
+case-sensitive. "Per file" options keep a value for each file, which all its views share, and "Per pane" options keep
+one in each view.
 
 | Option | Default | Notes |
 |---|---|---|
 | `argtextobj` | off | [Extension](#extensions) |
-| `autoindent` (`ai`) | on | Per tab; Jasper's default, Vim's is off |
+| `autoindent` (`ai`) | on | Per file; Jasper's default, Vim's is off |
 | `backspace` (`bs`) | `indent,eol,start` | |
 | `belloff` (`bo`) | empty | Accepted; changes nothing |
 | `clipboard` (`cb`) | empty | |
 | `commentary` | off | Extension |
-| `commentstring` (`cms`) | The tab's language's comment (`//%s`, `#%s`), else `/* %s */` | Per tab; used by [commentary](#extensions) |
-| `comments` (`com`) | Vim's | Per tab |
+| `commentstring` (`cms`) | The tab's language's comment (`//%s`, `#%s`), else `/* %s */` | Per file; used by [commentary](#extensions) |
+| `comments` (`com`) | Vim's | Per file |
 | `compatible` (`cp`) | off | Accepted; changes nothing |
 | `encoding` (`enc`) | `utf-8` | Accepted; changes nothing |
 | `exchange` | off | Extension |
-| `expandtab` (`et`) | the tab's `Spaces` or `Tab` | Per tab |
-| `fileformat` (`ff`) | `unix` | Per tab; accepted, changes nothing |
+| `expandtab` (`et`) | the tab's `Spaces` or `Tab` | Per file |
+| `fileformat` (`ff`) | `unix` | Per file; accepted, changes nothing |
 | `foldopen` (`fdo`) | `block,hor,mark,percent,quickfix,search,tag,undo` | |
-| `formatoptions` (`fo`) | `tcq` | Per tab |
+| `formatoptions` (`fo`) | `tcq` | Per file |
 | `gdefault` (`gd`) | off | |
 | `highlightedyank` | off | Extension |
 | `hlsearch` (`hls`) | on | Vim's is off |
 | `ignorecase` (`ic`) | off | |
 | `incsearch` (`is`) | on | |
-| `iskeyword` (`isk`) | `@,48-57,_,192-255` | Per tab |
+| `iskeyword` (`isk`) | `@,48-57,_,192-255` | Per file |
 | `joinspaces` (`js`) | on | |
 | `laststatus` (`ls`) | `1` | Accepted; changes nothing |
 | `matchit` | off | Extension |
-| `matchpairs` (`mps`) | `(:),{:},[:]` | Per tab |
+| `matchpairs` (`mps`) | `(:),{:},[:]` | Per file |
 | `maxmapdepth` (`mmd`) | `1000` | |
 | `mouse` | empty | Accepted; changes nothing |
-| `nrformats` (`nf`) | `bin,octal,hex` | Per tab |
-| `number` (`nu`) | on | Per tab; Vim's is off |
-| `relativenumber` (`rnu`) | off | Per tab |
+| `nrformats` (`nf`) | `bin,octal,hex` | Per file |
+| `number` (`nu`) | on | Per pane; Vim's is off |
+| `relativenumber` (`rnu`) | off | Per pane |
 | `replacewithregister` | off | Extension |
 | `report` | `2` | |
 | `ruler` (`ru`) | off | Accepted; changes nothing |
 | `scrolljump` (`sj`) | `1` | |
 | `scrolloff` (`so`) | `0` | |
 | `shiftround` (`sr`) | off | |
-| `shiftwidth` (`sw`) | `tab_size` | Per tab |
+| `shiftwidth` (`sw`) | `tab_size` | Per file |
 | `showcmd` (`sc`) | on | |
 | `showmode` (`smd`) | on | |
 | `sidescroll` (`ss`) | `0` | |
 | `sidescrolloff` (`siso`) | `0` | |
 | `smartcase` (`scs`) | off | |
 | `sneak` | off | Extension |
-| `softtabstop` (`sts`) | `0` | Per tab |
+| `softtabstop` (`sts`) | `0` | Per file |
 | `startofline` (`sol`) | on | |
 | `surround` | off | Extension |
-| `syntax` (`syn`) | empty | Per tab; accepted, changes nothing |
-| `tabstop` (`ts`) | `tab_size` | Per tab |
+| `syntax` (`syn`) | empty | Per file; accepted, changes nothing |
+| `tabstop` (`ts`) | `tab_size` | Per file |
 | `textobj-entire` | off | Extension |
 | `textobj-indent` | off | Extension |
-| `textwidth` (`tw`) | `0` | Per tab |
+| `textwidth` (`tw`) | `0` | Per file |
 | `tildeop` (`top`) | off | |
 | `timeout` (`to`) | on | |
 | `timeoutlen` (`tm`) | `1000` | |
@@ -781,7 +819,7 @@ case-sensitive. "Per tab" options keep a value in each tab.
 | `vim-paragraph-motion` | off | Extension |
 | `visualbell` (`vb`) | off | Accepted; the bell is always the flash |
 | `whichwrap` (`ww`) | `b,s` | |
-| `wrap` | the tab's Wrap | Per tab |
+| `wrap` | the tab's Wrap | Per pane |
 | `wrapscan` (`ws`) | on | |
 
 ### Extensions

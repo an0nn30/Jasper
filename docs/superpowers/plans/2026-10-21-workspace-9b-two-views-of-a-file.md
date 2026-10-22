@@ -1,10 +1,30 @@
 # Workspace tabs 9b: two views of one file Implementation Plan
 
-**Status: written on 2026-10-21, not executed.** Written against `claude/workspace-tabs` at `ff322c478` ("Spec: pane
-flexibility approved by the user; the tabs and panes spec points at it") with plan 9a's final text
-(`2026-10-21-workspace-9a-open-beside-and-move-into-tabs.md`, 4,401 lines, 2026-10-21) applied on top, after its
-review; this plan's own review's findings are in (Rulings 3, 13, 14, 18-20). See Workspace for what was replayed,
-compiled and run.
+**Status: executed on 2026-10-22** (`ab55ecde6..e6c33c193`, then the documentation commit); see `docs/STATUS.md`.
+Written against `claude/workspace-tabs` at `ff322c478` ("Spec: pane flexibility approved by the user; the tabs and panes
+spec points at it") with plan 9a's final text (`2026-10-21-workspace-9a-open-beside-and-move-into-tabs.md`, 4,401 lines,
+2026-10-21) applied on top, after its review; this plan's own review's findings are in (Rulings 3, 13, 14, 18-20). See
+Workspace for what was replayed, compiled and run. Deviations from the plan's text: (1) Ruling 3, amended after Task
+1a's review (a controller ruling; fix rounds `4fec5fb25` and `a1ff84d6f`): another view keeps showing the same text, not
+the same pixels, where the plan restored its scroll offset; a Vim view's cursor stays on its text in every mode outside
+the command line and the window scrolls the least that shows it, with `scrolloff`, a view without Vim keeps its first
+line, and a whole-text replace and its undo keep each view's line number, an insert at a view's first-line start and at
+offset 0 keeps that line on top, an edit that takes away the first shown line shows the text after the deletion, and a
+Markdown view returns from Preview to the same text; `share` enforces its preconditions, a closed view cannot be shared,
+and one put-back is queued per view per event; (2) Task 2's fix round (`fc9d4d147`): a closing view keeps the
+most-recent order, and `EditorWindow.step(int)` and the no-argument `mayClose()` are gone; (3) Task 3's fix round
+(`a6b4ff402`), following Vim (the user's rule): an uppercase mark in another view of the same file acts in the current
+window, a new view starts at the change list's end, only the editing window's place in it moves, file marks pass to the
+file's most recent other view when their view closes (`EditorTab.shutdown`, `marksHeir`), a split copies the jumplist,
+`''`, the change-list place and the window-local options, and buffer-local options (`sw`, `et`, `ts`, `sts` and the
+others) are the file's while `number`, `relativenumber` and `wrap` are the pane's, which supersedes Ruling 13's clause
+that options stay global; the Vim reference changed six rows, not two; (4) Task 4: `openRestored` passes
+`views(open).getFirst()`, as `openView` does after Task 2's fix; (5) found during execution, fixed in `e6c33c193`:
+`EditorTextView` read token lists from the text area's current document while its lines came from its own, so closing a
+view after another view's Vim edit threw a `NullPointerException` in `unshare`; it reads the tokens from its own
+document now; (6) Task 1b's `TextViewsTest` has one case more than the plan (a second view's Vim groups), and the plan's
+counts are lower than what ran (the Editor's suite has 5,223 tests, not 5,177); (7) Task 5: `docs/vim-divergences.md`
+says what Task 3 made true. Tasks 1a to 4 ran their scripts with no anchor re-found.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
