@@ -121,15 +121,31 @@ final class ViewportSync {
     /**
      * The user scrolled: the view's first line follows, and the cursor moves inside the window. While another view's
      * edit waits to put this view back on its text, or a split view waits to start where its source is, only a scroll
-     * the mouse makes (the wheel, the scroll bar) is the user's: the viewport's own moves meanwhile, its layout and the
-     * caret's scrolling, would pull the cursor onto other text, and the place that waits decides where the view goes.
+     * the user makes with the wheel or on a scroll bar counts ({@link #scrollingByHand}): the viewport's own moves
+     * meanwhile, its layout and the caret's scrolling, would pull the cursor onto other text, and the place that waits
+     * decides where the view goes.
      */
     private void userScrolled() {
         if (moving || viewport == null) return;
-        if (editor.placePending() && !(java.awt.EventQueue.getCurrentEvent() instanceof java.awt.event.MouseEvent)) return;
+        if (editor.placePending() && !scrollingByHand()) return;
         int top = topline(viewport.getViewPosition().y);
         if (top < 0 || top == editor.view().topline) return;
         editor.viewScrolled(top);
+    }
+
+    /**
+     * @return whether the event being dispatched is the user's scroll: the wheel, or the mouse on a scroll bar or one of
+     *     its parts. A window's own mouse event, before Swing hands it to the component under the mouse, counts by that
+     *     component; a click anywhere else (a tab's header) does not
+     */
+    static boolean scrollingByHand() {
+        java.awt.AWTEvent event = java.awt.EventQueue.getCurrentEvent();
+        if (event instanceof java.awt.event.MouseWheelEvent) return true;
+        if (!(event instanceof java.awt.event.MouseEvent mouse) || mouse.getComponent() == null) return false;
+        java.awt.Component target = mouse.getComponent();
+        if (!(target instanceof javax.swing.JComponent) && target instanceof java.awt.Container window)
+            target = SwingUtilities.getDeepestComponentAt(window, mouse.getX(), mouse.getY());
+        return target instanceof javax.swing.JScrollBar || SwingUtilities.getAncestorOfClass(javax.swing.JScrollBar.class, target) != null;
     }
 
     /**

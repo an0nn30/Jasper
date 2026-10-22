@@ -209,8 +209,10 @@ final class VimUndoManager extends RUndoManager {
      * line.
      *
      * @param number the line's number, which the place keeps once the whole text is replaced; -1 before
+     * @param cursor the caret's line number then, to which a Vim view's cursor goes back, as a reload puts each caret
+     *     back on its line; -1 before
      */
-    private record Place(JViewport port, Point shown, Position line, int number, int below) {
+    private record Place(JViewport port, Point shown, Position line, int number, int cursor, int below) {
         /** @return where {@code area} shows the text now, or null when it is not in a viewport */
         static Place of(RTextArea area) {
             if (!(area.getParent() instanceof JViewport port)) return null;
@@ -219,7 +221,7 @@ final class VimUndoManager extends RUndoManager {
                 int line = area.getLineOfOffset(Math.max(0, area.viewToModel2D(new Point(0, shown.y))));
                 int top = area.yForLine(line);
                 Position start = area.getDocument().createPosition(area.getLineStartOffset(line));
-                return new Place(port, shown, start, -1, top < 0 ? 0 : shown.y - top);
+                return new Place(port, shown, start, -1, -1, top < 0 ? 0 : shown.y - top);
             } catch (BadLocationException impossible) {
                 // The offsets are the document's own; Swing's own scrolling then stands.
                 return null;
@@ -227,11 +229,16 @@ final class VimUndoManager extends RUndoManager {
         }
 
         /** @return this place on the line that starts at {@code start} */
-        Place at(Position start) { return new Place(port, shown, start, number, below); }
+        Place at(Position start) { return new Place(port, shown, start, number, cursor, below); }
 
-        /** @return this place, keeping its line's number from now on: the whole text is about to be replaced */
+        /**
+         * @return this place, keeping its line's number and the caret's from now on: the whole text is about to be
+         *     replaced, and Swing's caret then goes past the text put in
+         */
         Place byNumber(RTextArea area) {
-            return number >= 0 ? this : new Place(port, shown, line, area.getDocument().getDefaultRootElement().getElementIndex(line.getOffset()), below);
+            if (number >= 0) return this;
+            int at = area.getDocument().getDefaultRootElement().getElementIndex(line.getOffset());
+            return new Place(port, shown, line, at, area.getCaretLineNumber(), below);
         }
 
         /** @return the viewport position that shows the place's line where it was shown, wherever the line is now */
@@ -358,6 +365,9 @@ final class VimUndoManager extends RUndoManager {
 
     /** @return whether more than one text area shows the document */
     boolean shared() { return views.size() > 1; }
+
+    /** Its text area shows another document with that document's history from now on: nothing here listens to it. */
+    void abandon() { for (View each : views) each.close(); }
 
     /**
      * {@code area} stops showing the document. Its open steps end here, and {@code swap}, which gives it a document of
@@ -606,7 +616,8 @@ final class VimUndoManager extends RUndoManager {
      * scrolls a view's moved caret into sight later, through the event queue, after each edit of the event; the put-back
      * runs after everything the event queued ({@link #queue}), its later edits' scrolling among it, and only the last
      * one queued puts the view back. A view that does not show queues nothing: its place waits, and it is put back once
-     * it shows, so that nothing lays out its text while another view is typed in.
+     * it shows, so that the put-back lays out none of its text while another view is typed in. Swing's caret still lays
+     * out a hidden view whose caret an edit moves, one whose caret is below the edits, to scroll it into sight.
      */
     private void release(View acting) {
         AWTEvent now = EventQueue.getCurrentEvent();
@@ -645,7 +656,7 @@ final class VimUndoManager extends RUndoManager {
         RTextArea area = other.area;
         if (area.getParent() != place.port()) return;
         Point position = place.now(area);
-        if (area instanceof VimTextArea text) text.keepPlace(position);
+        if (area instanceof VimTextArea text) text.keepPlace(position, place.cursor());
         else place.port().setViewPosition(position);
     }
 

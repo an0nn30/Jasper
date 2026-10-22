@@ -391,6 +391,20 @@ public final class VimEditor {
     /** @return whether a split view's start or another view's edit waits to place this view's window */
     boolean placePending() { return start != null || area.placeHeld(); }
 
+    /**
+     * Another view replaced the whole text, and Swing's caret went past what it put in: the cursor goes back to the start
+     * of {@code line}, or of the last line when the text is shorter, as a reload puts it back on its line.
+     *
+     * @param line the cursor's line before the replace, 0-based
+     */
+    void cursorToLine(int line) {
+        boolean was = busy;
+        busy = true;
+        try { setCursor(new Pos(Math.min(line, buffer.count() - 1), 0)); }
+        finally { busy = was; }
+        curswant = -1;
+    }
+
     /** The viewport's size changed the view's: outside a command, the view scrolls to keep the cursor shown. */
     void viewResized() {
         // The constructor sizes the view before it has its viewport sync.

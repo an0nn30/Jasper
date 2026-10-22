@@ -433,8 +433,9 @@ class VimUndoManagerTest {
 
     /**
      * A view that does not show, as one in a tab that is not shown, lays nothing out while another view edits, however
-     * many edits: its place waits, and it is put back on its text once it shows. {@code hide} and {@code show} take the
-     * view's pane out of sight and back, given the pane and the realized holder it is in.
+     * many edits: its place waits, and it is put back on its text once it shows. Its caret is above the edits, which
+     * leaves it where it is: Swing's caret lays out a view whose caret an edit moves. {@code hide} and {@code show} take
+     * the view's pane out of sight and back, given the pane and the realized holder it is in.
      */
     private static void hiddenWhileAnotherEdits(java.util.function.BiConsumer<JScrollPane, javax.swing.JPanel> hide,
                                                 java.util.function.BiConsumer<JScrollPane, javax.swing.JPanel> show) throws Exception {
@@ -660,6 +661,30 @@ class VimUndoManagerTest {
         });
     }
 
+    /** @return how many of the undo histories' views listen to {@code area}'s place in the window */
+    private static long viewListeners(VimTextArea area) {
+        return Arrays.stream(area.getHierarchyListeners())
+            .filter(listener -> listener.getClass().getName().startsWith(VimUndoManager.class.getName() + "$View")).count();
+    }
+
+    /**
+     * A text area that shares another's document drops the history it was made with, which nothing else uses: one view
+     * of the shared history listens to it, before and after it lets go.
+     */
+    @Test void anAreaThatSharesADocumentListensForItsOneHistory() throws Exception {
+        onEdt(() -> {
+            var a = new VimTextArea();
+            var b = new VimTextArea();
+            assertThat(viewListeners(b)).as("its own history").isEqualTo(1);
+            b.share(a);
+            assertThat(viewListeners(b)).as("the shared history only").isEqualTo(1);
+            assertThat(viewListeners(a)).isEqualTo(1);
+            b.unshare();
+            assertThat(viewListeners(b)).as("a history of its own again").isEqualTo(1);
+            assertThat(viewListeners(a)).isEqualTo(1);
+        });
+    }
+
     /** The history made before a document's second view opens is undoable from the new view. */
     @Test void theHistoryBeforeASecondViewIsUndoableFromIt() throws Exception {
         onEdt(() -> {
@@ -811,6 +836,120 @@ class VimUndoManagerTest {
             assertThat(v.get().cursorShown()).as("in sight").isTrue();
             assertThat(editor.mode()).isEqualTo(Mode.INSERT);
         });
+    }
+
+    /**
+     * A click elsewhere, a tab's header say, whose handler edits above a Vim view's window and lays the view out before
+     * its put-back, is not the user's scroll of that view: only the wheel or the mouse on a scroll bar is. The cursor
+     * stays on its text.
+     */
+    @Test void aClickElsewhereIsNotTheUsersScrollOfAVimViewWaitingToBePutBack() throws Exception {
+        var v = new AtomicReference<VimViews>();
+        onEdt(() -> {
+            v.set(vimViews());
+            type(v.get().editor(), "560Gzt570G");
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var header = new javax.swing.JLabel("tab");
+            header.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override public void mousePressed(java.awt.event.MouseEvent event) {
+                    var other = v.get().other();
+                    other.select(lineStart(other, 9), lineStart(other, 309));
+                    other.replaceSelection("");
+                    v.get().port().doLayout();
+                }
+            });
+            Toolkit.getDefaultToolkit().getSystemEventQueue().postEvent(new java.awt.event.MouseEvent(header,
+                java.awt.event.MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), java.awt.event.InputEvent.BUTTON1_DOWN_MASK,
+                5, 5, 1, false, java.awt.event.MouseEvent.BUTTON1));
+        });
+        onEdt(() -> { });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(top(v.get().shown())).as("the view shows the same text").isEqualTo("line 560");
+            assertThat(line(v.get().shown(), v.get().editor().cursor().line)).as("the cursor stays on its text").isEqualTo("line 570");
+        });
+    }
+
+    /**
+     * A press on a Vim view's scroll bar while its put-back waits is the user's scroll: Vim's window follows it, and the
+     * put-back leaves the view there.
+     */
+    @Test void aScrollBarPressOnAVimViewWaitingToBePutBackIsFollowedByVim() throws Exception {
+        var v = new AtomicReference<VimViews>();
+        var after = new int[1];
+        onEdt(() -> {
+            v.set(vimViews());
+            type(v.get().editor(), "300Gzt");
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var other = v.get().other();
+            other.setCaretPosition(lineStart(other, 50));
+            other.replaceSelection("new\n".repeat(100));
+            var bar = ((JScrollPane) v.get().port().getParent()).getVerticalScrollBar();
+            int y = bar.getHeight() - 2;
+            var queue = Toolkit.getDefaultToolkit().getSystemEventQueue();
+            queue.postEvent(new java.awt.event.MouseEvent(bar, java.awt.event.MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(),
+                java.awt.event.InputEvent.BUTTON1_DOWN_MASK, bar.getWidth() / 2, y, 1, false, java.awt.event.MouseEvent.BUTTON1));
+            queue.postEvent(new java.awt.event.MouseEvent(bar, java.awt.event.MouseEvent.MOUSE_RELEASED, System.currentTimeMillis(),
+                0, bar.getWidth() / 2, y, 1, false, java.awt.event.MouseEvent.BUTTON1));
+            SwingUtilities.invokeLater(() -> after[0] = v.get().port().getViewPosition().y);
+        });
+        onEdt(() -> { });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var shown = v.get().shown();
+            assertThat(after[0]).as("the press scrolled the view").isGreaterThan(yFor(shown, 299));
+            assertThat(v.get().port().getViewPosition().y).as("the put-back leaves it there").isEqualTo(after[0]);
+            int top;
+            try { top = shown.getLineOfOffset(shown.viewToModel2D(new Point(0, after[0]))) + 1; }
+            catch (BadLocationException bad) { throw new AssertionError(bad); }
+            assertThat(v.get().editor().view().topline).as("Vim's window follows the press").isBetween(top, top + 1);
+        });
+    }
+
+    /**
+     * Select All then paste in another view replaces the whole text: a Vim view's cursor keeps its line's number, as a
+     * reload keeps it, and its window shows it by Vim's rule, whether the view shows meanwhile or not ({@code hidden}).
+     */
+    private static void wholeReplaceKeepsTheVimCursorsLine(boolean hidden) throws Exception {
+        var v = new AtomicReference<VimViews>();
+        onEdt(() -> {
+            v.set(vimViews());
+            var holder = new javax.swing.JPanel(null);
+            holder.add(v.get().port().getParent());
+            holder.addNotify();
+            type(v.get().editor(), "300Gzt310G");
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            if (hidden) v.get().port().getParent().setVisible(false);
+            var other = v.get().other();
+            StringBuilder rows = new StringBuilder();
+            for (int i = 1; i <= 600; i++) rows.append("row ").append(i).append('\n');
+            other.selectAll();
+            other.replaceSelection(rows.toString());
+        });
+        onEdt(() -> { });
+        onEdt(() -> { if (hidden) v.get().port().getParent().setVisible(true); });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var shown = v.get().shown();
+            assertThat(shown.getText()).startsWith("row 1\n");
+            assertThat(line(shown, v.get().editor().cursor().line)).as("the cursor keeps its line's number").isEqualTo("row 310");
+            assertThat(top(shown)).as("and the window its first line").isEqualTo("row 300");
+            assertThat(v.get().cursorShown()).isTrue();
+        });
+    }
+
+    @Test void aWholeReplaceInAnotherViewKeepsAVimCursorOnItsLineNumber() throws Exception {
+        wholeReplaceKeepsTheVimCursorsLine(false);
+    }
+
+    @Test void aWholeReplaceInAnotherViewKeepsAHiddenVimCursorOnItsLineNumber() throws Exception {
+        wholeReplaceKeepsTheVimCursorsLine(true);
     }
 
     /** The window that scrolls to an edited-away cursor keeps 'scrolloff' lines below it, as Vim's update_topline does. */

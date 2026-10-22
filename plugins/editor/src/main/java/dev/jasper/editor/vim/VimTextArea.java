@@ -73,13 +73,28 @@ public class VimTextArea extends RSyntaxTextArea {
      *
      * @param position the viewport position to show
      */
-    public void keepPlace(java.awt.Point position) {
+    public void keepPlace(java.awt.Point position) { keepPlace(position, -1); }
+
+    /**
+     * As {@link #keepPlace(java.awt.Point)}, after another view replaced the whole text: with Vim on, the cursor goes
+     * back to the start of {@code cursorLine} first, as a reload puts each caret back on its line, and the window then
+     * shows it by Vim's rule.
+     *
+     * @param position the viewport position to show
+     * @param cursorLine the line the Vim cursor goes back to, 0-based (the last line when the text is shorter); -1 leaves
+     *     it where it is
+     */
+    void keepPlace(java.awt.Point position, int cursorLine) {
         if (!(getParent() instanceof JViewport port)) return;
         // The lines an edit added must be laid out before a line below the old end can be shown (a view in a hidden
         // tab is not laid out by itself), or the scroll pane would pull the view back.
         if (getHeight() < getPreferredSize().height) port.doLayout();
-        if (vim != null) vim.keepPlace(position);
-        else port.setViewPosition(position);
+        if (vim == null) {
+            port.setViewPosition(position);
+            return;
+        }
+        if (cursorLine >= 0) vim.cursorToLine(cursorLine);
+        vim.keepPlace(position);
     }
 
     /** From now on the area edits the document whenever it gains the focus, as one of several views of it. */
@@ -107,6 +122,8 @@ public class VimTextArea extends RSyntaxTextArea {
         history.join(this);
         other.followFocus();
         followFocus();
+        // The history the area was made with is dropped: nothing of it listens to the area any more.
+        undo.abandon();
         // setDocument's discardAllEdits empties this area's own history, then createUndoManager hands it the shared one.
         undo = history;
         setDocument(other.getDocument());

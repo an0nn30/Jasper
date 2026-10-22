@@ -443,6 +443,32 @@ class EditorViewsTest {
         assertThat(first.area().getCaretLineNumber()).isZero();
     }
 
+    /**
+     * A closing view's uppercase marks go to the file's view active last that has Vim: the view before it in that order,
+     * whose Vim has stopped (as a view's does once it shuts down in a batch close), is passed over for a later one.
+     */
+    @Test void aClosedViewsUppercaseMarkPassesOverAViewWithoutVim() throws Exception {
+        vimOn();
+        EditorTab first = opened(file("heir.txt", "1\n2\n3\n4\n"));
+        EditorTab second = split(TabPlacement.SPLIT_RIGHT);
+        EditorTab third = split(TabPlacement.SPLIT_DOWN);
+        EditorTab fourth = split(TabPlacement.SPLIT_DOWN);
+        EditorTab other = opened(file("two.txt", "two\n"));
+        vimKeys(fourth, "3GmA");
+        // Active last first, among the file's views but the fourth: the second, the third, then the first.
+        handle(0).select();
+        handle(2).select();
+        handle(1).select();
+        handle(4).select();
+        second.vim(java.util.Optional.empty());
+        assertThat(second.vimEditor()).isEmpty();
+        window.closeTab(fourth);
+        vimKeys(other, "'A");
+        assertThat(window.selected()).as("the view active last with Vim, not the file's first").containsSame(third);
+        assertThat(third.area().getCaretLineNumber()).isEqualTo(2);
+        assertThat(first.area().getCaretLineNumber()).isZero();
+    }
+
     /** {@code :q!} in a view another view of its file shows closes that view alone, and the other keeps the file's changes. */
     @Test void quitBangInAViewThatIsNotTheFilesLastKeepsItsChangesInTheOther() throws Exception {
         vimOn();
