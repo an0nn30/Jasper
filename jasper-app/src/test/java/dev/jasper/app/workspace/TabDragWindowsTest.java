@@ -1087,6 +1087,42 @@ class TabDragWindowsTest {
         });
     }
 
+    /**
+     * Pane flexibility spec 5 and workspace plan 9a Rulings 15: the dragged entry resting on another window's entry shows
+     * that tab there, so a pane of it takes the drop; a drag that ends over no target after a spring shows the tab that
+     * showed there before.
+     */
+    @Test void restingOnAnotherWindowsEntryShowsItsTabThereForTheDrop() throws Exception {
+        ParentTabId[] ids = new ParentTabId[3];
+        edt(() -> {
+            ids[0] = child.content().activeParentTab();
+            ids[1] = secondTab(child);
+            ids[2] = secondTab(main);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            TabDrag drag = manager.tabDrag();
+            Tab hidden = entryOf(to, ids[0]);
+            Point rest = onEntry(to, hidden, 0.5);
+            Component source = start(from, entryOf(from, ids[2]), rest);
+            elapse(drag);
+            assertThat(to.activeParentTab()).as("its tab shows there at once").isEqualTo(ids[0]);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onTitleBar(frameOf(child)));
+            mouse(source, MouseEvent.MOUSE_RELEASED, onTitleBar(frameOf(child)));
+            assertThat(to.activeParentTab()).as("over no target: the tab that showed before").isEqualTo(ids[1]);
+            source = start(from, entryOf(from, ids[2]), rest);
+            elapse(drag);
+            Point right = inside(pane(to, hidden.group().orElseThrow()), 0.9, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, right);
+            assertThat(drag.target()).contains(new TabDrag.Target.Into(to, hidden.group().orElseThrow(), Side.RIGHT));
+            mouse(source, MouseEvent.MOUSE_RELEASED, right);
+            assertThat(to.activeParentTab()).as("the tab it joined").isEqualTo(ids[0]);
+            assertThat(to.workspace().tabs()).hasSize(2).startsWith(hidden);
+            assertThat(tabIds(from)).as("its entry went").hasSize(1).doesNotContain(ids[2]);
+        });
+    }
+
     /** Every pane id of {@code window}'s tabs. */
     private static java.util.Set<GroupId> groupIds(WindowContent window) {
         var ids = new java.util.HashSet<GroupId>();

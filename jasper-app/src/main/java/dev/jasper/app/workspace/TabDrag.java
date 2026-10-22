@@ -40,6 +40,7 @@ import javax.swing.AbstractButton;
 import javax.swing.JLayeredPane;
 import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.text.JTextComponent;
 
 /**
@@ -62,9 +63,12 @@ import javax.swing.text.JTextComponent;
  * once on the release; a window whose strip hides (the standard look's one tab) takes it at its end over the band its
  * strip takes when it shows, and the main window's empty workspace, which has no panes, anywhere over it, in its place.
  * Over a pane of a window's shown tab other than the dragged tab's own, beside that pane on the side whose edge the
- * cursor is nearest, every pane of the tab as one nested split (pane flexibility spec 5); the drag's own window shows the
- * dragged tab, so its other tabs' panes take it once spring-loading shows one. Anywhere else in that window (its dock,
- * chrome or title bar), and over any other window of Jasper's (Settings, About, a dialog), nothing; outside every window,
+ * cursor is nearest, every pane of the tab as one nested split (pane flexibility spec 5). Spring-loading shows the tabs
+ * whose panes take it: the entry resting on another tab's entry of a strip, any window's, for {@link #SPRING_DELAY} ms,
+ * within {@link #SPRING_SLOP} px of where it came to rest, shows that tab at once, as a pane drag's hover does, so in the
+ * drag's own window, which shows the dragged tab, its other tabs' panes take it too. Anywhere else in that window (its
+ * dock, chrome or title bar), and over any other window of Jasper's (Settings, About, a dialog), nothing; outside every
+ * window,
  * a new full window the size of the tab's workspace, with the entry
  * where the cursor holds it and kept on the display under the cursor, except for a window's only tab (a full window's
  * already is its own; workspace plan 8a Rulings 6). A tab holding an item that is pinned (a modal owner holds it in its
@@ -139,6 +143,12 @@ final class TabDrag {
     /** How far right of and below the cursor the label's corner sits, so no window is ever under the pointer's tip. */
     static final int LABEL_OFFSET = 8;
 
+    /** How long the dragged entry rests on another tab's entry before that tab shows, in ms: macOS's spring-loading delay. */
+    static final int SPRING_DELAY = 500;
+
+    /** How far the cursor may move, in pixels at scale 1, while the entry still rests (pane flexibility spec 5). */
+    static final int SPRING_SLOP = 4;
+
     /** The keys a mouse event may hold besides its buttons: a pane's press holds its modifier of them and no other. */
     private static final int KEYS = InputEvent.SHIFT_DOWN_MASK | InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK
         | InputEvent.META_DOWN_MASK | InputEvent.ALT_GRAPH_DOWN_MASK;
@@ -193,6 +203,16 @@ final class TabDrag {
     private final Map<WindowContent, ParentTabId> hovered = new LinkedHashMap<>();
     /** The text view whose text drag sits out the gesture, while it does (workspace plan 8c Rulings 16). */
     private JTextComponent textDrag;
+    /**
+     * The spring-loading wait (pane flexibility spec 5; workspace plan 9a Rulings 15), which shows {@link #springTab} of
+     * {@link #springWindow} when it runs out. A test seam too: tests give it a delay they never reach and fire it
+     * themselves, as no test sleeps.
+     */
+    final Timer spring = new Timer(SPRING_DELAY, event -> sprung());
+    /** While the wait runs: the window whose strip holds the entry the dragged one rests on, that entry's tab, where it came to rest. */
+    private WindowContent springWindow;
+    private ParentTabId springTab;
+    private Point springAt;
 
     /**
      * @param windows the windows a drag can reach, the most recently active first; what leaves its window goes through
@@ -200,6 +220,7 @@ final class TabDrag {
      */
     TabDrag(Supplier<List<WindowContent>> windows) {
         this.windows = Objects.requireNonNull(windows, "windows");
+        spring.setRepeats(false);
     }
 
     /** @return whether a drag runs: from the threshold to its release or its end */
@@ -543,7 +564,66 @@ final class TabDrag {
             // Outside every window of Jasper's: a full window.
             target = Optional.of(new Target.TearOut(tearOutBounds(at), new Point(at)));
         }
+        // Spring-loading: the entry resting on another tab's entry shows that tab (pane flexibility spec 5).
+        spring(stays || under.isEmpty() ? null : open.get(under.getAsInt()), at);
         showLanding();
+    }
+
+    /**
+     * Spring-loading (pane flexibility spec 5; workspace plan 9a Rulings 15): while the dragged entry rests on the entry of
+     * another tab of {@code window}'s strip, within {@link #SPRING_SLOP} of where it came to rest, the wait runs, and when
+     * it runs out that tab shows ({@link #sprung}); moving past the slop or onto another entry starts it again, and
+     * anywhere else stops it. Never over the dragged tab's own entry or a tab that shows, and never for {@code window}
+     * null: a tab that moves along its strip only, or the cursor outside every window.
+     */
+    private void spring(WindowContent window, Point at) {
+        ParentTabId over = window == null ? null : entryUnder(window, at);
+        if (over == null || over.equals(parentTab) || window.activeParentTab().equals(over)) {
+            stopSpring();
+            return;
+        }
+        if (window == springWindow && over.equals(springTab) && at.distance(springAt) <= UIScale.scale(SPRING_SLOP)) return;
+        springWindow = window;
+        springTab = over;
+        springAt = new Point(at);
+        spring.restart();
+    }
+
+    /** The tab whose entry in {@code window}'s shown strip is under {@code at}, on screen; null off the entries. */
+    private static ParentTabId entryUnder(WindowContent window, Point at) {
+        Component strip = window.tabBar().component();
+        if (!strip.isVisible()) return null;
+        Point inStrip = new Point(at);
+        SwingUtilities.convertPointFromScreen(inStrip, strip);
+        if (!new Rectangle(strip.getSize()).contains(inStrip)) return null;
+        List<Rectangle> entries = window.tabBar().tabBounds();
+        List<Tab> listed = window.parentTabs().bar().tabs();
+        for (int i = 0; i < Math.min(entries.size(), listed.size()); i++) {
+            Rectangle entry = entries.get(i);
+            if (inStrip.x >= entry.x && inStrip.x < entry.x + entry.width) return window.parentTabs().bar().id(listed.get(i));
+        }
+        return null;
+    }
+
+    /**
+     * The wait ran out: the tab under the resting entry shows at once, its panes taking the drop, as a pane drag's hover
+     * shows one ({@link #hover}: its active item focused in the drag's own window, the tab that showed before kept to show
+     * again when the drag ends elsewhere). Nothing once the drag has ended or the window or the tab has gone.
+     */
+    private void sprung() {
+        WindowContent window = springWindow;
+        ParentTabId id = springTab;
+        stopSpring();
+        if (!dragging || pane || window == null || window.closed() || window.parentTabs().view(id).isEmpty()) return;
+        hover(window, id);
+    }
+
+    /** The spring-loading wait stops, and no entry rests. */
+    private void stopSpring() {
+        spring.stop();
+        springWindow = null;
+        springTab = null;
+        springAt = null;
     }
 
     /**
@@ -771,6 +851,7 @@ final class TabDrag {
         size = null;
         target = Optional.empty();
         pane = false;
+        stopSpring();
         if (closing != null) {
             closing.close();
             closing = null;

@@ -36,8 +36,13 @@ final class TabDragTestSupport {
 
     private TabDragTestSupport() { }
 
-    /** {@code window} in a stand-in frame at {@code x}, {@code y} on the pretend screen, {@code width} by {@code height}, laid out. */
+    /**
+     * {@code window} in a stand-in frame at {@code x}, {@code y} on the pretend screen, {@code width} by {@code height},
+     * laid out. Its tab drag never springs by itself ({@link #neverSprings}): a test that springs a tab ends the wait
+     * with {@link #elapse}.
+     */
     static JPanel frame(WindowContent window, int x, int y, int width, int height) {
+        neverSprings(window.tabDrag());
         var root = new JRootPane();
         root.setContentPane(window);
         var frame = new JPanel(new BorderLayout());
@@ -202,5 +207,19 @@ final class TabDragTestSupport {
     /** As {@link #startPane}, then releases at the last point. */
     static void dropPane(WindowContent window, Tab item, Point... path) {
         mouse(startPane(window, item, path), MouseEvent.MOUSE_RELEASED, path[path.length - 1], PANE);
+    }
+
+    /**
+     * Gives {@code drag}'s spring-loading wait (pane flexibility spec 5) a delay no test reaches, so that only
+     * {@link #elapse} ends it: no test sleeps.
+     */
+    static void neverSprings(TabDrag drag) { drag.spring.setInitialDelay(3_600_000); }
+
+    /** The spring-loading wait running out, as its timer fires; it must be running. */
+    static void elapse(TabDrag drag) {
+        if (!drag.spring.isRunning()) throw new AssertionError("the spring-loading wait does not run");
+        drag.spring.stop();
+        for (var listener : drag.spring.getActionListeners())
+            listener.actionPerformed(new java.awt.event.ActionEvent(drag.spring, java.awt.event.ActionEvent.ACTION_PERFORMED, null));
     }
 }

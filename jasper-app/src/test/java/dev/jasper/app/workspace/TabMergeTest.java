@@ -22,11 +22,16 @@ import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import java.awt.Component;
 import java.awt.KeyboardFocusManager;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import javax.swing.JComponent;
+import javax.swing.JLayeredPane;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -78,6 +83,13 @@ class TabMergeTest {
             owner.selectTab(b);
             frame = frame(owner, 100, 50, 1208, 760);
         });
+    }
+
+    /** Esc pressed and let go: whether the drag took its press. */
+    private boolean esc() {
+        boolean taken = keys.send(new KeyEvent(owner, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
+        keys.send(new KeyEvent(owner, KeyEvent.KEY_RELEASED, 0, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
+        return taken;
     }
 
     /** A drag that outlived its test would keep its listeners into the next test of this JVM. */
@@ -187,6 +199,244 @@ class TabMergeTest {
                 .containsExactly(new TerminalEvent.TabSelected(owner.id(), d.id().value()));
             assertThat(List.of(c, d)).noneMatch(Tab::closed);
             assertThat(d.window()).isEqualTo(owner.id());
+        });
+    }
+
+    /**
+     * Pane flexibility spec 5 and workspace plan 9a Rulings 15: the dragged entry resting on another tab's entry waits,
+     * the reorder marker as before; when the wait ends that tab shows at once, its active item focused, and a drop beside
+     * one of its panes moves every pane of the dragged tab there as one nested split, announced once where it lands.
+     */
+    @Test void restingOnAnotherEntryShowsItsTabAndAPaneOfItTakesTheDraggedTab() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Point rest = onEntry(owner, d, 0.6);
+            Component source = start(owner, b, rest);
+            assertThat(drag.spring.isRunning()).as("the wait runs").isTrue();
+            assertThat(owner.activeParentTab()).as("not before it ends").isEqualTo(first);
+            assertThat(drag.target()).as("the reorder marker as before").contains(new TabDrag.Target.Bar(owner, 1));
+            elapse(drag);
+            assertThat(owner.activeParentTab()).as("its tab shows at once").isEqualTo(second);
+            assertThat(owner.selectedTab()).as("its active item focused, as Select Tab focuses it").isSameAs(d);
+            assertThat(drag.active()).as("the drag runs on").isTrue();
+            Point right = inside(pane(owner, d.group().orElseThrow()), 0.9, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, right);
+            assertThat(drag.spring.isRunning()).as("off the entries the wait stops").isFalse();
+            assertThat(drag.target()).contains(new TabDrag.Target.Into(owner, d.group().orElseThrow(), Side.RIGHT));
+            facts.clear();
+            mouse(source, MouseEvent.MOUSE_RELEASED, right);
+            assertThat(ids()).as("its entry goes").containsExactly(second, third);
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+            assertThat(PaneDragTest.shape(owner)).as("beside d, as one nested split").isEqualTo("V[c, H[d, a, b]]");
+            assertThat(owner.selectedTab()).as("the moved tab's active pane has the focus").isSameAs(b);
+            assertThat(announced()).as("announced once, where it lands")
+                .containsExactly(new TerminalEvent.TabSelected(owner.id(), b.id().value()));
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 15: no wait over the dragged tab's own entry; within a few pixels the entry still rests;
+     * off the entries the wait stops; another entry's wait shows that tab; and the tab that shows waits for nothing.
+     */
+    @Test void theWaitRunsOnlyWhileTheEntryRestsOnAnotherTabsEntry() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Component source = start(owner, b, onEntry(owner, b, 0.3));
+            assertThat(drag.spring.isRunning()).as("over its own entry").isFalse();
+            Point rest = onEntry(owner, d, 0.6);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, rest);
+            assertThat(drag.spring.isRunning()).isTrue();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(rest.x + 2, rest.y + 1));
+            assertThat(drag.spring.isRunning()).as("within a few pixels it still rests").isTrue();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, inside(pane(owner, a.group().orElseThrow()), 0.5, 0.5));
+            assertThat(drag.spring.isRunning()).as("off the entries it stops").isFalse();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onEntry(owner, e, 0.6));
+            elapse(drag);
+            assertThat(owner.activeParentTab()).as("the entry it rests on now").isEqualTo(third);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onEntry(owner, e, 0.7));
+            assertThat(drag.spring.isRunning()).as("over the tab that shows").isFalse();
+        });
+    }
+
+    /**
+     * Pane flexibility spec 5: Esc, a release over no target, a lost release and focus loss after a spring bring back the
+     * tab that showed before, its item focused; nothing moves.
+     */
+    @Test void aDragEndingWithoutADropAfterASpringShowsTheTabThatShowedBefore() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Point rest = onEntry(owner, d, 0.6);
+            Component source = start(owner, b, rest);
+            elapse(drag);
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+            assertThat(esc()).isTrue();
+            assertThat(owner.activeParentTab()).as("after Esc").isEqualTo(first);
+            assertThat(owner.selectedTab()).isSameAs(b);
+            mouse(source, MouseEvent.MOUSE_RELEASED, rest);
+            source = start(owner, b, rest);
+            elapse(drag);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onTitleBar(frame));
+            mouse(source, MouseEvent.MOUSE_RELEASED, onTitleBar(frame));
+            assertThat(owner.activeParentTab()).as("after a release over no target").isEqualTo(first);
+            start(owner, b, rest);
+            elapse(drag);
+            broadcast(new MouseEvent(owner.workspace(), MouseEvent.MOUSE_MOVED, 0, 0, 5, 5, 0, false, MouseEvent.NOBUTTON));
+            assertThat(drag.active()).isFalse();
+            assertThat(owner.activeParentTab()).as("after a lost release").isEqualTo(first);
+            source = start(owner, b, rest);
+            elapse(drag);
+            owner.setActive(false);
+            assertThat(drag.active()).isFalse();
+            assertThat(owner.activeParentTab()).as("after focus loss").isEqualTo(first);
+            mouse(source, MouseEvent.MOUSE_RELEASED, rest);
+            assertThat(ids()).as("nothing moved").containsExactly(first, second, third);
+            assertThat(PaneDragTest.shape(owner)).isEqualTo("H[a, b]");
+        });
+    }
+
+    /** Workspace plan 9a Rulings 7 and 15: a tab with a dialog open in a pane springs nothing; its strip still takes it. */
+    @Test void aTabThatMovesAlongItsStripOnlySpringsNothing() throws Exception {
+        edt(() -> {
+            var held = a.pin();
+            try {
+                Point rest = onEntry(owner, d, 0.6);
+                Component source = start(owner, b, rest);
+                assertThat(owner.tabDrag().spring.isRunning()).as("no wait").isFalse();
+                assertThat(owner.tabDrag().target()).as("its strip takes it").contains(new TabDrag.Target.Bar(owner, 1));
+                mouse(source, MouseEvent.MOUSE_RELEASED, rest);
+                assertThat(ids()).as("reordered, as before").containsExactly(second, first, third);
+            } finally {
+                held.close();
+            }
+        });
+    }
+
+    /** Pane flexibility spec 5: a reorder after a spring is a reorder, as before; the dragged tab shows again, its item focused. */
+    @Test void aReorderAfterASpringShowsTheDraggedTabAgain() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            Point rest = onEntry(owner, d, 0.6);
+            Component source = start(owner, b, rest);
+            elapse(drag);
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+            mouse(source, MouseEvent.MOUSE_RELEASED, rest);
+            assertThat(ids()).as("reordered").containsExactly(second, first, third);
+            assertThat(owner.activeParentTab()).as("the dragged tab shows again").isEqualTo(first);
+            assertThat(owner.selectedTab()).isSameAs(b);
+        });
+    }
+
+    /** Workspace plan 9a Rulings 15: Esc while the wait runs stops it, and nothing shows. */
+    @Test void escWhileTheWaitRunsStopsItAndShowsNothing() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            start(owner, b, onEntry(owner, d, 0.6));
+            assertThat(drag.spring.isRunning()).isTrue();
+            assertThat(esc()).isTrue();
+            assertThat(drag.spring.isRunning()).as("Esc stops the wait").isFalse();
+            assertThat(owner.activeParentTab()).isEqualTo(first);
+        });
+    }
+
+    /** Workspace plan 9a Rulings 15: a drag's wait is macOS's spring-loading delay, run once; only tests shorten it. */
+    @Test void aDragWaitsMacOsSpringLoadingDelayOnce() throws Exception {
+        edt(() -> {
+            var drag = new TabDrag(List::of);
+            assertThat(drag.spring.getInitialDelay()).isEqualTo(TabDrag.SPRING_DELAY).isEqualTo(500);
+            assertThat(drag.spring.isRepeats()).isFalse();
+            assertThat(owner.tabDrag().spring.getInitialDelay()).as("a framed window's drag never springs by itself")
+                .isGreaterThan(60_000);
+        });
+    }
+
+    /**
+     * Workspace plan 9a Rulings 12 and 15 (Task 6's review): a drop on a pane of a tab that spring-loading showed in the
+     * drag's own window, whose merge fails, leaves both tabs exactly as they were, the dragged tab shows again with its
+     * item focused, and the failure propagates; the next drag merges it.
+     */
+    @Test void aMergeThatFailsAfterASpringLeavesBothTabsAsTheyWereAndShowsTheDraggedTabAgain() throws Exception {
+        edt(() -> {
+            var refusing = new PaneDragTest.Refusing();
+            Tab notes = view("notes", refusing, TabRegistry.Placement.NEW_TAB);
+            Tab more = view("more", TabRegistry.Placement.SPLIT_RIGHT);
+            owner.selectTab(notes);
+            relayout(frame);
+            ParentTabId own = owner.parentTabOf(notes).orElseThrow();
+            WorkspaceView moving = owner.parentTabs().view(own).orElseThrow(), target = owner.parentTabs().view(second).orElseThrow();
+            var before = owner.windowLayout();
+            Layout movingBefore = moving.model(), targetBefore = target.model();
+            TabDrag drag = owner.tabDrag();
+            Point rest = onEntry(owner, d, 0.6);
+            Component source = start(owner, notes, rest);
+            elapse(drag);
+            assertThat(owner.activeParentTab()).isEqualTo(second);
+            Point right = inside(pane(owner, d.group().orElseThrow()), 0.9, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, right);
+            assertThat(drag.target()).contains(new TabDrag.Target.Into(owner, d.group().orElseThrow(), Side.RIGHT));
+            facts.clear();
+            refusing.armed = true;
+            assertThatThrownBy(() -> mouse(source, MouseEvent.MOUSE_RELEASED, right)).as("the failure propagates")
+                .hasMessage("refused");
+            assertThat(drag.active()).isFalse();
+            assertThat(drag.overlay().getParent()).as("the landing goes").isNull();
+            assertThat(owner.activeParentTab()).as("the dragged tab shows again").isEqualTo(own);
+            assertThat(owner.selectedTab()).as("its item focused").isSameAs(notes);
+            assertThat(owner.windowLayout()).as("the window's tabs as they were").isEqualTo(before);
+            assertThat(owner.parentTabs().view(own)).as("its workspace stays").containsSame(moving);
+            assertThat(moving.model()).as("the dragged tab exactly as it was").isEqualTo(movingBefore);
+            assertThat(target.model()).as("the target exactly as it was").isEqualTo(targetBefore);
+            assertThat(refusing.getParent()).as("back in its pane").isSameAs(moving.groupView(notes.group().orElseThrow()));
+            assertThat(more.component().getParent()).as("in its pane").isSameAs(moving.groupView(more.group().orElseThrow()));
+            assertThat(target.contains(notes) || target.contains(more)).as("the target holds neither").isFalse();
+            assertThat(List.of(notes, more)).noneMatch(Tab::closed);
+            assertThat(announced()).as("nothing moved or closed")
+                .noneMatch(fact -> fact instanceof TerminalEvent.TabMoved || fact instanceof TerminalEvent.TabClosed);
+            drawsInOrder("b", "d", "e", "notes");
+            Component again = start(owner, notes, rest);
+            elapse(drag);
+            mouse(again, MouseEvent.MOUSE_DRAGGED, right);
+            mouse(again, MouseEvent.MOUSE_RELEASED, right);
+            assertThat(owner.parentTabOf(notes)).as("once it lands").contains(second);
+            assertThat(ids()).containsExactly(first, second, third);
+            assertThat(PaneDragTest.shape(owner)).isEqualTo("V[c, H[d, notes, more]]");
+        });
+    }
+
+    /**
+     * Pane flexibility spec 5 and workspace plan 9a Rulings 14 and 15 (Task 6's review): after a spring in the drag's own
+     * window, a pane of the tab that shows takes the dragged tab, its landing that pane's half on the nearest side, in
+     * that window's layered pane; leaving the pane, Esc and the release each take the landing away.
+     */
+    @Test void aPaneOfASprungTabShowsTheLandingInTheDragsOwnWindow() throws Exception {
+        edt(() -> {
+            TabDrag drag = owner.tabDrag();
+            JLayeredPane layers = SwingUtilities.getRootPane(owner).getLayeredPane();
+            Point rest = onEntry(owner, d, 0.6);
+            Component source = start(owner, b, rest);
+            elapse(drag);
+            GroupView under = owner.workspace().groupView(d.group().orElseThrow());
+            Rectangle half = SwingUtilities.convertRectangle(under, new Rectangle(0, 0, under.getWidth() / 2, under.getHeight()), layers);
+            Point left = inside(pane(owner, under.id()), 0.1, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, left);
+            assertThat(drag.target()).contains(new TabDrag.Target.Into(owner, under.id(), Side.LEFT));
+            assertThat(drag.overlay().getParent()).as("the landing shows in the drag's own window").isSameAs(layers);
+            assertThat(drag.overlay().highlight()).as("d's left half").isEqualTo(half);
+            assertThat(drag.overlay().placeholder()).isNull();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, onTitleBar(frame));
+            assertThat(drag.target()).as("off the pane").isEmpty();
+            assertThat(drag.overlay().getParent()).as("leaving the pane takes it away").isNull();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, left);
+            assertThat(drag.overlay().getParent()).as("back over the pane").isSameAs(layers);
+            assertThat(esc()).isTrue();
+            assertThat(drag.overlay().getParent()).as("Esc takes it away").isNull();
+            mouse(source, MouseEvent.MOUSE_RELEASED, left);
+            source = start(owner, b, rest);
+            elapse(drag);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, left);
+            assertThat(drag.overlay().highlight()).isEqualTo(half);
+            mouse(source, MouseEvent.MOUSE_RELEASED, left);
+            assertThat(drag.overlay().getParent()).as("the release takes it away").isNull();
+            assertThat(PaneDragTest.shape(owner)).as("beside d, on its left").isEqualTo("V[c, H[a, b, d]]");
         });
     }
 
