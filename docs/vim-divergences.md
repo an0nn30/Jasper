@@ -51,8 +51,9 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **`:undo N` follows one line of history.** Undo is linear, so `:undo N` reaches only the changes on it; another
   number fails with `E830`. Vim's message after an undo ("1 line less; before #2") is not shown.
 - **`:sort` compares code points.** `:sort l` does not use the system's collation.
-- **Marks and registers in other files' views.** `:marks` shows an uppercase mark in another file's view with the tab's
-  name, and `:registers` shows `"%` as the tab's name, where Vim shows file names.
+- **Marks and registers in other files' views.** `:marks` shows an uppercase mark in another file's view with that
+  file's location (its full path, or a remote file's host and path), and `:registers` shows `"%` as the file's location,
+  where Vim shows file names.
 - **`:` is not a motion.** After an operator (`d:`) it fails; Vim runs the command and deletes to where it went.
 - **Options.** `:set` knows only the [options Jasper has](editor.md#vim-options); an option Vim has and Jasper lacks
   fails with `E518: Unknown option`, and `:set` and `:set all` list only Jasper's. 'hlsearch' starts on (Vim's default

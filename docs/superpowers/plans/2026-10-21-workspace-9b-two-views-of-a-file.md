@@ -24,18 +24,19 @@ that options stay global; the Vim reference changed six rows, not two; (4) Task 
 `EditorTextView` read token lists from the text area's current document while its lines came from its own, so closing a
 view after another view's Vim edit threw a `NullPointerException` in `unshare`; it reads the tokens from its own
 document now; (6) Task 1b's `TextViewsTest` has one case more than the plan (a second view's Vim groups), and the plan's
-counts are lower than what ran (the Editor's suite has 5,242 tests, not 5,177); (7) Task 5: `docs/vim-divergences.md`
+counts are lower than what ran (the Editor's suite has 5,248 tests, not 5,177); (7) Task 5: `docs/vim-divergences.md`
 says what Task 3 made true, and the Editor guide's options table says "Per file" and "Per pane" where it said "Per tab";
 (8) the final review's fix wave (the controller's rulings): several edits in one event no longer take a view scrolled
 away from its caret to it (the put-back runs after everything the event queued); a Vim split view starts on its source's
 cursor line once its pane has a size, through Vim, and Vim follows only a mouse scroll while a put-back or a split's
 start waits; a Markdown view in Preview keeps its source's line across a reload or Revert to Saved; a wheel scroll or
-scroll-bar press before a put-back stands; a view that does not show lays nothing out while another view is typed in and
-is put back once it shows; Open File Right… and Down… of an open file start where the file's view active last is; with
-the parked items and test pins of the task reviews. Rulings 14 departs from spec 6's "own find bar": the find bar
-belongs to the window's selected view, as with files today, and per-view find bars, as in IntelliJ and VS Code, would
-change every tab's behaviour and are left for the user to decide. Tasks 1a to 4 ran their scripts with no anchor
-re-found.
+scroll-bar press before a put-back stands; a view that does not show is put back once it shows, and the put-back lays
+out none of its text meanwhile; Open File Right… and Down… of an open file start where the file's view active last is;
+with the parked items and test pins of the task reviews; and the residual round after its re-review (`e7960dc34`): a
+whole-text replace keeps a Vim cursor's line number, and Vim's scroll guard counts only the wheel and the mouse on a
+scroll bar. Rulings 14 departs from spec 6's "own find bar": the find bar belongs to the window's selected view, as with
+files today, and per-view find bars, as in IntelliJ and VS Code, would change every tab's behaviour and are left for the
+user to decide. Tasks 1a to 4 ran their scripts with no anchor re-found.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -40,16 +40,16 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   safe mode starts with the default look).
 - **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
   prerelease Jasper 1.0.0; no entry below records that run.
-- **Last recorded checks.** This branch after plan 9b's final fix wave (2026-10-22): 12,796 tests, 0 failures, 0
-  errors, 29 skipped. After plan 9b's documentation commit (2026-10-22) it had 12,777, and after plan 9a's final fix
-  wave and its residual round (2026-10-21) 12,706. `./gradlew check` on local `main` with the Editor's typography and
-  Markdown preview and the bundled Cygwin merged (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25
-  platform skips and four opt-in Editor performance tests). It ran with Python 3.13 (`-Pjasper.python`), because
-  `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19):
-  macOS, Ubuntu and every Linux packaging and install check passed, and so did the single-worker Windows check. No check
-  is recorded for the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode
-  (`eb424eeec`, `4743469e5`), the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the
-  Javadoc rename (`427321de4`).
+- **Last recorded checks.** This branch after plan 9b's final fix wave and its residual round (2026-10-22): 12,802
+  tests, 0 failures, 0 errors, 29 skipped. After the fix wave alone it had 12,796, after plan 9b's documentation commit
+  (2026-10-22) 12,777, and after plan 9a's final fix wave and its residual round (2026-10-21) 12,706. `./gradlew check`
+  on local `main` with the Editor's typography and Markdown preview and the bundled Cygwin merged (2026-10-20): 11,878
+  tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in Editor performance tests). It ran with
+  Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python
+  3.14. Hosted CI on PR #1 (2026-10-19): macOS, Ubuntu and every Linux packaging and install check passed, and so did
+  the single-worker Windows check. No check is recorded for the later commits: the Shell Prompt icon and the Meadow
+  splash shared with Enterprise mode (`eb424eeec`, `4743469e5`), the Meadow theme pair (`73c2b8f61`), the website
+  fixtures' removal (`375615bbf`) and the Javadoc rename (`427321de4`).
 
 Bundled plugins, all enabled by default except Enterprise:
 
@@ -183,8 +183,8 @@ fixed in `e6c33c193`: with Vim on in two views, an edit in one and then the othe
 from the text area's current one, so a `setDocument` with stale geometry laid out the old lines against the new
 document; it reads the tokens from its own document now, as RSyntaxTextArea's `SyntaxView` does (seven cases, six of
 them RED with the exception). (6) Task 1b added one case beyond the plan (a second view's Vim groups), and the plan's
-Workspace counts are lower than what ran: the Editor's suite, 5,177 tests there, has 5,242, among them
-`VimUndoManagerTest` 36 (the plan's 8), `TextViewsTest` 30 (8), `EditorViewsTest` 21 (12) and `EditorWindowTest` 82 (79),
+Workspace counts are lower than what ran: the Editor's suite, 5,177 tests there, has 5,248, among them
+`VimUndoManagerTest` 41 (the plan's 8), `TextViewsTest` 30 (8), `EditorViewsTest` 22 (12) and `EditorWindowTest` 82 (79),
 the fix rounds', the crash fix's and the final fix wave's cases included. (7) Task 5 (the documentation commit
 `c098fcbc5`) also corrects `docs/vim-divergences.md`, where "Tabs are the buffers", "Uppercase marks across tabs" and
 "One typeahead per tab" were no longer true, and adds its "Another view's window after an edit" item; the options table
@@ -203,31 +203,41 @@ one-view regression from `a1ff84d6f`): across a whole-text replace the place kee
 (`DocumentArea.replacing`, from `EditorTab.beginReplace`) and then follows the new text; M1, a wheel scroll, or a press
 on a scroll bar, of a view's pane while its put-back waits lets go of the place (`VimUndoManager.UserScroll`), which
 fixes the edge Task 5 noted (a queued wheel scroll overridden by a put-back); M2, a view that does not show once it has
-been displayable (a tab not shown, a source behind Preview) queues no put-back and lays out nothing while another view
-is typed in, and is put back once it shows, by the same rules (`EditorTextView.geometryBuilds()` counts the layouts for
-the test); M3, Open File Right… and Down… of an open file start the new view where the file's view active last is, as
-IntelliJ opens a file again at its last caret, through Vim's start with Vim on. Also in the wave: the Preview's place at
-the text's start follows the first-line rule; `Step.takesWhole` counts only inserts and removals; the marks heir is the
-file's view active last with Vim on, and its Javadoc cites Rulings 12; the class Javadoc and `docs/vim-divergences.md`
-widen the first-line departure from `mark_adjust` (lines added just above a window's first line: `O`, `:put!`, `o` on
-the line above, a split at column 0), the parked `w_topline` nuance being overturned; new cases pin the cursor rule
-while a command line is typed and in Insert mode, `g;` after an edit made from the middle of the change list, a view
-opened after a `:setlocal`, `:marks` for an uppercase mark of the same file, a two-window restore with the origin reset
-on the view path, a quiet read told from a loud one, and what a restored second view shows; the Editor guide says that
-closing asks only for a file's last view, how Open File Right… starts, and that a remote file's sign-in prompt shows
-over the window it was first opened in (a second view in another window shares the first view's sign-in owner, so a loud
-Retry asks there). Accepted with no change, as the reviews ruled: Task 1b's Minor 4 (one dirty check per view per edit),
-Task 4's Minor 4 (`openRestored`'s sentinel shape), the garbage-collection test of Task 1a, which assumes explicit GC
-(the build never disables it), and the other edge Task 5 noted: an edit no view's hook sees (a reload) holds no place
-for the view that edits now.
+been displayable (a tab not shown, a source behind Preview) queues no put-back, so the put-back lays out none of its
+text while another view is typed in, and is put back once it shows, by the same rules (`EditorTextView.geometryBuilds()`
+counts the layouts for the test); a known cost stays: Swing's caret still lays out a hidden view whose caret an edit
+moves, one whose caret is below the edits, to scroll it into sight; M3, Open File Right… and Down… of an open file start
+the new view where the file's view active last is, as IntelliJ opens a file again at its last caret, through Vim's start
+with Vim on. Also in the wave: the Preview's place at the text's start follows the first-line rule; `Step.takesWhole`
+counts only inserts and removals; the marks heir is the file's view active last with Vim on, and its Javadoc cites
+Rulings 12; the class Javadoc and `docs/vim-divergences.md` widen the first-line departure from `mark_adjust` (lines
+added just above a window's first line: `O`, `:put!`, `o` on the line above, a split at column 0), the parked
+`w_topline` nuance being overturned; new cases pin the cursor rule while a command line is typed and in Insert mode,
+`g;` after an edit made from the middle of the change list, a view opened after a `:setlocal`, `:marks` for an uppercase
+mark of the same file, a two-window restore with the origin reset on the view path, a quiet read told from a loud one,
+and what a restored second view shows; the Editor guide says that closing asks only for a file's last view, how Open
+File Right… starts, and that a remote file's sign-in prompt shows over the window it was first opened in (a second view
+in another window shares the first view's sign-in owner, so a loud Retry asks there). The residual round after the fix
+wave's re-review (`e7960dc34`, then the documentation commit after it): a whole-text replace in another view (Select
+All, then paste) keeps a Vim view's cursor on its line number, as a reload does, and its window follows by Vim's rule,
+shown or hidden, where Swing's caret had taken the cursor to the end of the text; while a put-back or a split's start
+waits, Vim follows only the wheel or the mouse on a scroll bar (`ViewportSync.scrollingByHand`), so a click elsewhere, a
+tab's header say, that edits and lays a view out is not the user's scroll; a text area that shares a document drops the
+history it was made with (`VimUndoManager.abandon`), whose view listened to it for nothing; the marks heir has its test
+(a view before it in recent order whose Vim has stopped is passed over); and `docs/vim-divergences.md` says that
+`:marks` and `"%` show the file's location. Accepted with no change, as the reviews ruled: Task 1b's Minor 4 (one dirty
+check per view per edit), Task 4's Minor 4 (`openRestored`'s sentinel shape), the garbage-collection test of Task 1a,
+which assumes explicit GC (the build never disables it), and the other edge Task 5 noted: an edit no view's hook sees (a
+reload) holds no place for the view that edits now.
 
-`./gradlew check --continue` after the fix wave: **12,796 tests, 0 failures, 0 errors, 29 skipped, BUILD SUCCESSFUL**
-(app 4,395, Editor 5,242, UI 943, terminal 460, testkit 244, Buddy 154, SDK 105, the other plugins 1,253) (excludes the
-external example, which `check` does not run); the example external plugin's `check pluginZip`, built against the SDK
-jars `check` wrote, passes. The run before it failed one app test, `StagedRemoteSessionsTest`'s
+`./gradlew check --continue` after the residual round: **12,802 tests, 0 failures, 0 errors, 29 skipped, BUILD
+SUCCESSFUL** (app 4,395, Editor 5,248, UI 943, terminal 460, testkit 244, Buddy 154, SDK 105, the other plugins 1,253)
+(excludes the external example, which `check` does not run); after the fix wave the example external plugin's
+`check pluginZip`, built against the SDK jars `check` wrote, passed, and the residual round changed no SDK. The fix
+wave's run had 12,796 tests (Editor 5,242); the run before it failed one app test, `StagedRemoteSessionsTest`'s
 `editingSavedVaultReferenceWithoutOptionalVaultDoesNotLinkItsApi` ("Plugin workers did not finish resource cleanup after
-stop"), which then passed three times on its own and in this run. The documentation commit `c098fcbc5` had 12,777 tests
-(Editor 5,223).
+stop"), which then passed three times on its own and in the next full run. The documentation commit `c098fcbc5` had
+12,777 tests (Editor 5,223).
 GUI checks for the user:
 - Split File Right from a file's right-click menu: the file shows in a new pane to the right; typing in either pane shows
   in both at once, the ● marker on both; Cmd+Z (Ctrl+Z) in the other pane undoes it, that pane's caret going to the
@@ -268,8 +278,9 @@ GUI checks for the user:
   shows the line it showed;
 - Open File Right… of an open file: the new view starts where the view you were in last is (with Vim on, on its
   cursor line);
-- two views of a 1 MB file, one in a tab that is not shown: typing in the shown one stays as quick as with one view,
-  and selecting the other tab shows it on its text.
+- two views of a 1 MB file, one in a tab that is not shown with its caret near the top: typing below that caret in the
+  shown view stays as quick as with one view, and selecting the other tab shows it on its text;
+- Vim on, two views of a file: Select All and paste in one; the other's cursor stays on its line number, in sight.
 
 Not merged, not pushed.
 
