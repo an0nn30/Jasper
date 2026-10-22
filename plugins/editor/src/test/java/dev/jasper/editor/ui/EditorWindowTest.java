@@ -1274,6 +1274,7 @@ class EditorWindowTest {
         Path a = file("a.txt", "a");
         window.openLocal(a, handle);
         drain();
+        EditorTab first = window.selected().orElseThrow();
         UUID editor = host.windowTabs(main).get(1).getFirst();
         host.focusTerminalPane(pane);
         host.queueFileChoice(List.of(new FileLocation.Local(a)));
@@ -1284,7 +1285,11 @@ class EditorWindowTest {
         assertThat(host.windowTabs(main)).hasSize(2);
         assertThat(host.windowTabs(main).getFirst()).as("beside the focused shell, in its tab").hasSize(2).startsWith(shell);
         assertThat(host.windowTabs(main).get(1)).containsExactly(editor);
-        assertThat(window.selected().orElseThrow().session()).isSameAs(window.sessions().getFirst());
+        assertThat(window.selected().orElseThrow()).as("the new view is selected").isNotSameAs(first)
+            .satisfies(view -> assertThat(view.session()).isSameAs(first.session()));
+        assertThat(host.contentTabs().get(1).isActive()).as("its content tab is the active one").isTrue();
+        assertThat(handle.activeTab().map(dev.jasper.sdk.terminal.TabHandle::id)).as("the new pane has the focus")
+            .contains(host.windowTabs(main).getFirst().get(1));
         assertThat(recorded).containsExactly(LocalDocument.key(a), LocalDocument.key(a));
     }
 

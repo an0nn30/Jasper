@@ -124,6 +124,19 @@ class EditorViewsTest {
         assertThat(item(b, "Split File Right")).isNotNull();
     }
 
+    /** Vim's {@code :action split-file-down} is the Editor's Split File Down, for the view Vim is in (Rulings 9). */
+    @Test void vimsActionSplitFileDownShowsTheFileInAnotherView() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 13, List.of(), false, 1.0, false, 4, false, 1, true));
+        EditorTab first = opened(file("vim.txt", "one\n"));
+        for (var key : dev.jasper.editor.vim.KeyInput.parse(":action split-file-down<CR>")) first.vimEditor().orElseThrow().feed(key);
+        EditorTab view = window.selected().orElseThrow();
+        assertThat(view).isNotSameAs(first);
+        assertThat(view.session()).isSameAs(first.session());
+        assertThat(host.windowTabs(main)).as("the file's tab holds both views").singleElement()
+            .satisfies(panes -> assertThat(panes).hasSize(2));
+        assertThat(view.vimEditor()).as("Vim is on in the new view too").isPresent();
+    }
+
     @Test void saveFromAnyViewSavesTheFileAndClearsEveryMarker() throws Exception {
         Path file = file("save.txt", "one\n");
         EditorTab first = opened(file);
@@ -150,6 +163,24 @@ class EditorViewsTest {
         assertThat(window.selected()).containsSame(second);
         assertThat(handle(1).isActive()).isTrue();
         assertThat(host.contentTabs()).as("no new view").hasSize(2);
+    }
+
+    /**
+     * Closing the selected view keeps the others most recent first (Rulings 7): when another file's view closes, the
+     * view selected in its place is the one focused before it, so an open of its file selects that view still.
+     */
+    @Test void closingTheSelectedViewKeepsTheOthersMostRecentFirst() throws Exception {
+        Path x = file("x.txt", "x\n");
+        opened(x);
+        EditorTab second = split(TabPlacement.SPLIT_RIGHT);
+        handle(1).select();
+        UUID shell = host.addTerminalTab(main, "zsh");
+        host.focusTerminalPane(host.addTerminalPane(shell, dev.jasper.sdk.terminal.PaneInfo.unknown()));
+        opened(file("y.txt", "y\n"));
+        handle(2).close();
+        window.openLocal(x);
+        assertThat(window.selected()).as("x.txt's view focused last").containsSame(second);
+        assertThat(handle(1).isActive()).isTrue();
     }
 
     @Test void closingAViewAsksNothingAndTheFilesLastViewAsks() throws Exception {

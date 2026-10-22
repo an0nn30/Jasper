@@ -210,12 +210,15 @@ public final class EditorWindow {
     }
 
     /**
-     * The closing guard Jasper asks before content tabs close: one tab's own close ({@code batch} false), or a window's,
-     * a quit's or a restart's batch. A view of a file another view still shows closes without a question (pane
-     * flexibility spec 6).
+     * The closing guard Jasper asks before content tabs close: a close the user asked for ({@code batch} false), of one
+     * content tab or, by Close Tab, of every pane of a tab at once (the app's {@code TabRegistry.requestClose} of a
+     * list), or a window's, a quit's or a restart's batch. One content tab's own close asks about its file; several ask
+     * once about each file every view of which is among them. A view of a file another view still shows closes without
+     * a question (pane flexibility spec 6).
      *
      * @param handles the closing tabs, the Editor's among them
-     * @param batch whether a window, a quit or a restart closes them
+     * @param batch false for a close the user asked for, of one content tab or of a tab's panes; true for a window, a
+     *     quit or a restart
      * @return whether they may close
      */
     CompletableFuture<Boolean> tabsClosing(List<ContentTab> handles, boolean batch) {
@@ -752,14 +755,14 @@ public final class EditorWindow {
     boolean showingEmpty() { return showingEmpty; }
 
     /**
-     * The closing guard (spec 2.3), asked when the window closes and when Jasper quits: waits for running saves,
-     * then asks about unsaved tabs, and saves them all when asked to. Re-checks after each wait, since edits made
-     * during it can leave a tab saving again or dirty again, rather than trusting a single pass to still hold.
+     * The closing guard (spec 2.3) for several tabs, asked when a window closes, when Jasper quits and by Close Tab:
+     * waits for running saves, then asks about unsaved tabs, and saves them all when asked to. Re-checks after each
+     * wait, since edits made during it can leave a tab saving again or dirty again, rather than trusting a single pass
+     * to still hold.
      * Refuses while it is already asking or waiting: a quit or close that arrives during its prompt or wait
      * would otherwise wait on saves that cannot finish until the outer prompt returns. It asks about a file only when
      * every view of it closes (pane flexibility spec 6), and then once.
      */
-    boolean mayClose() { return mayClose(editorTabs()); }
     private boolean mayClose(List<EditorTab> closing) {
         if (guarding) {
             if (selectedTab != null) hosted.get(selectedTab).select();
@@ -1075,7 +1078,7 @@ public final class EditorWindow {
      */
     private void openView(DocumentSession session, WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
         origin = owner;
-        addView(session, placement, views(session).stream().findFirst().orElse(null));
+        addView(session, placement, views(session).getFirst());
         if (session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
     }
 
@@ -1135,7 +1138,8 @@ public final class EditorWindow {
         tab.dispose();
         if (views(session).isEmpty()) forget(session);
         else questionOwners.get(session).set(hosted.get(views(session).getFirst()));
-        if (selectedTab == tab) selectedTab = hosted.keySet().stream().findFirst().orElse(null);
+        // The view active before it, not the first opened: recent stays most recent first (pane flexibility spec 6).
+        if (selectedTab == tab) selectedTab = recent.stream().findFirst().orElse(null);
         if (selectedTab != null) activate(selectedTab);
         refresh();
     }
@@ -1168,9 +1172,6 @@ public final class EditorWindow {
         selectedTab = tab; tab.find(findBar); refreshStatus();
     }
     private void refreshFind() { if (!disposed && selectedTab != null) selectedTab.render(); }
-    private void step(int delta) {
-        var all = editorTabs(); if (all.size() > 1) select(all.get(Math.floorMod(all.indexOf(selectedTab) + delta, all.size())).session());
-    }
     private List<EditorTab> editorTabs() { return List.copyOf(hosted.keySet()); }
     private void refresh() { showingEmpty = hosted.isEmpty(); refreshHeaders(); refreshStatus(); }
 
