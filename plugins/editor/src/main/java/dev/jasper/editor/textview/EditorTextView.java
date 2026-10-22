@@ -42,6 +42,8 @@ public final class EditorTextView extends SyntaxView {
     private int tabSize;
     private final Map<Element,CachedLine> cache=new HashMap<>();
     private Geometry currentGeometry;
+    /** How many times the rows have been placed anew: the cost of a layout after an edit, which tests count. */
+    private int geometryBuilds;
     private org.fife.ui.rsyntaxtextarea.folding.FoldManager foldManager;
     private final java.beans.PropertyChangeListener foldChanges=event -> foldsChanged();
     private record CachedLine(int start, String text, List<LineLayout.Row> rows) { }
@@ -110,6 +112,7 @@ public final class EditorTextView extends SyntaxView {
     private Geometry geometry() {
         configure();
         if(currentGeometry!=null) return currentGeometry;
+        geometryBuilds++;
         int count=getElement().getElementCount(), y=0; float max=0;
         var placed=new ArrayList<Placed>(); int[] tops=new int[count], heights=new int[count];
         for(int i=0;i<count;i++) {
@@ -121,6 +124,8 @@ public final class EditorTextView extends SyntaxView {
         currentGeometry=new Geometry(List.copyOf(placed),tops,heights,max,y);
         return currentGeometry;
     }
+    /** @return how many times the view has placed the document's rows anew, each a pass over every line */
+    public int geometryBuilds() { return geometryBuilds; }
     /** Physical wrapped row count for a logical line, independent of fold visibility. */
     public int rowsForLine(int logicalLine) { configure(); return line(logicalLine).size(); }
     /** Physical row within its logical line containing an absolute offset. */

@@ -1,10 +1,18 @@
 package dev.jasper.editor.vim;
 
 import java.awt.AWTEvent;
+import java.awt.Component;
 import java.awt.EventQueue;
 import java.awt.Point;
+import java.awt.event.HierarchyEvent;
+import java.awt.event.HierarchyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
 import javax.swing.JViewport;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
@@ -36,10 +44,12 @@ import org.fife.ui.rtextarea.RUndoManager;
  *
  * <p>Every other view stays on the text it showed. An edit that adds or removes lines above a view's first shown line
  * moves the view with its text, as Vim's mark_adjust moves another window's topline; an edit inside or below its window
- * leaves it where it is. Two edits depart from mark_adjust: an insert exactly at the start of the first shown line
- * keeps that line on top, where Vim shows the new line, and an edit that takes away the first shown line's start shows
- * the text after the deletion, where Vim shows the line before it. Text replaced whole (a reload) leaves each view on
- * its line's number, as each caret keeps its line. A Vim view's cursor, which moves with its text as Vim's w_cursor
+ * leaves it where it is. Two edits depart from mark_adjust: lines added just above a view's first line, including an
+ * insert at its start, keep the old line on top, where Vim shows the new line ({@code O}, {@code :put!}, {@code o} on
+ * the line above, a split at column 0), and an edit that takes away the first shown line's start shows the text after
+ * the deletion, where Vim shows the line before it. Text replaced whole (a reload) leaves each view on its line's
+ * number, as each caret keeps its line. A view that does not show is put back once it shows, and the user's scroll of a
+ * view's pane before its put-back runs stands. A Vim view's cursor, which moves with its text as Vim's w_cursor
  * does, stays on it: when the edit leaves it outside the window, the window scrolls as little as Vim's update_topline
  * scrolls it into sight, with 'scrolloff'; a view without Vim keeps its first line, and its caret may leave it. An undo
  * or redo moves only its own view's caret to the change: every other view keeps its caret, its selection and its
@@ -75,6 +85,8 @@ final class VimUndoManager extends RUndoManager {
             if (undo) java.util.Collections.reverse(order);
             for (UndoableEdit edit : order) {
                 if (!(edit instanceof DocumentEvent change)) continue;
+                // An attribute change (RSyntaxTextArea's token changes) adds and takes no text.
+                if (change.getType() == DocumentEvent.EventType.CHANGE) continue;
                 // An undo takes out what an insert put in, a redo what a removal took.
                 if ((change.getType() == DocumentEvent.EventType.INSERT) == undo) {
                     if (change.getOffset() == 0 && change.getLength() == length) return true;
@@ -98,13 +110,96 @@ final class VimUndoManager extends RUndoManager {
         boolean vim;
         Step vimStep, internal;
         int stepDepth, internalDepth;
-        /** Where the view showed the text before the edits its queued put-back answers; null when none is queued. */
-        Place held;
+        /** Where the view showed the text before the edits its put-back answers; null when none waits. */
+        private Place held;
         /** The event its latest put-back was queued in, and that put-back's number: only the latest one acts. */
         AWTEvent queuedIn;
         int queued;
+        /** Whether its put-back waits for the view to show, as it did not show when the put-back would have run. */
+        boolean waiting;
+        /** Whether the view has been displayable: from then on, while it does not show, it is hidden. */
+        private boolean realized;
+        /** While a place is held: listens for the user's scroll of the view's pane, which lets go of the place. */
+        private UserScroll scrolls;
+        private final HierarchyListener hierarchy = this::hierarchyChanged;
 
-        View(RTextArea area) { this.area = area; }
+        View(RTextArea area) {
+            this.area = area;
+            area.addHierarchyListener(hierarchy);
+        }
+
+        /** Notes when the view becomes displayable, and queues a waiting put-back once the view shows. */
+        private void hierarchyChanged(HierarchyEvent event) {
+            if ((event.getChangeFlags() & (HierarchyEvent.SHOWING_CHANGED | HierarchyEvent.DISPLAYABILITY_CHANGED
+                    | HierarchyEvent.PARENT_CHANGED)) == 0) return;
+            if (area.isDisplayable()) realized = true;
+            if (waiting && !hidden()) {
+                waiting = false;
+                queue(this, ++queued);
+            }
+        }
+
+        Place held() { return held; }
+
+        /** @param place where the view shows the text, held for its put-back; the user's scroll of its pane lets go of it */
+        void hold(Place place) {
+            held = place;
+            if (place != null && scrolls == null && place.port().getParent() instanceof JScrollPane pane) scrolls = new UserScroll(this, pane);
+        }
+
+        /** The view holds no place: a put-back queued for it does nothing. */
+        void letGo() {
+            held = null;
+            waiting = false;
+            if (scrolls != null) scrolls.remove();
+            scrolls = null;
+        }
+
+        /** The view's text area stops showing the document: nothing here listens to it any more. */
+        void close() {
+            letGo();
+            area.removeHierarchyListener(hierarchy);
+        }
+
+        /**
+         * @return whether the view does not show, though it has been displayable: in a tab that is not shown, or its
+         *     source while a Markdown preview takes its place
+         */
+        boolean hidden() {
+            if (area.isDisplayable()) realized = true;
+            return realized && !area.isShowing();
+        }
+    }
+
+    /**
+     * The user scrolls a view's pane while its put-back waits, with the wheel or a scroll bar: the view stays where the
+     * user put it, and its put-back does nothing.
+     */
+    private static final class UserScroll extends MouseAdapter {
+        private final View view;
+        private final JScrollPane pane;
+        /** The pane's scroll bars and their parts (the arrow buttons), which a press reaches. */
+        private final List<Component> bars = new ArrayList<>();
+
+        UserScroll(View view, JScrollPane pane) {
+            this.view = view;
+            this.pane = pane;
+            for (JScrollBar bar : new JScrollBar[] { pane.getVerticalScrollBar(), pane.getHorizontalScrollBar() }) {
+                if (bar == null) continue;
+                bars.add(bar);
+                bars.addAll(List.of(bar.getComponents()));
+            }
+            pane.addMouseWheelListener(this);
+            for (Component bar : bars) bar.addMouseListener(this);
+        }
+
+        void remove() {
+            pane.removeMouseWheelListener(this);
+            for (Component bar : bars) bar.removeMouseListener(this);
+        }
+
+        @Override public void mouseWheelMoved(MouseWheelEvent event) { view.letGo(); }
+        @Override public void mousePressed(MouseEvent event) { view.letGo(); }
     }
 
     /**
@@ -186,8 +281,9 @@ final class VimUndoManager extends RUndoManager {
 
         private void insertedAtStart(int length) {
             for (View other : views) {
-                if (other.held == null || other.held.number() >= 0 || other.held.line().getOffset() != 0) continue;
-                try { other.held = other.held.at(document.createPosition(length)); }
+                Place held = other.held();
+                if (held == null || held.number() >= 0 || held.line().getOffset() != 0) continue;
+                try { other.hold(held.at(document.createPosition(length))); }
                 catch (BadLocationException impossible) {
                     // The inserted text is in the document.
                 }
@@ -276,7 +372,7 @@ final class VimUndoManager extends RUndoManager {
         closeAll(leaving);
         typing = seal(typing);
         // Its queued put-back, if any, does nothing: the place is on the document it leaves.
-        leaving.held = null;
+        leaving.close();
         views.remove(leaving);
         if (view == leaving) view = views.getFirst();
         if (views.size() == 1) {
@@ -307,7 +403,7 @@ final class VimUndoManager extends RUndoManager {
 
     /** @return whether {@code area}'s view holds its place on the text for a put-back that has not run yet */
     boolean holds(RTextArea area) {
-        for (View each : views) if (each.area == area) return each.held != null;
+        for (View each : views) if (each.area == area) return each.held() != null;
         return false;
     }
 
@@ -500,38 +596,52 @@ final class VimUndoManager extends RUndoManager {
     private void hold(View acting, boolean whole) {
         for (View other : views) {
             if (other == acting) continue;
-            if (other.held == null) other.held = Place.of(other.area);
-            if (whole && other.held != null) other.held = other.held.byNumber(other.area);
+            if (other.held() == null) other.hold(Place.of(other.area));
+            if (whole && other.held() != null) other.hold(other.held().byNumber(other.area));
         }
     }
 
     /**
      * After an edit: each view but {@code acting} that holds a place queues its put-back, once in each event. Swing
      * scrolls a view's moved caret into sight later, through the event queue, after each edit of the event; the put-back
-     * goes through the queue twice, so it runs after everything the event queued, its later edits' scrolling among it,
-     * and only the last one queued puts the view back.
+     * runs after everything the event queued ({@link #queue}), its later edits' scrolling among it, and only the last
+     * one queued puts the view back. A view that does not show queues nothing: its place waits, and it is put back once
+     * it shows, so that nothing lays out its text while another view is typed in.
      */
     private void release(View acting) {
         AWTEvent now = EventQueue.getCurrentEvent();
         for (View other : views) {
-            if (other == acting || other.held == null || now != null && now == other.queuedIn) continue;
+            if (other == acting || other.held() == null) continue;
+            if (other.hidden()) {
+                other.waiting = true;
+                continue;
+            }
+            if (now != null && now == other.queuedIn) continue;
             other.queuedIn = now;
-            int number = ++other.queued;
             putBacksQueued++;
-            SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> putBack(other, number)));
+            queue(other, ++other.queued);
         }
+    }
+
+    /** Queues {@code view}'s put-back numbered {@code number}: it goes through the queue twice, after what is queued now. */
+    private static void queue(View view, int number) {
+        SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> putBack(view, number)));
     }
 
     /**
      * Shows {@code other}'s held place's line where it was shown, unless a later put-back is queued for it; a Vim view's
-     * engine then keeps its cursor in sight.
+     * engine then keeps its cursor in sight. A view that does not show waits to show first.
      */
     private static void putBack(View other, int number) {
-        Place place = other.held;
+        Place place = other.held();
         if (number != other.queued || place == null) return;
-        other.held = null;
         // The event goes with the put-back: for typing, its source is the text area that edited.
         other.queuedIn = null;
+        if (other.hidden()) {
+            other.waiting = true;
+            return;
+        }
+        other.letGo();
         RTextArea area = other.area;
         if (area.getParent() != place.port()) return;
         Point position = place.now(area);

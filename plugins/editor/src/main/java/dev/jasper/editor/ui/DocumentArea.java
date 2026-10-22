@@ -71,6 +71,23 @@ final class DocumentArea extends JComponent implements AutoCloseable {
             return sourcePlace.shown();
         }
     }
+    /**
+     * Text inserted at the start of the text, by an edit or an undo: a Swing position at offset 0 stays there, where one
+     * anywhere else moves past text inserted at it, so the source's place held at the start moves past it here, and the
+     * source comes back on its first line, as another view showing a line first keeps it on top.
+     */
+    private final javax.swing.event.DocumentListener insertedAtStart = new javax.swing.event.DocumentListener() {
+        @Override public void insertUpdate(javax.swing.event.DocumentEvent event) {
+            var place = sourcePlace;
+            if (event.getOffset() != 0 || place == null || place.line() == null || place.number() >= 0 || place.line().getOffset() != 0) return;
+            try { sourcePlace = new SourcePlace(place.shown(), area.getDocument().createPosition(event.getLength()), -1, place.below()); }
+            catch (javax.swing.text.BadLocationException impossible) {
+                // The inserted text is in the document.
+            }
+        }
+        @Override public void removeUpdate(javax.swing.event.DocumentEvent event) { }
+        @Override public void changedUpdate(javax.swing.event.DocumentEvent event) { }
+    };
     /** The whole text is about to be replaced (a reload, Revert to Saved): the source's place keeps its line's number. */
     void replacing() {
         var place = sourcePlace;
@@ -173,6 +190,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         scroll.setFoldIndicatorEnabled(true);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scrollLink = new ScrollLink(this, preview);
+        area.getDocument().addDocumentListener(insertedAtStart);
         add(scroll, BorderLayout.CENTER);
         addHierarchyListener(hierarchy);
         area.addFocusListener(new java.awt.event.FocusAdapter() {
@@ -234,6 +252,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
         if (closed) return;
         closed = true;
         area.putClientProperty("jasper.editor.closed", Boolean.TRUE);
+        area.getDocument().removeDocumentListener(insertedAtStart);
         scrollLink.close();
         preview.close();
         removeHierarchyListener(hierarchy);

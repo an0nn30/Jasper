@@ -389,6 +389,46 @@ class TextViewsTest {
         assertThat(two.area().getCaretLineNumber()).as("the other view's change leaves this view's place").isZero();
     }
 
+    /**
+     * A view in the middle of the file's change list that edits goes to the list's end, as Vim's changed_common moves the
+     * current window there: its next {@code g;} goes to the change it just made, not on from the middle.
+     */
+    @Test void aViewThatEditsFromTheMiddleOfTheChangeListGoesToItsEnd() throws Exception {
+        var one = first(Files.writeString(folder.resolve("middle.txt"), "a\nb\nc\nd\ne\nf\n"));
+        var two = second(one);
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        two.vim(Optional.of(vim));
+        type(one, "xjjxjjx");
+        type(two, "g;g;");
+        assertThat(two.area().getCaretLineNumber()).as("the middle of the list").isEqualTo(2);
+        type(two, "Gxgg");
+        type(two, "g;");
+        assertThat(two.area().getCaretLineNumber()).as("the change it made").isEqualTo(5);
+        type(two, "g;");
+        assertThat(two.area().getCaretLineNumber()).as("then the one before").isEqualTo(4);
+    }
+
+    /** A view whose Vim starts after another view's {@code :setlocal} has the file's buffer-local options too. */
+    @Test void aViewOpenedAfterASetlocalHasTheFilesBufferLocalOptions() throws Exception {
+        var one = first(Files.writeString(folder.resolve("later.txt"), "x\n"));
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        type(one, ":setlocal sw=2 et<CR>");
+        var two = second(one);
+        two.vim(Optional.of(vim));
+        type(two, ">>");
+        assertThat(two.area().getText()).as("two spaces, as 'shiftwidth' and 'expandtab' say").isEqualTo("  x\n");
+    }
+
+    /** {@code :marks} lists an uppercase mark another view of the file set with its line's text, as a mark in this file. */
+    @Test void marksListsAnUppercaseMarkSetInAnotherViewOfTheFileWithItsText() throws Exception {
+        var views = markedViews("listed.txt");
+        type(views.getFirst(), ":marks A<CR>");
+        assertThat(views.getFirst().vimEditor().orElseThrow().output()).extracting(dev.jasper.editor.vim.VimEditor.OutputLine::text)
+            .containsExactly("mark line  col file/text", String.format(" %c %6d %4d ", 'A', 3, 0) + "3");
+    }
+
     /** A full change list drops its oldest entry, and another view's place stays on its entry (changed_common). */
     @Test void aFullChangeListKeepsAnotherViewOnItsEntry() throws Exception {
         var one = first(Files.writeString(folder.resolve("full.txt"), "ab\n".repeat(102)));
@@ -531,6 +571,21 @@ class TextViewsTest {
         assertThat(one.area().getText()).startsWith("row 1\n");
         source(one);
         assertThat(top(one)).as("after a reload").isEqualTo("row 300");
+    }
+
+    /**
+     * A view in Preview from the top of the text comes back to its first line though another view added lines at the
+     * start, as a view showing a line first keeps it on top when lines are added at its start.
+     */
+    @Test void aPreviewFromTheTopComesBackToItsFirstLineAfterAnInsertAtTheStart() throws Exception {
+        var views = markdownViews();
+        var one = views.getFirst();
+        previewFrom(one, 0);
+        views.get(1).area().setCaretPosition(0);
+        views.get(1).area().replaceSelection("new\n".repeat(3));
+        source(one);
+        assertThat(top(one)).isEqualTo("line 1");
+        assertThat(one.scroll().getViewport().getViewPosition().y).isEqualTo(one.area().yForLine(3));
     }
 
     /** Each view has its own Markdown mode: the preview in one and the source in the other, each switched on its own. */

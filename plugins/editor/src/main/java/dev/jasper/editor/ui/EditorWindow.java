@@ -1002,8 +1002,8 @@ public final class EditorWindow {
             if (!disposed) context.notifications().group().error("Could not save the Markdown default view", failed);
         }));
         tab.modeChanged(() -> activate(tab));
-        // Vim's file marks are the file's (Rulings 12): a closing view's go to the file's view active last.
-        tab.marksHeir(() -> views(session).stream().filter(view -> view != tab).findFirst().flatMap(EditorTab::vimEditor));
+        // Vim's file marks are the file's (Rulings 12): a closing view's go to the file's view active last with Vim on.
+        tab.marksHeir(() -> views(session).stream().filter(view -> view != tab).map(EditorTab::vimEditor).flatMap(Optional::stream).findFirst());
         tab.noticeChanged(this::refreshStatus);
         tab.surface().previewCallbacks(id -> {
             // Resolve IDs only against the currently installed, generation-validated controller result.
@@ -1083,7 +1083,8 @@ public final class EditorWindow {
 
     /**
      * Open File Right or Down of a file that is already open (pane flexibility spec 6): another view of it, in a new pane
-     * beside the focused pane of {@code owner}'s window, as Open in Editor… of an open file reports it again.
+     * beside the focused pane of {@code owner}'s window, as Open in Editor… of an open file reports it again. The view
+     * starts where the file's view active last is, as a split view starts where its source is.
      *
      * @param session the open file
      * @param owner the window or tab it was asked in
@@ -1091,7 +1092,9 @@ public final class EditorWindow {
      */
     private void openView(DocumentSession session, WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
         origin = owner;
-        addView(session, placement, views(session).getFirst());
+        EditorTab last = views(session).getFirst();
+        // As IntelliJ opens a file again at its last caret.
+        addView(session, placement, last).startAt(last);
         if (session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
     }
 

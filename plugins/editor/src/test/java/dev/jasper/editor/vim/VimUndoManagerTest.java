@@ -380,6 +380,112 @@ class VimUndoManagerTest {
         });
     }
 
+    /**
+     * The user scrolls a view, with {@code scroll} on its pane, between another view's edit above it and the view's
+     * put-back: the put-back leaves the view where the user scrolled it.
+     */
+    private static void scrolledBeforeThePutBack(java.util.function.Consumer<JScrollPane> scroll) throws Exception {
+        var shown = new AtomicReference<VimTextArea>();
+        var other = new AtomicReference<VimTextArea>();
+        var scrolledTo = new int[2];
+        onEdt(() -> {
+            shown.set(lines());
+            other.set(new VimTextArea());
+            other.get().share(shown.get());
+            scrolled(shown.get(), new JViewport());
+        });
+        onEdt(() -> ((JViewport) shown.get().getParent()).setViewPosition(new Point(0, yFor(shown.get(), 299))));
+        onEdt(() -> {
+            other.get().setCaretPosition(lineStart(other.get(), 50));
+            other.get().replaceSelection("new\n".repeat(100));
+            // Queued after the edit's put-back is first queued, so it runs before the put-back.
+            SwingUtilities.invokeLater(() -> {
+                var port = (JViewport) shown.get().getParent();
+                scrolledTo[0] = port.getViewPosition().y;
+                scroll.accept((JScrollPane) port.getParent());
+                scrolledTo[1] = port.getViewPosition().y;
+            });
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(scrolledTo[0]).as("before the put-back").isEqualTo(yFor(shown.get(), 299));
+            assertThat(scrolledTo[1]).as("the user scrolled the view").isGreaterThan(scrolledTo[0]);
+            assertThat(((JViewport) shown.get().getParent()).getViewPosition().y).as("and it stays there").isEqualTo(scrolledTo[1]);
+        });
+    }
+
+    @Test void aWheelScrollBeforeThePutBackStaysWhereTheUserScrolled() throws Exception {
+        scrolledBeforeThePutBack(pane -> pane.dispatchEvent(new java.awt.event.MouseWheelEvent(pane, java.awt.event.MouseEvent.MOUSE_WHEEL,
+            System.currentTimeMillis(), 0, 10, 10, 0, false, java.awt.event.MouseWheelEvent.WHEEL_UNIT_SCROLL, 3, 1)));
+    }
+
+    /** A press on the scroll bar's track below its thumb, which scrolls a block down, is the user's scroll too. */
+    @Test void aScrollBarPressBeforeThePutBackStaysWhereTheUserScrolled() throws Exception {
+        scrolledBeforeThePutBack(pane -> {
+            var bar = pane.getVerticalScrollBar();
+            int y = bar.getHeight() - 2;
+            bar.dispatchEvent(new java.awt.event.MouseEvent(bar, java.awt.event.MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(),
+                java.awt.event.InputEvent.BUTTON1_DOWN_MASK, bar.getWidth() / 2, y, 1, false, java.awt.event.MouseEvent.BUTTON1));
+            bar.dispatchEvent(new java.awt.event.MouseEvent(bar, java.awt.event.MouseEvent.MOUSE_RELEASED, System.currentTimeMillis(),
+                0, bar.getWidth() / 2, y, 1, false, java.awt.event.MouseEvent.BUTTON1));
+        });
+    }
+
+    /**
+     * A view that does not show, as one in a tab that is not shown, lays nothing out while another view edits, however
+     * many edits: its place waits, and it is put back on its text once it shows. {@code hide} and {@code show} take the
+     * view's pane out of sight and back, given the pane and the realized holder it is in.
+     */
+    private static void hiddenWhileAnotherEdits(java.util.function.BiConsumer<JScrollPane, javax.swing.JPanel> hide,
+                                                java.util.function.BiConsumer<JScrollPane, javax.swing.JPanel> show) throws Exception {
+        var shown = new AtomicReference<VimTextArea>();
+        var other = new AtomicReference<VimTextArea>();
+        var holder = new AtomicReference<javax.swing.JPanel>();
+        var builds = new int[1];
+        onEdt(() -> {
+            shown.set(lines());
+            other.set(new VimTextArea());
+            other.get().share(shown.get());
+            scrolled(shown.get(), new JViewport());
+            // Realized, as a view in a window is: the holder has no parent, so it and the pane then show.
+            holder.set(new javax.swing.JPanel(null));
+            holder.get().add(shown.get().getParent().getParent());
+            holder.get().addNotify();
+            assertThat(shown.get().isShowing()).isTrue();
+        });
+        onEdt(() -> ((JViewport) shown.get().getParent()).setViewPosition(new Point(0, yFor(shown.get(), 299))));
+        var pane = new AtomicReference<JScrollPane>();
+        onEdt(() -> {
+            pane.set((JScrollPane) shown.get().getParent().getParent());
+            hide.accept(pane.get(), holder.get());
+            assertThat(shown.get().isShowing()).isFalse();
+            builds[0] = shown.get().textView().geometryBuilds();
+        });
+        for (int n = 0; n < 5; n++) {
+            onEdt(() -> {
+                other.get().setCaretPosition(lineStart(other.get(), 50));
+                other.get().replaceSelection("new\n".repeat(20));
+            });
+        }
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(shown.get().textView().geometryBuilds()).as("no layout of the hidden view's text").isEqualTo(builds[0]);
+            show.accept(pane.get(), holder.get());
+            assertThat(shown.get().isShowing()).isTrue();
+        });
+        onEdt(() -> { });
+        onEdt(() -> assertThat(top(shown.get())).as("put back on its text once it shows").isEqualTo("line 300"));
+    }
+
+    @Test void aHiddenViewLaysOutNothingWhileAnotherEditsAndIsPutBackWhenItShows() throws Exception {
+        hiddenWhileAnotherEdits((pane, holder) -> pane.setVisible(false), (pane, holder) -> pane.setVisible(true));
+    }
+
+    /** The same for a view taken out of its window and put back, as a tab's pane is when another tab shows. */
+    @Test void aViewTakenOutOfItsWindowLaysOutNothingAndIsPutBackWhenItIsBack() throws Exception {
+        hiddenWhileAnotherEdits((pane, holder) -> holder.remove(pane), (pane, holder) -> holder.add(pane));
+    }
+
     /** Lines removed above a view, in another view, leave it on the text it showed, as far into its first line. */
     @Test void linesRemovedAboveAViewLeaveItOnItsText() throws Exception {
         var shown = new AtomicReference<VimTextArea>();
@@ -515,6 +621,21 @@ class VimUndoManagerTest {
         });
     }
 
+    /**
+     * Only a step's inserts and removals count toward taking the whole text: an attribute change, as RSyntaxTextArea's
+     * token change event over every line, adds and takes nothing.
+     */
+    @Test void aChangeEventInAStepTakesNothing() throws Exception {
+        onEdt(() -> {
+            AbstractDocument document = new javax.swing.text.PlainDocument();
+            var step = new VimUndoManager.Step(-1, -1);
+            step.take(document.new DefaultDocumentEvent(0, 5, javax.swing.event.DocumentEvent.EventType.CHANGE));
+            step.end();
+            assertThat(step.takesWhole(false, 5)).as("its redo").isFalse();
+            assertThat(step.takesWhole(true, 5)).as("its undo").isFalse();
+        });
+    }
+
     /** A text area shares a document only before Vim turns on in it, since Vim reads the document it shows. */
     @Test void anAreaWithVimOnSharesNoDocument() throws Exception {
         onEdt(() -> {
@@ -640,6 +761,55 @@ class VimUndoManagerTest {
         onEdt(() -> {
             assertThat(top(v.get().shown())).as("the view shows the same text").isEqualTo("line 560");
             assertThat(line(v.get().shown(), v.get().editor().cursor().line)).as("the cursor stays on its text").isEqualTo("line 570");
+        });
+    }
+
+    /**
+     * An edit in another view that pushes a Vim view's cursor out of its window while a command line is typed in that
+     * view sets only the window's first line, as the command line keeps the window where it is: the cursor keeps its
+     * text out of sight.
+     */
+    @Test void aVimViewTypingACommandLineKeepsItsWindowThoughItsCursorIsPushedOut() throws Exception {
+        var v = new AtomicReference<VimViews>();
+        onEdt(() -> {
+            v.set(vimViews());
+            type(v.get().editor(), "300Gzt318G:");
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(v.get().editor().commandLineText()).isPresent();
+            v.get().other().setCaretPosition(lineStart(v.get().other(), 305));
+            v.get().other().replaceSelection("new\n".repeat(10));
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var editor = v.get().editor();
+            assertThat(top(v.get().shown())).as("the window stays").isEqualTo("line 300");
+            assertThat(editor.view().topline).isEqualTo(300);
+            assertThat(line(v.get().shown(), editor.cursor().line)).as("the cursor keeps its text").isEqualTo("line 318");
+            assertThat(v.get().cursorShown()).as("out of sight").isFalse();
+        });
+    }
+
+    /** In Insert mode too, a Vim view's cursor pushed out of its window by another view's edit keeps its text, in sight. */
+    @Test void aVimViewInInsertModeKeepsItsCursorOnItsTextInSight() throws Exception {
+        var v = new AtomicReference<VimViews>();
+        onEdt(() -> {
+            v.set(vimViews());
+            type(v.get().editor(), "300Gzt318Gi");
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(v.get().editor().mode()).isEqualTo(Mode.INSERT);
+            v.get().other().setCaretPosition(lineStart(v.get().other(), 305));
+            v.get().other().replaceSelection("new\n".repeat(10));
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            var editor = v.get().editor();
+            assertThat(line(v.get().shown(), editor.cursor().line)).as("the cursor keeps its text").isEqualTo("line 318");
+            assertThat(v.get().cursorShown()).as("in sight").isTrue();
+            assertThat(editor.mode()).isEqualTo(Mode.INSERT);
         });
     }
 

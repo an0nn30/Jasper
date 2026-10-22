@@ -66,6 +66,13 @@ class EditorPluginTest {
     private static String rowId(List<String> rows) { return rows.getFirst().split("\\|")[0]; }
     private static void drain(FakePluginHost host) { while (host.runBackground() > 0) { } }
 
+    /** @return the plugin's Editor window, whose selected view is the content tab active last */
+    private static EditorWindow window(EditorPlugin plugin) throws ReflectiveOperationException {
+        var field = EditorPlugin.class.getDeclaredField("window");
+        field.setAccessible(true);
+        return (EditorWindow) field.get(plugin);
+    }
+
     @Test void recentFilesListOpenedFilesReopenThemAndForgetThem() throws Exception {
         try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
@@ -411,8 +418,9 @@ class EditorPluginTest {
      * nothing; a document already open comes back as another view of it, which reads nothing (pane flexibility spec 6).
      */
     @Test void aRestoredRemoteDocumentReadsQuietlyOnlyOnceItsTabIsActive() throws Exception {
+        var plugin = plugin();
         try (var host = host()) {
-            host.start(INFO, Set.of(), Set.of(), plugin());
+            host.start(INFO, Set.of(), Set.of(), plugin);
             UUID main = host.addTerminalWindow();
             var consumer = new AtomicReference<PluginContext>();
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
@@ -458,7 +466,13 @@ class EditorPluginTest {
             drain(host);
             assertThat(host.declinedRestores()).isEmpty();
             assertThat(host.contentTabs()).as("two views of notes.md, and other.md").hasSize(3);
+            host.contentTabs().getLast().select();
+            drain(host);
             assertThat(quiet.get() + loud.get()).as("the new view shares the file's one read").isEqualTo(1);
+            var view = window(plugin).selected().orElseThrow();
+            assertThat(view.session().name()).isEqualTo("notes.md");
+            assertThat(dev.jasper.editor.testsupport.Kits.button(view.view(), "document.retry").state().visible())
+                .as("the new view shows the failed read, with Retry").isTrue();
         }
     }
 
@@ -475,6 +489,7 @@ class EditorPluginTest {
             var consumer = new AtomicReference<PluginContext>();
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
             var reads = new java.util.concurrent.atomic.AtomicInteger();
+            var quiet = new java.util.concurrent.atomic.AtomicInteger();
             dev.jasper.editor.api.EditorDocument remote = new dev.jasper.editor.api.EditorDocument() {
                 @Override public String key() { return "test:/srv/two.md"; }
                 @Override public String name() { return "two.md"; }
@@ -482,6 +497,13 @@ class EditorPluginTest {
                 @Override public Optional<String> host() { return Optional.of("box"); }
                 @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> read(long limitBytes) {
                     reads.incrementAndGet();
+                    return content();
+                }
+                @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> readQuietly(long limitBytes) {
+                    quiet.incrementAndGet();
+                    return content();
+                }
+                private java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> content() {
                     byte[] text = "# two\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     return java.util.concurrent.CompletableFuture.completedFuture(new dev.jasper.editor.api.Content(text, new dev.jasper.editor.api.Revision(1, text.length)));
                 }
@@ -497,24 +519,23 @@ class EditorPluginTest {
             assertThat(host.restoreTab("dev.jasper.editor", main, "two.md", state)).isPresent();
             assertThat(host.restoreTab("dev.jasper.editor", main, "two.md", state)).as("another view of it").isPresent();
             drain(host);
-            assertThat(reads).as("both views wait").hasValue(0);
+            assertThat(reads.get() + quiet.get()).as("both views wait").isZero();
             var views = List.copyOf(host.contentTabs());
             assertThat(views).hasSize(2).allSatisfy(tab -> assertThat(host.restoreState(tab)).contains(state));
             views.getLast().select();
             drain(host);
-            assertThat(reads).as("one read for both views").hasValue(1);
+            assertThat(quiet).as("one read for both views, asking nothing").hasValue(1);
+            assertThat(reads).hasValue(0);
             views.getFirst().select();
             drain(host);
-            assertThat(reads).hasValue(1);
+            assertThat(reads.get() + quiet.get()).isEqualTo(1);
+            assertThat(window(plugin).selected().orElseThrow().area().getText()).as("the other view shows the text read").isEqualTo("# two\n");
             Path notes = Files.writeString(home.resolve("notes.md"), "# notes\n");
             var local = dev.jasper.sdk.RestoreState.of("document", "key", "local:" + notes.toAbsolutePath().normalize());
             assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", local)).isPresent();
             assertThat(host.restoreTab("dev.jasper.editor", main, "notes.md", local)).isPresent();
             drain(host);
-            var windowField = EditorPlugin.class.getDeclaredField("window");
-            windowField.setAccessible(true);
-            var window = (EditorWindow) windowField.get(plugin);
-            assertThat(window.sessions()).as("two files, four views").hasSize(2);
+            assertThat(window(plugin).sessions()).as("two files, four views").hasSize(2);
             assertThat(host.contentTabs()).hasSize(4);
             assertThat(host.declinedRestores()).isEmpty();
             assertThat(host.failures()).isEmpty();

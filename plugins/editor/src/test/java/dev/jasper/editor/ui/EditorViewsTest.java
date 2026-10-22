@@ -319,6 +319,51 @@ class EditorViewsTest {
         assertThat(source.area().getCaretLineNumber()).as("the source stays").isEqualTo(228);
     }
 
+    /** Open File Right… of {@code file}, which is open, from the main window. */
+    private EditorTab openRight(Path file) {
+        host.queueFileChoice(List.of(new FileLocation.Local(file)));
+        window.openBeside(context.terminals().window(main).orElseThrow(), TabPlacement.SPLIT_RIGHT);
+        drain();
+        return window.selected().orElseThrow();
+    }
+
+    /**
+     * Open File Right… of a file that is open starts the new view where the file's view active last is, at its caret,
+     * selection and scroll position, as IntelliJ opens a file again at its last caret.
+     */
+    @Test void openFileRightOfAnOpenFileStartsWhereItsLastActiveViewIs() throws Exception {
+        Path file = numbered("again.txt", 600);
+        EditorTab first = opened(file);
+        EditorTab second = split(TabPlacement.SPLIT_DOWN);
+        laidOut(first, 400, 20);
+        laidOut(second, 400, 20);
+        first.area().select(first.area().getLineStartOffset(250), first.area().getLineEndOffset(250));
+        first.scroll().getViewport().setViewPosition(new java.awt.Point(0, first.area().yForLine(240)));
+        handle(0).select();
+        EditorTab view = openRight(file);
+        assertThat(view).isNotIn(first, second);
+        laidOut(view, 400, 20);
+        settle();
+        assertThat(view.area().getSelectedText()).as("its caret and selection").isEqualTo("line 251\n");
+        assertThat(topLine(view)).as("its scroll position").isEqualTo(240);
+    }
+
+    /** With Vim on, Open File Right… of an open file starts the new view as a split view starts, on the cursor's line. */
+    @Test void openFileRightOfAnOpenFileWithVimStartsOnItsLastActiveViewsCursorLine() throws Exception {
+        vimOn();
+        Path file = numbered("vim-again.txt", 600);
+        EditorTab source = opened(file);
+        laidOut(source, 400, 40);
+        settle();
+        vimKeys(source, "200Gzt229G");
+        settle();
+        EditorTab view = openRight(file);
+        laidOut(view, 400, 20);
+        settle();
+        assertThat(view.area().getCaretLineNumber()).isEqualTo(228);
+        assertThat(caretShown(view)).isTrue();
+    }
+
     /** Closed views leave nothing on their file's session: five views opened and closed, and its listeners are as before. */
     @Test void closedViewsLeaveNoListenerOnTheirFile() throws Exception {
         EditorTab first = opened(file("leak.txt", "x\n"));

@@ -267,6 +267,37 @@ class EditorWindowTest {
         assertThat(host.contentOwner(host.contentTabs().getLast())).as("a new document").isEqualTo(used);
     }
 
+    /**
+     * A file's views come back each in the window it was saved in, the second window's first: the view restored into the
+     * first window, as another view of the open file, opens there, and the window the Editor was used from stays as it
+     * was on that path too.
+     */
+    @Test void aFilesViewsComeBackInTheWindowsTheyWereSavedIn() throws Exception {
+        WindowHandle used = context.terminals().window(host.addTerminalWindow()).orElseThrow();
+        UUID firstId = host.addTerminalWindow(), secondId = host.addTerminalWindow();
+        // A shell keeps each window open once its restored view has closed.
+        host.addTerminalTab(firstId, "zsh");
+        host.addTerminalTab(secondId, "zsh");
+        WindowHandle first = context.terminals().window(firstId).orElseThrow(), second = context.terminals().window(secondId).orElseThrow();
+        window.openLocal(file("used.txt", "used\n"), used);
+        drain();
+        host.contentTabs().getLast().close();
+        Path file = file("both.txt", "both\n");
+        window.openRestored(new LocalDocument(file, context.background()), second);
+        drain();
+        window.openRestored(new LocalDocument(file, context.background()), first);
+        drain();
+        assertThat(window.sessions()).as("one file").hasSize(1);
+        assertThat(host.contentTabs()).hasSize(2);
+        assertThat(host.contentOwner(host.contentTabs().get(0))).as("the view restored first").isEqualTo(second);
+        assertThat(host.contentOwner(host.contentTabs().get(1))).as("another view of it, in its own window").isEqualTo(first);
+        List.copyOf(host.contentTabs()).forEach(dev.jasper.sdk.ui.ContentTab::close);
+        assertThat(window.selected()).isEmpty();
+        host.queueFileChoice(List.of());
+        window.openChooser();
+        assertThat(host.fileChoices().getLast().owner()).as("the window the Editor was used from").isEqualTo(used);
+    }
+
     @Test void aTabPublishesItsCommandsButLeavesCloseTabToTheHost() throws Exception {
         var tab = opened(file("menu.txt", "text"));
         var published = window.contentCommands(tab);

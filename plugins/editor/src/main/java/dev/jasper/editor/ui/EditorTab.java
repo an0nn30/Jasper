@@ -247,8 +247,8 @@ public final class EditorTab {
     }
 
     /**
-     * @param heir the editor of the file's other view that this view's uppercase Vim marks go to when it closes, as Vim's
-     *     file marks are the file's (pane flexibility spec 6); empty gives them to another editor of the file
+     * @param heir the editor of the file's view active last, with Vim on, that this view's uppercase Vim marks go to when
+     *     it closes, as Vim's file marks are the file's (Rulings 12); empty gives them to another editor of the file
      */
     void marksHeir(java.util.function.Supplier<Optional<VimEditor>> heir) { marksHeir = heir; }
 
