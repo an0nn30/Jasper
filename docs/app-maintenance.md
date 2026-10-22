@@ -147,10 +147,10 @@ checks those anchors: keep the headings that make `supported-settings`, `theme`,
 `palette`, `desk-buddy`, `terminal-colors`, `shell-environment-and-history`, `background-residency`, `plugins` and
 `shortcuts`.
 
-A View menu choice for a saved field saves it (`WindowContent.choose`); only per-pane font sizes and Show/Hide Jasper
-stay session-only, and an unchanged saved font size must preserve a pane's size. Check `TabHost.configure`
-for pending-session attachment as well as existing views. Shell, environment, integration and scrollback are captured
-per launch; columns and lines once per window in `JasperApplication.windowLauncher`
+A View menu choice for a saved field saves it (`WindowContent.choose`); only a pane's or Editor tab's own font size and
+Show/Hide Jasper stay session-only, and an unchanged saved font size must preserve a pane's size. Check
+`TabHost.configure` for pending-session attachment as well as existing views. Shell, environment, integration and
+scrollback are captured per launch; columns and lines once per window in `JasperApplication.windowLauncher`
 ([architecture](app-architecture.md#saved-and-temporary-configuration)).
 
 <!-- example:settings -->

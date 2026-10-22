@@ -114,6 +114,7 @@ final class WorkspaceActions {
         return switch (id) {
             case FIND -> "find"; case FIND_NEXT -> "find-next"; case FIND_PREVIOUS -> "find-previous";
             case COPY -> "copy"; case PASTE -> "paste";
+            case FONT_BIGGER -> "font-bigger"; case FONT_SMALLER -> "font-smaller"; case FONT_RESET -> "font-reset";
             default -> null;
         };
     }

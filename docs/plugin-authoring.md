@@ -579,8 +579,9 @@ the tab strip, the window, its menus and the status bar; the plugin provides the
   title while dirty and the detail after it; its tooltip is the location, which Jasper never treats as a local path.
 - `setCommands(List<ContentCommand>)`: commands appear in the tab's right-click menu, after Move Tab to New Window, Move
   Tab Into and Close Tab, and their shortcuts work while the tab is active. Commands with the ids `find`, `find-next`,
-  `find-previous`, `copy` and `paste` answer Jasper's Find, Find Next, Find Previous, Copy and Paste; Close Pane asks
-  the item to close, and Close Tab every item of its tab.
+  `find-previous`, `copy`, `paste`, `font-bigger`, `font-smaller` and `font-reset` answer Jasper's Find, Find Next,
+  Find Previous, Copy, Paste, Increase Font Size, Decrease Font Size and Reset Font Size; Close Pane asks the item to
+  close, and Close Tab every item of its tab.
 - `setStatus(List<ContentStatus>)`: items in the status bar while the tab is active, each plain text or a button.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new child window
   (a child window's only tab stays where it is) and `moveToMainWindow()` to the main window, keeping the view and its

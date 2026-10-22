@@ -43,13 +43,14 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
 - **Last recorded checks.** This branch after plan 9b's final fix wave and its residual round (2026-10-22): 12,802
   tests, 0 failures, 0 errors, 29 skipped. After the fix wave alone it had 12,796, after plan 9b's documentation commit
   (2026-10-22) 12,777, and after plan 9a's final fix wave and its residual round (2026-10-21) 12,706. `./gradlew check`
-  on local `main` with the Editor's typography and Markdown preview and the bundled Cygwin merged (2026-10-20): 11,878
-  tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in Editor performance tests). It ran with
-  Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python
-  3.14. Hosted CI on PR #1 (2026-10-19): macOS, Ubuntu and every Linux packaging and install check passed, and so did
-  the single-worker Windows check. No check is recorded for the later commits: the Shell Prompt icon and the Meadow
-  splash shared with Enterprise mode (`eb424eeec`, `4743469e5`), the Meadow theme pair (`73c2b8f61`), the website
-  fixtures' removal (`375615bbf`) and the Javadoc rename (`427321de4`).
+  on `claude/editor-font-zoom` (`427321de4` with the Editor font size shortcuts, 2026-10-21): 11,893 tests, 0 failures,
+  0 errors, 29 skipped; on local `main` with the Editor's typography and Markdown preview and the bundled Cygwin merged
+  (2026-10-20): 11,878 tests, 0 failures, 0 errors, 29 skipped (25 platform skips and four opt-in Editor performance
+  tests). Both ran with Python 3.13 (`-Pjasper.python`), because `checkThemeTool`'s
+  `test_deeply_nested_input_is_a_message` fails under Python 3.14. Hosted CI on PR #1 (2026-10-19): macOS, Ubuntu and
+  every Linux packaging and install check passed, and so did the single-worker Windows check. No check is recorded for
+  the later commits: the Shell Prompt icon and the Meadow splash shared with Enterprise mode (`eb424eeec`, `4743469e5`),
+  the Meadow theme pair (`73c2b8f61`), the website fixtures' removal (`375615bbf`) and the Javadoc rename (`427321de4`).
 
 Bundled plugins, all enabled by default except Enterprise:
 
@@ -71,9 +72,10 @@ Open items, as the entries below record them:
   Enterprise look's, in the series entry (2026-10-18, spec 16.2); the side stripes entry and plans 13, 14, 15a and 15b
   add their own, plan 14's starting with the classic title band in the packaged macOS app. The Editor's fonts and
   Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
-  Meadow splash and the Rail and Status Bar shortcuts (2026-10-20) await theirs. The workspace tabs series awaits the
-  checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only tab, plans 7a to 8c, 6a, 6b, 9a and 9b; plan 2
-  had none), and so do its two merge entries ("local main merged in", 2026-10-19, and the second sync, 2026-10-21).
+  Meadow splash, the Rail and Status Bar shortcuts (2026-10-20) and the Editor font size shortcuts (2026-10-21) await
+  theirs. The workspace tabs series awaits the checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only
+  tab, plans 7a to 8c, 6a, 6b, 9a and 9b; plan 2 had none), and so do its two merge entries ("local main merged in",
+  2026-10-19, and the second sync, 2026-10-21).
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
@@ -512,6 +514,17 @@ host's Close Pane closes the pane, and Vim's `:action close-pane` still runs it)
 pages and the `jasper` usage text match the merged code; its re-review's residuals: Dismiss Cards run from a child
 window closes the main window's cards, a preview realized hidden (a restored tab that is not the shown one) waits until
 it shows, and Zen saves when toggled; `./gradlew check --continue`: **12,606 tests, 0 failures, 0 errors, 29 skipped**. Not merged into `main`, not pushed.
+
+**Editor font size shortcuts — 2026-10-21** (`claude/editor-font-zoom`, worktree `.claude/worktrees/editor-font-zoom`,
+from `main` at `427321de4`): Increase, Decrease and Reset Font Size (Cmd+=, Cmd+- and Cmd+0; Ctrl+Shift+=, - and 0)
+act on a selected Editor tab as they do on a terminal pane: one point at a time from 6 to 72 points, the tab's Markdown
+preview included, nothing saved; Reset returns it to the saved Editor size (the terminal's while the Editor follows
+it). A new saved size replaces the tab's own size; other font changes keep it. The workspace runs a plugin tab's
+content commands `font-bigger`, `font-smaller` and `font-reset` for the three actions (named in the SDK's
+`ContentTab`/`ContentCommand` Javadoc, the plugin guide and the regenerated SDK reference); the Editor publishes them
+without shortcuts, so the keymap's keys apply. The SDK stays 0.18.3 and the Editor 0.11.0. A small change agreed in
+chat, without a written spec or plan. Full headless `check` passed on macOS with Python 3.13: 11,893 tests, zero
+failures/errors, 29 skips. GUI check pending.
 
 **Workspace tabs, plan 6b: plugins' tabs come back — 2026-10-21** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `eefe0324e..b22836d14`, then this documentation commit and its final-review fix

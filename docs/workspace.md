@@ -103,8 +103,8 @@ Plugins can open their own items in tabs and panes beside terminals; the Editor 
 [Editor](editor.md)). A plugin's item shows ● before its title while it has unsaved changes. While one is active:
 
 - its own commands take their shortcuts (the Editor's Cmd+S, Ctrl+S on Linux and Windows, and so on), and **Find**,
-  **Find Next**, **Find Previous** and **Copy** and **Paste** act on it; **Close Pane** closes it, and **Close Tab** its
-  whole tab;
+  **Find Next**, **Find Previous**, **Copy**, **Paste**, **Increase Font Size**, **Decrease Font Size** and
+  **Reset Font Size** act on it; **Close Pane** closes it, and **Close Tab** its whole tab;
 - the header's search field shows its title and host, and the status bar shows its location and its own items.
 
 A tab's right-click menu has **Rename Tab** (for a terminal), **Move Tab to New Window**, **Move Tab Into**, **Close

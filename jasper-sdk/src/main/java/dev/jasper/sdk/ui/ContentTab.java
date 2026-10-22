@@ -24,9 +24,11 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
     /**
      * Replaces the content's commands. They appear in the tab's context menu; while the tab is active, a command's
      * shortcut runs it ahead of the Jasper actions bound to the same key, the command palette's shortcuts excepted (a
-     * disabled command's shortcut does nothing), and Jasper's Copy, Paste, Find, Find Next and Find Previous run the enabled command with the id {@code copy},
-     * {@code paste}, {@code find}, {@code find-next} or {@code find-previous}. In a text field, the shortcut of a
-     * {@code copy} or {@code paste} command keeps the field's own clipboard behaviour. Ignored once the tab is closed.
+     * disabled command's shortcut does nothing), and Jasper's Copy, Paste, Find, Find Next, Find Previous, Increase
+     * Font Size, Decrease Font Size and Reset Font Size run the enabled command with the id {@code copy},
+     * {@code paste}, {@code find}, {@code find-next}, {@code find-previous}, {@code font-bigger}, {@code font-smaller}
+     * or {@code font-reset}. In a text field, the shortcut of a {@code copy} or {@code paste} command keeps the field's
+     * own clipboard behaviour. Ignored once the tab is closed.
      *
      * @param commands immutable snapshot of active-content commands
      */

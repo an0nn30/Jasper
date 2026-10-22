@@ -1133,6 +1133,13 @@ public final class EditorWindow {
             () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().undoLastAction(); }))));
         descriptions.add(new dev.jasper.sdk.ui.ContentCommand("redo", "Redo", null, true,
             () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().redoLastAction(); }))));
+        // Jasper's Increase, Decrease and Reset Font Size run these, with the keys the window's keymap gives them.
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("font-bigger", "Increase Font Size", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> value.changeFontSize(1)))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("font-smaller", "Decrease Font Size", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> value.changeFontSize(-1)))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("font-reset", "Reset Font Size", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(EditorTab::resetFontSize))));
         return descriptions;
     }
 

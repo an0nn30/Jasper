@@ -61,6 +61,10 @@ public final class EditorTab {
     private java.util.function.Supplier<Optional<VimEditor>> marksHeir = Optional::empty;
     private final VimBar vimBar = new VimBar(this::render, this::reveal);
     private int tabSize = 4;
+    private static final double MIN_FONT_SIZE = 6, MAX_FONT_SIZE = 72;
+    /** The saved typography, and this tab's own size while it is zoomed (null otherwise). */
+    private TerminalTypography typography;
+    private Double fontSize;
     private FindBar find;
     private MarkdownController markdown;
     private MarkdownPreferences markdownPreferences;
@@ -191,7 +195,32 @@ public final class EditorTab {
         document.settings(settings);
         if (vim != null) vim.editorDefaults(defaults());
     }
-    void typography(TerminalTypography value) { if (!closed) document.typography(value); }
+    /** Shows the saved typography; a new saved size replaces this tab's own size, as it does a terminal pane's. */
+    void typography(TerminalTypography value) {
+        if (closed) return;
+        if (typography != null && value.size() != typography.size()) fontSize = null;
+        typography = value;
+        showTypography();
+    }
+    /** Changes this tab's own font size by {@code points}, from 6 to 72 points, without saving it. */
+    void changeFontSize(double points) {
+        if (closed || typography == null) return;
+        double current = fontSize == null ? typography.size() : fontSize;
+        double next = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, current + points));
+        if (next == current) return;
+        fontSize = next;
+        showTypography();
+    }
+    /** Returns this tab to the saved font size. */
+    void resetFontSize() {
+        if (closed || fontSize == null) return;
+        fontSize = null;
+        showTypography();
+    }
+    private void showTypography() {
+        document.typography(fontSize == null ? typography : new TerminalTypography(typography.family(), fontSize,
+            typography.fallback(), typography.ligatures(), typography.lineHeight()));
+    }
     void find(FindBar value) {
         if (closed) return;
         if (find != null && find != value) find.dismiss();

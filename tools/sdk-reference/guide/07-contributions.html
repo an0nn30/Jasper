@@ -142,7 +142,9 @@ already has open selects that tab and returns its handle. Through the {@link Con
 title, detail, icon, unsaved marker and location ({@link ContentTab#setPresentation(ContentPresentation)}), its commands
 ({@link ContentTab#setCommands(List)}), which its context menu lists and whose shortcuts apply while it is active, and
 its status bar items ({@link ContentTab#setStatus(List)}). Commands with the ids {@code find}, {@code find-next},
-{@code find-previous}, {@code copy} and {@code paste} answer Jasper's own Find, Find Next, Find Previous, Copy and Paste.
+{@code find-previous}, {@code copy}, {@code paste}, {@code font-bigger}, {@code font-smaller} and {@code font-reset}
+answer Jasper's own Find, Find Next, Find Previous, Copy, Paste, Increase Font Size, Decrease Font Size and Reset Font
+Size.
 The user can move the tab to a new window and back, as {@link ContentTab#moveToNewWindow()} and
 {@link ContentTab#moveToMainWindow()} do, give its pane a tab of its own ({@link ContentTab#moveToNewTab()}), and move
 its pane into another tab of its window ({@link ContentTab#moveToTab(int)}, one of {@link ContentTab#tabChoices()}). A

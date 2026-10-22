@@ -68,6 +68,28 @@ class HostedContentTest {
         });
     }
 
+    @Test void fontSizeActionsRunTheSelectedContentsFontCommands() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>())); var terminal = owner.currentTerminal();
+            var model = new Contributions(); owner.connectContributions(model);
+            var plain = model.tabs().open("dev.editor", "plain", "Plain", owner.id(), new JPanel());
+            owner.invoke(ActionId.FONT_BIGGER);
+            assertThat(owner.action(ActionId.FONT_BIGGER).isEnabled()).as("content without the command").isFalse();
+            var entry = model.tabs().open("dev.editor", "file", "File", owner.id(), new JPanel());
+            var ran = new ArrayList<String>();
+            entry.commands(List.of(
+                new ContentCommand("font-bigger", "Increase Font Size", null, true, () -> ran.add("bigger")),
+                new ContentCommand("font-smaller", "Decrease Font Size", null, true, () -> ran.add("smaller")),
+                new ContentCommand("font-reset", "Reset Font Size", null, true, () -> ran.add("reset"))));
+            owner.invoke(ActionId.FONT_BIGGER); owner.invoke(ActionId.FONT_SMALLER); owner.invoke(ActionId.FONT_RESET);
+            assertThat(ran).containsExactly("bigger", "smaller", "reset");
+            assertThat(owner.action(ActionId.FONT_RESET).isEnabled()).isTrue();
+            owner.selectTab(terminal);
+            owner.invoke(ActionId.FONT_BIGGER);
+            assertThat(ran).as("a terminal tab keeps the terminal's own font actions").hasSize(3);
+            plain.requestClose();
+        });
+    }
     @Test void documentOnlyShortcutIsInstalledAndRemovedOnSelectionChange() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
