@@ -22,6 +22,11 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   terminal's or an editor's right-click menu. **New Editor Window** (File menu, command palette and the toolbar's New
   Editor Window button) opens one in a new child window. None of these has a default shortcut. A new file's first save
   asks where to save it.
+- **Open File Right…** and **Open File Down…**, in the Split submenus (the command palette calls them **Split Right
+  with Open File…** and **Split Down with Open File…**), and **Open in Editor Pane…** in the File menu, which does what
+  Open File Right does, show the file chooser for one file and open it in a new pane beside the focused pane, which it
+  then has. A file that is open already shows its open pane instead; cancelling opens nothing. None of these has a
+  default shortcut.
 - **Recent Files…** (command palette) reopens a file the Editor opened before; see [Recent files](#recent-files).
 - **Show Editor** (command palette) selects the Editor tab you were last in, or opens an untitled tab when there is
   none.
@@ -56,15 +61,17 @@ Each file is the item of one pane: a tab of its own, or a pane beside others in 
   by ` · `;
 - a file icon, or a server icon for a remote file. Its tooltip is the file's full location.
 
-Right-click the tab for **Move Tab to New Window** and **Close Tab**, then every [command](#commands-and-shortcuts)
-with its shortcut, **Copy**, **Paste**, **Select All**, **Cut**, **Delete**, **Undo** and **Redo**; a child window's ⋮
-menu also has **Move to Main Window**. Moving a tab keeps its text, undo history, unsaved changes and Markdown view.
+Right-click the tab for **Move Tab to New Window**, **Move Tab Into** and **Close Tab**, then every
+[command](#commands-and-shortcuts) with its shortcut, **Copy**, **Paste**, **Select All**, **Cut**, **Delete**,
+**Undo** and **Redo**; a child window's ⋮ menu also has **Move to Main Window**. Moving a tab keeps its text, undo
+history, unsaved changes and Markdown view.
 Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the
 **Folding** submenu (Toggle Current Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by
 **Save**, **Find…**, **Go to Line…**, **Toggle Comment** and **Revert to Saved**, then **Split** (Terminal Right,
-Terminal Down, Editor Right, Editor Down, then each plugin's split items), which opens the choice in a new pane beside
-the editor, and **Move Pane to New Tab**, which gives the editor's pane a tab of its own while its tab holds another
-pane.
+Terminal Down, Editor Right, Editor Down, Open File Right…, Open File Down…, then each plugin's split items), which opens
+the choice in a new pane beside the editor, **Move Pane to New Tab**, which gives the editor's pane a tab of its own
+while its tab holds another pane, and **Move Pane to Tab**, which moves it into another tab of its window. This menu
+names a tab whose active pane shows an Editor file and lists any other tab as "Tab 3"; the Tab menu names them all.
 
 While an Editor tab is selected its own shortcuts take precedence over the window's: on macOS Cmd+N makes a new file
 instead of a new terminal window. The Edit menu's **Copy**, **Paste**, **Find**, **Find Next** and **Find Previous**
@@ -138,6 +145,9 @@ The plugin's actions are in the command palette and can be given other shortcuts
 | New Editor Tab | `dev.jasper.editor.new_editor_tab` | | | File menu |
 | Split Right with Editor | `dev.jasper.editor.split_right_editor` | | | File menu (as New Editor Pane), the Split submenus |
 | Split Down with Editor | `dev.jasper.editor.split_down_editor` | | | The Split submenus |
+| Split Right with Open File… | `dev.jasper.editor.split_right_open-file` | | | The Split submenus (as Open File Right…) |
+| Split Down with Open File… | `dev.jasper.editor.split_down_open-file` | | | The Split submenus (as Open File Down…) |
+| Open in Editor Pane… | `dev.jasper.editor.open_in_pane` | | | File menu |
 | New Editor Window | `dev.jasper.editor.new_window` | | | File menu, toolbar |
 | Revert to Saved | `dev.jasper.editor.revert` | | | |
 | Reload vimrc | `dev.jasper.editor.reload_vimrc` | | | |

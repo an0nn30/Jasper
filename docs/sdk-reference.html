@@ -1601,12 +1601,18 @@ title, detail, icon, unsaved marker and location (<a href="#dev.jasper.sdk.ui.Co
 its status bar items (<a href="#dev.jasper.sdk.ui.ContentTab.setStatus(List)"><code>ContentTab.setStatus(List)</code></a>). Commands with the ids <code>find</code>, <code>find-next</code>,
 <code>find-previous</code>, <code>copy</code> and <code>paste</code> answer Jasper's own Find, Find Next, Find Previous, Copy and Paste.
 The user can move the tab to a new window and back, as <a href="#dev.jasper.sdk.ui.ContentTab.moveToNewWindow()"><code>ContentTab.moveToNewWindow()</code></a> and
-<a href="#dev.jasper.sdk.ui.ContentTab.moveToMainWindow()"><code>ContentTab.moveToMainWindow()</code></a> do, and give its pane a tab of its own (<a href="#dev.jasper.sdk.ui.ContentTab.moveToNewTab()"><code>ContentTab.moveToNewTab()</code></a>).
+<a href="#dev.jasper.sdk.ui.ContentTab.moveToMainWindow()"><code>ContentTab.moveToMainWindow()</code></a> do, give its pane a tab of its own (<a href="#dev.jasper.sdk.ui.ContentTab.moveToNewTab()"><code>ContentTab.moveToNewTab()</code></a>), and move
+its pane into another tab of its window (<a href="#dev.jasper.sdk.ui.ContentTab.moveToTab(int)"><code>ContentTab.moveToTab(int)</code></a>, one of <a href="#dev.jasper.sdk.ui.ContentTab.tabChoices()"><code>ContentTab.tabChoices()</code></a>). A
+<a href="#dev.jasper.sdk.ui.TabChoice"><code>TabChoice</code></a> carries its tab's title only when the plugin holds <code>terminal.observe</code> or the tab shows the
+plugin's own content; otherwise its title is empty and <a href="#dev.jasper.sdk.ui.TabChoice.label()"><code>TabChoice.label()</code></a> reads "Tab 2".
 <a href="#dev.jasper.sdk.ui.Windows.onTabsClosing(BiFunction)"><code>Windows.onTabsClosing(BiFunction)</code></a> decides whether tabs with unsaved work may close.</p>
 <p><a href="#dev.jasper.sdk.ui.Windows.splitItem(SplitItemSpec,BiConsumer)"><code>Windows.splitItem(SplitItemSpec, BiConsumer)</code></a> puts a view of the plugin's in every Split list (the Tab menu's and
 the right-click menus' Split submenus), after the terminal, with two actions, "Split Right with" and "Split Down with"
-its label; the opener receives the window and the placement. <a href="#dev.jasper.sdk.ui.Windows.splitChoices()"><code>Windows.splitChoices()</code></a> lists the choices for a menu
-the plugin builds itself, and <a href="#dev.jasper.sdk.ui.ContentTab.split(SplitChoice,Direction)"><code>ContentTab.split(SplitChoice, Direction)</code></a> runs one beside the item.</p>
+its label; the opener receives the window and the placement. An item whose actions ask something first, as a file
+chooser does (<a href="#dev.jasper.sdk.ui.SplitItemSpec.asking()"><code>SplitItemSpec.asking()</code></a>), ends its entries and its actions' titles with an ellipsis.
+<a href="#dev.jasper.sdk.ui.Windows.splitChoices()"><code>Windows.splitChoices()</code></a> lists the choices for a menu the plugin builds itself, each worded by
+<a href="#dev.jasper.sdk.ui.SplitChoice.rightLabel()"><code>SplitChoice.rightLabel()</code></a> and <a href="#dev.jasper.sdk.ui.SplitChoice.downLabel()"><code>SplitChoice.downLabel()</code></a>, and <a href="#dev.jasper.sdk.ui.ContentTab.split(SplitChoice,Direction)"><code>ContentTab.split(SplitChoice, Direction)</code></a>
+runs one beside the item.</p>
 <p>A tab comes back when Jasper restores its windows if its <a href="#dev.jasper.sdk.ui.ContentSpec"><code>ContentSpec</code></a> carries a <a href="#dev.jasper.sdk.RestoreState"><code>RestoreState</code></a>
 (<a href="#dev.jasper.sdk.ui.ContentSpec.withRestore(RestoreState)"><code>ContentSpec.withRestore(RestoreState)</code></a>, later <a href="#dev.jasper.sdk.ui.ContentTab.setRestore(Optional)"><code>ContentTab.setRestore(Optional)</code></a>) and the plugin registered a
 <a href="#dev.jasper.sdk.ui.TabRestorer"><code>TabRestorer</code></a> for its kind with <a href="#dev.jasper.sdk.ui.Windows.restorer(String,TabRestorer)"><code>Windows.restorer(String, TabRestorer)</code></a>. The restorer gets a

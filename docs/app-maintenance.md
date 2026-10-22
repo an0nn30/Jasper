@@ -873,9 +873,12 @@ cursor and the landing on the target window's `DockDropOverlay`. A parent tab's 
 `WorkspaceDropResolver.place`: change the rule in the resolver and its tests first. A drop along its own strip is
 `WindowContent.reorderParentTab`; one into another window goes through `WindowManager.moveParentTab` (a window whose
 strip hides takes it over the band at its top, the main window's empty workspace anywhere over it), and a tear-out
-through `WindowManager.moveTabToNewWindow`, a full window. A parent tab drops on strips alone; a window's only parent
-tab has no tear-out target, and a parent tab holding a pinned tab or one being closed takes targets along its own strip
-only. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in
+through `WindowManager.moveTabToNewWindow`, a full window. Beside a pane of a window's shown tab other than its own
+(`TabDrag.Target.Into`) a parent tab merges into that tab, as one nested split (`Layout.insertBeside`): in its window
+through `WindowContent.mergeTab`, into another through `WindowManager.moveTabInto` and the tab registry. Its entry
+resting on another tab's entry for `TabDrag.SPRING_DELAY` shows that tab (spring-loading, the `TabDrag.spring` timer,
+which tests fire themselves: `TabDragTestSupport.elapse`). A window's only parent tab has no tear-out target, and a
+parent tab holding a pinned tab or one being closed takes targets along its own strip only. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in
 full screen on the display of the drag's own window, other than that window, takes no drop (`TabDrag.dropFrame`). Esc,
 a plain move or a press anywhere (a lost release), the source window losing the focus, and the tab its entry shows
 closing, leaving its parent tab or giving way to another of its groups end a drag. `TabDragTest` and

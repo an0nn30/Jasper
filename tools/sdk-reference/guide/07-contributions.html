@@ -144,12 +144,18 @@ title, detail, icon, unsaved marker and location ({@link ContentTab#setPresentat
 its status bar items ({@link ContentTab#setStatus(List)}). Commands with the ids {@code find}, {@code find-next},
 {@code find-previous}, {@code copy} and {@code paste} answer Jasper's own Find, Find Next, Find Previous, Copy and Paste.
 The user can move the tab to a new window and back, as {@link ContentTab#moveToNewWindow()} and
-{@link ContentTab#moveToMainWindow()} do, and give its pane a tab of its own ({@link ContentTab#moveToNewTab()}).
+{@link ContentTab#moveToMainWindow()} do, give its pane a tab of its own ({@link ContentTab#moveToNewTab()}), and move
+its pane into another tab of its window ({@link ContentTab#moveToTab(int)}, one of {@link ContentTab#tabChoices()}). A
+{@link TabChoice} carries its tab's title only when the plugin holds {@code terminal.observe} or the tab shows the
+plugin's own content; otherwise its title is empty and {@link TabChoice#label()} reads "Tab 2".
 {@link Windows#onTabsClosing(BiFunction)} decides whether tabs with unsaved work may close.</p>
 <p>{@link Windows#splitItem(SplitItemSpec,BiConsumer)} puts a view of the plugin's in every Split list (the Tab menu's and
 the right-click menus' Split submenus), after the terminal, with two actions, "Split Right with" and "Split Down with"
-its label; the opener receives the window and the placement. {@link Windows#splitChoices()} lists the choices for a menu
-the plugin builds itself, and {@link ContentTab#split(SplitChoice,Direction)} runs one beside the item.</p>
+its label; the opener receives the window and the placement. An item whose actions ask something first, as a file
+chooser does ({@link SplitItemSpec#asking()}), ends its entries and its actions' titles with an ellipsis.
+{@link Windows#splitChoices()} lists the choices for a menu the plugin builds itself, each worded by
+{@link SplitChoice#rightLabel()} and {@link SplitChoice#downLabel()}, and {@link ContentTab#split(SplitChoice,Direction)}
+runs one beside the item.</p>
 <p>A tab comes back when Jasper restores its windows if its {@link ContentSpec} carries a {@link RestoreState}
 ({@link ContentSpec#withRestore(RestoreState)}, later {@link ContentTab#setRestore(Optional)}) and the plugin registered a
 {@link TabRestorer} for its kind with {@link Windows#restorer(String,TabRestorer)}. The restorer gets a

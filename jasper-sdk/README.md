@@ -42,7 +42,7 @@ third-party plugin. The SDK depends only on the JDK.
 | Actions and where they appear | `Actions`, `ActionSpec`, `ActionContext`, `PluginAction`, `ShortcutContext`, `Toolbar`, `ToolbarItem`, `ToolbarViewFactory`, `Menus`, `StandardMenu`, `PluginMenu`, `StatusBar`, `StatusItemSpec`, `Side`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Rail` |
 | Declarative views | `UiKit`, `ViewSpec`, `Nodes`, `UiView`, `UiEvent`, `ControlState`, `ListItem`, `TableRow`, `TreeItem`, `Column`, `Option`, `MenuItem`, `Crumb`, `CustomContent`, `IconAsset`, `UiAnchor` |
 | Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelHeader` |
-| Dialogs, content tabs and split items | `Windows`, `WindowSurface`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `TabPlacement`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `SplitItemSpec`, `SplitChoice`, `TabRestorer`, `RestoreRequest` |
+| Dialogs, content tabs and split items | `Windows`, `WindowSurface`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `TabPlacement`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `SplitItemSpec`, `SplitChoice`, `TabChoice`, `TabRestorer`, `RestoreRequest` |
 | Colours for custom content and the look | `Appearance`, `SemanticColor`, `WorkspacePalette`, `EditorPalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Presentation`, `TerminalTypography` |
 | Desktop integration | `Platform`, `FileEditor` |
 
@@ -68,8 +68,10 @@ A plugin that uses something only a later 0.21 version has starts its range ther
 and content tabs alike (`TabHandle.kind()` and `terminal()` in place of a tab's pane list, no Pane menu); 0.20.0 gives
 Jasper one main window and child windows in place of plugin windows (`WindowHandle.isMain()`, `TabPlacement`,
 `ContentTab.moveToNewWindow()` and `moveToMainWindow()` in place of `move(boolean)`, no window shortcut context); 0.21.0
-makes tabs hold panes, adds split items (`Windows.splitItem`, `splitChoices`, `ContentTab.split`, `moveToNewTab`) and
-saves the workspace (`RestoreState`, `Windows.restorer`, `SessionState.NOT_STARTED`).
+makes tabs hold panes, adds split items (`Windows.splitItem`, `splitChoices`, `ContentTab.split`, `moveToNewTab`,
+`tabChoices` and `moveToTab`, whose choices carry another tab's title only with `terminal.observe` or when that tab
+shows the plugin's own content) and saves the workspace (`RestoreState`, `Windows.restorer`,
+`SessionState.NOT_STARTED`).
 [Writing a plugin](../docs/plugin-authoring.md) describes each.
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›

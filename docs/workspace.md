@@ -86,7 +86,8 @@ two or more tabs; tabs share its width equally and centre their titles, each nam
 |---|---|
 | Select a tab | Click it, or use **Select Tab 1**–**9**, **Next Tab** or **Previous Tab** (Tab menu). Next and Previous wrap around. |
 | Close a tab | Click the × that appears on hover (when the tab is wide enough to show it), middle-click the tab, choose **Close Tab** on its right-click menu or in the File menu, or press Cmd+Option+W (Ctrl+Alt+Shift+W). Close Tab closes every pane of the tab. |
-| Reorder or move tabs | Drag a tab along the strip to reorder it, onto another window's strip (or the top of a window that shows none, or anywhere over the main window's empty workspace) to move it there, or out of every window into a new child window (not a window's only tab, nor a tab with a dialog open in one of its panes, which moves along its strip only). Escape cancels. |
+| Reorder or move tabs | Drag a tab along the strip to reorder it, onto another window's strip (or the top of a window that shows none, or anywhere over the main window's empty workspace) to move it there, onto a pane of the tab another window shows to put all its panes beside that pane, on the side the landing shows, or out of every window into a new child window (not a window's only tab). Hold it still over another tab's entry for half a second to show that tab, then drop it beside one of its panes. A tab with a dialog open in one of its panes moves along its strip only. Escape cancels. |
+| Move a tab into another tab | **Move Tab Into** on the tab's right-click menu lists the window's other tabs, numbered as **Select Tab** numbers them; choosing one puts all the tab's panes to the right of that tab's active pane, keeping their arrangement and sizes. The moved tab's entry goes, the tab it joined shows, and the moved tab's active pane takes the focus, so the tab is named after that pane. |
 | Rename a tab | **Rename Tab** (Tab menu, Cmd+I; Ctrl+Shift+I) asks "Tab name (leave blank for automatic):". |
 
 Closing a terminal tab stops its shells immediately. A tab is named after its active pane: the title a program set,
@@ -106,8 +107,8 @@ Plugins can open their own items in tabs and panes beside terminals; the Editor 
   whole tab;
 - the header's search field shows its title and host, and the status bar shows its location and its own items.
 
-A tab's right-click menu has **Rename Tab** (for a terminal), **Move Tab to New Window**, **Close Tab**, then the active
-item's own commands.
+A tab's right-click menu has **Rename Tab** (for a terminal), **Move Tab to New Window**, **Move Tab Into**, **Close
+Tab**, then the active item's own commands.
 
 ## Panes and splits
 
@@ -116,9 +117,14 @@ Each tab holds one or more panes, and each pane one terminal, Editor file or plu
 - **Split Right** (Cmd+D; Ctrl+Shift+D) and **Split Down** (Cmd+Shift+D; Ctrl+Alt+Shift+D) halve the focused pane with
   a new terminal. The new pane takes the focus; beside a running terminal it starts in the same folder with the same
   shell profile. The **Split** submenu of the Tab menu and of a terminal's or an editor's right-click menu opens a
-  terminal, an editor (**Editor Right**, **Editor Down**) or a plugin's split item in a new pane beside the focused one.
+  terminal, an editor (**Editor Right**, **Editor Down**), a file you choose (**Open File Right…**, **Open File
+  Down…**) or a plugin's split item in a new pane beside the focused one.
 - **Move Pane to New Tab** (Cmd+Option+T; Ctrl+Alt+Shift+T) gives the focused pane a tab of its own, right after its
   tab, while its tab holds another pane.
+- **Move Pane to Tab** (Tab menu, and a terminal's or an editor's right-click menu) lists the window's other tabs,
+  numbered as **Select Tab** numbers them, and moves the focused pane to the right of the chosen tab's active pane: that
+  tab shows, the pane keeps the focus, a maximized pane there stops being maximized, and a tab left without panes
+  closes. **Move Pane to Tab 1** to **9** do the same from the keyboard; they have no default shortcut.
 - Hold Cmd+Option (Ctrl+Alt on Linux and Windows; on Windows the left Alt key) and drag inside a pane to move it: onto
   another pane of any window, which it splits on the side nearest the cursor; over the middle of a tab's entry, which
   shows that tab for the drop; or onto the outer quarter of a tab's entry (under the Enterprise look also its "+" or
@@ -207,10 +213,10 @@ Menu items show their current shortcuts. Opening a menu refreshes which items ar
 
 | Menu | Items |
 |---|---|
-| File | New Tab, New Terminal Window, Open File…, Close Pane, Close Tab, Close Window, Settings, Reload Config, Quit; then, each after a separator, Jasper's **Manage Plugins…** and the plugins' items: Editor's **Open in Editor…**, **New Editor Tab**, **New Editor Pane** and **New Editor Window**, Credential Vault's **Open Vault...**, **Change Vault Master Password...** and **Vault Plugin Grants...**, Project Index's **Index Folder…** |
+| File | New Tab, New Terminal Window, Open File…, Close Pane, Close Tab, Close Window, Settings, Reload Config, Quit; then, each after a separator, Jasper's **Manage Plugins…** and the plugins' items: Editor's **Open in Editor…**, **New Editor Tab**, **New Editor Pane**, **Open in Editor Pane…** and **New Editor Window**, Credential Vault's **Open Vault...**, **Change Vault Master Password...** and **Vault Plugin Grants...**, Project Index's **Index Folder…** |
 | Edit | Copy, Paste, Find, Find Next, Find Previous, Clear Scrollback |
 | View | Command Palette; View Modes › Zen; Maximize Pane; Show/Hide › Toolbar (Icons and Labels, Icons Only, Hidden), Status Bar, Rail; Font Size › Increase Font Size, Decrease Font Size, Reset Font Size; Tool Windows › one toggle per tool window |
-| Tab | Split › Terminal Right, Terminal Down, then each split item's Right and Down (Editor Right, Editor Down); Move Pane to New Tab, Focus Pane Left, Focus Pane Right, Focus Pane Up, Focus Pane Down, Previous Prompt, Next Prompt; Rename Tab; Next Tab, Previous Tab, Select Tab 1 to Select Tab 9 |
+| Tab | Split › Terminal Right, Terminal Down, then each split item's Right and Down (Editor Right, Editor Down, Open File Right…, Open File Down…); Move Pane to New Tab, Move Pane to Tab ›, Focus Pane Left, Focus Pane Right, Focus Pane Up, Focus Pane Down, Previous Prompt, Next Prompt; Rename Tab; Next Tab, Previous Tab, Select Tab 1 to Select Tab 9 |
 | Session | Plugins' session items. Remote: Connect to SSH Host..., Toggle SSH hosts, Split with Same Host, New Host..., Import from ~/.ssh/config..., Toggle Tunnels, Start or Stop a Tunnel..., New Tunnel..., Forward a Port..., Stop All Tunnels |
 | Transfer | Plugins' transfer items. Remote: Open SFTP here, Transfers; File Server: Share Folder…, New File Server… |
 | Tools | Plugins' tool items |
@@ -234,8 +240,8 @@ On macOS, while the menus are in the screen menu bar, the application menu (Jasp
 
 | Where | Items |
 |---|---|
-| A terminal pane | Copy, Paste, Find, Clear Terminal, Split › (as in the Tab menu), Move Pane to New Tab, Maximize Pane, Close Pane, then the window menu's Move Tab to New Window (and Move to Main Window in a child window); then plugins' items: Remote's **Forward a Port...** and **Open SFTP here**, File Server's **Share Path** › HTTP, HTTPS, FTP, FTPS, SFTP, TFTP |
-| A tab's entry in the strip | Rename Tab (for a terminal), Move Tab to New Window, Close Tab, then the active item's own commands |
+| A terminal pane | Copy, Paste, Find, Clear Terminal, Split › (as in the Tab menu), Move Pane to New Tab, Move Pane to Tab ›, Maximize Pane, Close Pane, then the window menu's Move Tab to New Window (and Move to Main Window in a child window); then plugins' items: Remote's **Forward a Port...** and **Open SFTP here**, File Server's **Share Path** › HTTP, HTTPS, FTP, FTPS, SFTP, TFTP |
+| A tab's entry in the strip | Rename Tab (for a terminal), Move Tab to New Window, Move Tab Into ›, Close Tab, then the active item's own commands |
 | A rail button, or a tool window's Options (⋯) button | Move to › Left Top, Left Bottom, Bottom Left, Right Top, Right Bottom, Bottom Right (the current slot checked); Hide |
 
 ## Tool windows and the dock

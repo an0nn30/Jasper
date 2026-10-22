@@ -7,8 +7,8 @@ and tool windows), the terminal (with the bundled Cygwin environment's Cygwin Ba
 notifications, Settings, themes and looks; most features, the Editor and its Markdown preview among them, are bundled
 plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
 
-- **Branches.** This is `claude/workspace-tabs` (the workspace tabs and the single instance: plans 1 to 5, 7a to 8c, 6a
-  and 6b), which merged `origin/main` at `8c8776e7e` on 2026-10-21 (the merge entry below); it is not merged into
+- **Branches.** This is `claude/workspace-tabs` (the workspace tabs and the single instance: plans 1 to 5, 7a to 8c, 6a,
+  6b and 9a), which merged `origin/main` at `8c8776e7e` on 2026-10-21 (the merge entry below); it is not merged into
   `main` and not pushed. `origin/main` at `8c8776e7e` is `427321de4` and the two documentation commits that bring the
   guides up to it. `origin/main` at `427321de4` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status
   Bar Keymap actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise mode),
@@ -55,7 +55,7 @@ Bundled plugins, all enabled by default except Enterprise:
 | Plugin | Id | Version | Exports | Provides |
 | --- | --- | --- | --- | --- |
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
-| Editor | `dev.jasper.editor` | 0.13.0 | `dev.jasper.editor.api` | Local and remote text files in tabs, with Markdown preview; `jasper editor` |
+| Editor | `dev.jasper.editor` | 0.14.0 | `dev.jasper.editor.api` | Local and remote text files in tabs, with Markdown preview; `jasper editor` |
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
 | File Server | `dev.jasper.fileserver` | 0.6.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
@@ -94,6 +94,130 @@ Open items, as the entries below record them:
 ## Handoff log
 
 Newest first. Each entry describes its change as it stood when the entry was written.
+
+**Workspace tabs, plan 9a: open beside, and moving panes and tabs into tabs — 2026-10-21** (`claude/workspace-tabs`,
+worktree `.claude/worktrees/workspace-tabs`, `b748fa26a..d9f6ad43e`, then this documentation commit;
+[plan](superpowers/plans/2026-10-21-workspace-9a-open-beside-and-move-into-tabs.md),
+[spec](superpowers/specs/2026-10-21-jasper-pane-flexibility-design.md), sections 3 to 5 and 8). **Open beside:** the
+Editor (0.14.0) registers a second split item, Open File (`EditorPlugin.OPEN_FILE`), so every Split list gains Open
+File Right… and Open File Down…, and its File menu gains Open in Editor Pane… (`dev.jasper.editor.open_in_pane`) beside
+New Editor Pane; each shows the Editor's chooser for one file (`EditorWindow.openBeside`) and opens it in a new pane
+beside the focused pane (`openDocumentBeside`), a file that is open already showing its open pane (`selectOpen`, the
+branch plan 9b replaces), and cancelling opens nothing. The SDK (0.21.0, unreleased) says that a split item's actions
+ask first (`SplitItemSpec.asking()`, `asks`), and both runtimes end its entries and its actions' titles with an
+ellipsis (`SplitChoice.rightLabel()` and `downLabel()` word them for plugins' own lists). **Move Pane to Tab:** the
+Tab menu and a terminal's and an editor's right-click menus list the window's other tabs, numbered as Select Tab
+numbers them ("2 zsh"), and move the focused pane to the right of the chosen tab's active pane, as a pane drag drops
+it (`WindowContent.moveToTab` over plan 8c's `movePane`); Move Pane to Tab 1 to 9 (`move_pane_to_tab_1`…) are
+unbound keymap actions; plugins build the submenu from `ContentTab.tabChoices()` (`TabChoice`) and
+`ContentTab.moveToTab(int)`, through the tab registry (`WorkspaceHost.tabChoices`, `moveToTab`), the testkit's fake and
+the contract pinning them on both runtimes. **Move Tab Into:** a tab's menu lists the window's other tabs and moves
+every pane of the tab to the right of the chosen tab's active pane as one nested split that keeps its arrangement and
+sizes (`Layout.insertBeside`, `ParentTabsView.moveInto`, `WindowContent.mergeTab`), held and announced once where it
+lands, a failure restoring both tabs. **The tab drag** drops a tab beside a pane of any window's shown tab but its own
+(`TabDrag.Target.Into`), the landing showing the side; across windows `WindowManager.moveTabInto` moves the items
+through the tab registry into the target tab, one `TAB_MOVED` each in the tab's order, then a full window it emptied
+closes (`WINDOW_CLOSED` after the last), and the main window it emptied renews its empty workspace's ids.
+**Spring-loading:** the entry resting on another tab's entry of any strip for 0.5 s, within 4 px, shows that tab at
+once (`TabDrag.spring`, a Swing `Timer` the tests fire themselves), and Esc, focus loss, a lost release or a release
+over no target bring back the tab that showed before. Rulings (plan, "Rulings"): (1) an asking split item ends its
+entries and its actions' titles with an ellipsis; (2) Open File's chooser takes one file, local or a file source's,
+starting in the folder of the Editor file active in the window; (3) Open in Editor Pane… is its own action; (4) a file
+that is open already shows its open pane; (5) the submenus' entries read "N title", every other tab listed, the first
+nine running Move Pane to Tab 1 to 9; (6) Move Pane to Tab moves the focused pane as a pane drag does; (7) what a drag
+may not move does not move; (8) `ContentTab.tabChoices()` and `moveToTab(int)`; (9) Move Tab Into follows Move Tab to
+New Window and has no keymap actions; (10) `Layout.insertBeside` shares the pane's space by halves, a split of the
+side's orientation flattening into its parent; (11) names stay with their panes; (12) a merge within a window is held
+and undone on failure; (13) a merge across windows is one pass through the registry, with the event order above; (14)
+`Target.Into` over any shown tab's panes but the dragged tab's own; (15) spring-loading's delay, slop and seam; (16)
+the moved pane, or the moved tab's active item, takes the focus; (17) Editor 0.14.0; (18) nothing animates; (19) the
+SDK stays 0.21.0; (20), added after the automated security review of Task 4 (a controller ruling): `ContentTab.tabChoices()`
+follows `TabHandle.title()`'s rule: a choice carries its tab's title only when the plugin holds `terminal.observe`, or
+the tab's shown item is the plugin's own content; otherwise its title is empty and `TabChoice.label()` reads "Tab N"
+(the number still matches Select Tab N, so `moveToTab(N)` works); the first answer that carries other tabs' titles is
+audited once per plugin as a use of `terminal.observe`; the testkit's fake follows the same rule; Jasper's own menus
+(the Tab menu, a terminal's right-click menu) keep real titles. The Editor declares no `terminal.observe`, so its
+right-click Move Pane to Tab names its own tabs and lists every other tab as "Tab N". Cost if wrong: the Editor would
+have to declare the capability (its consent text changes), or a host-rendered pane menu would name every tab. Spec
+issues: (1) spec 5's "a name you gave it goes; the target keeps its own name": Jasper names a tab after its active pane,
+and Rename Tab names that pane's terminal, so the merged tab is named after the moved tab's active pane while it has the
+focus; the controller ruled that names stay with their panes (Ruling 11) and amended spec 5, and the guides say what
+happens without claiming that the target keeps its name.
+Deviations: (1) Task 4's fix round (`cdb2fbff5`): Ruling 20; `OtherTab` gains the item its tab's active pane shows
+(`shown`) and `TabChoice` allows an empty title; the real `WorkspaceHost` wiring is tested (`MovePaneToTabTest`); a
+refused `moveToTab` leaves an unselected item inactive (the app contract's host lambda activates it only on a move); the
+contract pins a two-pane target (the pane lands right of the shown pane, not at the end), an emoji pair at the title's
+cap, an item waiting on its close decision (offered none and refused), and `TabRegistryTest` a restorer's held item; the
+Editor's entries and submenu are plain text (`html.disable`) and its menu follows tabs that open and close; `StandardMenu.TAB`'s Javadoc lists
+Move Pane to Tab. (2) Task 4: `PaneItems`'s class Javadoc was re-wrapped after the brief's edit (wording only). (3) Task
+5's fix round (`423688d6b`): the window's tab strip re-slots its entries at once when a merge or a move changes their
+order (`WindowTabs.refresh`). Before, an entry that survived a merge between tabs that were not neighbours stayed where
+it was drawn while Select Tab, the Move lists, the tab list and the drop places followed the model; plan 8c's last-pane
+move into a tab that is not its neighbour was affected too. An open and a close keep their motion (plan 8a's veto), and
+`ClassicTabs`, which rebuilds its entries every time, needed nothing; `WorkspaceView.join` refuses a layout that places
+other items than the ones that arrived; `Layout.insertBeside` checks its arguments before the empty-layout message.
+(4) Task 5: the shown tab merging into a hidden one announces nothing, as plan 8c's rule has it (an item that stays the
+selected item gives the registry no selection, move or close); a hidden tab merging into the shown one announces the
+moved tab's active item once. (5) Task 7: two tests beyond the plan, from Task 6's review: a merge that fails after a
+spring leaves both tabs as they were, shows the dragged tab again and lets the failure propagate, and the landing of an
+Into target shows in the drag's own window after a spring. (6) Task 8: two sentences the new menu entry made stale are
+corrected (plugin authoring's content-tab commands and the Editor guide's tab right-click menu list Move Tab Into), and
+Ruling 20 is in plugin authoring, the SDK README, the guide page and the Editor guide. Accepted with no change, as the
+reviews ruled: Task 1's Minors 3 and 4 (one `UiValuesTest` assertion tests only the action id's validation; the
+ellipsis wording sits in four places because the architecture forces it); Task 3's Minor 4 (style: fully qualified
+names, `PANE_MOVES`' place); Task 4's Minors 6 and 7 (a stale entry moves by number, inherent to the number API and
+shared by the host's menus; the title cap is copied across the module boundary) and that an own tab's placeholder text
+is blanked too (conservative); Task 5's Minor 2 (a redundant, defensive `reslot ||` where `WindowTabs.refresh` runs without motion); Task 6's Minors 5, 7
+and 8 (the move reads the pre-move target view, contrived; duplication; a report's warning breakdown). Left for the
+final review (its fix wave): Task 1's Minor 1 (a `SplitListsTest` helper's Javadoc); Task 2's Minors 1 to 3 (the
+resolver-failure path of `withDocument` untested; focus asserted through the Editor's `selected()`, not the handle's
+`activeTab()`; `openBeside` shows the chooser before it validates the placement) and an app test for a split item
+opening into the main window's empty workspace; Task 3's Minors 2 and 3 (the Enterprise pin uses `containsSubsequence`
+and nothing opens the classic Window menu to see it filled; `update()` rebuilds the `OtherTab` list nine times, which a
+range check would avoid); Task 4's two test pins (`TabChoice(2, "").label()` in `UiValuesTest`; an own item hidden
+behind a foreign shown pane); Task 5's Minors 1 and 3 and a whole-tab merge with terminal items for `ActivePaneChanged`
+(pin the join guard's messages; a `WindowTabMotionTest` case for a non-neighbour merge with motion on); Task 6's Minors 1
+to 4 (the main drag test cannot catch a missing final select or weights; the maximize test checks only a count; the
+selection after `WINDOW_CLOSED` is unasserted; `moveTabInto` throws for an empty workspace's pane instead of refusing)
+and its Minor 6 as a question (below, GUI checks); Task 7's own notes (the slop assertion cannot tell resting from
+restarting, since only timing shows it; `entryUnder` repeats `onPanes`' loop over the entries' x-ranges).
+`./gradlew check --continue`: **12,680 tests, 0 failures, 0 errors, 29 skipped, BUILD SUCCESSFUL** (app 4,372, Editor
+5,150, UI 943, terminal 460, testkit 243, Buddy 154, SDK 105, the other plugins 1,253) (excludes the external example,
+which `check` does not run); the example external plugin's `check pluginZip`, built against the SDK jars `check` wrote,
+passes.
+GUI checks for the user:
+- Tab › Split and a terminal's and an editor's right-click Split submenus list Open File Right… and Open File Down…;
+  each opens the file chooser for one file, and the file opens in a new pane to the right of or below the focused pane,
+  focused; Cancel opens nothing; a file that is open already shows its open pane;
+- File › Open in Editor Pane… sits after Split Right with Editor (New Editor Pane) and does what Open File Right does; in the main window's empty
+  workspace the file fills it as its one tab;
+- Tab › Move Pane to Tab and a terminal's and an editor's right-click Move Pane to Tab list the window's other tabs as
+  "2 zsh"; choosing one moves the focused pane to the right of that tab's active pane, which shows, and typing reaches
+  the moved pane; the submenu is disabled in a window of one tab; under the Enterprise look the Window menu shows it
+  too;
+- on macOS, with the menu in the screen menu bar, the Tab menu's Move Pane to Tab submenu fills when the menu opens
+  (listing the window's other tabs, not an empty or stale list), and follows a tab opened or closed since;
+- the Editor's right-click Move Pane to Tab names the tabs whose active pane shows an Editor file and lists every other
+  tab, terminals included, as "Tab 3" (the Editor reads no other tab's title); the Tab menu's submenu names them all;
+- Settings › Keymap lists Move Pane to Tab 1 to 9, unbound, and Split Right and Down with Open File… and Open in Editor
+  Pane…; binding Move Pane to Tab 2 shows the key on its entry and moves the pane;
+- a tab's right-click Move Tab Into lists the window's other tabs; choosing one puts all the tab's panes to the right of
+  that tab's active pane, keeping their arrangement and sizes, its entry gone and its active pane focused, every shell
+  running; a tab with a dialog open in a pane shows it disabled; the merged tab's entry is named after the focused pane;
+- dragging a tab's entry over a pane of another window shows the landing on the nearest side; releasing moves all its
+  panes there, the windows' shells still running; a child window's only tab dragged away (Enterprise, where its strip
+  shows) closes that window;
+- during a tab drag, a Settings or About window floating over another window's panes does not take the drop: the drag
+  targets the workspace window's pane beneath it, the landing showing through, and a release there merges the tab
+  (auxiliary windows are consulted only where no workspace window is under the cursor, for the tear-out; the final
+  review decides whether that stands);
+- holding the dragged entry still over another tab's entry for half a second shows that tab at once, with no motion,
+  in the drag's own window and in another; a drop beside one of its panes merges the tab there; Esc, or a release over
+  a title bar, brings back the tab that showed before; moving on keeps the reorder marker as before;
+- pausing over another tab's entry while reordering springs that tab open; dropping the entry on the strip then
+  reorders it, as before, and the dragged tab shows again.
+
+Not merged, not pushed.
 
 **Workspace tabs: origin/main merged in (the second sync) — 2026-10-21** (`claude/workspace-tabs`, the merge of
 `origin/main` at `8c8776e7e` into `154aaf27b`, plan 6b's close; the merge base was the first sync's `f78bb0385`). Main

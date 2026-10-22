@@ -577,15 +577,20 @@ the tab strip, the window, its menus and the status bar; the plugin provides the
   key the plugin has open selects that tab and returns its handle, without mounting the view passed.
 - `setPresentation(new ContentPresentation(title, detail, icon, dirty, location, host))`: the tab shows "● " before the
   title while dirty and the detail after it; its tooltip is the location, which Jasper never treats as a local path.
-- `setCommands(List<ContentCommand>)`: commands appear in the tab's right-click menu, after Move Tab to New Window and
-  Close Tab, and their shortcuts work while the tab is active. Commands with the ids `find`, `find-next`,
+- `setCommands(List<ContentCommand>)`: commands appear in the tab's right-click menu, after Move Tab to New Window, Move
+  Tab Into and Close Tab, and their shortcuts work while the tab is active. Commands with the ids `find`, `find-next`,
   `find-previous`, `copy` and `paste` answer Jasper's Find, Find Next, Find Previous, Copy and Paste; Close Pane asks
   the item to close, and Close Tab every item of its tab.
 - `setStatus(List<ContentStatus>)`: items in the status bar while the tab is active, each plain text or a button.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new child window
   (a child window's only tab stays where it is) and `moveToMainWindow()` to the main window, keeping the view and its
   state, and `window()` is the window that holds it (`WindowHandle.isMain()` tells the main window from a child window).
-  `moveToNewTab()` gives its pane a tab of its own, disabled while `mayMoveToNewTab()` is false. The tab is an item of
+  `moveToNewTab()` gives its pane a tab of its own, disabled while `mayMoveToNewTab()` is false; `tabChoices()` lists the
+  other tabs of its window as [`TabChoice`](sdk-reference.html#dev.jasper.sdk.ui.TabChoice)s, numbered as Select Tab
+  numbers them and worded by `label()` ("2 notes.txt"), none while the item may not move or its window has one tab. A
+  choice carries its tab's title only when the plugin holds `terminal.observe` (as `TabHandle.title()` needs it) or the
+  tab shows the plugin's own content; otherwise its title is empty and `label()` reads "Tab 2". `moveToTab(number)`
+  moves its pane to the right of that tab's active pane, which shows. The content tab is an item of
   its window: `WindowHandle.tabs()` lists it and the `TAB_*` topics report it.
 - Pass the `ContentTab` as the owner of dialogs and pickers, so they follow the tab to another window.
 - `windows().onTabsClosing((tabs, batch) -> future)` registers the plugin's one close guard. It receives the tabs about
@@ -604,9 +609,12 @@ Split list (the Tab menu's and the right-click menus' Split submenus), after the
 items, with two actions, "Split Right with" and "Split Down with" the label, that users bind under `[keybindings]` and
 the plugin may place in its menus; their ids follow from the item's (`dev.example.notes.notes` gives
 `dev.example.notes.split_right_notes`). The opener receives the window and `SPLIT_RIGHT` or `SPLIT_DOWN` and opens its
-view there with `openTab`. A plugin that builds its own right-click menu, as the Editor does, lists
-`windows().splitChoices()` and runs one with `ContentTab.split(choice, direction)` (the terminal's needs
-`terminal.open`), and offers Move Pane to New Tab with `ContentTab.moveToNewTab()`.
+view there with `openTab`. `SplitItemSpec.asking()` marks an item whose actions ask something before they open the
+pane, as a file chooser does: its entries and its actions' titles end with an ellipsis ("Open File Right…"). A plugin
+that builds its own right-click menu, as the Editor does, lists `windows().splitChoices()`, words each with
+`rightLabel()` and `downLabel()` and runs one with `ContentTab.split(choice, direction)` (the terminal's needs
+`terminal.open`), and offers Move Pane to New Tab with `ContentTab.moveToNewTab()` and Move Pane to Tab with
+`tabChoices()` and `moveToTab(number)`.
 
 ### Coming back with the windows
 
