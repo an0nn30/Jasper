@@ -82,6 +82,20 @@ final class StagedRemoteHost implements AutoCloseable {
             content.connectContributions(contributions);
             return content;
         });
+        awaitTransferStore();
+    }
+
+    /**
+     * Waits until the plugin's transfer queue has opened its store, which its control loop does at start: sqlite-jdbc then
+     * loads a fresh copy of its native library for this plugin class loader, which a stop cannot interrupt and which takes
+     * seconds on a loaded machine. Until then a test that stopped the plugin waited on that load in {@link #close}. A
+     * command runs only once the store is open, so one answered snapshot means it is.
+     */
+    private void awaitTransferStore() throws Exception {
+        Object transfers = field(plugin, "transfers");
+        var snapshot = (CompletableFuture<?>) transfers.getClass().getMethod("snapshot", long.class, int.class).invoke(transfers, 0L, 1);
+        try { snapshot.get(60, TimeUnit.SECONDS); }
+        catch (java.util.concurrent.TimeoutException slow) { throw new AssertionError("The Remote plugin's transfer store did not open", slow); }
     }
 
     /**
