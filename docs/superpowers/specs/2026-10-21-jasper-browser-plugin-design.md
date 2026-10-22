@@ -1,12 +1,13 @@
 # Jasper Browser plugin
 
-Status: **Brainstormed with the user on 2026-10-21; awaiting the user's approval.** Decisions marked *(user)* are the
+Status: **Approved by the user on 2026-10-21** ("Looks good to me - lets go ahead and write out the plan"). **Refreshed
+against main on 2026-10-22**, after the tab rework and its pane flexibility amendment landed. Decisions marked *(user)* are the
 user's own. Decisions marked *(call)* are the designer's calls. Most of them were shown to the user in the conversation;
 the ones made after the builder check (in sections 4, 5, 7, 8 and 9) are listed in the hand-over for the user to check.
 Anything not marked is a constraint or a fact checked on 2026-10-21.
 
-This design follows the [tabs and panes spec](2026-10-20-jasper-tabs-and-panes-design.md) on `claude/workspace-tabs`.
-It uses that spec's principles; it is not built on that branch (see section 13).
+This design follows the [tabs and panes spec](2026-10-20-jasper-tabs-and-panes-design.md) and its
+[pane flexibility amendment](2026-10-21-jasper-pane-flexibility-design.md), both on main.
 
 ## 1. Intent
 
@@ -45,21 +46,28 @@ microphone, location and page notifications are denied), and Jira or GitHub plug
 
 - **Tabs and panes.** A window holds tabs and a tab holds panes. A pane holds exactly one item and has no tab strip or
   title bar. A tab is named after its focused pane's item. Every command is a bindable keymap action.
-- **The SDK surface from the tab rework**, confirmed by that session on 2026-10-21:
+- **The SDK surface from the tab rework** (SDK 0.21.0, on main; checked on 2026-10-22):
   - `TabPlacement` has `NEW_TAB`, `SPLIT_RIGHT`, `SPLIT_DOWN` and `NEW_WINDOW`.
   - `Windows.splitItem(SplitItemSpec.of(id, label).withIcon(..), (window, placement) -> ...)` registers a split item.
     The Editor's split item, at `EditorPlugin.java:55` and `:126`, is the model.
   - `ContentTab.isActive()` and `onActive` mean focus, not visibility. To pause a hidden page, use Swing's showing state
     (`isShowing()`, `HierarchyEvent.SHOWING_CHANGED`).
-  - Restore works through `ContentSpec.withRestore(RestoreState.of(kind, map))` and `context.windows().restorer(kind, ...)`.
+  - A tab opens with `Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)`. A plugin's own Swing component
+    goes in as `CustomContent`, as the Editor's `EditorTab` registers its document.
+  - Restore works through `ContentSpec.withRestore(new RestoreState(kind, values))` (or `RestoreState.of(kind, key,
+    value)`) and `context.windows().restorer(kind, ...)`.
     The state is limited to 32 entries and 4,096 characters, and holds no secrets. The restorer runs on the EDT, must
     not block or ask anything, and opens the item at once. A kind without a restorer is not saved.
   - The host gives the active item these, and draws no per-pane toolbar:
     - the header search field's title and host;
     - the status bar's location and the item's own status items;
     - `ContentCommand`s in the Tab menu and the right-click menu;
-    - Find, Find Next and Find Previous, plus Copy and Paste routing;
-    - Close Pane.
+    - Find, Find Next and Find Previous, Copy and Paste, and Increase, Decrease and Reset Font Size: Jasper runs the
+      item's enabled command with the id `find`, `find-next`, `find-previous`, `copy`, `paste`, `font-bigger`,
+      `font-smaller` or `font-reset`;
+    - Close Pane, the Split submenu and Move Pane to Tab ▸ (pane flexibility section 8), through the host's pane items.
+  - While a tab is active, a content command's shortcut runs ahead of the Jasper actions bound to the same key, except
+    the palette's shortcuts (`ContentTab.setCommands`).
 - **Heavyweight children are out.** A native child window would cover everything Jasper paints over a pane, and would
   swallow the ⌘⌥ or Ctrl+Alt press that starts a pane drag. The things it would cover:
   - the pane-drag and tab-drag landing overlay;
@@ -163,7 +171,8 @@ A browser tab is the plugin's own keymap place, and the most specific place wins
 shortcut behave differently:
 
 - **The window's own shortcuts keep their keys:** New Tab, Split Right and Down, Close Pane, Close Tab, tab switching,
-  Rename Tab and the palette.
+  Rename Tab and the palette. The browser's defaults avoid those keys, because an active tab's command would otherwise
+  take them (section 3).
 - **Other actions bound anywhere yield to the browser's standard key.** For example, ⌘R reloads the page in a browser
   tab, while Shell History's Search Shell History keeps ⌘R everywhere else.
 
@@ -202,11 +211,14 @@ the host's routing. Zoom uses the same actions Editor tabs answer.
   the system browser.
 - **New SDK surface:**
   - **Today:**
-    - terminal link clicks go straight to the desktop browser through the app's `TerminalView.setLinkOpener`;
+    - terminal link clicks go straight to the desktop browser through jasper-terminal's own default opener
+      (`DesktopServices.openBrowser`). `TerminalView.setLinkOpener` is package-private and only tests use it;
     - the SDK has only `Platform.browse(URI)`;
     - `jasper <url>` fails with "no such file or folder".
   - **The design adds** a link-handler contribution. A plugin claims http(s) URLs, and the host consults it before
-    falling back to the desktop browser. Terminal link clicks and `jasper` CLI URLs go through it. With the Browser
+    falling back to the desktop browser. Terminal link clicks and `jasper` CLI URLs go through it.
+  - **jasper-terminal also needs** a supported way for the app to set a view's link opener. That is an addition to its
+    app-facing API and to the documented allowlist in `docs/terminal-architecture.md`. With the Browser
     plugin off, nothing is claimed and everything goes to the system browser, as today.
 - **`BROWSER`.** Jasper sets `BROWSER` in its local shells to the `jasper` command, so a program's URL reaches the
   running app. The app applies the program-opened rule.
@@ -277,7 +289,9 @@ the host's routing. Zoom uses the same actions Editor tabs answer.
   - keyboard movement between links;
   - external images only after consent;
   - the size limits;
-  - hidden tabs cancelling work.
+  - a preview whose pane isn't showing pausing its work.
+- **Every view has its own preview.** Each view of a file has its own Markdown mode and preview (pane flexibility
+  section 6), so each view showing a preview has its own Chromium browser.
 - **Safety** *(call)*. A Markdown file is untrusted. Scripts and event handlers in its HTML never run. A content security
   policy allows only Jasper's bundled Mermaid and highlighter, and no network except images the user allowed.
 - **Links clicked in the preview** follow section 6.
@@ -342,8 +356,8 @@ Settings › Browser, in the plugin's own settings file:
 
 ## 13. Delivery
 
-The work starts from `main` after `claude/workspace-tabs` lands there, because it needs SDK 0.21.0's split items, tab
-placements and restorers. Proposed plans, in order:
+The tab rework is on main (SDK 0.21.0's split items, tab placements and restorers), so the work starts from main.
+Proposed plans, in order:
 
 1. **Spike (throwaway).** JCEF OSR in a Swing window on every platform, which the user runs, covering:
    - the section 12 risks;
@@ -354,8 +368,8 @@ placements and restorers. Proposed plans, in order:
    - whether Chromium's sandbox runs on each platform.
 2. **Runtime switch.** The `jbrsdk_jcef` toolchain for development, CI and packaging, plus Chromium's native parts in
    every package and the licence notices.
-3. **Link routing.** The SDK link-handler contribution, terminal link clicks through it, `BROWSER` in local shells,
-   `jasper <url>`, and the fallback to `Platform.browse`.
+3. **Link routing.** The SDK link-handler contribution, jasper-terminal's link-opener API, terminal link clicks
+   through them, `BROWSER` in local shells, `jasper <url>`, and the fallback to `Platform.browse`.
 4. **The browser plugin core.** `plugins/browser` (`:jasper-plugin-browser`, exporting `dev.jasper.browser.api`), with:
    - the item, the document bar, navigation and the shortcuts;
    - the split item, the toolbar item and New Browser Tab;

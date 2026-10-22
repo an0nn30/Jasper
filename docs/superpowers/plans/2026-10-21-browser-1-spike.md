@@ -20,14 +20,18 @@
 |---|---|---|
 | **1 (this plan)** | The spike and its report; the design amended with what it found | Nothing |
 | 2 | Runtime switch to `jbrsdk_jcef` for development, CI and packaging | This report, and the user's sandbox decision |
-| 3 | Link routing: the SDK link-handler contribution, `BROWSER`, `jasper <url>` | `claude/workspace-tabs` on `main` (SDK 0.21.0) |
+| 3 | Link routing: the SDK link-handler contribution, jasper-terminal's link-opener API, `BROWSER`, `jasper <url>` | Nothing: the tab rework (SDK 0.21.0) is on main since 2026-10-22 |
 | 4 | The Browser plugin core | Plans 2 and 3 |
 | 5 | Downloads, bookmarks, history, start page | Plan 4 |
 | 6 | Saved logins (Vault API and format) | Plan 4 |
 | 7 | The Chromium Markdown preview | Plan 4 |
 | 8 | Documentation | Plans 4 to 7 |
 
-Each later plan is written when what it waits on is done, because this spike's findings change their content.
+Each later plan is written when what it waits on is done, because this spike's findings change their content. Plan 3
+does not depend on Chromium, so it can be written and built alongside the spike.
+
+**Refreshed against main on 2026-10-22.** The tab rework and its pane flexibility amendment landed on main, and the
+design branch was rebased onto it. The spike itself is standalone, so its tasks are unchanged.
 
 **Deviation from the spec:** spec section 12 lists macOS signing of the CEF framework and helpers inside `Jasper.app` as
 a spike risk. A spike run from the unpacked JBR cannot test it, because that needs a packaged app. It moves to plan 2,
