@@ -435,6 +435,38 @@ GUI checks for the user:
 
 Not merged, not pushed.
 
+**External text stays plain text — 2026-10-21** (`claude/html-disable-sweep`, from `claude/workspace-tabs` at
+`ff322c478`; not merged, not pushed). Swing builds a text's HTML view when a component's UI is installed (at
+construction) and when its text, font or foreground changes, and reads `html.disable` only then; a tooltip does not
+take the property from its component. A component given its text or its Action before the property, or a tooltip
+without it, showed a text starting with `<html>` as HTML. Fixed sites:
+- `jasper-ui`: `Buttons.KitButton` sets the property in its constructor (a segmented choice set its option label
+  first); `Composition.WrappedText` (a form row's caption) and `PreviewChoices.Tile` (an option's description) set it
+  on their tooltips.
+- `jasper-app` workspace: the new `PlainText` builds menus, items, check items, buttons and toggles empty, sets the
+  property, then the text or Action. It serves the toolbar's overflow items (`WindowToolbar.menuItem`), a contributed
+  dropdown's submenu and popup, contributed submenus, top-level menus and context items (`WindowChrome`), both tab
+  lists, the Find bar's recent searches, the status bar's content items, contributed items and progress buttons, the
+  rail's buttons and a tool window header's actions. `MenuBarItems.Item`, `ClassicToolbarButton` and
+  `WindowChrome.ReferenceButton` set the property before their Action, `PathBreadcrumbs` before a crumb's text.
+  Tooltips: those buttons, `StripeLabels.Label`, a tool window header's detail and the status bar's segments.
+- Window titles: on Windows and Linux FlatLaf's title pane shows a window's title (a child window's is its tab's,
+  which a program sets) in a label without the property. `platform.PlainTitlePane` sets it on each pane FlatLaf adds to
+  a workspace window, an auxiliary window or dialog, or the file chooser.
+
+Checked and unchanged: `WindowChrome.fillSplit`, `WindowContent.tabMenu` and the Editor's `DocumentArea.submenu` and
+`plainItem` (already in order); `DocumentArea.menuItem(Command)` (only the Editor's own titles); the other plugins (no
+Swing text of their own); the configuration file tooltip (an absolute path) and `LaunchFailure`'s lines (each starts
+with Jasper's text). The breadcrumb's label and the classic toolbar button's text were already rebuilt plain by the
+`setFont` after them. Tests: `ButtonsTest`, `PanelSurfacesTest` and `SettingsControlsTest` in `jasper-ui`,
+`PlainTextTest`, `PlainTitlePaneTest`, and a view check on the `WindowTabsTest` and `ClassicTabsTest` tab lists; each
+fails without its fix except `WindowTabsTest`'s, whose menu styling rebuilds the item. `./gradlew check`
+(Python 3.13): **12,615 tests, 0 failures, 0 errors, 29 skipped**; a first run under heavy machine load (load average 80)
+failed 42 tests, most waiting on plugin workers' cleanup, which all pass rerun, and `ThemeMigrationCoverageTest`,
+which wanted the new files in `docs/design/theme-engine/migration.csv`. GUI checks for the user: on Windows or Linux,
+a child window whose tab a program titles `<html><b>x</b>` shows the markup as text in its title bar; so do a
+contributed menu, a toolbar dropdown and a rail tooltip.
+
 **Workspace tabs: origin/main merged in (the second sync) — 2026-10-21** (`claude/workspace-tabs`, the merge of
 `origin/main` at `8c8776e7e` into `154aaf27b`, plan 6b's close; the merge base was the first sync's `f78bb0385`). Main
 brought Enterprise plans 15a and 15b (SDK 0.18.2's `Appearance.presentation()`, the look's defaults for plugin

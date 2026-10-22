@@ -30,7 +30,6 @@ import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleState;
 import javax.accessibility.AccessibleStateSet;
 import javax.swing.JButton;
-import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
@@ -87,8 +86,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
     @Override public JPopupMenu tabList() {
         var menu = new JPopupMenu();
         for (Entry entry : entries) {
-            var item = new JCheckBoxMenuItem(WindowTabs.capped(source.title(entry.tab)), source.icon(entry.tab), entry.tab == selected);
-            item.putClientProperty("html.disable", true);
+            var item = PlainText.checkBox(WindowTabs.capped(source.title(entry.tab)), source.icon(entry.tab), entry.tab == selected);
             item.addActionListener(event -> { if (!disposed) source.select(entry.tab); });
             menu.add(item);
         }

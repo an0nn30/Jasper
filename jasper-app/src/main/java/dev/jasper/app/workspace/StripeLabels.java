@@ -199,6 +199,8 @@ final class StripeLabels {
             setUp();
         }
 
+        @Override public javax.swing.JToolTip createToolTip() { return PlainText.plain(super.createToolTip()); }
+
         private void setUp() {
             setOpaque(false);
             setBorderPainted(false);

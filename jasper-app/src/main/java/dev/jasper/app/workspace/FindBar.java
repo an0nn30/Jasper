@@ -267,8 +267,7 @@ final class FindBar extends JPanel {
             var none = new JMenuItem("No recent searches"); none.setEnabled(false); menu.add(none);
         }
         for (String text : recent) {
-            var item = new JMenuItem(text);
-            item.putClientProperty("html.disable", true);
+            var item = PlainText.item(text);
             item.addActionListener(event -> { query.setText(text); query.requestFocusInWindow(); });
             menu.add(item);
         }

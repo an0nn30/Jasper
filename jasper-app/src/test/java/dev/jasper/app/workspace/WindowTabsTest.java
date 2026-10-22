@@ -181,6 +181,7 @@ class WindowTabsTest {
             assertThat(select.getToolTipText()).hasSizeLessThanOrEqualTo(210).startsWith("<html><img").contains("\u2026");
             var item = (JMenuItem) strip.tabList().getComponent(0);
             assertThat(item.getText()).hasSizeLessThanOrEqualTo(201).startsWith("<html><img").endsWith("\u2026");
+            assertThat(item.getClientProperty(BasicHTML.propertyKey)).as("the tab list renders the title literally").isNull();
             // Select Tab 1's shortcut follows the Keymap: rebind it.
             owner.setBindings(dev.jasper.app.config.KeyBindings.withOverrides(true, java.util.Map.of("select_tab_1", "alt+1")));
             owner.currentTerminal().rename("short"); owner.update();

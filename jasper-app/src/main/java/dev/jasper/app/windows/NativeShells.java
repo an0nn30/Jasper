@@ -19,6 +19,7 @@ import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.MacTitleBar;
+import dev.jasper.app.platform.PlainTitlePane;
 import java.awt.Dialog;
 import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
@@ -314,6 +315,7 @@ public final class NativeShells {
         var resources = new ShellResources(surface, frame);
         try {
             frame.setIconImages(ApplicationIcon.images());
+            PlainTitlePane.install(frame.getRootPane());
             resources.layout = installChrome(frame.getRootPane(), surface, shell);
             MacTitleBar bar = resources.layout.bar();
             // The minimal File menu is a row of this frame (spec 10.1); a classic look's frames show no menu row, as the 07
@@ -448,6 +450,7 @@ public final class NativeShells {
             dialog.setResizable(resizable(surface));
             dialog.getAccessibleContext().setAccessibleName(surface.title());
             dialog.setIconImages(ApplicationIcon.images());
+            PlainTitlePane.install(dialog.getRootPane());
             resources.layout = installChrome(dialog.getRootPane(), surface, shell);
             MacTitleBar bar = resources.layout.bar();
             shell.followTheme(dialog.getRootPane(), bar, themes.current().chrome().dark());
@@ -652,6 +655,7 @@ public final class NativeShells {
     private List<Location> showChooser(Window owner, ChooserRequest request, LocalBrowser local, List<ChooserSource> extra,
                                        Consumer<Runnable> cancellation) {
         var dialog = new JDialog(owner, request.title(), Dialog.ModalityType.DOCUMENT_MODAL);
+        PlainTitlePane.install(dialog.getRootPane());
         ExecutorService worker = Executors.newSingleThreadExecutor(task -> {
             var thread = new Thread(task, "jasper-file-chooser");
             thread.setDaemon(true);

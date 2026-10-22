@@ -54,6 +54,7 @@ final class PreviewChoices extends ControlRegistry.Control {
         Option option; ThemePainting.Focus focus;
         @Override public javax.accessibility.AccessibleContext getAccessibleContext(){if(accessibleContext==null)accessibleContext=new AccessibleJButton(){@Override public javax.accessibility.AccessibleRole getAccessibleRole(){return javax.accessibility.AccessibleRole.TOGGLE_BUTTON;}@Override public javax.accessibility.AccessibleStateSet getAccessibleStateSet(){var states=super.getAccessibleStateSet();if(isSelected())states.add(javax.accessibility.AccessibleState.CHECKED);return states;}};return accessibleContext;}
         Tile() { setOpaque(false);setContentAreaFilled(false);setBorderPainted(false);setFocusPainted(false); }
+        @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         /** The selection box, then the caption one line high below a fixed gap, so a larger font grows the tile. */
         @Override public Dimension getPreferredSize() { return context().faces().exclusive.previewSize(this); }
         /** The context the tile paints in. */

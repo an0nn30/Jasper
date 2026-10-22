@@ -324,15 +324,14 @@ final class WindowChrome {
                         if (live.isEmpty()) break;
                         JButton button = composition.contributed(this, null, dropdown.title(), dropdown.icon(), true);
                         WindowToolbar.entry(button, 80, () -> {
-                            var menu = new JMenu(dropdown.title());
-                            menu.putClientProperty("html.disable", true);
+                            var menu = PlainText.menu(dropdown.title());
                             live.forEach(action -> menu.add(WindowToolbar.menuItem(action)));
                             return menu;
                         });
                         button.addActionListener(event -> {
                             owner.updateActions();
                             JPopupMenu popup = new JPopupMenu();
-                            live.forEach(popup::add);
+                            live.forEach(action -> popup.add(PlainText.item(action)));
                             popup.show(button, 0, button.getHeight());
                         });
                         contributedToolbar.add(button);
@@ -383,7 +382,7 @@ final class WindowChrome {
                 case MenuEntry.Submenu submenu -> {
                     List<Component> children = build(submenu.entries(), item);
                     if (children.stream().noneMatch(child -> child instanceof JMenuItem)) break;
-                    JMenu menu = new JMenu(submenu.title());
+                    JMenu menu = PlainText.menu(submenu.title());
                     children.forEach(menu::add);
                     NativeStyles.installed().menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
                     built.add(menu);
@@ -447,7 +446,7 @@ final class WindowChrome {
                 if (section.target().type() != MenuTarget.Type.TOP_LEVEL) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);
                 if (built.isEmpty()) continue;
-                JMenu menu = observe(new JMenu(section.target().title()));
+                JMenu menu = observe(PlainText.menu(section.target().title()));
                 built.forEach(menu::add);
                 topLevel.add(new MenuBarLayout.TopMenu(menu, MenuTarget.HELP.equals(section.target().key())));
             }
@@ -665,7 +664,14 @@ final class WindowChrome {
         private final ActionId id;
 
         private boolean chevron;
-        ReferenceButton(Action action, ActionId id) { super(action); this.id = id; setRolloverEnabled(true); }
+        ReferenceButton(Action action, ActionId id) {
+            this.id = id;
+            // A plugin's action name is plain text: html.disable first, as the UI reads it only when the text changes.
+            putClientProperty("html.disable", true);
+            setAction(action);
+            setRolloverEnabled(true);
+        }
+        @Override public JToolTip createToolTip() { return PlainText.plain(super.createToolTip()); }
         private boolean labels() { return getText() != null; }
         private boolean menu() { return id == ActionId.SPLIT_RIGHT || chevron; }
 
@@ -743,7 +749,7 @@ final class WindowChrome {
         if (contributions != null) {
             for (MenuSection section : contributions.model().menus()) {
                 if (section.target().type() != MenuTarget.Type.CONTEXT) continue;
-                List<Component> built = build(section.entries(), JMenuItem::new);
+                List<Component> built = build(section.entries(), PlainText::item);
                 if (built.isEmpty()) continue;
                 menu.addSeparator();
                 built.forEach(menu::add);

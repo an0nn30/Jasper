@@ -106,7 +106,7 @@ final class WindowStatusBar extends JPanel {
         if (!items.equals(contentStatus)) {
             contentStatus = items; contentItems.removeAll();
             for (var item : items) {
-                var button = new JButton(item.text()); button.putClientProperty("html.disable", true);
+                var button = PlainText.button(); button.setText(item.text());
                 button.setToolTipText(item.tooltip()); button.setBorder(BorderFactory.createEmptyBorder(0, NativeStyles.installed().metric(DesignMetrics.Role.STATUS_ITEM_GAP), 0, NativeStyles.installed().metric(DesignMetrics.Role.STATUS_ITEM_GAP)));
                 button.setContentAreaFilled(false); button.setFocusable(false); button.setFont(statusFont());
                 button.setForeground(muted()); if (item.run() != null) button.addActionListener(event -> item.run().run());
@@ -177,9 +177,9 @@ final class WindowStatusBar extends JPanel {
                 ((StatusProgressView) view).update(entry.progress(), actions);
             } else {
                 if (!(view instanceof JButton)) {
-                    var item = new JButton();
+                    var item = PlainText.button();
                     item.setBorder(BorderFactory.createEmptyBorder()); item.setContentAreaFilled(false); item.setOpaque(false);
-                    item.setFocusable(false); item.putClientProperty("html.disable", true);
+                    item.setFocusable(false);
                     item.setIconTextGap(NativeStyles.installed().metric(DesignMetrics.Role.STATUS_ITEM_GAP));
                     view = item;
                 }
@@ -261,6 +261,7 @@ final class WindowStatusBar extends JPanel {
             slash.setVisible(!first.isEmpty());
         }
         void setFirstToolTip(String tip) { first.setToolTipText(tip); }
+        @Override public javax.swing.JToolTip createToolTip() { return PlainText.plain(super.createToolTip()); }
         void refreshTheme() {
             for (JComponent label : new JComponent[]{first, slash, last}) {
                 if (label == last && cells instanceof RuledCells) continue;

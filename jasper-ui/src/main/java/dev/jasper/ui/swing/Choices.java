@@ -148,7 +148,7 @@ final class Choices {
                         for (int i = 0; i < options.size(); i++) {
                             Option option = options.get(i); var button = new SegmentButton(context(), optionsFace()); button.setText(option.label());
                             KitOwnership.mark(button, choice.id() + ".option." + option.id()); button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
-                            button.setRolloverEnabled(true); button.putClientProperty("html.disable", true);
+                            button.setRolloverEnabled(true);
                             button.focus = new ThemePainting.Focus(button, button, view); optionLifetimes.add(button.focus);
                             ActionListener listener = event -> select(option.id()); button.addActionListener(listener); optionLifetimes.add(() -> button.removeActionListener(listener));
                             int index = i;

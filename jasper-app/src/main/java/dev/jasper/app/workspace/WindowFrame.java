@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.MacTitleBar;
+import dev.jasper.app.platform.PlainTitlePane;
 import dev.jasper.app.platform.WindowGlass;
 import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.Component;
@@ -82,6 +83,7 @@ public final class WindowFrame {
         WindowGlass made = null;
         try {
             frame.setIconImages(ApplicationIcon.images());
+            PlainTitlePane.install(frame.getRootPane());
             if (initial != null) {
                 // An empty window (a moved tab's) gives up its stand-in size, so its workspace takes
                 // the grid's (Rulings 18).

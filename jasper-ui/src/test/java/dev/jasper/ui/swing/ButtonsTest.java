@@ -15,6 +15,16 @@ import static dev.jasper.ui.swing.KitViewTest.*;
 
 class ButtonsTest {
     /** Plan 1 finding 2: the inset line reaches the face's outermost pixels, antialiased into its rounded corners. */
+    @Test void aKitButtonsTextIsPlainText() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try {
+                // Every kit button, a segment's option button among them, takes html.disable before its first text.
+                var button = new Buttons.KitButton(context); button.setText("<html><b>x</b>");
+                assertThat(button.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).as("a plugin's label builds no HTML view").isNull();
+            } finally { release(context); }
+        });
+    }
     @Test void thePrimaryInsetLineReachesTheFacesOutermostPixels() {
         Edt.run(() -> {
             var ctx = KitFixtures.context();

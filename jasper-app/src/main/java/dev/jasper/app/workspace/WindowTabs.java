@@ -137,8 +137,7 @@ final class WindowTabs extends JPanel implements TabStrip {
     @Override public JPopupMenu tabList() {
         var menu = new JPopupMenu();
         for (Tab tab : order) {
-            var item = new JCheckBoxMenuItem(capped(source.title(tab)), source.icon(tab), tab == selected);
-            item.putClientProperty("html.disable", true);
+            var item = PlainText.checkBox(capped(source.title(tab)), source.icon(tab), tab == selected);
             item.addActionListener(event -> { if (!disposed) source.select(tab); });
             menu.add(item);
         }
