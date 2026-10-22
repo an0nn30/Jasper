@@ -4,6 +4,7 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
@@ -544,6 +545,52 @@ public final class WindowManager {
     private boolean mayMovePane(WindowContent from, Tab tab, WindowContent to) {
         return from != null && to != null && from != to && !from.closed() && !to.closed() && from.parentTabs().contains(tab)
             && model.tabs().movable(tab);
+    }
+
+    /**
+     * A tab's entry dropped beside {@code group}, a pane of a tab of {@code to} (pane flexibility spec 5; workspace plan 9a
+     * Rulings 13): every item of {@code from}'s tab {@code parentTab} moves into that tab through the tab registry, in the
+     * tab's order, one {@code TAB_MOVED} each, every session untouched, and the tab takes them as one nested split on
+     * {@code side} of the pane that keeps their arrangement and sizes ({@link Layout#insertBeside}); it shows there,
+     * keeping its id, its maximize ended, the moved tab's active item selected and its window raised. A full window the
+     * move empties closes after the moves, and the main window it empties shows an empty workspace under new ids, as the
+     * moved panes keep theirs. A tab holding an item that is pinned or being closed stays. When part of it stays behind (a
+     * listener pinned an item mid-move, or an item's move failed), the items that arrived keep the panes they landed in, to
+     * the right of the joined tab's active pane; a failure propagates afterwards.
+     *
+     * @param from the window holding the tab
+     * @param parentTab the tab
+     * @param to another main or full window
+     * @param group a pane of one of {@code to}'s tabs
+     * @param side where the tab's panes go
+     * @return whether any of its items arrived
+     */
+    public boolean moveTabInto(WindowContent from, ParentTabId parentTab, WindowContent to, GroupId group, Side side) {
+        requireEdt();
+        if (from == null || to == null || from == to || from.closed() || to.closed()) return false;
+        WorkspaceView view = from.parentTabs().view(parentTab).orElse(null);
+        WorkspaceView target = to.parentTabs().holding(group).orElse(null);
+        if (view == null || target == null || view.isEmpty() || !view.tabs().stream().allMatch(model.tabs()::movable)) return false;
+        List<Tab> moving = view.tabs();
+        Layout arranged = target.model().insertBeside(view.model(), group, side);
+        Throwable failure = null;
+        try {
+            to.receive(moving, target.id(), 0, arranged);
+        } catch (RuntimeException | Error thrown) {
+            failure = thrown;
+        }
+        boolean moved = !to.closed() && moving.stream().anyMatch(target::contains);
+        if (moved && !from.closed()) {
+            try {
+                // The main window's only tab moved away whole: its empty workspace takes new ids, as the moved panes keep
+                // theirs in the other window (spec 4).
+                from.parentTabs().renew(parentTab);
+            } catch (RuntimeException | Error thrown) {
+                failure = keep(failure, thrown);
+            }
+        }
+        rethrow(failure);
+        return moved;
     }
 
     /**
