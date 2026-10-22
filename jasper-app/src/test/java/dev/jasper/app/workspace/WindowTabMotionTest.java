@@ -231,6 +231,30 @@ class WindowTabMotionTest {
         });
     }
 
+    /**
+     * Pane flexibility spec 5 and workspace plan 9a Verified facts 7: with motion on, a tab merged into a tab that is
+     * not its neighbour leaves the strip at once, the entries left taking their places with no motion, while an open
+     * and a close still move.
+     */
+    @Test void aMergeBetweenTabsThatAreNotNeighboursLandsAtOnceWhileOpenAndCloseKeepTheirMotion() throws Exception {
+        edt(() -> {
+            var f = fixture(); f.add("second"); f.add("third"); f.advance(1000);
+            var ids = f.owner.windowLayout().parentTabs().stream().map(dev.jasper.app.layout.ParentTab::id).toList();
+            f.owner.moveTabInto(ids.get(2), ids.get(0)); f.strip.refresh();
+            assertThat(f.owner.parentTabCount()).isEqualTo(2);
+            assertThat(f.strip.motionRunning()).as("the merge lands at once").isFalse();
+            assertThat(f.entry("third").getBounds()).as("the tab it joined, named after the moved tab's active pane")
+                .isEqualTo(new Rectangle(0, 0, 400, 30));
+            assertThat(f.entry("second").getBounds()).isEqualTo(new Rectangle(400, 0, 400, 30));
+            f.add("fourth");
+            assertThat(f.strip.motionRunning()).as("an open still moves").isTrue();
+            f.advance(1000);
+            assertThat(f.strip.motionRunning()).isFalse();
+            f.owner.closeTab(f.owner.currentTerminal()); f.strip.refresh();
+            assertThat(f.strip.motionRunning()).as("a close still moves").isTrue();
+        });
+    }
+
     private Fixture fixture() {
         var owner = content(launcher(new ArrayDeque<>())); owner.currentTerminal().rename("first"); owner.update();
         var clock = new AtomicLong(); var strip = new WindowTabs(owner.parentTabs().bar(), clock::get);

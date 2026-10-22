@@ -567,9 +567,10 @@ public final class WindowManager {
      * {@code side} of the pane that keeps their arrangement and sizes ({@link Layout#insertBeside}); it shows there,
      * keeping its id, its maximize ended, the moved tab's active item selected and its window raised. A full window the
      * move empties closes after the moves, and the main window it empties shows an empty workspace under new ids, as the
-     * moved panes keep theirs. A tab holding an item that is pinned or being closed stays. When part of it stays behind (a
-     * listener pinned an item mid-move, or an item's move failed), the items that arrived keep the panes they landed in, to
-     * the right of the joined tab's active pane; a failure propagates afterwards.
+     * moved panes keep theirs. A tab holding an item that is pinned or being closed stays, and none merges into the
+     * main window's empty workspace, which has no pane to go beside. When part of it stays behind (a listener pinned an
+     * item mid-move, or an item's move failed), the items that arrived keep the panes they landed in, to the right of
+     * the joined tab's active pane; a failure propagates afterwards.
      *
      * @param from the window holding the tab
      * @param parentTab the tab
@@ -583,7 +584,9 @@ public final class WindowManager {
         if (from == null || to == null || from == to || from.closed() || to.closed()) return false;
         WorkspaceView view = from.parentTabs().view(parentTab).orElse(null);
         WorkspaceView target = to.parentTabs().holding(group).orElse(null);
-        if (view == null || target == null || view.isEmpty() || !view.tabs().stream().allMatch(model.tabs()::movable)) return false;
+        // The main window's empty workspace has a pane id but no pane to go beside: it takes a tab in its place.
+        if (view == null || target == null || view.isEmpty() || target.isEmpty()
+            || !view.tabs().stream().allMatch(model.tabs()::movable)) return false;
         List<Tab> moving = view.tabs();
         Layout arranged = target.model().insertBeside(view.model(), group, side);
         Throwable failure = null;

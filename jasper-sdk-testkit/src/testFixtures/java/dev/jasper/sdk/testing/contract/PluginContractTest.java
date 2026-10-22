@@ -2299,6 +2299,31 @@ public abstract class PluginContractTest {
     }
 
     /**
+     * Pane flexibility spec 4: a choice's title is the title of its tab's shown item, so a tab that holds the plugin's
+     * own content behind another plugin's shown pane names nothing to a plugin without {@code terminal.observe}; once
+     * its own content shows there, its name does.
+     */
+    @Test void aTabWhoseShownPaneIsAnotherPluginsNamesNothingThoughItHoldsThePluginsOwnContent() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.beta"), Set.of(), Set.of(), beta::set);
+        h.ui(() -> {
+            var memo = openContent(alpha.get(), main, "memo", "Memo");
+            beta.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("other", "Other"),
+                beta.get().terminals().window(main).orElseThrow(), kitView(beta.get()), dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+            var notes = openContent(alpha.get(), main, "notes", "Notes");
+            assertThat(notes.tabChoices()).as("its own Memo behind Other, which shows")
+                .containsExactly(new dev.jasper.sdk.ui.TabChoice(1, ""), new dev.jasper.sdk.ui.TabChoice(2, ""));
+            memo.select();
+            assertThat(notes.tabChoices()).as("Memo shows there now")
+                .containsExactly(new dev.jasper.sdk.ui.TabChoice(1, ""), new dev.jasper.sdk.ui.TabChoice(2, "Memo"));
+        });
+    }
+
+    /**
      * Pane flexibility spec 4: the pane moves to the right of the target tab's shown pane, not to the end of its panes.
      */
     @Test void aContentTabMovesRightOfTheShownPaneOfATabOfTwoPanes() {

@@ -49,9 +49,10 @@ class UiValuesTest {
         assertThat(SplitChoice.TERMINAL.downLabel()).isEqualTo("Terminal Down");
     }
 
-    /** Pane flexibility spec 4: a tab choice is numbered from 1 and worded "N title". */
+    /** Pane flexibility spec 4: a tab choice is numbered from 1 and worded "N title", or "Tab N" without a title. */
     @Test void aTabChoiceIsNumberedFromOneAndWordedNumberThenTitle() {
         assertThat(new TabChoice(3, "notes.txt").label()).isEqualTo("3 notes.txt");
+        assertThat(new TabChoice(2, "").label()).as("a title the plugin may not read").isEqualTo("Tab 2");
         assertThatIllegalArgumentException().isThrownBy(() -> new TabChoice(0, "zsh"));
         assertThatNullPointerException().isThrownBy(() -> new TabChoice(1, null));
     }

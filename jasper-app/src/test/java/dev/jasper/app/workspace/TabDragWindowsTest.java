@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -1299,9 +1300,9 @@ class TabDragWindowsTest {
     /**
      * Pane flexibility spec 5 and workspace plan 9a Rulings 13 and 14: a tab's entry dragged over another window's pane
      * shows the half beside which it lands, and its release moves every pane of the tab there through the tab registry,
-     * one TAB_MOVED per item in the tab's order, each session kept, as one nested split to the right of that pane. The tab
-     * it joined keeps its id and shows the moved tab's active item, its window raised; the moved tab's entry goes, and no
-     * pane is in two windows.
+     * one TAB_MOVED per item in the tab's order, each session kept, as one nested split to the right of that pane,
+     * which is not the target tab's active one. The tab it joined keeps its id and shows the moved tab's active item,
+     * its first pane here, its window raised; the moved tab's entry goes, and no pane is in two windows.
      */
     @Test void aTabDroppedOnAnotherWindowsPaneMergesBesideItThroughTheRegistry() throws Exception {
         ParentTabId[] ids = new ParentTabId[1];
@@ -1309,13 +1310,18 @@ class TabDragWindowsTest {
             ids[0] = main.content().activeParentTab();
             main.content().split(Side.RIGHT);
             secondTab(main);
+            child.content().split(Side.RIGHT);
         });
         launch();
         edt(() -> {
             WindowContent from = main.content(), to = child.content();
             WorkspaceView workspace = from.parentTabs().view(ids[0]).orElseThrow();
             List<Tab> tabs = workspace.tabs();
-            Tab shown = workspace.selected(), there = to.selectedTab();
+            from.selectTab(tabs.get(0));
+            relayout(frameOf(main));
+            Tab shown = workspace.selected(), there = to.workspace().tabs().get(0), active = to.selectedTab();
+            assertThat(shown).as("its first pane, not the split's new one").isSameAs(tabs.get(0));
+            assertThat(active).as("the target tab's active pane is its other one").isNotSameAs(there);
             ParentTabId target = to.activeParentTab();
             GroupId pane = there.group().orElseThrow();
             var sessions = tabs.stream().map(TabDragWindowsTest::session).toList();
@@ -1331,9 +1337,10 @@ class TabDragWindowsTest {
                 new Rectangle(under.getWidth() - under.getWidth() / 2, 0, under.getWidth() / 2, under.getHeight()), layers));
             mouse(source, MouseEvent.MOUSE_RELEASED, right);
             assertThat(tabIds(to)).as("the tab it joined keeps its id").containsExactly(target);
-            assertThat(to.workspace().tabs()).as("to the right of the pane, in the tab's order").containsExactly(there, tabs.get(0), tabs.get(1));
+            assertThat(to.workspace().tabs()).as("to the right of the pane, in the tab's order")
+                .containsExactly(there, tabs.get(0), tabs.get(1), active);
             assertThat(((Split) to.workspace().model().root()).children()).extracting(Child::weight)
-                .as("one nested split in the pane's right half").containsExactly(0.5, 0.25, 0.25);
+                .as("one nested split in the pane's right half").containsExactly(0.25, 0.125, 0.125, 0.5);
             assertThat(to.selectedTab()).as("the moved tab's active item").isSameAs(shown);
             assertThat(raised).as("its window comes to the front").contains(to);
             assertThat(tabIds(from)).as("its entry goes").hasSize(1).doesNotContain(ids[0]);
@@ -1348,9 +1355,90 @@ class TabDragWindowsTest {
         });
     }
 
+    /** The terminal pane of {@code tab}'s item. */
+    private static UUID paneOf(Tab tab) { return ((TerminalContent) tab.content()).pane().id(); }
+
+    /**
+     * Pane flexibility spec 5 and workspace plan 9a Rulings 12 and 16, with terminals: a tab of two terminal panes
+     * merged into the tab that shows is announced once, where it lands: its active item selected, then the active pane;
+     * the tab that shows merged into a hidden one, whose item stays selected and active, announces nothing. Nothing
+     * opens, closes or moves for the registry.
+     */
+    @Test void aTabOfTerminalsMergedWithinItsWindowIsAnnouncedOnceWhereItLands() throws Exception {
+        ParentTabId[] ids = new ParentTabId[3];
+        edt(() -> {
+            ids[0] = main.content().activeParentTab();
+            main.content().split(Side.RIGHT);
+            ids[1] = secondTab(main);
+        });
+        launch();
+        edt(() -> {
+            WindowContent window = main.content();
+            Tab moved = entryOf(window, ids[0]);
+            terminals.windowActivated(main.id());
+            facts.clear();
+            window.moveTabInto(ids[0], ids[1]);
+            assertThat(window.activeParentTab()).isEqualTo(ids[1]);
+            assertThat(window.selectedTab()).isSameAs(moved);
+            assertThat(facts).as("its active item selected, then the active pane").containsExactly(
+                new TerminalEvent.TabSelected(main.id(), moved.id().value()),
+                new TerminalEvent.ActivePaneChanged(Optional.of(paneOf(moved))));
+            ids[2] = secondTab(main);
+        });
+        launch();
+        edt(() -> {
+            WindowContent window = main.content();
+            Tab shown = window.selectedTab();
+            facts.clear();
+            window.moveTabInto(ids[2], ids[1]);
+            assertThat(window.activeParentTab()).isEqualTo(ids[1]);
+            assertThat(window.selectedTab()).isSameAs(shown);
+            assertThat(facts).as("the item that showed stays selected and active").isEmpty();
+        });
+    }
+
+    /**
+     * Pane flexibility spec 5 and workspace plan 9a Rulings 13 and 16, with terminals: the tab that shows, of two
+     * terminal panes, merged into another window's tab is announced move by move in the tab's order, each item selected
+     * where it arrives; the window it left shows its other tab as the first item leaves, that tab's item selected and
+     * its pane the active pane; once the target window comes to the front, the moved tab's active item is. Nothing
+     * opens or closes.
+     */
+    @Test void aTabOfTerminalsMergedIntoAnotherWindowIsAnnouncedMoveByMove() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            ids[0] = main.content().activeParentTab();
+            ids[1] = secondTab(main);
+            main.content().split(Side.RIGHT);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            List<Tab> tabs = from.parentTabs().view(ids[1]).orElseThrow().tabs();
+            Tab shown = entryOf(from, ids[1]), stays = entryOf(from, ids[0]);
+            terminals.windowActivated(main.id());
+            facts.clear();
+            assertThat(manager.moveTabInto(from, ids[1], to, activeGroup(child), Side.RIGHT)).isTrue();
+            assertThat(tabs).as("the split's new pane is the tab's active item, and its last").hasSize(2).endsWith(shown);
+            assertThat(facts).as("move by move; the window it left shows its other tab as the first item leaves").containsExactly(
+                new TerminalEvent.TabMoved(tabs.get(0).id().value(), main.id(), child.id()),
+                new TerminalEvent.TabSelected(child.id(), tabs.get(0).id().value()),
+                new TerminalEvent.TabSelected(main.id(), stays.id().value()),
+                new TerminalEvent.ActivePaneChanged(Optional.of(paneOf(stays))),
+                new TerminalEvent.TabMoved(shown.id().value(), main.id(), child.id()),
+                new TerminalEvent.TabSelected(child.id(), shown.id().value()));
+            assertThat(to.selectedTab()).isSameAs(shown);
+            facts.clear();
+            terminals.windowActivated(child.id());
+            assertThat(facts).as("the target window at the front: the moved tab's active item").containsExactly(
+                new TerminalEvent.WindowActivated(child.id()), new TerminalEvent.ActivePaneChanged(Optional.of(paneOf(shown))));
+        });
+    }
+
     /**
      * Pane flexibility spec 5 and workspace plan 9a Rulings 13: a full window's only tab merged into another window's tab
-     * moves item by item, and its window closes after the last move has reported itself.
+     * moves item by item, and its window closes after the last move has reported itself; then the moved tab's active
+     * item, its first here, is selected where it landed.
      */
     @Test void aFullWindowsOnlyTabMergedAwayClosesItsWindowAfterItsMoves() throws Exception {
         edt(() -> child.content().split(Side.DOWN));
@@ -1359,6 +1447,7 @@ class TabDragWindowsTest {
             WindowContent from = child.content(), to = main.content();
             ParentTabId only = from.activeParentTab();
             List<Tab> tabs = from.workspace().tabs();
+            from.selectTab(tabs.get(0));
             Tab there = to.selectedTab();
             facts.clear();
             assertThat(manager.moveTabInto(from, only, to, there.group().orElseThrow(), Side.LEFT)).isTrue();
@@ -1370,6 +1459,10 @@ class TabDragWindowsTest {
             int closed = facts.indexOf(new TerminalEvent.WindowClosed(child.id()));
             assertThat(first).as("TAB_MOVED per item, in the tab's order").isNotNegative().isLessThan(last);
             assertThat(closed).as("then WINDOW_CLOSED").isGreaterThan(last);
+            Tab active = tabs.get(0);
+            assertThat(to.selectedTab()).as("the moved tab's active item").isSameAs(active);
+            assertThat(facts.lastIndexOf(new TerminalEvent.TabSelected(main.id(), active.id().value())))
+                .as("selected after WINDOW_CLOSED").isGreaterThan(closed);
         });
     }
 
@@ -1392,6 +1485,27 @@ class TabDragWindowsTest {
         });
     }
 
+    /**
+     * Workspace plan 9a's Task 6 review: the main window's empty workspace has a pane id but no pane to merge beside,
+     * so the window manager refuses a tab merged into it, moving nothing; a drop there takes the tab in its place
+     * instead.
+     */
+    @Test void aTabMergedIntoTheMainWindowsEmptyWorkspaceIsRefused() throws Exception {
+        edt(() -> {
+            WindowContent empty = main.content(), from = child.content();
+            assertThat(manager.moveTabInto(empty, empty.activeParentTab(), from, activeGroup(child), Side.RIGHT)).isTrue();
+            assertThat(empty.parentTabs().isEmpty()).as("the main window's empty workspace").isTrue();
+            ParentTabId only = from.activeParentTab();
+            List<Tab> tabs = from.workspace().tabs();
+            facts.clear();
+            assertThat(manager.moveTabInto(from, only, empty, empty.workspace().model().activeGroup(), Side.RIGHT))
+                .as("no pane to go beside").isFalse();
+            assertThat(empty.parentTabs().isEmpty()).isTrue();
+            assertThat(from.workspace().tabs()).as("nothing moved").containsExactlyElementsOf(tabs);
+            assertThat(moves()).isEmpty();
+        });
+    }
+
     /** Pane flexibility spec 5 and Review Focus 2: a tab merged into another window's maximized tab ends the maximize. */
     @Test void aTabMergedIntoAnotherWindowsMaximizedTabEndsItsMaximize() throws Exception {
         ParentTabId[] ids = new ParentTabId[1];
@@ -1405,14 +1519,16 @@ class TabDragWindowsTest {
             to.toggleMaximize();
             relayout(frameOf(child));
             assertThat(to.workspace().model().maximized()).isPresent();
-            Tab there = to.selectedTab();
+            Tab there = to.selectedTab(), other = to.workspace().tabs().getFirst(), moved = entryOf(from, ids[0]);
             Point right = inside(pane(to, there.group().orElseThrow()), 0.9, 0.5);
-            Component source = start(from, entryOf(from, ids[0]), right);
+            Component source = start(from, moved, right);
             assertThat(manager.tabDrag().target()).as("only the maximized pane shows")
                 .contains(new TabDrag.Target.Into(to, there.group().orElseThrow(), Side.RIGHT));
             mouse(source, MouseEvent.MOUSE_RELEASED, right);
             assertThat(to.workspace().model().maximized()).as("the maximize ends").isEmpty();
-            assertThat(to.workspace().tabs()).hasSize(3);
+            assertThat(to.workspace().tabs()).as("beside the pane that was maximized, on its right").containsExactly(other, there, moved);
+            assertThat(((Split) to.workspace().model().root()).children()).extracting(Child::weight)
+                .as("in its half").containsExactly(0.5, 0.25, 0.25);
         });
     }
 

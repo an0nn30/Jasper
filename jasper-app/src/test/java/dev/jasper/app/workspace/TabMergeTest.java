@@ -888,9 +888,9 @@ class TabMergeTest {
             Layout before = target.model(), arranged = owner.parentTabs().view(second).orElseThrow().model();
             GroupId pane = a.group().orElseThrow();
             assertThatThrownBy(() -> target.join(List.of(c), arranged, pane, Side.RIGHT)).as("one item short")
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("The layout places other items");
             assertThatThrownBy(() -> target.join(List.of(c, d, e), arranged, pane, Side.RIGHT)).as("one item more")
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("The layout places other items");
             assertThat(target.model()).as("nothing changes").isEqualTo(before);
             assertThat(List.of(c, d, e)).noneMatch(target::contains);
         });

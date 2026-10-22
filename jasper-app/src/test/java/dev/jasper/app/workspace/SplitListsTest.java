@@ -42,12 +42,16 @@ class SplitListsTest {
     }
 
     /**
-     * A plugin's split item as {@code HostedUi} registers one: its two actions, with the item's icon, which open a plugin
-     * view in a new pane beside the focused one, then the item.
+     * A plugin's split item, much as {@code HostedUi} registers one: its two actions, each with an icon, which open a
+     * plugin view in a new pane beside the focused one, then the item, which has none.
      */
     private Subscription item(String plugin, String name, String label, boolean bundled) { return item(plugin, name, label, bundled, false); }
 
-    /** As {@link #item(String, String, String, boolean)}; with {@code asks} its actions ask something first. */
+    /**
+     * As {@link #item(String, String, String, boolean)}; with {@code asks} the item says its actions ask something
+     * first, so the Split lists end its entries with an ellipsis. Its actions' titles, which those lists do not show,
+     * end with none, unlike those {@code HostedUi} registers.
+     */
     private Subscription item(String plugin, String name, String label, boolean bundled, boolean asks) {
         String right = plugin + ".split_right_" + name, down = plugin + ".split_down_" + name;
         var rightAction = model.addAction(right, "Split Right with " + label, new ImageIcon(), List.of(), Optional.empty(), invocation -> {
@@ -132,6 +136,27 @@ class SplitListsTest {
             assertThat(window.parentTabCount()).isEqualTo(1);
             for (String id : List.of("split_right", "split_down", "dev.jasper.editor.split_right_editor", "dev.jasper.editor.split_down_editor"))
                 assertThat(window.commands().find(id)).as("%s in the palette", id).isPresent();
+        });
+    }
+
+    /**
+     * Pane flexibility spec 3 and workspace plan 9a Review Focus 4, in the app: a split item's Right or Down run in the
+     * main window's empty workspace, which has no pane to open beside, opens its view there as the window's one tab.
+     */
+    @Test void aSplitItemRunInTheMainWindowsEmptyWorkspaceOpensItsViewAsTheOneTab() throws Exception {
+        edt(() -> {
+            item("dev.jasper.editor", "editor", "Editor", true);
+            for (String side : List.of("Right", "Down")) {
+                WindowContent empty = content(idleLauncher(pending), WindowRole.MAIN, null, true, () -> { });
+                empty.connectContributions(model);
+                assertThat(empty.parentTabs().isEmpty()).as("the empty workspace").isTrue();
+                entry(tabSplit(empty), "Editor " + side).doClick();
+                assertThat(opened).last().asString().endsWith("split_" + side.toLowerCase(java.util.Locale.ROOT) + "_editor");
+                assertThat(empty.parentTabs().isEmpty()).as("%s: no longer empty", side).isFalse();
+                assertThat(empty.parentTabCount()).as("%s: one tab", side).isEqualTo(1);
+                assertThat(empty.workspace().tabCount()).as("%s: of one pane, the view's", side).isEqualTo(1);
+                assertThat(empty.selectedTab().title()).isEqualTo("Editor");
+            }
         });
     }
 
