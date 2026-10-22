@@ -47,6 +47,14 @@ during execution:
   - remote runs record `download.remote_note`, because cef_server has no download support.
 
   Task 8 reads these keys.
+- **Task 5, review fixes:**
+  - the toolbar is six rows of at most five buttons, and the window is clamped to the usable screen;
+  - `keys.swing_binding_fired` is written only while the page has the focus, and any other owner goes to
+    `keys.swing_binding_fired_elsewhere`;
+  - the checklist prefills saved answers and asks before it discards them;
+  - `scale.device_factor` ignores removal events;
+  - Measure hidden requires the Animation page;
+  - Quit logs what it does, stops the worker and runs on its own thread.
 
 ## The plan series
 
@@ -2654,7 +2662,7 @@ KEYS = [
     "restart.result", "restart.state_before", "restart.init_ms", "restart.first_paint_ms", "proc.restart_first_paint.helpers",
     "popup.requested", "popup.native_allowed", "page.popup.opener.window.open",
     "page.popup.opener.blank", "page.popup.opener.noopener", "page.popup.message",
-    "keys.swing_binding_fired", "page.keys.page_saw_palette_shortcut", "input.pane_drag_press_seen",
+    "keys.swing_binding_fired", "keys.swing_binding_fired_elsewhere", "page.keys.page_saw_palette_shortcut", "input.pane_drag_press_seen",
     "page.input.typed", "https.available", "cert.error", "cert.choice", "page.cert.loaded",
     "download.complete", "download.remote_note", "devtools.result", "devtools.component_added",
     "hidden.frame_rate_before", "hidden.visible", "hidden.hidden", "hidden.hidden_1fps", "hidden.visible_again",
