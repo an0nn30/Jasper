@@ -304,6 +304,12 @@ class DescriptorParserTest {
             .isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessageContaining(message));
     }
 
+    /** Browser plan 3: the web browser role's capability. */
+    @Test void acceptsTheBrowserCapability() throws Exception {
+        PluginDescriptor descriptor = DescriptorParser.parse(FULL.replace("\"session.provide\"", "\"browser.provide\""));
+        assertThat(descriptor.capabilities()).contains("browser.provide");
+    }
+
     @Test void acceptsTheEnvironmentAndEditorCapabilities() throws Exception {
         PluginDescriptor descriptor = DescriptorParser.parse(FULL.replace("\"session.provide\"", "\"terminal.environment\", \"editor.provide\""));
         assertThat(descriptor.capabilities()).contains("terminal.environment", "editor.provide");

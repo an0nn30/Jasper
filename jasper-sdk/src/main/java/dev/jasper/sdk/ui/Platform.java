@@ -87,4 +87,29 @@ public interface Platform {
         java.util.Objects.requireNonNull(editor, "editor");
         return () -> { };
     }
+
+    /**
+     * Makes this plugin the web browser Jasper opens web addresses with: an {@code http} or {@code https} link
+     * Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, with that window; every plugin's
+     * {@code openInBrowser} and Jasper's own web links, such as Settings' Help, with the active window; and the
+     * addresses given to the {@code jasper} command, with the window of the pane it ran in, go to {@code browser} first,
+     * on the UI thread, with who asked ({@link LinkOrigin}).
+     * A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown. Other
+     * schemes, such as {@code mailto}, and {@link #browse} always go to the system browser. One at a time: a bundled
+     * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
+     * plugin's own included, throws. When the browser returns false or throws, and when no plugin provides one, the
+     * system browser opens the address. Needs {@code browser.provide}. UI thread only. The registration ends with the
+     * plugin.
+     *
+     * @param browser opens a web address
+     * @return the registration
+     * @throws IllegalStateException when another plugin already provides the browser
+     *     ({@code The browser is already provided by <plugin id>}), and off the UI thread
+     * @throws dev.jasper.sdk.MissingCapabilityException without {@code browser.provide}
+     * @since 0.21.0
+     */
+    default Subscription browser(WebBrowser browser) {
+        java.util.Objects.requireNonNull(browser, "browser");
+        return () -> { };
+    }
 }

@@ -169,4 +169,19 @@ class UiValuesTest {
         assertThat(asked).as("an older host never asks").hasValue(0);
         assertThatNullPointerException().isThrownBy(() -> older.editor(null));
     }
+
+    /** Browser plan 3: the browser hook is a default an older host ignores, and an address comes from a click or a program. */
+    @Test void theBrowserHookIsADefaultThatAnOlderHostIgnores() throws Exception {
+        assertThat(Platform.class.getMethod("browser", WebBrowser.class).isDefault()).isTrue();
+        Platform older = (Platform) java.lang.reflect.Proxy.newProxyInstance(Platform.class.getClassLoader(), new Class<?>[]{Platform.class},
+            (proxy, method, args) -> method.isDefault() ? java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args) : null);
+        var asked = new java.util.concurrent.atomic.AtomicInteger();
+        older.browser((address, origin, window) -> {
+            asked.incrementAndGet();
+            return true;
+        }).close();
+        assertThat(asked).as("an older host never asks").hasValue(0);
+        assertThatNullPointerException().isThrownBy(() -> older.browser(null));
+        assertThat(LinkOrigin.values()).containsExactly(LinkOrigin.CLICK, LinkOrigin.PROGRAM);
+    }
 }
