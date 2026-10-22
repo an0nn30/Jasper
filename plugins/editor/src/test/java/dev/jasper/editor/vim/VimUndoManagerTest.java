@@ -347,6 +347,39 @@ class VimUndoManagerTest {
         });
     }
 
+    /**
+     * Several edits in one event, as Replace All or Toggle Comment on several lines make, leave a view without Vim on the
+     * text it showed though its caret is out of sight: Swing scrolls the moved caret into sight after each edit, and the
+     * view is put back after all of those scrolls.
+     */
+    @Test void severalEditsInOneEventLeaveAViewScrolledAwayFromItsCaretOnItsText() throws Exception {
+        var shown = new AtomicReference<VimTextArea>();
+        var other = new AtomicReference<VimTextArea>();
+        onEdt(() -> {
+            shown.set(lines());
+            other.set(new VimTextArea());
+            other.get().share(shown.get());
+            scrolled(shown.get(), new JViewport());
+            shown.get().setCaretPosition(lineStart(shown.get(), 499));
+        });
+        onEdt(() -> ((JViewport) shown.get().getParent()).setViewPosition(new Point(0, yFor(shown.get(), 99))));
+        onEdt(() -> {
+            var area = other.get();
+            area.beginAtomicEdit();
+            try {
+                area.setCaretPosition(lineStart(area, 2));
+                area.replaceSelection("new\n");
+                area.setCaretPosition(lineStart(area, 5));
+                area.replaceSelection("new\n");
+            } finally { area.endAtomicEdit(); }
+        });
+        onEdt(() -> { });
+        onEdt(() -> {
+            assertThat(top(shown.get())).as("the view shows the same text").isEqualTo("line 100");
+            assertThat(line(shown.get(), shown.get().getCaretLineNumber())).isEqualTo("line 500");
+        });
+    }
+
     /** Lines removed above a view, in another view, leave it on the text it showed, as far into its first line. */
     @Test void linesRemovedAboveAViewLeaveItOnItsText() throws Exception {
         var shown = new AtomicReference<VimTextArea>();

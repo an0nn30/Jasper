@@ -501,8 +501,9 @@ final class VimUndoManager extends RUndoManager {
 
     /**
      * After an edit: each view but {@code acting} that holds a place queues its put-back, once in each event. Swing
-     * scrolls a view's moved caret into sight later, through the event queue; the put-back runs after that, and only the
-     * last one queued puts the view back, so it runs after the last edit's scrolling.
+     * scrolls a view's moved caret into sight later, through the event queue, after each edit of the event; the put-back
+     * goes through the queue twice, so it runs after everything the event queued, its later edits' scrolling among it,
+     * and only the last one queued puts the view back.
      */
     private void release(View acting) {
         AWTEvent now = EventQueue.getCurrentEvent();
@@ -511,7 +512,7 @@ final class VimUndoManager extends RUndoManager {
             other.queuedIn = now;
             int number = ++other.queued;
             putBacksQueued++;
-            SwingUtilities.invokeLater(() -> putBack(other, number));
+            SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> putBack(other, number)));
         }
     }
 
