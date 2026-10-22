@@ -101,6 +101,8 @@ public final class JasperApplication {
     public static final String HANDOFF = "handoff";
     /** The trigger of a window the macOS open-file event asked for. */
     public static final String OPEN_FILE = "open-file";
+    /** The {@code jasper} subcommand a program opens a web address with (browser plan 3); no plugin may declare it. */
+    static final String OPEN_URL = "open-url";
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
@@ -802,6 +804,33 @@ public final class JasperApplication {
         else runtime.openLink(address, window, systemBrowser);
     }
 
+    /** As {@code openWebAddress}, for an address a program asked for ({@code jasper open-url}). EDT. */
+    private void openProgramAddress(java.net.URI address, Optional<UUID> window) {
+        PluginRuntime runtime = plugins;
+        if (runtime == null) systemBrowser.accept(address);
+        else runtime.openProgramLink(address, window, systemBrowser);
+    }
+
+    /** The window holding the pane a {@code jasper} call ran in, while it is open; empty for a call from elsewhere. EDT. */
+    private Optional<UUID> windowOfPane(Optional<UUID> pane) {
+        return pane.flatMap(terminals::pane).flatMap(entry -> terminals.tab(entry.tabId())).map(dev.jasper.app.terminals.TabEntry::windowId);
+    }
+
+    /**
+     * The {@code jasper} command's arguments as web addresses (browser plan 3): present only when there is at least one
+     * and every one is a web address ({@code webAddress}); a call that mixes them with paths is a path call. Any thread.
+     */
+    static Optional<List<java.net.URI>> webAddresses(List<String> arguments) {
+        if (arguments.isEmpty()) return Optional.empty();
+        List<java.net.URI> addresses = new ArrayList<>();
+        for (String argument : arguments) {
+            Optional<java.net.URI> address = webAddress(argument);
+            if (address.isEmpty()) return Optional.empty();
+            addresses.add(address.get());
+        }
+        return Optional.of(List.copyOf(addresses));
+    }
+
     /**
      * {@code text} as a web address (browser plan 3): an absolute URI whose scheme is {@code http} or {@code https}, in
      * any case, with an authority, such as {@code https://example.com/a}. Anything else is empty: another scheme, an
@@ -845,7 +874,9 @@ public final class JasperApplication {
     }
 
     /**
-     * What the command socket runs (workspace-tabs spec 5.4): no arguments raises or opens a window, as a launch would;
+     * What the command socket runs (workspace-tabs spec 5.4): {@code open-url} with one web address opens it as a
+     * program's, and arguments that are all web addresses open each as the user's, in the calling pane's window (browser
+     * plan 3); otherwise no arguments raises or opens a window, as a launch would;
      * a subcommand a plugin declares runs in that plugin; otherwise arguments that all name existing files or folders
      * open as a launch's paths do ({@code commandPaths}), and a call whose first argument names one while others name
      * nothing says which ({@code missingPaths}). A raise or a path call is answered once it has run. A plugin's subcommand
@@ -854,6 +885,22 @@ public final class JasperApplication {
      */
     public CommandDispatcher commands() {
         return invocation -> {
+            List<String> arguments = invocation.arguments();
+            if (!arguments.isEmpty() && arguments.getFirst().equals(OPEN_URL)) {
+                Optional<java.net.URI> address = arguments.size() == 2 ? webAddress(arguments.get(1)) : Optional.empty();
+                if (address.isEmpty()) {
+                    invocation.err("jasper: open-url needs one web address (http or https)\n");
+                    return CompletableFuture.completedFuture(2);
+                }
+                return onEventThread(SwingUtilities::invokeLater, this::acceptsRequests,
+                    () -> openProgramAddress(address.get(), windowOfPane(invocation.pane())));
+            }
+            Optional<List<java.net.URI>> addresses = webAddresses(arguments);
+            if (addresses.isPresent())
+                return onEventThread(SwingUtilities::invokeLater, this::acceptsRequests, () -> {
+                    Optional<UUID> window = windowOfPane(invocation.pane());
+                    addresses.get().forEach(address -> openWebAddress(address, window));
+                });
             PluginRuntime runtime = plugins;
             java.util.function.Predicate<String> subcommand = name -> runtime != null && runtime.declaresSubcommand(name);
             Optional<List<Path>> paths = commandPaths(invocation.workingDirectory(), invocation.arguments(), subcommand);

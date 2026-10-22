@@ -29,7 +29,7 @@ final class DescriptorParser {
     private static final String PACKAGE_NAME = "[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*";
     private static final java.util.regex.Pattern SUBCOMMAND = java.util.regex.Pattern.compile("[a-z][a-z0-9-]*");
     /** Names the {@code jasper} command keeps for itself. */
-    static final Set<String> RESERVED_SUBCOMMANDS = Set.of("help", "version");
+    static final Set<String> RESERVED_SUBCOMMANDS = Set.of("help", "version", "open-url");
 
     static final class InvalidDescriptor extends Exception {
         private static final long serialVersionUID = 1L;

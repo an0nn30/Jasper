@@ -667,6 +667,42 @@ class JasperApplicationPluginsTest {
         ApplicationPluginCleanup.await(application[0]);
     }
 
+    /** Browser plan 3: jasper's addresses reach the provided browser, as clicks in the calling pane's window or as a program's. */
+    @Test void theJasperCommandsAddressesGoToTheProvidedBrowser() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        var system = new CopyOnWriteArrayList<String>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        java.util.UUID[] pane = new java.util.UUID[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].startPlugins(null, dev, false, dirs);
+            // A stand-in frame opens the main window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
+            application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
+                () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            application[0].openFirstWindow(List.of()).orElseThrow();
+            pane[0] = application[0].terminals().windows().getFirst().selectedTab().get()
+                .flatMap(tab -> tab.terminal().get()).orElseThrow().id();
+        });
+        var commands = application[0].commands();
+        var clicked = commands.dispatch(new dev.jasper.app.commandline.Invocation(List.of("https://example.com/c", "https://example.com/d"),
+            home, Optional.of(pane[0]), text -> { }, text -> { }));
+        assertThat(clicked.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+        var program = commands.dispatch(new dev.jasper.app.commandline.Invocation(List.of("open-url", "https://example.com/sign-in"),
+            home, Optional.empty(), text -> { }, text -> { }));
+        assertThat(program.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened"))).containsExactly(
+            "https://example.com/c|CLICK|window", "https://example.com/d|CLICK|window", "https://example.com/sign-in|PROGRAM|-");
+        assertThat(system).as("the browser took each one").isEmpty();
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
     private static void awaitCalls(List<String> calls, int count) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline && calls.size() < count) Thread.sleep(10);

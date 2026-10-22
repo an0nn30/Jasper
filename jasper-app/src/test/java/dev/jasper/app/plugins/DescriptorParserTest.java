@@ -296,6 +296,7 @@ class DescriptorParserTest {
             "[[subcommands]]\nname = \"Editor\"\nsummary = \"s\"\n", "subcommands.name is not a command name: Editor",
             "[[subcommands]]\nname = \"-x\"\nsummary = \"s\"\n", "subcommands.name is not a command name: -x",
             "[[subcommands]]\nname = \"help\"\nsummary = \"s\"\n", "subcommands.name is reserved: help",
+            "[[subcommands]]\nname = \"open-url\"\nsummary = \"s\"\n", "subcommands.name is reserved: open-url",
             "[[subcommands]]\nname = \"a\"\nsummary = \"s\"\n[[subcommands]]\nname = \"a\"\nsummary = \"t\"\n", "subcommands names a command twice: a",
             "[[subcommands]]\nname = \"a\"\n", "Missing required key: summary",
             "[[subcommands]]\nname = \"a\"\nsummary = \"two\\nlines\"\n", "subcommands.summary must be one visible line: a",

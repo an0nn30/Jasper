@@ -705,6 +705,19 @@ public final class PluginRuntime {
         openAddress(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, window, desktop);
     }
 
+    /**
+     * As {@link #openLink}, for an address a program asked for ({@code jasper open-url}): the browser hears it as a
+     * program's. UI thread.
+     *
+     * @param address an absolute http or https address
+     * @param window the Jasper window of the pane the program ran in, or empty
+     * @param desktop the system browser's opener; it must not block
+     * @throws IllegalStateException off the UI thread
+     */
+    public void openProgramLink(java.net.URI address, Optional<UUID> window, Consumer<java.net.URI> desktop) {
+        openAddress(address, dev.jasper.sdk.ui.LinkOrigin.PROGRAM, window, desktop);
+    }
+
     private void openAddress(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> window,
                              Consumer<java.net.URI> desktop) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Web addresses are opened on the UI thread");
