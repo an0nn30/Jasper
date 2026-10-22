@@ -31,6 +31,22 @@ during execution:
     stronger `report_appends_each_put`.
 
   It has 13 checks after Task 2, and 21 after Task 3.
+- **Task 3, review fixes:**
+  - the test pages clean up their servers, thread pool and TLS folder after a failed start;
+  - a daemon thread pool serves both servers;
+  - the keytool timeout fires;
+  - a malformed tick gets a 400.
+- **Task 4, review fixes:**
+  - `popup.native_browser_created` became `popup.native_allowed`, a fixed note: JCEF gives an off-screen native popup
+    no Java browser, so it runs invisible at 1x1;
+  - the app handler is re-added before a remote restart;
+  - a 90 s watchdog records failures JCEF swallows, under `cef.start_error` and `restart.result`;
+  - `--eager` skips `JCefAppConfig` off macOS and waits 3 s;
+  - restart is refused while Chromium runs;
+  - `cef.child_no_sandbox_flag` counts "k of n launches";
+  - remote runs record `download.remote_note`, because cef_server has no download support.
+
+  Task 8 reads these keys.
 
 ## The plan series
 
@@ -2635,12 +2651,12 @@ KEYS = [
     "cef.no_sandbox_setting", "cef.child_no_sandbox_flag", "proc.cef_first_paint.no_sandbox_flag",
     "proc.window_shown.rss_kb", "proc.cef_first_paint.helpers", "proc.cef_first_paint.rss_kb",
     "dispose.terminated", "proc.after_dispose_10s.helpers", "proc.after_dispose_10s.rss_kb",
-    "restart.result", "restart.init_ms", "restart.first_paint_ms", "proc.restart_first_paint.helpers",
-    "popup.requested", "popup.native_browser_created", "page.popup.opener.window.open",
+    "restart.result", "restart.state_before", "restart.init_ms", "restart.first_paint_ms", "proc.restart_first_paint.helpers",
+    "popup.requested", "popup.native_allowed", "page.popup.opener.window.open",
     "page.popup.opener.blank", "page.popup.opener.noopener", "page.popup.message",
     "keys.swing_binding_fired", "page.keys.page_saw_palette_shortcut", "input.pane_drag_press_seen",
     "page.input.typed", "https.available", "cert.error", "cert.choice", "page.cert.loaded",
-    "download.complete", "devtools.result", "devtools.component_added",
+    "download.complete", "download.remote_note", "devtools.result", "devtools.component_added",
     "hidden.frame_rate_before", "hidden.visible", "hidden.hidden", "hidden.hidden_1fps", "hidden.visible_again",
     "scale.device_factor", "frame.window_closing_event", "browser.before_close", "load.error",
 ]
