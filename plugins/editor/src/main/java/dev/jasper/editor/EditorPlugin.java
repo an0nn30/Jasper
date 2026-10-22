@@ -2,6 +2,7 @@ package dev.jasper.editor;
 
 import dev.jasper.editor.api.LocationResolver;
 import dev.jasper.editor.open.Locations;
+import dev.jasper.editor.api.ContextRequest;
 import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.editor.api.OpenRequest;
@@ -14,6 +15,7 @@ import dev.jasper.editor.recent.RecentFiles;
 import dev.jasper.editor.recent.RecentFilesScope;
 import dev.jasper.editor.recent.Reopeners;
 import dev.jasper.editor.syntax.Languages;
+import dev.jasper.editor.ui.ContextItems;
 import dev.jasper.editor.ui.EditorEnvironment;
 import dev.jasper.editor.ui.EditorSettings;
 import dev.jasper.editor.ui.EditorSettingsPanel;
@@ -38,6 +40,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -70,6 +73,7 @@ public final class EditorPlugin implements Plugin {
     private Subscription typography = () -> { };
     private RecentFiles recent;
     private Openers openers;
+    private ContextItems contextItems;
     private final Locations locations = new Locations();
 
     /** The production plugin: Swing's event queue, modal dialogs, running timers, this machine's editors and real programs. */
@@ -101,6 +105,8 @@ public final class EditorPlugin implements Plugin {
         environment = environments.apply(context, settings);
         openers = new Openers(failure -> context.log().log(System.Logger.Level.WARNING,
             "Open in Editor: an opener failed, so the next opener or the local chooser answers instead", failure));
+        contextItems = new ContextItems(failure -> context.log().log(System.Logger.Level.WARNING,
+            "An Editor right-click item another plugin added failed", failure));
         Reopeners reopeners = new Reopeners(file -> new LocalDocument(file, context.background()));
         recent = RecentFiles.load(context.dataDirectory().resolve("recent-files.toml"), context.background(), settings::recentFilesDays, Instant.now());
         var scope = new RecentFilesScope(recent, reopeners, Instant::now, (document, owner) -> window().open(document, owner),
@@ -121,6 +127,7 @@ public final class EditorPlugin implements Plugin {
             }
             @Override public Subscription opener(Predicate<OpenRequest> handler) { return openers.register(handler); }
             @Override public Subscription locationDocuments(String sourceId, LocationResolver resolver) { return locations.register(sourceId, resolver); }
+            @Override public Subscription contextItem(String title, Consumer<ContextRequest> run) { return contextItems.register(title, run); }
         });
         context.actions().register(ActionSpec.of(OPEN, "Open in Editor…").withIcon("file")
                 .withKeywords(List.of("editor", "open", "file", "edit")).withDefaultBinding("cmd+o"),
@@ -202,7 +209,7 @@ public final class EditorPlugin implements Plugin {
     }
 
     private EditorWindow window() {
-        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle, locations, imageLoader);
+        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle, locations, imageLoader, contextItems);
         return window;
     }
 }

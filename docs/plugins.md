@@ -47,7 +47,7 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 |---|---|---|---|---|
 | Remote | `dev.jasper.remote` | 0.16.0 | Yes | [Remote](remote.md) |
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | Yes | [Credential Vault](credential-vault.md) |
-| Editor | `dev.jasper.editor` | 0.15.0 | Yes | [Editor](editor.md) |
+| Editor | `dev.jasper.editor` | 0.16.0 | Yes | [Editor](editor.md) |
 | File Server | `dev.jasper.fileserver` | 0.6.0 | Yes | [File Server](file-server.md) |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | Yes | [Project Index](project-index.md) |
 | Shell History | `dev.jasper.history` | 0.3.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |

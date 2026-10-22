@@ -17,24 +17,28 @@ import javax.swing.event.PopupMenuListener;
  * a rule, a Split submenu with Jasper's Split choices, each Right and Down, Move Pane to New Tab, which shows disabled
  * while the editor is its tab's only pane, and Move Pane to Tab, the window's other tabs, which shows disabled while
  * there is none (pane flexibility spec 4). They are built again each time the menu opens, so a split item that
- * registers or goes later, and a tab that opens or closes, shows at once. {@link DocumentArea} builds the menu and its
- * items, as the plugin presentation check lets only it construct the vendor popup's controls. UI thread only.
+ * registers or goes later, and a tab that opens or closes, shows at once. They keep their place before the items other
+ * plugins add ({@link ContextItems}), whichever the menu builds first as it opens. {@link DocumentArea} builds the menu
+ * and its items, as the plugin presentation check lets only it construct the vendor popup's controls. UI thread only.
  */
 final class PaneItems implements PopupMenuListener {
     private final JPopupMenu popup;
     private final Supplier<List<SplitChoice>> choices;
     private final ContentTab pane;
     private final List<Component> added = new ArrayList<>();
+    /** Where the entries start: after the menu's entries when they were installed. */
+    private final int start;
 
     private PaneItems(JPopupMenu popup, Supplier<List<SplitChoice>> choices, ContentTab pane) {
         this.popup = popup;
         this.choices = choices;
         this.pane = pane;
+        start = popup.getComponentCount();
     }
 
     /**
-     * Adds the entries at the end of {@code popup}, for the editor {@code pane} holds, and builds them again whenever the
-     * menu opens.
+     * Adds the entries after {@code popup}'s current ones, for the editor {@code pane} holds, and builds them again in
+     * that place whenever the menu opens.
      *
      * @param popup the text area's right-click menu
      * @param choices Jasper's Split choices, asked each time
@@ -65,8 +69,12 @@ final class PaneItems implements PopupMenuListener {
         List<TabChoice> targets = pane.tabChoices();
         for (TabChoice target : targets) moves.add(DocumentArea.plainItem(target.label(), () -> pane.moveToTab(target.number())));
         moves.setEnabled(!targets.isEmpty());
+        // The vendor popup builds its own rule at the end; it moves to the entries' place. Out of the menu first:
+        // JPopupMenu.insert adds the entries after the index again, which would move it back to the end.
         popup.addSeparator();
-        added.add(popup.getComponent(popup.getComponentCount() - 1));
+        Component rule = popup.getComponent(popup.getComponentCount() - 1);
+        popup.remove(rule);
+        add(rule);
         add(split);
         add(move);
         add(moves);
@@ -78,7 +86,7 @@ final class PaneItems implements PopupMenuListener {
     }
 
     private void add(Component component) {
-        popup.add(component);
+        popup.insert(component, start + added.size());
         added.add(component);
     }
 

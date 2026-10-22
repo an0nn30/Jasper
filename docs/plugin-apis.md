@@ -9,7 +9,7 @@ APIs, and exports its own, through the same mechanism. Every type below is in th
 | Package | Provider | Version | Service | Published with | Bundled consumers |
 | --- | --- | --- | --- | --- | --- |
 | [`dev.jasper.vault.api`](sdk-reference.html#package-dev.jasper.vault.api) | Credential Vault, `dev.jasper.vault` | 0.7.0 | [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi) | `publishPerConsumer`: each consumer gets its own instance | Remote, File Server |
-| [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.15.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
+| [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.16.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
 | [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.16.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
 | [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api) | Snippets, `dev.jasper.snippets` | 0.3.0 | [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) | `publish` | Shell History |
 
@@ -299,7 +299,7 @@ private void chooseCredential(WindowHandle window, UiView view, Optional<UUID> c
 ## Editor API
 
 Package [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api), from the Editor
-(`dev.jasper.editor`, 0.15.0). The user's side is in [Editor](editor.md).
+(`dev.jasper.editor`, 0.16.0). The user's side is in [Editor](editor.md).
 
 The Editor publishes one [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) for every consumer with `publish`.
 Call it on the UI thread only. Documents open as Editor tabs in a Jasper window; opening a document that is already
@@ -315,8 +315,9 @@ reloads it for all of them.
 | [`reopener(keyPrefix, resolve)`](sdk-reference.html#dev.jasper.editor.api.Editor.reopener(String,Function)) | Makes **Recent Files** entries whose key starts with `keyPrefix` reopenable, and brings Editor tabs of such documents back when Jasper restores its windows; without a reopener for its key, a saved tab comes back as a placeholder. `resolve` gets a recorded key, on the UI thread, and must do no I/O: it answers empty when the key cannot be reopened now (its host was deleted, say), otherwise a function that builds the document for the window reopening it. A restore at start may ask before the plugin's own data has loaded: Remote's resolver then answers a document that finds its saved host when first read. A resolver that throws or answers null cannot reopen. A later registration of the same prefix replaces the earlier one, and the longest matching prefix wins. The prefix may not be blank or start with `local:`, the Editor's own (`IllegalArgumentException`, "Not a key prefix: …"). |
 | [`opener(handler)`](sdk-reference.html#dev.jasper.editor.api.Editor.opener(Predicate)) | Lets a plugin answer **Open in Editor…** itself, for example by browsing a remote host. Handlers get an [`OpenRequest`](sdk-reference.html#dev.jasper.editor.api.OpenRequest) on the UI thread, in registration order, before the file chooser; the first to return true has handled it. One that throws is logged and counts as false. |
 | [`locationDocuments(sourceId, resolver)`](sdk-reference.html#dev.jasper.editor.api.Editor.locationDocuments(String,LocationResolver)) | While registered, **Open in Editor…**, **Open in Editor Pane…**, **Open File Right…**, **Open File Down…** and **Save As…** offer the roots of the file source `sourceId` and open or save what the user picks there through the [`LocationResolver`](sdk-reference.html#dev.jasper.editor.api.LocationResolver). A later registration for the same source replaces the earlier one; a blank id throws `IllegalArgumentException`. |
+| [`contextItem(title, run)`](sdk-reference.html#dev.jasper.editor.api.Editor.contextItem(String,Consumer)) | Adds an item to the end of every Editor tab's right-click menu, after a rule, in registration order with other plugins' items. Choosing it calls `run` on the UI thread with a [`ContextRequest`](sdk-reference.html#dev.jasper.editor.api.ContextRequest); the Editor leaves the document alone. The menu shows the title as plain text, and a handler that throws is logged. A blank title throws `IllegalArgumentException` ("A context item needs a title"). Editor 0.16.0. |
 
-`reopener`, `opener` and `locationDocuments` return a [`Subscription`](sdk-reference.html#dev.jasper.sdk.Subscription)
+`reopener`, `opener`, `locationDocuments` and `contextItem` return a [`Subscription`](sdk-reference.html#dev.jasper.sdk.Subscription)
 that removes the registration. Their default bodies do nothing, for other implementations such as test fakes.
 
 | Type | What it is |
@@ -327,6 +328,7 @@ that removes the registration. Their default bodies do nothing, for other implem
 | [`TooLargeException`](sdk-reference.html#dev.jasper.editor.api.TooLargeException) | An `IOException` with `size()` and `limit()`: "The file is *size* bytes; the limit is *limit* bytes". |
 | [`RelativePaths`](sdk-reference.html#dev.jasper.editor.api.RelativePaths) | `requireValid(path)` returns a relative path unchanged, or throws `IllegalArgumentException` for an empty or absolute path, one starting with a URI scheme or drive letter (`https:`, `C:`), or one holding `?`, `#`, a backslash, a control character or an unpaired surrogate. `%` and `+` are ordinary file-name characters, and `..` segments may leave the folder. Editor 0.11.0. |
 | [`LocationResolver`](sdk-reference.html#dev.jasper.editor.api.LocationResolver) | `document(location, owner)` builds the document for a [`FileLocation.Sourced`](sdk-reference.html#dev.jasper.sdk.files.FileLocation.Sourced) the user picked; `location(documentKey)` says where an open document is in the source, so the chooser starts in its folder. UI thread, no I/O. A `document` that throws posts "Could not open a file", or "Could not save a file" from **Save As…**. |
+| [`ContextRequest`](sdk-reference.html#dev.jasper.editor.api.ContextRequest) | `(window, documentKey, selection)`: the Jasper window that holds the tab, the key of its document (`untitled:<name>` for a file not yet saved) and the selected text, empty when nothing is selected. Editor 0.16.0. |
 | [`OpenRequest`](sdk-reference.html#dev.jasper.editor.api.OpenRequest) | `(window, pane, documentKey)`: the Jasper window; the focused terminal pane, empty while another kind of tab is selected; and the active Editor tab's key when no pane is focused. The pane handle is the Editor's and limited by the Editor's capabilities: use its `id()` to find the pane through your own terminals. It is not the SDK's `dev.jasper.sdk.terminal.OpenRequest`. |
 
 **Bundled consumers.** Remote opens SFTP files as `EditorDocument`s with keys `remote:<host id>/<login>[,…]:<path>`,

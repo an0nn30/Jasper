@@ -4,6 +4,7 @@ import dev.jasper.editor.api.LocationResolver;
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.files.FileLocation;
+import dev.jasper.editor.api.ContextRequest;
 import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.api.OpenRequest;
 import dev.jasper.editor.session.Question;
@@ -36,6 +37,9 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
+import javax.swing.event.PopupMenuEvent;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.TokenTypes;
 import org.junit.jupiter.api.Test;
@@ -201,6 +205,92 @@ class EditorPluginTest {
             assertThat(host.contentTabs()).as("the chooser never ran").hasSize(1);
             registration.close();
         }
+    }
+
+    /** Editor 0.16.0: another plugin's item ends every Editor tab's right-click menu and gets the tab's selection. */
+    @Test void aContextItemEndsTheRightClickMenuAndGetsTheWindowTheDocumentAndTheSelection() throws Exception {
+        try (var host = host()) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID terminal = host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            Editor editor = consumer.get().services().require(Editor.class);
+            Path file = Files.writeString(home.resolve("a.txt"), "hello world\n");
+            editor.open(file);
+            drain(host);
+            var chosen = new ArrayList<ContextRequest>();
+            // Registered after the tab opened: the menu builds its items as it opens.
+            Subscription item = editor.contextItem("Encrypt…", chosen::add);
+            var area = window(plugin).selected().orElseThrow().area();
+            area.select(0, 5);
+            var popup = area.getPopupMenu();
+            opened(popup);
+            var children = List.of(popup.getComponents());
+            assertThat(texts(popup).getLast()).as("the last item").isEqualTo("Encrypt…");
+            assertThat(children.get(children.size() - 2)).as("a rule before it").isInstanceOf(JPopupMenu.Separator.class);
+            assertThat(children.indexOf(item(popup, "Move Pane to New Tab"))).as("after the pane entries").isLessThan(children.size() - 2);
+            item(popup, "Encrypt…").doClick();
+            assertThat(chosen).singleElement().satisfies(request -> {
+                assertThat(request.window().id()).isEqualTo(terminal);
+                assertThat(request.documentKey()).isEqualTo("local:" + file.toAbsolutePath().normalize());
+                assertThat(request.selection()).isEqualTo("hello");
+            });
+            assertThat(area.getText()).as("the document is left alone").isEqualTo("hello world\n");
+            area.select(0, 0);
+            opened(popup);
+            item(popup, "Encrypt…").doClick();
+            assertThat(chosen.getLast().selection()).as("nothing selected").isEmpty();
+            item.close();
+            opened(popup);
+            assertThat(texts(popup)).as("removed").doesNotContain("Encrypt…");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** A context item needs a title, shows it as plain text, keeps its registration order and is contained when it throws. */
+    @Test void contextItemsKeepTheirOrderShowPlainTextAndAFailingOneIsContained() throws Exception {
+        try (var host = host()) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            Editor editor = consumer.get().services().require(Editor.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> editor.contextItem(" ", request -> { }))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("A context item needs a title");
+            var ran = new ArrayList<String>();
+            editor.contextItem("<html><b>Bold", request -> { throw new IllegalStateException("broken"); });
+            editor.contextItem("Second", request -> ran.add(request.selection()));
+            editor.open(Files.writeString(home.resolve("b.txt"), "text\n"));
+            drain(host);
+            var popup = window(plugin).selected().orElseThrow().area().getPopupMenu();
+            opened(popup);
+            var texts = texts(popup);
+            assertThat(texts.subList(texts.size() - 2, texts.size())).containsExactly("<html><b>Bold", "Second");
+            JMenuItem bold = item(popup, "<html><b>Bold");
+            assertThat(bold.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).as("renders no HTML").isNull();
+            org.assertj.core.api.Assertions.assertThatNoException().isThrownBy(bold::doClick);
+            item(popup, "Second").doClick();
+            assertThat(ran).containsExactly("");
+        }
+    }
+
+    /** The menu opening as Swing announces it, to the listener registered last first: the Editor builds its entries again. */
+    private static void opened(JPopupMenu popup) {
+        var listeners = popup.getPopupMenuListeners();
+        for (int i = listeners.length - 1; i >= 0; i--) listeners[i].popupMenuWillBecomeVisible(new PopupMenuEvent(popup));
+    }
+
+    private static List<String> texts(JPopupMenu popup) {
+        var texts = new ArrayList<String>();
+        for (var child : popup.getComponents()) if (child instanceof JMenuItem entry) texts.add(entry.getText());
+        return texts;
+    }
+
+    private static JMenuItem item(JPopupMenu popup, String text) {
+        for (var child : popup.getComponents()) if (child instanceof JMenuItem entry && text.equals(entry.getText())) return entry;
+        throw new AssertionError("no " + text);
     }
 
     @Test void registersItsActionsAndPublishesTheEditorService() throws Exception {

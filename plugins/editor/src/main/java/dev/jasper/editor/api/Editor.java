@@ -4,6 +4,7 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -84,6 +85,20 @@ public interface Editor {
      * @return removes the resolver
      */
     default Subscription locationDocuments(String sourceId, LocationResolver resolver) {
+        return () -> { };
+    }
+
+    /**
+     * Adds an item to the end of every Editor tab's right-click menu, after a rule, in registration order with the other
+     * plugins' items. The menu shows {@code title} as plain text. Choosing the item runs {@code run} on the UI thread with
+     * the tab's window, its document's key and the selected text; the Editor does not change the document. A handler that
+     * throws is logged. Since Editor 0.16.0.
+     *
+     * @param title the item's title; not blank ({@link IllegalArgumentException} otherwise)
+     * @param run told what the item was chosen on
+     * @return removes the item
+     */
+    default Subscription contextItem(String title, Consumer<ContextRequest> run) {
         return () -> { };
     }
 }

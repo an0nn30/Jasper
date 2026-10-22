@@ -1,5 +1,6 @@
 package dev.jasper.editor.ui;
 
+import dev.jasper.editor.api.ContextRequest;
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.editor.api.OpenRequest;
 import dev.jasper.editor.api.LocationResolver;
@@ -63,6 +64,7 @@ public final class EditorWindow {
     private final java.util.function.Consumer<EditorDocument> opened;
     private final Predicate<OpenRequest> openers;
     private final Locations locations;
+    private final ContextItems contextItems;
     private final EditorModel model = new EditorModel();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
     /** Every view, the most recently active first (pane flexibility spec 6): a file's first here is the one an open selects. */
@@ -158,13 +160,25 @@ public final class EditorWindow {
     /** Uses the plugin-wide image loader across every hosted window and tab. */
     public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
                         Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader) {
-        this(environment, onClosed, opened, openers, locations, imageLoader, false);
+        this(environment, onClosed, opened, openers, locations, imageLoader, new ContextItems(failure -> { }));
+    }
+    /** As above, with the items other plugins add to each tab's right-click menu. */
+    public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                        Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader,
+                        ContextItems contextItems) {
+        this(environment, onClosed, opened, openers, locations, imageLoader, false, contextItems);
     }
     private EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
                          Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader, boolean ownsImageLoader) {
+        this(environment, onClosed, opened, openers, locations, imageLoader, ownsImageLoader, new ContextItems(failure -> { }));
+    }
+    private EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                         Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader, boolean ownsImageLoader,
+                         ContextItems contextItems) {
         this.imageLoader = java.util.Objects.requireNonNull(imageLoader);
         this.ownsImageLoader = ownsImageLoader;
         this.locations = java.util.Objects.requireNonNull(locations);
+        this.contextItems = java.util.Objects.requireNonNull(contextItems);
         this.environment = environment;
         this.context = environment.context();
         this.onClosed = onClosed;
@@ -1042,6 +1056,9 @@ public final class EditorWindow {
         handle.onClosed(() -> remove(tab));
         // Tabs and panes spec 2.10 and 9: the right-click menu's Split submenu and Move Pane to New Tab.
         PaneItems.install(tab.area().getPopupMenu(), context.windows()::splitChoices, handle);
+        // Other plugins' items end the menu (Editor.contextItem); they get the selection and leave the document alone.
+        contextItems.install(tab.area().getPopupMenu(), handle, () -> new ContextRequest(handle.window(), session.key(),
+            java.util.Objects.requireNonNullElse(tab.area().getSelectedText(), "")));
         activate(tab);
         readVimrcOnce();
         refresh();

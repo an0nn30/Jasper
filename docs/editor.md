@@ -75,8 +75,9 @@ Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by 
 **Toggle Comment**, **Revert to Saved**, **Split File Right** and **Split File Down**, then **Split** (Terminal Right,
 Terminal Down, Editor Right, Editor Down, Open File Right…, Open File Down…, then each plugin's split items), which
 opens the choice in a new pane beside the editor, **Move Pane to New Tab**, which gives the editor's pane a tab of its
-own while its tab holds another pane, and **Move Pane to Tab**, which moves it into another tab of its window. This menu
-names a tab whose active pane shows an Editor file and lists any other tab as "Tab 3"; the Tab menu names them all.
+own while its tab holds another pane, **Move Pane to Tab**, which moves it into another tab of its window, and last the
+items other plugins add. This menu names a tab whose active pane shows an Editor file and lists any other tab as
+"Tab 3"; the Tab menu names them all.
 
 While an Editor file's pane is the active pane of the tab that shows, its own shortcuts take precedence over the
 window's: on macOS Cmd+N makes a new file instead of a new terminal window. The Edit menu's **Copy**, **Paste**,
