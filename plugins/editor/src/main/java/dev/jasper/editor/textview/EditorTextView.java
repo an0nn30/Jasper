@@ -23,6 +23,7 @@ import javax.swing.text.Element;
 import javax.swing.text.Position;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
+import org.fife.ui.rsyntaxtextarea.RSyntaxDocument;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextAreaHighlighter;
 import org.fife.ui.rsyntaxtextarea.SyntaxView;
@@ -78,6 +79,12 @@ public final class EditorTextView extends SyntaxView {
             wrap=area.getLineWrap(); wordWrap=area.getWrapStyleWord(); tabSize=area.getTabSize(); clearLayouts();
         }
     }
+    /**
+     * @return the tokens of {@code line} in the document this view shows, as its lines and text are: while the text area
+     *     takes another document, Swing moves the caret on the new one before the UI replaces this view, and the text
+     *     area's own token lists are then the new document's
+     */
+    private Token tokens(int line) { return ((RSyntaxDocument) getDocument()).getTokenListForLine(line); }
     private List<LineLayout.Row> line(int index) {
         Element element=getElement().getElement(index);
         int start=element.getStartOffset(), end=Math.min(getDocument().getLength(),element.getEndOffset());
@@ -91,7 +98,7 @@ public final class EditorTextView extends SyntaxView {
             String text=getDocument().getText(start,end-start);
             if(text.endsWith("\n")) text=text.substring(0,text.length()-1);
             var spans=new ArrayList<LineLayout.Span>();
-            for(Token token=area().getTokenListForLine(index); token!=null && token.isPaintable(); token=token.getNextToken()) {
+            for(Token token=tokens(index); token!=null && token.isPaintable(); token=token.getNextToken()) {
                 Font font=area().getFontForTokenType(token.getType());
                 spans.add(new LineLayout.Span(token.getOffset(),token.getEndOffset(),font==null?Font.PLAIN:font.getStyle(),area().getForegroundForTokenType(token.getType())));
             }
@@ -275,7 +282,7 @@ public final class EditorTextView extends SyntaxView {
                 if(host.getUseSelectedTextColor()) paintColorRange(g,row,a.x,baseline,
                     host.getSelectionStart(),host.getSelectionEnd(),host.getSelectedTextColor());
                 // Underline hyperlinks using the same shaped logical ranges as hit testing.
-                for(Token token=host.getTokenListForLine(placed.line());token!=null && token.isPaintable();token=token.getNextToken()) {
+                for(Token token=tokens(placed.line());token!=null && token.isPaintable();token=token.getNextToken()) {
                     if(!host.getForegroundForToken(token).equals(host.getForegroundForTokenType(token.getType())))
                         paintColorRange(g,row,a.x,baseline,token.getOffset(),token.getEndOffset(),host.getForegroundForToken(token));
                     if(!host.getUnderlineForToken(token)) continue;

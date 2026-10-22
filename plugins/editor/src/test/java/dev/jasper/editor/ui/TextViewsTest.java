@@ -173,6 +173,78 @@ class TextViewsTest {
         assertThat(one.area().getText()).as("one step, as RSyntaxTextArea groups typing").isEqualTo("x\n");
     }
 
+    /** Lays a view out at a size, as its pane would, so that its text area maps offsets to places. */
+    private static void laidOut(EditorTab view) {
+        view.surface().setSize(400, 300);
+        view.surface().doLayout();
+        view.scroll().doLayout();
+        view.scroll().getViewport().doLayout();
+    }
+
+    /**
+     * Vim on in both views of a file, an edit in one below the other's cursor, then the other closes: nothing throws.
+     * Its text area lets go of the document while its view's geometry is stale from the edit.
+     */
+    @Test void closingAViewAfterAVimEditInTheOtherThrowsNothing() throws Exception {
+        var one = first(Files.writeString(folder.resolve("both.txt"), "abc\ndef\nghi\n"));
+        var two = second(one);
+        laidOut(one);
+        laidOut(two);
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        two.vim(Optional.of(vim));
+        type(one, "j");
+        type(two, "Gox<Esc>");
+        one.dispose();
+        assertThat(two.area().getText()).isEqualTo("abc\ndef\nghi\nx\n");
+        assertThat(one.area().getText()).isEmpty();
+    }
+
+    /** The view that edited closes instead, after its own Vim edit: nothing throws, and the other keeps the edit. */
+    @Test void closingTheViewThatMadeAVimEditThrowsNothing() throws Exception {
+        var one = first(Files.writeString(folder.resolve("editing.txt"), "abc\ndef\nghi\n"));
+        var two = second(one);
+        laidOut(one);
+        laidOut(two);
+        var vim = new Vim(VimHost.detached());
+        one.vim(Optional.of(vim));
+        two.vim(Optional.of(vim));
+        type(one, "j");
+        type(two, "Gox<Esc>");
+        two.dispose();
+        assertThat(one.area().getText()).isEqualTo("abc\ndef\nghi\nx\n");
+    }
+
+    /** Vim on in the editing view only: the other view, its caret on a later line, closes after the edit, quietly. */
+    @Test void closingAViewWithoutVimAfterAVimEditInTheOtherThrowsNothing() throws Exception {
+        var one = first(Files.writeString(folder.resolve("one-vim.txt"), "abc\ndef\nghi\n"));
+        var two = second(one);
+        laidOut(one);
+        laidOut(two);
+        two.vim(Optional.of(new Vim(VimHost.detached())));
+        one.area().setCaretPosition(5);
+        type(two, "Gox<Esc>");
+        one.dispose();
+        assertThat(two.area().getText()).isEqualTo("abc\ndef\nghi\nx\n");
+    }
+
+    /** A view showing its Markdown preview closes after the other view's edit, quietly. */
+    @Test void closingAViewInPreviewAfterAnEditInTheOtherThrowsNothing() throws Exception {
+        var one = first(DocumentSession.untitled("Untitled", environment));
+        var two = second(one);
+        for (EditorTab view : List.of(one, two)) view.previews(background::add, Runnable::run);
+        one.session().setStyle(SYNTAX_STYLE_MARKDOWN);
+        two.area().setText("# One\n\ntext\n");
+        laidOut(one);
+        laidOut(two);
+        one.area().setCaretPosition(7);
+        one.markdownMode(MarkdownMode.PREVIEW, false);
+        two.area().setCaretPosition(two.area().getDocument().getLength());
+        two.area().replaceSelection("more\n");
+        one.dispose();
+        assertThat(two.area().getText()).isEqualTo("# One\n\ntext\nmore\n");
+    }
+
     /** A closed view leaves nothing behind on its file's session, which outlives it while other views show the file. */
     @Test void aClosedViewLeavesNoListenerOnTheSession() throws Exception {
         var one = first(Files.writeString(folder.resolve("listeners.txt"), "x\n"));

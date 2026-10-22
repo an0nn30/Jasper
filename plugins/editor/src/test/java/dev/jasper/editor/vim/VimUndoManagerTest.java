@@ -746,6 +746,62 @@ class VimUndoManagerTest {
         onEdt(() -> assertThat(kept.get().getText()).startsWith("xline 1"));
     }
 
+    /**
+     * A view lets go of the document after another view's edit below its caret, which leaves its geometry stale: the
+     * swap to its own empty document throws nothing, and it shows that document.
+     */
+    @Test void aViewLetsGoAfterAnotherViewsEditBelowItsCaret() throws Exception {
+        onEdt(() -> {
+            var a = new VimTextArea();
+            a.setText("abc\ndef\nghi\n");
+            a.discardAllEdits();
+            a.setSize(400, 300);
+            var b = new VimTextArea();
+            b.share(a);
+            a.setCaretPosition(5);
+            try { a.modelToView2D(5); } catch (BadLocationException impossible) { throw new AssertionError(impossible); }
+            b.setCaretPosition(b.getDocument().getLength());
+            b.replaceSelection("  ");
+            a.unshare();
+            assertThat(a.getText()).isEmpty();
+            assertThat(a.textView().getDocument()).as("its view shows its own document").isSameAs(a.getDocument());
+            assertThat(b.getText()).isEqualTo("abc\ndef\nghi\n  ");
+        });
+    }
+
+    /** A view lets go of the document with its put-back still queued: the put-back does nothing, and nothing throws. */
+    @Test void aViewThatLetsGoWithItsPutBackQueuedThrowsNothing() throws Exception {
+        var failures = new java.util.concurrent.CopyOnWriteArrayList<Throwable>();
+        var shown = new AtomicReference<VimTextArea>();
+        var other = new AtomicReference<VimTextArea>();
+        var handler = new AtomicReference<Thread.UncaughtExceptionHandler>();
+        onEdt(() -> {
+            handler.set(Thread.currentThread().getUncaughtExceptionHandler());
+            Thread.currentThread().setUncaughtExceptionHandler((thread, failure) -> failures.add(failure));
+            shown.set(lines());
+            other.set(new VimTextArea());
+            other.get().share(shown.get());
+            scrolled(shown.get(), new JViewport());
+        });
+        try {
+            onEdt(() -> ((JViewport) shown.get().getParent()).setViewPosition(new Point(0, yFor(shown.get(), 299))));
+            onEdt(() -> {
+                other.get().setCaretPosition(0);
+                other.get().replaceSelection("new\n".repeat(100));
+                shown.get().unshare();
+            });
+            onEdt(() -> { });
+            onEdt(() -> { });
+            assertThat(failures).isEmpty();
+            onEdt(() -> {
+                assertThat(shown.get().getText()).isEmpty();
+                assertThat(other.get().getText()).startsWith("new\n");
+            });
+        } finally {
+            onEdt(() -> Thread.currentThread().setUncaughtExceptionHandler(handler.get()));
+        }
+    }
+
     private static long registrations(AbstractDocument document, VimUndoManager history) {
         return Arrays.stream(document.getUndoableEditListeners()).filter(listener -> listener == history).count();
     }

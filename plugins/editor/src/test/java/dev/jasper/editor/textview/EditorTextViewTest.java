@@ -27,6 +27,24 @@ class EditorTextViewTest {
             assertNotSame(warm,geometry.get(view),"a real resize still reflows");
         }
     }
+    /**
+     * A text area given another document while its view's geometry is stale: the caret's move to the new document's
+     * start maps through the view of the old one before the UI replaces it, and that view reads the old document's
+     * lines and tokens alike (another view of a file letting go of it does this).
+     */
+    @Test void aNewDocumentWhileTheGeometryIsStaleThrowsNothing() throws Exception {
+        var area = new VimTextArea();
+        area.setText("abc\ndef\nghi\n");
+        area.setSize(400, 300);
+        area.setCaretPosition(5);
+        area.modelToView2D(5);
+        area.insert("  ", area.getDocument().getLength());
+        assertEquals(5, area.getCaretPosition(), "an edit after the caret leaves it, and the geometry is stale");
+        var replacement = new org.fife.ui.rsyntaxtextarea.RSyntaxDocument(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_NONE);
+        area.setDocument(replacement);
+        assertSame(replacement, area.textView().getDocument(), "the UI shows the new document");
+        assertEquals(0, area.modelToView2D(0).getY());
+    }
     @Test void firstPaintRefreshAndUiReplacementKeepSharedGeometry() throws Exception {
         var area = new dev.jasper.editor.testsupport.RasterTextArea();
         area.typography(new TerminalTypography("Monospaced",13.5,List.of(),true,1.5));
