@@ -138,7 +138,11 @@ class ToolStripeTest {
         var stripe = new ToolStripe(Side.LEFT);
         stripe.render(List.of(new ToolStripe.Button("a", "A", null, Slot.LEFT_TOP, false, Optional.empty(), OptionalInt.empty(), ToolWindowMode.WINDOW)), List.of());
         stripe.updateBadge("a", Optional.of(new PanelBadge(1, PanelBadge.Tone.ACCENT, "1 new item")));
-        assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(stripe.buttons().getFirst().getComponentPopupMenu(), "Window")).isSelected()).isTrue();
+        assertThat(stripe.window("a")).hasValueSatisfying(window -> {
+            assertThat(window.badge()).as("the badge changed").isPresent();
+            assertThat(window.mode()).as("the mode is kept").isEqualTo(ToolWindowMode.WINDOW);
+        });
+        assertThat(stripe.window("x")).as("a window this stripe does not show").isEmpty();
     }
 
     @Test void theStripeLaysOutItsButtonsFromItsWidth() {

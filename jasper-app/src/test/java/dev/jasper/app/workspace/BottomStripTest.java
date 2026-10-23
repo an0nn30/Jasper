@@ -80,8 +80,9 @@ class BottomStripTest {
             assertThat(((javax.swing.JMenu) menu.getComponent(0)).getText()).isEqualTo("View Mode");
             assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(menu, "Float")).isSelected()).isTrue();
             strip.updateBadge("log", Optional.of(new dev.jasper.app.contributions.PanelBadge(1, dev.jasper.app.contributions.PanelBadge.Tone.ACCENT, "1 new")));
-            assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(strip.buttons().getFirst().getComponentPopupMenu(), "Float")).isSelected())
-                .as("a badge change keeps the mode").isTrue();
+            var window = ((StripeLabels.Label) strip.buttons().getFirst()).window;
+            assertThat(window.badge()).as("the badge changed").isPresent();
+            assertThat(window.mode()).as("a badge change keeps the mode").isEqualTo(ToolWindowMode.FLOAT);
             ToolWindowHeaderTest.item(menu, "Float").doClick();
             assertThat(events).as("the current mode does nothing").isEmpty();
             ToolWindowHeaderTest.item(menu, "Docked").doClick();

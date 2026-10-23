@@ -113,8 +113,9 @@ class LabelledStripeTest {
             var menu = stripe.buttons().getFirst().getComponentPopupMenu();
             assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(menu, "Float")).isSelected()).isTrue();
             stripe.updateBadge("sessions", Optional.of(new PanelBadge(2, PanelBadge.Tone.ACCENT, "2 new")));
-            assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(stripe.buttons().getFirst().getComponentPopupMenu(), "Float")).isSelected())
-                .as("a badge change keeps the mode").isTrue();
+            var window = ((StripeLabels.Label) stripe.buttons().getFirst()).window;
+            assertThat(window.badge()).as("the badge changed").isPresent();
+            assertThat(window.mode()).as("a badge change keeps the mode").isEqualTo(ToolWindowMode.FLOAT);
             ToolWindowHeaderTest.item(menu, "Float").doClick();
             assertThat(events).as("the current mode does nothing").isEmpty();
             ToolWindowHeaderTest.item(menu, "Docked").doClick();

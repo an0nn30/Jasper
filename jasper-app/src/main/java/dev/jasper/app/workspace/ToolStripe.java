@@ -173,6 +173,9 @@ final class ToolStripe extends DockStripe {
         button.getAccessibleContext().setAccessibleDescription(badge.map(PanelBadge::description).orElse(null));
     }
 
+    /** What the window's button shows now, as its last render or badge change left it; empty for a window this stripe does not show. */
+    Optional<Button> window(String id) { return Optional.ofNullable(windows.get(id)); }
+
     /**
      * Changes the badge of the window's button in place and repaints it; a window this stripe does not show is ignored.
      * It rebuilds nothing, asks for no layout and leaves a drag as it is: the dot is part of the icon, whose size is the
