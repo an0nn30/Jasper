@@ -312,13 +312,15 @@ Each tool window has a header: its title, the plugin's buttons, **Options** (⋮
 ### Float and Window
 
 A tool window can have a window of its own. In its Options menu, or the right-click menu of its rail button or stripe
-button, **View Mode** › **Float** or **Window** gives it one, which takes the focus if the tool window was showing;
-**Docked** puts it back at its place on the stripe, showing there if it was showing. **Float** is a window owned by the
-main window: it stays above it, minimises and closes with it and has no taskbar or Dock entry of its own. **Window** is
-an ordinary window: it has its own entry in the taskbar or the window switcher and can go behind the main window. Either
-one has the tool window's title and its header, with Options and Hide, above its content. It opens where the tool
-window's frame was, or centred on the main window when the tool window was hidden, and afterwards where it last was,
-fitted to the displays that are connected.
+button, **View Mode** › **Float** or **Window** gives it one, which takes the focus if the tool window was showing, and
+dragging its button or header out of the main window opens a Float window for it ([Moving and
+resizing](#moving-and-resizing)); **Docked** puts it back at its place on the stripe, showing there if it was showing.
+**Float** is a window owned by the main window: it stays above it, minimises and closes with it and has no taskbar or
+Dock entry of its own. **Window** is an ordinary window: it has its own entry in the taskbar or the window switcher and
+can go behind the main window. Either one has the tool window's title and its header, with Options and Hide, above its
+content. From a menu it opens where the tool window's frame was, or centred on the main window when the tool window was
+hidden, and afterwards where it last was; dragged out, it opens at the pointer. Either way it is fitted to the displays
+that are connected.
 
 The tool window keeps its rail button or stripe button, in its slot, highlighted while its window shows.
 
@@ -345,6 +347,15 @@ start, and one saved on a display that is no longer connected opens on a connect
   and an outline shows where it would land. Release it on a rail to move it there, keeping it shown or hidden as it
   was, or over the workspace near its left, right or bottom edge to move it there and show it. Escape, a click with
   another button or switching windows cancels the drag. An empty, hidden rail still takes a drop at its window edge.
+- **Drag it out of the main window** (a rail button, a labelled stripe's or the bottom strip's tab, or a docked tool
+  window's header) and release it outside the window, or over another of Jasper's windows that lies in front of it, to
+  open the tool window in a Float window there, focused, whether it was showing or not ([Float and
+  Window](#float-and-window)). While the pointer is there, the rails' gap and the outline go and the tool window's title
+  and icon follow the pointer; moving back over the window brings them back. The window opens with the point you
+  pressed under the pointer, at the size it last had or else its frame's, on the display under the pointer. Dragging out
+  the button of a tool window that has a window of its own moves that window there, Float or Window as it was; released
+  on a rail, it keeps its own window and its button moves to that slot, and released over the workspace it docks there
+  and shows.
 - **Move to** on the right-click or Options menu moves it straight to a named slot.
 - **Resize** by dragging the gap between a tool window and the terminal, or between the two tool windows on a side.
   The change applies when you release. A side or the bottom area snaps to its default size (260 logical pixels wide,

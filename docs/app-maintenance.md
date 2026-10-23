@@ -808,11 +808,22 @@ partner is empty. The first slots keep the true landing. What a drop over the wo
 own width or height, so the zones keep their shape at any aspect ratio), a side split into its top and bottom slot at
 half of the side panels' visible height (`DockDrag.sideSplit`: above the bottom area while it shows, else the
 workspace's half) and the bottom at half its width; a side wins a tie. `DockDrag` previews no area for a stripe drop
-of a hidden window, which stays hidden. While the rails are enabled, an empty hidden stripe still takes drops:
-`DockDrag.standAtEdge` gives it bounds over the workspace's edge for the drag without showing it, and
-`DockDrag.areaAfter` lays the guide out for the stripes that show or hide after the drop, following
+of a hidden or detached window, which keeps its visibility and mode. While the rails are enabled, an empty hidden
+stripe still takes drops: `DockDrag.standAtEdge` gives it bounds over the workspace's edge for the drag without showing
+it, and `DockDrag.areaAfter` lays the guide out for the stripes that show or hide after the drop, following
 `syncRailVisibility`'s rule. Change the zones in the resolver and its tests first; the window tests aim with
 `DockTestSupport.zone(workspace, slot)`.
+
+While the pointer is outside the window's frame on screen (its title bar included), or over another of Jasper's windows
+in front of it (`DockDrag.covered`, wired to `TabDrag.behind`: a window the tab drag does not reach, such as Settings or
+a Float, that covers it, or a workspace window that came to the front after it), the target is Detach: no gap, guide or
+ghost, and a `TabDragLabel` with the tool window's title (`DockDrag.titles`) and icon follows the pointer; moving back
+over the window resolves a target again. A release on Detach calls `DockDrag.onDetach` with the screen point and the grab,
+where the press held the dragged component. `WindowContributions.detachDropped` detaches the tool window as Float, or in
+the mode it has, at `DetachedToolWindows.droppedBounds`, and activates it as View Mode from a menu does: the size is
+`initialBounds`'s rule (the bounds it last had, else its frame's, else its landing size, at least the minimum), the grab
+stays under the pointer and the window is kept on the usable part of the display whose whole bounds hold the pointer, so
+a release over a menu bar, Dock or taskbar picks that display (`WindowPlacement.Display`, from `WindowFrame.displays`).
 
 Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the components
 `DockDrag.install` was given: stripe window buttons and labels (`DockStripe.dragSource`, on `ToolStripe`,
@@ -854,7 +865,7 @@ Native FlatLaf controls keep their delegate behaviour and receive the kit's colo
 light and dark selected fills and readable text, while the kit's control tests cover their own rounded selections.
 
 ```sh
-./gradlew :jasper-app:test --tests "*DockGeometryTest" --tests "*DockDropResolverTest" --tests "*DockDragTest" --tests "*DockStateTest" --tests "*SelectionRenderingTest"
+./gradlew :jasper-app:test --tests "*DockGeometryTest" --tests "*DockDropResolverTest" --tests "*DockDragTest" --tests "*DockDragDetachTest" --tests "*DockStateTest" --tests "*SelectionRenderingTest"
 ```
 
 ### Tabs
