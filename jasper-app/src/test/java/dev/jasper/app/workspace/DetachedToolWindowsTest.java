@@ -66,8 +66,11 @@ class DetachedToolWindowsTest {
         final Map<String, DetachedToolWindows.Events> events = new HashMap<>();
         final Map<String, JComponent> contents = new HashMap<>();
         boolean active;
-        /** Run, with the tool window's id, inside the shell's making and its show and content functions: a dock change in the middle of a sync. */
-        Consumer<String> duringApply = id -> { }, duringShow = id -> { }, duringContent = id -> { };
+        /**
+         * Run, with the tool window's id, inside the shell's making and its show, content and dispose functions: a dock
+         * change in the middle of a sync, or a failure of the native window.
+         */
+        Consumer<String> duringApply = id -> { }, duringShow = id -> { }, duringContent = id -> { }, duringDispose = id -> { };
 
         @Override public DetachedToolWindows.Shell apply(DetachedToolWindows.Opening opening, DetachedToolWindows.Events heard) {
             String id = opening.id();
@@ -76,7 +79,7 @@ class DetachedToolWindowsTest {
             events.put(id, heard);
             duringApply.accept(id);
             return new DetachedToolWindows.Shell(() -> { log.add("show " + id); duringShow.accept(id); }, () -> log.add("toFront " + id),
-                () -> log.add("dispose " + id), () -> active, bounds -> log.add("place " + id + " " + text(bounds)),
+                () -> { log.add("dispose " + id); duringDispose.accept(id); }, () -> active, bounds -> log.add("place " + id + " " + text(bounds)),
                 frame -> { contents.put(id, frame); log.add("content " + id); duringContent.accept(id); });
         }
 
@@ -450,6 +453,8 @@ class DetachedToolWindowsTest {
             showing[0] = true;
             second.dispatchEvent(new HierarchyEvent(second, HierarchyEvent.HIERARCHY_CHANGED, second, second.getParent(),
                 HierarchyEvent.SHOWING_CHANGED));
+            assertThat(shells.take()).as("nothing opens inside the main window's own show").isEmpty();
+            PressedFrameTest.flushEdt();
             assertThat(shells.take()).as("the main window showed").containsExactly(open(ToolWindowMode.FLOAT, bounds), "show " + A);
         });
     }
@@ -514,6 +519,139 @@ class DetachedToolWindowsTest {
             fixture.owner.detachedShells(fixture.shells);
             assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, docked), "show " + A);
         });
+    }
+
+    /**
+     * Final review: a native window that fails to be made does not break the dock change that opened it. The tool window
+     * hides and stays detached, the change renders the stripes and saves it hidden, so neither the next dock change nor the
+     * next start tries again; a click on its stripe tries once more, and fails the same way.
+     */
+    @Test void aWindowThatFailsToBeMadeHidesItsToolWindowAndTheDockChangeCompletes() throws Exception {
+        edt(() -> {
+            Path file = dir.resolve("ui-state.toml");
+            var fixture = new Fixture(UiState.load(file));
+            String bravo = "dev.x.bravo";
+            fixture.addPanel(bravo, "Bravo", Slot.RIGHT_TOP);
+            fixture.toggle();
+            Rectangle docked = fixture.owner.area().frameOnScreen(A).orElseThrow();
+            fixture.shells.duringApply = id -> { throw new IllegalStateException("No native window"); };
+
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, docked));
+            assertHiddenAfterFailing(fixture, file, docked);
+
+            fixture.request(bravo, Contributions.PanelRequest.Op.SHOW);
+            assertThat(fixture.shells.take()).as("the next dock change does not try again").isEmpty();
+            assertThat(fixture.owner.area().content(Slot.RIGHT_TOP)).isNotNull();
+
+            fixture.button().doClick();
+            assertThat(fixture.shells.take()).as("a click tries again").containsExactly(open(ToolWindowMode.FLOAT, docked));
+            assertHiddenAfterFailing(fixture, file, docked);
+        });
+    }
+
+    /** Final review: a native window that fails to show is disposed, and its tool window hides as when it fails to be made. */
+    @Test void aWindowThatFailsToShowIsDisposedAndItsToolWindowHides() throws Exception {
+        edt(() -> {
+            Path file = dir.resolve("ui-state.toml");
+            var fixture = new Fixture(UiState.load(file));
+            fixture.toggle();
+            Rectangle docked = fixture.owner.area().frameOnScreen(A).orElseThrow();
+            fixture.shells.duringShow = id -> { throw new IllegalStateException("Not shown"); };
+
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, docked), "show " + A, "dispose " + A);
+            assertHiddenAfterFailing(fixture, file, docked);
+        });
+    }
+
+    /** Final review: a window restored at start-up that fails to open is saved hidden, so the next start opens nothing. */
+    @Test void aRestoredWindowThatFailsToOpenIsSavedHidden() throws Exception {
+        edt(() -> {
+            Path file = dir.resolve("ui-state.toml");
+            var saved = new Rectangle(200, 150, 400, 300);
+            var state = UiState.load(file);
+            state.putPanel(A, new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.FLOAT,
+                Optional.of(new UiState.Bounds(saved.x, saved.y, saved.width, saved.height))));
+            state.save();
+            var fixture = new Fixture(UiState.load(file), new JLabel("alpha"), false);
+            fixture.shells.duringApply = id -> { throw new IllegalStateException("No native window"); };
+
+            fixture.owner.detachedShells(fixture.shells);
+            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, saved));
+            assertHiddenAfterFailing(fixture, file, saved);
+        });
+    }
+
+    /** The tool window whose own window failed to open: hidden, still floating, its stripe button unselected, and saved so. */
+    private static void assertHiddenAfterFailing(Fixture fixture, Path file, Rectangle bounds) {
+        assertThat(fixture.owner.dock().visible(A)).isFalse();
+        assertThat(fixture.owner.dock().mode(A)).as("still detached").isEqualTo(ToolWindowMode.FLOAT);
+        assertThat(fixture.windows().showing(A)).isFalse();
+        assertThat(fixture.button().isSelected()).as("the stripes rendered").isFalse();
+        assertThat(UiState.load(file).panel(A)).as("saved hidden").hasValue(new UiState.Panel(Slot.LEFT_TOP, 0, false,
+            ToolWindowMode.FLOAT, Optional.of(new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height))));
+    }
+
+    /** Final review: a window that fails to dispose still goes, and the dock change that hid its tool window completes. */
+    @Test void aWindowThatFailsToDisposeStillHidesItsToolWindow() throws Exception {
+        edt(() -> {
+            Path file = dir.resolve("ui-state.toml");
+            var fixture = new Fixture(UiState.load(file));
+            Rectangle bounds = fixture.floated();
+            fixture.shells.duringDispose = id -> { throw new IllegalStateException("Not disposed"); };
+
+            fixture.button().doClick();
+            assertThat(fixture.shells.take()).containsExactly("dispose " + A);
+            assertHiddenAfterFailing(fixture, file, bounds);
+        });
+    }
+
+    /** Final review: closing the main window disposes every detached window when one fails to dispose, and the main window closes. */
+    @Test void closingTheMainWindowDisposesEveryWindowWhenOneFails() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            String bravo = "dev.x.bravo";
+            fixture.addPanel(bravo, "Bravo", Slot.RIGHT_TOP);
+            fixture.floated();
+            fixture.request(bravo, Contributions.PanelRequest.Op.SHOW);
+            fixture.choose(fixture.owner.area().headerOf(Slot.RIGHT_TOP).menu(), "Float");
+            assertThat(fixture.windows().showing(bravo)).isTrue();
+            fixture.shells.take();
+            fixture.shells.duringDispose = id -> { if (id.equals(A)) throw new IllegalStateException("Not disposed"); };
+
+            fixture.owner.close();
+            assertThat(fixture.shells.take()).containsExactly("dispose " + A, "dispose " + bravo, "closed " + A);
+            assertThat(fixture.owner.closed()).isTrue();
+        });
+    }
+
+    /**
+     * Final review: under flush frames View Mode \u203a Docked from the stripe button's menu docks a floating tool window
+     * back in place of the window its slot shows and leaves it the active tool window: the window it replaces hides without
+     * handing the focus back to the terminal, whose focus would undo the activation.
+     */
+    @Test void underFlushFramesViewModeDockedInPlaceOfAnotherWindowKeepsItActive() throws Exception {
+        try {
+            edt(() -> {
+                var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), true, true);
+                String charlie = "dev.x.charlie";
+                fixture.addPanel(charlie, "Charlie", Slot.LEFT_TOP);
+                var events = new ArrayList<String>();
+                fixture.model.tabs().open("dev.x", "doc", "Doc", fixture.owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+                fixture.floated();
+                fixture.request(charlie, Contributions.PanelRequest.Op.SHOW);
+                assertThat(fixture.owner.area().content(Slot.LEFT_TOP)).isNotNull().isNotSameAs(fixture.view);
+                events.clear();
+
+                fixture.choose(fixture.stripeMenu(), "Docked");
+                assertThat(fixture.shells.take()).containsExactly("dispose " + A);
+                assertThat(fixture.owner.area().content(Slot.LEFT_TOP)).isSameAs(fixture.view);
+                assertThat(fixture.owner.dock().visible(charlie)).isFalse();
+                assertThat(events).as("no hand-back to the terminal").isEmpty();
+                assertThat(fixture.owner.area().focusedSlot()).as("its frame is the active one").hasValue(Slot.LEFT_TOP);
+            });
+        } finally { edt(() -> ThemeTestSupport.controller(true)); }
     }
 
     /** A label that counts its look-and-feel updates. */

@@ -28,6 +28,7 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -249,21 +250,31 @@ public final class DetachedFrame {
         events.moved().accept(window.getBounds());
     }
 
-    /** Closes the theme subscription, the shortcut bindings and the title bar, then disposes the window. */
+    /**
+     * Closes the theme subscription, the shortcut bindings and the title bar, each whether or not another fails to, then
+     * disposes the window. The first failure propagates once the window is disposed, the later ones under it.
+     */
     private void dispose() {
         if (disposed) return;
         disposed = true;
+        Throwable failure = null;
         try {
-            if (theme != null) theme.close();
-            if (keys != null) keys.close();
-            if (bar != null) bar.close();
-            if (band != null) band.close();
-        } catch (RuntimeException failure) {
-            throw failure;
-        } catch (Exception failure) {
-            throw new IllegalStateException("A detached tool window's shortcuts could not be unbound", failure);
+            for (AutoCloseable part : Arrays.<AutoCloseable>asList(theme, keys, bar, band)) {
+                if (part == null) continue;
+                try { part.close(); } catch (Exception | Error closing) { failure = collected(failure, closing); }
+            }
         } finally {
-            window.dispose();
+            try { window.dispose(); } catch (RuntimeException | Error disposing) { failure = collected(failure, disposing); }
         }
+        if (failure instanceof RuntimeException unchecked) throw unchecked;
+        if (failure instanceof Error error) throw error;
+        if (failure != null) throw new IllegalStateException("A detached tool window's shortcuts could not be unbound", failure);
+    }
+
+    /** The first failure, with {@code next} under it; {@code next} when there was none. */
+    private static Throwable collected(Throwable first, Throwable next) {
+        if (first == null) return next;
+        first.addSuppressed(next);
+        return first;
     }
 }

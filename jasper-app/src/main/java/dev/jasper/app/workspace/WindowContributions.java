@@ -128,8 +128,12 @@ final class WindowContributions implements AutoCloseable {
         return panel == null ? id : panel.entry.title();
     }
 
+    /**
+     * The main window showed or hid: the detached windows sync after this event, not inside the main window's own show,
+     * which dispatches it under the AWT tree lock before that show has finished.
+     */
     private void showingChanged(HierarchyEvent event) {
-        if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0) detached.sync();
+        if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0) SwingUtilities.invokeLater(detached::sync);
     }
 
     /** The window's action for a contributed id, or null when the contributor removed it. */
@@ -397,8 +401,10 @@ final class WindowContributions implements AutoCloseable {
         detached.sync();
         if (change.stripes()) renderStripes();
         for (String id : change.hidden()) notifyVisibility(id, false);
-        // Hiding a docked window by any route returns focus to the terminal, unless a window being activated replaces it.
-        if (dockedHid && (activating == null || !change.shown().contains(activating))) owner.focusSelected();
+        // Hiding a docked window by any route returns focus to the terminal, unless a window being activated replaces it:
+        // one that starts showing, or a detached one docked back in its place (View Mode \u203a Docked).
+        if (dockedHid && (activating == null || !(change.shown().contains(activating) || change.placed().contains(activating))))
+            owner.focusSelected();
         for (String id : change.shown()) notifyVisibility(id, true);
         persist();
     }

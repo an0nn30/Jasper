@@ -31,10 +31,12 @@ import javax.swing.SwingUtilities;
  * are {@link Shell}s that {@link #shells} makes ({@link DetachedFrame} in the application), as {@link WindowShell} is
  * for workspace windows; without shells (headless) or before the main window shows ({@link #ready}) windows wait, and
  * open on the next sync. A window opens at the bounds its tool window has in the dock, kept on today's displays by
- * {@link WindowPlacement#restore}'s rule, and reports moves back to the dock, which saves them with its next change. EDT
- * only.
+ * {@link WindowPlacement#restore}'s rule, and reports moves back to the dock, which saves them with its next change. A
+ * window that fails to open hides its tool window, and one that fails to dispose goes all the same: each is logged, and
+ * the dock change around it completes. EDT only.
  */
 final class DetachedToolWindows implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(DetachedToolWindows.class.getName());
     /** The smallest size a detached tool window's window opens at, in logical pixels. */
     private static final int MINIMUM_WIDTH = 240, MINIMUM_HEIGHT = 160;
 
@@ -202,14 +204,18 @@ final class DetachedToolWindows implements AutoCloseable {
         return WindowPlacement.fitted(bounds, screens.get(WindowPlacement.displayFor(centre, screens).orElse(0)));
     }
 
-    /** Disposes every window; nothing opens afterwards. */
+    /** Disposes every window, each whether or not another fails to; nothing opens afterwards. */
     @Override public void close() {
         if (closed) return;
         closed = true;
         for (String id : List.copyOf(open.keySet())) dispose(id);
     }
 
-    /** Opens the tool window's window at its dock bounds (or its first ones) on today's displays, which the dock keeps. */
+    /**
+     * Opens the tool window's window at its dock bounds (or its first ones) on today's displays, which the dock keeps. A
+     * window that fails to be made or shown is logged and goes, and its tool window hides: the change that opened it
+     * completes and saves it hidden, so neither the next change nor the next start opens it again.
+     */
     private void open(String id, JComponent frame) {
         Rectangle bounds = dock.bounds(id).orElseGet(() -> initialBounds(id));
         bounds = new WindowPlacement(Optional.of(new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height)), Frame.NORMAL)
@@ -221,20 +227,46 @@ final class DetachedToolWindows implements AutoCloseable {
             window.bounds = new Rectangle(moved);
             dock.setBounds(id, moved);
         });
-        // The binding is made with the window's root pane; its Close keys hide this tool window, as its close button does.
-        Shell shell = shells.apply(new Opening(id, titles.apply(id), window.mode, new Rectangle(bounds), frame, ownerWindow(),
-            root -> keys.apply(root, () -> hide.accept(id))), events);
+        Shell shell;
+        try {
+            // The binding is made with the window's root pane; its Close keys hide this tool window, as its close button does.
+            shell = shells.apply(new Opening(id, titles.apply(id), window.mode, new Rectangle(bounds), frame, ownerWindow(),
+                root -> keys.apply(root, () -> hide.accept(id))), events);
+        } catch (RuntimeException failure) {
+            failed(id, failure);
+            return;
+        }
         // A dock change made while the shell was made ran a sync that opened this tool window's window itself or took its
         // frame (it hid, or docked): no window is left for this shell, which never showed.
-        if (open.containsKey(id) || area.detachedFrame(id) != frame) { shell.dispose().run(); return; }
+        if (open.containsKey(id) || area.detachedFrame(id) != frame) { dispose(id, shell); return; }
         window.shell = shell;
         open.put(id, window);
-        shell.show().run();
+        try {
+            shell.show().run();
+        } catch (RuntimeException failure) {
+            if (open.get(id) == window) dispose(id);
+            failed(id, failure);
+        }
+    }
+
+    /** Logs that the tool window's window failed to open, and hides the tool window. */
+    private void failed(String id, RuntimeException failure) {
+        LOG.log(System.Logger.Level.WARNING, "The tool window " + id + "'s own window could not be opened; it is hidden.", failure);
+        hide.accept(id);
     }
 
     private void dispose(String id) {
         Open window = open.remove(id);
-        if (window != null) window.shell.dispose().run();
+        if (window != null) dispose(id, window.shell);
+    }
+
+    /** Disposes a tool window's window; a failure is logged, and the window is no longer this one's all the same. */
+    private static void dispose(String id, Shell shell) {
+        try {
+            shell.dispose().run();
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "The tool window " + id + "'s own window could not be disposed.", failure);
+        }
     }
 
     /** The main window's native window, or null when its content is in none (a headless test). */
