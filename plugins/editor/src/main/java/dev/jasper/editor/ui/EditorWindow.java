@@ -109,6 +109,8 @@ public final class EditorWindow {
     private Boolean vimToggled;
     /** Whether the vimrc has been read into {@link #vim}: the first time Vim turns on, and again on Reload vimrc. */
     private boolean vimrcRead;
+    /** IdeaVim's shortcut-conflict notification, made on the first conflict; null until then. */
+    private ShortcutConflicts conflicts;
 
     /**
      * Creates the window, not yet shown, reporting opened documents to nobody.
@@ -559,6 +561,24 @@ public final class EditorWindow {
      * @param window the window the action ran in
      */
     public void reloadVimrc(WindowHandle window) { fileIn(window).ifPresent(tab -> { activate(tab); reloadVimrc(); }); }
+
+    /**
+     * Vim took a key that is also a shortcut outside Vim (Vim IdeaVim keys spec 2): the notification, once per key ever.
+     * Configure… opens the vimrc in one of the Editor's tabs. Nothing happens while the data folder is unavailable.
+     */
+    private void shortcutConflict(dev.jasper.editor.vim.KeyInput key, boolean editorBinds) {
+        if (conflicts == null) {
+            Path file;
+            try { file = context.dataDirectory().resolve("shortcut-conflicts"); }
+            catch (RuntimeException unavailable) {
+                context.log().log(System.Logger.Level.WARNING, "The Editor's data folder is not available for shortcut conflicts", unavailable);
+                return;
+            }
+            conflicts = new ShortcutConflicts(file, context.notifications().group(), vimrc -> openLocal(vimrc, owner()), this::reloadVimrc,
+                this::vimrcFile, context.log());
+        }
+        conflicts.taken(key, editorBinds);
+    }
 
     /** @return the vimrc: {@code vimrc} in the Editor's data folder, {@code <home>/plugins/dev.jasper.editor/data} */
     public Path vimrcFile() { return context.dataDirectory().resolve("vimrc"); }
@@ -1036,6 +1056,7 @@ public final class EditorWindow {
         tab.addToPopup(tabCommands.stream().filter(command -> POPUP.contains(command.id())).toList());
         tab.area().setTransferHandler(new FileDrop(tab.area().getTransferHandler(), this::openLocalFiles));
         tab.area().addCaretListener(event -> { if (selected().orElse(null) == tab) refreshStatus(); });
+        tab.area().onConflict(this::shortcutConflict);
         Runnable refreshing = () -> {
             if (!hosted.containsKey(tab)) return;
             refreshCommands(tab);

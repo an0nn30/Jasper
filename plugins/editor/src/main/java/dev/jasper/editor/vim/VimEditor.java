@@ -273,6 +273,16 @@ public final class VimEditor {
         return mine;
     }
 
+    /**
+     * Asked before {@link #offer}: whether Vim would take the key by the default rule, with no {@code sethandler} entry
+     * for the mode, rather than because the command line, a prompt or the output panel owns every key. Such a key
+     * reports a shortcut conflict when it is bound outside Vim too (spec 2).
+     */
+    boolean ownsByDefault(KeyInput key) {
+        if (commandLine.active() || promptHandler != null || !output.isEmpty()) return false;
+        return vim.handlers().handler(key, handlerMode()) == KeyHandlers.Handler.DEFAULT;
+    }
+
     /** @return whether a mapping for the mode Vim is in starts with the key */
     private boolean startsMapping(KeyInput key) {
         int state = mapState(key);

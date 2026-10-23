@@ -648,6 +648,7 @@ Under [Jasper home](getting-started.md#jasper-home):
 | `plugins/dev.jasper.editor/dev.jasper.editor.toml` | The [settings](#settings) |
 | `plugins/dev.jasper.editor/data/recent-files.toml` | [Recent files](#recent-files): `[[file]]` tables with `key`, `name`, `location`, `host` for a remote file, and `opened`. Jasper rewrites it; one it cannot read is renamed `recent-files.toml.bad` and the list starts empty. |
 | `plugins/dev.jasper.editor/data/vimrc` | Vim mode's [vimrc](#the-vimrc), which you create |
+| `plugins/dev.jasper.editor/data/shortcut-conflicts` | The keys Vim mode has posted a [shortcut-conflict notification](#which-keys-vim-takes) for, one key in Vim notation per line |
 
 While a local file is saved, its hidden `.<name>.jasper-<random>.tmp` stands beside it; the save removes it.
 
@@ -722,6 +723,11 @@ you turned it off).
   such as `sethandler <C-f> n:ide` for the Ctrl keys.
 - `sethandler <C-f> n:vim i:ide` decides who gets a key in each mode (`n i v x o c`, or `a` for all, joined by `-`), as
   in IdeaVim.
+- The first time Vim takes a Ctrl, Alt or Cmd key that is also a shortcut of the Editor or of Jasper and no `sethandler`
+  entry names it, Vim still runs the key and a notification says, for example, "Ctrl+F is a shortcut for both Vim and
+  the Editor" ("and Jasper" when only the window binds it). **Use as Editor shortcut** gives the key to the Editor in
+  every mode; **Configure…** opens the vimrc in an Editor tab. Each key notifies once, ever: Jasper records it in
+  `shortcut-conflicts`. Keys Vim takes while the strip reads a pattern or command line do not notify.
 
 ### Searching and the command line
 
@@ -786,7 +792,9 @@ start from the sourcing file's folder; ten levels deep at most), `finish`, and `
 blocks, where `has('ide')` and `has('jasper')` are true (so IdeaVim's blocks apply), a number is true when it is not 0,
 and anything else is false. Lines Jasper cannot run are skipped: a notification "Some vimrc lines were skipped" says how
 many, and `:messages` lists each with its line and the reason. A vimrc that cannot be read posts "Could not read the
-vimrc"; a missing one is not reported.
+vimrc"; a missing one is not reported. The shortcut-conflict notification's **Use as Editor shortcut** appends a line
+such as `sethandler <C-f> a:ide` to the vimrc, creating it if missing, and reloads it; a vimrc it cannot write posts
+"Could not update the vimrc".
 
 ### Vim options
 

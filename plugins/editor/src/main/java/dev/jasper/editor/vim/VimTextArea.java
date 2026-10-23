@@ -32,6 +32,8 @@ public class VimTextArea extends RSyntaxTextArea {
     private VimEditor vim;
     private final Set<Object> editorCommands = new HashSet<>();
     private boolean swallowTyped;
+    /** Told of a key Vim takes that is also a shortcut outside Vim; null while nobody listens. */
+    private java.util.function.BiConsumer<KeyInput, Boolean> conflicts;
     private char highSurrogate;
 
     /** Whether the area tells its history when it gains the focus: once another area shares its document. */
@@ -330,8 +332,10 @@ public class VimTextArea extends RSyntaxTextArea {
             case KeyEvent.KEY_PRESSED -> {
                 swallowTyped = false;
                 Optional<KeyInput> key = KeyTranslator.pressed(event.getKeyCode(), event.getModifiersEx(), MAC);
+                boolean byDefault = key.isPresent() && conflicts != null && editor.ownsByDefault(key.get());
                 if (key.isPresent() && editor.offer(key.get())) {
                     swallowTyped = true;
+                    if (byDefault) reportConflict(editor, key.get(), event);
                     return Verdict.TAKEN;
                 }
                 Verdict verdict = declined(editor, event, key);
@@ -372,6 +376,47 @@ public class VimTextArea extends RSyntaxTextArea {
         if (name != null && editorCommands.contains(name)) return Verdict.PASS;
         if (name != null) return key.isPresent() ? Verdict.HELD_BACK_RING : Verdict.HELD_BACK;
         return key.isPresent() ? Verdict.ANCESTORS_RING : Verdict.ANCESTORS;
+    }
+
+    /**
+     * Tells {@code listener} of each key Vim takes by the default rule, with no {@code sethandler} entry for it in any
+     * mode, while the key is also a shortcut outside Vim (spec 2): bound in the text area's own map, in an ancestor's,
+     * in the window's or as a menu accelerator. The flag is true when the text area binds it, false when only the
+     * ancestors or the window do. Only keys with Ctrl, Alt or ⌘ count: the named keys RSyntaxTextArea binds (arrows,
+     * Tab, Backspace) are Vim's own keys too.
+     *
+     * @param listener told the key and whether the Editor binds it; null for none
+     */
+    public void onConflict(java.util.function.BiConsumer<KeyInput, Boolean> listener) { conflicts = listener; }
+
+    private void reportConflict(VimEditor editor, KeyInput key, KeyEvent event) {
+        if ((key.modifiers() & (KeyInput.CTRL | KeyInput.ALT | KeyInput.META)) == 0 || editor.vim().handlers().has(key)) return;
+        if (bound(event) != null) conflicts.accept(key, true);
+        else if (boundOutside(KeyStroke.getKeyStrokeForEvent(event))) conflicts.accept(key, false);
+    }
+
+    /** @return whether an ancestor's map, the window's or a menu accelerator binds the stroke */
+    private boolean boundOutside(KeyStroke stroke) {
+        for (java.awt.Container parent = getParent(); parent != null; parent = parent.getParent()) {
+            if (!(parent instanceof javax.swing.JComponent component)) continue;
+            if (component.getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).get(stroke) != null
+                || component.getInputMap(WHEN_IN_FOCUSED_WINDOW).get(stroke) != null) return true;
+            if (component instanceof javax.swing.JRootPane root && root.getJMenuBar() != null) {
+                for (java.awt.Component menu : root.getJMenuBar().getComponents())
+                    if (menu instanceof javax.swing.JMenu items && accelerates(items, stroke)) return true;
+            }
+        }
+        return false;
+    }
+
+    /** @return whether an item of the menu or of its submenus has the stroke as its accelerator */
+    private static boolean accelerates(javax.swing.JMenu menu, KeyStroke stroke) {
+        for (java.awt.Component child : menu.getMenuComponents()) {
+            if (child instanceof javax.swing.JMenu submenu) {
+                if (accelerates(submenu, stroke)) return true;
+            } else if (child instanceof javax.swing.JMenuItem item && stroke.equals(item.getAccelerator())) return true;
+        }
+        return false;
     }
 
     /** @return the action name the text area's focused input map (or a parent) binds the event's stroke to, or null */
