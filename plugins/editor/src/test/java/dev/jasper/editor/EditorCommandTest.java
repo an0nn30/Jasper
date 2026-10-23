@@ -36,7 +36,7 @@ class EditorCommandTest {
         host = new FakePluginHost(home.resolve("plugins"));
         host.declareSubcommand("dev.jasper.editor", "editor", "Open files in Jasper's Editor");
         host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.9.0",
-            Set.of("palette.contribute", "terminal.environment", "editor.provide", "terminal.open")), Set.of(), Set.of(), plugin());
+            Set.of("palette.contribute", "terminal.environment", "editor.provide", "terminal.open", "terminal.observe")), Set.of(), Set.of(), plugin());
     }
 
     @AfterEach void closeTheHost() { host.close(); }

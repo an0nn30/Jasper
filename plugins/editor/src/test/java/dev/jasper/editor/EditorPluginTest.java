@@ -50,7 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class EditorPluginTest {
     @TempDir Path home;
     private static final PluginInfo INFO = new PluginInfo("dev.jasper.editor", "Editor", "0.1.0",
-        Set.of("palette.contribute", "terminal.environment", "editor.provide", "terminal.open"));
+        Set.of("palette.contribute", "terminal.environment", "editor.provide", "terminal.open", "terminal.observe"));
 
     private static EditorPlugin plugin() {
         return new EditorPlugin(Runnable::run, (context, settings) -> new EditorEnvironment(context, Runnable::run,

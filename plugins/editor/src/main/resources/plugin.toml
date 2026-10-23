@@ -8,7 +8,7 @@ vendor = "Jasper"
 icon_hue = "neutral"
 icon_selected_ink = "foreground"
 icon = "icons/editor.svg"
-capabilities = ["palette.contribute", "terminal.environment", "editor.provide", "terminal.open"]
+capabilities = ["palette.contribute", "terminal.environment", "editor.provide", "terminal.open", "terminal.observe"]
 exports = ["dev.jasper.editor.api"]
 
 [[subcommands]]

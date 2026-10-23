@@ -91,7 +91,8 @@ files with (or it hands them to another editor you choose), it can set `EDITOR` 
 `jasper editor` command.
 
 - **Start with** File › Open in Editor… (Cmd+O / Ctrl+Shift+O).
-- **Capabilities** `palette.contribute`, `terminal.environment`, `editor.provide`, `terminal.open`.
+- **Capabilities** `palette.contribute`, `terminal.environment`, `editor.provide`, `terminal.open`, `terminal.observe` (the
+  other tabs' names in its Move Pane to Tab menu).
 - **Exports** `dev.jasper.editor.api`, which Remote and Project Index use to open files.
 
 ### File Server

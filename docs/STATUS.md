@@ -109,6 +109,18 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Editor: Move Pane to Tab names every tab — 2026-10-23** (`claude/editor-tab-names`, rebased onto `main` at
+`f30067a2d`): the Editor's right-click Move Pane to Tab listed terminals' and other plugins' tabs as "Tab N",
+because a plugin reads other tabs' titles only with `terminal.observe` (plan 9a's security fix) and the Editor did not
+declare it. The user chose to have the Editor declare it, over Jasper drawing plugins' pane menus itself: the bundled
+Editor's `plugin.toml` now lists `terminal.observe`, so the menu names every tab as the Tab menu does. A bundled
+plugin is admitted without review, so no consent prompt appears; third-party plugins still see "Tab N" unless they
+declare it. The Editor's version is unchanged (0.16.0 on `main`). A new `EditorManifestTest` reads the shipped manifest
+(it failed before), and the Editor's test hosts declare what the manifest does. `./gradlew check --continue`: **12,828 tests, 0 failures,
+0 errors, 29 skipped**. GUI check for the user: in
+a window with a terminal tab and an Editor file in another tab, the Editor's right-click Move Pane to Tab lists the
+terminal's tab by its title.
+
 **Staged Remote fixture waits for its transfer store — 2026-10-22** (`claude/staged-remote-sessions-flake`, worktree
 `.claude/worktrees/staged-remote-flake`, from `claude/workspace-tabs` at `6f66a3603`; not merged or pushed):
 `StagedRemoteSessionsTest.editingSavedVaultReferenceWithoutOptionalVaultDoesNotLinkItsApi` failed now and then under a

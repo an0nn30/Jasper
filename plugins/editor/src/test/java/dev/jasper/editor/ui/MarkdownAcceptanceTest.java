@@ -45,7 +45,7 @@ class MarkdownAcceptanceTest {
             edt(() -> {
                 var host=new FakePluginHost(home.resolve("plugins"));ref[0]=host;
                 host.declareSubcommand("dev.jasper.editor","editor","Open files");
-                context[0]=host.start(new PluginInfo("dev.jasper.editor","Editor","0.11.0",Set.of("palette.contribute","terminal.environment","editor.provide","terminal.open")),Set.of(),Set.of(),plugin);
+                context[0]=host.start(new PluginInfo("dev.jasper.editor","Editor","0.11.0",Set.of("palette.contribute","terminal.environment","editor.provide","terminal.open","terminal.observe")),Set.of(),Set.of(),plugin);
                 UUID first=host.addTerminalWindow(),second=host.addTerminalWindow();
                 var consumer=host.start(new PluginInfo("test.consumer","Consumer","1.0.0",Set.of()),Set.of("dev.jasper.editor"),Set.of(),c -> {});
                 var api=consumer.services().require(Editor.class);
@@ -253,7 +253,7 @@ class MarkdownAcceptanceTest {
                 var fake=new FakePluginHost(home.resolve("plugins"));made[0]=fake;
                 fake.setSetting("dev.jasper.editor","markdown_view_mode",view);
                 fake.declareSubcommand("dev.jasper.editor","editor","Open files");
-                fake.start(new PluginInfo("dev.jasper.editor","Editor","0.11.0",Set.of("palette.contribute","terminal.environment","editor.provide","terminal.open")),Set.of(),Set.of(),plugin);
+                fake.start(new PluginInfo("dev.jasper.editor","Editor","0.11.0",Set.of("palette.contribute","terminal.environment","editor.provide","terminal.open","terminal.observe")),Set.of(),Set.of(),plugin);
                 window[0]=fake.addTerminalWindow();fake.addTerminalTab(window[0],"zsh");
                 context[0]=fake.start(new PluginInfo("test.consumer","Consumer","1.0.0",Set.of()),Set.of("dev.jasper.editor"),Set.of(),c -> {});
                 assertThat(fake.failures()).as("both started").isEmpty();

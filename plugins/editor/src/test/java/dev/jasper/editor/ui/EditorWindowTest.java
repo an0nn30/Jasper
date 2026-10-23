@@ -60,8 +60,10 @@ class EditorWindowTest {
     @BeforeEach void open() {
         Languages.register();
         host = new FakePluginHost(home.resolve("plugins"));
-        // terminal.open, as the Editor's manifest declares: Terminal Right and Down beside an editor need it (plan 8b Rulings 19).
-        context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of("terminal.open")), Set.of(), Set.of(), c -> { });
+        // As the Editor's manifest declares: terminal.open for Terminal Right and Down beside an editor (plan 8b Rulings 19),
+        // terminal.observe for the other tabs' names in its Move Pane to Tab menu.
+        context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of("terminal.open", "terminal.observe")),
+            Set.of(), Set.of(), c -> { });
         var environment = new EditorEnvironment(context, Runnable::run,
             owner -> question -> {
                 asked.add(question);
@@ -1498,9 +1500,9 @@ class EditorWindowTest {
 
     /**
      * Pane flexibility spec 4: an editor's right-click menu lists the window's other tabs after Move Pane to New Tab, as
-     * plain text, and moves its pane into one; in a window of one tab the submenu shows disabled. The Editor holds no
-     * {@code terminal.observe}, so a terminal's tab is listed by its number alone, and a tab of its own, titled with markup,
-     * by its name as text. The menu follows the window's tabs each time it opens.
+     * plain text, and moves its pane into one; in a window of one tab the submenu shows disabled. The Editor holds
+     * {@code terminal.observe}, so every tab is listed by its name, a terminal's included and a title with markup as text.
+     * The menu follows the window's tabs each time it opens.
      */
     @Test void anEditorsRightClickMenuMovesItsPaneIntoAnotherTab() throws Exception {
         UUID main = host.addTerminalWindow(), shell = host.addTerminalTab(main, "zsh");
@@ -1515,8 +1517,8 @@ class EditorWindowTest {
         var popup = window.selected().orElseThrow().area().getPopupMenu();
         opened(popup);
         var moves = submenu(popup, "Move Pane to Tab");
-        assertThat(texts(moves)).as("a terminal's title is not the Editor's to read; its own content's is")
-            .containsExactly("Tab 1", "2 <html><b>B");
+        assertThat(texts(moves)).as("every tab by its name, a terminal's included")
+            .containsExactly("1 zsh", "2 <html><b>B");
         assertThat(moves.isEnabled()).isTrue();
         assertThat(moves.getClientProperty("html.disable")).as("the submenu's title is text").isEqualTo(Boolean.TRUE);
         for (var child : moves.getMenuComponents()) {
@@ -1528,14 +1530,14 @@ class EditorWindowTest {
         var children = List.of(popup.getComponents());
         assertThat(children.indexOf(moves)).as("after Move Pane to New Tab")
             .isEqualTo(children.indexOf(item(popup.getComponents(), "Move Pane to New Tab")) + 1);
-        item(moves.getMenuComponents(), "Tab 1").doClick();
+        item(moves.getMenuComponents(), "1 zsh").doClick();
         assertThat(host.windowTabs(main)).as("to the right of the shell, its old tab gone")
             .containsExactly(List.of(shell, editor), List.of(bold));
         opened(popup);
         assertThat(texts(submenu(popup, "Move Pane to Tab"))).as("its own tab is no choice now").containsExactly("2 <html><b>B");
         UUID top = host.addTerminalTab(main, "top");
         opened(popup);
-        assertThat(texts(submenu(popup, "Move Pane to Tab"))).as("a tab that opened").containsExactly("2 <html><b>B", "Tab 3");
+        assertThat(texts(submenu(popup, "Move Pane to Tab"))).as("a tab that opened").containsExactly("2 <html><b>B", "3 top");
         host.closeTab(top);
         opened(popup);
         assertThat(texts(submenu(popup, "Move Pane to Tab"))).as("a tab that closed").containsExactly("2 <html><b>B");
