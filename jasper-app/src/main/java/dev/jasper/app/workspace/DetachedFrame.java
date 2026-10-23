@@ -196,7 +196,17 @@ public final class DetachedFrame {
         return menus;
     }
 
-    private void show() { if (!disposed) window.setVisible(true); }
+    /**
+     * Shows the window without taking the focus: a start-up restore, Zen's return or a plain show leaves it where it is,
+     * and only an activating request focuses the window ({@link #toFront}). {@code toFront} honours the same flag, so it
+     * is restored at once.
+     */
+    private void show() {
+        if (disposed) return;
+        window.setAutoRequestFocus(false);
+        try { window.setVisible(true); }
+        finally { window.setAutoRequestFocus(true); }
+    }
 
     /**
      * Raises the window and gives it the focus: a Float dialog hides while its owner is minimised, so the owner comes

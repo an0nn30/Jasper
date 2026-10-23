@@ -66,7 +66,8 @@ final class DetachedToolWindows implements AutoCloseable {
     /**
      * The native window's functions.
      *
-     * @param show shows it, once, after it opened
+     * @param show shows it, once, after it opened, without taking the focus: only {@link #activate} (an activating
+     *     request) focuses it
      * @param toFront raises it and gives it the focus, restoring it when it is minimized
      * @param dispose disposes it
      * @param active whether it is the active window
