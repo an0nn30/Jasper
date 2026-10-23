@@ -148,6 +148,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     // One root binding per stroke; dispatch picks the action for where focus is.
     private final java.util.Map<KeyStroke, String> rootKeys = new java.util.HashMap<>();
     private WindowContributions contributed;
+    /** Makes a detached tool window's native window; null until given (headless), and detached windows wait. */
+    private java.util.function.BiFunction<DetachedToolWindows.Opening, DetachedToolWindows.Events, DetachedToolWindows.Shell> detachedShells;
     /** Where this window's tool windows dock: its contributions change it, its area lays it out. */
     private final DockState dock = new DockState();
     private final ToolWindowArea area;
@@ -1223,6 +1225,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             host = registry.addHost(workspaceHost());
         }
         rebind();
+        if (detachedShells != null) detachedShells(detachedShells);
     }
 
     /**
@@ -1914,6 +1917,25 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     ToolWindowArea area() { return area; }
     DockState dock() { return dock; }
+
+    /**
+     * Gives the main window's detached tool windows (Float and Window) their native windows, and opens those that wait;
+     * a child window has none. Given before contributions connect, they are used once they do. EDT.
+     */
+    public void detachedShells(java.util.function.BiFunction<DetachedToolWindows.Opening, DetachedToolWindows.Events,
+                                   DetachedToolWindows.Shell> shells) {
+        detachedShells = shells;
+        DetachedToolWindows windows = detachedWindows();
+        if (windows == null) return;
+        windows.shells = shells;
+        windows.sync();
+    }
+
+    /** The main window's detached tool windows' own windows; null in a child window, or before contributions connect. */
+    DetachedToolWindows detachedWindows() { return contributed == null ? null : contributed.detached(); }
+
+    /** Whether the panel is one of this window's tool windows detached into a window of its own, showing or not. */
+    boolean panelDetached(String panelId) { return dock.mode(panelId).detached(); }
     DockStripe leftStripe() { return leftStripe; }
     DockStripe rightStripe() { return rightStripe; }
     /** The bottom strip of labelled stripes; empty under the icon rails. */

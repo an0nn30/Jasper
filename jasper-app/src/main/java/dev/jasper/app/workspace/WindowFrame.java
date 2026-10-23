@@ -151,14 +151,7 @@ public final class WindowFrame {
         placement = new WindowPlacement(saved.bounds(), saved.extendedState());
         this.report = java.util.Objects.requireNonNull(report, "report");
         updateMinimumSize();
-        var screens = new java.util.ArrayList<Rectangle>();
-        var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        screens.add(usableBounds(environment.getDefaultScreenDevice().getDefaultConfiguration()));
-        for (var device : environment.getScreenDevices()) {
-            Rectangle bounds = usableBounds(device.getDefaultConfiguration());
-            if (!screens.contains(bounds)) screens.add(bounds);
-        }
-        placement.restore(frame.getMinimumSize(), screens).ifPresent(frame::setBounds);
+        placement.restore(frame.getMinimumSize(), usableDisplays()).ifPresent(frame::setBounds);
         placement.observe(frame.getBounds(), java.awt.Frame.NORMAL);
         frame.setExtendedState(placement.extendedState());
         frame.addComponentListener(geometry);
@@ -227,6 +220,22 @@ public final class WindowFrame {
 
     private Rectangle usableBounds() {
         return usableBounds(frame.getGraphicsConfiguration());
+    }
+
+    /**
+     * The usable bounds of today's displays, less the menu bar, Dock or taskbar: the default display first, then the
+     * others; empty without a display (headless).
+     */
+    static java.util.List<Rectangle> usableDisplays() {
+        if (GraphicsEnvironment.isHeadless()) return java.util.List.of();
+        var screens = new java.util.ArrayList<Rectangle>();
+        var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        screens.add(usableBounds(environment.getDefaultScreenDevice().getDefaultConfiguration()));
+        for (var device : environment.getScreenDevices()) {
+            Rectangle bounds = usableBounds(device.getDefaultConfiguration());
+            if (!screens.contains(bounds)) screens.add(bounds);
+        }
+        return screens;
     }
 
     private static Rectangle usableBounds(java.awt.GraphicsConfiguration graphics) {

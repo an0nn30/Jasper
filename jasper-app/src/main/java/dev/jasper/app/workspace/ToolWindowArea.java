@@ -288,6 +288,11 @@ final class ToolWindowArea extends JPanel {
     private boolean leftStripeVisible, rightStripeVisible, statusVisible, headerVisible;
     /** Runs after every sync, which may have changed which windows show and so the area's minimum size. */
     Runnable onMinimumSizeChanged = () -> { };
+    /**
+     * Runs after a sync that no dock change made: a kit view replaced its header, so a detached tool window's frame may be
+     * a new one, which its window must take.
+     */
+    Runnable onRemounted = () -> { };
     BiConsumer<String, Slot> onMove = (id, slot) -> { };
     /** Docks a window or detaches it as a Float or a Window, from its header's Options menu. */
     BiConsumer<String, ToolWindowMode> onMode = (id, mode) -> { };
@@ -531,7 +536,9 @@ final class ToolWindowArea extends JPanel {
             var release = host.releaseHeader;
             // Plugin views update often (progress, switches, chips). Only a different borrowed header, or a
             // closed view, changes the dock frame; content-only updates must not relayout the whole area.
-            java.beans.PropertyChangeListener changed = event -> { if (host.borrowedHeader != kitHeader(view)) sync(); };
+            java.beans.PropertyChangeListener changed = event -> {
+                if (host.borrowedHeader != kitHeader(view)) { sync(); onRemounted.run(); }
+            };
             view.addPropertyChangeListener("viewSpec", changed);
             host.releaseHeader = () -> { view.removePropertyChangeListener("viewSpec", changed); release.run(); };
         }
