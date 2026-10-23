@@ -12,6 +12,7 @@ import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.platform.AppIcons;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -46,16 +47,22 @@ import javax.swing.UIManager;
  */
 final class ToolStripe extends DockStripe {
     /**
-     * One tool window's button, with its unread badge if it has one and the digit its toggle's shortcut ends in, if any;
-     * a rail shows no digit, a labelled stripe starts its label with it.
+     * One tool window's button, with its unread badge if it has one, the digit its toggle's shortcut ends in, if any
+     * (a rail shows no digit, a labelled stripe starts its label with it), and how the window is placed now, which its
+     * menu checks. A detached window's button stays in its slot's group. Built without a mode, a window is docked.
      */
-    record Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge, java.util.OptionalInt number) {
+    record Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge, java.util.OptionalInt number,
+                  ToolWindowMode mode) {
         Button(String id, String title, Icon icon, Slot slot, boolean selected) {
             this(id, title, icon, slot, selected, Optional.empty(), java.util.OptionalInt.empty());
         }
 
         Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge) {
             this(id, title, icon, slot, selected, badge, java.util.OptionalInt.empty());
+        }
+
+        Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge, java.util.OptionalInt number) {
+            this(id, title, icon, slot, selected, badge, number, ToolWindowMode.DOCKED);
         }
     }
 
@@ -144,8 +151,8 @@ final class ToolStripe extends DockStripe {
         decorate(button, window);
         button.setSelected(window.selected());
         button.addActionListener(event -> onToggle.accept(window.id()));
-        button.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.selected(),
-            slot -> onMove.accept(window.id(), slot), () -> onHide.accept(window.id())));
+        button.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.mode(), window.selected(),
+            slot -> onMove.accept(window.id(), slot), mode -> onMode.accept(window.id(), mode), () -> onHide.accept(window.id())));
         buttons.add(button);
         ids.put(button, window.id());
         windows.put(window.id(), window);
@@ -175,7 +182,7 @@ final class ToolStripe extends DockStripe {
         AbstractButton button = byId.get(id);
         Button window = windows.get(id);
         if (button == null || window == null) return;
-        Button updated = new Button(window.id(), window.title(), window.icon(), window.slot(), window.selected(), badge, window.number());
+        Button updated = new Button(window.id(), window.title(), window.icon(), window.slot(), window.selected(), badge, window.number(), window.mode());
         windows.put(id, updated);
         decorate(button, updated);
         button.repaint();

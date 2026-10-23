@@ -10,6 +10,7 @@ import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import java.awt.AlphaComposite;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -281,6 +282,8 @@ final class ToolWindowArea extends JPanel {
     /** Runs after every sync, which may have changed which windows show and so the area's minimum size. */
     Runnable onMinimumSizeChanged = () -> { };
     BiConsumer<String, Slot> onMove = (id, slot) -> { };
+    /** Docks a window or detaches it as a Float or a Window, from its header's Options menu. */
+    BiConsumer<String, ToolWindowMode> onMode = (id, mode) -> { };
     Consumer<String> onHide = id -> { };
     /** Shows a borrowed kit header's Options menu under its button; a header that is not showing opens nothing. */
     BiConsumer<JComponent, javax.swing.JPopupMenu> showOptions = (anchor, menu) -> {
@@ -602,13 +605,12 @@ final class ToolWindowArea extends JPanel {
         // The view lives only in this window's area, so the flag is never cleared on release.
         if (artwork == dev.jasper.ui.icons.ChromeArtwork.CLASSIC) view.classicChromeIcons(true);
         view.setPanelHostActions(panel, List.of(
-            new dev.jasper.ui.model.Nodes.Button("host.options", ready, "", "more", ghost, "host.options", "Options"),
+            new dev.jasper.ui.model.Nodes.Button("host.options", ready, "", "more.vertical", ghost, "host.options", "Options"),
             new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", flush ? "remove" : "collapse", ghost, "host.hide", "Hide")), event -> {
                 if (event instanceof dev.jasper.ui.model.UiEvent.Action action) {
                     if (action.id().equals("host.hide")) onHide.accept(id);
                     else if (action.id().equals("host.options"))
-                        showOptions.accept(optionsAnchor(header), ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
-                            slot -> onMove.accept(id, slot), () -> onHide.accept(id)));
+                        showOptions.accept(optionsAnchor(header), optionsMenu(id));
                 }
             });
         // A closed view, or one whose header was replaced (the dock then resyncs), takes no more metadata.
@@ -685,11 +687,15 @@ final class ToolWindowArea extends JPanel {
 
     private DockState layoutState() { return preview != null ? preview : state; }
 
+    /** The window's Options menu as it would open now: its slot, mode and visibility are read from the dock state. */
+    private javax.swing.JPopupMenu optionsMenu(String id) {
+        return ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.mode(id), state.visible(id),
+            slot -> onMove.accept(id, slot), mode -> onMode.accept(id, mode), () -> onHide.accept(id));
+    }
+
     private ToolWindowHeader header(String id, String title) {
         var header = new ToolWindowHeader(title,
-            () -> ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
-                slot -> onMove.accept(id, slot), () -> onHide.accept(id)),
-            () -> onHide.accept(id), kit, flush, artwork);
+            () -> optionsMenu(id), () -> onHide.accept(id), kit, flush, artwork);
         header.presentation(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
         return header;
     }

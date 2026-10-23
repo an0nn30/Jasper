@@ -95,7 +95,7 @@ public final class PanelSurfaceFixture implements AutoCloseable {
             zone(theme);
             hostHeader(view);
             view.setPanelHostActions(root, List.of(
-                new Nodes.Button("host.options", ControlState.READY, "", "more", Nodes.ButtonKind.GHOST, "host.options", "Options"),
+                new Nodes.Button("host.options", ControlState.READY, "", "more.vertical", Nodes.ButtonKind.GHOST, "host.options", "Options"),
                 new Nodes.Button("host.hide", ControlState.READY, "", "collapse", Nodes.ButtonKind.GHOST, "host.hide", "Hide")), e -> { });
             site.notifyVisibility(true);
         });

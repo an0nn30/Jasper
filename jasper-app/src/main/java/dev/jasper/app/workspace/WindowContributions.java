@@ -10,6 +10,7 @@ import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.app.persistence.UiState;
@@ -85,9 +86,11 @@ final class WindowContributions implements AutoCloseable {
             for (DockStripe stripe : owner.stripes().all()) {
                 stripe.onToggle = this::toggleAndActivate;
                 stripe.onMove = this::movePanel;
+                stripe.onMode = this::modePanel;
                 stripe.onHide = this::hidePanel;
             }
             owner.area().onMove = this::movePanel;
+            owner.area().onMode = this::modePanel;
             owner.area().onHide = this::hidePanel;
             owner.dockDrag().onDrop = this::dropped;
             owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
@@ -256,6 +259,11 @@ final class WindowContributions implements AutoCloseable {
         dock.moveAndShow(id, slot, dock.dropIndex(id, slot));
     }
 
+    /** From a View Mode choice: docks the window or detaches it, keeping its slot. */
+    private void modePanel(String id, ToolWindowMode mode) {
+        if (panels.containsKey(id)) dock.setMode(id, mode);
+    }
+
     /** From a Move to menu: the end of the target slot's group, keeping visibility. */
     private void movePanel(String id, Slot slot) {
         if (!panels.containsKey(id) || dock.slot(id).filter(slot::equals).isPresent()) return;
@@ -411,7 +419,7 @@ final class WindowContributions implements AutoCloseable {
                 PanelInstance panel = panels.get(id);
                 if (panel == null) continue;
                 windows.add(new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
-                    panel.entry.badge(), number(panel)));
+                    panel.entry.badge(), number(panel), dock.mode(id)));
             }
         List<Action> railActions = new ArrayList<>();
         for (String id : model.railActions()) if (actions.get(id) != null) railActions.add(actions.get(id));
@@ -532,10 +540,12 @@ final class WindowContributions implements AutoCloseable {
         for (DockStripe stripe : owner.stripes().all()) {
             stripe.onToggle = id -> { };
             stripe.onMove = (id, slot) -> { };
+            stripe.onMode = (id, mode) -> { };
             stripe.onHide = id -> { };
             stripe.render(List.of(), List.of());
         }
         owner.area().onMove = (id, slot) -> { };
+        owner.area().onMode = (id, mode) -> { };
         owner.area().onHide = id -> { };
         owner.syncRailVisibility();
         actions.clear();

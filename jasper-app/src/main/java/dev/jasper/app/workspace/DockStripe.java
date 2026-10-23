@@ -4,6 +4,7 @@ import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import java.awt.LayoutManager;
 import java.awt.Rectangle;
 import java.util.List;
@@ -27,6 +28,8 @@ abstract class DockStripe extends JPanel {
     Consumer<String> onToggle = id -> { };
     /** Moves the window to a slot, from its menu. */
     BiConsumer<String, Slot> onMove = (id, slot) -> { };
+    /** Docks the window or detaches it as a Float or a Window, from its menu's View Mode. */
+    BiConsumer<String, ToolWindowMode> onMode = (id, mode) -> { };
     /** Hides the window, from its menu. */
     Consumer<String> onHide = id -> { };
     /** Hears of each window button a render creates, so that a drag can start from it. */

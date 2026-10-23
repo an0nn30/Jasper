@@ -7,6 +7,7 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
@@ -17,6 +18,8 @@ import java.awt.Color;
 import java.awt.Rectangle;
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
 import javax.swing.AbstractButton;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
@@ -62,6 +65,27 @@ class BottomStripTest {
             strip.doLayout();
             assertThat(strip.getPreferredSize().height).as("independent of window.rail_width").isEqualTo(25);
             assertThat(strip.buttons().get(0).getX()).as("still the stripes' fill").isEqualTo(fill);
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    @Test void aRightClickMenuChecksTheLabelsModeAndChoosingAnotherSetsIt() throws Exception {
+        try {
+            EnterpriseLook.install(false);
+            var strip = new BottomStrip(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+            var events = new java.util.ArrayList<String>();
+            strip.onMode = (id, mode) -> events.add(id + ":" + mode);
+            strip.render(List.of(new ToolStripe.Button("log", "Event Log", null, Slot.BOTTOM_LEFT, true, Optional.empty(), OptionalInt.empty(),
+                ToolWindowMode.FLOAT)), List.of());
+            var menu = strip.buttons().getFirst().getComponentPopupMenu();
+            assertThat(((javax.swing.JMenu) menu.getComponent(0)).getText()).isEqualTo("View Mode");
+            assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(menu, "Float")).isSelected()).isTrue();
+            strip.updateBadge("log", Optional.of(new dev.jasper.app.contributions.PanelBadge(1, dev.jasper.app.contributions.PanelBadge.Tone.ACCENT, "1 new")));
+            assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(strip.buttons().getFirst().getComponentPopupMenu(), "Float")).isSelected())
+                .as("a badge change keeps the mode").isTrue();
+            ToolWindowHeaderTest.item(menu, "Float").doClick();
+            assertThat(events).as("the current mode does nothing").isEmpty();
+            ToolWindowHeaderTest.item(menu, "Docked").doClick();
+            assertThat(events).containsExactly("log:DOCKED");
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
