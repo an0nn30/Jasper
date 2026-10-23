@@ -468,4 +468,53 @@ class DockDragDetachTest {
             assertThat(f.content.area().content(Slot.RIGHT_TOP)).isSameAs(f.alpha);
         });
     }
+
+    /** {@code window} comes to the front: the shared tab drag hears it, and it heads the windows by activation. */
+    private static void activated(TabDrag shared, List<WindowContent> byActivation, WindowContent window) {
+        byActivation.remove(window);
+        byActivation.addFirst(window);
+        shared.activated(window);
+    }
+
+    /**
+     * Task 2 amendment 3: over another workspace window that came to the front after the main window (a child window
+     * overlapping it), a dock drag detaches; with the main window in front again, the same point is the main window's
+     * workspace, as before.
+     */
+    @Test void overAnotherWorkspaceWindowInFrontOfTheMainWindowItDetaches() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            Point overlap = f.zone(Slot.RIGHT_TOP);
+            WindowContent child = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), WindowRole.CHILD,
+                DesktopTestSupport.HOME, false, () -> { });
+            TabDragTestSupport.frame(child, overlap.x - 50, overlap.y - 50, 400, 300);
+            var byActivation = new ArrayList<WindowContent>();
+            var shared = new TabDrag(() -> List.copyOf(byActivation));
+            shared.otherWindows = List::of;
+            f.content.tabDrag(shared);
+            child.tabDrag(shared);
+            activated(shared, byActivation, f.content);
+            activated(shared, byActivation, child);
+
+            AbstractButton alpha = f.button("Alpha");
+            f.start(alpha, f.zone(Slot.LEFT_BOTTOM));
+            assertThat(f.drag().detaching()).as("beside the child window").isFalse();
+            mouse(alpha, MouseEvent.MOUSE_DRAGGED, overlap);
+            assertThat(f.drag().detaching()).as("over the child window in front").isTrue();
+            assertThat(f.drag().target()).isEmpty();
+            mouse(alpha, MouseEvent.MOUSE_RELEASED, overlap);
+            assertThat(f.detaches).extracting(Heard::id).containsExactly(A);
+            assertThat(f.drops).isEmpty();
+            assertThat(f.content.dock().mode(A)).isEqualTo(ToolWindowMode.FLOAT);
+
+            activated(shared, byActivation, f.content);
+            AbstractButton beta = f.button("Beta");
+            f.start(beta, overlap);
+            assertThat(f.drag().detaching()).as("the main window in front again").isFalse();
+            assertThat(f.drag().target()).hasValue(DockDropResolver.Target.workspace(Slot.RIGHT_TOP));
+            mouse(beta, MouseEvent.MOUSE_RELEASED, overlap);
+            assertThat(f.drops).containsExactly(B);
+            assertThat(f.content.dock().slot(B)).hasValue(Slot.RIGHT_TOP);
+        });
+    }
 }

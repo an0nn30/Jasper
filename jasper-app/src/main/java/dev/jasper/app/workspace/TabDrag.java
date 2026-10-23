@@ -632,7 +632,7 @@ final class TabDrag {
      * under the cursor that came to the front after {@code window}, the window the drag reaches under it, as native
      * drag and drop goes by the order windows stack in (workspace plan 9a Rulings 21), or that {@code window} owns,
      * which macOS keeps above it whichever came to the front last (a plugin's modeless dialog, a floating tool window);
-     * for {@code window} null, any under the cursor. A dock drag asks it too: over such a window its target is Detach.
+     * for {@code window} null, any under the cursor.
      *
      * @param window the window the drag reaches under the cursor, or null
      * @param screen the cursor on screen
@@ -644,6 +644,27 @@ final class TabDrag {
         for (Auxiliary other : otherWindows.get())
             if (other.frame().contains(screen)
                 && (fronts.getOrDefault(other.window(), 0L) > below || other.owners().contains(owner))) return true;
+        return false;
+    }
+
+    /**
+     * Whether {@code window} is behind another of Jasper's windows at {@code screen}: one the drag does not reach that
+     * {@link #covers} it there, or another open window the drag reaches whose frame holds the point and that came to the
+     * front after it (a child window over the main window). A dock drag asks it of its own window, and over such a
+     * window its target is Detach (floating tool windows spec, The drag out); a tab drag takes the window on top under the
+     * cursor first, so {@link #covers} serves it.
+     *
+     * @param window the dock drag's window
+     * @param screen the cursor on screen
+     * @return whether another of Jasper's windows is in front of {@code window} there
+     */
+    boolean behind(WindowContent window, Point screen) {
+        if (covers(window, screen)) return true;
+        long below = fronts.getOrDefault(window, 0L);
+        GraphicsDevice home = device(window);
+        for (WindowContent other : windows.get())
+            if (other != window && !other.closed() && fronts.getOrDefault(other, 0L) > below
+                && onScreen(other, false, home).contains(screen)) return true;
         return false;
     }
 

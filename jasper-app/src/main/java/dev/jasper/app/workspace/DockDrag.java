@@ -86,8 +86,9 @@ final class DockDrag {
     /** Applies a release on Detach: the dragged window and the release. */
     BiConsumer<String, Detach> onDetach = (id, detach) -> { };
     /**
-     * Whether another of Jasper's windows is on top of this one at a point on screen ({@code TabDrag}'s covering rule),
-     * which makes the target Detach as the outside does.
+     * Whether another of Jasper's windows is on top of this one at a point on screen ({@code TabDrag}'s rule: a window
+     * the drag does not reach that covers it, or another workspace window that came to the front after it), which makes
+     * the target Detach as the outside does.
      */
     Predicate<Point> covered = screen -> false;
     /** The dragged window's own icon, from which the stripes take its ghost and its gap's icon. */
