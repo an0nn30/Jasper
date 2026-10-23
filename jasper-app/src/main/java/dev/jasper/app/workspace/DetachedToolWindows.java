@@ -191,17 +191,45 @@ final class DetachedToolWindows implements AutoCloseable {
      */
     Rectangle initialBounds(String id) {
         Optional<Rectangle> docked = area.frameOnScreen(id);
-        Dimension size = docked.map(Rectangle::getSize).orElseGet(() -> area.landingSize(id));
-        int width = Math.max(UIScale.scale(MINIMUM_WIDTH), size.width), height = Math.max(UIScale.scale(MINIMUM_HEIGHT), size.height);
+        Dimension size = size(id);
         Point at = docked.map(Rectangle::getLocation).orElseGet(() -> {
             Rectangle main = mainOnScreen();
-            return new Point(main.x + (main.width - width) / 2, main.y + (main.height - height) / 2);
+            return new Point(main.x + (main.width - size.width) / 2, main.y + (main.height - size.height) / 2);
         });
-        var bounds = new Rectangle(at.x, at.y, width, height);
+        var bounds = new Rectangle(at, size);
+        return onDisplay(bounds, new Point((int) bounds.getCenterX(), (int) bounds.getCenterY()));
+    }
+
+    /**
+     * Where a tool window's own window goes for a dock drag released on Detach (floating tool windows spec, The drag
+     * out): at the size it opens at, with the point the press held under the pointer (that point kept inside the
+     * window), and kept on the display under the pointer, the default display when it is on none.
+     *
+     * @param screen the release point on screen
+     * @param grab where the press held the dragged stripe button or header, in its coordinates
+     */
+    Rectangle droppedBounds(String id, Point screen, Point grab) {
+        Dimension size = size(id);
+        int x = Math.clamp(grab.x, 0, size.width - 1), y = Math.clamp(grab.y, 0, size.height - 1);
+        return onDisplay(new Rectangle(new Point(screen.x - x, screen.y - y), size), screen);
+    }
+
+    /**
+     * The size a tool window's own window opens at (floating tool windows spec, The detached window): the bounds it last
+     * had, else its docked frame's on screen, else the size it would dock at; at least the minimum.
+     */
+    private Dimension size(String id) {
+        Dimension size = dock.bounds(id).or(() -> area.frameOnScreen(id)).map(Rectangle::getSize)
+            .orElseGet(() -> area.landingSize(id));
+        Dimension minimum = minimumSize();
+        return new Dimension(Math.max(minimum.width, size.width), Math.max(minimum.height, size.height));
+    }
+
+    /** {@code bounds} kept on the display holding {@code point}, else the default display; as they are with none known. */
+    private Rectangle onDisplay(Rectangle bounds, Point point) {
         List<Rectangle> screens = displays.get();
         if (screens.isEmpty()) return bounds;
-        var centre = new Point((int) bounds.getCenterX(), (int) bounds.getCenterY());
-        return WindowPlacement.fitted(bounds, screens.get(WindowPlacement.displayFor(centre, screens).orElse(0)));
+        return WindowPlacement.fitted(bounds, screens.get(WindowPlacement.displayFor(point, screens).orElse(0)));
     }
 
     /** Disposes every window, each whether or not another fails to; nothing opens afterwards. */

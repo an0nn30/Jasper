@@ -103,6 +103,7 @@ final class WindowContributions implements AutoCloseable {
             owner.area().onRemounted = detached::sync;
             owner.addHierarchyListener(showing);
             owner.dockDrag().onDrop = this::dropped;
+            owner.dockDrag().onDetach = this::detachDropped;
             owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
             owner.dockDrag().labels = this::stripeLabel;
             owner.dockDrag().titles = id -> panels.containsKey(id) ? panels.get(id).entry.title() : "";
@@ -304,6 +305,19 @@ final class WindowContributions implements AutoCloseable {
             return;
         }
         dock.moveAndShow(id, slot, dock.dropIndex(id, slot));
+    }
+
+    /**
+     * A dock drag released outside this window, or over another of Jasper's windows in front of it (floating tool windows
+     * spec, The drag out): the tool window detaches, Float unless it is detached already, keeping its slot, and its own
+     * window opens or moves with the point the press held under the pointer ({@link DetachedToolWindows#droppedBounds}).
+     * A user gesture, it activates the window as View Mode from a menu does: raised, with the keyboard in its frame.
+     */
+    private void detachDropped(String id, DockDrag.Detach drop) {
+        if (!panels.containsKey(id)) return;
+        Rectangle bounds = detached.droppedBounds(id, drop.screen(), drop.grab());
+        ToolWindowMode mode = dock.mode(id).detached() ? dock.mode(id) : ToolWindowMode.FLOAT;
+        changeAndActivate(id, () -> dock.detach(id, mode, bounds));
     }
 
     /**
@@ -614,6 +628,7 @@ final class WindowContributions implements AutoCloseable {
         // Snapshot before teardown: the last window closed wins; disposal must not save panels as hidden.
         owner.dockDrag().cancel();
         owner.dockDrag().onDrop = (id, target) -> { };
+        owner.dockDrag().onDetach = (id, detach) -> { };
         owner.dockDrag().icons = id -> null;
         owner.dockDrag().labels = id -> "";
         owner.dockDrag().titles = id -> "";

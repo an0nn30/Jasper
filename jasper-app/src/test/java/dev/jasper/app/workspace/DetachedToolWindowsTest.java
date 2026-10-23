@@ -59,8 +59,8 @@ class DetachedToolWindowsTest {
 
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
-    /** Native windows as text: each opening, and every call on each window's shell. */
-    private static final class Shells implements BiFunction<DetachedToolWindows.Opening, DetachedToolWindows.Events, DetachedToolWindows.Shell> {
+    /** Native windows as text: each opening, and every call on each window's shell. {@link DockDragDetachTest} uses them too. */
+    static final class Shells implements BiFunction<DetachedToolWindows.Opening, DetachedToolWindows.Events, DetachedToolWindows.Shell> {
         final List<String> log = new ArrayList<>();
         final Map<String, DetachedToolWindows.Opening> openings = new HashMap<>();
         final Map<String, DetachedToolWindows.Events> events = new HashMap<>();
@@ -91,7 +91,7 @@ class DetachedToolWindowsTest {
         }
     }
 
-    private static String text(Rectangle bounds) { return bounds.x + "," + bounds.y + " " + bounds.width + "x" + bounds.height; }
+    static String text(Rectangle bounds) { return bounds.x + "," + bounds.y + " " + bounds.width + "x" + bounds.height; }
 
     private static String open(ToolWindowMode mode, Rectangle bounds) { return "open " + A + " " + mode + " " + text(bounds); }
 

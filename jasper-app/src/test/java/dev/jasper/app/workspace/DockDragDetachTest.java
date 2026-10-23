@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
-import static dev.jasper.app.workspace.TabDragTestSupport.middle;
+import static dev.jasper.app.workspace.DetachedToolWindowsTest.text;
 import static dev.jasper.app.workspace.TabDragTestSupport.mouse;
 import static dev.jasper.app.workspace.TabDragTestSupport.onTitleBar;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,6 +14,7 @@ import dev.jasper.app.dock.Slot;
 import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.persistence.UiState;
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -27,6 +28,7 @@ import javax.swing.AbstractButton;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
@@ -34,15 +36,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Floating tool windows plan 2 Task 1: a dock drag that leaves the main window. A connected window with Alpha and Beta in
- * the left top group stands in a stand-in frame at 100,100 (1000 x 700) on {@link TabDragTestSupport}'s pretend screen;
- * the drags' events are in that screen's coordinates. Outside the frame, or over another of Jasper's windows in front of
- * it, the target is Detach: the tear-out label follows the cursor, the guides go, and the release is heard as a detach.
+ * Floating tool windows plan 2 Tasks 1 and 2: a dock drag that leaves the main window. A connected window with Alpha and
+ * Beta in the left top group stands in a stand-in frame at 100,100 (1000 x 700) on {@link TabDragTestSupport}'s pretend
+ * screen, with one 1920 by 1080 display; the drags' events are in that screen's coordinates, and the detached tool windows'
+ * native windows are recording shells. Outside the frame, or over another of Jasper's windows in front of it, the target
+ * is Detach: the tear-out label follows the cursor, the guides go, and the release detaches the tool window into a window
+ * of its own with the press's point under the pointer, kept on the display under it, raised and focused.
  */
 class DockDragDetachTest {
     private static final String A = "dev.x.alpha", B = "dev.x.beta";
     /** Right of the stand-in frame, which ends at x 1100. */
     private static final Point OUTSIDE = new Point(1300, 400);
+    /** The pretend screen's one display, unless a test gives it more. */
+    private static final Rectangle SCREEN = new Rectangle(0, 0, 1920, 1080);
+    /** Where a detached tool window's window was before a test's drag. */
+    private static final Rectangle BEFORE = new Rectangle(300, 200, 500, 400);
 
     /** Stands in for the focus manager during each test: it records the Esc dispatchers a drag adds. */
     private CommandPaletteShortcutsTest.RecordingFocusManager keys;
@@ -83,24 +91,35 @@ class DockDragDetachTest {
         return f;
     }
 
-    /** The connected window in its stand-in frame; what its drag drops and detaches is recorded. */
+    /**
+     * The connected window in its stand-in frame, its detached windows' shells recording on {@link #SCREEN}; what its drag
+     * drops and detaches is recorded, then applied.
+     */
     private static final class Fixture {
         final Contributions model = new Contributions();
         final WindowContent content = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
         final JPanel frame;
+        final DetachedToolWindowsTest.Shells shells = new DetachedToolWindowsTest.Shells();
+        /** Alpha's content, which takes the keyboard when its frame is activated. */
+        final JList<String> alpha = new JList<>(new String[] {"alpha"});
         final List<Heard> detaches = new ArrayList<>();
         final List<String> drops = new ArrayList<>();
 
         Fixture() {
             content.connectContributions(model, UiState.inMemory());
             Icon icon = new ImageIcon(new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB));
-            model.addPanel(A, "Alpha", icon, Slot.LEFT_TOP, site -> new JLabel("alpha"));
+            model.addPanel(A, "Alpha", icon, Slot.LEFT_TOP, site -> alpha);
             model.addPanel(B, "Beta", icon, Slot.LEFT_TOP, site -> new JLabel("beta"));
             frame = TabDragTestSupport.frame(content, 100, 100, 1000, 700);
+            DetachedToolWindows windows = content.detachedWindows();
+            windows.ready = () -> true;
+            windows.displays = () -> List.of(SCREEN);
+            content.detachedShells(shells);
             DockDrag drag = content.dockDrag();
             var apply = drag.onDrop;
             drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };
-            drag.onDetach = (id, detach) -> detaches.add(new Heard(id, detach));
+            var detach = drag.onDetach;
+            drag.onDetach = (id, release) -> { detaches.add(new Heard(id, release)); detach.accept(id, release); };
         }
 
         DockDrag drag() { return content.dockDrag(); }
@@ -120,13 +139,23 @@ class DockDragDetachTest {
          * @return where the press held {@code source}, in its coordinates
          */
         Point start(Component source, Point... path) {
-            Point press = middle(source);
-            Point grab = new Point(press);
-            SwingUtilities.convertPointFromScreen(grab, source);
+            return startAt(source, new Point(source.getWidth() / 2, source.getHeight() / 2), path);
+        }
+
+        /** As {@link #start}, the press at {@code grab} in {@code source}'s coordinates; returns {@code grab}. */
+        Point startAt(Component source, Point grab, Point... path) {
+            Point press = new Point(grab);
+            SwingUtilities.convertPointToScreen(press, source);
             mouse(source, MouseEvent.MOUSE_PRESSED, press);
             mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x + 12, press.y));
             for (Point point : path) mouse(source, MouseEvent.MOUSE_DRAGGED, point);
-            return grab;
+            return new Point(grab);
+        }
+
+        /** The size Alpha's window opens at while it has none to remember and no docked frame: its landing size, at least the minimum. */
+        Dimension landing() {
+            Dimension landing = content.area().landingSize(A), minimum = DetachedToolWindows.minimumSize();
+            return new Dimension(Math.max(landing.width, minimum.width), Math.max(landing.height, minimum.height));
         }
 
         /** The workspace, on the pretend screen. */
@@ -147,6 +176,8 @@ class DockDragDetachTest {
         }
     }
 
+    private static String open(ToolWindowMode mode, Rectangle bounds) { return "open " + A + " " + mode + " " + text(bounds); }
+
     private static Point labelAt(Point screen) {
         int offset = UIScale.scale(TabDrag.LABEL_OFFSET);
         return new Point(screen.x + offset, screen.y + offset);
@@ -162,7 +193,7 @@ class DockDragDetachTest {
             assertThat(f.drops).as("no drop").isEmpty();
             assertThat(f.drag().active()).isFalse();
             assertThat(f.drag().label().showing()).as("the label goes with the drag").isFalse();
-            assertThat(f.content.dock().slot(A)).as("the drag itself moves nothing").hasValue(Slot.LEFT_TOP);
+            assertThat(f.content.dock().slot(A)).as("it keeps its slot").hasValue(Slot.LEFT_TOP);
         });
     }
 
@@ -177,7 +208,7 @@ class DockDragDetachTest {
             mouse(title, MouseEvent.MOUSE_RELEASED, OUTSIDE);
             assertThat(f.detaches).containsExactly(new Heard(A, new DockDrag.Detach(OUTSIDE, grab)));
             assertThat(f.drops).isEmpty();
-            assertThat(f.content.dock().visible(A)).as("the drag itself hides nothing").isTrue();
+            assertThat(f.content.dock().visible(A)).as("it still shows, in its own window").isTrue();
         });
     }
 
@@ -291,6 +322,150 @@ class DockDragDetachTest {
             assertThat(f.drag().target()).hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
             assertThat(f.drag().overlay().highlight()).as("it stays in its own window: no docked frame to preview").isNull();
             assertThat(f.drag().overlay().placeholder()).as("the gap shows").isNotNull();
+        });
+    }
+
+    /**
+     * Task 2 and its amendment 1: a hidden tool window dropped outside opens a Float window at the size it would dock at,
+     * with the point the press held under the pointer, shown and then raised with the keyboard in its frame. Its stripe
+     * button stays in its slot, selected.
+     */
+    @Test void aDetachDropOpensAFloatWindowWithTheGrabUnderThePointer() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            var focused = new ArrayList<Component>();
+            f.content.area().focuser = focused::add;
+            Dimension size = f.landing();
+            var opened = new Rectangle(OUTSIDE.x - 6, OUTSIDE.y - 9, size.width, size.height);
+            assertThat(SCREEN.contains(opened)).as("on the display, so fitting keeps it").isTrue();
+            AbstractButton button = f.button("Alpha");
+            f.startAt(button, new Point(6, 9), OUTSIDE);
+            mouse(button, MouseEvent.MOUSE_RELEASED, OUTSIDE);
+
+            assertThat(f.shells.take()).as("opened with the grab under the pointer, shown, then raised")
+                .containsExactly(open(ToolWindowMode.FLOAT, opened), "show " + A, "toFront " + A);
+            PressedFrameTest.flushEdt();
+            assertThat(focused).as("the keyboard goes into its frame").containsExactly(f.alpha);
+            assertThat(f.content.dock().visible(A)).isTrue();
+            assertThat(f.content.dock().mode(A)).isEqualTo(ToolWindowMode.FLOAT);
+            assertThat(f.content.dock().bounds(A)).hasValue(opened);
+            assertThat(f.content.dock().slot(A)).as("its stripe button stays in its slot").hasValue(Slot.LEFT_TOP);
+            assertThat(f.content.leftStripe().buttons()).contains(f.button("Alpha"));
+            assertThat(f.button("Alpha").isSelected()).as("selected while its window shows").isTrue();
+        });
+    }
+
+    @Test void aShownDockedWindowKeepsItsFrameSize() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            f.content.dock().show(A);
+            f.relayout();
+            Rectangle docked = f.content.area().frameOnScreen(A).orElseThrow();
+            Dimension minimum = DetachedToolWindows.minimumSize();
+            assertThat(docked.width).as("the docked frame is at least the minimum").isGreaterThanOrEqualTo(minimum.width);
+            assertThat(docked.height).isGreaterThanOrEqualTo(minimum.height);
+            JLabel title = f.content.area().headerOf(Slot.LEFT_TOP).titleLabel();
+            Point grab = f.start(title, OUTSIDE);
+            mouse(title, MouseEvent.MOUSE_RELEASED, OUTSIDE);
+
+            var opened = new Rectangle(OUTSIDE.x - grab.x, OUTSIDE.y - grab.y, docked.width, docked.height);
+            assertThat(SCREEN.contains(opened)).as("on the display, so fitting keeps it").isTrue();
+            assertThat(f.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, opened), "show " + A, "toFront " + A);
+            assertThat(f.content.area().content(Slot.LEFT_TOP)).as("the slot shows nothing").isNull();
+        });
+    }
+
+    @Test void aRememberedSizeWins() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            f.content.dock().detach(A, ToolWindowMode.FLOAT, BEFORE);
+            f.content.dock().setMode(A, ToolWindowMode.DOCKED);
+            f.relayout();
+            assertThat(f.content.area().frameOnScreen(A)).as("docked and shown again")
+                .hasValueSatisfying(docked -> assertThat(docked.getSize()).isNotEqualTo(BEFORE.getSize()));
+            f.shells.take();
+            JLabel title = f.content.area().headerOf(Slot.LEFT_TOP).titleLabel();
+            Point grab = f.start(title, OUTSIDE);
+            mouse(title, MouseEvent.MOUSE_RELEASED, OUTSIDE);
+
+            var opened = new Rectangle(OUTSIDE.x - grab.x, OUTSIDE.y - grab.y, BEFORE.width, BEFORE.height);
+            assertThat(f.shells.take()).as("the size its window last had")
+                .containsExactly(open(ToolWindowMode.FLOAT, opened), "show " + A, "toFront " + A);
+        });
+    }
+
+    @Test void theWindowIsFittedToTheDisplayUnderThePointer() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            var right = new Rectangle(1920, 0, 1920, 1080);
+            f.content.detachedWindows().displays = () -> List.of(SCREEN, right);
+            Dimension size = f.landing();
+            var corner = new Point(3830, 1070);
+            AbstractButton button = f.button("Alpha");
+            f.start(button, corner);
+            mouse(button, MouseEvent.MOUSE_RELEASED, corner);
+
+            var fitted = new Rectangle(right.x + right.width - size.width, right.y + right.height - size.height, size.width, size.height);
+            assertThat(f.content.dock().bounds(A)).hasValue(fitted);
+            assertThat(right.contains(fitted)).as("wholly on the display under the pointer").isTrue();
+            assertThat(f.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, fitted), "show " + A, "toFront " + A);
+        });
+    }
+
+    @Test void draggingADetachedButtonOutAgainMovesItsWindow() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            f.content.dock().detach(A, ToolWindowMode.WINDOW, BEFORE);
+            f.relayout();
+            assertThat(f.shells.take()).containsExactly(open(ToolWindowMode.WINDOW, BEFORE), "show " + A);
+            AbstractButton button = f.button("Alpha");
+            f.startAt(button, new Point(6, 9), OUTSIDE);
+            mouse(button, MouseEvent.MOUSE_RELEASED, OUTSIDE);
+
+            var moved = new Rectangle(OUTSIDE.x - 6, OUTSIDE.y - 9, BEFORE.width, BEFORE.height);
+            assertThat(f.shells.take()).as("its window moves there, keeping its size, and comes forward")
+                .containsExactly("place " + A + " " + text(moved), "toFront " + A);
+            assertThat(f.content.dock().mode(A)).as("still a window of its own").isEqualTo(ToolWindowMode.WINDOW);
+            assertThat(f.content.dock().bounds(A)).hasValue(moved);
+            assertThat(f.content.dock().visible(A)).isTrue();
+        });
+    }
+
+    @Test void aDetachedButtonDroppedOnAStripeStaysDetached() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            f.content.dock().detach(A, ToolWindowMode.FLOAT, BEFORE);
+            f.relayout();
+            f.shells.take();
+            AbstractButton button = f.button("Alpha");
+            f.start(button, f.rightRailTop());
+            mouse(button, MouseEvent.MOUSE_RELEASED, f.rightRailTop());
+
+            assertThat(f.drops).containsExactly(A);
+            assertThat(f.detaches).isEmpty();
+            assertThat(f.content.dock().slot(A)).as("its stripe button moves").hasValue(Slot.RIGHT_TOP);
+            assertThat(f.content.dock().mode(A)).isEqualTo(ToolWindowMode.FLOAT);
+            assertThat(f.content.dock().visible(A)).isTrue();
+            assertThat(f.shells.take()).as("its window stays as it is").isEmpty();
+        });
+    }
+
+    @Test void aDetachedButtonDroppedOnTheWorkspaceDocks() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            f.content.dock().detach(A, ToolWindowMode.FLOAT, BEFORE);
+            f.relayout();
+            f.shells.take();
+            AbstractButton button = f.button("Alpha");
+            f.start(button, f.zone(Slot.RIGHT_TOP));
+            mouse(button, MouseEvent.MOUSE_RELEASED, f.zone(Slot.RIGHT_TOP));
+
+            assertThat(f.drops).containsExactly(A);
+            assertThat(f.detaches).isEmpty();
+            assertThat(f.shells.take()).containsExactly("dispose " + A);
+            assertThat(f.content.dock().mode(A)).isEqualTo(ToolWindowMode.DOCKED);
+            assertThat(f.content.dock().slot(A)).hasValue(Slot.RIGHT_TOP);
+            assertThat(f.content.area().content(Slot.RIGHT_TOP)).isSameAs(f.alpha);
         });
     }
 }
