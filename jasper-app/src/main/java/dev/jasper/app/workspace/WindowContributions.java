@@ -105,6 +105,7 @@ final class WindowContributions implements AutoCloseable {
             owner.dockDrag().onDrop = this::dropped;
             owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
             owner.dockDrag().labels = this::stripeLabel;
+            owner.dockDrag().titles = id -> panels.containsKey(id) ? panels.get(id).entry.title() : "";
             dock.addListener(docked);
             panelRequests = model.onPanelRequest(this::requested);
         }
@@ -615,6 +616,7 @@ final class WindowContributions implements AutoCloseable {
         owner.dockDrag().onDrop = (id, target) -> { };
         owner.dockDrag().icons = id -> null;
         owner.dockDrag().labels = id -> "";
+        owner.dockDrag().titles = id -> "";
         dock.removeListener(docked);
         if (detached != null) {
             // The windows close before their panels hear that they close.

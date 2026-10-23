@@ -392,6 +392,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         stripes.bottom().ifPresent(strip -> body.add(strip, BorderLayout.SOUTH));
         dockDrag = new DockDrag(this, dock, area, stripes);
         dockDrag.railsEnabled = this::railsEnabled;
+        // Over another of Jasper's windows in front of this one a dock drag detaches, as outside it. The window manager
+        // gives this window its shared tab drag later, so the query asks the tab drag of the moment.
+        dockDrag.covered = screen -> tabDrag().covers(this, screen);
         for (DockStripe stripe : stripes.all()) stripe.dragSource = dockDrag::install;
         area.dragSource = dockDrag::install;
         area.releaseDragSource = dockDrag::uninstall;
