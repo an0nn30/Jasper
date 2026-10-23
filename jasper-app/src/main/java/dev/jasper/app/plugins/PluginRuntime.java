@@ -380,6 +380,12 @@ public final class PluginRuntime {
         if(host!=null)throw new IllegalStateException("Plugins have already started");
         shortcuts = Objects.requireNonNull(labels);
     }
+    private Consumer<String> openSettings = page -> { };
+    /** Supplies how a plugin opens Settings at a page over the active window, before plugin startup. UI thread. */
+    public void openSettings(Consumer<String> opener) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        openSettings = Objects.requireNonNull(opener);
+    }
     private dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
     /** Supplies the application's clipboard before plugin startup, so plugins share it with Jasper's own copies. */
     public void clipboard(dev.jasper.app.platform.HostClipboard value) {
@@ -747,6 +753,7 @@ public final class PluginRuntime {
         }
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
+        created.openSettings = openSettings;
         created.commandClient = commandClient;
         Set<String> loadingIds = new HashSet<>();
         for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());

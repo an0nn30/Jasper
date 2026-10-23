@@ -40,7 +40,7 @@ final class FakeContent implements ContentTab {
     }
     public void setPresentation(ContentPresentation value){if(!closed){ui.context.kit().validateIcon(value.icon());presentation=value;tab.title=value.title();}}
     public void setCommands(List<ContentCommand> values){if(!closed)commands=List.copyOf(values);}
-    public void setStatus(List<ContentStatus> values){if(!closed)status=List.copyOf(values);}
+    public void setStatus(List<ContentStatus> values){if(closed)return;for(var value:values)if(!value.icon().isEmpty())ui.context.kit().validateIcon(value.icon());status=List.copyOf(values);}
     public void setFocusTarget(Runnable value){if(!closed)focus=value;}
     public void setRestore(Optional<dev.jasper.sdk.RestoreState> value){Objects.requireNonNull(value,"value");if(!closed)restore=value;}
     public void select(){if(closed)return;ui.host.workspace.select(tab);active(true);focus.run();}

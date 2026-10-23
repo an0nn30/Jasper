@@ -89,6 +89,17 @@ class DeclaredSettingsTest {
             .map(diagnostic -> diagnostic.severity() + " " + diagnostic.key() + " " + diagnostic.line() + " " + diagnostic.message()).toList();
     }
 
+    /** Vim IdeaVim keys spec 4: show opens Settings at the plugin's page, on the UI thread, while the plugin runs. */
+    @Test void showOpensSettingsAtThePluginsPage() {
+        var pages = new CopyOnWriteArrayList<String>();
+        host.openSettings = pages::add;
+        var settings = start(declared -> { });
+        onEdt(settings::show);
+        onEdt(() -> { });
+        assertThat(pages).containsExactly(PluginRuntime.settingsPageId(ID));
+        assertThatIllegalStateException().as("off the UI thread").isThrownBy(settings::show);
+    }
+
     @Test void valuesComeFromTheFileAndProblemsArePlaced() throws Exception {
         write("font_size = 99\ntab_size = 6\nmystery = 1\n[sftp]\nmax_parallel_files = 3\n");
         var size = new AtomicReference<Setting<Integer>>();

@@ -629,7 +629,9 @@ final class HostedUi {
         public void setCommands(List<dev.jasper.sdk.ui.ContentCommand> values) { requireUi("content commands"); entry.commands(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentCommand(v.id(), v.title(), v.shortcut(), v.enabled(), () -> containment.run(pluginId, "content command", v.run()))).toList()); }
         public void setStatus(List<dev.jasper.sdk.ui.ContentStatus> values) { requireUi("content status"); entry.status(values.stream().map(v ->
-            new dev.jasper.app.contributions.ContentStatus(v.text(), v.tooltip(), v.run() == null ? null : () -> containment.run(pluginId, "content status", v.run()))).toList()); }
+            new dev.jasper.app.contributions.ContentStatus(v.text(), v.tooltip(), contained(v.run()), v.icon().isEmpty() ? null : icon(v.icon()), v.dimmed(),
+                v.menu().stream().map(e -> new dev.jasper.app.contributions.ContentStatus.MenuEntry(e.label(), contained(e.run()), e.checkable(), e.checked(), e.separator())).toList())).toList()); }
+        private Runnable contained(Runnable run) { return run == null ? null : () -> containment.run(pluginId, "content status", run); }
         public void setFocusTarget(Runnable focus) { requireUi("content focus"); entry.focusTarget(() -> containment.run(pluginId, "content focus", focus)); }
         public void setRestore(Optional<dev.jasper.sdk.RestoreState> state) { requireUi("content restore"); entry.restore(state.map(HostedUi::restore)); }
         public void select() { requireUi("select content"); entry.select(); }

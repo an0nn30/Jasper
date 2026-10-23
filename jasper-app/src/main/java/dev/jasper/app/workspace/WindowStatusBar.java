@@ -109,7 +109,13 @@ final class WindowStatusBar extends JPanel {
                 var button = PlainText.button(); button.setText(item.text());
                 button.setToolTipText(item.tooltip()); button.setBorder(BorderFactory.createEmptyBorder(0, NativeStyles.installed().metric(DesignMetrics.Role.STATUS_ITEM_GAP), 0, NativeStyles.installed().metric(DesignMetrics.Role.STATUS_ITEM_GAP)));
                 button.setContentAreaFilled(false); button.setFocusable(false); button.setFont(statusFont());
-                button.setForeground(muted()); if (item.run() != null) button.addActionListener(event -> item.run().run());
+                button.setIconTextGap(NativeStyles.installed().metric(DesignMetrics.Role.STATUS_ITEM_GAP));
+                button.setIcon(item.dimmed() && item.icon() instanceof dev.jasper.app.platform.PresentationIcon icon ? icon.in(SemanticColor.TEXT_PLACEHOLDER) : item.icon());
+                button.getAccessibleContext().setAccessibleName(item.text().isEmpty() ? item.tooltip() : item.text());
+                if (item.dimmed()) button.putClientProperty(DIMMED, true);
+                button.setForeground(itemColor(button));
+                if (!item.menu().isEmpty()) button.addActionListener(event -> contentMenuPopup.accept(button, contentMenu(item.menu())));
+                else if (item.run() != null) button.addActionListener(event -> item.run().run());
                 contentItems.add(button);
             }
         }
@@ -130,6 +136,39 @@ final class WindowStatusBar extends JPanel {
         }
         cells.refresh(this);
         revalidate(); repaint();
+    }
+
+    /** Marks a content item painted in the disabled colour. */
+    private static final String DIMMED = "Jasper.status.dimmed";
+
+    /**
+     * How a content item shows its menu, as the kit places a menu button's: below the item, or above it when the window
+     * has no room below. A headless test, where nothing shows, records what a click would show instead.
+     */
+    java.util.function.BiConsumer<JComponent, JPopupMenu> contentMenuPopup = (invoker, menu) -> {
+        if (!invoker.isShowing()) return;
+        int height = menu.getPreferredSize().height;
+        var root = SwingUtilities.getRootPane(invoker);
+        boolean above = root != null && SwingUtilities.convertPoint(invoker, 0, invoker.getHeight(), root).y + height > root.getHeight();
+        menu.show(invoker, 0, above ? -height : invoker.getHeight());
+    };
+
+    /** A content item's menu in the themed popup the window's other menus use. */
+    private static JPopupMenu contentMenu(List<dev.jasper.app.contributions.ContentStatus.MenuEntry> entries) {
+        var menu = new JPopupMenu();
+        for (var entry : entries) {
+            if (entry.separator()) { menu.addSeparator(); continue; }
+            JMenuItem item = entry.checkable() ? PlainText.checkBox(entry.label(), null, entry.checked()) : PlainText.item(entry.label());
+            item.addActionListener(event -> entry.run().run());
+            menu.add(item);
+        }
+        NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        return menu;
+    }
+
+    /** A status item's text colour: the disabled colour for a dimmed content item, else the muted one. */
+    private Color itemColor(JButton item) {
+        return Boolean.TRUE.equals(item.getClientProperty(DIMMED)) ? ThemeZone.color(null, SemanticColor.TEXT_PLACEHOLDER) : muted();
     }
 
     void setConfiguration(ConfigService.State state) {
@@ -238,7 +277,7 @@ final class WindowStatusBar extends JPanel {
         left.refreshTheme(); right.refreshTheme(); breadcrumbs.refreshTheme();
         for (Box row : new Box[]{leftItems, rightItems, contentItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) {
-                item.setForeground(muted());
+                item.setForeground(itemColor(item));
                 item.setFont(statusFont());
             } else if (child instanceof StatusProgressView progress) progress.refreshTheme();
         configButton.setForeground(onStatus(configColor));
