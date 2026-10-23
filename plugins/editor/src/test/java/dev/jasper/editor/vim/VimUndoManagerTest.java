@@ -175,6 +175,21 @@ class VimUndoManagerTest {
         });
     }
 
+    /** RTextArea names the undo on every focus gain: the first open step's edits are undoable before the stack has any. */
+    @Test void anOpenStepOnAnEmptyStackHasAnUndoName() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            area.discardAllEdits();
+            VimUndoManager undo = area.vimUndo();
+            undo.vim(true);
+            undo.beginStep(0, 0);
+            area.replaceSelection("a");
+            assertThat(undo.canUndo()).isTrue();
+            assertThat(undo.getUndoPresentationName()).isNotEmpty();
+            assertThat(undo.getUndoOrRedoPresentationName()).isNotEmpty();
+        });
+    }
+
     /** Pane flexibility spec 6: two views of one document share its one history, so an undo in either undoes its last edit. */
     @Test void twoViewsOfADocumentShareOneUndoHistory() throws Exception {
         onEdt(() -> {

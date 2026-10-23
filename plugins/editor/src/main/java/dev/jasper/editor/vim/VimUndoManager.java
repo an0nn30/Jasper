@@ -554,6 +554,11 @@ final class VimUndoManager extends RUndoManager {
         return view.vimStep != null && view.vimStep.edits > 0 || view.internal != null && view.internal.edits > 0 || super.canUndo();
     }
 
+    /** An open step is undoable before the stack holds anything ({@link #canUndo}), and RTextArea names the undo on every focus gain. */
+    @Override public synchronized String getUndoPresentationName() {
+        return editToBeUndone() == null ? UIManager.getString("AbstractUndoableEdit.undoText") : super.getUndoPresentationName();
+    }
+
     /**
      * Nothing is redoable while an open step has edits: closing it for the redo would put it on the undo stack and
      * trim the redo stack, so the redo would fail (an outside ⌘⇧Z in the middle of an insert).
