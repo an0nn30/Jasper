@@ -119,9 +119,11 @@ window that was visible reopens in its window after the main window shows, its b
   (`ShortcutContext.panel`). Other window-level actions (new tab, palette, …) act on the main window and bring it
   forward. On macOS with the screen menu bar, a Window-mode window carries the minimal menu
   bar auxiliary frames carry so the screen menu bar does not empty; a Float dialog keeps its owner's.
-- Focus: showing it through an activating request (stripe click, View menu, `PanelHost.show` from the panel's toggle)
-  focuses its content, as docked activation does. Under flush frames (Enterprise) its header shows focus like a docked
-  strip's.
+- Focus: showing it through an activating request (stripe click, View menu, `PanelHost.show` from the panel's toggle),
+  View Mode ▸ Float/Window chosen from a menu, and a drag-out drop raise its window and focus its content, as docked
+  activation does. Any other show (a restore at start-up, Zen's return, a plugin's plain `show`) opens the window
+  without taking the focus (*Ruling, Task 8:* IntelliJ shows a tool window active only when it is activated). Under
+  flush frames (Enterprise) its header shows focus like a docked strip's.
 - Lifetime: it closes with the main window (and its tool window's removal: plugin stopped or removed); mode and
   visibility are saved, so it returns with the main window.
 - Zen hides detached tool windows with the docked ones and restores them after (*Ruling:* Zen means "only the
