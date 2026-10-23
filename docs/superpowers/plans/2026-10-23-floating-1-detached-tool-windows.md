@@ -1,5 +1,15 @@
 # Floating tool windows 1: Float and Window view modes Implementation Plan
 
+**Status: executed on 2026-10-23** (`6cef314c3..2a5f0d62e`, the spec's amendments `df1625825` and `acaac9e7c`, then the
+documentation commit); see `docs/STATUS.md`. Deviations from the plan's text: (1) a stripe click toggles a detached tool
+window as it does a docked one (shown hides, hidden shows and raises), where Task 6 had a click raise a shown window that
+is not in front (`af1b90e6e`, the spec amended); only the View menu and `<id>.toggle` raise it; (2) Move to on a detached
+tool window's own slot docks it there too (Task 6); (3) Task 8's `DetachedFrame` has a public static factory, `shells`,
+and `Shell` a sixth component, `content`, with `ToolWindowArea.onRemounted`, so that a kit view's remounted frame reaches
+an open window; (4) a detached window's `show` never takes the focus, and View Mode > Float or Window from a menu
+activates the window (`d1d8db2f3`, `2a5f0d62e`, the spec amended); (5) Task 3 draws `more.vertical` in the strip ink
+(`IconRegistry`); (6) Task 9 also edits `docs/configuration.md` and `docs/plugin-authoring.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A tool window can leave the main window's dock for a window of its own, in IntelliJ's Float or Window view mode, from its ⋮ Options menu (View Mode ▸ Docked / Float / Window), and come back; mode, bounds and visibility persist.

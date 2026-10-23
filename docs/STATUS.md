@@ -109,6 +109,122 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Floating tool windows, plan 1: Float and Window — 2026-10-23** (`claude/floating-tool-windows`, worktree
+`.claude/worktrees/workspace-tabs`, `6cef314c3..2a5f0d62e` and the documentation commit, from `main` at `5db3524b4`; not
+merged or pushed; [plan](superpowers/plans/2026-10-23-floating-1-detached-tool-windows.md),
+[spec](superpowers/specs/2026-10-23-jasper-floating-tool-windows-design.md), written without a question round at the
+user's request, "it should behave like IntelliJ"; executed with per-task subagents and reviews). A tool window can have a
+window of its own, in IntelliJ's two modes: **Float** (a modeless dialog owned by the main window) and **Window** (an
+ordinary frame). The Options button is the vertical ellipsis ⋮ in every header (native, flush strip and borrowed kit
+header), and its menu, like the stripe button's right-click menu, is **View Mode** › Docked, Float, Window, **Move to** ›
+the six places, **Hide**. What landed, in task order:
+1. `dev.jasper.app.dock.ToolWindowMode` and `DockState`'s mode and window bounds per id (`detach`, `setMode`,
+   `setBounds`; a detached id keeps its slot and is never its slot's active window; `Change.placed` names the ids whose
+   slot or mode changed) (`f9b5d4758`); `UiState` keeps `mode` (written only when detached) and `window = { x, y, width,
+   height }` per panel, per look (`a6ab38e5c`).
+2. The menu and the glyph (`20d020b50`, `1fd7b238a`); `ToolWindowArea` mounts a detached tool window's frame outside
+   itself, releasing every stale frame before any new one mounts (`0e277bdf4`).
+3. `DetachedToolWindows` keeps one window per shown detached tool window in line with the dock through `Shell`s, at the
+   bounds the dock holds (first bounds: where the docked frame was, or centred on the main window when it was hidden),
+   kept on today's displays by `WindowPlacement.restore`'s rule at every opening; a restored one opens after the main
+   window shows (`491878164`). The stripe button stays and a click toggles it; Zen hides detached windows with the docked
+   ones and brings them back; a child window's request raises the detached window instead of the main window
+   (`1e1ef5af1`, `af1b90e6e`). Jasper's shortcuts work in a detached window, the panel's own included; Close Pane, Close
+   Tab and Close Window there hide the tool window and close nothing of the main window; other window-level actions
+   bring the main window forward (`0c8776856`).
+4. `DetachedFrame`, the native window (never built headless): Float's `JDialog` and Window's `JFrame`, with the
+   auxiliary windows' title bars (`MacTitleBar` or `MacTitleBand`, FlatLaf's title pane), the theme, and on macOS with
+   the screen menu bar a Window's File › Close Window (`2e223733a`); a show never takes the focus, and View Mode › Float
+   or Window from a menu does (`d1d8db2f3`, `2a5f0d62e`).
+Documentation: [Float and Window](workspace.md#float-and-window), the menus and header, the keys in
+[configuration](configuration.md#ui-statetoml), the `dock` and `workspace` rows of the
+[architecture](app-architecture.md), plugin authoring's Options menu line, and the plan's status banner; the
+`migration.csv` rows came with their tasks.
+
+Rulings (the spec's own, such as Move to on a detached window docking it, opaque windows and Zen hiding them, stand;
+each below costs what its last words say if wrong):
+- Stripe click: a click toggles (shown hides, hidden shows, raises and focuses), as for a docked one. The spec's "hide
+  only when its window is active" could never hide from the stripe, because a click makes the main window the active
+  one; the cost is a second click to raise a buried window from the stripe (View › Tool Windows and `<id>.toggle`
+  still raise a shown window that is not in front, and hide the one that is). Spec amended (`df1625825`).
+- Focus: a show never takes the focus (`setAutoRequestFocus(false)` around `setVisible`), so a restore, Zen's return or a
+  plugin's plain `show` leaves the terminal focused, as IntelliJ activates a tool window only when it is activated; only
+  an activating request focuses (one more click for a window opened by a non-activating path). View Mode › Float or
+  Window from a menu activates the window, as IntelliJ keeps a tool window active through a view-mode change (a focus
+  change the user may not have wanted). Spec amended (`acaac9e7c`).
+- Move to on a detached tool window's own, checked slot docks it there too (a menu item that behaves differently for a
+  detached window).
+- Close keys: in a detached window they hide the tool window only when the stroke resolves to that close action from the
+  focus owner; a panel's own action on the same keys runs instead, as when docked (a panel can shadow ⌘W in its window).
+  While the main window's modal overlay is open a detached window swallows every key but Close.
+- The ⋮ glyph is drawn as a vector in the strip's ink in `IconRegistry` (a flush strip paints every action in one ink,
+  and the authored grey would break `HeaderStripTest`; other contexts keep authored art; a jasper-ui revert if the grey
+  is preferred).
+- `frameOnScreen` is the framed surface inside the gutters (what the user sees), not the host's outer bounds, so a window
+  opened there matches the frame.
+- `Shell` has a sixth component, `content`, and `ToolWindowArea` an `onRemounted`, so an open window takes a kit view's
+  remounted frame (a replaced borrowed header).
+- `initialBounds` lives on `DetachedToolWindows`; `WindowFrame.usableDisplays()` is extracted for it; `syncPanels` saves
+  once before it removes the panels whose plugin left, because a window's moves fire no dock change and its last bounds
+  must survive; `DetachedToolWindows.sync` is hardened against a nested sync.
+- `DetachedFrame.shells(ThemeController, WindowLook)` is a public static factory, because a lambda over the
+  package-private records does not compile across packages; it copies the few `NativeShells` lines it needs instead of
+  importing `dev.jasper.app.windows`, so the package graph is unchanged.
+- Task 9 also updates `configuration.md` (the reviewer found its `[panels."<id>"]` key list would go stale) and
+  `plugin-authoring.md`'s Options menu line.
+
+Deferred, worth knowing:
+- Not built: dragging a tool window out of the window (plan 2,
+  [drag out](superpowers/plans/2026-10-23-floating-2-drag-out.md)) and the SDK's `PanelHost.placement()` and `onPlacement`, the testkit and the Sample plugin
+  ([SDK placement](superpowers/plans/2026-10-23-floating-3-sdk-placement.md)); until then a detached window comes from
+  the menus alone and no plugin hears of it. `docs/sdk-architecture.md` waits for them.
+- A press inside a detached flush frame does not reach `ToolWindowArea.pressed`; focus marking follows the real focus
+  owner. A drop that detaches (plan 2) is a user gesture and must activate the window, as the menu does.
+- A focused scroll pane or table in a detached window can take Ctrl+PageUp/Down (and Ctrl+Tab on Linux and Windows)
+  before the root binding; a disabled panel action on a Close stroke lets the key through, which on macOS could reach the
+  owner's Close Pane.
+- A detached tool window saved as showing whose window has not opened yet toggles to hidden on a click instead of
+  raising; a plain `SHOW` or `TOGGLE` routed from a child window raises nothing for an open detached window.
+- View Mode › Docked under flush frames (Enterprise), replacing another docked window, still calls `focusSelected`
+  (`setMode`'s change has no shown ids), so the activation can be undone by the terminal's focus.
+- A window's title is fixed when it opens; a maximised Window reopens at its normal bounds; under Enterprise's classic
+  title bar a Float on macOS gets IntelliJ Classic's band, not the system bar auxiliary dialogs keep; the unified bar's
+  controls follow the chrome's darkness (`NativeShells`' rule) where `mountChild` uses `TitleBarTheme`; `dispose` closes
+  the theme subscription, keys, bar and band in sequence, so an early throw would skip the rest; ⌘W resolves to Close
+  Pane, which hides the tool window before File › Close Window's item can fire.
+- `ToolWindowArea` is 930 lines and `DetachedToolWindowsTest` 882.
+
+Check: `./gradlew check --continue` (BUILD SUCCESSFUL in 18m 59s; `:jasper-buddy:test` and `checkThemeTool` were up to
+date): **12,946 tests, 0 failures, 0 errors, 29 skipped** (this run's XML holds 12,792; the up-to-date Buddy tests are
+the other 154). The branch's new test classes: `DockStateDetachTest` 25, `ToolWindowAreaDetachedTest` 16,
+`DetachedToolWindowsTest` 34 and `DetachedShortcutsTest` 10, with added cases in `UiStateTest`, the header, stripe and
+menu tests and `WindowManagerTest`. GUI checks for the user, none run (no window was launched), on
+each platform in the default and the Enterprise look:
+- All: View Mode › Float and Window from the header's ⋮, the rail button's right-click and an Enterprise stripe's; the ⋮
+  in every header (native, flush strip, a kit panel's borrowed header); the window opens where the frame was, with the
+  tool window's title and its header; Docked returns it to its place on the stripe, showing there if it was showing.
+- All: Float stays above the main window, has no taskbar entry and minimises, restores and closes with it; Window can go
+  behind the main window and has its own entry; neither shrinks below about 240 by 160.
+- All: the close button hides it and a stripe click brings it back where it was, and a second click hides it; with the
+  window behind the main one, View › Tool Windows and the toggle shortcut raise it, and pressed in it hide it; Move to
+  on it docks it; the main window minimised, a stripe click shows a Float with its owner restored.
+- All: restart restores mode, bounds and visibility, and the terminal keeps the focus when a detached window comes back
+  at start-up, after leaving Zen or from a plugin's plain `show`; a window saved on a display that is gone opens on a
+  connected one, with two displays; a maximised Window reopens at its normal size.
+- All: in the window, the palette and New Tab act on the main window and bring it forward, the Close Pane key hides the
+  window, and the tool window's own shortcuts run; Zen hides detached windows and brings them back; a theme switch
+  (dark and light, and a theme with its own title bar colours) reaches the window, its header and its panel.
+- Enterprise: the header strip shows the focus in the window; View Mode › Docked over another docked window keeps the
+  focus in the docked frame; classic title bar (the 28 px bar on Windows and Linux, the band on macOS).
+- macOS (in the packaged Jasper.app): a unified bar, Float on the dialog row and Window on the window row, with the
+  traffic lights placed and the bar's light or dark following the theme, active and inactive; Window mode's screen menu
+  bar shows File › Close Window and a Float keeps the main window's menus; ⌘W hides the tool window; full screen of a
+  Window.
+- Windows: FlatLaf's title pane in the theme's colours, Enterprise's 28 px bar with the title dimmed while inactive;
+  snap and Aero in Window mode; Ctrl+W hides the tool window.
+- Linux (x64 and aarch64): FlatLaf's title pane where it decorates the window, else the system's; the window manager's
+  placement of the Float (transient for the main window); a restored Float takes no focus at start-up (X11).
+
 **Editor Color scheme setting — 2026-10-23** (`claude/editor-color-scheme`, worktree
 `.claude/worktrees/editor-color-scheme`, from local `main` at `f30067a2d`; not merged or pushed): the Editor's
 `color_scheme` (Settings › Tools › Editor › Colors) is `"workspace"` (the default: the shown UI theme's editor scheme,

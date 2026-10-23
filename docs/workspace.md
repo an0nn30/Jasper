@@ -261,13 +261,14 @@ On macOS, while the menus are in the screen menu bar, the application menu (Jasp
 |---|---|
 | A terminal pane | Copy, Paste, Find, Clear Terminal, Split › (as in the Tab menu), Move Pane to New Tab, Move Pane to Tab ›, Maximize Pane, Close Pane, then the window menu's Move Tab to New Window (and Move to Main Window in a child window); then plugins' items: Remote's **Forward a Port...** and **Open SFTP here**, File Server's **Share Path** › HTTP, HTTPS, FTP, FTPS, SFTP, TFTP |
 | A tab's entry in the strip | Rename Tab (for a terminal), Move Tab to New Window, Move Tab Into ›, Close Tab, then the active item's own commands |
-| A rail button, or a tool window's Options (⋯) button | Move to › Left Top, Left Bottom, Bottom Left, Right Top, Right Bottom, Bottom Right (the current slot checked); Hide |
+| A rail button, or a tool window's Options (⋮) button | View Mode › Docked, Float, Window (the current one checked); Move to › Left Top, Left Bottom, Bottom Left, Right Top, Right Bottom, Bottom Right (the current slot checked); Hide |
 
 ## Tool windows and the dock
 
 Tool windows are panels such as the Sessions list, the SFTP browser or the Notifications history. Jasper and plugins
-supply them, and they dock in the main window only: a tool window's toggle run in a child window brings the main window
-to the front and shows the tool window there, and never hides it. Under the default look they start here:
+supply them, and they belong to the main window only: a tool window's toggle run in a child window shows the tool window
+and brings the main window to the front, or the tool window's own window when it has one
+([Float and Window](#float-and-window)), and never hides it. Under the default look they start here:
 
 | Tool window | From | Starts in | Toggle |
 |---|---|---|---|
@@ -299,14 +300,45 @@ The rail on each side has a button per tool window: the top slot's buttons at th
 separator, and the button for that side's half of the bottom area at the foot. A button is highlighted while its tool
 window shows; click it to show or hide the window. A dot on a button marks unread news (the Notifications button's
 tooltip gives the count; see [the Notifications panel](notifications.md#the-notifications-panel)). Right-click a button
-for **Move to** and **Hide**.
+for **View Mode**, **Move to** and **Hide**.
 
 A rail shows only while it holds a button. View › Show/Hide › Rail (palette: **Show Rail** / **Hide Rail**; no default
 shortcut, `toggle_rail`) hides or shows both rails in the window, and Jasper remembers the choice in `ui-state.toml`.
 `window.rail_width` (Settings › Window › Panel rail width) sets their width.
 
-Each tool window has a header: its title, the plugin's buttons, **Options** (⋯) with **Move to** and **Hide**, and
-**Hide** (the chevron).
+Each tool window has a header: its title, the plugin's buttons, **Options** (⋮) with **View Mode**, **Move to** and
+**Hide**, and **Hide** (the chevron).
+
+### Float and Window
+
+A tool window can have a window of its own. In its Options menu, or the right-click menu of its rail button or stripe
+button, **View Mode** › **Float** or **Window** gives it one, which takes the focus if the tool window was showing;
+**Docked** puts it back at its place on the stripe, showing there if it was showing. **Float** is a window owned by the
+main window: it stays above it, minimises and closes with it and has no taskbar or Dock entry of its own. **Window** is
+an ordinary window: it has its own entry in the taskbar or the window switcher and can go behind the main window. Either
+one has the tool window's title and its header, with Options and Hide, above its content. It opens where the tool
+window's frame was, or centred on the main window when the tool window was hidden, and afterwards where it last was,
+fitted to the displays that are connected.
+
+The tool window keeps its rail button or stripe button, in its slot, highlighted while its window shows.
+
+- Click the button to show the window, in front and focused; click it again to hide it. View › Tool Windows and the tool
+  window's toggle shortcut show it the same way, bring a window that shows but is not in front to the front with the
+  focus, and hide one that is in front, as the shortcut does when pressed in the window itself.
+- Closing the window hides the tool window: the system's close button, **Hide**, or the keys of Close Pane, Close Tab or
+  Close Window pressed in it (they close no pane, tab or window of the main window from there). It stays in the mode it
+  has, its button stays on the stripe, and showing it again opens its window where it was. A window shown without being
+  asked for, such as one that comes back at start or after Zen, opens without taking the focus.
+- **Move to** on a tool window that has a window of its own docks it at the place you choose, its own slot included,
+  and shows it there.
+- Jasper's shortcuts work while the window has the focus, the tool window's own among them. Commands for the window as a
+  whole, such as New Tab or the command palette, run in the main window and bring it to the front.
+- Zen hides these windows with the docked tool windows and shows them again when it ends. Hiding the rail hides the
+  buttons only.
+
+Jasper saves each tool window's mode, whether it shows and its window's position and size in `ui-state.toml`, for the
+look in use ([the keys](configuration.md#ui-statetoml)); a window that showed opens again with the main window at the next
+start, and one saved on a display that is no longer connected opens on a connected one.
 
 ### Moving and resizing
 

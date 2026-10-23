@@ -395,7 +395,8 @@ the main window), and again after the main window closed and opened anew; the fa
 with the plugin's kit, and one that throws shows "This panel could not be loaded." Jasper adds:
 
 - a stripe button, the spec's icon (under the Enterprise look a label that starts with the icon and reads the title),
-  and a header with the title, an **Options** menu (**Move to** one of six places, **Hide**) and a **Hide** button;
+  and a header with the title, an **Options** menu (**View Mode**: Docked, Float or Window; **Move to** one of six
+  places; **Hide**) and a **Hide** button;
 - the action `<panel id>.toggle`, "Toggle *title*", with no default shortcut, listed in View › Tool Windows (the Window
   menu under the Enterprise look) and the palette. To give the toggle a shortcut, register an action of your own that
   calls `context.panels().toggle(id, invoked.window())`, register it before the tool window, and name it with
