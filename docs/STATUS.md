@@ -109,6 +109,17 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Editor Color scheme setting — 2026-10-23** (`claude/editor-color-scheme`, worktree
+`.claude/worktrees/editor-color-scheme`, from local `main` at `f30067a2d`; not merged or pushed): the Editor's
+`color_scheme` (Settings › Tools › Editor › Colors) is `"workspace"` (the default: the shown UI theme's editor scheme,
+the behaviour before) or an installed theme's `<id>/dark` or `<id>/light` scheme, kept whatever the appearance; a saved
+scheme that is not installed is listed as not found and the workspace's applies. SDK 0.21.0 (unreleased) gains
+`EditorScheme` and `Appearance.editorSchemes()`; the app converts the `ThemeController`'s `ThemeLibrary` and announces
+a changed library as a workspace change; the testkit's `setEditorSchemes` and a contract test cover both runtimes. The
+Markdown preview keeps the workspace's colours. Plan: `docs/superpowers/plans/2026-10-23-editor-color-scheme.md`,
+executed in one session with a whole-branch review instead of per-task subagents. GUI check pending: pick a scheme of
+the other variant, flip the appearance, import and remove a theme while it is chosen.
+
 **Editor: Move Pane to Tab names every tab — 2026-10-23** (`claude/editor-tab-names`, rebased onto `main` at
 `f30067a2d`): the Editor's right-click Move Pane to Tab listed terminals' and other plugins' tabs as "Tab N",
 because a plugin reads other tabs' titles only with `terminal.observe` (plan 9a's security fix) and the Editor did not

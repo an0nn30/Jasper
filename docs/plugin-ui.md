@@ -514,6 +514,10 @@ Only custom content reads colours, from [`Appearance`](sdk-reference.html#dev.ja
   colours ([`WorkspacePalette`](sdk-reference.html#dev.jasper.sdk.ui.WorkspacePalette); its `selectionText` is
   `TEXT_ONSELECTION`), and a style per [`SyntaxRole`](sdk-reference.html#dev.jasper.sdk.ui.SyntaxRole).
   `variant()` and `workspaceVariant()` (any thread) say dark or light.
+- `editorSchemes()` (UI thread) lists every installed theme's editor schemes, each theme's Dark and then Light one, as
+  [`EditorScheme`](sdk-reference.html#dev.jasper.sdk.ui.EditorScheme) values with an id such as `jasper-meadow/dark`,
+  for a plugin that lets its users pick a scheme of its own, as the Editor's **Color scheme** does; importing or
+  removing a theme is a workspace change.
 - Repaint in `appearance().onChanged(...)` for chrome and `onWorkspaceChanged(...)` for workspace content: the latter
   also fires when the colours change within one variant, when the workspace opacity changes and when the component
   moves to another window. For an editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every

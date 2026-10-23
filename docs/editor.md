@@ -615,7 +615,7 @@ shown.
 ## Settings
 
 The settings live in `plugins/dev.jasper.editor/dev.jasper.editor.toml` in [Jasper home](getting-started.md#jasper-home)
-and on Settings › Tools › Editor, in the sections Font, Editing, Markdown, Files and Default editor. Jasper creates the
+and on Settings › Tools › Editor, in the sections Font, Colors, Editing, Markdown, Files and Default editor. Jasper creates the
 file, with every setting commented out, when it is missing; changes in the file or on the page apply without a restart.
 A bad value is reported and its default used ([Plugin settings](plugins.md#plugin-settings)).
 
@@ -627,6 +627,7 @@ A bad value is reported and its default used ([Plugin settings](plugins.md#plugi
 | `font_fallback` | `[]` | Font family names, tried in order for characters the font lacks | Fallback fonts | Every tab, at once |
 | `font_ligatures` | `false` | | Font ligatures | Every tab, at once |
 | `font_line_height` | `1.0` | 0.5–3: a multiple of the fonts' own line height | Line height | Every tab, at once |
+| `color_scheme` | `"workspace"` | `workspace`, or a theme's id and variant: `<theme id>/dark` or `<theme id>/light` | Color scheme | Every tab, at once ([Theme colours](#theme-colours)) |
 | `tab_size` | `4` | 1–16 columns | Tab size | Every tab, at once; Vim's 'tabstop' and 'shiftwidth' |
 | `soft_wrap` | `false` | | Soft wrap | Files opened afterwards; **Toggle Soft Wrap** changes one file |
 | `vim` | `false` | | Vim mode | Every tab, at once; the Vim status item and **Toggle Vim Mode** set it |
@@ -652,10 +653,15 @@ While a local file is saved, its hidden `.<name>.jasper-<random>.tmp` stands bes
 
 ## Theme colours
 
-The Editor takes its colours from the UI theme the window shows, Dark or Light: the theme's editor scheme gives the
-background, text, caret, selection, current line, gutter and line numbers, and a colour with bold or italic for each
-syntax role, such as keywords, strings and comments. The terminal scheme (`terminal.scheme`) does not change the
-Editor. A theme change applies to open tabs at once, without touching their text. On macOS a translucent workspace
+The Editor takes its colours from an editor scheme: the background, text, caret, selection, current line, gutter and
+line numbers, and a colour with bold or italic for each syntax role, such as keywords, strings and comments. Every theme
+has an editor scheme for each of its variants. **Color scheme** (`color_scheme`, Settings › Tools › Editor › Colors)
+picks which one: **Follow Workspace Scheme** (`"workspace"`, the default) uses the scheme of the UI theme the window
+shows, Dark or Light, so it follows the appearance; the other entries, such as **Catppuccin Mocha (Dark)**
+(`"catppuccin-mocha/dark"`), list each installed theme's Dark and Light schemes, imported themes included, and keep
+that scheme whatever the appearance. A saved scheme whose theme is not installed is listed as not found, and the
+Editor shows the workspace's scheme until the theme is back. The terminal scheme (`terminal.scheme`) does not change
+the Editor. A change of theme or of the setting applies to open tabs at once, without touching their text. On macOS a translucent workspace
 (`ui.workspace.opacity`) makes the text and gutter backgrounds translucent too. The find bar's and 'hlsearch' match
 highlight, and Vim sneak's magenta matches, keep their own colours.
 
@@ -663,10 +669,11 @@ The [Markdown preview](#markdown-preview) takes its page from the UI theme's rol
 (translucent too, with `ui.workspace.opacity`), `text.primary` for text, `accent` for links, `text.secondary` for block
 quotes and image placeholders, `surface.card` behind code blocks, `border.window` and `surface.panel.raised` for table
 borders and header cells, and `selection.bg` and `text.onSelection` for selected text; Find's matches in it are
-highlighted in `selection.bg`. Its code blocks take the editor scheme's syntax colours. Writing an editor scheme:
+highlighted in `selection.bg`. Its code blocks take the workspace's editor scheme's syntax colours, whatever **Color scheme** chooses. Writing an editor scheme:
 [Creating themes](creating-themes.md); the SDK's view of it:
 [`Appearance.editorPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.editorPalette()) and
-[`Appearance.syntaxPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.syntaxPalette()).
+[`Appearance.syntaxPalette()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.syntaxPalette()), and every installed
+scheme: [`Appearance.editorSchemes()`](sdk-reference.html#dev.jasper.sdk.ui.Appearance.editorSchemes()).
 
 ## Vim mode
 

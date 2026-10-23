@@ -204,7 +204,8 @@ component paints the rest from {@link Appearance}.</p>
 <p>Views take their colours from the theme without help. Custom content reads them from {@link PluginContext#appearance()}:
 {@link Appearance#color(SemanticColor)} for one of the theme's semantic colours, {@link Appearance#workspacePalette()},
 {@link Appearance#editorPalette()} and {@link Appearance#syntaxPalette()} for the workspace, where terminals and content
-tabs live, and {@link Appearance#workspaceOpacity(Component)} for the alpha of a translucent workspace. Read them on the UI
+tabs live, {@link Appearance#editorSchemes()} for every installed theme's editor schemes, and
+{@link Appearance#workspaceOpacity(Component)} for the alpha of a translucent workspace. Read them on the UI
 thread, and again after {@link Appearance#onChanged(Consumer)} or {@link Appearance#onWorkspaceChanged(Consumer)}: the
 user can change the theme, and the chrome and the workspace can follow different themes. On the event bus,
 {@link AppEvents#THEME_CHANGED} announces each change of the chrome's theme or the interface font.</p>

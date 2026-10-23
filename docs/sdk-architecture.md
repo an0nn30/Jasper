@@ -303,7 +303,9 @@ it is registered and whenever the control refreshes, so the content follows the 
 
 `HostedUi.appearance()` reads the presentation's themes: `color` and the variant from the chrome theme, the
 `WorkspacePalette`, `EditorPalette` and `SyntaxPalette` from the workspace theme (`HostedPalettes` maps semantic roles
-and the editor scheme onto SDK values; no SDK value enters `UIManager`). The variant getters are safe from any thread;
+and the editor scheme onto SDK values; no SDK value enters `UIManager`). `editorSchemes()` converts the
+`ThemeLibrary` the `ThemeController` shows (given through `PluginRuntime.themes`) once per library, and a changed
+library is announced as a workspace change. The variant getters are safe from any thread;
 colour and palette getters and listener registration need the UI thread. `onWorkspaceChanged` also fires when the
 workspace opacity behind a component changes: `GlassSource`, built by `JasperApplication` from its windows, answers
 `workspaceOpacity(component)` (the window's opacity inside the centre deck that holds terminal and content tabs, 1.0
