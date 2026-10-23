@@ -57,6 +57,7 @@ public final class EditorTab {
 
     private Runnable focusArea = () -> area().requestFocusInWindow();
     private VimEditor vim;
+    private Runnable vimChanged = () -> { };
     /** The editor of the file's other view that this view's uppercase Vim marks go to when it closes, if any. */
     private java.util.function.Supplier<Optional<VimEditor>> marksHeir = Optional::empty;
     private final VimBar vimBar = new VimBar(this::render, this::reveal);
@@ -245,11 +246,14 @@ public final class EditorTab {
         if (global.isPresent()) {
             vim = new VimEditor(global.get(), area(), defaults());
             vim.documentInfo(session::location, session::dirty);
+            vim.addListener(() -> vimChanged.run());
             vimBar.attach(vim);
         } else { vimBar.detach(); vim.close(); vim = null; }
         render();
     }
     public Optional<VimEditor> vimEditor() { return Optional.ofNullable(vim); }
+    /** @param listener runs whenever this tab's Vim state changes, its mode among it */
+    void vimChanged(Runnable listener) { vimChanged = listener; }
 
     /**
      * The view starts where {@code source}, another view of its file, is (Rulings 19): at its caret, selection and scroll

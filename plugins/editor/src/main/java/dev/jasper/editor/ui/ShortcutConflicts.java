@@ -106,14 +106,18 @@ public final class ShortcutConflicts {
     /** Configure…: the vimrc, created empty if missing, in an Editor tab. */
     private void configure() {
         Path path = vimrc.get();
-        try {
-            createParent(path);
-            if (!Files.exists(path)) Files.createFile(path);
-        } catch (IOException | RuntimeException failed) {
+        try { create(path); }
+        catch (IOException | RuntimeException failed) {
             group.error("Could not open the vimrc", path + ": " + reason(failed));
             return;
         }
         openVimrc.accept(path);
+    }
+
+    /** Creates the vimrc empty, with its folders, if it is missing. */
+    static void create(Path vimrc) throws IOException {
+        createParent(vimrc);
+        if (!Files.exists(vimrc)) Files.createFile(vimrc);
     }
 
     private static void createParent(Path path) throws IOException {
@@ -121,7 +125,7 @@ public final class ShortcutConflicts {
         if (parent != null) Files.createDirectories(parent);
     }
 
-    private static String reason(Exception failed) {
+    static String reason(Exception failed) {
         String message = failed.getMessage();
         return message == null || message.isBlank() ? failed.getClass().getSimpleName() : failed.getClass().getSimpleName() + ": " + message;
     }

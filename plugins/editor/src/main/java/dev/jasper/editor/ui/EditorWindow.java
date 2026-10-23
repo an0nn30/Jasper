@@ -86,6 +86,7 @@ public final class EditorWindow {
     private final FindBar findBar;
     private final MarkdownNavigation navigation;
     private final StatusLine status;
+    private dev.jasper.editor.vim.Mode shownMode = dev.jasper.editor.vim.Mode.NORMAL;
     private final List<Command> commands;
     private final LocalWatcher watcher;
     private final Timer ticker;
@@ -192,7 +193,8 @@ public final class EditorWindow {
         await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
         navigation = new MarkdownNavigation(this, context.platform()::browse);
         findBar = new FindBar(() -> selected().flatMap(EditorTab::findTarget), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }), () -> selected().ifPresent(EditorTab::revealSource));
-        status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim);
+        status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim, this::openVimrc, this::reloadVimrc,
+            () -> context.settings().show());
         commands = List.of(
             command("save", "Save", KeyEvent.VK_S, 0, this::save),
             command("save-as", "Save As…", KeyEvent.VK_S, InputEvent.SHIFT_DOWN_MASK, this::saveAs),
@@ -578,6 +580,27 @@ public final class EditorWindow {
                 this::vimrcFile, context.log());
         }
         conflicts.taken(key, editorBinds);
+    }
+
+    /**
+     * Open vimrc, from the Vim widget's menu: the vimrc, created empty with its folders on a worker if it is missing, in
+     * the user's editor. A vimrc that cannot be created is reported.
+     */
+    public void openVimrc() {
+        Path file;
+        try { file = vimrcFile(); }
+        catch (RuntimeException unavailable) {
+            context.notifications().group().error("Could not open the vimrc", "The Editor's data folder is not available.", unavailable);
+            return;
+        }
+        context.background().execute(() -> {
+            try { ShortcutConflicts.create(file); }
+            catch (java.io.IOException | RuntimeException failed) {
+                environment.ui().execute(() -> context.notifications().group().error("Could not open the vimrc", file + ": " + ShortcutConflicts.reason(failed)));
+                return;
+            }
+            environment.ui().execute(() -> context.platform().openInEditor(file));
+        });
     }
 
     /** @return the vimrc: {@code vimrc} in the Editor's data folder, {@code <home>/plugins/dev.jasper.editor/data} */
@@ -1057,6 +1080,7 @@ public final class EditorWindow {
         tab.area().setTransferHandler(new FileDrop(tab.area().getTransferHandler(), this::openLocalFiles));
         tab.area().addCaretListener(event -> { if (selected().orElse(null) == tab) refreshStatus(); });
         tab.area().onConflict(this::shortcutConflict);
+        tab.vimChanged(() -> { if (selected().orElse(null) == tab && shownMode != vimMode(tab)) refreshStatus(); });
         Runnable refreshing = () -> {
             if (!hosted.containsKey(tab)) return;
             refreshCommands(tab);
@@ -1247,18 +1271,30 @@ public final class EditorWindow {
         }
     }
 
+    private static dev.jasper.editor.vim.Mode vimMode(EditorTab tab) {
+        return tab.vimEditor().map(dev.jasper.editor.vim.VimEditor::mode).orElse(dev.jasper.editor.vim.Mode.NORMAL);
+    }
+
     private void refreshStatus() {
-        status.display(selected(), environment.settings().get().tabSize(), vimOn());
+        shownMode = selected().map(EditorWindow::vimMode).orElse(dev.jasper.editor.vim.Mode.NORMAL);
+        status.display(selected(), environment.settings().get().tabSize(), vimOn(), shownMode);
         if (selectedTab != null && hosted.containsKey(selectedTab)) {
             var tab = selectedTab;
             refreshCommands(tab);
             hosted.get(tab).setStatus(status.items().stream().map(item -> new dev.jasper.sdk.ui.ContentStatus(
-                item.text(), item.tooltip(), item.run() == null ? null : () -> {
-                    if (!hosted.containsKey(tab)) return;
-                    activate(tab); item.run().run();
-                })).toList());
+                item.text(), item.tooltip(), forTab(tab, item.run()), item.icon(), item.dimmed(), item.menu().stream()
+                    .map(entry -> entry.separator() ? entry : new dev.jasper.sdk.ui.ContentStatus.MenuEntry(entry.label(),
+                        forTab(tab, entry.run()), entry.checkable(), entry.checked(), false)).toList())).toList());
         }
         if (environment.timers() && selected().flatMap(tab -> tab.navigationNotice().or(() -> tab.session().notice())).isPresent()) noticeTimer.restart();
+    }
+
+    /** A status action that acts on {@code tab}: it activates the tab first, and does nothing once the tab has closed. */
+    private Runnable forTab(EditorTab tab, Runnable run) {
+        return run == null ? null : () -> {
+            if (!hosted.containsKey(tab)) return;
+            activate(tab); run.run();
+        };
     }
 
     private static Command command(String id, String title, int keyCode, int extraModifiers, Runnable run) {

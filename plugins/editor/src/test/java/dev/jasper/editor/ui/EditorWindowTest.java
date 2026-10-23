@@ -64,6 +64,7 @@ class EditorWindowTest {
         // terminal.observe for the other tabs' names in its Move Pane to Tab menu.
         context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of("terminal.open", "terminal.observe")),
             Set.of(), Set.of(), c -> { });
+        context.kit().registerIcon(StatusLine.VIM_ICON); // as EditorPlugin.start does
         var environment = new EditorEnvironment(context, Runnable::run,
             owner -> question -> {
                 asked.add(question);
@@ -83,7 +84,8 @@ class EditorWindowTest {
         window = new EditorWindow(environment, () -> windowClosed = true, document -> recorded.add(document.key()), request -> false, locations);
     }
 
-    @AfterEach void close() { host.close(); }
+    /** As {@code EditorPlugin.stop}: the window closes its tabs before the host takes the Vim widget's icon away. */
+    @AfterEach void close() { window.dispose(); host.close(); }
 
     private void drain() { while (host.runBackground() > 0) { } }
 
@@ -913,15 +915,61 @@ class EditorWindowTest {
         assertThat(first.vimEditor()).isPresent();
         assertThat(second.vimEditor()).isPresent();
         assertThat(savedVim).containsExactly(true);
-        var item = host.contentStatus(host.contentTabs().getLast()).stream().filter(status -> status.text().startsWith("Vim:")).findFirst().orElseThrow();
-        assertThat(item.text()).isEqualTo("Vim: On");
+        var item = vimWidget(host.contentTabs().getLast());
+        assertThat(item.text()).isEqualTo("NORMAL");
+        assertThat(item.dimmed()).isFalse();
         assertThat(opened(file("three.txt", "three\n")).vimEditor()).as("a new tab follows").isPresent();
         settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
         window.apply();
         assertThat(window.vimOn()).isTrue();
-        item.run().run();
+        item.menu().getFirst().run().run();
         assertThat(first.vimEditor()).isEmpty();
         assertThat(savedVim).containsExactly(true, false);
+    }
+
+    private dev.jasper.sdk.ui.ContentStatus vimWidget(dev.jasper.sdk.ui.ContentTab handle) {
+        return host.contentStatus(handle).stream().filter(status -> status.tooltip().equals("Vim mode")).findFirst().orElseThrow();
+    }
+
+    @Test void widgetFollowsTheMode() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 13, java.util.List.of(), false, 1.0, false, 4, false, 1, true));
+        EditorTab tab = opened(file("mode.txt", "one\n"));
+        var handle = host.contentTabs().getLast();
+        assertThat(host.contentStatus(handle).getLast().text()).isEqualTo("NORMAL");
+        vimKeys(tab, "v");
+        assertThat(host.contentStatus(handle).getLast().text()).isEqualTo("VISUAL");
+        vimKeys(tab, "<Esc>");
+        assertThat(host.contentStatus(handle).getLast().text()).isEqualTo("NORMAL");
+        vimKeys(tab, ":");
+        assertThat(host.contentStatus(handle).getLast().text()).isEqualTo("COMMAND");
+    }
+
+    @Test void openVimrcCreatesTheFile() throws Exception {
+        opened(file("rc.txt", "one\n"));
+        Path vimrc = window.vimrcFile();
+        assertThat(vimrc).doesNotExist();
+        vimWidget(host.contentTabs().getLast()).menu().stream().filter(entry -> entry.label().equals("Open vimrc")).findFirst().orElseThrow().run().run();
+        drain();
+        assertThat(vimrc).exists().isEmptyFile();
+        assertThat(host.openedInEditor()).containsExactly(vimrc);
+    }
+
+    @Test void openVimrcWithoutTheDataFolderIsReported() throws Exception {
+        opened(file("rc.txt", "one\n"));
+        Path vimrc = window.vimrcFile();
+        Files.delete(vimrc.getParent());
+        Files.writeString(vimrc.getParent(), "not a folder");
+        window.openVimrc();
+        drain();
+        assertThat(host.notifications().lines()).singleElement().asString()
+            .isEqualTo("dev.jasper.editor|ERROR|Could not open the vimrc|The Editor's data folder is not available.|UncheckedIOException");
+        assertThat(host.openedInEditor()).isEmpty();
+    }
+
+    @Test void settingsOpensTheEditorPage() throws Exception {
+        opened(file("rc.txt", "one\n"));
+        vimWidget(host.contentTabs().getLast()).menu().getLast().run().run();
+        assertThat(host.settingsShown("dev.jasper.editor")).isEqualTo(1);
     }
 
     @Test void aVimModeThatCannotBeSavedLastsForTheSessionAndSaysSo() throws Exception {

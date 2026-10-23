@@ -51,6 +51,7 @@ class EditorViewsTest {
         Languages.register();
         host = new FakePluginHost(home.resolve("plugins"));
         context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of("terminal.open")), Set.of(), Set.of(), c -> { });
+        context.kit().registerIcon(StatusLine.VIM_ICON); // as EditorPlugin.start does
         var environment = new EditorEnvironment(context, Runnable::run,
             owner -> question -> {
                 asked.add(question);
@@ -65,7 +66,8 @@ class EditorViewsTest {
         main = host.addTerminalWindow();
     }
 
-    @AfterEach void close() { host.close(); }
+    /** As {@code EditorPlugin.stop}: the window closes its tabs before the host takes the Vim widget's icon away. */
+    @AfterEach void close() { window.dispose(); host.close(); }
 
     private void drain() { while (host.runBackground() > 0) { } }
 

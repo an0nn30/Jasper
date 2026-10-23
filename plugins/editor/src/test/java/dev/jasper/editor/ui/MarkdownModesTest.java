@@ -70,7 +70,7 @@ class MarkdownModesTest {
         tab.area().undoLastAction(); assertThat(tab.area().getText()).isEqualTo("# heading\nbody");
         assertThat(writes).containsExactly(PREVIEW);
         tab.markdownMode(PREVIEW, false);
-        var status = new StatusLine(() -> {}, () -> {}, () -> {}); status.display(Optional.of(tab), 4, false);
+        var status = new StatusLine(() -> {}, () -> {}, () -> {}, () -> {}, () -> {}, () -> {}); status.display(Optional.of(tab), 4, false, dev.jasper.editor.vim.Mode.NORMAL);
         assertThat(status.positionText()).startsWith("Source Ln ");
     }
     @Test void focusTargetsSurviveModeSwitchesAndRememberTheLastSplitPane() {
