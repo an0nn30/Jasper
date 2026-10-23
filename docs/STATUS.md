@@ -146,7 +146,7 @@ each below costs what its last words say if wrong):
 - Stripe click: a click toggles (shown hides, hidden shows, raises and focuses), as for a docked one. The spec's "hide
   only when its window is active" could never hide from the stripe, because a click makes the main window the active
   one; the cost is a second click to raise a buried window from the stripe (View › Tool Windows and `<id>.toggle`
-  still raise a shown window that is not in front, and hide the one that is). Spec amended (`df1625825`).
+  still raise a shown window that is not the active one, and hide the one that is). Spec amended (`df1625825`).
 - Focus: a show never takes the focus (`setAutoRequestFocus(false)` around `setVisible`), so a restore, Zen's return or a
   plugin's plain `show` leaves the terminal focused, as IntelliJ activates a tool window only when it is activated; only
   an activating request focuses (one more click for a window opened by a non-activating path). View Mode › Float or

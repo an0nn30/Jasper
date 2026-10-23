@@ -323,8 +323,8 @@ fitted to the displays that are connected.
 The tool window keeps its rail button or stripe button, in its slot, highlighted while its window shows.
 
 - Click the button to show the window, in front and focused; click it again to hide it. View › Tool Windows and the tool
-  window's toggle shortcut show it the same way, bring a window that shows but is not in front to the front with the
-  focus, and hide one that is in front, as the shortcut does when pressed in the window itself.
+  window's toggle shortcut show it the same way, bring a window that shows but is not the active one to the front with
+  the focus, and hide the one that is, as the shortcut does when pressed in the window itself.
 - Closing the window hides the tool window: the system's close button, **Hide**, or the keys of Close Pane, Close Tab or
   Close Window pressed in it (they close no pane, tab or window of the main window from there). It stays in the mode it
   has, its button stays on the stripe, and showing it again opens its window where it was. A window shown without being
@@ -333,8 +333,7 @@ The tool window keeps its rail button or stripe button, in its slot, highlighted
   and shows it there.
 - Jasper's shortcuts work while the window has the focus, the tool window's own among them. Commands for the window as a
   whole, such as New Tab or the command palette, run in the main window and bring it to the front.
-- Zen hides these windows with the docked tool windows and shows them again when it ends. Hiding the rail hides the
-  buttons only.
+- Zen hides these windows with the docked tool windows and shows them again when it ends.
 
 Jasper saves each tool window's mode, whether it shows and its window's position and size in `ui-state.toml`, for the
 look in use ([the keys](configuration.md#ui-statetoml)); a window that showed opens again with the main window at the next

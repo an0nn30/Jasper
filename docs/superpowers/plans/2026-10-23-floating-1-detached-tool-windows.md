@@ -3,7 +3,7 @@
 **Status: executed on 2026-10-23** (`6cef314c3..2a5f0d62e`, the spec's amendments `df1625825` and `acaac9e7c`, then the
 documentation commit); see `docs/STATUS.md`. Deviations from the plan's text: (1) a stripe click toggles a detached tool
 window as it does a docked one (shown hides, hidden shows and raises), where Task 6 had a click raise a shown window that
-is not in front (`af1b90e6e`, the spec amended); only the View menu and `<id>.toggle` raise it; (2) Move to on a detached
+is not the active one (`af1b90e6e`, the spec amended); only the View menu and `<id>.toggle` raise it; (2) Move to on a detached
 tool window's own slot docks it there too (Task 6); (3) Task 8's `DetachedFrame` has a public static factory, `shells`,
 and `Shell` a sixth component, `content`, with `ToolWindowArea.onRemounted`, so that a kit view's remounted frame reaches
 an open window; (4) a detached window's `show` never takes the focus, and View Mode > Float or Window from a menu
