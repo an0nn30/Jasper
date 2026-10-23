@@ -230,19 +230,12 @@ final class WindowContributions implements AutoCloseable {
     private void togglePanel(String id) { if (panels.containsKey(id)) dock.toggle(id); }
 
     /**
-     * A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). A
-     * detached tool window's button raises its own window when that is open and not the active window, and hides it when it
-     * is the active one (floating tool windows spec, Stripe buttons and requests).
+     * A toggle by a user gesture, a stripe click: a panel it shows becomes the active tool window under flush frames (plan 12
+     * Rulings 18). A detached tool window toggles as a docked one does: shown, it hides; hidden, it shows and its own window
+     * comes forward. The click made the main window the active one, so no detached window's being the active one is asked
+     * (floating tool windows spec, Stripe buttons and requests).
      */
-    private void toggleAndActivate(String id) {
-        if (raising(id)) {
-            detached.activate(id);
-            // The click flipped the stripe button and a raise changes no state, so the stripes render again to show it pressed.
-            renderStripes();
-            return;
-        }
-        changeAndActivate(id, () -> dock.toggle(id));
-    }
+    private void toggleAndActivate(String id) { changeAndActivate(id, () -> dock.toggle(id)); }
 
     /**
      * A show by the panel's own toggle action (plan 15b Rulings 1), or for a user gesture in another window, a child
@@ -261,22 +254,25 @@ final class WindowContributions implements AutoCloseable {
     }
 
     /**
-     * Whether a toggle of the panel raises its own window instead of hiding it: it is detached and its window is open but is
-     * not the active window. In every frame style, whatever the docked frames do: a detached tool window is its own window.
+     * Whether an activating toggle of the panel raises its own window instead of hiding it: it is detached and its window is
+     * open but is not the active window. In every frame style, whatever the docked frames do: a detached tool window is its
+     * own window.
      */
     private boolean raising(String id) {
-        return panels.containsKey(id) && dock.mode(id).detached() && detached.showing(id) && !detached.active(id);
+        return dock.mode(id).detached() && detached.showing(id) && !detached.active(id);
     }
 
     /**
      * A toggle by the user's View action or the panel's own toggle action, as IntelliJ's ActivateToolWindowAction: under
      * flush frames a visible tool window that is not the active one is activated, and only the active one hides; else a
-     * toggle that activates what it shows. A stripe click stays {@link #toggleAndActivate}, which a detached tool window's
-     * toggle is in every frame style.
+     * toggle that activates what it shows. A detached tool window follows that rule in every frame style, its own window
+     * being the one that is active or not: shown but not the active window, it is raised; shown and active, it hides; hidden,
+     * it shows and is raised. A stripe click stays {@link #toggleAndActivate}.
      */
     private void activatingToggle(String id) {
         if (!panels.containsKey(id)) return;
         var area = owner.area();
+        if (raising(id)) { detached.activate(id); return; }
         if (!dock.mode(id).detached() && area.flush() && dock.visible(id) && !area.focusedSlot().equals(dock.slot(id))) { area.activate(id); return; }
         toggleAndActivate(id);
     }

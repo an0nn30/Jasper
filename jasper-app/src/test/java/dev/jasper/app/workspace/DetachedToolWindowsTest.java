@@ -461,10 +461,11 @@ class DetachedToolWindowsTest {
     }
 
     /**
-     * A stripe click on a detached tool window: hidden, it shows and raises its window; shown while another window is the
-     * active one, it only raises it; shown and active, it hides. Its button stays pressed while it shows.
+     * A stripe click on a detached tool window toggles it as it does a docked one: hidden, it shows and raises its window;
+     * shown, it hides, whichever window is the active one (the click made the main window the active one, so the window never
+     * is at that moment). Its button follows.
      */
-    @Test void aStripeClickShowsRaisesThenHides() throws Exception {
+    @Test void aStripeClickTogglesADetachedWindowAsItDoesADockedOne() throws Exception {
         edt(() -> {
             var list = new JList<>(new String[] {"Mac"});
             var fixture = new Fixture(UiState.inMemory(), list, true);
@@ -483,23 +484,25 @@ class DetachedToolWindowsTest {
             assertThat(fixture.owner.dock().visible(A)).isTrue();
             assertThat(fixture.button().isSelected()).isTrue();
 
-            focused.clear();
+            assertThat(fixture.windows().active(A)).as("the click made the main window the active one").isFalse();
             fixture.button().doClick();
-            assertThat(fixture.shells.take()).as("shown behind another window: raised, not hidden").containsExactly("toFront " + A);
-            assertThat(fixture.owner.dock().visible(A)).isTrue();
-            assertThat(fixture.button().isSelected()).as("its button still shows it showing").isTrue();
-            PressedFrameTest.flushEdt();
-            assertThat(focused).containsExactly(list);
+            assertThat(fixture.shells.take()).as("shown: hidden, not raised").containsExactly("dispose " + A);
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+            assertThat(fixture.button().isSelected()).isFalse();
 
             fixture.shells.active = true;
             fixture.button().doClick();
-            assertThat(fixture.shells.take()).as("the active window: hidden").containsExactly("dispose " + A);
+            assertThat(fixture.shells.take().getLast()).as("hidden again: shown and raised").isEqualTo("toFront " + A);
+            fixture.button().doClick();
+            assertThat(fixture.shells.take()).as("whichever window is the active one: hidden").containsExactly("dispose " + A);
             assertThat(fixture.owner.dock().visible(A)).isFalse();
-            assertThat(fixture.button().isSelected()).isFalse();
         });
     }
 
-    /** The View menu's toggle, a shortcut or a plugin's own toggle action (an activating toggle) follows the stripe click's rule. */
+    /**
+     * The View menu's toggle, a shortcut or a plugin's own toggle action (an activating toggle) raises a shown window that is not
+     * the active one, and hides the active one.
+     */
     @Test void theViewMenusToggleFollowsTheSameRule() throws Exception {
         edt(() -> {
             var fixture = new Fixture();
