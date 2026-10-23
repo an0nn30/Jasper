@@ -133,7 +133,10 @@ final class DetachedToolWindows implements AutoCloseable {
      * Brings the windows in line with the area: a window whose tool window no longer shows detached with a frame is
      * disposed; one whose mode changed is disposed and opens again in the new mode at the same bounds; one whose frame
      * the area remounted takes the new frame; one whose dock bounds changed (a drop outside the main window) moves there;
-     * a shown detached tool window without a window opens, when there are shells and the main window is ready.
+     * a shown detached tool window without a window opens, when there are shells and the main window is ready. A shell's
+     * function may change the dock at once (a window event, a listener), which runs another sync inside this one: each
+     * step reads again what the nested sync may have changed, and a tool window it took the frame or the window of is
+     * left alone.
      */
     void sync() {
         if (closed) return;
@@ -141,13 +144,15 @@ final class DetachedToolWindows implements AutoCloseable {
         for (String id : List.copyOf(open.keySet())) if (!framed.contains(id)) dispose(id);
         for (String id : framed) {
             Open window = open.get(id);
-            if (window != null && window.mode != dock.mode(id)) { dispose(id); window = null; }
+            if (window != null && window.mode != dock.mode(id)) { dispose(id); window = open.get(id); }
             JComponent frame = area.detachedFrame(id);
+            if (frame == null) continue;
             if (window == null) {
                 if (shells != null && ready.getAsBoolean()) open(id, frame);
                 continue;
             }
             if (window.frame != frame) { window.frame = frame; window.shell.content().accept(frame); }
+            if (open.get(id) != window) continue;
             Optional<Rectangle> bounds = dock.bounds(id);
             if (bounds.isPresent() && !bounds.get().equals(window.bounds)) {
                 window.bounds = bounds.get();
@@ -213,10 +218,14 @@ final class DetachedToolWindows implements AutoCloseable {
             dock.setBounds(id, moved);
         });
         // The binding is made with the window's root pane; its Close keys hide this tool window, as its close button does.
-        window.shell = shells.apply(new Opening(id, titles.apply(id), window.mode, new Rectangle(bounds), frame, ownerWindow(),
+        Shell shell = shells.apply(new Opening(id, titles.apply(id), window.mode, new Rectangle(bounds), frame, ownerWindow(),
             root -> keys.apply(root, () -> hide.accept(id))), events);
+        // A dock change made while the shell was made ran a sync that opened this tool window's window itself or took its
+        // frame (it hid, or docked): no window is left for this shell, which never showed.
+        if (open.containsKey(id) || area.detachedFrame(id) != frame) { shell.dispose().run(); return; }
+        window.shell = shell;
         open.put(id, window);
-        window.shell.show().run();
+        shell.show().run();
     }
 
     private void dispose(String id) {

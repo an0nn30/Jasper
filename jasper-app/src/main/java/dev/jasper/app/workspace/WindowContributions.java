@@ -229,12 +229,25 @@ final class WindowContributions implements AutoCloseable {
 
     private void togglePanel(String id) { if (panels.containsKey(id)) dock.toggle(id); }
 
-    /** A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). */
-    private void toggleAndActivate(String id) { changeAndActivate(id, () -> dock.toggle(id)); }
+    /**
+     * A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). A
+     * detached tool window's button raises its own window when that is open and not the active window, and hides it when it
+     * is the active one (floating tool windows spec, Stripe buttons and requests).
+     */
+    private void toggleAndActivate(String id) {
+        if (raising(id)) {
+            detached.activate(id);
+            // The click flipped the stripe button and a raise changes no state, so the stripes render again to show it pressed.
+            renderStripes();
+            return;
+        }
+        changeAndActivate(id, () -> dock.toggle(id));
+    }
 
     /**
      * A show by the panel's own toggle action (plan 15b Rulings 1), or for a user gesture in another window, a child
-     * window's View toggle: the panel becomes the active tool window under flush frames.
+     * window's View toggle: the panel becomes the active tool window under flush frames, and a detached one's own window
+     * comes forward.
      */
     private void showAndActivate(String id) { changeAndActivate(id, () -> dock.show(id)); }
 
@@ -243,18 +256,28 @@ final class WindowContributions implements AutoCloseable {
         // Standard frames activate nothing, so a window replaced there still hands focus back to the terminal.
         activating = owner.area().flush() ? id : null;
         try { change.run(); } finally { activating = null; }
-        if (dock.visible(id)) owner.area().activate(id);
+        if (!dock.visible(id)) return;
+        if (dock.mode(id).detached()) detached.activate(id); else owner.area().activate(id);
+    }
+
+    /**
+     * Whether a toggle of the panel raises its own window instead of hiding it: it is detached and its window is open but is
+     * not the active window. In every frame style, whatever the docked frames do: a detached tool window is its own window.
+     */
+    private boolean raising(String id) {
+        return panels.containsKey(id) && dock.mode(id).detached() && detached.showing(id) && !detached.active(id);
     }
 
     /**
      * A toggle by the user's View action or the panel's own toggle action, as IntelliJ's ActivateToolWindowAction: under
      * flush frames a visible tool window that is not the active one is activated, and only the active one hides; else a
-     * toggle that activates what it shows. A stripe click stays {@link #toggleAndActivate}.
+     * toggle that activates what it shows. A stripe click stays {@link #toggleAndActivate}, which a detached tool window's
+     * toggle is in every frame style.
      */
     private void activatingToggle(String id) {
         if (!panels.containsKey(id)) return;
         var area = owner.area();
-        if (area.flush() && dock.visible(id) && !area.focusedSlot().equals(dock.slot(id))) { area.activate(id); return; }
+        if (!dock.mode(id).detached() && area.flush() && dock.visible(id) && !area.focusedSlot().equals(dock.slot(id))) { area.activate(id); return; }
         toggleAndActivate(id);
     }
 
@@ -296,11 +319,11 @@ final class WindowContributions implements AutoCloseable {
 
     /**
      * From a Move to menu: the end of the target slot's group, keeping visibility. A detached window docks there and
-     * shows (floating tool windows spec, The Options menu).
+     * shows (floating tool windows spec, The Options menu), in its own place when the slot is its own.
      */
     private void movePanel(String id, Slot slot) {
         if (!panels.containsKey(id)) return;
-        if (dock.mode(id).detached()) { dock.moveAndShow(id, slot, dock.ids(slot).size()); return; }
+        if (dock.mode(id).detached()) { dock.moveAndShow(id, slot, dock.dropIndex(id, slot)); return; }
         if (dock.slot(id).filter(slot::equals).isEmpty()) dock.move(id, slot, dock.ids(slot).size());
     }
 
@@ -383,20 +406,23 @@ final class WindowContributions implements AutoCloseable {
     }
 
     /**
-     * Entering Zen hides the panels that show and remembers them; any panel opened in Zen then shows in its slot as
-     * usual, without the rail. Leaving Zen hides those and shows the remembered panels again.
+     * Entering Zen hides the panels that show, docked or detached, and remembers them; any panel opened in Zen then shows
+     * in its slot, or in its own window, as usual, without the rail. Leaving Zen hides those and shows the remembered
+     * panels again.
      */
     void zenChanged() {
         if (owner.zenMode() == (beforeZen != null)) return;
         if (owner.zenMode()) {
             beforeZen = new LinkedHashSet<>();
             for (Slot slot : Slot.values()) dock.active(slot).ifPresent(beforeZen::add);
+            beforeZen.addAll(dock.detachedVisible());
             for (String id : List.copyOf(beforeZen)) dock.hide(id);
             return;
         }
         Set<String> restore = beforeZen;
         beforeZen = null;
         for (Slot slot : Slot.values()) dock.active(slot).filter(id -> !restore.contains(id)).ifPresent(dock::hide);
+        for (String id : dock.detachedVisible()) if (!restore.contains(id)) dock.hide(id);
         for (String id : restore) showPanel(id);
     }
 

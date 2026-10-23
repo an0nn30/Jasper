@@ -12,13 +12,13 @@ import javax.swing.JPopupMenu;
 /**
  * A tool window's menu, the same from its stripe button (right-click) and its header's options button: View Mode ›
  * Docked, Float and Window with the current one checked, Move to › the six slots by name with the current one checked,
- * then Hide. EDT only.
+ * then Hide. A detached window's slot is only where its stripe button sits, so its checked item docks it there. EDT only.
  */
 final class ToolWindowMenu {
     private ToolWindowMenu() { }
 
     /**
-     * @param current the window's slot; choosing it again does nothing
+     * @param current the window's slot; choosing it again does nothing for a docked window, and docks a detached one there
      * @param mode how the window is placed now; choosing it again does nothing
      * @param visible whether the window shows, which enables Hide
      * @param move moves the window to another slot
@@ -41,7 +41,7 @@ final class ToolWindowMenu {
         var group = new ButtonGroup();
         for (Slot slot : Slot.values()) {
             var item = new JCheckBoxMenuItem(slot.displayName(), slot == current);
-            if (slot != current) item.addActionListener(event -> move.accept(slot));
+            if (slot != current || mode.detached()) item.addActionListener(event -> move.accept(slot));
             group.add(item);
             moveTo.add(item);
         }

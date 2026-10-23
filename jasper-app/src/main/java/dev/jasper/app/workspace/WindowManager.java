@@ -1005,7 +1005,8 @@ public final class WindowManager {
     /**
      * A child window's panel request goes to the main window, which has the dock, and brings it forward to show it. A
      * toggle there shows the panel and never hides it, and a user's activating toggle shows it activating, as a tool
-     * window's shortcut in IntelliJ's detached editor activates the tool window.
+     * window's shortcut in IntelliJ's detached editor activates the tool window. A tool window detached into a window of
+     * its own is not in the main window: the main window stays where it is and the tool window's own window comes forward.
      */
     private Contributions.PanelRequest routePanel(Contributions.PanelRequest request) {
         if (main == null || children.stream().noneMatch(child -> child.id().equals(request.windowId()))) return request;
@@ -1014,7 +1015,7 @@ public final class WindowManager {
             case ACTIVATING_TOGGLE -> Contributions.PanelRequest.Op.ACTIVATING_SHOW;
             case SHOW, HIDE, ACTIVATING_SHOW -> request.op();
         };
-        if (op != Contributions.PanelRequest.Op.HIDE) main.toFront();
+        if (op != Contributions.PanelRequest.Op.HIDE && !main.content().panelDetached(request.panelId())) main.toFront();
         return new Contributions.PanelRequest(main.id(), request.panelId(), op);
     }
 

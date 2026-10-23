@@ -28,10 +28,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import javax.swing.AbstractButton;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
@@ -42,9 +44,10 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Floating tool windows plan 1 Task 5: a detached tool window's own window opens, moves, reopens and closes as the main
- * window's dock says, and its mode, bounds and visibility are saved and restored. The main window stands in a stand-in
- * frame on a pretend screen with one 1920 by 1080 display; the native windows are recording shells.
+ * Floating tool windows plan 1 Tasks 5 and 6: a detached tool window's own window opens, moves, reopens and closes as the
+ * main window's dock says, its mode, bounds and visibility are saved and restored, and its toggles, Zen and a dock change
+ * made in the middle of a sync treat it as a window of its own. The main window stands in a stand-in frame on a pretend
+ * screen with one 1920 by 1080 display; the native windows are recording shells.
  */
 class DetachedToolWindowsTest {
     private static final String A = "dev.x.alpha";
@@ -63,15 +66,18 @@ class DetachedToolWindowsTest {
         final Map<String, DetachedToolWindows.Events> events = new HashMap<>();
         final Map<String, JComponent> contents = new HashMap<>();
         boolean active;
+        /** Run, with the tool window's id, inside the shell's making and its show and content functions: a dock change in the middle of a sync. */
+        Consumer<String> duringApply = id -> { }, duringShow = id -> { }, duringContent = id -> { };
 
         @Override public DetachedToolWindows.Shell apply(DetachedToolWindows.Opening opening, DetachedToolWindows.Events heard) {
             String id = opening.id();
             log.add("open " + id + " " + opening.mode() + " " + text(opening.bounds()));
             openings.put(id, opening);
             events.put(id, heard);
-            return new DetachedToolWindows.Shell(() -> log.add("show " + id), () -> log.add("toFront " + id),
+            duringApply.accept(id);
+            return new DetachedToolWindows.Shell(() -> { log.add("show " + id); duringShow.accept(id); }, () -> log.add("toFront " + id),
                 () -> log.add("dispose " + id), () -> active, bounds -> log.add("place " + id + " " + text(bounds)),
-                frame -> { contents.put(id, frame); log.add("content " + id); });
+                frame -> { contents.put(id, frame); log.add("content " + id); duringContent.accept(id); });
         }
 
         /** What was recorded since the last call. */
@@ -90,8 +96,13 @@ class DetachedToolWindowsTest {
      * A main window connected to {@code model} and {@code state} in a stand-in frame at {@link #MAIN} on the pretend
      * screen, ready to open windows on {@link #SCREEN}; no shells yet.
      */
-    private static WindowContent window(Contributions model, UiState state) {
-        WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+    private static WindowContent window(Contributions model, UiState state) { return window(model, state, false); }
+
+    /** As above, under flush frames (Enterprise's classic dock) when {@code flush}, else the default look's standard ones. */
+    private static WindowContent window(Contributions model, UiState state, boolean flush) {
+        WindowContent owner = flush
+            ? DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true), DockChromeTest.classicDock())
+            : DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
         owner.connectContributions(model, state);
         TabDragTestSupport.frame(owner, MAIN.x, MAIN.y, MAIN.width, MAIN.height);
         DetachedToolWindows windows = owner.detachedWindows();
@@ -121,10 +132,12 @@ class DetachedToolWindowsTest {
 
         Fixture(UiState state) { this(state, new JLabel("alpha"), true); }
 
-        Fixture(UiState state, JComponent view, boolean withShells) {
+        Fixture(UiState state, JComponent view, boolean withShells) { this(state, view, withShells, false); }
+
+        Fixture(UiState state, JComponent view, boolean withShells, boolean flush) {
             this.state = state;
             this.view = view;
-            owner = window(model, state);
+            owner = window(model, state, flush);
             entry = model.addPanel(A, "Alpha", new ImageIcon(), Slot.LEFT_TOP, site -> {
                 site.onClosed(() -> shells.log.add("closed " + A));
                 return view;
@@ -135,8 +148,16 @@ class DetachedToolWindowsTest {
 
         DetachedToolWindows windows() { return owner.detachedWindows(); }
 
-        void toggle() {
-            model.requestPanel(new Contributions.PanelRequest(owner.id(), A, Contributions.PanelRequest.Op.TOGGLE));
+        void toggle() { request(A, Contributions.PanelRequest.Op.TOGGLE); }
+
+        void request(String id, Contributions.PanelRequest.Op op) {
+            model.requestPanel(new Contributions.PanelRequest(owner.id(), id, op));
+            relayout(owner);
+        }
+
+        /** Adds a panel of its own, hidden and docked in {@code slot}. */
+        void addPanel(String id, String title, Slot slot) {
+            model.addPanel(id, title, new ImageIcon(), slot, site -> new JLabel(title));
             relayout(owner);
         }
 
@@ -227,7 +248,8 @@ class DetachedToolWindowsTest {
             fixture.button().doClick();
             int width = Math.max(landing.width, UIScale.scale(240)), height = Math.max(landing.height, UIScale.scale(160));
             var centred = new Rectangle(MAIN.x + (MAIN.width - width) / 2, MAIN.y + (MAIN.height - height) / 2, width, height);
-            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, centred), "show " + A);
+            assertThat(fixture.shells.take()).as("a stripe click shows its window and raises it")
+                .containsExactly(open(ToolWindowMode.FLOAT, centred), "show " + A, "toFront " + A);
             assertThat(fixture.button().isSelected()).as("its stripe button shows it showing").isTrue();
         });
     }
@@ -265,7 +287,7 @@ class DetachedToolWindowsTest {
                 ToolWindowMode.FLOAT, Optional.of(new UiState.Bounds(300, 200, 500, 400))));
 
             fixture.button().doClick();
-            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, moved), "show " + A);
+            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, moved), "show " + A, "toFront " + A);
             events.closing().run();
             events.moved().accept(new Rectangle(0, 0, 640, 480));
             assertThat(fixture.owner.dock().visible(A)).as("the closed window's events are inert").isTrue();
@@ -435,6 +457,313 @@ class DetachedToolWindowsTest {
             child.connectContributions(new Contributions(), UiState.inMemory());
             child.detachedShells(shells);
             assertThat(child.detachedWindows()).isNull();
+        });
+    }
+
+    /**
+     * A stripe click on a detached tool window: hidden, it shows and raises its window; shown while another window is the
+     * active one, it only raises it; shown and active, it hides. Its button stays pressed while it shows.
+     */
+    @Test void aStripeClickShowsRaisesThenHides() throws Exception {
+        edt(() -> {
+            var list = new JList<>(new String[] {"Mac"});
+            var fixture = new Fixture(UiState.inMemory(), list, true);
+            var focused = new ArrayList<Component>();
+            fixture.owner.area().focuser = focused::add;
+            fixture.choose(fixture.stripeMenu(), "Float");
+            assertThat(fixture.shells.take()).as("hidden: no window").isEmpty();
+
+            fixture.button().doClick();
+            List<String> shown = fixture.shells.take();
+            assertThat(shown).hasSize(3);
+            assertThat(shown.getFirst()).startsWith("open " + A + " FLOAT");
+            assertThat(shown.subList(1, 3)).as("shown, then raised").containsExactly("show " + A, "toFront " + A);
+            PressedFrameTest.flushEdt();
+            assertThat(focused).as("the keyboard goes into its frame").containsExactly(list);
+            assertThat(fixture.owner.dock().visible(A)).isTrue();
+            assertThat(fixture.button().isSelected()).isTrue();
+
+            focused.clear();
+            fixture.button().doClick();
+            assertThat(fixture.shells.take()).as("shown behind another window: raised, not hidden").containsExactly("toFront " + A);
+            assertThat(fixture.owner.dock().visible(A)).isTrue();
+            assertThat(fixture.button().isSelected()).as("its button still shows it showing").isTrue();
+            PressedFrameTest.flushEdt();
+            assertThat(focused).containsExactly(list);
+
+            fixture.shells.active = true;
+            fixture.button().doClick();
+            assertThat(fixture.shells.take()).as("the active window: hidden").containsExactly("dispose " + A);
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+            assertThat(fixture.button().isSelected()).isFalse();
+        });
+    }
+
+    /** The View menu's toggle, a shortcut or a plugin's own toggle action (an activating toggle) follows the stripe click's rule. */
+    @Test void theViewMenusToggleFollowsTheSameRule() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            fixture.toggle();
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+            fixture.choose(fixture.detachedMenu(), "Hide");
+            fixture.shells.take();
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+
+            fixture.request(A, Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            List<String> shown = fixture.shells.take();
+            assertThat(shown).hasSize(3);
+            assertThat(shown.subList(1, 3)).containsExactly("show " + A, "toFront " + A);
+            assertThat(fixture.owner.dock().visible(A)).isTrue();
+
+            fixture.request(A, Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(fixture.shells.take()).containsExactly("toFront " + A);
+            assertThat(fixture.owner.dock().visible(A)).isTrue();
+
+            fixture.shells.active = true;
+            fixture.request(A, Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(fixture.shells.take()).containsExactly("dispose " + A);
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+        });
+    }
+
+    /** A detached window's own window is the one to raise whatever the frame style: flush frames do not make the toggle a raise forever. */
+    @Test void underFlushFramesTheActivatingToggleOfADetachedWindowFollowsTheSameRule() throws Exception {
+        try {
+            edt(() -> {
+                var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), true, true);
+                assertThat(fixture.owner.area().flush()).isTrue();
+                fixture.toggle();
+                fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+                fixture.shells.take();
+
+                fixture.request(A, Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+                assertThat(fixture.shells.take()).as("shown, not active: raised").containsExactly("toFront " + A);
+                assertThat(fixture.owner.dock().visible(A)).isTrue();
+                fixture.shells.active = true;
+                fixture.request(A, Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+                assertThat(fixture.shells.take()).as("active: hidden").containsExactly("dispose " + A);
+                fixture.request(A, Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+                assertThat(fixture.shells.take().getLast()).as("hidden: shown and raised").isEqualTo("toFront " + A);
+                assertThat(fixture.owner.dock().visible(A)).isTrue();
+                assertThat(fixture.owner.area().focusedSlot()).as("no docked frame is the active one").isEmpty();
+            });
+        } finally { edt(() -> ThemeTestSupport.controller(true)); }
+    }
+
+    /** An activating show (a child window's request, a plugin's own toggle after its first open) raises the window, and never hides it. */
+    @Test void anActivatingShowRaisesTheWindowAndNeverHidesIt() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            fixture.floated();
+            fixture.shells.active = true;
+            fixture.request(A, Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(fixture.shells.take()).containsExactly("toFront " + A);
+            assertThat(fixture.owner.dock().visible(A)).isTrue();
+        });
+    }
+
+    /**
+     * Hiding a detached tool window leaves the focus where it is (its window was one of its own); hiding a docked one hands it
+     * back to the selected tab. The selected tab is hosted content, so handing focus back runs its focus target.
+     */
+    @Test void hidingADetachedWindowLeavesFocusAloneAndHidingADockedOneHandsItBack() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            var events = new ArrayList<String>();
+            fixture.model.tabs().open("dev.x", "doc", "Doc", fixture.owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+            fixture.floated();
+            events.clear();
+
+            fixture.shells.events.get(A).closing().run();
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+            assertThat(events).as("its window closed").isEmpty();
+
+            fixture.button().doClick();
+            assertThat(fixture.owner.dock().visible(A)).isTrue();
+            fixture.choose(fixture.detachedMenu(), "Hide");
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+            assertThat(events).as("its Hide item").isEmpty();
+
+            fixture.choose(fixture.stripeMenu(), "Docked");
+            fixture.toggle();
+            events.clear();
+            fixture.toggle();
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+            assertThat(events).as("a docked window hides: back to the tab").containsExactly("focus");
+        });
+    }
+
+    /** Zen hides the detached windows' own windows with the docked ones and brings them back; they stay saved as showing. */
+    @Test void zenHidesDetachedWindowsAndBringsThemBack() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            Rectangle bounds = fixture.floated();
+            var showing = new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.FLOAT,
+                Optional.of(new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height)));
+
+            fixture.owner.toggleZenMode();
+            assertThat(fixture.shells.take()).containsExactly("dispose " + A);
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+            assertThat(fixture.windows().showing(A)).isFalse();
+            assertThat(fixture.state.panel(A)).as("Zen keeps it saved as showing").hasValue(showing);
+
+            fixture.owner.toggleZenMode();
+            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, bounds), "show " + A);
+            assertThat(fixture.owner.dock().visible(A)).isTrue();
+            assertThat(fixture.state.panel(A)).hasValue(showing);
+        });
+    }
+
+    @Test void zenBringsBackDockedAndDetachedWindowsAndClosesTheOnesOpenedInIt() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            String bravo = "dev.x.bravo", charlie = "dev.x.charlie", delta = "dev.x.delta";
+            fixture.addPanel(bravo, "Bravo", Slot.RIGHT_TOP);
+            fixture.addPanel(charlie, "Charlie", Slot.BOTTOM_LEFT);
+            fixture.addPanel(delta, "Delta", Slot.LEFT_BOTTOM);
+            Rectangle bounds = fixture.floated();
+            fixture.request(bravo, Contributions.PanelRequest.Op.SHOW);
+            var deltaBounds = new Rectangle(500, 200, 400, 300);
+            fixture.owner.dock().setBounds(delta, deltaBounds);
+            fixture.owner.dock().setMode(delta, ToolWindowMode.FLOAT);
+            assertThat(fixture.owner.area().content(Slot.RIGHT_TOP)).isNotNull();
+            assertThat(fixture.owner.dock().visible(delta)).as("detached while hidden").isFalse();
+
+            fixture.owner.toggleZenMode();
+            assertThat(fixture.shells.take()).containsExactly("dispose " + A);
+            assertThat(fixture.owner.area().content(Slot.RIGHT_TOP)).as("the docked one hides too").isNull();
+            fixture.request(charlie, Contributions.PanelRequest.Op.SHOW);
+            fixture.request(delta, Contributions.PanelRequest.Op.SHOW);
+            assertThat(fixture.shells.take()).as("a detached window opened in Zen shows")
+                .containsExactly("open " + delta + " FLOAT " + text(deltaBounds), "show " + delta);
+
+            fixture.owner.toggleZenMode();
+            assertThat(fixture.owner.area().content(Slot.RIGHT_TOP)).as("the docked one is back").isNotNull();
+            assertThat(fixture.owner.area().content(Slot.BOTTOM_LEFT)).as("one opened in Zen closes").isNull();
+            assertThat(fixture.owner.dock().visible(delta)).as("the detached one opened in Zen closes").isFalse();
+            assertThat(fixture.owner.dock().visible(A)).as("the detached one that showed before is back").isTrue();
+            assertThat(fixture.shells.take()).containsExactly("dispose " + delta, open(ToolWindowMode.FLOAT, bounds), "show " + A);
+        });
+    }
+
+    /** Move to on a detached tool window's own slot docks it at its own place there and shows it; the checked item is not inert for it. */
+    @Test void moveToItsOwnSlotDocksADetachedWindowThereAndShowsIt() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            String charlie = "dev.x.charlie";
+            fixture.addPanel(charlie, "Charlie", Slot.LEFT_TOP);
+            fixture.floated();
+            assertThat(fixture.owner.dock().ids(Slot.LEFT_TOP)).containsExactly(A, charlie);
+
+            fixture.choose(fixture.stripeMenu(), "Left Top");
+            assertThat(fixture.shells.take()).containsExactly("dispose " + A);
+            assertThat(fixture.owner.dock().mode(A)).isEqualTo(ToolWindowMode.DOCKED);
+            assertThat(fixture.owner.dock().slot(A)).hasValue(Slot.LEFT_TOP);
+            assertThat(fixture.owner.dock().visible(A)).isTrue();
+            assertThat(fixture.owner.dock().ids(Slot.LEFT_TOP)).as("at its own place").containsExactly(A, charlie);
+            assertThat(fixture.owner.area().content(Slot.LEFT_TOP)).isSameAs(fixture.view);
+        });
+    }
+
+    @Test void moveToItsOwnSlotFromTheDetachedHeaderOrWhileHiddenDocksAndShowsIt() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            fixture.floated();
+            fixture.choose(fixture.detachedMenu(), "Left Top");
+            assertThat(fixture.shells.take()).containsExactly("dispose " + A);
+            assertThat(fixture.owner.area().content(Slot.LEFT_TOP)).isSameAs(fixture.view);
+
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+            fixture.choose(fixture.detachedMenu(), "Hide");
+            fixture.shells.take();
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+            fixture.choose(fixture.stripeMenu(), "Left Top");
+            assertThat(fixture.owner.dock().mode(A)).isEqualTo(ToolWindowMode.DOCKED);
+            assertThat(fixture.owner.dock().visible(A)).as("a hidden detached window shows where it docks").isTrue();
+            assertThat(fixture.owner.area().content(Slot.LEFT_TOP)).isSameAs(fixture.view);
+            assertThat(fixture.shells.take()).isEmpty();
+
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Left Top");
+            assertThat(fixture.owner.dock().mode(A)).as("a docked window's own slot stays inert").isEqualTo(ToolWindowMode.DOCKED);
+        });
+    }
+
+    /** A later window in the sync's list whose frame a dock change made in the middle of the sync took opens no window. */
+    @Test void aWindowWhoseFrameWentWhileAnEarlierOneOpenedOpensNoWindow() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), false);
+            String bravo = "dev.x.bravo";
+            fixture.addPanel(bravo, "Bravo", Slot.RIGHT_TOP);
+            fixture.toggle();
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+            fixture.request(bravo, Contributions.PanelRequest.Op.SHOW);
+            fixture.choose(fixture.owner.area().headerOf(Slot.RIGHT_TOP).menu(), "Float");
+            assertThat(fixture.owner.dock().detachedVisible()).containsExactly(A, bravo);
+
+            fixture.shells.duringShow = id -> { if (id.equals(A)) fixture.owner.dock().hide(bravo); };
+            fixture.owner.detachedShells(fixture.shells);
+            List<String> log = fixture.shells.take();
+            assertThat(log).as("only Alpha's window").hasSize(2);
+            assertThat(log.getFirst()).startsWith("open " + A);
+            assertThat(fixture.windows().showing(A)).isTrue();
+            assertThat(fixture.windows().showing(bravo)).isFalse();
+            assertThat(fixture.owner.dock().visible(bravo)).isFalse();
+        });
+    }
+
+    @Test void aWindowHiddenWhileItsShellIsBeingMadeIsDisposedAtOnce() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), false);
+            fixture.toggle();
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+            Rectangle bounds = fixture.owner.dock().bounds(A).orElseThrow();
+            fixture.shells.duringApply = id -> fixture.owner.dock().hide(id);
+            fixture.owner.detachedShells(fixture.shells);
+            assertThat(fixture.shells.take()).as("the shell made for a tool window that is gone is never shown")
+                .containsExactly(open(ToolWindowMode.FLOAT, bounds), "dispose " + A);
+            assertThat(fixture.windows().showing(A)).isFalse();
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+
+            fixture.shells.duringApply = id -> { };
+            fixture.button().doClick();
+            assertThat(fixture.shells.take()).as("and it opens when shown again")
+                .containsExactly(open(ToolWindowMode.FLOAT, bounds), "show " + A, "toFront " + A);
+            assertThat(fixture.windows().showing(A)).isTrue();
+        });
+    }
+
+    @Test void aWindowHiddenInsideItsShowIsDisposedOnce() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), false);
+            fixture.toggle();
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+            Rectangle bounds = fixture.owner.dock().bounds(A).orElseThrow();
+            fixture.shells.duringShow = id -> fixture.owner.dock().hide(id);
+            fixture.owner.detachedShells(fixture.shells);
+            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, bounds), "show " + A, "dispose " + A);
+            assertThat(fixture.windows().showing(A)).isFalse();
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+        });
+    }
+
+    /** A kit view's new header and a moved window reach the shell together; the first hiding the tool window leaves the second nothing to move. */
+    @Test void aWindowHiddenWhileItsFrameIsReplacedIsNotPlacedAfterItsDisposal() throws Exception {
+        edt(() -> {
+            var theme = ThemeTestSupport.generated(true);
+            try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
+                 var view = new KitView(bindings.context(ThemeRoute.CHROME), spec("panel", "header"), event -> { })) {
+                var fixture = new Fixture(UiState.inMemory(), view, true);
+                fixture.toggle();
+                fixture.choose(fixture.stripeMenu(), "Float");
+                fixture.shells.take();
+                fixture.owner.dock().setBounds(A, new Rectangle(700, 300, 420, 360));
+                fixture.shells.duringContent = id -> fixture.owner.dock().hide(id);
+
+                view.update(spec("replacement", "replacement-header"));
+                assertThat(fixture.shells.take()).containsExactly("content " + A, "dispose " + A);
+                assertThat(fixture.windows().showing(A)).isFalse();
+                assertThat(fixture.owner.dock().visible(A)).isFalse();
+            }
         });
     }
 

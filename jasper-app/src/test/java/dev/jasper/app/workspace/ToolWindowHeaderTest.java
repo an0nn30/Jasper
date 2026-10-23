@@ -118,6 +118,21 @@ class ToolWindowHeaderTest {
         assertThat(item(menu(Slot.RIGHT_TOP, false), "Hide").isEnabled()).as("nothing to hide").isFalse();
     }
 
+    /** A detached window's slot is only where its stripe button sits: choosing it docks the window there, so it is not inert. */
+    @Test void theCurrentSlotMovesADetachedWindowButNotADockedOne() {
+        for (ToolWindowMode mode : new ToolWindowMode[] {ToolWindowMode.FLOAT, ToolWindowMode.WINDOW}) {
+            events.clear();
+            JPopupMenu menu = menu(Slot.LEFT_BOTTOM, mode, true);
+            assertThat(((JCheckBoxMenuItem) item(menu, "Left Bottom")).isSelected()).as("still checked").isTrue();
+            item(menu, "Left Bottom").doClick();
+            item(menu, "Bottom Right").doClick();
+            assertThat(events).as(mode + " docks it in its own slot too").containsExactly("move:LEFT_BOTTOM", "move:BOTTOM_RIGHT");
+        }
+        events.clear();
+        item(menu(Slot.LEFT_BOTTOM, ToolWindowMode.DOCKED, true), "Left Bottom").doClick();
+        assertThat(events).as("a docked window is already there").isEmpty();
+    }
+
     @Test void theHeaderShowsThePlainTitleAndHidesOrOpensItsMenu() {
         var header = new ToolWindowHeader("<html><b>Sessions</b>", () -> menu(Slot.LEFT_TOP, true), () -> events.add("hidden"));
         assertThat(header.titleLabel().getText()).isEqualTo("<html><b>Sessions</b>");
