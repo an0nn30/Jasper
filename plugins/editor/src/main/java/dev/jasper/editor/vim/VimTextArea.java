@@ -12,6 +12,7 @@ import java.util.Set;
 import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
+import org.fife.ui.rtextarea.ClipboardHistory;
 import org.fife.ui.rtextarea.RTextAreaUI;
 import org.fife.ui.rtextarea.RUndoManager;
 
@@ -141,10 +142,52 @@ public class VimTextArea extends RSyntaxTextArea {
         history.leave(this, () -> setDocument(createDefaultModel()));
     }
 
+    /** In Vim's Visual mode, Paste from a list (and the Editor's Delete) replaces the Visual area. */
     @Override public void replaceSelection(String text) {
         edits();
-        super.replaceSelection(text);
+        Optional<VimEditor> visual = visualVim();
+        if (visual.isPresent()) visual.get().replaceVisual(text == null ? "" : text);
+        else super.replaceSelection(text);
     }
+
+    /** In Vim's Visual mode, Copy puts the Visual area's text on the clipboard and Visual mode stays (IdeaVim). */
+    @Override public void copy() {
+        Optional<VimEditor> visual = visualVim();
+        if (visual.isPresent()) ClipboardHistory.get().add(visual.get().copyVisual());
+        else super.copy();
+    }
+
+    /** RSyntaxTextArea's Copy key runs this: in Vim's Visual mode, as {@link #copy}. */
+    @Override public void copyAsStyledText() {
+        Optional<VimEditor> visual = visualVim();
+        if (visual.isPresent()) ClipboardHistory.get().add(visual.get().copyVisual());
+        else super.copyAsStyledText();
+    }
+
+    /** In Vim's Visual mode, Cut copies the Visual area's text and deletes the area. */
+    @Override public void cut() {
+        edits();
+        Optional<VimEditor> visual = visualVim();
+        if (visual.isPresent()) ClipboardHistory.get().add(visual.get().cutVisual());
+        else super.cut();
+    }
+
+    /** In Vim's Visual mode, Paste replaces the Visual area with the clipboard's text; with none, Visual mode ends. */
+    @Override public void paste() {
+        edits();
+        Optional<VimEditor> visual = visualVim();
+        if (visual.isEmpty()) {
+            super.paste();
+            return;
+        }
+        VimEditor editor = visual.get();
+        Optional<String> text = editor.vim().host().readClipboard().apply('+');
+        if (text.isPresent() && !text.get().isEmpty()) editor.replaceVisual(text.get());
+        else editor.endVisual();
+    }
+
+    /** @return the attached Vim editor while it is in a Visual mode */
+    private Optional<VimEditor> visualVim() { return vim().filter(VimEditor::visual); }
 
     @Override public void beginAtomicEdit() {
         edits();

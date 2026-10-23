@@ -762,6 +762,9 @@ you turned it off).
 
 - `"+` is the system clipboard and `"*` the selection (the clipboard where there is none); `set clipboard=unnamed`
   (`"*`) or `unnamedplus` (`"+`) makes yanks, deletes and puts without a register use them.
+- In Visual mode the Editor's Copy puts the Visual area's text on the clipboard, as `y` would yank it, and Visual mode
+  stays; Cut copies it and deletes the area; Paste and Paste from a list replace the area. Vim's registers are
+  untouched.
 - Macros: `qa` … `q` records the keys you type into register `a`, `@a` runs them, `5@a` five times, `@@` the last
   register again and `@:` the last command line; `qA` appends to `a`. A macro stops at the first command that fails, so
   one that ends with `@a` runs to the end of the file; `u` undoes everything a macro or mapping changed at once.
